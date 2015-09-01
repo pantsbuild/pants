@@ -1,4 +1,4 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Alexander Johnson
 + Alyssa Pohahau
@@ -52,6 +52,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Jonathan Sokolowski
 + Joshua Cohen
 + Joshua Humphries
++ Justin Trobec
 + Ken Kawamoto
 + Kevin Sweeney
 + Kris Wilson

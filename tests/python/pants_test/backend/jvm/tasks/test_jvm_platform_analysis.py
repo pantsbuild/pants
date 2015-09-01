@@ -117,6 +117,78 @@ class JvmPlatformValidateTest(JvmPlatformAnalysisTestMixin, TaskTestBase):
   def test_inverted_ordering_works(self):
     self.assert_warning(self.bad_targets(), check='warn', children_before_parents=True)
 
+  def construct_interesting_graph(self):
+    """Constructs an "interesting" transitive graph, with a mix of jvm and non-jvm targets.
+
+    Drawn in ascii below, with '->' indicating dependencies, with capital letters indicating
+    JvmTargets and lower-case letters indicating non-JvmTargets.
+
+    A -> B
+      -> c -> D -> l -> N
+           -> f -> G
+           -> e -> q
+
+    Constructed to demonstrate the behavior of jvm_dependency_map on dependency
+    graphs that include many intermediate dependencies which are not JvmTargets.
+    """
+    q = self._plain('q')
+    e = self._plain('e', deps=[q])
+    n = self._java('n')
+    l = self._plain('l', deps=[n])
+    d = self._java('d', deps=[l])
+    g = self._java('g')
+    f = self._plain('f', deps=[g])
+    c = self._plain('c', deps=[d,f,e])
+    b = self._java('b')
+    a = self._java('a', deps=[b,c])
+    return [a,b,c,d,e,f,g,q,n,l]
+
+  def assert_depmaps_equal(self, expected, received):
+    jvm_deps = {target.name: ''.join(sorted({t.name for t in deps}))
+                for target, deps in received.items()}
+    for target, deps in sorted(expected.items()):
+      got = jvm_deps.get(target, ())
+      self.assertEqual(set(deps), set(got), '{}\n  expected {}\n  got {}\n  \n{}'
+                       .format(target, deps, got, '\n'.join(
+        '{}: {}'.format(key, val) for key, val in sorted(jvm_deps.items())
+      )))
+    self.assertEqual(len(filter(expected.get, expected)), len(filter(jvm_deps.get, jvm_deps)))
+
+  def test_non_jvm_transitivity(self):
+    """Tests the behavior of jvm_dependency_map."""
+    expected = {
+      'n': '',
+      'g': '',
+      'q': '',
+      'l': 'n',
+      'd': 'n',
+      'f': 'g',
+      'e': '',
+      'c': 'gd',
+      'b': '',
+      'a': 'gdb',
+    }
+    jvm_deps = self.simple_task(self.construct_interesting_graph())._unfiltered_jvm_dependency_map()
+    self.assert_depmaps_equal(expected, jvm_deps)
+
+  def test_full_transitivity(self):
+    """Tests the behavior of jvm_dependency_map when including all transitive dependencies."""
+    expected = {
+      'n': '',
+      'g': '',
+      'q': '',
+      'l': 'n',
+      'd': 'n',
+      'f': 'g',
+      'e': '',
+      'c': 'gdn',
+      'b': '',
+      'a': 'gdbn',
+    }
+    task = self.simple_task(self.construct_interesting_graph())
+    jvm_deps = task._unfiltered_jvm_dependency_map(fully_transitive=True)
+    self.assert_depmaps_equal(expected, jvm_deps)
+
 
 class JvmPlatformExplainTest(JvmPlatformAnalysisTestMixin, TaskTestBase):
 

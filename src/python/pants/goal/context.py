@@ -20,7 +20,6 @@ from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
-from pants.java.distribution.distribution import Distribution
 from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.reporting.report import Report
 
@@ -123,28 +122,6 @@ class Context(object):
     return self._workspace
 
   @property
-  def java_sysprops(self):
-    """The system properties of the JVM we use."""
-    # TODO: In the future we can use these to hermeticize the Java enivronment rather than relying
-    # on whatever's on the shell's PATH. E.g., you either specify a path to the Java home via a
-    # cmd-line flag or .pantsrc, or we infer one from java.home but verify that the java.version
-    # is a supported version.
-    if self._java_sysprops is None:
-      # TODO(John Sirois): Plumb a sane default distribution through 1 point of control
-      self._java_sysprops = Distribution.cached().system_properties
-    return self._java_sysprops
-
-  @property
-  def java_home(self):
-    """Find the java home for the JVM we use."""
-    # Implementation is a kind-of-insane hack: we run the jvm to get it to emit its
-    # system properties. On some platforms there are so many hard and symbolic links into
-    # the JRE dirs that it's actually quite hard to establish what path to use as the java home,
-    # e.g., for the purpose of rebasing. In practice, this seems to work fine.
-    # Note that for our purposes we take the parent of java.home.
-    return os.path.realpath(os.path.dirname(self.java_sysprops['java.home']))
-
-  @property
   def spec_excludes(self):
     return self._spec_excludes
 
@@ -238,16 +215,18 @@ class Context(object):
     # the post RoundEngine engine - kill the method at that time.
     self._target_roots = list(target_roots)
 
-  def add_new_target(self, address, target_type, dependencies=None, derived_from=None, **kwargs):
+  def add_new_target(self, address, target_type, target_base=None, dependencies=None,
+                     derived_from=None, **kwargs):
     """Creates a new target, adds it to the context and returns it.
 
     This method ensures the target resolves files against the given target_base, creating the
     directory if needed and registering a source root.
     """
-    target_base = os.path.join(get_buildroot(), address.spec_path)
+    target_base = os.path.join(get_buildroot(), target_base or address.spec_path)
     if not os.path.exists(target_base):
       os.makedirs(target_base)
-    SourceRoot.register(address.spec_path)
+    if not SourceRoot.find_by_path(target_base):
+      SourceRoot.register(target_base)
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
 

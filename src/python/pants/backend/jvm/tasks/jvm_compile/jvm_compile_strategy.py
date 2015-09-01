@@ -225,3 +225,10 @@ class JvmCompileStrategy(object):
         lambda: safe_rmtree(analysis_tmpdir))
     safe_mkdir(analysis_tmpdir)
     return analysis_tmpdir
+
+  def parse_deps(self, analysis_file):
+    """Parses the actual source dependencies given an analysis file.
+
+    The dependencies are returned as relative paths.
+    """
+    return self._analysis_parser.parse_deps_from_path(analysis_file)

@@ -3,7 +3,7 @@ package main
 import (
   "flag"
 
-  "contrib/go/examples/src/go/libA"
+  "libA"
 )
 
 func main() {

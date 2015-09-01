@@ -13,7 +13,7 @@ import sbt.{ ConsoleOut, Level }
 import org.junit.runner.RunWith
 import org.scalatest.WordSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.matchers.MustMatchers
+import org.scalatest.MustMatchers
 
 @RunWith(classOf[JUnitRunner])
 class LoggersSpec extends WordSpec with MustMatchers {
@@ -26,7 +26,6 @@ class LoggersSpec extends WordSpec with MustMatchers {
         Loggers.create(
           Level.Debug,
           false,
-          Seq(),
           ConsoleOut.printWriterOut(new PrintWriter(stdout)),
           Some(captureFile)
         )

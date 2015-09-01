@@ -10,6 +10,7 @@ import time
 from collections import defaultdict
 from itertools import chain
 
+from pants.base.source_root import SourceRoot
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -56,7 +57,9 @@ class GoWorkspaceTaskTest(TaskTestBase):
 
   def test_symlink_local_src(self):
     with pushd(self.build_root):
-      spec = 'foo/bar/mylib'
+      SourceRoot.register('src/main/go')
+      spec = 'src/main/go/foo/bar/mylib'
+
       sources = ['x.go', 'y.go', 'z.go']
       for src in sources:
         self.create_file(os.path.join(spec, src))
@@ -66,7 +69,7 @@ class GoWorkspaceTaskTest(TaskTestBase):
       gopath = ws_task.get_gopath(go_lib)
 
       def assert_is_linked(src):
-        link = os.path.join(gopath, 'src', spec, src)
+        link = os.path.join(gopath, 'src/foo/bar/mylib', src)
         self.assertTrue(os.path.islink(link))
         self.assertEqual(os.readlink(link), os.path.join(self.build_root, spec, src))
 
@@ -86,7 +89,7 @@ class GoWorkspaceTaskTest(TaskTestBase):
       for src in chain(sources, ['w.go']):
         assert_is_linked(src)
 
-      mtime = lambda src: os.lstat(os.path.join(gopath, 'src', spec, src)).st_mtime
+      mtime = lambda src: os.lstat(os.path.join(gopath, 'src/foo/bar/mylib', src)).st_mtime
       for src in sources:
         # Ensure none of the old links were overwritten.
         self.assertLessEqual(mtime(src), mtime('w.go') - 1)
@@ -94,20 +97,25 @@ class GoWorkspaceTaskTest(TaskTestBase):
   def test_symlink_remote_lib(self):
     with pushd(self.build_root):
       with temporary_dir() as d:
-        spec = 'github.com/user/lib'
-        src_dir = os.path.join(d, spec)
-        go_remote_lib = self.make_target(spec=spec, target_type=GoRemoteLibrary,
-                                         rev='', zip_url='')
-        context = self.context()
-        context.products.get_data('go_remote_lib_src',
-                                  init_func=lambda: defaultdict(str))[go_remote_lib] = src_dir
-        ws_task = self.create_task(context)
+        SourceRoot.register('3rdparty')
+        spec = '3rdparty/github.com/user/lib'
 
-        # Monkey patch global_import_id to not use source roots when resolving import id.
-        ws_task.global_import_id = lambda target: target.address.spec_path
+        remote_lib_src_dir = os.path.join(d, spec)
+        self.create_file(os.path.join(remote_lib_src_dir, 'file.go'))
+
+        go_remote_lib = self.make_target(spec=spec, target_type=GoRemoteLibrary)
+
+        context = self.context()
+        go_remote_lib_src = context.products.get_data('go_remote_lib_src',
+                                                      init_func=lambda: defaultdict(str))
+        go_remote_lib_src[go_remote_lib] = remote_lib_src_dir
+
+        ws_task = self.create_task(context)
 
         gopath = ws_task.get_gopath(go_remote_lib)
         ws_task._symlink_remote_lib(gopath, go_remote_lib, set())
-        link = os.path.join(gopath, 'src', spec)
-        self.assertTrue(os.path.islink(link))
-        self.assertEqual(os.readlink(link), os.path.join(d, spec))
+        workspace_dir = os.path.join(gopath, 'src/github.com/user/lib')
+        self.assertTrue(os.path.isdir(workspace_dir))
+
+        link = os.path.join(workspace_dir, 'file.go')
+        self.assertEqual(os.readlink(link), os.path.join(remote_lib_src_dir, 'file.go'))

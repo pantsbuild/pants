@@ -29,13 +29,6 @@ class IvyUtilsTestBase(BaseTest):
 
 class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
-  # TODO(John Sirois): increase coverage.
-  # Some examples:
-  # + multiple confs - via with_sources and with_docs for example
-  # + excludes
-  # + classifiers
-  # + with_artifact
-
   def setUp(self):
     super(IvyUtilsGenerateIvyTest, self).setUp()
 

@@ -6,8 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 
+from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
@@ -32,7 +32,7 @@ class GoCompile(GoWorkspaceTask):
     return ['exec_binary']
 
   def execute(self):
-    self.context.products.safe_create_data('exec_binary', lambda: defaultdict(str))
+    self.context.products.safe_create_data('exec_binary', lambda: {})
     with self.invalidated(self.context.targets(self.is_go),
                           invalidate_dependents=True,
                           topological_order=True) as invalidation_check:
@@ -48,19 +48,16 @@ class GoCompile(GoWorkspaceTask):
           binary_path = os.path.join(gopath, 'bin', os.path.basename(vt.target.address.spec_path))
           self.context.products.get_data('exec_binary')[vt.target] = binary_path
         else:
-          lib_binary_path = (vt.target.address.spec_path if self.is_local_lib(vt.target)
-                             else self.global_import_id(vt.target))
-          lib_binary_map[vt.target] = os.path.join(gopath, 'pkg',
-                                                   self.goos_goarch,
-                                                   lib_binary_path) + '.a'
+          lib_binary_map[vt.target] = os.path.join(gopath, 'pkg', self.goos_goarch,
+                                                   vt.target.import_path + '.a')
 
   def _go_install(self, target, gopath):
-    pkg_path = (self.global_import_id(target) if self.is_remote_lib(target)
-                else target.address.spec_path)
-    args = self.get_options().build_flags.split() + [pkg_path]
-    self.go_dist.execute_go_cmd('install', gopath=gopath, args=args,
-                                workunit_factory=self.context.new_workunit,
-                                workunit_labels=[WorkUnitLabel.COMPILER])
+    args = self.get_options().build_flags.split() + [target.import_path]
+    result, go_cmd = self.go_dist.execute_go_cmd('install', gopath=gopath, args=args,
+                                                 workunit_factory=self.context.new_workunit,
+                                                 workunit_labels=[WorkUnitLabel.COMPILER])
+    if result != 0:
+      raise TaskError('{} failed with exit code {}'.format(go_cmd, result))
 
   def _sync_binary_dep_links(self, target, gopath, lib_binary_map):
     """Syncs symlinks under gopath to the library binaries of target's transitive dependencies.

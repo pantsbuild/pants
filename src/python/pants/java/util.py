@@ -12,7 +12,7 @@ from pants.java.nailgun_executor import NailgunExecutor
 
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                  workunit_factory=None, workunit_name=None, workunit_labels=None,
-                 cwd=None, workunit_log_config=None):
+                 cwd=None, workunit_log_config=None, distribution=None):
   """Executes the java program defined by the classpath and main.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -32,7 +32,7 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
   Returns the exit code of the java program.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
   """
-  executor = executor or SubprocessExecutor()
+  executor = executor or SubprocessExecutor(distribution)
   if not isinstance(executor, Executor):
     raise ValueError('The executor argument must be a java Executor instance, give {} of type {}'
                      .format(executor, type(executor)))

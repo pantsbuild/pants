@@ -98,27 +98,18 @@ class AnalysisParser(object):
     """
     raise NotImplementedError()
 
-  def parse_deps_from_path(self, infile_path, classpath_indexer, classes_dir):
-    """An efficient parser of just the src->dep mappings.
-
-    classpath_indexer - a no-arg method that an implementation may call if it needs a mapping
-                        of class->element on the classpath that provides that class.
-                        We use this indirection to avoid unnecessary precomputation.
-    """
+  def parse_deps_from_path(self, infile_path):
+    """An efficient parser of just the src->dep mappings."""
     with open(infile_path, 'rb') as infile:
-      return self.parse_deps(infile, classpath_indexer, classes_dir)
+      return self.parse_deps(infile)
 
-  def parse_deps(self, infile, classpath_indexer, classes_dir):
+  def parse_deps(self, infile):
     """An efficient parser of just the binary, source and external deps sections.
-
-    classpath_indexer - a no-arg method that an implementation may call if it needs a mapping
-                        of class->element on the classpath that provides that class.
-                        We use this indirection to avoid unnecessary precomputation.
 
     Returns a dict of src -> iterable of deps, where each item in deps is either a binary dep,
     source dep or external dep, i.e., either a source file, a class file or a jar file.
 
-    All paths are absolute.
+    All paths are relative.
     """
     raise NotImplementedError()
 

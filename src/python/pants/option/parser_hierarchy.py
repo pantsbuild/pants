@@ -10,6 +10,11 @@ from pants.option.errors import OptionsError
 from pants.option.parser import Parser
 
 
+def enclosing_scope(scope):
+  """Utility function to return the scope immediately enclosing a given scope."""
+  return scope.rpartition('.')[0]
+
+
 class ParserHierarchy(object):
   """A hierarchy of scoped Parser instances.
 
@@ -24,7 +29,7 @@ class ParserHierarchy(object):
     for scope_info in scope_infos:
       scope = scope_info.scope
       parent_parser = (None if scope == GLOBAL_SCOPE else
-                       self._parser_by_scope[scope.rpartition('.')[0]])
+                       self._parser_by_scope[enclosing_scope(scope)])
       self._parser_by_scope[scope] = Parser(env, config, scope_info, parent_parser)
 
   def get_parser_by_scope(self, scope):

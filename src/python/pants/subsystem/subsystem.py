@@ -9,13 +9,14 @@ from twitter.common.collections import OrderedSet
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin, SubsystemDependency
 
 
 class SubsystemError(Exception):
   """An error in a subsystem."""
 
 
-class Subsystem(Optionable):
+class Subsystem(SubsystemClientMixin, Optionable):
   """A separable piece of functionality that may be reused across multiple tasks or other code.
 
   Subsystems encapsulate the configuration and initialization of things like JVMs,
@@ -32,8 +33,16 @@ class Subsystem(Optionable):
 
   For example, the global artifact cache options would be in scope `cache`, but the
   compile.java task can override those options in scope `cache.compile.java`.
+
+  Subsystems may depend on other subsystems, and therefore mix in SubsystemClientMixin.
   """
   options_scope_category = ScopeInfo.SUBSYSTEM
+
+  class UninitializedSubsystemError(SubsystemError):
+    def __init__(self, class_name, scope):
+      super(Subsystem.UninitializedSubsystemError, self).__init__(
+        'Subsystem "{}" not initialized for scope "{}". '
+        'Is subsystem missing from subsystem_dependencies() in a task? '.format(class_name, scope))
 
   class CycleException(Exception):
     """Thrown when a circular dependency is detected."""
@@ -41,6 +50,14 @@ class Subsystem(Optionable):
       message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
           '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
       super(Subsystem.CycleException, self).__init__(message)
+
+  @classmethod
+  def scoped(cls, optionable):
+    """Returns a dependency on this subsystem, scoped to `optionable`.
+
+    Return value is suitable for use in SubsystemClientMixin.subsystem_dependencies().
+    """
+    return SubsystemDependency(cls, optionable.options_scope)
 
   @classmethod
   def get_scope_info(cls, subscope=None):
@@ -70,7 +87,7 @@ class Subsystem(Optionable):
       path.add(subsystem)
       if subsystem not in known_subsystem_types:
         known_subsystem_types.add(subsystem)
-        for dependency in subsystem.dependencies():
+        for dependency in subsystem.subsystem_dependencies():
           collect_subsystems(dependency)
       path.remove(subsystem)
 
@@ -78,14 +95,6 @@ class Subsystem(Optionable):
       collect_subsystems(subsystem_type)
 
     return known_subsystem_types
-
-  @classmethod
-  def dependencies(cls):
-    """The subsystems this subsystem uses.
-
-    A tuple of subsystem types.
-    """
-    return tuple()
 
   @classmethod
   def subscope(cls, scope):
@@ -125,7 +134,7 @@ class Subsystem(Optionable):
   @classmethod
   def _instance_for_scope(cls, scope):
     if cls._options is None:
-      raise SubsystemError('Subsystem not initialized yet.')
+      raise cls.UninitializedSubsystemError(cls.__name__, scope)
     key = (cls, scope)
     if key not in cls._scoped_instances:
       cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))

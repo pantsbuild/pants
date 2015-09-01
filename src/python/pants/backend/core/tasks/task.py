@@ -25,10 +25,11 @@ from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.meta import AbstractClass
 
 
-class TaskBase(Optionable, AbstractClass):
+class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 
@@ -104,8 +105,9 @@ class TaskBase(Optionable, AbstractClass):
     # The task's own scope.
     yield cls.get_scope_info()
     # The scopes of any task-specific subsystems it uses.
-    for subsystem in cls.task_subsystems():
-      yield subsystem.get_scope_info(subscope=cls.options_scope)
+    for dep in cls.subsystem_dependencies_iter():
+      if not dep.is_global():
+        yield dep.subsystem_cls.get_scope_info(subscope=dep.scope)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -223,9 +225,8 @@ class TaskBase(Optionable, AbstractClass):
     if not self._fingerprint:
       hasher = sha1()
       hasher.update(self._options_fingerprint(self.options_scope))
-      for subsystem in self.task_subsystems():
-        hasher.update(self._options_fingerprint(subsystem.subscope(self.options_scope)))
-        hasher.update(self._options_fingerprint(subsystem.options_scope))
+      for dep in self.subsystem_dependencies_iter():
+        hasher.update(self._options_fingerprint(dep.options_scope()))
       self._fingerprint = str(hasher.hexdigest())
     return self._fingerprint
 

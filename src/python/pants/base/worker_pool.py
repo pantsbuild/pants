@@ -50,6 +50,8 @@ class WorkerPool(object):
 
     self._shutdown_hooks = []
 
+    self.num_workers = num_workers
+
   def add_shutdown_hook(self, hook):
     self._shutdown_hooks.append(hook)
 

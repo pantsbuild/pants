@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.memo import memoized
 
@@ -16,6 +16,10 @@ class JavadocGen(JvmdocGen):
   @memoized
   def jvmdoc(cls):
     return Jvmdoc(tool_name='javadoc', product_type='javadoc')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JavadocGen, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def execute(self):
     def is_java(target):
@@ -32,7 +36,7 @@ class JavadocGen(JvmdocGen):
       return None
 
     # Without a JDK/tools.jar we have no javadoc tool and cannot proceed, so check/acquire early.
-    jdk = Distribution.cached(jdk=True)
+    jdk = DistributionLocator.cached(jdk=True)
     tool_classpath = jdk.find_libs(['tools.jar'])
 
     args = ['-quiet',

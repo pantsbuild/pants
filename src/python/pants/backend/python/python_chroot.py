@@ -47,8 +47,6 @@ class PythonChroot(object):
     PythonTests: 'tests'
   }
 
-  MEMOIZED_THRIFTS = {}
-
   class InvalidDependencyException(Exception):
     def __init__(self, target):
       Exception.__init__(self, "Not a valid Python dependency! Found: {}".format(target))
@@ -197,11 +195,8 @@ class PythonChroot(object):
 
     generated_reqs = OrderedSet()
     if targets['thrifts']:
-      for thr in set(targets['thrifts']):
-        if thr not in self.MEMOIZED_THRIFTS:
-          self.MEMOIZED_THRIFTS[thr] = self._generate_thrift_requirement(thr)
-        generated_reqs.add(self.MEMOIZED_THRIFTS[thr])
-
+      for thr in targets['thrifts']:
+        generated_reqs.add(self._generate_thrift_requirement(thr))
       generated_reqs.add(PythonRequirement('thrift', use_2to3=True))
 
     for antlr in targets['antlrs']:
@@ -255,13 +250,14 @@ class PythonChroot(object):
     context = self._python_repos.get_network_context()
 
     for platform in platforms:
+      requirements_cache_dir = os.path.join(self._python_setup.resolver_cache_dir, str(self._interpreter.identity))
       distributions[platform] = resolve(
         requirements=[req.requirement for req in requirements],
         interpreter=self._interpreter,
         fetchers=fetchers,
         platform=platform,
         context=context,
-        cache=self._python_setup.resolver_cache_dir,
+        cache=requirements_cache_dir,
         cache_ttl=self._python_setup.resolver_cache_ttl)
 
     return distributions

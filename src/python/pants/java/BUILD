@@ -8,7 +8,6 @@ python_library(
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
-    'src/python/pants/java/distribution:distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',

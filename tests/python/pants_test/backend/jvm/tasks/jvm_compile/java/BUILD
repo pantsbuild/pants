@@ -5,9 +5,7 @@ target(
   name='java',
   dependencies=[
     ':jmake_analysis',
-    ':java_compile_jvm_platform_integration',
     ':java_compile_settings_partitioning',
-    ':zinc_compile_jvm_platform_integration',
   ],
 )
 
@@ -44,7 +42,7 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ]
 )
 

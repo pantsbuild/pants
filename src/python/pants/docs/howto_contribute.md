@@ -19,12 +19,8 @@ pants developers.
 
 Join the [pantsbuild Slack team](https://pantsbuild.slack.com) and hop on the
 `#general` channel for higher bandwidth questions and answers about hacking on
-or using pants. You can [send yourself an invite](https://pantsslack.herokuapp.com/) or ask for one on the
-[pants-devel Google group][pants-devel].
-
-Join the [pants-reviews Google
-Group](https://groups.google.com/forum/#!forum/pants-reviews) to see
-many code reviews.
+or using pants. You can [send yourself an invite](https://pantsslack.herokuapp.com/) or ask for one
+on the [pants-devel Google group][pants-devel].
 
 Watch the [pantsbuild/pants Github
 project](https://github.com/pantsbuild/pants) for notifications of new
@@ -157,9 +153,20 @@ Now that your change is complete, post it for review. We use `rbcommons.com` to 
 
 #### Posting the First Draft
 
-**Before posting your first review,** you must create an account at
-<https://rbcommons.com> . To create one, visit
-<https://rbcommons.com/account/login/> and click "Create one now."
+**Before posting your first review,** you need to both subscribe to the [pants-reviews
+Google Group](https://groups.google.com/forum/#!forum/pants-reviews) and create an
+[RBCommons](https://rbcommons.com) account.  Its critical that the email address you use for each
+of these is the same, and it's also recommended that you have that same email address registered as
+one of your [email addresses](https://github.com/settings/emails) with Github.
+
+_A special warning to `@twitter.com` contributors:_ The twitter.com email domain does not permit
+emails being sent on behalf of its members by RBCommons. As such, you should use a personal email
+address or some other non-`@twitter.com` email address to subscribe to both RBCommons and
+pants-reviews.
+
+To create your RBCommons account, visit <https://rbcommons.com/account/login/> and click "Create
+one now.".  To sign up for pants-reviews@googlegroups.com, just browse to
+<https://groups.google.com/forum/#!forum/pants-reviews/join>.
 
 To set up local tools, run `./rbt help`. (`./rbt` is a wrapper around
 the usual RBTools [rbt](http://www.reviewboard.org/docs/rbtools/dev/)

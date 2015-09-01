@@ -440,9 +440,10 @@ class PytestRun(PythonTask):
       self.context.log.info(traceback.format_exc())
       return PythonTestResult.exception()
 
-  # Pattern for lines such as:
+  # Pattern for lines such as ones below.  The second one is from a test inside a class.
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
-  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+)::(.+)')
+  # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
+  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+?)::(.+)')
 
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):

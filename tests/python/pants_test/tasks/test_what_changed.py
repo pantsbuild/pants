@@ -7,14 +7,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
+from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.core.from_target import FromTarget
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import RGlobs
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
@@ -31,13 +34,16 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
         'java_library': JavaLibrary,
         'python_library': PythonLibrary,
         'jar_library': JarLibrary,
+        'unpacked_jars': UnpackedJars,
         'resources': Resources,
         'java_thrift_library': JavaThriftLibrary,
+        'java_protobuf_library': JavaProtobufLibrary,
         'python_thrift_library': PythonThriftLibrary,
       },
       context_aware_object_factories={
         'source_root': SourceRoot.factory,
-        'rglobs': RGlobs,
+        'rglobs': RGlobs.factory,
+        'from_target': FromTarget,
       },
       objects={
         'jar': JarDependency,
@@ -327,4 +333,31 @@ class WhatChangedTest(BaseWhatChangedTest):
       'root/src/py/dependency_tree/c:c',
       options={'include_dependees': 'transitive', 'exclude_target_regexp': [':b']},
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
+    )
+
+  def test_deferred_sources(self):
+    self.add_to_build_file('root/proto', dedent("""
+      java_protobuf_library(name='unpacked_jars',
+        sources=from_target(':external-source'),
+      )
+
+      unpacked_jars(name='external-source',
+        libraries=[':external-source-jars'],
+        include_patterns=[
+          'com/squareup/testing/**/*.proto',
+        ],
+      )
+
+      jar_library(name='external-source-jars',
+        jars=[
+          jar(org='com.squareup.testing.protolib', name='protolib-external-test', rev='0.0.2'),
+        ],
+      )
+    """))
+
+    self.assert_console_output(
+      'root/proto:unpacked_jars',
+      'root/proto:external-source',
+      'root/proto:external-source-jars',
+      workspace=self.workspace(files=['root/proto/BUILD'])
     )

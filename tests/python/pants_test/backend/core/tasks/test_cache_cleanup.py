@@ -15,6 +15,11 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class CacheCleanupTest(PantsRunIntegrationTest):
 
+  def create_platform_args(self, version):
+    return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""
+             .format(version=version)),
+            '--jvm-platform-default-platform=default']
+
   def test_leave_one(self):
     """ Ensure that max-old of 1 removes all but one files"""
 
@@ -30,7 +35,8 @@ class CacheCleanupTest(PantsRunIntegrationTest):
 
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile.java',
+      pants_run = self.run_pants(self.create_platform_args(6) +
+                                 ['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                   '--cache-max-entries-per-target=1'],
                                  config=config)
@@ -40,8 +46,8 @@ class CacheCleanupTest(PantsRunIntegrationTest):
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
       # Rerun for java 7
-      pants_run = self.run_pants(['compile.java',
-                                  '--target=1.7',
+      pants_run = self.run_pants(self.create_platform_args(7) +
+                                 ['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                   '--cache-max-entries-per-target=1'],
                                  config)
@@ -69,7 +75,8 @@ class CacheCleanupTest(PantsRunIntegrationTest):
 
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile.java',
+      pants_run = self.run_pants(self.create_platform_args(6) +
+                                 ['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                   '--cache-max-entries-per-target=0'],
                                  config=config)
@@ -80,8 +87,8 @@ class CacheCleanupTest(PantsRunIntegrationTest):
       self.assertEqual(len(os.listdir(artifact_dir)), 6)
 
       # Rerun for java 7
-      pants_run = self.run_pants(['compile.java',
-                                  '--target=1.7',
+      pants_run = self.run_pants(self.create_platform_args(7) +
+                                 ['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                   '--cache-max-entries-per-target=0'],
                                  config)

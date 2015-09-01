@@ -17,15 +17,15 @@ class ThriftBinary(object):
     options_scope = 'thrift-binary'
 
     @classmethod
-    def dependencies(cls):
+    def subsystem_dependencies(cls):
       return (BinaryUtil.Factory,)
 
     @classmethod
     def register_options(cls, register):
-      register('--supportdir', recursive=True, advanced=True, default='bin/thrift',
+      register('--supportdir', advanced=True, default='bin/thrift',
                help='Find thrift binaries under this dir.   Used as part of the path to lookup the'
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', recursive=True, advanced=True, default='0.9.2', fingerprint=True,
+      register('--version', advanced=True, default='0.9.2', fingerprint=True,
                help='Thrift compiler version.   Used as part of the path to lookup the'
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
 

@@ -9,4 +9,4 @@ from pants.contrib.go.targets.go_local_source import GoLocalSource
 
 
 class GoBinary(GoLocalSource):
-  pass
+  """Represents a local Go main package."""

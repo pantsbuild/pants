@@ -197,6 +197,11 @@ class DeferredSourcesField(SourcesField):
       raise self.NotPopulatedError()
     return self._source_paths
 
+  def matches(self, path):
+    if not self._populated:
+      raise self.NotPopulatedError()
+    return wrapped_globs.matches_filespec(path, self.filespec)
+
   def _compute_fingerprint(self):
     """A subclass must provide an implementation of _compute_fingerprint that can return a valid
     fingerprint even if the sources aren't unpacked yet.

@@ -27,7 +27,9 @@ class ScalaCompileIntegrationTest(BaseCompileIT):
       self.assertTrue(self.get_only(found, SHAPELESS_CLSNAME).endswith(SHAPELESS_CLSFILE))
 
   def test_scala_isolated_compile_jar(self):
-    jar_suffix = 'testprojects.src.scala.org.pantsbuild.testproject.unicode.shapeless.shapeless.jar'
+    # NB: generated with:
+    #   hashlib.sha1('testprojects.src.scala.org.pantsbuild.testproject.unicode.shapeless.shapeless').hexdigest()[:12]
+    jar_suffix = 'fd9f49e1153b.jar'
     with self.do_test_compile(SHAPELESS_TARGET,
                               'isolated',
                               expected_files=[jar_suffix]) as found:

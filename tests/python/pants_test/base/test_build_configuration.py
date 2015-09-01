@@ -9,7 +9,7 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_graph import BuildGraph
@@ -49,7 +49,7 @@ class BuildConfigurationTest(unittest.TestCase):
     with self.assertRaises(TypeError):
       self.build_configuration.register_target_alias('fred', object())
 
-    target = Target('fred', SyntheticAddress.parse('a:b'), BuildGraph(address_mapper=None))
+    target = Target('fred', Address.parse('a:b'), BuildGraph(address_mapper=None))
     with self.assertRaises(TypeError):
       self.build_configuration.register_target_alias('fred', target)
 

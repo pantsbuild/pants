@@ -14,7 +14,6 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.java import util
 
 
 logger = logging.getLogger(__name__)
@@ -76,8 +75,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
       antlr_classpath = self.tool_classpath(compiler)
       sources = self._calculate_sources([target])
       args.extend(sources)
-      result = util.execute_java(classpath=antlr_classpath, main=java_main,
-                                 args=args, workunit_name='antlr')
+      result = self.runjava(classpath=antlr_classpath, main=java_main, args=args,
+                            workunit_name='antlr')
       if result != 0:
         raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
 

@@ -7,7 +7,7 @@
 # will create a review with the specified names as reviewers, with pants-reviews as a group,
 # and with the other flags passed through to rbt.
 
-NAME_REGEX="[a-z].+"
+NAME_REGEX="^[a-zA-Z][a-zA-Z_.-]+$"
 REVIEWERS=""
 
 while [[ $1 ]] && [[ $1 =~ ${NAME_REGEX} ]]; do
@@ -21,4 +21,4 @@ if [[ ${REVIEWERS} ]]; then
   REVIEWERS_FLAG="--target-people=${REVIEWERS}"
 fi
 
-./rbt post -o -g --target-groups=pants-reviews ${REVIEWERS_FLAG} "$@"
+./rbt post -o -g ${REVIEWERS_FLAG} "$@"

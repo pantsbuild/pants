@@ -12,11 +12,13 @@ from collections import defaultdict
 
 from twitter.common.collections.orderedset import OrderedSet
 
+from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.project_info.tasks.projectutils import get_jar_infos
+from pants.base.address import BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -43,9 +45,6 @@ def is_java(target):
 
 
 class IdeGen(JvmToolTaskMixin, Task):
-
-  RESOURCES = "java-resource"
-  TEST_RESOURCES = "java-test-resource"
 
   @classmethod
   def register_options(cls, register):
@@ -181,7 +180,8 @@ class IdeGen(JvmToolTaskMixin, Task):
     self.configure_compile_context(targets)
 
   def configure_project(self, targets, debug_port):
-    jvm_targets = [t for t in targets if t.has_label('jvm') or t.has_label('java')]
+    jvm_targets = [t for t in targets if t.has_label('jvm') or t.has_label('java') or
+                   isinstance(t, Resources)]
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
     project = Project(self.project_name,
@@ -355,21 +355,21 @@ class ClasspathEntry(object):
 class SourceSet(object):
   """Models a set of source files."""
 
-  def __init__(self, root_dir, source_base, path, is_test, content_type=''):
+  def __init__(self, root_dir, source_base, path, is_test=False, resources_only=False):
     """
     :param string root_dir: full path to the root of the project containing this source set
     :param string source_base: the relative path from root_dir to the base of this source set
     :param string path: relative path from the source_base to the base of the sources in this set
-    :param bool is_test: true iff the sources contained by this set implement test cases
-    :param string content_type: Content type resources or test resources for scala/java project
+    :param bool is_test: true if the sources contained by this set implement test cases
+    :param bool resources_only: true if a target has resources but no sources.
     """
 
     self.root_dir = root_dir
     self.source_base = source_base
     self.path = path
     self.is_test = is_test
+    self.resources_only = resources_only
     self._excludes = []
-    self.content_type = content_type
 
   @property
   def excludes(self):
@@ -393,6 +393,15 @@ class SourceSet(object):
   def __hash__(self):
     return hash(self._key_tuple)
 
+  def __repr__(self):
+    return "root_dir={} source_base={} path={} is_test={} resources_only={} _excludes={}".format(
+      self.root_dir,
+      self.source_base,
+      self.path,
+      self.is_test,
+      self.resources_only,
+      self._excludes)
+
 
 class Project(object):
   """Models a generic IDE project that is comprised of a set of BUILD targets."""
@@ -415,19 +424,19 @@ class Project(object):
     a test path.  This method will give unpredictable results if source root entries overlap.
 
     :param list source_sets: SourceSets to analyze
-    :returns: list of SourceSets collapsed to the source root paths.
+    :returns: list of SourceSets collapsed to the source root paths.  There may be duplicate
+      entries in this list which will be removed by dedup_sources()
     """
-
-    roots_found = set()  # remember the roots we've already encountered
     collapsed_source_sets = []
     for source in source_sets:
       query = os.path.join(source.source_base, source.path)
       source_root = SourceRoot.find_by_path(query)
       if not source_root:
         collapsed_source_sets.append(source)
-      elif not source_root in roots_found:
-        roots_found.add(source_root)
-        collapsed_source_sets.append(SourceSet(source.root_dir, source_root, "", source.is_test))
+      else:
+        collapsed_source_sets.append(SourceSet(source.root_dir, source_root, "",
+                                               is_test=source.is_test,
+                                               resources_only=source.resources_only))
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
@@ -441,7 +450,7 @@ class Project(object):
     self.targets = OrderedSet(targets)
     self.transitive = transitive
 
-    self.sources = set()
+    self.sources = []
     self.py_sources = []
     self.py_libs = []
     self.resource_extensions = set()
@@ -460,12 +469,35 @@ class Project(object):
     self.spec_excludes = spec_excludes
 
   def configure_python(self, source_roots, test_roots, lib_roots):
-    self.py_sources.extend(SourceSet(get_buildroot(), root, None, False) for root in source_roots)
-    self.py_sources.extend(SourceSet(get_buildroot(), root, None, True) for root in test_roots)
+    self.py_sources.extend(SourceSet(get_buildroot(), root, None) for root in source_roots)
+    self.py_sources.extend(SourceSet(get_buildroot(), root, None, is_test=True) for root in test_roots)
     for root in lib_roots:
       for path in os.listdir(os.path.join(get_buildroot(), root)):
         if os.path.isdir(os.path.join(get_buildroot(), root, path)) or path.endswith('.egg'):
-          self.py_libs.append(SourceSet(get_buildroot(), root, path, False))
+          self.py_libs.append(SourceSet(get_buildroot(), root, path, is_test=False))
+
+  @classmethod
+  def dedup_sources(cls, source_set_list):
+    """Remove duplicate source sets from the source_set_list.
+
+      Sometimes two targets with the same path are added to the source set. Remove duplicates
+      with the following rules:
+
+      1) If two targets are resources_only with different settings for is_test, is_test = False
+      2) If the targets have different settings for resources_only, resources_only = False
+      3) If the two non-resource-only targets have different settings for is_test, is_test = True
+    """
+    deduped_sources = set(filter(lambda s: not s.resources_only and s.is_test,
+                                 source_set_list))
+    deduped_sources.update(filter(lambda s: not s.resources_only,
+                                  source_set_list))
+    deduped_sources.update(filter(lambda s : s.resources_only and not s.is_test,
+                                  source_set_list))
+    deduped_sources.update(filter(lambda s : s.resources_only and s.is_test,
+                                  source_set_list))
+
+    # re-sort the list, makes the generated project easier to read.
+    return sorted(list(deduped_sources))
 
   def configure_jvm(self, extra_source_paths, extra_test_paths):
     """
@@ -477,7 +509,7 @@ class Project(object):
     # TODO(John Sirois): much waste lies here, revisit structuring for more readable and efficient
     # construction of source sets and excludes ... and add a test!
 
-    analyzed = OrderedSet()
+    analyzed_targets = OrderedSet()
     targeted = set()
 
     def relative_sources(target):
@@ -491,7 +523,7 @@ class Project(object):
                not (self.skip_scala and is_scala(target))))
       return result
 
-    def configure_source_sets(relative_base, sources, is_test, content_type=''):
+    def configure_source_sets(relative_base, sources, is_test=False, resources_only=False):
       absolute_base = os.path.join(self.root_dir, relative_base)
       paths = set([os.path.dirname(source) for source in sources])
       for path in paths:
@@ -499,15 +531,9 @@ class Project(object):
         # Note, this can add duplicate source paths to self.sources().  We'll de-dup them later,
         # because we want to prefer test paths.
         targeted.add(absolute_path)
-        source_set = SourceSet(self.root_dir, relative_base, path, is_test, content_type)
-        if source_set in self.sources and content_type:
-         # Note, same resource can be added twice.
-         # 1. Once with the content_type attached with target.has_resources loop
-         # 2. Second without content_type from command line target.
-         # We do not want to skip resources in flow 2 as we can have resources on the command line
-         # which are not attached to any target.
-         self.sources.remove(source_set)
-        self.sources.add(source_set)
+        source_set = SourceSet(self.root_dir, relative_base, path,
+                               is_test=is_test, resources_only=resources_only)
+        self.sources.append(source_set)
 
     def find_source_basedirs(target):
       dirs = set()
@@ -518,8 +544,8 @@ class Project(object):
       return dirs
 
     def configure_target(target):
-      if target not in analyzed:
-        analyzed.add(target)
+      if target not in analyzed_targets:
+        analyzed_targets.add(target)
         self.has_scala = not self.skip_scala and (self.has_scala or is_scala(target))
 
         # Hack for java_sources and Eclipse/IntelliJ: add java_sources to project
@@ -527,24 +553,22 @@ class Project(object):
           for java_source in target.java_sources:
             configure_target(java_source)
 
+        # Resources are already in the target set
         if target.has_resources:
           resources_by_basedir = defaultdict(set)
           for resources in target.resources:
+            analyzed_targets.add(resources)
             resources_by_basedir[resources.target_base].update(relative_sources(resources))
           for basedir, resources in resources_by_basedir.items():
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
-            if target.is_test:
-              configure_source_sets(basedir, resources, is_test=target.is_test,
-                                    content_type=IdeGen.TEST_RESOURCES)
-            else:
-              configure_source_sets(basedir, resources, is_test=target.is_test,
-                                    content_type=IdeGen.RESOURCES)
-
+            configure_source_sets(basedir, resources, is_test=target.is_test,
+                                  resources_only=True)
         if target.has_sources():
           test = target.is_test
           self.has_tests = self.has_tests or test
           base = target.target_base
-          configure_source_sets(base, relative_sources(target), is_test=test)
+          configure_source_sets(base, relative_sources(target), is_test=test,
+                                resources_only=isinstance(target, Resources))
 
         # TODO(Garrett Malmquist): This is dead code, and should be redone/reintegrated.
         # Other BUILD files may specify sources in the same directory as this target. Those BUILD
@@ -552,8 +576,8 @@ class Project(object):
         # this target globs children as well.  Gather all these candidate BUILD files to test for
         # sources they own that live in the directories this targets sources live in.
         target_dirset = find_source_basedirs(target)
-        if target.address.is_synthetic:
-          return []  # Siblings don't make sense for synthetic addresses.
+        if not isinstance(target.address, BuildFileAddress):
+          return []  # Siblings only make sense for BUILD files.
         candidates = self.target_util.get_all_addresses(target.address.build_file)
         for ancestor in target.address.build_file.ancestors():
           candidates.update(self.target_util.get_all_addresses(ancestor))
@@ -567,23 +591,21 @@ class Project(object):
 
         return filter(is_sibling, [self.target_util.get(a) for a in candidates if a != target.address])
 
+    resource_targets = []
     for target in self.targets:
-      target.walk(configure_target, predicate=source_target)
+      if isinstance(target, Resources):
+        # Wait to process these until all resources that are reachable from other targets are
+        # processed.  That way we'll only add a new SourceSet if this target has never been seen
+        # before. This allows test resource SourceSets to be properly keep the is_test property.
+        resource_targets.append(target)
+      else:
+        target.walk(configure_target, predicate=source_target)
+
+    for target in resource_targets:
+      target.walk(configure_target)
 
     def full_path(source_set):
       return os.path.join(source_set.root_dir, source_set.source_base, source_set.path)
-
-    def dedup_sources(source_set_list):
-      """Sometimes two targets with the same path are added to the source set. One is a target where
-       is_test evaluates to True and the other were it evaluates to False.  When this happens,
-       make sure we prefer the SourceSet with is_test set to True.
-      """
-      deduped_sources = set(filter(lambda source_set: source_set.is_test, source_set_list))
-      for source_set in source_set_list:
-        if not source_set.is_test and source_set not in deduped_sources:
-          deduped_sources.add(source_set)
-      # re-sort the list, makes the generated project easier to read.
-      return sorted(list(deduped_sources))
 
     # Check if there are any overlapping source_sets, and output an error message if so.
     # Overlapping source_sets cause serious problems with package name inference.
@@ -639,12 +661,12 @@ class Project(object):
     targets = OrderedSet()
     for target in self.targets:
       target.walk(lambda target: targets.add(target), source_target)
-    targets.update(analyzed - targets)
-    self.sources.update(SourceSet(get_buildroot(), p, None, False) for p in extra_source_paths)
-    self.sources.update(SourceSet(get_buildroot(), p, None, True) for p in extra_test_paths)
+    targets.update(analyzed_targets - targets)
+    self.sources.extend(SourceSet(get_buildroot(), p, None, is_test=False) for p in extra_source_paths)
+    self.sources.extend(SourceSet(get_buildroot(), p, None, is_test=True) for p in extra_test_paths)
     if self.use_source_root:
       self.sources = Project._collapse_by_source_root(self.sources)
-    self.sources = dedup_sources(self.sources)
+    self.sources = self.dedup_sources(self.sources)
 
     return targets
 

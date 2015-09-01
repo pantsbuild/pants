@@ -57,7 +57,6 @@ target(
     ':jvm_bundle_integration',
     ':jvm_run_integration',
     ':protobuf_integration',
-    ':wire_integration',
   ],
 )
 
@@ -357,15 +356,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'wire_integration',
-  sources = ['test_wire_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_tests(
   name = 'roots',
   sources = ['test_roots.py'],
   dependencies = [
@@ -439,10 +429,8 @@ python_tests(
   name = 'group_task',
   sources = ['test_group_task.py'],
   dependencies = [
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:group_task',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:target',
     'src/python/pants/engine:engine',
     'tests/python/pants_test:base_test',
