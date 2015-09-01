@@ -32,7 +32,7 @@ class ResolvedJar(object):
 
 
 class M2Coordinate(object):
-  """Represents a fully qualified name of an artifact in a M2 repository."""
+  """Represents a fully qualified name of an artifact."""
 
   def __init__(self, org, name, rev=None, classifier=None, type_='jar'):
     """

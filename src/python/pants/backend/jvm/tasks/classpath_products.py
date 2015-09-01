@@ -128,20 +128,16 @@ class ClasspathProducts(object):
     self._classpaths.add_for_target(target, elements)
 
   def _validate_classpath_tuples(self, classpath, target):
-    """Validates that all files are located within the working copy, to simplify relativization."""
-    for classpath_tuple in classpath:
-      self._validate_path_in_buildroot(classpath_tuple, target)
+    """Validates that all files are located within the working copy, to simplify relativization.
 
-  def _validate_path_in_buildroot(self, classpath_tuple, target):
-    """Validates that a classpath element is in the build root.
-
-    :param classpath_tuple: a 2-tuple of ivy_conf and ClasspathEntry
+    :param classpath: The list of classpath tuples. Each tuple is a 2-tuple of ivy_conf and ClasspathEntry
     :param target: The target that the classpath tuple is being registered for
     :raises: `TaskError` when the path is outside the build root
     """
-    conf, classpath_entry = classpath_tuple
-    path = classpath_entry.path
-    if os.path.relpath(path, self._buildroot).startswith(os.pardir):
-      raise TaskError(
-        'Classpath entry {} for target {} is located outside the buildroot.'
-        .format(path, target.address.spec))
+    for classpath_tuple in classpath:
+      conf, classpath_entry = classpath_tuple
+      path = classpath_entry.path
+      if os.path.relpath(path, self._buildroot).startswith(os.pardir):
+        raise TaskError(
+          'Classpath entry {} for target {} is located outside the buildroot.'
+          .format(path, target.address.spec))
