@@ -30,8 +30,8 @@ from pants.util.dirutil import relativize_paths, safe_open
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 
 
-class ZincCompile(JvmCompile):
-  """Compile Scala and Java code using Zinc."""
+class BaseZincCompile(JvmCompile):
+  """A base class for GroupTask GroupMembers that compile code using Zinc."""
 
   _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
 
@@ -54,7 +54,7 @@ class ZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
+    return super(BaseZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -70,11 +70,7 @@ class ZincCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(ZincCompile, cls).register_options(register)
-    register('--plugins', advanced=True, action='append', fingerprint=True,
-             help='Use these scalac plugins.')
-    register('--plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
-             help='Map from plugin name to list of arguments for that plugin.')
+    super(BaseZincCompile, cls).register_options(register)
     register('--name-hashing', advanced=True, action='store_true', default=False, fingerprint=True,
              help='Use zinc name hashing.')
 
@@ -93,21 +89,11 @@ class ZincCompile(JvmCompile):
     cls.register_jvm_tool(register, 'compiler-interface')
     cls.register_jvm_tool(register, 'sbt-interface')
 
-    cls.register_jvm_tool(register, 'plugin-jars', default=[])
-
   def select(self, target):
-    return target.has_sources('.java') or target.has_sources('.scala')
+    raise NotImplementedError()
 
   def select_source(self, source_file_path):
-    return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
-
-  def __init__(self, *args, **kwargs):
-    super(ZincCompile, self).__init__(*args, **kwargs)
-
-    # A directory independent of any other classpath which can contain per-target
-    # plugin resource files.
-    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
-    self._lazy_plugin_args = None
+    raise NotImplementedError()
 
   def create_analysis_tools(self):
     return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis)
@@ -129,9 +115,6 @@ class ZincCompile(JvmCompile):
     return ScalaPlatform.global_instance().compiler_classpath(self.context.products)
 
   def extra_compile_time_classpath_elements(self):
-    return []
-
-  def plugin_jars(self):
     return []
 
   def plugin_args(self):
@@ -202,3 +185,33 @@ class ZincCompile(JvmCompile):
                                    hash_file(analysis_file).upper()
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
+
+
+class ZincCompile(BaseZincCompile):
+  """A GroupTask GroupMember that compiles Scala and Java code using Zinc."""
+
+  @classmethod
+  def register_options(cls, register):
+    super(ZincCompile, cls).register_options(register)
+    register('--plugins', advanced=True, action='append', fingerprint=True,
+             help='Use these scalac plugins.')
+    register('--plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
+             help='Map from plugin name to list of arguments for that plugin.')
+    register('--name-hashing', advanced=True, action='store_true', default=False, fingerprint=True,
+             help='Use zinc name hashing.')
+
+    cls.register_jvm_tool(register, 'plugin-jars', default=[])
+
+  def select(self, target):
+    return target.has_sources('.java') or target.has_sources('.scala')
+
+  def select_source(self, source_file_path):
+    return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
+
+  def __init__(self, *args, **kwargs):
+    super(ZincCompile, self).__init__(*args, **kwargs)
+
+    # A directory independent of any other classpath which can contain per-target
+    # plugin resource files.
+    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
+
