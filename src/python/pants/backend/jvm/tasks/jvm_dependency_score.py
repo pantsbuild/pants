@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 from collections import defaultdict
 
@@ -37,6 +38,8 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
              help='The method of target size estimation.')
     register('--root-targets-only', default=True,
              help='Score only the root targets, not their dependencies.')
+    register('--output-file', type=str,
+             help='Output score graph as JSON to this file, creating the file if necessary.')
 
   def execute(self):
     if self.get_options().skip:
@@ -62,7 +65,7 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
         for src_dep in actual_source_deps.get(src, []):
           dep_tgts = self.targets_by_file.get(src_dep)
           if dep_tgts is None:
-            # TODO(cgibb): Why is this None for jars?
+            # src_dep is from JVM runtime / bootstrap jar, so skip.
             pass
           else:
             for tgt in dep_tgts:
@@ -89,7 +92,11 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
 
         graph[target].add_child(graph[dep_tgt], percent_used)
 
-    print(graph)
+    output_file = self.get_options().output_file
+    if output_file:
+      with open(output_file, 'w') as fh:
+        fh.write(graph.to_json())
+
 
 class DepScoreGraph(dict):
 
@@ -135,3 +142,13 @@ class DepScoreGraph(dict):
                            percent=percent_used,
                            size=child_node.job_size))
     return '\n'.join(buf)
+
+  def to_json(self):
+    res_dict = {}
+    for _, node in self.items():
+      res_dict[node.target.address.spec_path] = [{
+          'target': child_node.target.address.spec_path,
+          'job_size': child_node.job_size,
+          'percent_used': percent_used,
+        } for child_node, percent_used in node.children.items()]
+    return json.dumps(res_dict, indent=2)
