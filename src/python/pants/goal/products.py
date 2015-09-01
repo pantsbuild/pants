@@ -38,17 +38,21 @@ class UnionProducts(object):
     for product in products:
       self._products_by_target[target].discard(product)
 
-  def get_for_target(self, target):
+  def get_for_target(self, target, transitive=True):
     """Gets the transitive product deps for the given target."""
-    return self.get_for_targets([target])
+    return self.get_for_targets([target], transitive=transitive)
 
-  def get_for_targets(self, targets):
+  def get_for_targets(self, targets, transitive=True):
     """Gets the transitive product deps for the given targets, in order."""
     products = OrderedSet()
     visited = set()
     # Walk the targets transitively to aggregate their products. We do a breadth-first
     for target in targets:
-      for dep in target.closure(bfs=True):
+      if transitive:
+        deps = target.closure(bfs=True)
+      else:
+        deps = [target]
+      for dep in deps:
         if dep not in visited:
           products.update(self._products_by_target[dep])
           visited.add(dep)

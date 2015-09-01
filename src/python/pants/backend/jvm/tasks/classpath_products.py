@@ -45,20 +45,24 @@ class ClasspathProducts(object):
     """Removes the given entries for the target"""
     self._classpaths.remove_for_target(target, classpath_elements)
 
-  def get_for_target(self, target):
+  def get_for_target(self, target, transitive=True):
     """Gets the transitive classpath products for the given target, in order, respecting target
        excludes."""
-    return self.get_for_targets([target])
+    return self.get_for_targets([target], transitive=transitive)
 
-  def get_for_targets(self, targets):
+  def get_for_targets(self, targets, transitive=True):
     """Gets the transitive classpath products for the given targets, in order, respecting target
        excludes."""
-    classpath_tuples = self._classpaths.get_for_targets(targets)
-    filtered_classpath_tuples = self._filter_by_excludes(classpath_tuples, targets)
+    classpath_tuples = self._classpaths.get_for_targets(targets, transitive=transitive)
+    filtered_classpath_tuples = self._filter_by_excludes(
+      classpath_tuples,
+      targets,
+      transitive=transitive,
+    )
     return filtered_classpath_tuples
 
-  def _filter_by_excludes(self, classpath_tuples, root_targets):
-    exclude_patterns = self._exclude_patterns.get_for_targets(root_targets)
+  def _filter_by_excludes(self, classpath_tuples, root_targets, transitive):
+    exclude_patterns = self._exclude_patterns.get_for_targets(root_targets, transitive=transitive)
     filtered_classpath_tuples = filter(_not_excluded_filter(exclude_patterns),
                                        classpath_tuples)
     return filtered_classpath_tuples

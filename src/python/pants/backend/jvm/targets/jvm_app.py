@@ -91,11 +91,11 @@ class Bundle(object):
   def factory(cls, parse_context):
     """Return a factory method that can create bundles rooted at the parse context path."""
     def bundle(**kwargs):
-      return Bundle(parse_context, **kwargs)
+      return Bundle(parse_context.rel_path, **kwargs)
     bundle.__doc__ = Bundle.__init__.__doc__
     return bundle
 
-  def __init__(self, parse_context, rel_path=None, mapper=None, relative_to=None, fileset=None):
+  def __init__(self, target_rel_path, rel_path=None, mapper=None, relative_to=None, fileset=None):
     """
     :param rel_path: Base path of the "source" file paths. By default, path of the
       BUILD file. Useful for assets that don't live in the source code repo.
@@ -110,7 +110,7 @@ class Bundle(object):
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
-    self._rel_path = rel_path or parse_context.rel_path
+    self._rel_path = rel_path or target_rel_path
     self.filemap = {}
 
     if relative_to:

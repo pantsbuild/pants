@@ -60,8 +60,19 @@ class ClasspathProductsTest(BaseTest):
     classpath_product.add_excludes_for_targets([a, b])
 
     classpath = classpath_product.get_for_target(a)
-
     self.assertEqual([], classpath)
+
+  def test_intransitive_dependencies_excluded_classpath_element(self):
+    b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+    a = self.make_target('a', JvmTarget, dependencies=[b])
+
+    classpath_product = ClasspathProducts()
+    example_jar_path = self._example_jar_path()
+    classpath_product.add_for_target(a, [('default', example_jar_path)])
+    classpath_product.add_excludes_for_targets([a, b])
+
+    intransitive_classpath = classpath_product.get_for_target(a, transitive=False)
+    self.assertEqual([('default', example_jar_path)], intransitive_classpath)
 
   def test_parent_exclude_excludes_dependency_jar(self):
     b = self.make_target('b', JvmTarget)
