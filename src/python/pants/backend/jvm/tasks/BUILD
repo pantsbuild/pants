@@ -317,7 +317,6 @@ python_library(
     'src/python/pants/base:build_graph',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/backend/jvm/tasks:jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/java/distribution',
