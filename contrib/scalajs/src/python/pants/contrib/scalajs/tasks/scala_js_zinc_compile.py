@@ -48,11 +48,14 @@ class ScalaJSZincCompile(BaseZincCompile):
       # Select ScalaJSBinary and its transitive scala dependencies.
       for dep in target.closure():
         if dep.has_sources('.scala'):
+          print(">>> will select {}".format(dep.address))
           self._selected_target_addresses.add(dep.address)
       return True
     elif target.address in self._selected_target_addresses:
       # Previously selected due to having a ScalaJSBinary parent.
+      print(">>> selecting {}".format(target.address))
       return True
+    print(">>> ignoring {}".format(target.address))
     return False
 
   def select_source(self, source_file_path):
