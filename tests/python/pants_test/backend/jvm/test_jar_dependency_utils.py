@@ -33,16 +33,47 @@ class JarDependencyUtilsTest(unittest.TestCase):
                                             classifier='classify')
     self.assertEquals('org.example:lib::classify:jar', str(org_name_type_jar_classifier))
 
+  def test_m2_coordinates_with_same_properties(self):
+    coordinate1 = M2Coordinate('org.example', 'lib')
+    coordinate2 = M2Coordinate('org.example', 'lib')
+
+    self.assertEqual(coordinate1, coordinate2)
+    self.assertEqual(hash(coordinate1), hash(coordinate2))
+
+  def test_m2_coordinates_with_differing_properties_not_equal(self):
+    coordinate1 = M2Coordinate('org.example', 'lib')
+    coordinate2 = M2Coordinate('org.example', 'lib2')
+
+    self.assertNotEqual(coordinate1, coordinate2)
+
+  def test_m2_coordinates_with_different_types_have_different_hashes(self):
+    coordinate1 = M2Coordinate('org.example', 'lib', type_='zip')
+    coordinate2 = M2Coordinate('org.example', 'lib')
+
+    self.assertNotEqual(hash(coordinate1), hash(coordinate2))
+
+  def test_resolved_jars_with_same_properties(self):
+    jar1 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'path')
+    jar2 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'path')
+
+    self.assertEqual(jar1, jar2)
+    self.assertEqual(hash(jar1), hash(jar2))
+
   def test_resolved_jars_with_differing_cache_paths_not_equal(self):
     jar1 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'path1')
     jar2 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'path2')
 
     self.assertNotEqual(jar1, jar2)
 
-
   def test_resolved_jars_with_differing_paths_not_equal(self):
-
     jar1 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'ivy2/path', 'path1')
     jar2 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'ivy2/path', 'path2')
 
     self.assertNotEqual(jar1, jar2)
+
+
+  def test_resolved_jars_with_same_paths_equal(self):
+    jar1 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'ivy2/path', 'path')
+    jar2 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'ivy2/path', 'path')
+
+    self.assertEqual(jar1, jar2)
