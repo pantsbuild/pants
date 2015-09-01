@@ -15,31 +15,20 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
-from pants.util.memo import memoized_property
 
 
-class JvmDependencyCheck(Task):
+class JvmDependencyCheck(JvmDependencyAnalyzer):
   """Checks true dependencies of a JVM target and ensures that they are consistent with BUILD files."""
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(JvmDependencyCheck, cls).prepare(options, round_manager)
-    if not options.skip:
-      round_manager.require_data('actual_source_deps')
-      round_manager.require_data('classes_by_target')
-      round_manager.require_data('compile_classpath')
 
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyCheck, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             fingerprint=True,
-             help='Skip dependency check.')
     register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
              fingerprint=True,
              help='Check for missing dependencies in compiled code. Reports actual '
@@ -93,71 +82,6 @@ class JvmDependencyCheck(Task):
         actual_source_deps = self.context.products.get_data('actual_source_deps').get(vt.target)
         if actual_source_deps is not None:
           self.check(vt.target, actual_source_deps)
-
-  @memoized_property
-  def targets_by_file(self):
-    """Returns a map from abs path of source, class or jar file to an OrderedSet of targets.
-
-    The value is usually a singleton, because a source or class file belongs to a single target.
-    However a single jar may be provided (transitively or intransitively) by multiple JarLibrary
-    targets. But if there is a JarLibrary target that depends on a jar directly, then that
-    "canonical" target will be the first one in the list of targets.
-    """
-    targets_by_file = defaultdict(OrderedSet)
-
-    # Compute src -> target.
-    self.context.log.debug('Mapping sources...')
-    buildroot = get_buildroot()
-    # Look at all targets in-play for this pants run. Does not include synthetic targets,
-    for target in self.context.targets():
-      if isinstance(target, JvmTarget):
-        for src in target.sources_relative_to_buildroot():
-          targets_by_file[os.path.join(buildroot, src)].add(target)
-      # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
-      if isinstance(target, ScalaLibrary):
-        for java_source in target.java_sources:
-          for src in java_source.sources_relative_to_buildroot():
-            targets_by_file[os.path.join(buildroot, src)].add(target)
-
-    # Compute class -> target.
-    self.context.log.debug('Mapping classes...')
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    for tgt, target_products in classes_by_target.items():
-      for classes_dir, classes in target_products.rel_paths():
-        for cls in classes:
-          targets_by_file[cls].add(tgt)
-          targets_by_file[os.path.join(classes_dir, cls)].add(tgt)
-
-    # Compute jar -> target.
-    self.context.log.debug('Mapping jars...')
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    for jar_lib in self.context.targets(lambda t: isinstance(t, JarLibrary)):
-      for _, artifact_path in compile_classpath.get_for_target(jar_lib, transitive=False):
-        targets_by_file[artifact_path].add(jar_lib)
-
-    return targets_by_file
-
-  def _compute_transitive_deps_by_target(self):
-    """Map from target to all the targets it depends on, transitively."""
-    # Sort from least to most dependent.
-    sorted_targets = reversed(sort_targets(self.context.targets()))
-    transitive_deps_by_target = defaultdict(set)
-    # Iterate in dep order, to accumulate the transitive deps for each target.
-    for target in sorted_targets:
-      transitive_deps = set()
-      for dep in target.dependencies:
-        transitive_deps.update(transitive_deps_by_target.get(dep, []))
-        transitive_deps.add(dep)
-
-      # Need to handle the case where a java_sources target has dependencies.
-      # In particular if it depends back on the original target.
-      if hasattr(target, 'java_sources'):
-        for java_source_target in target.java_sources:
-          for transitive_dep in java_source_target.dependencies:
-            transitive_deps_by_target[java_source_target].add(transitive_dep)
-
-      transitive_deps_by_target[target] = transitive_deps
-    return transitive_deps_by_target
 
   def check(self, src_tgt, actual_deps):
     """Check for missing deps.
@@ -245,7 +169,8 @@ class JvmDependencyCheck(Task):
     def must_be_explicit_dep(dep):
       # We don't require explicit deps on the java runtime, so we shouldn't consider that
       # a missing dep.
-      return not dep.startswith(DistributionLocator.cached().real_home)
+      return (dep not in self.bootstrap_jar_classfiles
+              and not dep.startswith(DistributionLocator.cached().real_home))
 
     def target_or_java_dep_in_targets(target, targets):
       # We want to check if the target is in the targets collection

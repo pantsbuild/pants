@@ -43,10 +43,10 @@ class ZincAnalysisParser(AnalysisParser):
       except UnderlyingParser.ParseError as e:
         raise ParseError(e)
 
-  def parse_deps(self, infile, classpath_indexer, classes_dir):
+  def parse_deps(self, infile):
     with raise_on_eof(infile):
       try:
-        return self._underlying_parser.parse_deps(infile, classes_dir)
+        return self._underlying_parser.parse_deps(infile, "")
       except UnderlyingParser.ParseError as e:
         raise ParseError(e)
 
