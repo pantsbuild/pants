@@ -39,8 +39,7 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
     register('--root-targets-only', default=True,
              help='Score only the root targets, not their dependencies.')
     register('--output-file', type=str,
-             help='Output score graph as JSON to this file, creating the file if necessary. '
-                  'If no file specified, score graph is outputted to stdout.')
+             help='Output score graph as JSON to the specified file.')
 
   def execute(self):
     if self.get_options().skip:
@@ -52,25 +51,26 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
   def score(self, targets):
     graph = DepScoreGraph(self.size_estimators[self.get_options().size_estimator])
 
+    classes_by_target = self.context.products.get_data('classes_by_target')
     for target in targets:
-      actual_source_deps = self.context.products.get_data('actual_source_deps').get(target)
-      if actual_source_deps is None:
+      product_deps_by_src = self.context.products.get_data('actual_source_deps').get(target)
+      if product_deps_by_src is None:
         # No analysis for this target -- skip it.
         continue
 
-      # Maps some target t to the exact sources of t which are used by :param target:
-      used_src_deps_by_target = defaultdict(set)
+      # Maps some dependency target d to the exact products of d which are used by :param target:
+      used_product_deps_by_target = defaultdict(set)
       abs_srcs = [os.path.join(get_buildroot(), src)
                   for src in target.sources_relative_to_buildroot()]
       for src in abs_srcs:
-        for src_dep in actual_source_deps.get(src, []):
-          dep_tgts = self.targets_by_file.get(src_dep)
+        for product_dep in product_deps_by_src.get(src, []):
+          dep_tgts = self.targets_by_file.get(product_dep)
           if dep_tgts is None:
-            # src_dep is from JVM runtime / bootstrap jar, so skip.
+            # product_dep is from JVM runtime / bootstrap jar, so skip.
             pass
           else:
             for tgt in dep_tgts:
-              used_src_deps_by_target[tgt].add(src_dep)
+              used_product_deps_by_target[tgt].add(product_dep)
 
       # Skip targets that generate into other targets (like JavaAntlrLibrary) because
       # only the dependency to the generated target will be parsed from analysis file.
@@ -85,34 +85,42 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
             or isinstance(dep_tgt, JarLibrary)):
           continue
 
-        actual_source_deps = used_src_deps_by_target.get(dep_tgt, [])
-        total_srcs = len(dep_tgt.sources_relative_to_buildroot())
-        if total_srcs == 0:
+        used_product_deps = used_product_deps_by_target.get(dep_tgt, [])
+        total_products = list(p for _, paths in classes_by_target[dep_tgt].rel_paths() for p in paths)
+        if not total_products:
           continue
-        percent_used = 100.0 * len(actual_source_deps) / total_srcs
-
-        graph[target].add_child(graph[dep_tgt], percent_used)
+        graph[target].add_child(graph[dep_tgt], len(used_product_deps), len(total_products))
 
     output_file = self.get_options().output_file
     if output_file:
+      self.context.log.info('Writing dependency score graph to {}'.format(output_file))
       with open(output_file, 'w') as fh:
         fh.write(graph.to_json())
     else:
-      graph.log_usage(self.context.log)
-
+      self.context.log.error('No output file specified')
 
 class DepScoreGraph(dict):
 
   class Node(object):
 
-    def __init__(self, target, job_size):
+    def __init__(self, target, job_size, trans_job_size):
       self.target = target
+      self.inbound_edges = len(target.dependents)
       self.job_size = job_size
+      self.trans_job_size = trans_job_size
+      self.min_products_used = None
+      self.max_products_used = None
+      self.products_used_count = 0
       # Maps child node to percent used of child node's target.
       self.children = {}
 
-    def add_child(self, node, percent_used):
-      self.children[node] = percent_used
+    def add_child(self, node, products_used, products_total):
+      def get_update(f, n):
+        return f(n, products_used) if n is not None else products_used
+      node.min_products_used = get_update(min, node.min_products_used)
+      node.max_products_used = get_update(max, node.max_products_used)
+      node.products_used_count += products_used
+      self.children[node] = (products_used, products_total)
 
     def __eq__(self, other):
       return self.target == other.target
@@ -123,34 +131,39 @@ class DepScoreGraph(dict):
   def __init__(self, size_estimator):
     self._size_estimator = size_estimator
     self._job_size_cache = {}
+    self._trans_job_size_cache = {}
 
   def __missing__(self, target):
-    node = self[target] = self.Node(target, self._job_size(target))
+    node = self[target] = self.Node(target, self._job_size(target), self._trans_job_size(target))
     return node
 
   def _job_size(self, target):
     if target not in self._job_size_cache:
-      dep_sum = sum(self._job_size(dep) for dep in target.dependencies)
-      self._job_size_cache[target] = \
-          self._size_estimator(target.sources_relative_to_buildroot()) + dep_sum
+      self._job_size_cache[target] = self._size_estimator(target.sources_relative_to_buildroot())
     return self._job_size_cache[target]
 
-  def log_usage(self, log):
-    for _, node in self.items():
-      log.info('Dependency usage for ' + node.target.address.spec)
-      for child_node, percent_used in node.children.items():
-        log_fn = log.error if percent_used == 0 else log.info
-        log_fn('\t{target} --> {percent}%, job size: {size}'
-               .format(target=child_node.target.address.spec,
-                       percent=percent_used,
-                       size=child_node.job_size))
+  def _trans_job_size(self, target):
+    if target not in self._trans_job_size_cache:
+      dep_sum = sum(self._trans_job_size(dep) for dep in target.dependencies)
+      self._trans_job_size_cache[target] = self._job_size(target) + dep_sum
+    return self._trans_job_size_cache[target]
 
   def to_json(self):
     res_dict = {}
     for _, node in self.items():
-      res_dict[node.target.address.spec_path] = [{
-          'target': child_node.target.address.spec_path,
-          'job_size': child_node.job_size,
-          'percent_used': percent_used,
-        } for child_node, percent_used in node.children.items()]
+      res_dict[node.target.address.spec] = {
+          'synthetic': node.target.is_synthetic,
+          'job_size': node.job_size,
+          'trans_job_size': node.trans_job_size,
+          'inbound_edges': node.inbound_edges,
+          'min_products_used': node.min_products_used,
+          'max_products_used': node.max_products_used,
+          'avg_products_used': 1.0 * node.products_used_count / max(node.inbound_edges, 1),
+          'dependencies': [{
+              'target': child_node.target.address.spec,
+              'products_used': products_used,
+              'products_total': products_total,
+              'ratio': 1.0 * products_used / max(products_total, 1),
+            } for child_node, (products_used, products_total) in node.children.items()]
+        }
     return json.dumps(res_dict, indent=2)
