@@ -171,32 +171,36 @@ command-line options for that goal. E.g.,
     :::bash
     $ ./pants test -h
 
-    test: Test compiled code.
+    cache.test options:
 
-    test.specs
-      -h, --help              show this help message and exit
-      --jvm-options <option>...
-                              Run the jvm with these extra jvm options. (default: [])
-      --args <arg>...         Run the jvm with these extra program args. (default: [])
-      --[no-]debug            Run the jvm under a debugger. (default: None)
-      --confs _TEST.SPECS_CONFS__
-                              Use only these Ivy configurations of external deps.
-                              (default: [u'default'])
+    --[no-]cache-test-read (default: True)
+        Read build artifacts from cache, if available.
+    --[no-]cache-test-write (default: True)
+        Write build artifacts to cache, if available.
 
+    test.go options:
+    Runs `go test` on Go packages.
+
+    --[no-]test-go-remote (default: False)
+        Enables running tests found in go_remote_libraries.
+    --test-go-build-and-test-flags=<str> (default: )
+        Flags to pass in to `go test` tool.
     ...more test options...
 
-    test.pytest
-      -h, --help              show this help message and exit
-      --timeout _TEST.PYTEST_TIMEOUT__
-                              Number of seconds to wait for http connections.
-                              (default: 0)
+    test.junit options:
 
+    --test-junit-confs="['str1','str2',...]" (--test-junit-confs="['str1','str2',...]") ... (default: ['default'])
+        Use only these Ivy configurations of external deps.
+    --[no-]test-junit-skip (default: False)
+        Skip running junit.
+    --[no-]test-junit-fail-fast (default: False)
+        Fail fast on the first test failure in a suite.
 
     ...many more test options...
 
-The `test` goal is made up of parts, or *tasks*: `test.junit`, `test.pytest`, and `test.specs`.
+The `test` goal is made up of parts, or *tasks* such as `test.junit` and `test.pytest`.
 Command-line options apply to those tasks. The goal's help groups options by task. E.g., here, it
-shows the `test.spec` ` --jvm-options` option with `test.specs`.
+shows the `test.go` ` --test-go-build-and-test-flags` option with `test.go`.
 
 For a list of available goals, `./pants goals`.
 
@@ -207,7 +211,7 @@ For help with things that aren't goals (global options, other kinds of help), us
 
 If you want help diagnosing some strange Pants behavior, you might want verbose output.
 To get this, instead of just invoking `./pants`, set some environment variables and request
-more logging: `PEX_VERBOSE=1 PANTS_VERBOSE=1 PYTHON_VERBOSE=1 ./pants -debug`.
+more logging: `PEX_VERBOSE=1 PANTS_VERBOSE=1 ./pants -ldebug`.
 
 BUILD Files
 -----------
