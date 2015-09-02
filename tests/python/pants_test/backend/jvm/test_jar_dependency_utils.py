@@ -71,7 +71,6 @@ class JarDependencyUtilsTest(unittest.TestCase):
 
     self.assertNotEqual(jar1, jar2)
 
-
   def test_resolved_jars_with_same_paths_equal(self):
     jar1 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'ivy2/path', 'path')
     jar2 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'ivy2/path', 'path')

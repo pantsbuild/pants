@@ -95,7 +95,6 @@ class Config(object):
     return ConfigParser.SafeConfigParser(all_seed_values)
 
   # TODO(John Sirois): s/type/type_/
-
   def getbool(self, section, option, default=None):
     """Equivalent to calling get with expected type bool."""
     return self.get(section, option, type=bool, default=default)
@@ -187,7 +186,6 @@ class Config(object):
     return parsed_value
 
   # Subclasses must implement.
-
   def sources(self):
     """Return the sources of this config as a list of filenames."""
     raise NotImplementedError()
@@ -207,6 +205,7 @@ class Config(object):
 
 class SingleFileConfig(Config):
   """Config read from a single file."""
+
   def __init__(self, configpath, configparser):
     super(SingleFileConfig, self).__init__()
     self.configpath = configpath
@@ -231,6 +230,7 @@ class SingleFileConfig(Config):
 
 class ChainedConfig(Config):
   """Config read from multiple sources."""
+
   def __init__(self, configs):
     """
     :param configs: A list of Config instances to chain.

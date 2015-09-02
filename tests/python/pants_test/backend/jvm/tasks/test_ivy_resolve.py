@@ -45,7 +45,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
   #
   # Test section
   #
-
   def test_resolve_specific(self):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
@@ -174,7 +173,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
     regular_jar = 'avro-1.7.7.jar'
     self.assertIn(tests_jar, list((os.path.basename(j[-1]) for j in cp)))
     self.assertIn(regular_jar, list((os.path.basename(j[-1]) for j in cp)))
-
     # TODO(Eric Ayers):  I can't replicate the test in test_resolve_multiple_artifacts1
     # probably because the previous example creates a unique key for the jar_dependency for //:b
     # with a classifier.

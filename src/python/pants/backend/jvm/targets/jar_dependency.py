@@ -147,9 +147,9 @@ class JarDependency(object):
       raise ValueError('Cannot determine classifier. No explicit classifier is set and this jar '
                        'has more than 1 artifact: {}\n\t{}'.format(self, '\n\t'.join(map(str, self.artifacts))))
 
-
   def append_artifact(self, name, type_=None, ext=None, conf=None, url=None, classifier=None):
     """Append a new IvyArtifact to the list of artifacts for this jar."""
+
     @deprecated('0.0.48',
                 hint_message='JarDependency now only specifies a single artifact, {} defines more than one.'.format(name))
     def add_more_artifacts():

@@ -36,6 +36,7 @@ class Fetcher(object):
     Retrying operations that raise these errors is unlikely to succeed.  For example, an HTTP 404
     response code is considered a permanent error.
     """
+
     def __init__(self, value=None, response_code=None):
       super(Fetcher.PermanentError, self).__init__(value)
       if response_code and not isinstance(response_code, six.integer_types):

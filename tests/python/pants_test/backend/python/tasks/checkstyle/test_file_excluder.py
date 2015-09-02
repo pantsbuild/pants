@@ -17,6 +17,7 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 
 logger = logging.getLogger(__name__)
 
+
 class TestExcluder(PythonTaskTestBase):
   def task_type(cls):
     """Required method"""

@@ -46,6 +46,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   class CycleException(Exception):
     """Thrown when a circular dependency is detected."""
+
     def __init__(self, cycle):
       message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
           '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))

@@ -20,6 +20,7 @@ class Payload(object):
   A Target will add PayloadFields to its Payload until instantiation is finished, at which point
   freeze() will be called and make the Payload immutable.
   """
+
   def __init__(self):
     self._fields = {}
     self._frozen = False

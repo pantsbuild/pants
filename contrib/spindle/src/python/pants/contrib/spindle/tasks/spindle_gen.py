@@ -211,11 +211,11 @@ class SpindleGen(NailgunTask):
       target.walk(collect_sources)
     return sources
 
-
 # Slightly hacky way to figure out which files get generated from a particular thrift source.
 # TODO(benjy): This could be emitted by the codegen tool.
 # That would also allow us to easily support 1:many codegen.
 NAMESPACE_PARSER = re.compile(r'^\s*namespace\s+([^\s]+)\s+([^\s]+)\s*$')
+
 
 def calculate_genfiles(source):
   abs_source = os.path.join(get_buildroot(), source)

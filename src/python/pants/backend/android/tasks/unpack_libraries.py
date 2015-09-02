@@ -33,6 +33,7 @@ class AndroidLibraryFingerprintStrategy(DefaultFingerprintStrategy):
       return hasher.hexdigest()
     return None
 
+
 class UnpackLibraries(Task):
   """Unpack AndroidDependency artifacts, including .jar and .aar libraries.
 

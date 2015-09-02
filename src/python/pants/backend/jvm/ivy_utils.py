@@ -35,7 +35,6 @@ IvyModule = namedtuple('IvyModule', ['ref', 'artifact', 'callers'])
 logger = logging.getLogger(__name__)
 
 
-
 class IvyResolveMappingError(Exception):
   """Raised when there is a failure mapping the ivy resolve results to pants objects."""
 

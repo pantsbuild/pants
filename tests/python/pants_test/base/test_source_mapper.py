@@ -94,6 +94,7 @@ class SourceMapperTest(object):
     self.owner(['a/b:b'], 'a/b/bar.py')
     self.owner([':top'], 'foo.py')
 
+
 class LazySourceMapperTest(SourceMapperTest, BaseTest):
   def set_mapper(self, fast=False):
     self._mapper = LazySourceMapper(self.address_mapper, self.build_graph, fast)

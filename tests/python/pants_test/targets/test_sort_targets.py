@@ -23,7 +23,6 @@ class SortTargetsTest(BaseTest):
   #                       self.make_target,
   #                       ':invalid',
   #                       dependencies=1)
-
   def test_detect_cycle_direct(self):
     a = self.make_target(':a')
 

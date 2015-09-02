@@ -19,6 +19,7 @@ from pants_test.base_test import BaseTest
 jar1 = JarDependency(org='testOrg1', name='testName1', rev='123')
 jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
 
+
 class JarLibraryTest(BaseTest):
 
   @property

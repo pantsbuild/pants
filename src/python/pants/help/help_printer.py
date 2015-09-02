@@ -18,6 +18,7 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 class HelpPrinter(object):
   """Prints help to the console."""
+
   def __init__(self, options):
     self._options = options
 

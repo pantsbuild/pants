@@ -19,6 +19,7 @@ class JMakeAnalysis(Analysis):
 
   We use the term 'analysis' for uniformity with Zinc etc.
   """
+
   @classmethod
   def merge(cls, analyses):
     merged_pcd_entries = []

@@ -57,7 +57,6 @@ class Report(object):
   # Note that if you addr/remove reporters after open() has been called you have
   # to ensure that their state is set up correctly. Best only to do this with
   # stateless reporters, such as ConsoleReporter.
-
   def add_reporter(self, name, reporter):
     with self._lock:
       self._reporters[name] = reporter

@@ -14,6 +14,7 @@ from pants.base.validation import assert_list
 
 class PythonRequirementLibrary(Target):
   """Named target for some pip requirements."""
+
   def __init__(self, payload=None, requirements=None, **kwargs):
     """
     :param requirements: pip requirements as `python_requirement <#python_requirement>`_\s.
