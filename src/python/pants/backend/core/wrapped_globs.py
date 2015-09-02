@@ -54,6 +54,7 @@ class FilesetWithSpec(object):
 
 
 class FilesetRelPathWrapper(object):
+  KNOWN_PARAMETERS = frozenset(['exclude', 'follow_links'])
 
   @classmethod
   @manual.builddict(factory=True)
@@ -71,8 +72,15 @@ class FilesetRelPathWrapper(object):
     root = os.path.normpath(os.path.join(get_buildroot(), self._rel_path))
 
     excludes = kwargs.pop('exclude', [])
+
     if isinstance(excludes, string_types):
-        raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+
+    # making sure there is no unknown argument(s)
+    unknown_args = set(kwargs.keys()) - self.KNOWN_PARAMETERS
+
+    if unknown_args:
+      raise ValueError('Unexpected arguments while parsing globs: {}'.format(', '.join(unknown_args)))
 
     for i, exclude in enumerate(excludes):
       if isinstance(exclude, string_types):
