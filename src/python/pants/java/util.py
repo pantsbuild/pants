@@ -59,12 +59,12 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                           workunit_log_config=workunit_log_config)
   except OSError as e:
     if errno.E2BIG == e.errno and len(classpath) > 1:
-        with bundled_classpath(classpath) as bundled_cp:
-          logger.debug('failed with argument list too long error, now bundling classpath {} into {}'
-                       .format(':'.join(classpath), bundled_cp))
-          return execute_java(bundled_cp, main, jvm_options, args, executor,
-                              workunit_factory, workunit_name, workunit_labels,
-                              cwd, workunit_log_config, distribution)
+      with bundled_classpath(classpath) as bundled_cp:
+        logger.debug('failed with argument list too long error, now bundling classpath {} into {}'
+                     .format(':'.join(classpath), bundled_cp))
+        return execute_java(bundled_cp, main, jvm_options, args, executor,
+                            workunit_factory, workunit_name, workunit_labels,
+                            cwd, workunit_log_config, distribution)
     else:
       raise e
 
