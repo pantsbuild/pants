@@ -22,6 +22,7 @@ class JvmCompileStrategy(object):
   __metaclass__ = ABCMeta
   # Common code.
   # ------------
+
   @staticmethod
   def _analysis_for_target(analysis_dir, target):
     return os.path.join(analysis_dir, target.id + '.analysis')
@@ -152,6 +153,7 @@ class JvmCompileStrategy(object):
         if target.has_sources():
           resolved_sources.extend(target.sources_relative_to_buildroot())
       return resolved_sources
+
     def calculate_sources(target):
       sources = [s for s in target.sources_relative_to_buildroot() if self._sources_predicate(s)]
       # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
@@ -226,10 +228,9 @@ class JvmCompileStrategy(object):
     safe_mkdir(analysis_tmpdir)
     return analysis_tmpdir
 
-  @abstractmethod
-  def parse_deps(self, classpath, compile_context):
-    """Parses the actual source dependencies of compile_context.target given a classpath.
+  def parse_deps(self, analysis_file):
+    """Parses the actual source dependencies given an analysis file.
 
-    The returned source dependencies may be either absolute filepaths, or relative filepaths.
+    The dependencies are returned as relative paths.
     """
-    pass
+    return self._analysis_parser.parse_deps_from_path(analysis_file)

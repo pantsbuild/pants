@@ -29,6 +29,7 @@ def build_file_aliases():
     }
   )
 
+
 def register_goals():
   task(name='unpack-libs', action=UnpackLibraries).install('unpack-jars')
   task(name='aapt', action=AaptGen).install('gen')

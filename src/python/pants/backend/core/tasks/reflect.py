@@ -35,7 +35,6 @@ buildroot = get_buildroot()
 
 
 # Our CLI help and doc-website-gen use this to get useful help text.
-
 def indent_docstring_by_n(s, n=1):
   """Given a non-empty docstring, return version indented N spaces.
   Given an empty thing, return the thing itself."""
@@ -326,6 +325,7 @@ def info_for_target_class(cls):
         funcdoc_rst += '\n:param {0}: {1}'.format(param, parts['param'])
   paramdocs = param_docshards_to_template_datas(funcdoc_shards)
   return(argspec, funcdoc_rst, paramdocs)
+
 
 def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.

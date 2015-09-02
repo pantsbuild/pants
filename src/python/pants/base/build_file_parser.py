@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 #
 # Note: In general, 'spec' should not be a user visible term, it is usually appropriate to
 # substitute 'address' instead.
-
 class BuildFileParser(object):
   """Parses BUILD files for a given repo build configuration."""
 

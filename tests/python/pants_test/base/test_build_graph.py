@@ -13,7 +13,6 @@ from pants_test.base_test import BaseTest
 
 
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.
-
 class BuildGraphTest(BaseTest):
 
   def inject_graph(self, root_spec, graph_dict):

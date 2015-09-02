@@ -23,6 +23,7 @@ class Dependencies(Target):
 
 class DeprecatedDependencies(Dependencies):
   """A subclass for Dependencies that warns that the 'dependencies' alias is deprecated."""
+
   def __init__(self, *args, **kwargs):
     logger.warn("For {0} : The alias 'dependencies(..)' has been deprecated in favor of "
                 "'target(..)'"

@@ -107,7 +107,6 @@ class UnpackJars(Task):
     return lambda f: cls._file_filter(f, include_patterns, exclude_patterns)
 
   # TODO(mateor) move unpack code that isn't jar-specific to fs.archive or an Unpack base class.
-
   @classmethod
   def get_unpack_filter(cls, unpacked_jars):
     """Calculate a filter function from the include/exclude patterns of a Target.

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 class FakeConfig(object):
   """Useful for providing fake config values while testing the options system."""
+
   def __init__(self, values):
     self._values = values
 

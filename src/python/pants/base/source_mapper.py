@@ -14,8 +14,10 @@ from pants.base.payload_field import DeferredSourcesField
 
 class SourceMapper(object):
   """A utility for making a mapping of source files to targets that own them."""
+
   def target_addresses_for_source(self, source):
     raise NotImplementedError
+
 
 class SpecSourceMapper(SourceMapper):
   """
@@ -71,6 +73,7 @@ class SpecSourceMapper(SourceMapper):
             """
             if resource.payload.sources.matches(source):
               yield address
+
 
 class LazySourceMapper(SourceMapper):
   """

@@ -189,7 +189,6 @@ class UnpackLibrariesTest(TestAndroidBase):
             task.create_android_library_target(android_library, archive, contents)
 
   # Test unpacking process.
-
   def create_unpack_build_file(self):
     self.add_to_build_file('unpack', dedent('''
             android_library(name='test',
@@ -229,7 +228,6 @@ class UnpackLibrariesTest(TestAndroidBase):
         self.unpack_libraries(target_name, unexpected_archive)
 
   # Test aar unpacking and invalidation
-
   def test_ivy_args(self):
     # A regression test for ivy_mixin_task. UnpackLibraries depends on the mapped jar filename
     # being unique and including the version number. If you are making a change to

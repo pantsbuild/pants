@@ -36,6 +36,7 @@ from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
 logger = logging.getLogger(__name__)
 
+
 class PythonChroot(object):
   _VALID_DEPENDENCIES = {
     PrepCommand: 'prep',

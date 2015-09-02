@@ -17,6 +17,7 @@ class CompileContext(object):
   This can be used to differentiate between a partially completed compile in a temporary location
   and a finalized compile in its permanent location.
   """
+
   def __init__(self, target, analysis_file, classes_dir, sources):
     self.target = target
     self.analysis_file = analysis_file
@@ -39,6 +40,7 @@ class CompileContext(object):
 
 class IsolatedCompileContext(CompileContext):
   """Extends CompileContext to add a jar location."""
+
   def __init__(self, target, analysis_file, classes_dir, jar_file, sources):
     super(IsolatedCompileContext, self).__init__(target, analysis_file, classes_dir, sources)
     self.jar_file = jar_file

@@ -46,6 +46,7 @@ class OptionValueContainer(object):
   Note that this container is suitable for passing as the namespace argument to argparse's
   parse_args() method.
   """
+
   def __init__(self):
     self._forwardings = {}  # src attribute name -> target attribute name.
 

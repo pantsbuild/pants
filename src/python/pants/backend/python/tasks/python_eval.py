@@ -19,6 +19,7 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 class PythonEval(PythonTask):
   class Error(TaskError):
     """A richer failure exception type useful for tests."""
+
     def __init__(self, *args, **kwargs):
       compiled = kwargs.pop('compiled')
       failed = kwargs.pop('failed')

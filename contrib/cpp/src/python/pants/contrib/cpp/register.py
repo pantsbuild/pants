@@ -24,6 +24,7 @@ def build_file_aliases():
     }
   )
 
+
 def register_goals():
   task(name='cpp', action=CppCompile).install('compile')
   task(name='cpplib', action=CppLibraryCreate).install('binary')

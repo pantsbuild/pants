@@ -52,7 +52,6 @@ class JvmPlatform(Subsystem):
   options_scope = 'jvm-platform'
 
   # Mapping to keep version numbering consistent for ease of comparison.
-
   @classmethod
   def register_options(cls, register):
     super(JvmPlatform, cls).register_options(register)

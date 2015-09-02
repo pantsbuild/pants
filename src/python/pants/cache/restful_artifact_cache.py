@@ -21,17 +21,21 @@ logger = logging.getLogger(__name__)
 # TODO do this in a central place
 logging.getLogger('requests').setLevel(logging.WARNING)
 
+
 class InvalidRESTfulCacheProtoError(ArtifactCacheError):
   """Indicates an invalid protocol used in a remote spec."""
   pass
 
+
 class RequestsSession(object):
   _session = None
+
   @classmethod
   def instance(cls):
     if cls._session is None:
       cls._session = requests.Session()
     return cls._session
+
 
 class RESTfulArtifactCache(ArtifactCache):
   """An artifact cache that stores the artifacts on a RESTful service."""

@@ -122,12 +122,14 @@ class Executor(AbstractClass):
 
 class CommandLineGrabber(Executor):
   """Doesn't actually execute anything, just captures the cmd line."""
+
   def __init__(self, distribution):
     super(CommandLineGrabber, self).__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
 
   def _runner(self, classpath, main, jvm_options, args, cwd=None):
     self._command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
+
     class Runner(self.Runner):
       @property
       def executor(_):

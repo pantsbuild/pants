@@ -19,6 +19,7 @@ from pants.util.memo import memoized_property
 def globs_matches(path, patterns):
   return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
 
+
 def matches_filespec(path, spec):
   if spec is None:
     return False
@@ -28,6 +29,7 @@ def matches_filespec(path, spec):
     if matches_filespec(path, spec):
       return False
   return True
+
 
 class FilesetWithSpec(object):
   """A set of files that keeps track of how we got it.
@@ -66,7 +68,7 @@ class FilesetRelPathWrapper(object):
     self._rel_path = rel_path
 
   def __call__(self, *args, **kwargs):
-    root = os.path.join(get_buildroot(), self._rel_path)
+    root = os.path.normpath(os.path.join(get_buildroot(), self._rel_path))
 
     excludes = kwargs.pop('exclude', [])
     if isinstance(excludes, string_types):
@@ -90,7 +92,7 @@ class FilesetRelPathWrapper(object):
       return result
 
     buildroot = get_buildroot()
-    rel_root = os.path.relpath(root, buildroot)
+    rel_root = os.path.relpath(root, buildroot) if root != buildroot else ''
     filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
     return FilesetWithSpec(rel_root, filespec, files_calculator)
 
@@ -157,6 +159,7 @@ class RGlobs(FilesetRelPathWrapper):
   those in ``config/foo``.  Please use exclude instead, since pants is moving to
   make BUILD files easier to parse, and the new grammar will not support arithmetic.
   """
+
   @staticmethod
   def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
     if 'follow_links' not in kw:
@@ -222,6 +225,7 @@ class ZGlobs(FilesetRelPathWrapper):
 
   Uses ``BUILD`` file's directory as the "working directory".
   """
+
   @staticmethod
   def zglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
     if 'follow_links' not in kw:

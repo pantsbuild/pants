@@ -24,6 +24,7 @@ from pants.util.dirutil import safe_mkdir
 
 logger = logging.getLogger(__name__)
 
+
 class AaptGen(AaptTask):
   """
   Handle the processing of resources for Android targets with the Android Asset Packaging Tool
@@ -112,6 +113,7 @@ class AaptGen(AaptTask):
       # framework can't differentiate between one library that has to be compiled by multiple sdks.
 
       gentargets = [binary]
+
       def gather_gentargets(tgt):
         """Gather all AndroidLibrary targets that have a manifest."""
         if isinstance(tgt, AndroidLibrary) and tgt.manifest:

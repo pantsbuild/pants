@@ -22,10 +22,9 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.exceptions import TaskError
 from pants.base.target import Target
 from pants.base.worker_pool import Work
-from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
-from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir
 
 
 class JvmCompileGlobalStrategy(JvmCompileStrategy):
@@ -619,62 +618,3 @@ class JvmCompileGlobalStrategy(JvmCompileStrategy):
     for f in changed_files:
       ret.update(targets_by_source.get(f, []))
     return list(ret)
-
-  def parse_deps(self, classpath, compile_context):
-    def classpath_indexer():
-      return self._compute_classpath_elements_by_class(classpath)
-    return self._analysis_parser.parse_deps_from_path(compile_context.analysis_file,
-                                                      classpath_indexer,
-                                                      self._classes_dir)
-
-
-  def _compute_classpath_elements_by_class(self, classpath):
-    """Computes a mapping of a .class file to its corresponding element on the given classpath."""
-    # Don't consider loose classes dirs in our classes dir. Those will be considered
-    # separately, by looking at products.
-    def non_product(path):
-      return path != self._classes_dir
-    classpath_entries = filter(non_product, classpath)
-
-    if self._upstream_class_to_path is None:
-      self._upstream_class_to_path = {}
-      for cp_entry in self._find_all_bootstrap_jars() + classpath_entries:
-        # Per the classloading spec, a 'jar' in this context can also be a .zip file.
-        if os.path.isfile(cp_entry) and (cp_entry.endswith('.jar') or cp_entry.endswith('.zip')):
-          with open_zip(cp_entry, 'r') as jar:
-            for cls in jar.namelist():
-              # First jar with a given class wins, just like when classloading.
-              if cls.endswith(b'.class') and not cls in self._upstream_class_to_path:
-                self._upstream_class_to_path[cls] = cp_entry
-        elif os.path.isdir(cp_entry):
-          for dirpath, _, filenames in safe_walk(cp_entry, followlinks=True):
-            for f in filter(lambda x: x.endswith('.class'), filenames):
-              cls = os.path.relpath(os.path.join(dirpath, f), cp_entry)
-              if not cls in self._upstream_class_to_path:
-                self._upstream_class_to_path[cls] = os.path.join(dirpath, f)
-    return self._upstream_class_to_path
-
-  def _find_all_bootstrap_jars(self):
-    def get_path(key):
-      return DistributionLocator.cached().system_properties.get(key, '').split(':')
-
-    def find_jars_in_dirs(dirs):
-      ret = []
-      for d in dirs:
-        if os.path.isdir(d):
-          ret.extend(filter(lambda s: s.endswith('.jar'), os.listdir(d)))
-      return ret
-
-    # Note: assumes HotSpot, or some JVM that supports sun.boot.class.path.
-    # TODO: Support other JVMs? Not clear if there's a standard way to do so.
-    # May include loose classes dirs.
-    boot_classpath = get_path('sun.boot.class.path')
-
-    # Note that per the specs, overrides and extensions must be in jars.
-    # Loose class files will not be found by the JVM.
-    override_jars = find_jars_in_dirs(get_path('java.endorsed.dirs'))
-    extension_jars = find_jars_in_dirs(get_path('java.ext.dirs'))
-
-    # Note that this order matters: it reflects the classloading order.
-    bootstrap_jars = filter(os.path.isfile, override_jars + boot_classpath + extension_jars)
-    return bootstrap_jars  # Technically, may include loose class dirs from boot_classpath.

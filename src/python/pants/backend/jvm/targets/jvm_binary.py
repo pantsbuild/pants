@@ -149,6 +149,7 @@ class JarRules(FingerprintedMixin):
   `Duplicate <#Duplicate>`_ rules support resolution of these cases by allowing 1st wins,
   last wins, concatenation of the duplicate entry contents or raising an exception.
   """
+
   @classmethod
   def skip_signatures_and_duplicates_concat_well_known_metadata(cls, default_dup_action=None,
                                                                 additional_rules=None):

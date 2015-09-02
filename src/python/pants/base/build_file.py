@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
 # Target separated appropriately.  Don't add references to those other types to this module.
-
 class BuildFile(AbstractClass):
 
   class BuildFileError(Exception):

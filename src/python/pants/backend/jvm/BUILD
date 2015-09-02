@@ -13,6 +13,11 @@ python_library(
 )
 
 python_library(
+  name='jar_dependency_utils',
+  sources=['jar_dependency_utils.py'],
+)
+
+python_library(
   name='plugin',
   sources=['__init__.py', 'register.py'],
   dependencies=[
@@ -33,6 +38,7 @@ python_library(
   sources=['ivy_utils.py'],
   resources=globs('tasks/templates/ivy_resolve/*.mustache'),
   dependencies=[
+    ':jar_dependency_utils',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',

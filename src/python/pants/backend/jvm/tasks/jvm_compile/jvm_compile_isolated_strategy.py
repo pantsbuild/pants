@@ -37,6 +37,7 @@ def create_size_estimators():
     'constzero': lambda sources: 0
   }
 
+
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses per-target classpaths and analysis."""
 
@@ -393,9 +394,3 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
           update_artifact_cache_work
       ]
       self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
-
-  def parse_deps(self, classpath, compile_context):
-    # We intentionally pass in an empty string for classes_dir in order to receive
-    # relative paths, because we currently don't know (and don't need to know) what target
-    # provided the file.
-    return self._analysis_parser.parse_deps_from_path(compile_context.analysis_file, dict, '')

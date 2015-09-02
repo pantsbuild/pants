@@ -13,6 +13,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class ExceptStatementsSubsystem(Subsystem):
   options_scope = 'pycheck-except-statement'
+
   @classmethod
   def register_options(cls, register):
     super(ExceptStatementsSubsystem, cls).register_options(register)

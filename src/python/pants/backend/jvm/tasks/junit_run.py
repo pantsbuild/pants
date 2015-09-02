@@ -149,6 +149,7 @@ class _JUnitRunner(object):
       return
 
     bootstrapped_cp = self._task_exports.tool_classpath('junit')
+
     def compute_complete_classpath():
       return self._task_exports.classpath(targets, cp=bootstrapped_cp)
 
@@ -339,7 +340,6 @@ class _JUnitRunner(object):
 
     return self._tests_by_property(tests_to_targets, combined_property)
 
-
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
     for i in range(0, len(tests), stride):
@@ -394,6 +394,7 @@ class _JUnitRunner(object):
     else:  # It's a classname.
       classname = classname_or_srcfile
       yield classname + methodname
+
 
 #TODO(jtrobec): move code coverage into tasks, and out of the general UT code.
 class _Coverage(_JUnitRunner):

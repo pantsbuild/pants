@@ -22,7 +22,6 @@ from pants.base.build_file_parser import BuildFileParser
 #     so that callers do not have to reference those modules
 #
 # Note: 'spec' should not be a user visible term, substitute 'address' instead.
-
 class BuildFileAddressMapper(object):
   """Maps addresses in the pants virtual address space to corresponding BUILD file declarations.
   """
