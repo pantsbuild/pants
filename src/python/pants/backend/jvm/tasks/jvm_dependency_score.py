@@ -137,11 +137,11 @@ class DepScoreGraph(dict):
 
   def log_usage(self, log):
     for _, node in self.items():
-      log.info('Dependency usage for ' + node.target.address.spec_path)
+      log.info('Dependency usage for ' + node.target.address.spec)
       for child_node, percent_used in node.children.items():
         log_fn = log.error if percent_used == 0 else log.info
         log_fn('\t{target} --> {percent}%, job size: {size}'
-               .format(target=child_node.target,
+               .format(target=child_node.target.address.spec,
                        percent=percent_used,
                        size=child_node.job_size))
 
