@@ -319,7 +319,7 @@ class GroupTask(Task):
     return member_types
 
   @classmethod
-  def add_member(cls, group_member, first=False):
+  def add_member(cls, group_member):
     """Enlists a member in this group.
 
     A group task delegates all its work to group members who act cooperatively on targets they
@@ -331,10 +331,7 @@ class GroupTask(Task):
                        'given {} of type {}'.format(group_member, type(group_member)))
 
     group_member.options_scope = Goal.scope(cls.options_scope, group_member.name())
-    if first:
-      cls._member_types().insert(0, group_member)
-    else:
-      cls._member_types().append(group_member)
+    cls._member_types().append(group_member)
 
   def __init__(self, *args, **kwargs):
     super(GroupTask, self).__init__(*args, **kwargs)

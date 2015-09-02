@@ -23,8 +23,6 @@ class ScalaJSLink(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ScalaJSLink, cls).register_options(register)
-    # TODO: This option should cause target invalidation but doesn't.
-    #   see https://github.com/pantsbuild/pants/issues/1273
     register('--full-opt', default=False, action='store_true', fingerprint=True,
              help='Perform all optimizations; this is generally only useful for deployments.')
     register('--check-ir', default=False, action='store_true', fingerprint=True,

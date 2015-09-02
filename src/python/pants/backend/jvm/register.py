@@ -60,6 +60,7 @@ def build_file_aliases():
       'benchmark': Benchmark,
       'credentials': Credentials,
       'jar_library': JarLibrary,
+      'unpacked_jars': UnpackedJars,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'java_tests': JavaTests,
@@ -68,7 +69,6 @@ def build_file_aliases():
       'jvm_binary': JvmBinary,
       'scala_library': ScalaLibrary,
       'scalac_plugin': ScalacPlugin,
-      'unpacked_jars' : UnpackedJars,
     },
     objects={
       'artifact': Artifact,
