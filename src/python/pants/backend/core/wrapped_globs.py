@@ -66,7 +66,7 @@ class FilesetRelPathWrapper(object):
     self._rel_path = rel_path
 
   def __call__(self, *args, **kwargs):
-    root = os.path.join(get_buildroot(), self._rel_path)
+    root = os.path.normpath(os.path.join(get_buildroot(), self._rel_path))
 
     excludes = kwargs.pop('exclude', [])
     if isinstance(excludes, string_types):
@@ -90,7 +90,7 @@ class FilesetRelPathWrapper(object):
       return result
 
     buildroot = get_buildroot()
-    rel_root = os.path.relpath(root, buildroot)
+    rel_root = os.path.relpath(root, buildroot) if root != buildroot else ''
     filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
     return FilesetWithSpec(rel_root, filespec, files_calculator)
 
