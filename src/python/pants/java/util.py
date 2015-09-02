@@ -5,9 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
+import logging
+import os
+from contextlib import contextmanager
+from zipfile import ZIP_STORED
+
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.executor import Executor, SubprocessExecutor
+from pants.java.jar.manifest import Manifest
 from pants.java.nailgun_executor import NailgunExecutor
+from pants.util.contextutil import open_zip, temporary_file
+
+
+logger = logging.getLogger(__name__)
 
 
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
@@ -39,12 +50,23 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
 
   runner = executor.runner(classpath, main, args=args, jvm_options=jvm_options, cwd=cwd)
   workunit_name = workunit_name or main
-  return execute_runner(runner,
-                        workunit_factory=workunit_factory,
-                        workunit_name=workunit_name,
-                        workunit_labels=workunit_labels,
-                        cwd=cwd,
-                        workunit_log_config=workunit_log_config)
+  try:
+    return execute_runner(runner,
+                          workunit_factory=workunit_factory,
+                          workunit_name=workunit_name,
+                          workunit_labels=workunit_labels,
+                          cwd=cwd,
+                          workunit_log_config=workunit_log_config)
+  except OSError as e:
+    if errno.E2BIG == e.errno and len(classpath) > 1:
+        with bundled_classpath(classpath) as bundled_cp:
+          logger.debug('failed with argument list too long error, now bundling classpath {} into {}'
+                       .format(':'.join(classpath), bundled_cp))
+          return execute_java(bundled_cp, main, jvm_options, args, executor,
+                              workunit_factory, workunit_name, workunit_labels,
+                              cwd, workunit_log_config, distribution)
+    else:
+      raise e
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
@@ -80,3 +102,32 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
       ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
       workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
       return ret
+
+
+@contextmanager
+def bundled_classpath(classpath):
+  """Bundles classpath into one synthetic jar that includes original classpath in its manifest.
+
+  See https://docs.oracle.com/javase/7/docs/technotes/guides/extensions/spec.html#bundled
+
+  :param list classpath: Classpath to be bundled.
+
+  :returns: A classpath (singleton list with just the synthetic jar).
+  :rtype: list of strings
+  """
+  def prepare_url(url):
+    url_in_bundle = os.path.realpath(url)
+    # append '/' for directories, those not ending with '/' are assumed to be jars
+    if os.path.isdir(url):
+      url_in_bundle += '/'
+    return url_in_bundle
+
+  bundled_classpath = [prepare_url(url) for url in classpath]
+
+  manifest = Manifest()
+  manifest.addentry(Manifest.CLASS_PATH, ' '.join(bundled_classpath))
+
+  with temporary_file(cleanup=False, suffix='.jar') as jar_file:
+    with open_zip(jar_file, mode='w', compression=ZIP_STORED) as jar:
+      jar.writestr(Manifest.PATH, manifest.contents())
+    yield [jar_file.name]
