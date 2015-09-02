@@ -9,8 +9,8 @@ import os
 
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import BaseZincCompile
 
-from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
+from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
 class ScalaJSZincCompile(BaseZincCompile):
