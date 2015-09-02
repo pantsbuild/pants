@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import os
 import sys
 import traceback
@@ -63,6 +62,9 @@ def _run(exiter):
   # Bootstrap options and logging.
   options, build_config = OptionsInitializer().setup()
 
+  # Apply exiter options.
+  exiter.apply_options(options)
+
   # Launch RunTracker as early as possible (just after Subsystem options are initialized).
   run_tracker, reporting = ReportingInitializer().setup()
 
@@ -70,9 +72,6 @@ def _run(exiter):
   root_dir = get_buildroot()
   if not os.path.exists(root_dir):
     exiter.exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: {}'.format(root_dir))
-
-  # Apply exiter options.
-  exiter.apply_options(options)
 
   # Setup and run GoalRunner.
   goal_runner = GoalRunner.Factory(root_dir, options, build_config, run_tracker, reporting).setup()

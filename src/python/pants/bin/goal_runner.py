@@ -172,21 +172,6 @@ class ReportingInitializer(object):
 
 
 class GoalRunnerFactory(object):
-  def __init__(self, *args, **kwargs):
-    self._args = args
-    self._kwargs = kwargs
-
-  def setup(self):
-    goal_runner = GoalRunner(*self._args, **self._kwargs)
-    goal_runner.setup()
-    return goal_runner
-
-
-class GoalRunner(object):
-  """Lists installed goals or else executes a named goal."""
-
-  Factory = GoalRunnerFactory
-
   def __init__(self, root_dir, options, build_config, run_tracker, reporting, exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
@@ -196,34 +181,40 @@ class GoalRunner(object):
     :param Reporting reporting: The global, pre-initialized Reporting instance.
     :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
     """
-    self.root_dir = root_dir
-    self.options = options
-    self.build_configuration = build_config
-    self.run_tracker = run_tracker
-    self.reporting = reporting
+    self._root_dir = root_dir
+    self._options = options
+    self._build_config = build_config
+    self._run_tracker = run_tracker
+    self._reporting = reporting
     self._exiter = exiter
 
-    self.goals = []
-    self.targets = []
-    self.requested_goals = []
+    self._goals = []
+    self._targets = []
+    self._requested_goals = self._options.goals
+    self._target_specs = self._options.target_specs
+    self._help_request = self._options.help_request
 
-    self.build_file_type = self._get_buildfile_type(self.global_options.build_file_rev)
-    self.build_file_parser = BuildFileParser(self.build_configuration, self.root_dir)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.build_file_type)
-    self.build_graph = BuildGraph(self.address_mapper)
+    self._global_options = options.for_global_scope()
+    self._tag = self._global_options.tag
+    self._fail_fast = self._global_options.fail_fast
+    self._spec_excludes = self._global_options.spec_excludes
+    self._explain = self._global_options.explain
+    self._kill_nailguns = self._global_options.kill_nailguns
 
-  @property
-  def global_options(self):
-    return self.options.for_global_scope()
+    self._invalidation_report = self._get_invalidation_report()
+    self._build_file_type = self._get_buildfile_type(self._global_options.build_file_rev)
+    self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
+    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._build_file_type)
+    self._build_graph = BuildGraph(self._address_mapper)
+    self._spec_parser = CmdLineSpecParser(
+      self._root_dir,
+      self._address_mapper,
+      spec_excludes=self._spec_excludes,
+      exclude_target_regexps=self._global_options.exclude_target_regexp
+    )
 
-  @property
-  def spec_excludes(self):
-    return self.global_options.spec_excludes
-
-  @classmethod
-  def subsystems(cls):
-    # Subsystems used outside of any task.
-    return set([SourceRootBootstrapper, Reporting, RunTracker])
+  def _get_invalidation_report(self):
+    return InvalidationReport() if self._reporting.invalidation_report else None
 
   def _get_buildfile_type(self, build_file_rev):
     """Selects the BuildFile type for use in a given pants run."""
@@ -234,120 +225,143 @@ class GoalRunner(object):
     else:
       return FilesystemBuildFile
 
-  def setup(self):
-    # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
-    with self.run_tracker.new_workunit(name='bootstrap', labels=[WorkUnitLabel.SETUP]):
-      source_root_bootstrapper = SourceRootBootstrapper.global_instance()
-      source_root_bootstrapper.bootstrap(self.address_mapper, self.build_file_parser)
-
-    with self.run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      self._expand_goals(self.options.goals)
-      self._expand_specs(self.options.target_specs, self.global_options.fail_fast)
-
-      # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
-      self.run_tracker.run_info.add_scm_info()
-
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""
     for goal in goals:
-      if self.address_mapper.from_cache(self.root_dir, goal, must_exist=False).file_exists():
+      if self._address_mapper.from_cache(self._root_dir, goal, must_exist=False).file_exists():
         logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
-    if self.options.help_request:
-      help_printer = HelpPrinter(self.options)
+    if self._help_request:
+      help_printer = HelpPrinter(self._options)
       help_printer.print_help()
       self._exiter(0)
 
-    self.requested_goals.extend(self.options.goals)
-    self.goals.extend([Goal.by_name(goal) for goal in goals])
+    self._goals.extend([Goal.by_name(goal) for goal in goals])
 
   def _expand_specs(self, specs, fail_fast):
     """Populate the BuildGraph and target list from a set of input specs."""
-    spec_parser = CmdLineSpecParser(
-      self.root_dir,
-      self.address_mapper,
-      spec_excludes=self.spec_excludes,
-      exclude_target_regexps=self.global_options.exclude_target_regexp
-    )
-
-    with self.run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
+    with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
       def filter_for_tag(tag):
         return lambda target: tag in map(str, target.tags)
 
-      tag_filter = wrap_filters(create_filters(self.global_options.tag, filter_for_tag))
+      tag_filter = wrap_filters(create_filters(self._tag, filter_for_tag))
 
       for spec in specs:
-        for address in spec_parser.parse_addresses(spec, fail_fast):
-          self.build_graph.inject_address_closure(address)
-          tgt = self.build_graph.get_target(address)
-          if tag_filter(tgt):
-            self.targets.append(tgt)
+        for address in self._spec_parser.parse_addresses(spec, fail_fast):
+          self._build_graph.inject_address_closure(address)
+          target = self._build_graph.get_target(address)
+          if tag_filter(target):
+            self._targets.append(target)
+
+  def _has_quiet_task(self):
+    return any(goal.has_task_of_type(QuietTaskMixin) for goal in self._goals)
+
+  def _setup(self):
+    # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
+    with self._run_tracker.new_workunit(name='bootstrap', labels=[WorkUnitLabel.SETUP]):
+      source_root_bootstrapper = SourceRootBootstrapper.global_instance()
+      source_root_bootstrapper.bootstrap(self._address_mapper, self._build_file_parser)
+
+    with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
+      self._expand_goals(self._requested_goals)
+      self._expand_specs(self._target_specs, self._fail_fast)
+
+      # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
+      self._run_tracker.run_info.add_scm_info()
+
+      # Update the reporting settings now that we have options and goals.
+      self._reporting.update_reporting(self._global_options,
+                                       self._has_quiet_task() or self._explain,
+                                       self._run_tracker,
+                                       self._invalidation_report)
+
+      context = Context(options=self._options,
+                        run_tracker=self._run_tracker,
+                        target_roots=self._targets,
+                        requested_goals=self._requested_goals,
+                        build_graph=self._build_graph,
+                        build_file_parser=self._build_file_parser,
+                        address_mapper=self._address_mapper,
+                        spec_excludes=self._spec_excludes,
+                        invalidation_report=self._invalidation_report)
+
+    return context
+
+  def setup(self):
+    context = self._setup()
+    return GoalRunner(context=context,
+                      goals=self._goals,
+                      kill_nailguns=self._kill_nailguns,
+                      run_tracker=self._run_tracker,
+                      invalidation_report=self._invalidation_report)
+
+
+class GoalRunner(object):
+  """Lists installed goals or else executes a named goal."""
+
+  Factory = GoalRunnerFactory
+
+  def __init__(self, context, goals, run_tracker, invalidation_report, kill_nailguns,
+               exiter=sys.exit):
+    """
+    :param Context context: The global, pre-initialized Context as created by GoalRunnerFactory.
+    :param list[Goal] goals: The list of goals to act on.
+    :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
+    :param InvalidationReport invalidation_report: An InvalidationReport instance (Optional).
+    :param bool kill_nailguns: Whether or not to kill nailguns after the run.
+    :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
+    """
+    self._context = context
+    self._goals = goals
+    self._run_tracker = run_tracker
+    self._invalidation_report = invalidation_report
+    self._kill_nailguns = kill_nailguns
+    self._exiter = exiter
+
+  @classmethod
+  def subsystems(cls):
+    # Subsystems used outside of any task.
+    return {SourceRootBootstrapper, Reporting, RunTracker}
+
+  def _run(self):
+    unknown_goals = [goal.name for goal in self._goals if not goal.ordered_task_names()]
+    if unknown_goals:
+      self._context.log.error('Unknown goal(s): {}\n'.format(' '.join(unknown_goals)))
+      return 1
+
+    engine = RoundEngine()
+    result = engine.execute(self._context, self._goals)
+
+    if self._invalidation_report:
+      self._invalidation_report.report()
+
+    return result
 
   def run(self):
-    kill_nailguns = self.global_options.kill_nailguns
+    should_kill_nailguns = self._kill_nailguns
 
     try:
-      result = self._do_run()
+      result = self._run()
       if result:
-        self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
+        self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
     except KeyboardInterrupt:
-      self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
+      self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
       # On ctrl-c we always kill nailguns, otherwise they might keep running
       # some heavyweight compilation and gum up the system during a subsequent run.
-      kill_nailguns = True
+      should_kill_nailguns = True
       raise
     except Exception:
-      self.run_tracker.set_root_outcome(WorkUnit.FAILURE)
+      self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
       raise
     finally:
-      self.run_tracker.end()
+      self._run_tracker.end()
       # Must kill nailguns only after run_tracker.end() is called, otherwise there may still
       # be pending background work that needs a nailgun.
-      if kill_nailguns:
+      if should_kill_nailguns:
         # TODO: This is JVM-specific and really doesn't belong here.
         # TODO: Make this more selective? Only kill nailguns that affect state?
         # E.g., checkstyle may not need to be killed.
         NailgunProcessGroup().killall()
-
-    return result
-
-  def _has_quiet_task(self):
-    return any(goal.has_task_of_type(QuietTaskMixin) for goal in self.goals)
-
-  def _do_run(self):
-    # Update the reporting settings, now that we have flags etc.
-    if self.reporting.global_instance().get_options().invalidation_report:
-      invalidation_report = InvalidationReport()
-    else:
-      invalidation_report = None
-
-    self.reporting.update_reporting(self.global_options,
-                                    self._has_quiet_task() or self.global_options.explain,
-                                    self.run_tracker,
-                                    invalidation_report=invalidation_report)
-
-    context = Context(
-      options=self.options,
-      run_tracker=self.run_tracker,
-      target_roots=self.targets,
-      requested_goals=self.requested_goals,
-      build_graph=self.build_graph,
-      build_file_parser=self.build_file_parser,
-      address_mapper=self.address_mapper,
-      spec_excludes=self.spec_excludes,
-      invalidation_report=invalidation_report
-    )
-
-    unknown_goals = [goal.name for goal in self.goals if not goal.ordered_task_names()]
-    if unknown_goals:
-      context.log.error('Unknown goal(s): {}\n'.format(' '.join(unknown_goals)))
-      return 1
-
-    engine = RoundEngine()
-    result = engine.execute(context, self.goals)
-
-    if invalidation_report:
-      invalidation_report.report()
 
     return result

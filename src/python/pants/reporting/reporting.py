@@ -45,6 +45,10 @@ class Reporting(Subsystem):
                   '{workunits}.  Possible formatting values are {formats}'.format(
                workunits=WorkUnitLabel.keys(), formats=ToolOutputFormat.keys()))
 
+  @property
+  def invalidation_report(self):
+    return self.get_options().invalidation_report
+
   def initial_reporting(self, run_tracker):
     """Sets up the initial reporting configuration.
 
