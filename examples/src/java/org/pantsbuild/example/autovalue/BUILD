@@ -9,8 +9,8 @@ jvm_binary(name='autovalue',
 )
 
 java_library(name='autovalue-lib',
+  sources = globs('*'),
   dependencies = [
     '3rdparty/jvm/com/google/auto/value',
   ],
-  sources = globs('*'),
 )
