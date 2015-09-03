@@ -100,7 +100,9 @@ class FilesetRelPathWrapper(object):
       return result
 
     buildroot = get_buildroot()
-    rel_root = os.path.relpath(root, buildroot) if root != buildroot else ''
+    rel_root = os.path.relpath(root, buildroot)
+    if rel_root == '.':
+      rel_root = ''
     filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
     return FilesetWithSpec(rel_root, filespec, files_calculator)
 
