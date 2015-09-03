@@ -35,7 +35,8 @@ Some goals are made up of tasks; to specify an option for that task, use the dot
 _goal.task_ notation:
 
     :::bash
-    ./pants compile.java --no-delete-scratch src:: # compile src, keeping Java compile's "scratch files"
+    # compile src, keeping Java compile's "scratch files"
+    ./pants compile.java --no-delete-scratch src::
 
 You can specify one or more targets to operate upon. Target specifications come after goals
 and goal options on the command line.
@@ -67,8 +68,8 @@ Instead of passing an option on the command line, you can set an environment var
 an option in an `.ini` file. Pants "looks" for an option value on the command line, environment
 variable, and `.ini` file; it uses the first it finds.
 For a complete, precedence-ordered list of places Pants looks for option values, see the
-`Options` docstring in
-[src/python/pants/option/options.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py).
+`Options` docstring in [src/python/pants/option/options.py]
+(https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py).
 
 ### `PANTS_...` Environment Variables
 
@@ -83,16 +84,6 @@ commands opens a coverage report in your browser:
 Pants checks for an environment variable whose name is `PANTS` + the goal name (or goal+task name)
 + the option name; all of these in all-caps, joined by underscores (instead of dots or hyphens).
 
-Pants checks some environment variables that don't correspond to command-line options.
-E.g., though Pants uses the `PANTS_VERBOSE` environment variable, there's no `--verbose` flag
-to Pants.
-
-* `PANTS_BUILD_ROOT`
-* `PANTS_IVY_CACHE_DIR`
-* `PANTS_IVY_SETTINGS_XML`
-* `PANTS_LEAVE_CHROOT`
-* `PANTS_VERBOSE`
-
 ### `pants.ini` Settings File
 
 Pants can also read command-line options (and other options) from an `.ini` file. For example, if
@@ -104,10 +95,6 @@ your `pants.ini` file contains
 ...then whenever Pants carries out the `test.junit` task, it will behave as if you passed
 `test.junit --coverage-html-open`. If an environment variable and an `.ini` configuration both
 specify a value for some option, the environment variable "wins".
-
-Pants also checks some `.ini` settings that don't correspond to any command-line option.
-For example, though Pants uses the `PANTS_VERBOSE` environment variable, there's no `--verbose`
-flag to Pants.
 
 ### Overlay `.ini` Files with `--config-overrides`
 

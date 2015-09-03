@@ -143,6 +143,7 @@ class ThreadSafeCounter(object):
     with self.lock:
       self._counter -= 1
 
+
 class ExecutionGraph(object):
   """A directed acyclic graph of work to execute.
 

@@ -48,6 +48,7 @@ class TestContext(Context):
     """A runtracker stand-in that does no actual tracking."""
     class DummyArtifactCacheStats(object):
       def add_hit(self, cache_name, tgt): pass
+
       def add_miss(self, cache_name, tgt): pass
 
     artifact_cache_stats = DummyArtifactCacheStats()

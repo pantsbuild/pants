@@ -38,8 +38,15 @@ class Subsystem(SubsystemClientMixin, Optionable):
   """
   options_scope_category = ScopeInfo.SUBSYSTEM
 
+  class UninitializedSubsystemError(SubsystemError):
+    def __init__(self, class_name, scope):
+      super(Subsystem.UninitializedSubsystemError, self).__init__(
+        'Subsystem "{}" not initialized for scope "{}". '
+        'Is subsystem missing from subsystem_dependencies() in a task? '.format(class_name, scope))
+
   class CycleException(Exception):
     """Thrown when a circular dependency is detected."""
+
     def __init__(self, cycle):
       message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
           '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
@@ -99,6 +106,10 @@ class Subsystem(SubsystemClientMixin, Optionable):
   # TODO: A less clunky way to make option values available?
   _options = None
 
+  @classmethod
+  def set_options(cls, options):
+    cls._options = options
+
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
   _scoped_instances = {}
 
@@ -128,7 +139,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
   @classmethod
   def _instance_for_scope(cls, scope):
     if cls._options is None:
-      raise SubsystemError('Subsystem not initialized yet.')
+      raise cls.UninitializedSubsystemError(cls.__name__, scope)
     key = (cls, scope)
     if key not in cls._scoped_instances:
       cls._scoped_instances[key] = cls(scope, cls._options.for_scope(scope))

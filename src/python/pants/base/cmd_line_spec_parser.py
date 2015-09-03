@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 # Note: In general, 'spec' should not be a user visible term, it is usually appropriate to
 # substitute 'address' for a spec resolved to an address, or 'address selector' if you are
 # referring to an unresolved spec string.
-
 class CmdLineSpecParser(object):
   """Parses address selectors as passed from the command line.
 

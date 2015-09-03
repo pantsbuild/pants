@@ -56,6 +56,7 @@ class OptionsHelp(HelpRequest):
 
 class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
+
   def __init__(self, unknown_goals):
     super(UnknownGoalHelp, self).__init__()
     self.unknown_goals = unknown_goals

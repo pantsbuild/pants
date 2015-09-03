@@ -22,6 +22,7 @@ class ParserHierarchy(object):
   enclosed in the compile scope, which is enclosed in the global scope (represented by an
   empty string.)
   """
+
   def __init__(self, env, config, scope_infos):
     # Sorting ensures that ancestors precede descendants.
     scope_infos = sorted(set(list(scope_infos)), key=lambda si: si.scope)

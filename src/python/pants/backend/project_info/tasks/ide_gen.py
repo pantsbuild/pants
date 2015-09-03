@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 # 2.) the target may be under development in which case it may not have sources yet - its pretty
 #     common to write a BUILD and ./pants idea the target inside to start development at which
 #     point there are no source files yet - and the developer intents to add them using the ide.
-
 def is_scala(target):
   return target.has_sources('.scala') or target.is_scala
 

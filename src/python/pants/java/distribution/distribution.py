@@ -281,6 +281,7 @@ class DistributionLocator(Subsystem):
 
   class _Location(namedtuple('Location', ['home_path', 'bin_path'])):
     """Represents the location of a java distribution."""
+
     @classmethod
     def from_home(cls, home):
       """Creates a location given the JAVA_HOME directory.

@@ -18,12 +18,14 @@ class NoopExecTask(Task):
     not need this, but some tasks, eg "compile changed targets" just know they want the "compile"
     goal to be run, rather than a specific product, eg jvm classfiles.
   """
+
   def execute(self):
     pass
 
 
 class NoopCompile(NoopExecTask):
   """A no-op that provides a product type that can be used to force scheduling."""
+
   @classmethod
   def product_types(cls):
     return ['ran_compile']
@@ -31,6 +33,7 @@ class NoopCompile(NoopExecTask):
 
 class NoopTest(NoopExecTask):
   """A no-op that provides a product type that can be used to force scheduling."""
+
   @classmethod
   def product_types(cls):
     return ['ran_tests']

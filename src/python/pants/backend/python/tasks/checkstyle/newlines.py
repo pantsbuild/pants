@@ -13,6 +13,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class NewlinesSubsystem(Subsystem):
   options_scope = 'pycheck-newlines'
+
   @classmethod
   def register_options(cls, register):
     super(NewlinesSubsystem, cls).register_options(register)

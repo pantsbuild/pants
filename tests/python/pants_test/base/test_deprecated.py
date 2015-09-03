@@ -107,6 +107,7 @@ def test_removal_version_bad():
     def test_func():
       pass
 
+
 def test_removal_version_same():
   with pytest.raises(PastRemovalVersionError):
     check_deprecated_semver(VERSION)
@@ -116,6 +117,7 @@ def test_removal_version_same():
     def test_func():
       pass
 
+
 def test_removal_version_too_small():
   with pytest.raises(PastRemovalVersionError):
     check_deprecated_semver('0.0.27')
@@ -124,6 +126,7 @@ def test_removal_version_too_small():
     @deprecated('0.0.27')
     def test_func():
       pass
+
 
 def test_bad_decorator_nesting():
   with pytest.raises(BadDecoratorNestingError):

@@ -26,7 +26,6 @@ class ZincAnalysisParser(AnalysisParser):
     self._underlying_parser = UnderlyingParser()
 
   # Implement AnalysisParser methods.
-
   def parse(self, infile):
     """Parse a ZincAnalysis instance from an open text file."""
     with raise_on_eof(infile):

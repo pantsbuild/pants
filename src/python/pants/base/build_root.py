@@ -16,8 +16,8 @@ class BuildRoot(Singleton):
   """Represents the global workspace build root.
 
   By default a pants workspace is defined by a root directory where the workspace configuration
-  file - 'pants.ini' - lives.  This can be overridden by exporting 'PANTS_BUILD_ROOT' in the
-  environment with the path to the build root or manipulated through this interface.
+  file - 'pants.ini' - lives.  This path can also be manipulated through this interface for
+  re-location of the build root in tests.
   """
 
   class NotFoundError(Exception):
@@ -30,16 +30,13 @@ class BuildRoot(Singleton):
   def path(self):
     """Returns the build root for the current workspace."""
     if self._root_dir is None:
-      if 'PANTS_BUILD_ROOT' in os.environ:
-        self._root_dir = os.environ['PANTS_BUILD_ROOT']
-      else:
-        buildroot = os.path.abspath(os.getcwd())
-        while not os.path.exists(os.path.join(buildroot, 'pants.ini')):
-          if buildroot != os.path.dirname(buildroot):
-            buildroot = os.path.dirname(buildroot)
-          else:
-            raise self.NotFoundError('Could not find pants.ini!')
-        self._root_dir = buildroot
+      buildroot = os.path.abspath(os.getcwd())
+      while not os.path.exists(os.path.join(buildroot, 'pants.ini')):
+        if buildroot != os.path.dirname(buildroot):
+          buildroot = os.path.dirname(buildroot)
+        else:
+          raise self.NotFoundError('Could not find pants.ini!')
+      self._root_dir = buildroot
     return self._root_dir
 
   @path.setter

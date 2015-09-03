@@ -19,7 +19,6 @@ from pants_test.base_test import BaseTest
 
 # TODO(Eric Ayers) Explicit unit tests are missing for registered_alises, parse_spec,
 # parse_build_file_family
-
 class ErrorTarget(Target):
 
   def __init__(self, *args, **kwargs):

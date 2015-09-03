@@ -40,5 +40,7 @@ python_library(
     ':executor',
     ':nailgun_executor',
     'src/python/pants/base:workunit',
+    'src/python/pants/java/jar:manifest',
+    'src/python/pants/util:contextutil',
   ],
 )

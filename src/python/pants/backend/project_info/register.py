@@ -18,6 +18,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
   pass
 
+
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals
 def register_goals():
   # IDE support.
