@@ -1,0 +1,12 @@
+python_library(
+  name='scalajs',
+  dependencies=[
+    'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
+    'contrib/scalajs/src/python/pants/contrib/scalajs/targets',
+    'contrib/scalajs/src/python/pants/contrib/scalajs/tasks',
+    'src/python/pants/backend/core/tasks:group_task',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/goal:task_registrar',
+  ],
+  sources=globs('*.py'),
+)

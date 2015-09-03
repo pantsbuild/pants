@@ -45,9 +45,6 @@ class ScalaLibrary(ExportableJvmLibrary):
   def traversable_dependency_specs(self):
     for spec in super(ScalaLibrary, self).traversable_dependency_specs:
       yield spec
-
-    # TODO(John Sirois): Targets should be able to set their scala platform version
-    # explicitly, and not have to conform to this global setting.
     for library_spec in ScalaPlatform.global_instance().runtime:
       yield library_spec
 

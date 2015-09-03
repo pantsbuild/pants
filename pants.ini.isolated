@@ -12,7 +12,6 @@ use_jmake: False
 [compile.zinc]
 strategy: isolated
 worker_count: 4
-zinc: [':zinc']
 jvm_options: [
     '-Xmx4g', '-XX:MaxPermSize=512m', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4',
     # bigger cache size for our big projects (default is just 5)
@@ -32,3 +31,8 @@ warning_args: [
 no_warning_args: [
     '-S-nowarn',
   ]
+
+
+[compile.scala-js]
+strategy: isolated
+worker_count: 4

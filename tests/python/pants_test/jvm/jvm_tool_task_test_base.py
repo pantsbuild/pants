@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -27,6 +28,7 @@ class JvmToolTaskTestBase(TaskTestBase):
     return BuildFileAliases.create(
       targets={
         'jar_library': JarLibrary,
+        'target': Dependencies,
       },
       objects={
         'jar': JarDependency,

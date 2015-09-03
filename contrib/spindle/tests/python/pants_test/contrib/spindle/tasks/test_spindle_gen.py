@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.build_file_aliases import BuildFileAliases
@@ -28,6 +29,7 @@ class SpindleGenTest(JvmToolTaskTestBase):
       targets={
         'spindle_thrift_library': SpindleThriftLibrary,
         'jar_library': JarLibrary,
+        'target': Dependencies,
       },
       objects={
         'jar': JarDependency,
