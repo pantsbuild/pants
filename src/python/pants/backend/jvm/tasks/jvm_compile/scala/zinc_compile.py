@@ -87,6 +87,13 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register, 'compiler-interface')
     cls.register_jvm_tool(register, 'sbt-interface')
 
+  def __init__(self, *args, **kwargs):
+    super(BaseZincCompile, self).__init__(*args, **kwargs)
+
+    # A directory independent of any other classpath which can contain per-target
+    # plugin resource files.
+    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
+
   def select(self, target):
     raise NotImplementedError()
 
@@ -221,9 +228,6 @@ class ZincCompile(BaseZincCompile):
   def __init__(self, *args, **kwargs):
     super(ZincCompile, self).__init__(*args, **kwargs)
 
-    # A directory independent of any other classpath which can contain per-target
-    # plugin resource files.
-    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
     self._lazy_plugin_args = None
 
   def plugin_jars(self):

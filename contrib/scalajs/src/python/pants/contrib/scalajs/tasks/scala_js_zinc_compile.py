@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -25,10 +25,6 @@ class ScalaJSZincCompile(BaseZincCompile):
   def __init__(self, *args, **kwargs):
     super(ScalaJSZincCompile, self).__init__(*args, **kwargs)
 
-    # A directory independent of any other classpath which can contain per-target
-    # plugin resource files.
-    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
-
     # The set of target addresses that should be selected by this member.
     self._selected_target_addresses = None
 
@@ -45,17 +41,16 @@ class ScalaJSZincCompile(BaseZincCompile):
     TODO: This method implements a stateful, hacky workaround. The ability to select transitively
     should probably be baked into GroupTask.
     """
-    if self._selected_target_addresses:
-      return target.address in self._selected_target_addresses
-
-    self._selected_target_addresses = set()
-    for target in self.context.targets():
-      if not isinstance(target, ScalaJSBinary):
-        continue
-      # Select ScalaJSBinary and its transitive scala dependencies.
-      for dep in target.closure():
-        if dep.has_sources('.scala'):
-          self._selected_target_addresses.add(dep.address)
+    if self._selected_target_addresses is None:
+      self._selected_target_addresses = set()
+      for target in self.context.targets():
+        if not isinstance(target, ScalaJSBinary):
+          continue
+        # Select ScalaJSBinary and its transitive scala dependencies.
+        for dep in target.closure():
+          if dep.has_sources('.scala'):
+            self._selected_target_addresses.add(dep.address)
+    return target.address in self._selected_target_addresses
 
   def select_source(self, source_file_path):
     return source_file_path.endswith('.scala')
