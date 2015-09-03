@@ -31,7 +31,6 @@ from pants.logging.setup import setup_logging
 from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.subsystem.subsystem import Subsystem
@@ -201,7 +200,6 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    self._invalidation_report = self._get_invalidation_report()
     self._build_file_type = self._get_buildfile_type(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
     self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._build_file_type)
@@ -212,9 +210,6 @@ class GoalRunnerFactory(object):
       spec_excludes=self._spec_excludes,
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
-
-  def _get_invalidation_report(self):
-    return InvalidationReport() if self._reporting.invalidation_report else None
 
   def _get_buildfile_type(self, build_file_rev):
     """Selects the BuildFile type for use in a given pants run."""
@@ -254,10 +249,10 @@ class GoalRunnerFactory(object):
           if tag_filter(target):
             self._targets.append(target)
 
-  def _has_quiet_task(self):
-    return any(goal.has_task_of_type(QuietTaskMixin) for goal in self._goals)
+  def _is_quiet(self):
+    return any(goal.has_task_of_type(QuietTaskMixin) for goal in self._goals) or self._explain
 
-  def _setup(self):
+  def _setup_context(self):
     # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
     with self._run_tracker.new_workunit(name='bootstrap', labels=[WorkUnitLabel.SETUP]):
       source_root_bootstrapper = SourceRootBootstrapper.global_instance()
@@ -270,11 +265,10 @@ class GoalRunnerFactory(object):
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()
 
-      # Update the reporting settings now that we have options and goals.
-      self._reporting.update_reporting(self._global_options,
-                                       self._has_quiet_task() or self._explain,
-                                       self._run_tracker,
-                                       self._invalidation_report)
+      # Update the Reporting settings now that we have options and goal info.
+      invalidation_report = self._reporting.update_reporting(self._global_options,
+                                                             self._is_quiet(),
+                                                             self._run_tracker)
 
       context = Context(options=self._options,
                         run_tracker=self._run_tracker,
@@ -284,17 +278,17 @@ class GoalRunnerFactory(object):
                         build_file_parser=self._build_file_parser,
                         address_mapper=self._address_mapper,
                         spec_excludes=self._spec_excludes,
-                        invalidation_report=self._invalidation_report)
+                        invalidation_report=invalidation_report)
 
-    return context
+    return context, invalidation_report
 
   def setup(self):
-    context = self._setup()
+    context, invalidation_report = self._setup_context()
     return GoalRunner(context=context,
                       goals=self._goals,
                       kill_nailguns=self._kill_nailguns,
                       run_tracker=self._run_tracker,
-                      invalidation_report=self._invalidation_report)
+                      invalidation_report=invalidation_report)
 
 
 class GoalRunner(object):
@@ -324,7 +318,7 @@ class GoalRunner(object):
     # Subsystems used outside of any task.
     return {SourceRootBootstrapper, Reporting, RunTracker}
 
-  def _run(self):
+  def _execute_engine(self):
     unknown_goals = [goal.name for goal in self._goals if not goal.ordered_task_names()]
     if unknown_goals:
       self._context.log.error('Unknown goal(s): {}\n'.format(' '.join(unknown_goals)))
@@ -342,7 +336,7 @@ class GoalRunner(object):
     should_kill_nailguns = self._kill_nailguns
 
     try:
-      result = self._run()
+      result = self._execute_engine()
       if result:
         self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
     except KeyboardInterrupt:
