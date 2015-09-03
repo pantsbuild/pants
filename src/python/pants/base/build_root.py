@@ -17,7 +17,7 @@ class BuildRoot(Singleton):
 
   By default a pants workspace is defined by a root directory where the workspace configuration
   file - 'pants.ini' - lives.  This path can also be manipulated through this interface for
-  re-location of the build root in tests
+  re-location of the build root in tests.
   """
 
   class NotFoundError(Exception):

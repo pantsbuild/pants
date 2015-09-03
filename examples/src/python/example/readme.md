@@ -191,7 +191,7 @@ turn on to see what's going on in the background:
 
     :::bash
     $ ./pants -ldebug repl examples/src/python/example/hello/greet
-    
+
     15:11:41 00:00 [main]
                    (To run a reporting server: ./pants server)
       ...lots of build output...
