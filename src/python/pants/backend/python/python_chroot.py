@@ -65,7 +65,8 @@ class PythonChroot(object):
                builder,
                targets,
                platforms,
-               extra_requirements=None):
+               extra_requirements=None,
+               log=None):
     self._python_setup = python_setup
     self._python_repos = python_repos
     self._ivy_bootstrapper = ivy_bootstrapper
@@ -76,6 +77,7 @@ class PythonChroot(object):
     self._targets = targets
     self._platforms = platforms
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
+    self._logger = log or logger
 
     # Note: unrelated to the general pants artifact cache.
     self._artifact_cache_root = os.path.join(
@@ -87,9 +89,8 @@ class PythonChroot(object):
     """Deletes this chroot from disk if it has been dumped."""
     safe_rmtree(self.path())
 
-  def debug(self, msg, indent=0):
-    if os.getenv('PANTS_VERBOSE') is not None:
-      print('{}{}'.format(' ' * indent, msg))
+  def debug(self, msg):
+    self._logger.debug(msg)
 
   def path(self):
     return os.path.realpath(self._builder.path())

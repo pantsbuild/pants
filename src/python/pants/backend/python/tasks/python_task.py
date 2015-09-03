@@ -123,7 +123,8 @@ class PythonTask(Task):
                         builder=builder,
                         targets=targets,
                         platforms=platforms,
-                        extra_requirements=extra_requirements)
+                        extra_requirements=extra_requirements,
+                        log=self.context.log)
 
   @contextmanager
   def cached_chroot(self, interpreter, pex_info, targets, platforms,
