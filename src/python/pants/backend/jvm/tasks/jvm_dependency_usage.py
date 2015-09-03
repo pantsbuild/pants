@@ -17,6 +17,22 @@ from pants.util.fileutil import create_size_estimators
 
 
 class JvmDependencyUsage(JvmDependencyAnalyzer):
+  """Determines the dependency usage ratios of targets.
+
+  Analyzes the relationship between the products a target T produces vs. the products
+  which T's dependents actually require (this is done by observing analysis files).
+  If the ratio of required products to available products is low, then this is a sign
+  that target T isn't factored well.
+
+  A graph is formed from these results, where each node of the graph is a target, and
+  each edge is a product usage ratio between a target and its dependency. The nodes
+  also contain additional information to guide refactoring -- for example, the estimated
+  job size of each target, which indicates the impact a poorly factored target has on
+  the build times. (see DependencyUsageGraph->to_json)
+
+  The graph is outputted into a JSON file, with the intent of consuming and analyzing
+  the graph via some external tool.
+  """
 
   size_estimators = create_size_estimators()
 
