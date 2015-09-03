@@ -50,7 +50,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
 
     classes_by_target = self.context.products.get_data('classes_by_target')
     for target in targets:
-      product_deps_by_src = self.context.products.get_data('actual_source_deps').get(target)
+      product_deps_by_src = self.context.products.get_data('product_deps_by_src').get(target)
       if product_deps_by_src is None:
         self.context.log.warn('No dependency analysis for {}'.format(target.address.spec))
         continue

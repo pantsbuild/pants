@@ -33,7 +33,7 @@ class JvmDependencyAnalyzer(Task):
   def prepare(cls, options, round_manager):
     super(JvmDependencyAnalyzer, cls).prepare(options, round_manager)
     if not options.skip:
-      round_manager.require_data('actual_source_deps')
+      round_manager.require_data('product_deps_by_src')
       round_manager.require_data('classes_by_target')
       round_manager.require_data('compile_classpath')
 
