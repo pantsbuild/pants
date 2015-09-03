@@ -126,7 +126,6 @@ class PythonTask(Task):
                         extra_requirements=extra_requirements,
                         log=self.context.log)
 
-  @contextmanager
   def cached_chroot(self, interpreter, pex_info, targets, platforms,
                     extra_requirements=None, executable_file_content=None):
     """Returns a cached PythonChroot created with the specified args.
@@ -155,16 +154,11 @@ class PythonTask(Task):
     pex_info = PexInfo.from_pex(path)
     # Now create a PythonChroot wrapper without dumping it.
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
-    chroot = self.create_chroot(
-      interpreter=interpreter,
-      builder=builder,
-      targets=targets,
-      platforms=platforms,
-      extra_requirements=extra_requirements)
-    # TODO: Doesn't really need to be a contextmanager, but it's convenient to make it so
-    # while transitioning calls to temporary_chroot to calls to cached_chroot.
-    # We can revisit after that transition is complete.
-    yield chroot
+    return self.create_chroot(interpreter=interpreter,
+                              builder=builder,
+                              targets=targets,
+                              platforms=platforms,
+                              extra_requirements=extra_requirements)
 
   @contextmanager
   def temporary_chroot(self, interpreter, pex_info, targets, platforms,
