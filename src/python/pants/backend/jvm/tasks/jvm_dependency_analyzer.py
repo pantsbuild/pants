@@ -83,6 +83,7 @@ class JvmDependencyAnalyzer(Task):
     compile_classpath = self.context.products.get_data('compile_classpath')
     for jar_lib in self.context.targets(lambda t: isinstance(t, JarLibrary)):
       for _, artifact_path in compile_classpath.get_for_target(jar_lib, transitive=False):
+        targets_by_file[artifact_path].add(jar_lib)
         if artifact_path.endswith('.jar'):
           for cls in self._jar_classfiles(artifact_path):
             targets_by_file[cls].add(jar_lib)
