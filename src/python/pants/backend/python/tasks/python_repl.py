@@ -46,17 +46,17 @@ class PythonRepl(PythonTask):
 
       pex_info = PexInfo.default()
       pex_info.entry_point = entry_point
-      with self.cached_chroot(interpreter=interpreter,
-                              pex_info=pex_info,
-                              targets=targets,
-                              platforms=None,
-                              extra_requirements=extra_requirements) as chroot:
-        pex = chroot.pex()
-        self.context.release_lock()
-        with stty_utils.preserve_stty_settings():
-          with self.context.new_workunit(name='run', labels=[WorkUnitLabel.RUN]):
-            po = pex.run(blocking=False, **pex_run_kwargs)
-            try:
-              return po.wait()
-            except KeyboardInterrupt:
-              pass
+      chroot = self.cached_chroot(interpreter=interpreter,
+                                  pex_info=pex_info,
+                                  targets=targets,
+                                  platforms=None,
+                                  extra_requirements=extra_requirements)
+      pex = chroot.pex()
+      self.context.release_lock()
+      with stty_utils.preserve_stty_settings():
+        with self.context.new_workunit(name='run', labels=[WorkUnitLabel.RUN]):
+          po = pex.run(blocking=False, **pex_run_kwargs)
+          try:
+            return po.wait()
+          except KeyboardInterrupt:
+            pass
