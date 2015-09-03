@@ -26,30 +26,37 @@ def create_size_estimators():
   }
 
 
-class JvmDependencyScore(JvmDependencyAnalyzer):
+class JvmDependencyUsage(JvmDependencyAnalyzer):
 
   size_estimators = create_size_estimators()
 
   @classmethod
   def register_options(cls, register):
-    super(JvmDependencyScore, cls).register_options(register)
+    super(JvmDependencyUsage, cls).register_options(register)
     register('--size-estimator',
              choices=list(cls.size_estimators.keys()), default='filesize',
              help='The method of target size estimation.')
-    register('--root-targets-only', default=True,
-             help='Score only the root targets, not their dependencies.')
+    register('--transitive', default=True, action='store_true',
+             help='Score all targets in build graph transitively.')
     register('--output-file', type=str,
-             help='Output score graph as JSON to the specified file.')
+             help='Output dependency usage graph as JSON to the specified file.')
 
   def execute(self):
     if self.get_options().skip:
       return
-    targets = (self.context.target_roots if self.get_options().root_targets_only
-               else self.context.targets())
-    self.score(targets)
+    targets = (self.context.targets() if self.get_options().transitive
+               else self.context.target_roots)
+    graph = self.create_dep_usage_graph(targets)
+    output_file = self.get_options().output_file
+    if output_file:
+      self.context.log.info('Writing dependency usage graph to {}'.format(output_file))
+      with open(output_file, 'w') as fh:
+        fh.write(graph.to_json())
+    else:
+      self.context.log.error('No output file specified')
 
-  def score(self, targets):
-    graph = DepScoreGraph(self.size_estimators[self.get_options().size_estimator])
+  def create_dep_usage_graph(self, targets):
+    graph = DependencyUsageGraph(self.size_estimators[self.get_options().size_estimator])
 
     classes_by_target = self.context.products.get_data('classes_by_target')
     for target in targets:
@@ -91,15 +98,10 @@ class JvmDependencyScore(JvmDependencyAnalyzer):
           continue
         graph[target].add_child(graph[dep_tgt], len(used_product_deps), len(total_products))
 
-    output_file = self.get_options().output_file
-    if output_file:
-      self.context.log.info('Writing dependency score graph to {}'.format(output_file))
-      with open(output_file, 'w') as fh:
-        fh.write(graph.to_json())
-    else:
-      self.context.log.error('No output file specified')
+    return graph
 
-class DepScoreGraph(dict):
+
+class DependencyUsageGraph(dict):
 
   class Node(object):
 
@@ -111,7 +113,7 @@ class DepScoreGraph(dict):
       self.min_products_used = None
       self.max_products_used = None
       self.products_used_count = 0
-      # Maps child node to percent used of child node's target.
+      # Maps child node to tuple of (products used, products total) of said child node.
       self.children = {}
 
     def add_child(self, node, products_used, products_total):
@@ -166,4 +168,4 @@ class DepScoreGraph(dict):
               'ratio': 1.0 * products_used / max(products_total, 1),
             } for child_node, (products_used, products_total) in node.children.items()]
         }
-    return json.dumps(res_dict, indent=2)
+    return json.dumps(res_dict, indent=2, sort_keys=True)

@@ -1,0 +1,29 @@
+{
+  "examples/src/java/org/pantsbuild/example/hello/greet:greet": {
+    "avg_products_used": 1.0, 
+    "dependencies": [], 
+    "inbound_edges": 1, 
+    "job_size": 1098, 
+    "max_products_used": 1, 
+    "min_products_used": 1, 
+    "synthetic": false, 
+    "trans_job_size": 1098
+  }, 
+  "examples/src/java/org/pantsbuild/example/hello/main:main-bin": {
+    "avg_products_used": 0.0, 
+    "dependencies": [
+      {
+        "products_total": 1, 
+        "products_used": 1, 
+        "ratio": 1.0, 
+        "target": "examples/src/java/org/pantsbuild/example/hello/greet:greet"
+      }
+    ], 
+    "inbound_edges": 1, 
+    "job_size": 724, 
+    "max_products_used": null, 
+    "min_products_used": null, 
+    "synthetic": false, 
+    "trans_job_size": 1837
+  }
+}

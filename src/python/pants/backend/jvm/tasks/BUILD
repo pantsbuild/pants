@@ -20,7 +20,7 @@ python_library(
     ':junit_run',
     ':jvm_binary_task',
     ':jvm_dependency_check',
-    ':jvm_dependency_score',
+    ':jvm_dependency_usage',
     ':jvm_platform_analysis',
     ':jvm_run',
     ':jvm_task',
@@ -326,8 +326,8 @@ python_library(
 )
 
 python_library(
-  name = 'jvm_dependency_score',
-  sources = ['jvm_dependency_score.py'],
+  name = 'jvm_dependency_usage',
+  sources = ['jvm_dependency_usage.py'],
   dependencies = [
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
