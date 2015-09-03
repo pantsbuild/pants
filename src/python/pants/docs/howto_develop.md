@@ -17,9 +17,6 @@ As pants is implemented in python it can be run directly from sources.
     $ ./pants goals
     <remainder of output omitted for brevity>
 
-Notice this invocation specifies the `PANTS_DEV` environment variable.
-By defining `PANTS_DEV` pants will be run from sources.
-
 Building a Pants PEX for Production
 -----------------------------------
 

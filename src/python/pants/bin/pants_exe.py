@@ -68,10 +68,8 @@ def _run(exiter):
   # Launch RunTracker as early as possible (just after Subsystem options are initialized).
   run_tracker, reporting = ReportingInitializer().setup()
 
-  # Determine and check validity of the buildroot.
+  # Determine the build root dir.
   root_dir = get_buildroot()
-  if not os.path.exists(root_dir):
-    exiter.exit_and_fail('PANTS_BUILD_ROOT does not point to a valid path: {}'.format(root_dir))
 
   # Setup and run GoalRunner.
   goal_runner = GoalRunner.Factory(root_dir, options, build_config, run_tracker, reporting).setup()
