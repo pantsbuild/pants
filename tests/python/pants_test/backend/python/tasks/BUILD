@@ -58,6 +58,7 @@ python_tests(
   sources=['test_python_repl.py'],
   dependencies=[
     ':python_task_test_base',
+    'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:all_utils',

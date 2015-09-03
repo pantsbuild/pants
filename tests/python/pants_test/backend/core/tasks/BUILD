@@ -4,9 +4,34 @@
 target(
   name='tasks',
   dependencies=[
+    ':bash_completion',
     ':markdown_to_html',
+    'mutex_task_mixin',
     ':scm_publish',
   ],
+)
+
+python_tests(
+  name='bash_completion',
+  sources=['test_bash_completion.py'],
+  coverage=['pants.backend.core.tasks.bash_completion'],
+  dependencies=[
+    '3rdparty/python:mock',
+    'src/python/pants/backend/core/tasks:bash_completion',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
+  name='cache_cleanup',
+  sources=['test_cache_cleanup.py'],
+  coverage=['pants.backend.core.tasks.bash_completion'],
+  dependencies=[
+    'src/python/pants/backend/jvm/tasks/jvm_compile:java',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+    'src/python/pants/util:contextutil',
+  ]
 )
 
 python_tests(
@@ -39,34 +64,22 @@ python_tests(
 )
 
 python_tests(
+  name='mutex_task_mixin',
+  sources=['test_mutex_task_mixin.py'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:mutex_task_mixin',
+    'src/python/pants/base:target',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
   name='scm_publish',
   sources=['test_scm_publish.py'],
   coverage=['pants.backend.core.tasks.scm_publish'],
   dependencies=[
     '3rdparty/python:mock',
     'src/python/pants/backend/core/tasks:scm_publish',
-  ]
-)
-
-python_tests(
-  name='bash_completion',
-  sources=['test_bash_completion.py'],
-  coverage=['pants.backend.core.tasks.bash_completion'],
-  dependencies=[
-    '3rdparty/python:mock',
-    'src/python/pants/backend/core/tasks:bash_completion',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
-  name='cache_cleanup',
-  sources=['test_cache_cleanup.py'],
-  coverage=['pants.backend.core.tasks.bash_completion'],
-  dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile:java',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
-    'src/python/pants/util:contextutil',
   ]
 )
