@@ -332,6 +332,7 @@ python_library(
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
+    'src/python/pants/util:fileutil',
   ]
 )
 

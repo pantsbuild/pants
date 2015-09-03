@@ -7,23 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import create_size_estimators
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
-
-
-def create_size_estimators():
-  def line_count(filename):
-    with open(filename, 'rb') as fh:
-      return sum(1 for line in fh)
-  return {
-    'linecount': lambda srcs: sum(linecount(src) for src in srcs),
-    'filecount': lambda srcs: len(srcs),
-    'filesize': lambda srcs: sum(os.path.getsize(src) for src in srcs),
-    'nosize': lambda srcs: 0,
-  }
+from pants.util.fileutil import create_size_estimators
 
 
 class JvmDependencyUsage(JvmDependencyAnalyzer):
@@ -62,19 +52,18 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     for target in targets:
       product_deps_by_src = self.context.products.get_data('actual_source_deps').get(target)
       if product_deps_by_src is None:
-        # No analysis for this target -- skip it.
+        self.context.log.warn('No dependency analysis for {}'.format(target.address.spec))
         continue
 
       # Maps some dependency target d to the exact products of d which are used by :param target:
       used_product_deps_by_target = defaultdict(set)
-      abs_srcs = [os.path.join(get_buildroot(), src)
-                  for src in target.sources_relative_to_buildroot()]
-      for src in abs_srcs:
-        for product_dep in product_deps_by_src.get(src, []):
+      for src in target.sources_relative_to_buildroot():
+        abs_src = os.path.join(get_buildroot(), src)
+        for product_dep in product_deps_by_src.get(abs_src, []):
           dep_tgts = self.targets_by_file.get(product_dep)
           if dep_tgts is None:
             # product_dep is from JVM runtime / bootstrap jar, so skip.
-            pass
+            continue
           else:
             for tgt in dep_tgts:
               used_product_deps_by_target[tgt].add(product_dep)
@@ -92,11 +81,19 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
             or isinstance(dep_tgt, JarLibrary)):
           continue
 
-        used_product_deps = used_product_deps_by_target.get(dep_tgt, [])
-        total_products = list(p for _, paths in classes_by_target[dep_tgt].rel_paths() for p in paths)
-        if not total_products:
+        used_products = len(used_product_deps_by_target.get(dep_tgt, []))
+        total_products = sum(1 for _, paths in classes_by_target[dep_tgt].rel_paths() for p in paths)
+        if total_products == 0:
+          # The dep_tgt is a 3rd party library, so skip.
           continue
-        graph[target].add_child(graph[dep_tgt], len(used_product_deps), len(total_products))
+
+        node = graph[target]
+        if dep_tgt.is_original:
+          node.add_dep(graph[dep_tgt], used_products, total_products)
+        else:
+          # The dep_tgt is synthetic -- so we want to attribute it's used / total products to
+          # the target it was derived from, which may already exist as a dependency of node.
+          node.update_dep(graph[dep_tgt.derived_from], used_products, total_products)
 
     return graph
 
@@ -105,30 +102,27 @@ class DependencyUsageGraph(dict):
 
   class Node(object):
 
-    def __init__(self, target, job_size, trans_job_size):
+    def __init__(self, target):
       self.target = target
-      self.inbound_edges = len(target.dependents)
-      self.job_size = job_size
-      self.trans_job_size = trans_job_size
-      self.min_products_used = None
-      self.max_products_used = None
-      self.products_used_count = 0
-      # Maps child node to tuple of (products used, products total) of said child node.
-      self.children = {}
+      # Maps dep node to tuple of (products used, products total) of said dep node.
+      self.usage_by_dep = defaultdict(lambda: (0, 0))
 
-    def add_child(self, node, products_used, products_total):
-      def get_update(f, n):
-        return f(n, products_used) if n is not None else products_used
-      node.min_products_used = get_update(min, node.min_products_used)
-      node.max_products_used = get_update(max, node.max_products_used)
-      node.products_used_count += products_used
-      self.children[node] = (products_used, products_total)
+    def add_dep(self, node, products_used, products_total):
+      self.usage_by_dep[node] = (products_used, products_total)
+
+    def update_dep(self, node, products_used, products_total):
+      old_products_used, old_products_total = self.usage_by_dep[node]
+      self.usage_by_dep[node] = (old_products_used + products_used,
+                                 old_products_total + products_total)
 
     def __eq__(self, other):
-      return self.target == other.target
+      return self.target.address == other.target.address
+
+    def __ne__(self, other):
+      return not self.__eq__(other)
 
     def __hash_(self):
-      return hash(self.target)
+      return hash(self.target.address)
 
   def __init__(self, size_estimator):
     self._size_estimator = size_estimator
@@ -136,7 +130,7 @@ class DependencyUsageGraph(dict):
     self._trans_job_size_cache = {}
 
   def __missing__(self, target):
-    node = self[target] = self.Node(target, self._job_size(target), self._trans_job_size(target))
+    node = self[target] = self.Node(target)
     return node
 
   def _job_size(self, target):
@@ -150,22 +144,42 @@ class DependencyUsageGraph(dict):
       self._trans_job_size_cache[target] = self._job_size(target) + dep_sum
     return self._trans_job_size_cache[target]
 
+  def _aggregate_product_usage_stats(self):
+    """Compute the min, max, and total products used for each node in the current graph.
+
+    Returns a dict mapping each node to a named tuple of (min_used, max_used, total_used).
+    """
+    UsageStats = namedtuple('UsageStats', ['min_used', 'max_used', 'total_used'])
+    usage_stats_by_node = defaultdict(lambda: UsageStats(0, 0, 0))
+    for _, node in self.items():
+      for dep_node, (products_used, _) in node.usage_by_dep.items():
+        if dep_node not in usage_stats_by_node:
+          usage_stats_by_node[dep_node] = UsageStats(products_used, products_used, products_used)
+        else:
+          old = usage_stats_by_node[dep_node]
+          usage_stats_by_node[dep_node] = UsageStats(min(old.min_used, products_used),
+                                                     max(old.max_used, products_used),
+                                                     old.total_used + products_used)
+    return usage_stats_by_node
+
   def to_json(self):
     res_dict = {}
+    usage_stats_by_node = self._aggregate_product_usage_stats()
     for _, node in self.items():
+      usage_stats = usage_stats_by_node[node]
+      inbound_edges = len(node.target.dependents)
       res_dict[node.target.address.spec] = {
-          'synthetic': node.target.is_synthetic,
-          'job_size': node.job_size,
-          'trans_job_size': node.trans_job_size,
-          'inbound_edges': node.inbound_edges,
-          'min_products_used': node.min_products_used,
-          'max_products_used': node.max_products_used,
-          'avg_products_used': 1.0 * node.products_used_count / max(node.inbound_edges, 1),
+          'job_size': self._job_size(node.target),
+          'trans_job_size': self._trans_job_size(node.target),
+          'inbound_edges': inbound_edges,
+          'min_products_used': usage_stats.min_used,
+          'max_products_used': usage_stats.max_used,
+          'avg_products_used': 1.0 * usage_stats.total_used / max(inbound_edges, 1),
           'dependencies': [{
-              'target': child_node.target.address.spec,
+              'target': dep_node.target.address.spec,
               'products_used': products_used,
               'products_total': products_total,
               'ratio': 1.0 * products_used / max(products_total, 1),
-            } for child_node, (products_used, products_total) in node.children.items()]
+            } for dep_node, (products_used, products_total) in node.usage_by_dep.items()]
         }
     return json.dumps(res_dict, indent=2, sort_keys=True)

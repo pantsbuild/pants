@@ -22,20 +22,8 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_mkdir, safe_walk
-from pants.util.fileutil import atomic_copy
+from pants.util.fileutil import atomic_copy, create_size_estimators
 
-
-def create_size_estimators():
-  def file_line_count(source_file_name):
-    with open(source_file_name, 'rb') as fh:
-      return sum(1 for line in fh)
-
-  return {
-    'linecount': lambda sources: sum([file_line_count(filepath) for filepath in sources]),
-    'filecount': lambda sources: len(sources),
-    'filesize': lambda sources: sum([os.path.getsize(filepath) for filepath in sources]),
-    'constzero': lambda sources: 0
-  }
 
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   """A strategy for JVM compilation that uses per-target classpaths and analysis."""
