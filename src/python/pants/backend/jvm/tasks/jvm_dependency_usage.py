@@ -36,7 +36,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       return
     targets = (self.context.targets() if self.get_options().transitive
                else self.context.target_roots)
-    graph = self.create_dep_usage_graph(targets)
+    graph = self.create_dep_usage_graph(targets, get_buildroot())
     output_file = self.get_options().output_file
     if output_file:
       self.context.log.info('Writing dependency usage graph to {}'.format(output_file))
@@ -45,9 +45,8 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     else:
       self.context.log.error('No output file specified')
 
-  def create_dep_usage_graph(self, targets):
+  def create_dep_usage_graph(self, targets, buildroot):
     graph = DependencyUsageGraph(self.size_estimators[self.get_options().size_estimator])
-
     classes_by_target = self.context.products.get_data('classes_by_target')
     for target in targets:
       product_deps_by_src = self.context.products.get_data('product_deps_by_src').get(target)
@@ -58,7 +57,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       # Maps some dependency target d to the exact products of d which are used by :param target:
       used_product_deps_by_target = defaultdict(set)
       for src in target.sources_relative_to_buildroot():
-        abs_src = os.path.join(get_buildroot(), src)
+        abs_src = os.path.join(buildroot, src)
         for product_dep in product_deps_by_src.get(abs_src, []):
           dep_tgts = self.targets_by_file.get(product_dep)
           if dep_tgts is None:
