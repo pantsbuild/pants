@@ -292,6 +292,20 @@ public class JarBuilder implements Closeable {
     }
   }
 
+  /**
+   * Joins the path components together with the JAR_PATH_JOINER char.
+   *
+   * Sanitation is performed to ensure that no consecutive JAR_PATH_JOINER chars appear in the
+   * output string.
+   *
+   * @param path List of jar path components.
+   * @return The path string.
+   */
+  @VisibleForTesting
+  static String joinJarPath(Iterable<String> path) {
+    return JAR_PATH_JOINER.join(path).replaceAll("/{2,}", "/");
+  }
+
   private static Source jarSource(File jar) {
     return new JarSource(jar) {
       @Override public String identify(String name) {
@@ -658,14 +672,14 @@ public class JarBuilder implements Closeable {
         for (File child : files) {
           Iterable<String> relpathComponents = relpathComponents(child, directory);
           Iterable<String> path = Iterables.concat(jarBasePath, relpathComponents);
-          String entryPath = JAR_PATH_JOINER.join(relpathComponents);
+          String entryPath = joinJarPath(relpathComponents);
           if (!JarFile.MANIFEST_NAME.equals(entryPath)) {
             NamedByteSource contents =
                 NamedByteSource.create(
                     directorySource,
                     entryPath,
                     Files.asByteSource(child));
-            add(entries, contents, JAR_PATH_JOINER.join(path));
+            add(entries, contents, joinJarPath(path));
           }
         }
       }
@@ -1179,7 +1193,7 @@ public class JarBuilder implements Closeable {
           ancestry.add(component);
           if (!directories.contains(ancestry)) {
             directories.add(ImmutableList.copyOf(ancestry));
-            out.putNextEntry(new JarEntry(JAR_PATH_JOINER.join(ancestry) + "/"));
+            out.putNextEntry(new JarEntry(joinJarPath(ancestry) + "/"));
           }
         }
       }
