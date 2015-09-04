@@ -38,10 +38,10 @@ class MutexTaskMixin(Task):
   """
 
   class NoActivationsError(TaskError):
-    """"""
+    """Indicates a mutexed task group had no tasks run."""
 
   class IncompatibleActivationsError(TaskError):
-    """"""
+    """Indicates a mutexed task group had more than one task eligible to run."""
 
   _implementations = defaultdict(set)
 
