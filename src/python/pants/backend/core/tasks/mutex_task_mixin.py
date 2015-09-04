@@ -123,7 +123,7 @@ class MutexTaskMixin(Task):
       # TODO: once https://github.com/pantsbuild/pants/issues/425 lands, we should add
       # language-specific flags that would resolve the ambiguity here
       def render_target(target):
-        return '{} a {}'.format(target.address.reference(), target.type_alias)
+        return '{} (a {})'.format(target.address.reference(), target.type_alias)
       raise self.IncompatibleActivationsError('Mutually incompatible targets specified: {} vs {} '
                                               '(and {} others)'
                                               .format(render_target(accepted[0]),

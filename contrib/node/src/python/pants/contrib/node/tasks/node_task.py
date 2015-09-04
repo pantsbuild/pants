@@ -28,7 +28,7 @@ class NodeTask(Task):
 
   @classmethod
   def is_npm_package(cls, target):
-    """Returns `True` if the given target is an `NopmPackage`."""
+    """Returns `True` if the given target is an `NpmPackage`."""
     return isinstance(target, NpmPackage)
 
   @classmethod

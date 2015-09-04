@@ -21,6 +21,8 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
         console.log("type of boolean is: " + typ.BOOLEAN);
       """)
     pants_run = self.run_pants(command=command, stdin_data=program)
+
+    self.assert_success(pants_run)
     self.assertEqual('type of boolean is: boolean', pants_run.stdout_data.strip())
 
   def test_run_repl_passthrough(self):
@@ -31,4 +33,6 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
                '--eval',
                'var typ = require("typ"); console.log("type of boolean is: " + typ.BOOLEAN)']
     pants_run = self.run_pants(command=command)
+
+    self.assert_success(pants_run)
     self.assertEqual('type of boolean is: boolean', pants_run.stdout_data.strip())
