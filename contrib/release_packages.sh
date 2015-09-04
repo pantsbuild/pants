@@ -62,10 +62,28 @@ function pkg_go_install_test() {
       test.go contrib/go/examples::
 }
 
+PKG_NODE=(
+  "pantsbuild.pants.contrib.node"
+  "//contrib/node/src/python/pants/contrib/node:plugin"
+  "pkg_node_install_test"
+)
+function pkg_node_install_test() {
+  (cat << EOF
+var typ = require('typ');
+console.log("type of boolean is: " + typ.BOOLEAN);
+EOF
+  ) | \
+  execute_packaged_pants_with_internal_backends \
+    "extra_bootstrap_buildfiles='${ROOT}/contrib/node/BUILD'" \
+      --plugins="['pantsbuild.pants.contrib.node==$(local_version)']" \
+      repl.node contrib/node/examples::
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_SCROOGE
   PKG_BUILDGEN
   PKG_SPINDLE
   PKG_GO
+  PKG_NODE
 )
