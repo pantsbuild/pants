@@ -44,7 +44,7 @@ class BuildConfiguration(object):
   def registered_aliases(self):
     """Return the registered aliases exposed in BUILD files.
 
-    This returned aliases aren't so useful for actually parsing BUILD files.
+    These returned aliases aren't so useful for actually parsing BUILD files.
     They are useful for generating things like http://pantsbuild.github.io/build_dictionary.html.
 
     :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias

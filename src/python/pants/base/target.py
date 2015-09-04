@@ -222,7 +222,7 @@ class Target(AbstractTarget):
                     fingerprinting details.
     :type payload: :class:`pants.base.payload.Payload`
     :param tags: Arbitrary string tags that describe this target. Usable by downstream/custom tasks
-                 for reasoning about build graph. NOT included in payloads and thus not used in
+                 for reasoning about the build graph. NOT included in payloads and thus not used in
                  fingerprinting, thus not suitable for anything that affects how a particular
                  target is built.
     :type tags: :class:`collections.Iterable` of strings
