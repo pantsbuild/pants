@@ -82,7 +82,7 @@ class OptionsBootstrapper(object):
       if bootstrap_option_values.pantsrc:
         rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
         existing_rcfiles = filter(os.path.exists, rcfiles)
-        full_configpaths.append(existing_rcfiles)
+        full_configpaths.extend(existing_rcfiles)
 
       self._post_bootstrap_config = Config.load(full_configpaths,
                                                 seed_values=bootstrap_option_values)
