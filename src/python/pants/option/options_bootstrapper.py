@@ -84,9 +84,11 @@ class OptionsBootstrapper(object):
         existing_rcfiles = filter(os.path.exists, rcfiles)
         full_configpaths.append(existing_rcfiles)
 
+      print(existing_rcfiles)
+      print(full_configpaths)
+
       self._post_bootstrap_config = Config.load(full_configpaths,
                                                 seed_values=bootstrap_option_values)
-      print(full_configpaths)
       # Now recompute the bootstrap options with the full config. This allows us to pick up
       # bootstrap values (such as backends) from a config override file, for example.
       self._bootstrap_options = bootstrap_options_from_config(self._post_bootstrap_config)
