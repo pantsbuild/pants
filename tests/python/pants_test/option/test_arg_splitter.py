@@ -196,10 +196,12 @@ class ArgSplitterTest(unittest.TestCase):
                      {'': [], 'compile': [], 'test': []}, [], False, True)
 
   def test_unknown_goal_detection(self):
-    self._split_unknown_goal('./pants foo', ['foo'])
-    self._split_unknown_goal('./pants compile foo', ['foo'])
-    self._split_unknown_goal('./pants foo bar baz:qux', ['foo', 'bar'])
-    self._split_unknown_goal('./pants foo compile bar baz:qux', ['foo', 'bar'])
+    self._split_unknown_goal('./pants nosuchgoal', ['nosuchgoal'])
+    self._split_unknown_goal('./pants compile nosuchgoal', ['nosuchgoal'])
+    self._split_unknown_goal('./pants nosuchgoal1 nosuchgoal2 baz:qux',
+                             ['nosuchgoal1', 'nosuchgoal2'])
+    self._split_unknown_goal('./pants nosuchgoal1 compile nosuchgoal2 baz:qux',
+                             ['nosuchgoal1', 'nosuchgoal2'])
 
   def test_no_goal_detection(self):
     self._split_no_goal('./pants foo/bar:baz')
