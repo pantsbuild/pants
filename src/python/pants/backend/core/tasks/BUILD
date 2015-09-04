@@ -20,10 +20,12 @@ target(
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
+    ':mutex_task_mixin',
     ':noop',
     ':pathdeps',
     ':paths',
     ':reporting_server',
+    ':repl_task_mixin',
     ':roots',
     ':run_prep_command',
     ':scm_publish',
@@ -217,6 +219,15 @@ python_library(
 )
 
 python_library(
+  name = 'mutex_task_mixin',
+  sources = ['mutex_task_mixin.py'],
+  dependencies = [
+    ':task',
+    'src/python/pants/base:exceptions',
+  ]
+)
+
+python_library(
   name = 'noop',
   sources = ['noop.py'],
   dependencies = [
@@ -239,6 +250,16 @@ python_library(
     ':console_task',
     'src/python/pants/base:exceptions',
   ],
+)
+
+python_library(
+  name = 'repl_task_mixin',
+  sources = ['repl_task_mixin.py'],
+  dependencies = [
+    ':mutex_task_mixin',
+    'src/python/pants/base:workunit',
+    'src/python/pants/console:stty_utils',
+  ]
 )
 
 python_library(

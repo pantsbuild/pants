@@ -58,6 +58,7 @@ python_tests(
   sources=['test_python_repl.py'],
   dependencies=[
     ':python_task_test_base',
+    'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:all_utils',
@@ -68,6 +69,14 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/util:contextutil',
   ]
+)
+
+python_tests(
+  name='python_repl_integration',
+  sources=['test_python_repl_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
 )
 
 python_tests(
