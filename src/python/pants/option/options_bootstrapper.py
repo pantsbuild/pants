@@ -77,14 +77,17 @@ class OptionsBootstrapper(object):
       # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
       # from (typically pants.ini), then config override, then rcfiles.
       full_configpaths = pre_bootstrap_config.sources()
+      print(full_configpaths)
+
       if bootstrap_option_values.config_override:
         full_configpaths.extend(bootstrap_option_values.config_override)
+        print(full_configpaths)
+
       if bootstrap_option_values.pantsrc:
         rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
         existing_rcfiles = filter(os.path.exists, rcfiles)
         full_configpaths.append(existing_rcfiles)
 
-      print(existing_rcfiles)
       print(full_configpaths)
 
       self._post_bootstrap_config = Config.load(full_configpaths,
