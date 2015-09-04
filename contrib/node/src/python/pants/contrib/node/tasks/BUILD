@@ -4,7 +4,23 @@
 target(
   name='tasks',
   dependencies=[
+    ':node_repl',
     ':npm_resolve',
+  ]
+)
+
+python_library(
+  name='node_paths',
+  sources=['node_paths.py']
+)
+
+python_library(
+  name='node_repl',
+  sources=['node_repl.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/backend/core/tasks:repl_task_mixin',
   ]
 )
 
@@ -15,6 +31,7 @@ python_library(
     'contrib/node/src/python/pants/contrib/node/subsystems:node_distribution',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
+    'contrib/node/src/python/pants/contrib/node/targets:npm_package',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:workunit',
     'src/python/pants/util:memo',
@@ -25,6 +42,7 @@ python_library(
   name='npm_resolve',
   sources=['npm_resolve.py'],
   dependencies=[
+    ':node_paths',
     ':node_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import json
 import os
 import shutil
@@ -16,26 +15,16 @@ from pants.base.workunit import WorkUnitLabel
 from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdir
 
+from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
-
-
-def _safe_copy(source, dest):
-  safe_mkdir(os.path.dirname(dest))
-  try:
-    os.link(source, dest)
-  except OSError as e:
-    if e.errno == errno.EXDEV:
-      # We can't hard link across devices, fall back on copying
-      shutil.copyfile(source, dest)
-    else:
-      raise
 
 
 def _copy_sources(buildroot, node_module, dest_dir):
   source_relative_to = node_module.address.spec_path
   for source in node_module.sources_relative_to_buildroot():
     dest = os.path.join(dest_dir, os.path.relpath(source, source_relative_to))
-    _safe_copy(os.path.join(buildroot, source), dest)
+    safe_mkdir(os.path.dirname(dest))
+    shutil.copyfile(os.path.join(buildroot, source), dest)
 
 
 class NpmResolve(NodeTask):
@@ -44,36 +33,9 @@ class NpmResolve(NodeTask):
   See: see `npm install <https://docs.npmjs.com/cli/install>`_
   """
 
-  # TODO(John Sirois): UnionProducts? That seems broken though for ranged version constraints,
-  # which npm has and are widely used in the community.  For now stay dumb simple (and slow) and
-  # resolve each node_module individually.
-  class NodePaths(object):
-    """Maps NpmPackage targets to their resolved NODE_PATH chroot."""
-
-    def __init__(self):
-      self._paths_by_target = {}
-
-    def resolved(self, target, node_path):
-      """Identifies the given target as resolved to the given chroot path.
-
-      :param target: The target that was resolved to the `node_path` chroot.
-      :type target: :class:`pants.contrib.node.targets.npm_package.NpmPackage`
-      :param string node_path: The chroot path the given `target` was resolved to.
-      """
-      self._paths_by_target[target] = node_path
-
-    def node_path(self, target):
-      """Returns the path of the resolved chroot for the given NpmPackage.
-
-      Returns `None` if the target has not been resolved to a chroot.
-
-      :rtype string
-      """
-      return self._paths_by_target.get(target)
-
   @classmethod
   def product_types(cls):
-    return [cls.NodePaths]
+    return [NodePaths]
 
   @property
   def cache_target_dirs(self):
@@ -84,12 +46,12 @@ class NpmResolve(NodeTask):
     # resolve and then post-resolve analyze the results locally to create a separate NODE_PATH
     # for each target participating in the bulk resolve?  This is unlikely since versions are often
     # unconstrained or partially constrained in the npm community.
-    # See NodePaths TODO above.
-    targets = set(self.context.targets(predicate=self.is_node_module))
+    # See TODO in NodePaths re: UnionProducts.
+    targets = set(self.context.targets(predicate=self.is_npm_package))
     if not targets:
       return
 
-    node_paths = self.context.products.get_data(self.NodePaths, init_func=self.NodePaths)
+    node_paths = self.context.products.get_data(NodePaths, init_func=NodePaths)
 
     # We must have linked local sources for internal dependencies before installing dependees; so,
     # `topological_order=True` is critical.
@@ -100,31 +62,50 @@ class NpmResolve(NodeTask):
       with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
           target = vt.target
-          node_path = vt.results_dir
+          chroot = vt.results_dir
           if not vt.valid:
-            safe_mkdir(node_path, clean=True)
-            self._resolve(target, node_path, node_paths)
+            safe_mkdir(chroot, clean=True)
+            self._resolve(target, chroot, node_paths)
+          node_path = chroot if self.is_node_module(target) else os.path.join(chroot,
+                                                                              'node_modules')
           node_paths.resolved(target, node_path)
 
   def _resolve(self, target, node_path, node_paths):
-    _copy_sources(buildroot=get_buildroot(), node_module=target, dest_dir=node_path)
-    self._emit_package_descriptor(target, node_path, node_paths)
+    if self.is_node_remote_module(target):
+      self._resolve_remote_module(node_path, target)
+    else:
+      self._resolve_local_module(node_path, node_paths, target)
 
+  def _resolve_remote_module(self, node_path, node_remote_module):
+    with pushd(node_path):
+      package = '{}@{}'.format(node_remote_module.package_name, node_remote_module.version)
+      result, npm_install = self.execute_npm(args=['install', package],
+                                             workunit_name=node_remote_module.address.reference())
+      if result != 0:
+        raise TaskError('Failed to resolve package {} for {}:\n\t{} failed with exit code {}'
+                        .format(node_remote_module.address.reference(),
+                                package,
+                                npm_install,
+                                result))
+
+  def _resolve_local_module(self, node_path, node_paths, node_module):
+    _copy_sources(buildroot=get_buildroot(), node_module=node_module, dest_dir=node_path)
+    self._emit_package_descriptor(node_module, node_path, node_paths)
     with pushd(node_path):
       # TODO(John Sirois): Handle dev dependency resolution.
       result, npm_install = self.execute_npm(args=['install'],
-                                             workunit_name=target.address.reference())
+                                             workunit_name=node_module.address.reference())
       if result != 0:
         raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
-                        .format(target.address.reference(), npm_install, result))
+                        .format(node_module.address.reference(), npm_install, result))
 
-      # TODO(John Sirois): This will be part of install in npm 3.x, detect or control the npm version.
-      # we use and only conditionally execute this.
+      # TODO(John Sirois): This will be part of install in npm 3.x, detect or control the npm
+      # version we use and only conditionally execute this.
       result, npm_dedupe = self.execute_npm(args=['dedupe'],
-                                            workunit_name=target.address.reference())
+                                            workunit_name=node_module.address.reference())
       if result != 0:
         raise TaskError('Failed to dedupe dependencies for {}:\n\t{} failed with exit code {}'
-                        .format(target.address.reference(), npm_dedupe, result))
+                        .format(node_module.address.reference(), npm_dedupe, result))
 
   def _emit_package_descriptor(self, npm_package, node_path, node_paths):
     def render_dep(target):
