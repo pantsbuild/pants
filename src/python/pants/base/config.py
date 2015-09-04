@@ -58,7 +58,6 @@ class Config(object):
     """
     configpaths = cls._munge_configpaths_arg(configpaths)
     single_file_configs = []
-    print(configpaths)
     for configpath in configpaths:
       parser = cls.create_parser(seed_values)
       with open(configpath, 'r') as ini:
