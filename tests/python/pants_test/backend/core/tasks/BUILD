@@ -6,7 +6,7 @@ target(
   dependencies=[
     ':bash_completion',
     ':markdown_to_html',
-    'mutex_task_mixin',
+    ':mutex_task_mixin',
     ':scm_publish',
   ],
 )
