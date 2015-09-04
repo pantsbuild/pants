@@ -80,7 +80,7 @@ class OptionsBootstrapper(object):
       print(full_configpaths)
 
       if bootstrap_option_values.config_override:
-        full_configpaths.extend(bootstrap_option_values.config_override)
+        full_configpaths.append(bootstrap_option_values.config_override)
         print(full_configpaths)
 
       if bootstrap_option_values.pantsrc:
