@@ -55,9 +55,13 @@ class TestJvmDependencyUsage(TaskTestBase):
     dep_usage = self.create_task(context)
     graph = dep_usage.create_dep_usage_graph([t1, t2, t3], '')
 
+    self.assertEqual(graph[t1].total_products, 2)
+    self.assertEqual(graph[t2].total_products, 1)
+    self.assertEqual(graph[t3].total_products, 2)
+
     self.assertEqual(graph[t1].usage_by_dep, {})
-    self.assertEqual(graph[t2].usage_by_dep[graph[t1]], (1, 2))
-    self.assertEqual(graph[t3].usage_by_dep[graph[t1]], (2, 2))
+    self.assertEqual(graph[t2].usage_by_dep[graph[t1]], 1)
+    self.assertEqual(graph[t3].usage_by_dep[graph[t1]], 2)
 
     usage_stats_by_node = graph._aggregate_product_usage_stats()
     self.assertEqual(usage_stats_by_node[graph[t1]], (1, 2, 3))
@@ -91,4 +95,5 @@ class TestJvmDependencyUsage(TaskTestBase):
     dep_usage = self.create_task(context)
     graph = dep_usage.create_dep_usage_graph([t1, t1_x, t1_y, t1_z, t2], '')
 
-    self.assertEqual(graph[t2].usage_by_dep[graph[t1]], (3, 5))
+    self.assertEqual(graph[t1].total_products, 5)
+    self.assertEqual(graph[t2].usage_by_dep[graph[t1]], 3)

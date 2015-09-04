@@ -178,7 +178,7 @@ python_tests(
   name = 'jvm_dependency_usage',
   sources = ['test_jvm_dependency_usage.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/tasks:jvm_dependency_usage', 
+    'src/python/pants/backend/jvm/tasks:jvm_dependency_usage',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/goal:products',

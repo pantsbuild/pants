@@ -137,7 +137,7 @@ def register_goals():
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile').with_description(
       'Check that used dependencies have been requested.')
 
-  task(name='jvm-dep-usage', action=JvmDependencyUsage).install().with_description(
+  task(name='jvm', action=JvmDependencyUsage).install('dep-usage').with_description(
       'Collect target dependency usage data.')
 
   # Generate documentation.

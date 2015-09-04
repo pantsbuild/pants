@@ -43,7 +43,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
              choices=list(cls.size_estimators.keys()), default='filesize',
              help='The method of target size estimation.')
     register('--transitive', default=True, action='store_true',
-             help='Score all targets in build graph transitively.')
+             help='Score all targets in the build graph transitively.')
     register('--output-file', type=str,
              help='Output dependency usage graph as JSON to the specified file.')
 
@@ -62,8 +62,14 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       self.context.log.error('No output file specified')
 
   def create_dep_usage_graph(self, targets, buildroot):
-    graph = DependencyUsageGraph(self.size_estimators[self.get_options().size_estimator])
     classes_by_target = self.context.products.get_data('classes_by_target')
+    total_products_by_target = {
+        target: sum(1 for _, paths in classes_by_target[target].rel_paths() for p in paths)
+        for target in targets
+      }
+
+    graph = DependencyUsageGraph(self.size_estimators[self.get_options().size_estimator])
+
     for target in targets:
       product_deps_by_src = self.context.products.get_data('product_deps_by_src').get(target)
       if product_deps_by_src is None:
@@ -96,39 +102,38 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
             or isinstance(dep_tgt, JarLibrary)):
           continue
 
-        used_products = len(used_product_deps_by_target.get(dep_tgt, []))
-        total_products = sum(1 for _, paths in classes_by_target[dep_tgt].rel_paths() for p in paths)
-        if total_products == 0:
+        if target.is_original and target not in graph:
+          total_products = total_products_by_target[target]
+          node = graph[target] = Node(target, total_products)
+
+        total_dep_products = total_products_by_target[dep_tgt]
+        if total_dep_products == 0:
           # The dep_tgt is a 3rd party library, so skip.
           continue
-
-        node = graph[target]
+        num_dep_products_used = len(used_product_deps_by_target.get(dep_tgt, []))
         if dep_tgt.is_original:
-          node.add_dep(graph[dep_tgt], used_products, total_products)
+          if dep_tgt not in graph:
+            graph[dep_tgt] = Node(dep_tgt, total_dep_products)
+          node.usage_by_dep[graph[dep_tgt]] = num_dep_products_used
         else:
           # The dep_tgt is synthetic -- so we want to attribute it's used / total products to
           # the target it was derived from, which may already exist as a dependency of node.
-          node.update_dep(graph[dep_tgt.derived_from], used_products, total_products)
+          original_dep_tgt = dep_tgt.derived_from
+          if original_dep_tgt not in graph:
+            graph[original_dep_tgt] = Node(original_dep_tgt, total_dep_products)
+          else:
+            graph[original_dep_tgt].total_products += total_dep_products
+          node.usage_by_dep[graph[original_dep_tgt]] += num_dep_products_used
 
     return graph
 
 
-class DependencyUsageGraph(dict):
+class Node(object):
 
-  class Node(object):
-
-    def __init__(self, target):
+    def __init__(self, target, total_products):
       self.target = target
-      # Maps dep node to tuple of (products used, products total) of said dep node.
-      self.usage_by_dep = defaultdict(lambda: (0, 0))
-
-    def add_dep(self, node, products_used, products_total):
-      self.usage_by_dep[node] = (products_used, products_total)
-
-    def update_dep(self, node, products_used, products_total):
-      old_products_used, old_products_total = self.usage_by_dep[node]
-      self.usage_by_dep[node] = (old_products_used + products_used,
-                                 old_products_total + products_total)
+      self.total_products = total_products
+      self.usage_by_dep = defaultdict(int)
 
     def __eq__(self, other):
       return self.target.address == other.target.address
@@ -139,14 +144,13 @@ class DependencyUsageGraph(dict):
     def __hash_(self):
       return hash(self.target.address)
 
+
+class DependencyUsageGraph(dict):
+
   def __init__(self, size_estimator):
     self._size_estimator = size_estimator
     self._job_size_cache = {}
     self._trans_job_size_cache = {}
-
-  def __missing__(self, target):
-    node = self[target] = self.Node(target)
-    return node
 
   def _job_size(self, target):
     if target not in self._job_size_cache:
@@ -160,14 +164,15 @@ class DependencyUsageGraph(dict):
     return self._trans_job_size_cache[target]
 
   def _aggregate_product_usage_stats(self):
-    """Compute the min, max, and total products used for each node in the current graph.
+    """Compute the min, max, and total products used by dependents of each node.
 
     Returns a dict mapping each node to a named tuple of (min_used, max_used, total_used).
+    Note: this is an aggregation of inbound edges.
     """
     UsageStats = namedtuple('UsageStats', ['min_used', 'max_used', 'total_used'])
     usage_stats_by_node = defaultdict(lambda: UsageStats(0, 0, 0))
     for _, node in self.items():
-      for dep_node, (products_used, _) in node.usage_by_dep.items():
+      for dep_node, products_used in node.usage_by_dep.items():
         if dep_node not in usage_stats_by_node:
           usage_stats_by_node[dep_node] = UsageStats(products_used, products_used, products_used)
         else:
@@ -183,18 +188,21 @@ class DependencyUsageGraph(dict):
     for _, node in self.items():
       usage_stats = usage_stats_by_node[node]
       inbound_edges = len(node.target.dependents)
+      avg_products_used = 1.0 * usage_stats.total_used / max(inbound_edges, 1)
       res_dict[node.target.address.spec] = {
           'job_size': self._job_size(node.target),
           'trans_job_size': self._trans_job_size(node.target),
           'inbound_edges': inbound_edges,
           'min_products_used': usage_stats.min_used,
           'max_products_used': usage_stats.max_used,
-          'avg_products_used': 1.0 * usage_stats.total_used / max(inbound_edges, 1),
+          'avg_products_used': avg_products_used,
+          'total_products': node.total_products,
+          'avg_ratio': avg_products_used / max(node.total_products, 1),
           'dependencies': [{
               'target': dep_node.target.address.spec,
               'products_used': products_used,
-              'products_total': products_total,
-              'ratio': 1.0 * products_used / max(products_total, 1),
-            } for dep_node, (products_used, products_total) in node.usage_by_dep.items()]
+              'total_products': dep_node.total_products,
+              'ratio': 1.0 * products_used / max(dep_node.total_products, 1),
+            } for dep_node, products_used in node.usage_by_dep.items()]
         }
     return json.dumps(res_dict, indent=2, sort_keys=True)
