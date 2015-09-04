@@ -197,12 +197,11 @@ class DependencyUsageGraph(dict):
           'max_products_used': usage_stats.max_used,
           'avg_products_used': avg_products_used,
           'total_products': node.total_products,
-          'avg_ratio': avg_products_used / max(node.total_products, 1),
+          'avg_products_used_ratio': avg_products_used / max(node.total_products, 1),
           'dependencies': [{
               'target': dep_node.target.address.spec,
               'products_used': products_used,
-              'total_products': dep_node.total_products,
-              'ratio': 1.0 * products_used / max(dep_node.total_products, 1),
+              'products_used_ratio': 1.0 * products_used / max(dep_node.total_products, 1),
             } for dep_node, products_used in node.usage_by_dep.items()]
         }
     return json.dumps(res_dict, indent=2, sort_keys=True)
