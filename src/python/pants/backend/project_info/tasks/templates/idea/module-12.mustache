@@ -51,6 +51,16 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <excludeFolder url="file://{{module.root_dir}}/{{.}}"/>
       {{/exclude_paths}}
     {{/module.content_roots}}
+    {{#module.annotation_processing.enabled?}}
+      {{#module.annotation_processing.source_output_dir}}
+        <sourceFolder url="file://{{module.annotation_processing.source_output_dir}}"
+                      isTestSource="false"/>
+      {{/module.annotation_processing.source_output_dir}}
+      {{#module.annotation_processing.test_source_output_dir}}
+        <sourceFolder url="file://{{module.annotation_processing.test_source_output_dir}}"
+                      isTestSource="true"/>
+      {{/module.annotation_processing.test_source_output_dir}}
+    {{/module.annotation_processing.enabled?}}
       <excludeFolder url="file://$MODULE_DIR$/external-libs" />
       <excludeFolder url="file://$MODULE_DIR$/external-libsources" />
       <excludeFolder url="file://$MODULE_DIR$/internal-libs" />
