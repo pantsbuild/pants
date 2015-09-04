@@ -72,6 +72,14 @@ python_tests(
 )
 
 python_tests(
+  name='python_repl_integration',
+  sources=['test_python_repl_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name='setup_py',
   sources=['test_setup_py.py'],
   dependencies=[
