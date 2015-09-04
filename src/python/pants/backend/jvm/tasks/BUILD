@@ -20,6 +20,7 @@ python_library(
     ':junit_run',
     ':jvm_binary_task',
     ':jvm_dependency_check',
+    ':jvm_dependency_usage',
     ':jvm_platform_analysis',
     ':jvm_run',
     ':jvm_task',
@@ -310,19 +311,30 @@ python_library(
   name = 'jvm_dependency_check',
   sources = ['jvm_dependency_check.py'],
   dependencies = [
+    ':jvm_dependency_analyzer',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_graph',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/backend/jvm/tasks:jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
   ],
+)
+
+python_library(
+  name = 'jvm_dependency_usage',
+  sources = ['jvm_dependency_usage.py'],
+  dependencies = [
+    ':jvm_dependency_analyzer',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:fileutil',
+  ]
 )
 
 python_library(

@@ -40,6 +40,7 @@ from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
+from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
@@ -123,7 +124,7 @@ def register_goals():
   # Compilation.
   jvm_compile = GroupTask.named(
       'jvm-compilers',
-      product_type=['classes_by_target', 'classes_by_source', 'resources_by_target', 'actual_source_deps'],
+      product_type=['classes_by_target', 'classes_by_source', 'resources_by_target', 'product_deps_by_src'],
       flag_namespace=['compile'])
 
   # It's important we add AptCompile before other java-compiling tasks since the first selector wins,
@@ -135,6 +136,9 @@ def register_goals():
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile').with_description(
       'Check that used dependencies have been requested.')
+
+  task(name='jvm', action=JvmDependencyUsage).install('dep-usage').with_description(
+      'Collect target dependency usage data.')
 
   # Generate documentation.
   task(name='javadoc', action=JavadocGen).install('doc').with_description('Create documentation.')
