@@ -123,7 +123,6 @@ class BootstrapOptionsTest(unittest.TestCase):
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)
     self.assertEquals('/pear/banana', opts.for_scope('fruit').apple)
 
-
   def test_create_bootstrapped_multiple_config_override(self):
     # check with multiple config files, the latest values always get taken
     # in this case strategy will be overwritten, while fruit stays the same
@@ -173,8 +172,6 @@ class BootstrapOptionsTest(unittest.TestCase):
 
         self.assertEquals('isolated', opts_double_config.for_scope('compile.apt').strategy)
         self.assertEquals('red', opts_double_config.for_scope('fruit').apple)
-
-
 
   def test_full_options_caching(self):
     with temporary_file_path() as config:
