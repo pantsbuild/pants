@@ -136,7 +136,8 @@ class BootstrapOptionsTest(unittest.TestCase):
       """))
       fp.close()
 
-      bootstrapper_single_config = OptionsBootstrapper(args=['--config-override={}'.format(fp.name)])
+      bootstrapper_single_config = OptionsBootstrapper(configpath=fp.name,
+                                                       args=['--config-override={}'.format(fp.name)])
 
       opts_single_config  = bootstrapper_single_config.get_full_options(known_scope_infos=[
           ScopeInfo('', ScopeInfo.GLOBAL),
@@ -158,6 +159,7 @@ class BootstrapOptionsTest(unittest.TestCase):
         fp2.close()
 
         bootstrapper_double_config = OptionsBootstrapper(
+            configpath=fp.name,
             args=['--config-override={}'.format(fp.name),
                   '--config-override={}'.format(fp2.name)])
 
