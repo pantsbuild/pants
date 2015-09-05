@@ -329,8 +329,8 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     """
     root = compile_context.classes_dir
     with compile_context.open_jar(mode='w') as jar:
-      for abs_sub_dir, dirnames, filenames in safe_walk(root):
-        for name in dirnames + filenames:
+      for abs_sub_dir, _, filenames in safe_walk(root):
+        for name in filenames:
           abs_filename = os.path.join(abs_sub_dir, name)
           arcname = os.path.relpath(abs_filename, root)
           jar.write(abs_filename, arcname)
