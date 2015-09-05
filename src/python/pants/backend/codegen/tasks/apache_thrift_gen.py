@@ -46,6 +46,12 @@ class ApacheThriftGen(SimpleCodegenTask):
                   'code.  If not supplied, then --deps will be used for service deps.')
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    super(ApacheThriftGen, cls).prepare(options, round_manager)
+    # A synthetic product to allow tasks to require that they run before thrift compilers.
+    round_manager.require_data('thrift_inputs')
+
+  @classmethod
   def global_subsystems(cls):
     return super(ApacheThriftGen, cls).global_subsystems() + (ThriftDefaults,)
 

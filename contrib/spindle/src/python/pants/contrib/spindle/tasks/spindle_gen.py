@@ -52,6 +52,8 @@ class SpindleGen(NailgunTask):
   def prepare(cls, options, round_manager):
     super(SpindleGen, cls).prepare(options, round_manager)
     round_manager.require_data('jvm_build_tools_classpath_callbacks')
+    # A synthetic product to allow tasks to require that they run before thrift compilers.
+    round_manager.require_data('thrift_inputs')
 
   @property
   def spindle_classpath(self):

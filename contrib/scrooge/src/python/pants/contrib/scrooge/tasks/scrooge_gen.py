@@ -79,6 +79,12 @@ class ScroogeGen(NailgunTask):
   def product_types(cls):
     return ['java', 'scala']
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ScroogeGen, cls).prepare(options, round_manager)
+    # A synthetic product to allow tasks to require that they run before thrift compilers.
+    round_manager.require_data('thrift_inputs')
+
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
     self._thrift_defaults = ThriftDefaults.global_instance()
