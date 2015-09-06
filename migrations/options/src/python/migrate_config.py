@@ -20,6 +20,7 @@ migrations = {
   ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
 
   ('jvm', 'missing_deps_target_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
+  ('jvm', 'jdk_paths'): ('jvm-distributions', 'paths'),
   ('compile.java', 'missing_deps'): ('compile.jvm-dep-check', 'missing_deps'),
   ('compile.java', 'missing_direct_deps'): ('compile.jvm-dep-check', 'missing_direct_deps'),
   ('compile.java', 'missing_deps_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
