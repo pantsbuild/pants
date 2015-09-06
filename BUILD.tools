@@ -165,7 +165,7 @@ jar_library(name = 'spindle-codegen',
 
 jar_library(name = 'jar-tool',
             jars = [
-              jar(org = 'org.pantsbuild', name = 'jar-tool', rev = '0.0.5')
+              jar(org = 'org.pantsbuild', name = 'jar-tool', rev = '0.0.7')
             ])
 
 jar_library(name = 'jarjar',
