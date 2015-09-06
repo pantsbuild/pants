@@ -78,7 +78,8 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     return genfiles
 
   def synthetic_target_extra_dependencies(self, target):
-    return self.resolve_deps(self.get_options().javadeps)
+    wire_runtime_deps_spec = self.get_options().javadeps
+    return self.resolve_deps([wire_runtime_deps_spec])
 
   def format_args_for_target(self, target):
     """Calculate the arguments to pass to the command line for a single target."""
@@ -231,7 +232,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
 
     # Wire generates a single type for all of the 'extends' declarations in this file.
     if protobuf_parse.extends:
-      types |= set(["Ext_{0}".format(protobuf_parse.filename)])
+      types |= {"Ext_{0}".format(protobuf_parse.filename)}
 
     java_files = self.calculate_java_genfiles(protobuf_parse.package, types)
     logger.debug('Path {path} yielded types {types} got files {java_files}'
