@@ -72,12 +72,18 @@ class JvmToolMixin(object):
                            classpath.
     :param unicode help: An optional custom help string; otherwise a reasonable one is generated.
     """
-    register('--{0}'.format(key),
+    def formulate_help():
+      if classpath:
+        return ('Target address spec for overriding the classpath of the {} jvm tool which is, '
+                'by default: {}'.format(key, classpath))
+      else:
+        return 'Target address spec for specifying the classpath of the {} jvm tool.'.format(key)
+    help = help or formulate_help()
+
+    register('--{}'.format(key),
              advanced=True,
-             default='//:{0}'.format(key) if classpath_spec is None else classpath_spec,
-             help=(help or
-                   'Target address spec for overriding the classpath of the {0} jvm '
-                   'tool.'.format(key)),
+             default='//:{}'.format(key) if classpath_spec is None else classpath_spec,
+             help=help,
              fingerprint=fingerprint)
 
     # TODO(John Sirois): Move towards requiring tool specs point to jvm_binary targets.
