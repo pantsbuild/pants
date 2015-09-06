@@ -17,6 +17,7 @@ from pants.backend.codegen.tasks.protobuf_gen import check_duplicate_conflicting
 from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -47,6 +48,10 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
                           classpath_spec='//:wire-runtime',
                           help='Runtime dependencies for wire-using Java code.')
     cls.register_jvm_tool(register, 'wire-compiler', classpath=[wire_jar(name='wire-compiler')])
+
+  @classmethod
+  def is_wire_compiler_jar(cls, jar):
+    return 'com.squareup.wire' == jar.org and 'wire-compiler' == jar.name
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -122,7 +127,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
 
     # A check is done in the java_wire_library target  to make sure only one of --service_writer or
     # --service_factory is specified.
-    if self._wire_compiler_version < Revision(2, 0):
+    if self.wire_compiler_version < Revision(2, 0):
       if target.payload.service_factory:
         raise TaskError('{spec} used service_factory, which is not available before Wire 2.0. You '
                         'should use service_writer instead.'
@@ -149,7 +154,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     if target.payload.enum_options:
       args.append('--enum_options={0}'.format(','.join(target.payload.enum_options)))
 
-    if self._wire_compiler_version < Revision(2, 0):
+    if self.wire_compiler_version < Revision(2, 0):
       args.append('--proto_path={0}'.format(os.path.join(get_buildroot(),
                                                          SourceRoot.find(target))))
     else:
@@ -174,10 +179,24 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
         if result != 0:
           raise TaskError('Wire compiler exited non-zero ({0})'.format(result))
 
+  class WireCompilerVersionError(TaskError):
+    """Indicates the wire compiler version could not be determined."""
+
   @memoized_property
-  def _wire_compiler_version(self):
-    wire_compiler = self.tool_targets(self.context, 'wire_compiler')[0]
-    wire_compiler_jar = wire_compiler.jar_dependencies[0]
+  def wire_compiler_version(self):
+    wire_compiler_jars = OrderedSet()
+    classpath_spec = self.get_options().wire_compiler
+    for target in self.context.resolve(classpath_spec):
+      if isinstance(target, JarLibrary):
+        wire_compiler_jars.update(jar for jar in target.jar_dependencies
+                                  if self.is_wire_compiler_jar(jar))
+    if len(wire_compiler_jars) != 1:
+      msg = ('Expected to find exactly 1 wire-compiler jar in --wire-compiler classpath rooted '
+             'at {}, but found {}'
+             .format(classpath_spec,
+                     ', '.join(map(str, wire_compiler_jars)) if wire_compiler_jars else 0))
+      raise self.WireCompilerVersionError(msg)
+    wire_compiler_jar = wire_compiler_jars.pop()
     wire_compiler_version = wire_compiler_jar.rev
     return Revision.lenient(wire_compiler_version)
 

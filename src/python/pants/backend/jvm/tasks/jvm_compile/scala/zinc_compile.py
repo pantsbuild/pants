@@ -92,7 +92,10 @@ class ZincCompile(JvmCompile):
                           ])
     cls.register_jvm_tool(register, 'compiler-interface')
     cls.register_jvm_tool(register, 'sbt-interface')
-    cls.register_jvm_tool(register, 'plugin-jars')
+
+    # By default we expect no plugin-jars classpath_spec is filled in by the user, so we accept an
+    # empty classpath.
+    cls.register_jvm_tool(register, 'plugin-jars', classpath=[])
 
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')

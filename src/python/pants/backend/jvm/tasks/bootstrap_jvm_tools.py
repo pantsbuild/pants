@@ -21,6 +21,7 @@ from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
+from pants.base.target import Target
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
 from pants.java.executor import Executor
@@ -94,17 +95,53 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   def global_subsystems(cls):
     return super(BootstrapJvmTools, cls).global_subsystems() + (IvySubsystem, )
 
+  class ToolResolveError(TaskError):
+    """Indicates an error resolving a required JVM tool classpath."""
+
+  @classmethod
+  def _tool_resolve_error(cls, error, dep_spec, jvm_tool):
+    msg = dedent("""
+        Failed to resolve target for tool: {tool}. This target was obtained from
+        option {option} in scope {scope}. You probably need to add this target to your tools
+        BUILD file(s), usually located in BUILD.tools in the workspace root.
+        Exception {etype}: {error}
+      """.format(tool=dep_spec,
+                 etype=type(error).__name__,
+                 error=error,
+                 scope=jvm_tool.scope,
+                 option=jvm_tool.key))
+    return cls.ToolResolveError(msg)
+
   @classmethod
   def _alternate_target_roots(cls, options, address_mapper, build_graph):
+    processed = set()
     for jvm_tool in JvmToolMixin.get_registered_tools():
       dep_spec = jvm_tool.dep_spec(options)
       dep_address = Address.parse(dep_spec)
-      if not build_graph.contains_address(dep_address) and jvm_tool.classpath:
-        tool_classpath_target = JarLibrary(name=dep_address.target_name,
-                                           address=dep_address,
-                                           build_graph=build_graph,
-                                           jars=jvm_tool.classpath)
-        build_graph.inject_target(tool_classpath_target)
+      # Some JVM tools are requested multiple times, we only need to handle them once.
+      if dep_address not in processed:
+        processed.add(dep_address)
+        try:
+          if build_graph.contains_address(dep_address) or address_mapper.resolve(dep_address):
+            # The user has defined a tool classpath override - we let that stand.
+            continue
+        except AddressLookupError as e:
+          if jvm_tool.classpath is None:
+            raise cls._tool_resolve_error(e, dep_spec, jvm_tool)
+          else:
+            if jvm_tool.classpath:
+              tool_classpath_target = JarLibrary(name=dep_address.target_name,
+                                                 address=dep_address,
+                                                 build_graph=build_graph,
+                                                 jars=jvm_tool.classpath)
+            else:
+              # The tool classpath is empty by default, so we just inject a dummy target that
+              # ivy resolves as the empty list classpath.  JarLibrary won't do since it requires
+              # one or more jars, so we just pick a target type ivy has no resolve work to do for.
+              tool_classpath_target = Target(name=dep_address.target_name,
+                                             address=dep_address,
+                                             build_graph=build_graph)
+            build_graph.inject_target(tool_classpath_target)
 
     # We use the trick of not returning alternate roots, but instead just filling the dep_spec
     # holes with a JarLibrary built from a tool's default classpath JarDependency list if there is
@@ -141,18 +178,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
         raise KeyError
       return targets
     except (KeyError, AddressLookupError) as e:
-      msg = dedent("""
-        Failed to resolve target for tool: {tool}. This target was obtained from
-        option {option} in scope {scope}. You probably need to add this target to your tools
-        BUILD file(s), usually located in BUILD.tools in the workspace root.
-        Exception {etype}: {e}
-      """.format(tool=dep_spec,
-                 etype=type(e).__name__,
-                 e=e,
-                 scope=jvm_tool.scope,
-                 option=jvm_tool.key))
-      self.context.log.error(msg)
-      raise TaskError(msg)
+      raise self._tool_resolve_error(e, dep_spec, jvm_tool)
 
   def _bootstrap_classpath(self, jvm_tool, targets):
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
@@ -176,6 +202,11 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                           # We're the only dependent in reality since we shade.
                           invalidate_dependents=False,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+
+      # If there are no vts, then there are no resolvable targets, so we exit early with an empty
+      # classpath.  This supports the optional tool classpath case.
+      if not invalidation_check.all_vts:
+        return []
 
       tool_vts = self.tool_vts(invalidation_check)
       jar_name = '{main}-{hash}.jar'.format(main=jvm_tool.main, hash=tool_vts.cache_key.hash)

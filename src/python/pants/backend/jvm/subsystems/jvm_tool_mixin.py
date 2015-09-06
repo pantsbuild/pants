@@ -52,7 +52,7 @@ class JvmToolMixin(object):
     :param register: A function that can register options with the option system.
     :param unicode key: The key the tool configuration should be registered under.
     :param unicode classpath_spec: The tool classpath target address spec that can be used to
-                                   override this tool's classpath.
+                                   override this tool's classpath; by default, `//:[key]`.
     :param unicode main: The fully qualified class name of the tool's main class if shading of the
                          tool classpath is desired.
     :param list custom_rules: An optional list of `Shader.Rule`s to apply before the automatically
@@ -66,7 +66,10 @@ class JvmToolMixin(object):
                              Note that unlike for other options, fingerprinting is enabled for tools
                              by default.
     :param list classpath: A list of one or more `JarDependency` objects that form this tool's
-                           default classpath.
+                           default classpath.  If the classpath is optional, supply an empty list;
+                           otherwise the default classpath of `None` indicates the `classpath_spec`
+                           must point to a target defined in a BUILD file that provides the tool
+                           classpath.
     :param unicode help: An optional custom help string; otherwise a reasonable one is generated.
     """
     register('--{0}'.format(key),
@@ -100,23 +103,6 @@ class JvmToolMixin(object):
   def reset_registered_tools():
     """Needed only for test isolation."""
     JvmToolMixin._jvm_tools = []
-
-  # TODO(John Sirois): This is only used by WireGen to implement conditional logic based on the
-  # version of a tool it's using.  WireGen should get its tool version via other means, possibly by
-  # calling wire-gen once with `--version`.  As it stands this lives in JvmToolMixin which has no
-  # `.get_options()` or `.options_scope` unlike JvmToolTaskMixin, which WireGen extends.  So even
-  # moving this method there would likely be an improvement.
-  def tool_targets(self, context, key):
-    """Return the Target objects obtained by resolving a tool's specs."""
-    spec = self.get_options()[key]
-    # Resolve to actual targets.
-    try:
-      return list(context.resolve(spec))
-    except AddressLookupError as e:
-      raise self.DepLookupError("{message}\n  specified by option --{key} in scope {scope}."
-                                .format(message=e,
-                                        key=key,
-                                        scope=self.options_scope))
 
   def tool_classpath_from_products(self, products, key, scope):
     """Get a classpath for the tool previously registered under key in the given scope.
