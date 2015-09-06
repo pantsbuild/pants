@@ -93,6 +93,9 @@ class JvmToolTaskTestBase(TaskTestBase):
     # Bootstrap the tools needed by the task under test.
     # We need the bootstrap task's workdir to be under the test's .pants.d, so that it can
     # use artifact caching.  Making it a sibling of the main task's workdir achieves this.
+    self.bootstrap_task_type._alternate_target_roots(context.options,
+                                                     self.address_mapper,
+                                                     self.build_graph)
     bootstrap_workdir = os.path.join(os.path.dirname(task.workdir), 'bootstrap_jvm_tools')
     self.bootstrap_task_type(context, bootstrap_workdir).execute()
     return task

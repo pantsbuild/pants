@@ -16,6 +16,7 @@ from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.protobuf_gen import check_duplicate_conflicting_protos
 from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -23,7 +24,6 @@ from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
 from pants.base.source_root import SourceRoot
 from pants.java.distribution.distribution import DistributionLocator
-from pants.option.custom_types import list_option
 from pants.util.memo import memoized_property
 
 
@@ -35,9 +35,18 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   @classmethod
   def register_options(cls, register):
     super(WireGen, cls).register_options(register)
-    register('--javadeps', type=list_option, default=['//:wire-runtime'],
-             help='Runtime dependencies for wire-using Java code.')
-    cls.register_jvm_tool(register, 'wire-compiler')
+
+    def wire_jar(name):
+      return JarDependency(org='com.squareup.wire', name=name, rev='1.6.0')
+
+    cls.register_jvm_tool(register,
+                          'javadeps',
+                          classpath=[
+                            wire_jar(name='wire-runtime')
+                          ],
+                          classpath_spec='//:wire-runtime',
+                          help='Runtime dependencies for wire-using Java code.')
+    cls.register_jvm_tool(register, 'wire-compiler', classpath=[wire_jar(name='wire-compiler')])
 
   @classmethod
   def subsystem_dependencies(cls):

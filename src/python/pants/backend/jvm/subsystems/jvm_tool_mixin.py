@@ -5,9 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from collections import namedtuple
+
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import target_list_option
 
 
 class JvmToolMixin(object):
@@ -19,10 +20,29 @@ class JvmToolMixin(object):
     """Thrown when a dependency can't be found."""
     pass
 
-  _tool_keys = []  # List of (scope, key, main, custom_rule) tuples.
+  class JvmTool(namedtuple('JvmTool', ['scope', 'key', 'classpath', 'main', 'custom_rules'])):
+    """Represents a jvm tool classpath request."""
+
+    def dep_spec(self, options):
+      """Returns the target address spec that points to this JVM tool's classpath dependencies.
+
+      :rtype string
+      """
+      option = self.key.replace('-', '_')
+      return options.for_scope(self.scope)[option]
+
+  _jvm_tools = []  # List of JvmTool objects.
 
   @classmethod
-  def register_jvm_tool(cls, register, key, default=None, main=None, custom_rules=None, fingerprint=True):
+  def register_jvm_tool(cls,
+                        register,
+                        key,
+                        classpath_spec=None,
+                        main=None,
+                        custom_rules=None,
+                        fingerprint=True,
+                        classpath=None,
+                        help=None):
     """Registers a jvm tool under `key` for lazy classpath resolution.
 
     Classpaths can be retrieved in `execute` scope via `tool_classpath`.
@@ -31,7 +51,8 @@ class JvmToolMixin(object):
 
     :param register: A function that can register options with the option system.
     :param unicode key: The key the tool configuration should be registered under.
-    :param list default: The default tool classpath target address specs to use.
+    :param unicode classpath_spec: The tool classpath target address spec that can be used to
+                                   override this tool's classpath.
     :param unicode main: The fully qualified class name of the tool's main class if shading of the
                          tool classpath is desired.
     :param list custom_rules: An optional list of `Shader.Rule`s to apply before the automatically
@@ -44,12 +65,16 @@ class JvmToolMixin(object):
     :param bool fingerprint: Indicates whether to include the jvm tool in the task's fingerprint.
                              Note that unlike for other options, fingerprinting is enabled for tools
                              by default.
+    :param list classpath: A list of one or more `JarDependency` objects that form this tool's
+                           default classpath.
+    :param unicode help: An optional custom help string; otherwise a reasonable one is generated.
     """
     register('--{0}'.format(key),
              advanced=True,
-             type=target_list_option,
-             default=['//:{0}'.format(key)] if default is None else default,
-             help='Target specs for bootstrapping the {0} tool.'.format(key),
+             default='//:{0}'.format(key) if classpath_spec is None else classpath_spec,
+             help=(help or
+                   'Target address spec for overriding the classpath of the {0} jvm '
+                   'tool.'.format(key)),
              fingerprint=fingerprint)
 
     # TODO(John Sirois): Move towards requiring tool specs point to jvm_binary targets.
@@ -60,31 +85,38 @@ class JvmToolMixin(object):
     # be worth creating a JarLibrary subclass - say JarBinary, or else mixing in a Binary interface
     # to JarLibrary to endow it with main and shade_rules attributes to allow for single-target
     # definition of resolvable jvm binaries.
-    JvmToolMixin._tool_keys.append((register.scope, key, main, custom_rules))
+    jvm_tool = cls.JvmTool(register.scope, key, classpath, main, custom_rules)
+    JvmToolMixin._jvm_tools.append(jvm_tool)
 
   @staticmethod
   def get_registered_tools():
-    return JvmToolMixin._tool_keys
+    """Returns all registered jvm tools.
+
+    :rtype: list of :class:`JvmToolMixin.JvmTool`
+    """
+    return JvmToolMixin._jvm_tools
 
   @staticmethod
   def reset_registered_tools():
     """Needed only for test isolation."""
-    JvmToolMixin._tool_keys = []
+    JvmToolMixin._jvm_tools = []
 
+  # TODO(John Sirois): This is only used by WireGen to implement conditional logic based on the
+  # version of a tool it's using.  WireGen should get its tool version via other means, possibly by
+  # calling wire-gen once with `--version`.  As it stands this lives in JvmToolMixin which has no
+  # `.get_options()` or `.options_scope` unlike JvmToolTaskMixin, which WireGen extends.  So even
+  # moving this method there would likely be an improvement.
   def tool_targets(self, context, key):
     """Return the Target objects obtained by resolving a tool's specs."""
-    specs = self.get_options()[key]
-    targets = []
-    for spec in specs:
-      # Resolve to actual targets.
-      try:
-        targets.extend(context.resolve(spec))
-      except AddressLookupError as e:
-        raise self.DepLookupError("{message}\n  specified by option --{key} in scope {scope}."
-                                  .format(message=e,
-                                          key=key,
-                                          scope=self.options_scope))
-    return targets
+    spec = self.get_options()[key]
+    # Resolve to actual targets.
+    try:
+      return list(context.resolve(spec))
+    except AddressLookupError as e:
+      raise self.DepLookupError("{message}\n  specified by option --{key} in scope {scope}."
+                                .format(message=e,
+                                        key=key,
+                                        scope=self.options_scope))
 
   def tool_classpath_from_products(self, products, key, scope):
     """Get a classpath for the tool previously registered under key in the given scope.

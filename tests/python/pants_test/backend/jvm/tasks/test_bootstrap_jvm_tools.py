@@ -10,7 +10,6 @@ import subprocess
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -24,8 +23,18 @@ class JvmToolTask(JvmToolTaskMixin, Task):
   @classmethod
   def register_options(cls, register):
     super(JvmToolTask, cls).register_options(register)
-    cls.register_jvm_tool(register, 'ant', default=['test:ant'])
-    cls.register_jvm_tool(register, 'ant-shaded', default=['test:ant'],
+
+    # We know this version of ant has a dependency on org.apache.ant#ant-launcher;1.9.4
+    ant_classpath = [JarDependency(org='org.apache.ant', name='ant', rev='1.9.4')]
+
+    cls.register_jvm_tool(register,
+                          'ant',
+                          classpath=ant_classpath,
+                          classpath_spec='test:ant')
+    cls.register_jvm_tool(register,
+                          'ant-shaded',
+                          classpath=ant_classpath,
+                          classpath_spec='test:ant',
                           main='org.apache.tools.ant.Main')
 
   def execute(self):
@@ -42,11 +51,6 @@ class BootstrapJvmToolsTest(JvmToolTaskTestBase):
     self.set_options_for_scope('', max_subprocess_args=100)
 
   def test_shaded_and_unshaded(self):
-    # We know this version of ant has a dependency on org.apache.ant#ant-launcher;1.9.4
-    self.make_target(spec='test:ant',
-                     target_type=JarLibrary,
-                     jars=[JarDependency(org='org.apache.ant', name='ant', rev='1.9.4')])
-
     task = self.execute(context=self.context())
     ant_classpath, ant_shaded_classpath = task.execute()
 

@@ -51,15 +51,15 @@ that combines DEFAULT values with others is in Pants'
 Configure Pants' own Runtime Dependencies
 -----------------------------------------
 
-Pants calls out to other tools. E.g., it uses `jmake` for part of Java compilation.
+Pants calls out to other tools. E.g., it uses `zinc` for part of scala compilation.
 Some special files in your workspace specify versions of these to fetch.
 When setting up your Pants repo, you want to copy these files over from a working Pants
 repo and perhaps change some version numbers to fit your situation.
 
-**JVM** `BUILD.tools` has JVM dependencies. For example, when Pants fetches `jmake`, it looks in
+**JVM** `BUILD.tools` has JVM dependencies. For example, when Pants fetches `zinc`, it looks in
 `BUILD.tools` for that target:
 
-!inc[start-at=jmake&end-before=java](../../BUILD.tools)
+!inc[start-at=zinc&end-before=SBT_REV](../../BUILD.tools)
 
 **Python** `build-support/python/pants.requirements.txt` has Pants' runtime Python requirements,
 expressed as a `requirements.txt` file.

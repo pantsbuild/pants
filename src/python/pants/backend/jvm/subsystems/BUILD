@@ -7,7 +7,6 @@ python_library(
   dependencies = [
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:exceptions',
-    'src/python/pants/option',
   ],
 )
 
@@ -16,6 +15,7 @@ python_library(
   sources = ['jar_tool.py'],
   dependencies = [
     ':jvm_tool_mixin',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:workunit',
     'src/python/pants/option',
     'src/python/pants/subsystem',

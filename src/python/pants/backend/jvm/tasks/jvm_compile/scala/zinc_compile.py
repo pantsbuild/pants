@@ -92,8 +92,7 @@ class ZincCompile(JvmCompile):
                           ])
     cls.register_jvm_tool(register, 'compiler-interface')
     cls.register_jvm_tool(register, 'sbt-interface')
-
-    cls.register_jvm_tool(register, 'plugin-jars', default=[])
+    cls.register_jvm_tool(register, 'plugin-jars')
 
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')

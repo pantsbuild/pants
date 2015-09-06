@@ -45,6 +45,7 @@ python_library(
     ':jvm_task',
     ':jvm_tool_task_mixin',
     'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:workunit',
     'src/python/pants/java:util',
   ],
@@ -109,6 +110,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':nailgun_task',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/java/jar:shader',
     'src/python/pants/option',
@@ -166,6 +168,7 @@ python_library(
     ':classpath_products',
     ':ivy_task_mixin',
     ':nailgun_task',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:cache_manager',
@@ -272,6 +275,7 @@ python_library(
     ':jvm_tool_task_mixin',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',
@@ -407,12 +411,13 @@ python_library(
   sources = ['nailgun_task.py'],
   dependencies = [
     ':jvm_tool_task_mixin',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
+    'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'src/python/pants/java:nailgun_executor',
-    'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:util',
-    'src/python/pants/backend/core/tasks:task',
   ],
 )
 

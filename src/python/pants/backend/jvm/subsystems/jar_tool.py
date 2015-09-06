@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
@@ -20,7 +21,11 @@ class JarTool(JvmToolMixin, Subsystem):
     # TODO: All jvm tools will need this option, so might as well have register_jvm_tool add it?
     register('--jvm-options', advanced=True, type=list_option, default=['-Xmx64M'],
              help='Run the jar tool with these JVM options.')
-    cls.register_jvm_tool(register, 'jar-tool')
+    cls.register_jvm_tool(register,
+                          'jar-tool',
+                          classpath=[
+                            JarDependency(org='org.pantsbuild', name='jar-tool', rev='0.0.5'),
+                          ])
 
   def run(self, context, runjava, args):
     return runjava(self.tool_classpath_from_products(context.products, 'jar-tool',
