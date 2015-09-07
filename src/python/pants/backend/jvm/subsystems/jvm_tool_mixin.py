@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from collections import namedtuple
+from textwrap import dedent
 
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
@@ -29,7 +30,16 @@ class JvmToolMixin(object):
       :rtype string
       """
       option = self.key.replace('-', '_')
-      return options.for_scope(self.scope)[option]
+      dep_spec = options.for_scope(self.scope)[option]
+      if dep_spec.startswith('['):
+        raise ValueError(dedent("""\
+          JVM tool configuration now expects a single target address, use the
+          following in pants.ini:
+
+          [{scope}]
+          {key}: //tool/classpath:address
+          """.format(scope=self.scope, key=self.key)))
+      return dep_spec
 
   _jvm_tools = []  # List of JvmTool objects.
 

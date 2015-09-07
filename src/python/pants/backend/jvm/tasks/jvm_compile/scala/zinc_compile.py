@@ -11,6 +11,7 @@ from contextlib import closing
 from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
@@ -80,6 +81,9 @@ class ZincCompile(JvmCompile):
 
     cls.register_jvm_tool(register,
                           'zinc',
+                          classpath=[
+                            JarDependency('org.pantsbuild', 'zinc', '1.0.8')
+                          ],
                           main=cls._ZINC_MAIN,
                           custom_rules=[
                             # The compiler-interface and sbt-interface tool jars carry xsbt and
@@ -90,8 +94,27 @@ class ZincCompile(JvmCompile):
                             Shader.exclude_package('xsbt', recursive=True),
                             Shader.exclude_package('xsbti', recursive=True),
                           ])
-    cls.register_jvm_tool(register, 'compiler-interface')
-    cls.register_jvm_tool(register, 'sbt-interface')
+
+    def sbt_jar(name, **kwargs):
+      return JarDependency(org='com.typesafe.sbt', name=name, rev='0.13.9', **kwargs)
+
+    cls.register_jvm_tool(register,
+                          'compiler-interface',
+                          classpath=[
+                            sbt_jar(name='compiler-interface',
+                                    classifier='sources',
+                                    # We just want the single compiler-interface jar and not its
+                                    # dep on scala-lang
+                                    intransitive=True)
+                          ])
+    cls.register_jvm_tool(register,
+                          'sbt-interface',
+                          classpath=[
+                            sbt_jar(name='sbt-interface',
+                                    # We just want the single sbt-interface jar and not its dep
+                                    # on scala-lang
+                                    intransitive=True)
+                          ])
 
     # By default we expect no plugin-jars classpath_spec is filled in by the user, so we accept an
     # empty classpath.

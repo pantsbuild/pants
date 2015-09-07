@@ -184,7 +184,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
 
   @memoized_property
   def wire_compiler_version(self):
-    wire_compiler_jars = OrderedSet()
+    wire_compiler_jars = set()
     classpath_spec = self.get_options().wire_compiler
     for target in self.context.resolve(classpath_spec):
       if isinstance(target, JarLibrary):
