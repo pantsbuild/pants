@@ -51,13 +51,13 @@ that combines DEFAULT values with others is in Pants'
 Configure Pants' own Runtime Dependencies
 -----------------------------------------
 
-Pants calls out to other tools. E.g., it uses `zinc` for part of scala compilation. Most tools
-come pre-configured by Pants. A few do require more setup though and these rely on special targets
-in your workspace to specify versions of the tools to fetch. These targets all live in the
-`BUILD.tools` file by convention. For example, when Pants fetches `zinc`, it looks in `BUILD.tools`
-for that target:
+Pants calls out to other tools. E.g., it optionally uses `scalastyle` to check scala source code.
+Most tools come pre-configured by Pants. A few do require more setup though and these rely on
+special targets in your workspace to specify versions of the tools to fetch. These targets all live
+in the `BUILD.tools` file by convention. For example, when Pants fetches `scalastyle`, it looks in
+`BUILD.tools` for that target:
 
-!inc[start-at=zinc&end-before=SBT_REV](../../BUILD.tools)
+!inc[start-at=scalastyle&end-before=scrooge-gen](../../BUILD.tools)
 
 When setting up your Pants repo, you may want to copy this file over from a working Pants repo and
 perhaps change some version numbers to fit your situation.
