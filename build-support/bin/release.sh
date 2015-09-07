@@ -318,6 +318,10 @@ function tag_release() {
   git push git@github.com:pantsbuild/pants.git ${tag_name}
 }
 
+function publish_docs() {
+  ${ROOT}/build-support/bin/publish_docs.sh -p -y
+}
+
 function list_packages() {
   echo "Releases the following source distributions to PyPi."
   version="$(local_version)"
@@ -476,7 +480,7 @@ else
   banner "Releasing packages to PyPi." && \
   (
     check_origin && check_clean_master && check_pgp && check_owners && \
-      dry_run_install && publish_packages && tag_release && \
-        banner "Successfully released packages to PyPi."
+      dry_run_install && publish_packages && tag_release && publish_docs && \
+      banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
 fi

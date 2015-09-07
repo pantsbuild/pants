@@ -15,6 +15,7 @@ function usage() {
   echo " -h           print out this help message"
   echo " -o           open the doc site locally"
   echo " -p           publish the doc site remotely"
+  echo " -y           continue publishing without prompting"
   echo " -d  <dir>    publish the site to a subdir staging/<dir> (useful for public previews)"
 
   if (( $# > 0 )); then
@@ -26,11 +27,12 @@ function usage() {
 
 publish_path=""
 
-while getopts "hopd:" opt; do
+while getopts "hopyd:" opt; do
   case ${opt} in
     h) usage ;;
     o) preview="true" ;;
     p) publish="true" ;;
+    y) publish_confirmed="true" ;;
     d) publish_path="staging/${OPTARG}" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
@@ -65,8 +67,10 @@ do_open "${REPO_ROOT}/dist/docsite/index.html"
 
 if [[ "${publish}" = "true" ]]; then
   url="http://pantsbuild.github.io/${publish_path}"
-  read -ep "To abort publishing these docs to ${url} press CTRL-C, otherwise press enter to \
+  if [[ "${publish_confirmed}" != "true" ]] ; then
+    read -ep "To abort publishing these docs to ${url} press CTRL-C, otherwise press enter to \
 continue."
+  fi
   (
     ${REPO_ROOT}/src/python/pants/docs/publish_via_git.sh \
       git@github.com:pantsbuild/pantsbuild.github.io.git \
