@@ -140,7 +140,6 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
         avro_lib_info.get('tests'),
         os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
       )
-
       # TODO(Eric Ayers): Pants does not properly download javadoc and test jars
       #self.assertEquals(
       #  common_lang_lib_info.get('javadoc'),
@@ -150,3 +149,42 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       #  common_lang_lib_info.get('sources'),
       #  os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-sources.jar')
       #)
+
+  def test_distributions_and_platforms(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/src/java/org/pantsbuild/example/hello/simple'
+      json_data = self.run_export(test_target, workdir, load_libs=False, extra_args=[
+        '--jvm-platform-default-platform=java7',
+        '--jvm-platform-platforms={'
+        ' "java7": {"source": "1.7", "target": "1.7", "args": [ "-X123" ]},'
+        ' "java8": {"source": "1.8", "target": "1.8", "args": [ "-X456" ]}'
+        '}',
+        '--jvm-distributions-paths={'
+        ' "macos": [ "/Library/JDK" ],'
+        ' "linux": [ "/usr/lib/jdk7", "/usr/lib/jdk8"]'
+        '}'
+      ])
+      target_name = 'examples/src/java/org/pantsbuild/example/hello/simple:simple'
+      targets = json_data.get('targets')
+      self.assertEquals('java7', targets[target_name]['platform'])
+      self.assertEquals(
+        {
+          'darwin': ['/Library/JDK'],
+          'linux': ['/usr/lib/jdk7', u'/usr/lib/jdk8'],
+        },
+        json_data['jvm_distributions'])
+      self.assertEquals(
+        {
+          'default_platform' : 'java7',
+          'platforms': {
+            'java7': {
+              'source_level': '1.7',
+              'args': ['-X123'],
+              'target_level': '1.7'},
+            'java8': {
+              'source_level': '1.8',
+              'args': ['-X456'],
+              'target_level': '1.8'},
+          }
+        },
+        json_data['jvm_platforms'])

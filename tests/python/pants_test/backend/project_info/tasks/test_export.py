@@ -44,6 +44,12 @@ class ProjectInfoTest(ConsoleTaskTestBase):
   def setUp(self):
     super(ProjectInfoTest, self).setUp()
 
+    self.set_options_for_scope('jvm-platform',
+                               default_platform='java6',
+                               platforms= {
+                                 'java6': {'source': '1.6', 'target': '1.6'}
+                               })
+
     with subsystem_instance(ScalaPlatform):
       self.make_target(':scala-library',
                        JarLibrary,
@@ -192,7 +198,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     result = get_json(self.execute_console_task(
       targets=[self.target('project_info:first')]
     ))
-    self.assertEqual('1.0.2', result['version'])
+    self.assertEqual('1.0.3', result['version'])
 
   def test_sources(self):
     result = get_json(self.execute_console_task(
@@ -240,15 +246,16 @@ class ProjectInfoTest(ConsoleTaskTestBase):
                      result['targets']['project_info:jvm_app']['libraries'])
 
   def test_jvm_target(self):
+    self.maxDiff = None
     result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:jvm_target')]
+      targets=[self.target('project_info:jvm_target')],
     ))
     jvm_target = result['targets']['project_info:jvm_target']
     expected_jvm_target = {
       'excludes': [],
       'globs': {'globs': ['project_info/this/is/a/source/Foo.scala',
                           'project_info/this/is/a/source/Bar.scala']},
-      'libraries': ['org.scala-lang:scala-library:2.10.5', 'org.apache:apache-jar:12.12.2012'],
+      'libraries': ['org.apache:apache-jar:12.12.2012', 'org.scala-lang:scala-library:2.10.5'],
       'is_code_gen': False,
       'targets': ['project_info:jar_lib', ':scala-library'],
       'roots': [
@@ -258,7 +265,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
          },
       ],
       'target_type': 'SOURCE',
-      'pants_target_type': 'scala_library'
+      'pants_target_type': 'scala_library',
+      'platform': 'java6',
     }
     self.assertEqual(jvm_target, expected_jvm_target)
 
@@ -310,6 +318,13 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     self.assertEqual('SOURCE',
                      result['targets']['project_info:target_type']['target_type'])
     self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
+
+  def test_target_platform(self):
+    result = get_json(self.execute_console_task(
+      targets=[self.target('project_info:target_type')],
+    ))
+    self.assertEqual('java6',
+                     result['targets']['project_info:target_type']['platform'])
 
   def test_output_file(self):
     outfile = os.path.join(self.build_root, '.pants.d', 'test')
