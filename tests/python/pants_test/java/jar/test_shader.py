@@ -11,7 +11,7 @@ import unittest
 
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
-from pants.java.jar.shader import Shader
+from pants.java.jar.shader import Shader, Shading
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
 from pants_test.subsystem.subsystem_util import subsystem_instance
@@ -93,7 +93,72 @@ class ShaderTest(unittest.TestCase):
         self.assertEqual('rule * @1', lines[1])  # Exclude main's package.
         self.assertIn('rule javax.annotation.* javax.annotation.@1', lines)  # Exclude system.
         self.assertEqual('rule com.google.common.base.* {}com.google.common.base.@1'
-                         .format(Shader.SHADE_PREFIX), lines[-1])  # Shade the rest.
+                         .format(Shading.SHADE_PREFIX), lines[-1])  # Shade the rest.
 
       self.assertEqual(input_jar, command.pop(0))
       self.assertEqual(self.output_jar, command.pop(0))
+
+  def test_sanitize_package_name(self):
+    def assert_sanitize(name, sanitized):
+      self.assertEqual(sanitized, Shading.Relocate._sanitize_package_name(name))
+
+    assert_sanitize('hello', 'hello')
+    assert_sanitize('hello.goodbye', 'hello.goodbye')
+    assert_sanitize('.hello.goodbye', 'hello.goodbye')
+    assert_sanitize('hello.goodbye.', 'hello.goodbye')
+    assert_sanitize('123', '_123')
+    assert_sanitize('123.456', '_123._456')
+    assert_sanitize('123.v2', '_123.v2')
+    assert_sanitize('hello-goodbye', 'hello_goodbye')
+    assert_sanitize('hello-/.goodbye.?', 'hello__.goodbye._')
+    assert_sanitize('one.two..three....four.', 'one.two.three.four')
+
+  def test_infer_shaded_pattern(self):
+    def assert_inference(from_pattern, prefix, to_pattern):
+      result = ''.join(Shading.Relocate._infer_shaded_pattern_iter(from_pattern, prefix))
+      self.assertEqual(to_pattern, result)
+
+    assert_inference('com.foo.bar.Main', None, 'com.foo.bar.Main')
+    assert_inference('com.foo.bar.', None, 'com.foo.bar.')
+    assert_inference('com.foo.bar.', '__prefix__.', '__prefix__.com.foo.bar.')
+    assert_inference('com.*.bar.', None, 'com.@1.bar.')
+    assert_inference('com.*.bar.*.', None, 'com.@1.bar.@2.')
+    assert_inference('com.*.bar.**', None, 'com.@1.bar.@2')
+    assert_inference('*', None, '@1')
+    assert_inference('**', None, '@1')
+    assert_inference('**', '__prefix__.', '__prefix__.@1')
+
+  def test_shading_exclude(self):
+    def assert_exclude(from_pattern, to_pattern):
+      self.assertEqual((from_pattern, to_pattern), Shading.Exclude.new(from_pattern).rule())
+
+    assert_exclude('com.foo.bar.Main', 'com.foo.bar.Main')
+    assert_exclude('com.foo.bar.**', 'com.foo.bar.@1')
+    assert_exclude('com.*.bar.**', 'com.@1.bar.@2')
+
+  def test_shading_exclude_package(self):
+    self.assertEqual(('com.foo.bar.**', 'com.foo.bar.@1'),
+                     Shading.ExcludePackage.new('com.foo.bar').rule())
+    self.assertEqual(('com.foo.bar.*', 'com.foo.bar.@1'),
+                     Shading.ExcludePackage.new('com.foo.bar', recursive=False).rule())
+
+  def test_relocate(self):
+    self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
+                     Shading.Relocate.new(from_pattern='com.foo.bar.**').rule())
+
+    self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format('__my_prefix__.')),
+                     Shading.Relocate.new(from_pattern='com.foo.bar.**',
+                                      shade_prefix='__my_prefix__.').rule())
+
+    self.assertEqual(('com.foo.bar.**', 'org.biz.baz.@1'.format('__my_prefix__.')),
+                     Shading.Relocate.new(from_pattern='com.foo.bar.**',
+                                      shade_prefix='__my_prefix__.',
+                                      shade_pattern='org.biz.baz.@1').rule())
+
+  def test_relocate_package(self):
+    self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
+                     Shading.RelocatePackage.new('com.foo.bar').rule())
+    self.assertEqual(('com.foo.bar.*', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
+                     Shading.RelocatePackage.new('com.foo.bar', recursive=False).rule())
+    self.assertEqual(('com.foo.bar.**', '__p__.com.foo.bar.@1'),
+                     Shading.RelocatePackage.new('com.foo.bar', shade_prefix='__p__.').rule())

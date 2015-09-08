@@ -14,7 +14,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
-from pants.java.jar.shader import Shader
+from pants.java.jar.shader import Shading
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
@@ -86,7 +86,7 @@ class BootstrapJvmToolsTest(JvmToolTaskTestBase):
     for excluded_class in excluded_classes:
       self.assertEqual('org/apache/tools/ant', os.path.dirname(excluded_class))
 
-    prefix_len = len(Shader.SHADE_PREFIX)
+    prefix_len = len(Shading.SHADE_PREFIX)
 
     def strip_prefix(shaded):
       return set(classfile[prefix_len:] for classfile in shaded)

@@ -291,6 +291,7 @@ class JvmBinary(JvmTarget):
                deploy_excludes=None,
                deploy_jar_rules=None,
                manifest_entries=None,
+               shading_rules=None,
                **kwargs):
     """
     :param string main: The name of the ``main`` class, e.g.,
@@ -300,9 +301,6 @@ class JvmBinary(JvmTarget):
       ``'hello'``. (By default, uses ``name`` param)
     :param string source: Name of one ``.java`` or ``.scala`` file (a good
       place for a ``main``).
-    :param sources: Overridden by source. If you want more than one source
-      file, use a library and have the jvm_binary depend on that library.
-    :param resources: List of ``resource``\s to include in bundle.
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
     :type dependencies: list of target specs
@@ -316,9 +314,10 @@ class JvmBinary(JvmTarget):
       deploy jar.
     :param manifest_entries: dict that specifies entries for `ManifestEntries <#manifest_entries>`_
       for adding to MANIFEST.MF when packaging this binary.
-    :param configurations: Ivy configurations to resolve for this target.
-      This parameter is not intended for general use.
-    :type configurations: tuple of strings
+    :param list shading_rules: Optional list of shading rules to apply when building a shaded
+      (aka monolithic aka fat) binary jar. The order of the rules matters: the first rule which
+      matches a fully-qualified class name is used to shade it. See shading_relocate(),
+      shading_exclude(), shading_relocate_package(), and shading_exclude_package().
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if main and not isinstance(main, string_types):
@@ -349,7 +348,8 @@ class JvmBinary(JvmTarget):
       'deploy_jar_rules': FingerprintedField(deploy_jar_rules or JarRules.default()),
       'manifest_entries': FingerprintedField(ManifestEntries(manifest_entries)),
       'main': PrimitiveField(main),
-      })
+      'shading_rules': PrimitiveField(shading_rules or ()),
+    })
 
     super(JvmBinary, self).__init__(name=name,
                                     address=address,
@@ -368,6 +368,10 @@ class JvmBinary(JvmTarget):
   @property
   def deploy_jar_rules(self):
     return self.payload.deploy_jar_rules
+
+  @property
+  def shading_rules(self):
+    return self.payload.shading_rules
 
   @property
   def main(self):
