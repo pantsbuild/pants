@@ -271,7 +271,10 @@ class _JUnitRunner(object):
           str_failures = xml.get_attribute('testsuite', 'failures')
           int_failures = int(str_failures)
 
-          if target and (int_failures > 0):
+          str_errors = xml.get_attribute('testsuite', 'errors')
+          int_errors = int(str_errors)
+
+          if target and (int_failures or int_errors):
             failed_targets.append(target)
         except (XmlParser.XmlError, ValueError) as e:
           self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
