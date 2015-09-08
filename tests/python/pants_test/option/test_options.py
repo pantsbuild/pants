@@ -21,7 +21,7 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
 from pants.option.scope import ScopeInfo
-from pants.util.contextutil import temporary_file_path
+from pants.util.contextutil import temporary_file, temporary_file_path
 from pants_test.option.fake_config import FakeConfig
 
 
@@ -43,7 +43,8 @@ class OptionsTest(unittest.TestCase):
                         task('simple'),
                         task('simple-dashed'),
                         task('scoped.a.bit'),
-                        task('scoped.and-dashed')]
+                        task('scoped.and-dashed'),
+                        task('fromfile')]
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -103,6 +104,12 @@ class OptionsTest(unittest.TestCase):
     options.register('simple-dashed', '--spam')
     options.register('scoped.a.bit', '--spam')
     options.register('scoped.and-dashed', '--spam')
+
+    # For fromfile test
+    options.register('fromfile', '--string', fromfile=True)
+    options.register('fromfile', '--intvalue', type=int, fromfile=True)
+    options.register('fromfile', '--dictvalue', type=dict_option, fromfile=True)
+    options.register('fromfile', '--listvalue', type=list_option, fromfile=True)
 
   def _parse(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
@@ -626,3 +633,49 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(('', 'blah blah blah'), pairs[0])
     self.assertEquals(('', True), pairs[1])
     self.assertEquals((int, 77), pairs[2])
+
+  def assert_fromfile(self, parse_func):
+    def assert_fromfile(dest, expected, contents):
+      with temporary_file() as fp:
+        fp.write(contents)
+        fp.close()
+        options = parse_func(dest, fp.name)
+        self.assertEqual(expected, options.for_scope('fromfile')[dest])
+
+    assert_fromfile(dest='string', expected='jake', contents='jake')
+    assert_fromfile(dest='intvalue', expected=42, contents='42')
+    assert_fromfile(dest='dictvalue', expected={'a': 42, 'b': (1, 2)}, contents=dedent("""
+      {
+        'a': 42,
+        'b': (
+          1,
+          2
+        )
+      }
+      """))
+    assert_fromfile(dest='listvalue', expected=['a', 1, 2], contents=dedent("""
+      ['a',
+       1,
+       2]
+      """))
+
+  def test_fromfile_flags(self):
+    def parse_func(dest, fromfile):
+      return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
+    self.assert_fromfile(parse_func)
+
+  def test_fromfile_config(self):
+    def parse_func(dest, fromfile):
+      return self._parse('./pants fromfile', config={'fromfile': {dest: '@{}'.format(fromfile)}})
+    self.assert_fromfile(parse_func)
+
+  def test_fromfile_env(self):
+    def parse_func(dest, fromfile):
+      return self._parse('./pants fromfile',
+                         env={'PANTS_FROMFILE_{}'.format(dest.upper()): '@{}'.format(fromfile)})
+    self.assert_fromfile(parse_func)
+
+  def test_fromfile_error(self):
+    options = self._parse('./pants fromfile --string=@/does/not/exist')
+    with self.assertRaises(Parser.FromfileError):
+      options.for_scope('fromfile')

@@ -56,8 +56,10 @@ class Parser(object):
   """
 
   class BooleanConversionError(ParseError):
-    """Raised when a value other than 'True' or 'False' is encountered."""
-    pass
+    """Indicates a value other than 'True' or 'False' when attempting to parse a bool."""
+
+  class FromfileError(ParseError):
+    """Indicates a problem reading a value @fromfile."""
 
   @staticmethod
   def str_to_bool(s):
@@ -234,7 +236,7 @@ class Parser(object):
     return '{}. {}'.format(message, hint)
 
   _custom_kwargs = ('advanced', 'recursive', 'recursive_root', 'subsystem', 'registering_class',
-                    'fingerprint', 'deprecated_version', 'deprecated_hint')
+                    'fingerprint', 'deprecated_version', 'deprecated_hint', 'fromfile')
 
   def _clean_argparse_kwargs(self, dest, args, kwargs):
     ranked_default = self._compute_default(dest, kwargs=kwargs)
@@ -341,6 +343,12 @@ class Parser(object):
 
     The source of the default value is chosen according to the ranking in RankedValue.
     """
+    is_fromfile = kwargs.get('fromfile', False)
+    action = kwargs.get('action')
+    if is_fromfile and action:
+      raise ParseError('Cannot fromfile {} with an action ({}) in scope {}'
+                       .format(dest, action, self._scope))
+
     config_section = 'DEFAULT' if self._scope == GLOBAL_SCOPE else self._scope
     udest = dest.upper()
     if self._scope == GLOBAL_SCOPE:
@@ -356,25 +364,46 @@ class Parser(object):
     else:
       sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', config_section.upper())
       env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
+
     value_type = self.str_to_bool if is_boolean_flag(kwargs) else kwargs.get('type', str)
+
     env_val_str = None
     if self._env:
       for env_var in env_vars:
         if env_var in self._env:
           env_val_str = self._env.get(env_var)
           break
-    env_val = None if env_val_str is None else value_type(env_val_str)
-    if kwargs.get('action') == 'append':
+
+    def expand(val_str):
+      if is_fromfile and val_str and val_str.startswith('@'):
+        fromfile = val_str[1:]
+        try:
+          with open(fromfile) as fp:
+            return fp.read().strip()
+        except IOError as e:
+          raise self.FromfileError('Failed to read {} from file {}: {}'.format(dest, fromfile, e))
+      else:
+        return val_str
+
+    if is_fromfile:
+      kwargs['type'] = lambda flag_val_str: value_type(expand(flag_val_str))  # Expand flag values.
+
+    env_val = None if env_val_str is None else value_type(expand(env_val_str))  # Expand env values.
+
+    config_val = None
+    if action == 'append':
       config_val_strs = self._config.getlist(config_section, dest) if self._config else None
-      config_val = (None if config_val_strs is None else
-                    [value_type(config_val_str) for config_val_str in config_val_strs])
+      if config_val_strs is not None:
+        config_val = [value_type(config_val_str) for config_val_str in config_val_strs]
       default = []
     else:
       config_val_str = (self._config.get(config_section, dest, default=None)
                         if self._config else None)
-      config_val = None if config_val_str is None else value_type(config_val_str)
+      if config_val_str is not None:
+        config_val = value_type(expand(config_val_str))  # Expand config values.
       default = None
-    hardcoded_val = kwargs.get('default')
+
+    hardcoded_val = kwargs.get('default')  # We don't expand hard coded defaults.
     return RankedValue.choose(None, env_val, config_val, hardcoded_val, default)
 
   def _create_inverse_args(self, args):
