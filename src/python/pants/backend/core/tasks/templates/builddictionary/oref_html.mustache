@@ -7,13 +7,13 @@
 <h1>Options Reference</h1>
 
 <p>
-This page documents Pants options: command-line options, options in a <tt>pants.ini</tt> file.
+This page documents Pants options: command-line options, options in a <code>pants.ini</code> file.
 These options are organized by <em>goal</em>. Goals are actions that can be taken on build targets.
 A goal identifies some high-level goal that you wish to accomplish, such as compiling your code.
 
 <p>
-Some goals have sub-goals, or <em>tasks</em>. For example, the <tt>compile.jvm</tt> task compiles
-Java code, and is installed in the <tt>compile</tt> goal.
+Some goals have sub-goals, or <em>tasks</em>. For example, the <code>compile.jvm</code> task compiles
+Java code, and is installed in the <code>compile</code> goal.
 
 <p><b>Goals and Tasks summary</b>
 
@@ -48,7 +48,7 @@ div.oref_ogroup_section h3 {
 <h2 id="{{goal.name}}">{{goal.name}}</h2>
 
 {{#goal.description}}
-<p>{{goal.description}}
+<p>{{.}}
 {{/goal.description}}
 
 {{#tasks}}
@@ -64,7 +64,7 @@ div.oref_ogroup_section h3 {
 
 {{#doc_html}}
 <div>
-{{{doc_html}}}
+{{{.}}}
 </div>
 {{/doc_html}}
 
@@ -73,10 +73,13 @@ div.oref_ogroup_section h3 {
 {{#options}}
 <li><code>{{st}}</code>
 {{#typ}}
-    <code>{{typ}}</code>
+    <code>{{.}}</code>
 {{/typ}}
+{{#fromfile}}
+      (@fromfile value supported)
+{{/fromfile}}
 {{#default}}
-      (Default: <code>{{default}}</code>)
+      (Default: <pre style="display: inline">{{.}}</pre>)
 {{/default}}
 
 {{hlp}}
@@ -109,10 +112,13 @@ These command-line flags are available with all Pants goals.
 {{#options}}
 <li><code>{{st}}</code>
 {{#typ}}
-    <code>{{typ}}</code>
+    <code>{{.}}</code>
 {{/typ}}
+{{#fromfile}}
+      (@fromfile value supported)
+{{/fromfile}}
 {{#default}}
-      (Default: <code>{{default}}</code>)
+      (Default: <pre style="display: inline">{{.}}</pre>)
 {{/default}}
 
 {{hlp}}
