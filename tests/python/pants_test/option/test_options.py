@@ -679,3 +679,7 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants fromfile --string=@/does/not/exist')
     with self.assertRaises(Parser.FromfileError):
       options.for_scope('fromfile')
+
+  def test_fromfile_escape(self):
+    options = self._parse(r'./pants fromfile --string=@@/does/not/exist')
+    self.assertEqual('@/does/not/exist', options.for_scope('fromfile').string)

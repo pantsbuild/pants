@@ -454,9 +454,10 @@ def oref_template_data_from_help_info(oschi):
       hlp = indent_docstring_by_n(sub_buildroot(ohi.help), 6)
     option_l.append(TemplateData(
       st=st,
+      fromfile=ohi.fromfile,
       default=sub_buildroot(ohi.default),
       hlp=hlp,
-      typ=ohi.type.__name__))
+      typ=ohi.typ.__name__))
   return TemplateData(
     title=title,
     options=option_l,

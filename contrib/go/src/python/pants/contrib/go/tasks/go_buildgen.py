@@ -183,11 +183,8 @@ class GoBuildgen(GoTask):
              help='Instead of just auto-generating missing go_binary and go_library targets in '
                   'memory, (re-)generate them on disk using the installed Go BUILD file template.')
 
-    # TODO(John Sirois): Support loading the template from disk and add docs for the template
-    # parameters.
-    # This disk loading will come for free when the options system supports argfile syntax, ie:
-    #   --template=@argfile
-    register('--template', metavar='<template>',
+    # TODO(John Sirois): Add docs for the template parameters.
+    register('--template', metavar='<template>', fromfile=True,
              default=cls._default_template(),
              advanced=True, fingerprint=True,
              help='A Go BUILD file mustache template to use with --materialize.')

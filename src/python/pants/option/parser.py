@@ -375,7 +375,7 @@ class Parser(object):
           break
 
     def expand(val_str):
-      if is_fromfile and val_str and val_str.startswith('@'):
+      if is_fromfile and val_str and val_str.startswith('@') and not val_str.startswith('@@'):
         fromfile = val_str[1:]
         try:
           with open(fromfile) as fp:
@@ -383,7 +383,8 @@ class Parser(object):
         except IOError as e:
           raise self.FromfileError('Failed to read {} from file {}: {}'.format(dest, fromfile, e))
       else:
-        return val_str
+        # Support a literal @ for fromfile values via @@.
+        return val_str[1:] if is_fromfile and val_str.startswith('@@') else val_str
 
     if is_fromfile:
       kwargs['type'] = lambda flag_val_str: value_type(expand(flag_val_str))  # Expand flag values.
