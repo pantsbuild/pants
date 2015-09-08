@@ -19,12 +19,12 @@ class AnalysisTools(object):
   # for that reason.
   # TODO: If some future change requires us to invalidate all cached artifacts for some good reason
   # (by bumping GLOBAL_CACHE_KEY_GEN_VERSION), we can use that opportunity to change this string.
-  _PANTS_HOME_PLACEHOLDER = '/_PANTS_HOME_PLACEHOLDER'
+  _PANTS_HOME_PLACEHOLDER = b'/_PANTS_HOME_PLACEHOLDER'
 
   def __init__(self, java_home, parser, analysis_cls):
     self.parser = parser
     self._java_home = java_home
-    self._pants_home = get_buildroot()
+    self._pants_home = get_buildroot().encode('utf-8')
     self._analysis_cls = analysis_cls
 
   def split_to_paths(self, analysis_path, split_path_pairs, catchall_path=None):

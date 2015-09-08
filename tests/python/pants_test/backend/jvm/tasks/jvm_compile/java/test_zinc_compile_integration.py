@@ -46,3 +46,18 @@ class JvmExamplesCompileIntegrationTest(BaseCompileIT):
         )
         self.assertIn('[warn] sun.security.x509.X500Name', pants_run.stdout_data)
         self.assertIn('[error] System2.out', pants_run.stdout_data)
+
+  def test_unicode_source_symbol(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with temporary_dir(root_dir=self.workdir_root()) as cachedir:
+        target = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/unicodedep/consumer'
+        pants_run = self.run_test_compile(
+          workdir, cachedir, target, 'isolated',
+          extra_args=[
+            '--compile-zinc-name-hashing',
+            '--config-override=pants.ini.isolated',
+            '--cache-compile-zinc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
+          ],
+          clean_all=True,
+        )
+        self.assertEqual(0, pants_run.returncode)

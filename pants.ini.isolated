@@ -10,6 +10,7 @@ use_jmake: False
 
 
 [compile.zinc]
+name_hashing: True
 strategy: isolated
 worker_count: 4
 zinc: [':zinc']
