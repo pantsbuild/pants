@@ -20,10 +20,10 @@ from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
-from pants.java.distribution.distribution import DistributionLocator
-from pants.java.executor import Executor, SubprocessExecutor
+from pants.java.executor import Executor
 from pants.java.jar.shader import Shader
 from pants.util.dirutil import safe_mkdir_for
+from pants.util.memo import memoized_property
 
 
 class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
@@ -75,11 +75,10 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     super(BootstrapJvmTools, cls).register_options(register)
     register('--jvm-options', action='append', metavar='<option>...',
              help='Run the tool shader with these extra jvm options.')
-    cls.register_jvm_tool(register, 'jarjar')
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (Shader.Factory,)
 
   @classmethod
   def global_subsystems(cls):
@@ -142,12 +141,9 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     targets = list(self._resolve_tool_targets(tools, key, scope))
     return self._bootstrap_classpath(key, targets)
 
-  @property
+  @memoized_property
   def shader(self):
-    if self._shader is None:
-      jarjar = self.tool_jar('jarjar')
-      self._shader = Shader(jarjar, SubprocessExecutor(DistributionLocator.cached()))
-    return self._shader
+    return Shader.Factory.create(self.context)
 
   def _bootstrap_shaded_jvm_tool(self, key, scope, tools, main, custom_rules=None):
     targets = list(self._resolve_tool_targets(tools, key, scope))

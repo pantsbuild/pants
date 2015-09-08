@@ -52,6 +52,7 @@ from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
+from pants.java.jar.shader import Shading
 
 
 def build_file_aliases():
@@ -86,6 +87,10 @@ def build_file_aliases():
       'jar_rules': JarRules,
       'Repository': Repository,
       'Skip': Skip,
+      'shading_relocate': Shading.Relocate.new,
+      'shading_exclude': Shading.Exclude.new,
+      'shading_relocate_package': Shading.RelocatePackage.new,
+      'shading_exclude_package': Shading.ExcludePackage.new,
     },
     context_aware_object_factories={
       'bundle': Bundle.factory,
