@@ -24,7 +24,7 @@ class TargetAddressable(Addressable):
     """
     class Factory(Addressable.Factory):
       @property
-      def produced_types(self):
+      def target_types(self):
         return (target_type,)
 
       def capture(self, *args, **kwargs):

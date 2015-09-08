@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.build_file_aliases import BuildFileAliases, Macro
+from pants.base.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -21,21 +21,12 @@ from pants.contrib.go.tasks.go_test import GoTest
 
 def build_file_aliases():
   return BuildFileAliases.create(
-    # We register all Go targets anonymously so that only the macros below can create them in
-    # BUILD files.  This allows us to exert more control over allowable parameters and in
-    # particular disallow specifying target names; instead we control the name to always match
-    # the BUILD file location and strictly enforce 1:1:1 in local source targets and
-    # single-version for remote dependencies with multiple packages.
-    anonymous_targets=[
-      GoBinary,
-      GoLibrary,
-      GoRemoteLibrary,
-    ],
-    context_aware_object_factories={
-      GoBinary.alias(): Macro.wrap(GoBinary.create, GoBinary),
-      GoLibrary.alias(): Macro.wrap(GoLibrary.create, GoLibrary),
-      'go_remote_libraries': Macro.wrap(GoRemoteLibrary.from_packages, GoRemoteLibrary),
-      'go_remote_library': Macro.wrap(GoRemoteLibrary.from_package, GoRemoteLibrary),
+    target_macro_factories={
+      GoBinary.alias(): TargetMacro.Factory.wrap(GoBinary.create, GoBinary),
+      GoLibrary.alias(): TargetMacro.Factory.wrap(GoLibrary.create, GoLibrary),
+      'go_remote_libraries': TargetMacro.Factory.wrap(GoRemoteLibrary.from_packages,
+                                                      GoRemoteLibrary),
+      'go_remote_library': TargetMacro.Factory.wrap(GoRemoteLibrary.from_package, GoRemoteLibrary),
     }
   )
 

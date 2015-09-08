@@ -9,52 +9,89 @@ import functools
 from abc import abstractmethod
 from collections import namedtuple
 
-from pants.base.build_file_type_factory import BuildFileTypeFactory
+from pants.base.build_file_target_factory import BuildFileTargetFactory
 
 
-class Macro(BuildFileTypeFactory):
-  """A context aware object factory responsible for instantiating a set of addressable types.
+class TargetMacro(object):
+  """A specialized context aware object factory responsible for instantiating a set of target types.
 
-  The macro acts to expand arguments to its alias in a BUILD file into one or more addressable
-  instances.
+  The macro acts to expand arguments to its alias in a BUILD file into one or more target
+  addressable instances.  This is primarily useful for hiding true target type constructors from
+  BUILD file authors and providing an extra layer of control over core target parameters like `name`
+  and `dependencies`.
   """
 
-  @classmethod
-  def wrap(cls, context_aware_object_factory, *produced_types):
-    """Wraps an existing context aware object factory into a macro.
+  class Factory(BuildFileTargetFactory):
+    """Creates new target macros specialized for a particular BUILD file parse context."""
 
-    :param context_aware_object_factory: The existing context aware object factory.
-    :param *produced_types: One or more addressable types the context aware object factory creates.
-    """
-    if not produced_types:
-      raise ValueError('The given `context_aware_object_factory` {} must expand at least 1 '
-                       'produced type; none were registered'.format(context_aware_object_factory))
+    @classmethod
+    def wrap(cls, context_aware_object_factory, *target_types):
+      """Wraps an existing context aware object factory into a target macro factory.
 
-    class Wrapper(cls):
-      @property
-      def produced_types(self):
-        return produced_types
+      :param context_aware_object_factory: The existing context aware object factory.
+      :param *target_types: One or more target types the context aware object factory creates.
+      :returns: A new target macro factory.
+      :rtype: :class:`TargetMacro.Factory`
+      """
+      if not target_types:
+        raise ValueError('The given `context_aware_object_factory` {} must expand at least 1 '
+                         'produced type; none were registered'.format(context_aware_object_factory))
 
-      def expand(self, *args, **kwargs):
-        context_aware_object_factory(self._parse_context, *args, **kwargs)
-    return Wrapper
+      class Factory(cls):
+        @property
+        def target_types(self):
+          return target_types
 
-  def __init__(self, parse_context):
-    self._parse_context = parse_context
+        def macro(self, parse_context):
+          class Macro(TargetMacro):
+            def expand(self, *args, **kwargs):
+              context_aware_object_factory(parse_context, *args, **kwargs)
+          return Macro()
+      return Factory()
+
+    @abstractmethod
+    def macro(self, parse_context):
+      """Returns a new target macro that can create targets in the given parse context.
+
+      :param parse_context: The parse context the target macro will expand targets in.
+      :type parse_context: :class:`pants.base.parse_context.ParseContext`
+      :rtype: :class:`TargetMacro`
+      """
+
+    def target_macro(self, parse_context):
+      """Returns a new target macro that can create targets in the given parse context.
+
+      The target macro will also act as a build file target factory and report the target types it
+      creates.
+
+      :param parse_context: The parse context the target macro will expand targets in.
+      :type parse_context: :class:`pants.base.parse_context.ParseContext`
+      :rtype: :class:`BuildFileTargetFactory` & :class:`TargetMacro`
+      """
+      macro = self.macro(parse_context)
+
+      class BuildFileTargetFactoryMacro(BuildFileTargetFactory, TargetMacro):
+        @property
+        def target_types(_):
+          return self.target_types
+
+        expand = macro.expand
+
+      return BuildFileTargetFactoryMacro()
 
   def __call__(self, *args, **kwargs):
     self.expand(*args, **kwargs)
 
   @abstractmethod
   def expand(self, *args, **kwargs):
-    """Expands the given BUILD file arguments in to one or more addressable instances."""
+    """Expands the given BUILD file arguments in to one or more target addressable instances."""
 
 
 class BuildFileAliases(namedtuple('BuildFileAliases',
                                   ['targets',
                                    'objects',
                                    'context_aware_object_factories',
-                                   'anonymous_targets'])):
+                                   'target_macro_factories'])):
   """A structure containing sets of symbols to be exposed in BUILD files.
 
   There are three types of symbols that can be directly exposed:
@@ -70,11 +107,11 @@ class BuildFileAliases(namedtuple('BuildFileAliases',
 
   Additionally, targets can be exposed only indirectly via macros.  To do so you register:
 
-  - anonymous_targets: These are Target subclasses.
+  - target_macro_factories: These are TargetMacro.Factory instances.
 
-  An exposed macro you registered in context_aware_object_factories can then use
-  `ParseContext.create_object` passing the target type as its "alias" to create targets on behalf
-  of the BUILD file author.
+  An exposed target macro factory can produce target macros that use `ParseContext.create_object`
+  passing one of the target types the macro is responsible for as its "alias" to create targets on
+  behalf of the BUILD file author.
   """
 
   @classmethod
@@ -82,14 +119,14 @@ class BuildFileAliases(namedtuple('BuildFileAliases',
              targets=None,
              objects=None,
              context_aware_object_factories=None,
-             anonymous_targets=None):
+             target_macro_factories=None):
     """A convenience constructor that can accept zero to all alias types."""
-    def copy(orig, copy_type):
-      return copy_type(orig) if orig else copy_type()
-    return cls(copy(targets, dict),
-               copy(objects, dict),
-               copy(context_aware_object_factories, dict),
-               copy(anonymous_targets, set))
+    def copy(orig):
+      return orig.copy() if orig else {}
+    return cls(targets=copy(targets),
+               objects=copy(objects),
+               context_aware_object_factories=copy(context_aware_object_factories),
+               target_macro_factories=copy(target_macro_factories))
 
   @classmethod
   def curry_context(cls, wrappee):

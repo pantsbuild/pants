@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from abc import abstractmethod
 
 from pants.base.address import BuildFileAddress
-from pants.base.build_file_type_factory import BuildFileTypeFactory
+from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.util.meta import AbstractClass
 
 
-class AddressableCallProxy(BuildFileTypeFactory):
+class AddressableCallProxy(BuildFileTargetFactory):
   """A registration proxy for objects to be captured and addressed from BUILD files."""
 
   def __init__(self, addressable_factory, build_file, registration_callback):
@@ -21,8 +21,8 @@ class AddressableCallProxy(BuildFileTypeFactory):
     self._registration_callback = registration_callback
 
   @property
-  def produced_types(self):
-    return self._addressable_factory.produced_types
+  def target_types(self):
+    return self._addressable_factory.target_types
 
   def __call__(self, *args, **kwargs):
     addressable = self._addressable_factory.capture(*args, **kwargs)
@@ -40,7 +40,7 @@ class AddressableCallProxy(BuildFileTypeFactory):
 class Addressable(AbstractClass):
   """An ABC for classes which would like instances to be named and exported from BUILD files."""
 
-  class Factory(BuildFileTypeFactory):
+  class Factory(BuildFileTargetFactory):
     """Captures addressable instances from BUILD file calls."""
 
     @abstractmethod
@@ -52,7 +52,7 @@ class Addressable(AbstractClass):
       """
 
     def __str__(self):
-      return '{}(produced_types={})'.format(type(self).__name__, self.produced_types)
+      return '{}(target_types={})'.format(type(self).__name__, self.target_types)
 
   class AddressableInitError(Exception):
     """"""

@@ -11,7 +11,7 @@ import logging
 from collections import Iterable, namedtuple
 
 from pants.base.addressable import Addressable, AddressableCallProxy
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.base.parse_context import ParseContext
 from pants.base.target import Target
 from pants.base.target_addressable import TargetAddressable
@@ -30,13 +30,16 @@ class BuildConfiguration(object):
 
   ParseState = namedtuple('ParseState', ['registered_addressable_instances', 'parse_globals'])
 
-  _is_addressable_type = functools.partial(_is_subtype, Addressable)
   _is_subsystem_type = functools.partial(_is_subtype, Subsystem)
   _is_target_type = functools.partial(_is_subtype, Target)
 
+  @classmethod
+  def _is_target_macro_factory(cls, obj):
+    return isinstance(obj, TargetMacro.Factory)
+
   def __init__(self):
     self._target_by_alias = {}
-    self._anonymous_targets = set()
+    self._target_macro_factory_by_alias = {}
     self._exposed_object_by_alias = {}
     self._exposed_context_aware_object_factory_by_alias = {}
     self._subsystems = set()
@@ -55,7 +58,7 @@ class BuildConfiguration(object):
         targets=self._target_by_alias,
         objects=self._exposed_object_by_alias,
         context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias,
-        anonymous_targets=self._anonymous_targets)
+        target_macro_factories=self._target_macro_factory_by_alias)
 
   def register_aliases(self, aliases):
     """Registers the given aliases to be exposed in parsed BUILD files.
@@ -69,8 +72,8 @@ class BuildConfiguration(object):
     for alias, target_type in aliases.targets.items():
       self._register_target_alias(alias, target_type)
 
-    for anonymous_target_type in aliases.anonymous_targets:
-      self._register_anonymous_target(anonymous_target_type)
+    for alias, target_macro_factory in aliases.target_macro_factories.items():
+      self._register_target_macro_factory_alias(alias, target_macro_factory)
 
     for alias, obj in aliases.objects.items():
       self._register_exposed_object(alias, obj)
@@ -80,6 +83,9 @@ class BuildConfiguration(object):
 
   # TODO(John Sirois): Move all these checks to BuildFileAliases where they belong:
   # See: https://github.com/pantsbuild/pants/issues/2124
+  # TODO(John Sirois): Warn on alias override across all aliases since they share a global
+  # namespace in BUILD files.
+  # See: https://github.com/pantsbuild/pants/issues/2151
   def _register_target_alias(self, alias, target_type):
     if not self._is_target_type(target_type):
       raise TypeError('Only Target types can be registered via `register_target_alias`, given {}'
@@ -91,21 +97,23 @@ class BuildConfiguration(object):
     self._target_by_alias[alias] = target_type
     self._subsystems.update(target_type.subsystems())
 
-  def _register_anonymous_target(self, anonymous_target_type):
-    if not self._is_target_type(anonymous_target_type):
-      raise TypeError('Only Target types can be registered via `register_anonymous_target`, '
-                      'given {}'.format(anonymous_target_type))
+  def _register_target_macro_factory_alias(self, alias, target_macro_factory):
+    if not self._is_target_macro_factory(target_macro_factory):
+      raise TypeError('Only TargetMacro.Factory instances can be registered via'
+                      '`register_target_macro_factory_alias`, given {}'
+                      .format(target_macro_factory))
 
-    self._anonymous_targets.add(anonymous_target_type)
-    self._subsystems.update(anonymous_target_type.subsystems())
+    if alias in self._target_macro_factory_by_alias:
+      logger.debug('TargetMacro alias {} has already been registered. Overwriting!'.format(alias))
+
+    self._target_macro_factory_by_alias[alias] = target_macro_factory
+    for target_type in target_macro_factory.target_types:
+      self._subsystems.update(target_type.subsystems())
 
   def _register_exposed_object(self, alias, obj):
     if self._is_target_type(obj):
       raise TypeError('The exposed object {} is a Target - these should be registered '
                       'via `register_target_alias`'.format(obj))
-    if self._is_addressable_type(obj):
-      raise TypeError('The exposed object {} is an Addressable - these should be registered '
-                      'via `register_addressable_alias`'.format(obj))
 
     if alias in self._exposed_object_by_alias:
       logger.debug('Object alias {} has already been registered. Overwriting!'.format(alias))
@@ -119,10 +127,6 @@ class BuildConfiguration(object):
     if self._is_target_type(context_aware_object_factory):
       raise TypeError('The exposed context aware object factory {} is a Target - these '
                       'should be registered via `register_target_alias`'
-                      .format(context_aware_object_factory))
-    if self._is_addressable_type(context_aware_object_factory):
-      raise TypeError('The exposed context aware object factory {} is an Addressable - these '
-                      'should be registered via `register_addressable_alias`'
                       .format(context_aware_object_factory))
     if not callable(context_aware_object_factory):
       raise TypeError('The given context aware object factory {} must be a callable.'
@@ -168,7 +172,7 @@ class BuildConfiguration(object):
     # TODO(John Sirois): Introduce a factory method to seal the BuildConfiguration and add a check
     # there that all anonymous types are covered by context aware object factories that are
     # Macro instances.  Without this, we could have non-Macro context aware object factories being
-    # asked to be a BuildFileTypeFactory when they are not (in SourceRoot registration context).
+    # asked to be a BuildFileTargetFactory when they are not (in SourceRoot registration context).
     # See: https://github.com/pantsbuild/pants/issues/2125
     type_aliases = self._exposed_object_by_alias.copy()
 
@@ -182,7 +186,7 @@ class BuildConfiguration(object):
                                   build_file=build_file,
                                   registration_callback=registration_callback)
 
-    # Expose only aliased Addressable types.
+    # Expose all aliased Target types.
     for alias, target_type in self._target_by_alias.items():
       proxy = create_call_proxy(target_type, alias)
       type_aliases[alias] = proxy
@@ -190,19 +194,24 @@ class BuildConfiguration(object):
     # Expose aliases for exposed objects and targets in the BUILD file.
     parse_globals = type_aliases.copy()
 
-    # Now its safe to add mappings from both the exposed and anonymous target types to their call
-    # proxies for context awares to use to manufacture targets by type instead of by alias.
+    # Now its safe to add mappings from both the directly exposed and macro-created target types to
+    # their call proxies for context awares and macros to use to manufacture targets by type
+    # instead of by alias.
     for alias, target_type in self._target_by_alias.items():
       proxy = type_aliases[alias]
       type_aliases[target_type] = proxy
 
-    for anonymous_target_type in self._anonymous_targets:
-      proxy = create_call_proxy(anonymous_target_type)
-      type_aliases[anonymous_target_type] = proxy
+    for target_macro_factory in self._target_macro_factory_by_alias.values():
+      for target_type in target_macro_factory.target_types:
+        proxy = create_call_proxy(target_type)
+        type_aliases[target_type] = proxy
 
     parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
 
     for alias, object_factory in self._exposed_context_aware_object_factory_by_alias.items():
       parse_globals[alias] = object_factory(parse_context)
+
+    for alias, target_macro_factory in self._target_macro_factory_by_alias.items():
+      parse_globals[alias] = target_macro_factory.target_macro(parse_context)
 
     return self.ParseState(registered_addressable_instances, parse_globals)

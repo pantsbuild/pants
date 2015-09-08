@@ -10,12 +10,12 @@ from abc import abstractproperty
 from pants.util.meta import AbstractClass
 
 
-class BuildFileTypeFactory(AbstractClass):
-  """An object that can hydrate types from BUILD files."""
+class BuildFileTargetFactory(AbstractClass):
+  """An object that can hydrate target types from BUILD files."""
 
   @abstractproperty
-  def produced_types(self):
-    """The set of types this factory can produce.
+  def target_types(self):
+    """The set of target types this factory can produce.
 
-    :rytpe: :class:`collections.Iterable` of BUILD file addressable types.
+    :rytpe: :class:`collections.Iterable` of :class:`pants.base.target.Target` types.
     """

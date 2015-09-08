@@ -10,7 +10,7 @@ import os
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file_type_factory import BuildFileTypeFactory
+from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 
@@ -186,25 +186,27 @@ class SourceRoot(object):
     self.rel_path = rel_path
 
   def __call__(self, basedir, *allowed_target_types):
-    self._register_type_factories(os.path.join(self.rel_path, basedir), *allowed_target_types)
+    self._register_target_type_factories(os.path.join(self.rel_path, basedir),
+                                         *allowed_target_types)
 
   def here(self, *allowed_target_types):
     """Registers the cwd as a source root for the given target types.
 
     :param allowed_target_types: Type factories to register for this BUILD file.
     """
-    self._register_type_factories(self.rel_path, *allowed_target_types)
+    self._register_target_type_factories(self.rel_path, *allowed_target_types)
 
-  def _register_type_factories(self, basedir, *type_factories):
-    invalid_type_factories = [f for f in type_factories if not isinstance(f, BuildFileTypeFactory)]
-    if invalid_type_factories:
+  def _register_target_type_factories(self, basedir, *target_type_factories):
+    invalid_target_type_factories = [f for f in target_type_factories
+                                     if not isinstance(f, BuildFileTargetFactory)]
+    if invalid_target_type_factories:
       raise ValueError('The following are not valid target types for registering against the '
                        'source root at {}:\n\t{}'
-                       .format(basedir, '\n\t'.join(map(str, invalid_type_factories))))
+                       .format(basedir, '\n\t'.join(map(str, invalid_target_type_factories))))
 
     allowed_target_types = set()
-    for type_factory in type_factories:
-      allowed_target_types.update(type_factory.produced_types)
+    for target_type_factory in target_type_factories:
+      allowed_target_types.update(target_type_factory.target_types)
     self.register(basedir, *tuple(allowed_target_types))
 
   @classmethod
