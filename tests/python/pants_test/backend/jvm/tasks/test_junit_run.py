@@ -72,6 +72,22 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
+  def test_junit_runner_error(self):
+    with self.assertRaises(TaskError) as cm:
+      self.execute_junit_runner(
+        dedent("""
+          import org.junit.Test;
+          public class FooTest {
+            @Test
+            public void testFoo() {
+              throw new RuntimeException("test error");
+            }
+          }
+        """)
+      )
+
+    self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+
   def execute_junit_runner(self, content):
 
     # Create the temporary base test directory
