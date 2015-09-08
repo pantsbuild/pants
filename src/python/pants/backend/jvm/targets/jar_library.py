@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import six
+from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.address import Address
@@ -64,7 +65,7 @@ class JarLibrary(Target):
     :param BuildGraph build_graph: build graph instance used to search for specs
     :return: list of JarDependency instances represented by the library_specs
     """
-    jar_deps = set()
+    jar_deps = OrderedSet()
     for spec in jar_library_specs:
       if not isinstance(spec, six.string_types):
         raise JarLibrary.ExpectedAddressError(

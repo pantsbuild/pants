@@ -14,6 +14,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.ivy_utils import IvyModuleRef
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -21,6 +22,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.projectutils import get_jar_infos
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.java.distribution.distribution import DistributionLocator
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
@@ -42,7 +44,11 @@ class Export(ConsoleTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION='1.0.2'
+  DEFAULT_EXPORT_VERSION='1.0.3'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(Export, cls).subsystem_dependencies() + (DistributionLocator, JvmPlatform)
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -161,6 +167,7 @@ class Export(ConsoleTask):
         'target_type': get_target_type(current_target),
         'is_code_gen': current_target.is_codegen,
         'pants_target_type': self._get_pants_target_alias(type(current_target))
+
       }
 
       if not current_target.is_synthetic:
@@ -168,7 +175,7 @@ class Export(ConsoleTask):
         if self.get_options().sources:
           info['sources'] = list(current_target.sources_relative_to_buildroot())
 
-      target_libraries = set()
+      target_libraries = OrderedSet()
       if isinstance(current_target, JarLibrary):
         target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
@@ -188,6 +195,7 @@ class Export(ConsoleTask):
 
       if isinstance(current_target, JvmTarget):
         info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
+        info['platform'] = current_target.platform.name
 
       info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,
@@ -201,9 +209,24 @@ class Export(ConsoleTask):
     for target in targets:
       process_target(target)
 
+    jvm_platforms_map = {
+      'default_platform' : JvmPlatform.global_instance().default_platform.name,
+      'platforms': {
+        str(platform_name): {
+          'target_level' : str(platform.target_level),
+          'source_level' : str(platform.source_level),
+          'args' : platform.args,
+        } for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items() }
+    }
+
     graph_info = {
       'targets': targets_map,
+      'jvm_platforms' : jvm_platforms_map,
     }
+    jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
+    if jvm_distributions:
+      graph_info['jvm_distributions'] = jvm_distributions
+
     if self.get_options().libraries:
       graph_info['libraries'] = self._resolve_jars_info()
 
