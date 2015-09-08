@@ -62,6 +62,10 @@ in the `BUILD.tools` file by convention. For example, when Pants fetches `scalas
 When setting up your Pants repo, you may want to copy this file over from a working Pants repo and
 perhaps change some version numbers to fit your situation.
 
+**Note**: pants ships expecting a specific main class and command line interface for all jvm tools
+it uses; so, if the version you specify does not match either of those expectations, pants will
+fail when it tries to call the tool.
+
 Configure Code Layout with `source_root`, `maven_layout`
 --------------------------------------------------------
 
