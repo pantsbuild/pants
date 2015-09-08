@@ -80,7 +80,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           public class FooTest {
             @Test
             public void testFoo() {
-              throw new RuntimeException('test error');
+              throw new RuntimeException("test error");
             }
           }
         """)
