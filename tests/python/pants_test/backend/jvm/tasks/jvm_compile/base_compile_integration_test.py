@@ -33,16 +33,19 @@ class BaseCompileIT(PantsRunIntegrationTest):
           else:
             self.assert_success(pants_run)
         found = defaultdict(set)
+        workdir_files = []
         if expected_files:
           to_find = set(expected_files)
           for root, _, files in os.walk(workdir):
             for file in files:
+              workdir_files.append(os.path.join(root, file))
               if file in to_find:
                 found[file].add(os.path.join(root, file))
           to_find.difference_update(found)
           if not expect_failure:
             self.assertEqual(set(), to_find,
-                            'Failed to find the following compiled files: {}'.format(to_find))
+                             'Failed to find the following compiled files: {} in {}'.format(
+                               to_find, '\n'.join(sorted(workdir_files))))
         yield found
 
   def run_test_compile(self, workdir, cachedir, target, strategy, clean_all=False, extra_args=None):
