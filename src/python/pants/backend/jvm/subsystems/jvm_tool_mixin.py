@@ -21,6 +21,9 @@ class JvmToolMixin(object):
     """Thrown when a dependency can't be found."""
     pass
 
+  class InvalidToolClasspath(TaskError):
+    """Indicates an invalid jvm tool classpath."""
+
   class JvmTool(namedtuple('JvmTool', ['scope', 'key', 'classpath', 'main', 'custom_rules'])):
     """Represents a jvm tool classpath request."""
 
@@ -120,10 +123,34 @@ class JvmToolMixin(object):
     """Needed only for test isolation."""
     JvmToolMixin._jvm_tools = []
 
+  def tool_jar_from_products(self, products, key, scope):
+    """Get the jar for the tool previously registered under key in the given scope.
+
+    :param products: The products of the current pants run.
+    :type products: :class:`pants.goal.products.Products`
+    :param string key: The key the tool configuration was registered under.
+    :param string scope: The scope the tool configuration was registered under.
+    :returns: A single jar path.
+    :rtype: string
+    :raises: `JvmToolMixin.InvalidToolClasspath` when the tool classpath is not composed of exactly
+             one jar.
+    """
+    classpath = self.tool_classpath_from_products(products, key, scope)
+    if len(classpath) != 1:
+      params = dict(tool=key, scope=scope, count=len(classpath), classpath='\n\t'.join(classpath))
+      raise self.InvalidToolClasspath('Expected tool {tool} in scope {scope} to resolve to one '
+                                      'jar, instead found {count}:\n\t{classpath}'.format(**params))
+    return classpath[0]
+
   def tool_classpath_from_products(self, products, key, scope):
     """Get a classpath for the tool previously registered under key in the given scope.
 
-    Returns a list of paths.
+    :param products: The products of the current pants run.
+    :type products: :class:`pants.goal.products.Products`
+    :param string key: The key the tool configuration was registered under.
+    :param string scope: The scope the tool configuration was registered under.
+    :returns: A list of paths.
+    :rtype: list
     """
     callback_product_map = products.get_data('jvm_build_tools_classpath_callbacks') or {}
     callback = callback_product_map.get(scope, {}).get(key)

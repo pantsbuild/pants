@@ -80,13 +80,6 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     register('--jvm-options', action='append', metavar='<option>...',
              help='Run the tool shader with these extra jvm options.')
 
-    # TODO(John Sirois): This should use the Shader factory subsystem when it lands on master.
-    cls.register_jvm_tool(register,
-                          'jarjar',
-                          classpath=[
-                            JarDependency(org='org.pantsbuild.jarjar', name='jarjar', rev='1.5')
-                          ])
-
   @classmethod
   def subsystem_dependencies(cls):
     return super(BootstrapJvmTools, cls).subsystem_dependencies() + (Shader.Factory,)
@@ -184,11 +177,6 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
     classpath, _ = self.ivy_resolve(targets, silent=True, workunit_name=workunit_name)
     return classpath
-
-  # @memoized_property
-  # def shader(self):
-  #   jarjar = self.tool_jar('jarjar')
-  #   return Shader(jarjar, SubprocessExecutor(DistributionLocator.cached()))
 
   @memoized_property
   def shader(self):
