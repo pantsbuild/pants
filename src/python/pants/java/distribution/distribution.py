@@ -331,7 +331,21 @@ class DistributionLocator(Subsystem):
         normalized[rename] = paths
     return normalized
 
+  def all_jdk_paths(self):
+    """Get all explicitly configured JDK paths.
+
+    :return: mapping of os  name -> list of jdk_paths
+    :rtype: dict of string -> list of string
+    """
+    return self._normalized_jdk_paths
+
   def get_jdk_paths(self, os_name=None):
+    """Get the list of explicitly configured JDK paths for this os.
+
+    :param os_name: Os name to lookup. If None, use the currently detected os name.
+    :return: Paths of explicitly configured JDK's from the --jvm-distribution-paths option
+    :rtype: list of strings
+    """
     jdk_paths = self._normalized_jdk_paths
     if not jdk_paths:
       return ()

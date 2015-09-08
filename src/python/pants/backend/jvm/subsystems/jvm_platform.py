@@ -95,7 +95,7 @@ class JvmPlatform(Subsystem):
           "defined. Typically, this should be defined under [{1}] in pants.ini."
           .format(name, self.options_scope)
       )
-    return JvmPlatformSettings(*platforms_by_name[name], name='{} (by default)'.format(name))
+    return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)
 
   @memoized_method
   def get_platform_by_name(self, name, for_target=None):
@@ -116,6 +116,12 @@ class JvmPlatform(Subsystem):
     return self.platforms_by_name[name]
 
   def get_platform_for_target(self, target):
+    """Find the platform associated with this target.
+
+    :param JvmTarget target: target to query.
+    :return: The jvm platform object.
+    :rtype: JvmPlatformSettings
+    """
     if not target.payload.platform and target.is_synthetic:
       derived_from = target.derived_from
       platform = derived_from and getattr(derived_from, 'platform', None)
@@ -153,27 +159,37 @@ class JvmPlatformSettings(object):
   class IllegalSourceTargetCombination(TaskError):
     """Illegal pair of -source and -target flags to compile java."""
 
-  def __init__(self, source_level, target_level, args, name=None):
+  def __init__(self, source_level, target_level, args, name=None, by_default=False):
     """
     :param source_level: Revision object or string for the java source level.
     :param target_level: Revision object or string for the java target level.
     :param list args: Additional arguments to pass to the java compiler.
-    :param str name: optional name to identify this platform; not used for anything but logging.
+    :param str name: name to identify this platform.
+    :param by_default: True if this value was inferred by omission of a specific platform setting.
     """
     self.source_level = JvmPlatform.parse_java_version(source_level)
     self.target_level = JvmPlatform.parse_java_version(target_level)
     self.args = tuple(args or ())
     self.name = name
+    self._by_default = by_default
     self._validate_source_target()
 
   def _validate_source_target(self):
     if self.source_level > self.target_level:
+      if self.by_default:
+        name = "{} (by default)".format(self.name)
+      else:
+        name = self.name
       raise self.IllegalSourceTargetCombination(
         'Platform {platform} has java source level {source_level} but target level {target_level}.'
-        .format(platform=self.name,
+        .format(platform=name,
                 source_level=self.source_level,
                 target_level=self.target_level)
       )
+
+  @property
+  def by_default(self):
+    return self._by_default
 
   def __iter__(self):
     yield self.source_level

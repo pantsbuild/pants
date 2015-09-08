@@ -59,27 +59,56 @@ fields defined in the target:
 
 The following is an abbreviated export file from the command in the pants repo:
 
-`pants export examples/tests/java/org/pantsbuild/example/usethrift:usethrift`
+`./pants export ./examples/tests/java/org/pantsbuild/example/usethrift`
 
 
 ```
 {
-
-  "version": "1.0.0",
-  "libraries": {
-        "org.hamcrest:hamcrest-core:1.3": {
-            "default": "/Users/zundel/.ivy2/pants/org.hamcrest/hamcrest-core/jars/hamcrest-core-1.3.jar"
+    "version": "1.0.3",
+    "libraries": {
+        "commons-logging:commons-logging:1.1.1": {
+            "default": "/Users/zundel/.ivy2/pants/commons-logging/commons-logging/jars/commons-logging-1.1.1.jar"
+        },
+        "commons-codec:commons-codec:1.6": {
+            "default": "/Users/zundel/.ivy2/pants/commons-codec/commons-codec/jars/commons-codec-1.6.jar"
+        },
+        "org.apache.httpcomponents:httpclient:4.2.5": {
+            "default": "/Users/zundel/.ivy2/pants/org.apache.httpcomponents/httpclient/jars/httpclient-4.2.5.jar"
         },
         ...
-  }
-  "targets": {
+    },
+    # distributions settings provided as an example from another repo
+    "distributions": {
+        "darwin": [
+            "/Library/Java/JavaVirtualMachines/jdk1.8.0_45.jdk/Contents/Home",
+            "/Library/Java/JavaVirtualMachines/jdk1.7.0_80.jdk/Contents/Home"
+        ],
+        "linux": [
+            "/usr/java/jdk1.8.0_45",
+            "/usr/java/jdk1.7.0_80"
+        ]
+    },
+   "jvm_platforms": {
+        "platforms": {
+            "java6": {
+                "source_level": "1.6",
+                "args": [],
+                "target_level": "1.6"
+            }
+        },
+        "default_platform": "java6"
+    },
+    "targets": {
         "examples/tests/java/org/pantsbuild/example/usethrift:usethrift": {
             "is_code_gen": false,
+            "excludes": [],
             "target_type": "TEST",
             "libraries": [
                 "junit:junit:4.12",
-                "org.hamcrest:hamcrest-core:1.3"
+                "org.hamcrest:hamcrest-core:1.3",
+                "junit:junit:latest.integration"
             ],
+            "platform": "java6",
             "pants_target_type": "java_tests",
             "globs": {
                 "globs": [
@@ -90,8 +119,8 @@ The following is an abbreviated export file from the command in the pants repo:
                 "3rdparty:junit",
                 "examples/src/thrift/org/pantsbuild/example/distance:distance-java",
                 "examples/src/thrift/org/pantsbuild/example/precipitation:precipitation-java",
-                ".pants.d/gen/thrift/combined/gen-java:examples.src.thrift.org.pantsbuild.example.precipitation.precipitation-java",
-                ".pants.d/gen/thrift/combined/gen-java:examples.src.thrift.org.pantsbuild.example.distance.distance-java"
+                ".pants.d/gen/thrift/isolated/examples.src.thrift.org.pantsbuild.example.distance.distance-java:examples.src.thrift.org.pantsbuild.example.distance.distance-java",
+                ".pants.d/gen/thrift/isolated/examples.src.thrift.org.pantsbuild.example.precipitation.precipitation-java:examples.src.thrift.org.pantsbuild.example.precipitation.precipitation-java"
             ],
             "roots": [
                 {
@@ -100,12 +129,22 @@ The following is an abbreviated export file from the command in the pants repo:
                 }
             ]
         },
+
         ...
    }
+}
 ```
 
 
 # Export Format Changes
+
+## 1.0.3
+
+Added information about jdk settings
+
+## 1.0.2
+
+Handle jars with classifiers
 
 ## 1.0.1
 
