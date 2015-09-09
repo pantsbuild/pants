@@ -21,8 +21,8 @@ from pants.subsystem.subsystem import Subsystem
 logger = logging.getLogger(__name__)
 
 
-def _is_subtype(clazz, obj):
-  return inspect.isclass(obj) and issubclass(obj, clazz)
+def _is_subtype(cls, obj):
+  return inspect.isclass(obj) and issubclass(obj, cls)
 
 
 class BuildConfiguration(object):
@@ -33,8 +33,8 @@ class BuildConfiguration(object):
   _is_subsystem_type = functools.partial(_is_subtype, Subsystem)
   _is_target_type = functools.partial(_is_subtype, Target)
 
-  @classmethod
-  def _is_target_macro_factory(cls, obj):
+  @staticmethod
+  def _is_target_macro_factory(obj):
     return isinstance(obj, TargetMacro.Factory)
 
   def __init__(self):
@@ -154,7 +154,7 @@ class BuildConfiguration(object):
     invalid_subsystems = [s for s in subsystems if not self._is_subsystem_type(s)]
     if invalid_subsystems:
       raise TypeError('The following items from the given subsystems are not Subsystem '
-                      'subclasses:\n\t{}'.format('\n\t'.join(map(str, invalid_subsystems))))
+                      'subclasses:\n\t{}'.format('\n\t'.join(str(i) for i in invalid_subsystems)))
 
     self._subsystems.update(subsystems)
 

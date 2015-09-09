@@ -82,7 +82,7 @@ class TargetAddressable(Addressable):
                                                         address=address,
                                                         **self._kwargs)
     if not type_alias:
-      self.logger.warn('%s has no BUILD alias suggesting a broken macro that does not assign one.',
+      self.logger.warn('%s has no BUILD alias, suggesting a broken macro that does not assign one.',
                        target)
     return target
 

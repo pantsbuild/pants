@@ -55,7 +55,7 @@ class Addressable(AbstractClass):
       return '{}(target_types={})'.format(type(self).__name__, self.target_types)
 
   class AddressableInitError(Exception):
-    """"""
+    """Indicates a problem capturing arguments to create a new :class:`Addressable`."""
 
   def __init__(self, addressed_alias, addressed_type):
     self._addressed_alias = addressed_alias
