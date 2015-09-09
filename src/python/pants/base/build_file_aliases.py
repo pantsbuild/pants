@@ -90,13 +90,12 @@ class TargetMacro(object):
 class BuildFileAliases(namedtuple('BuildFileAliases',
                                   ['targets',
                                    'objects',
-                                   'context_aware_object_factories',
-                                   'target_macro_factories'])):
+                                   'context_aware_object_factories'])):
   """A structure containing sets of symbols to be exposed in BUILD files.
 
   There are three types of symbols that can be directly exposed:
 
-  - targets: These are Target subclasses.
+  - targets: These are Target subclasses or TargetMacro.Factory instances.
   - objects: These are any python object, from constants to types.
   - context_aware_object_factories: These are object factories that are passed a ParseContext and
     produce one or more objects that use data from the context to enable some feature or utility;
@@ -104,29 +103,19 @@ class BuildFileAliases(namedtuple('BuildFileAliases',
     BUILD file object.  Common uses include creating objects that must be aware of the current
     BUILD file path or functions that need to be able to create targets or objects from within the
     BUILD file parse.
-
-  Additionally, targets can be exposed only indirectly via macros.  To do so you register:
-
-  - target_macro_factories: These are TargetMacro.Factory instances.
-
-  An exposed target macro factory can produce target macros that use `ParseContext.create_object`
-  passing one of the target types the macro is responsible for as its "alias" to create targets on
-  behalf of the BUILD file author.
   """
 
   @classmethod
   def create(cls,
              targets=None,
              objects=None,
-             context_aware_object_factories=None,
-             target_macro_factories=None):
+             context_aware_object_factories=None):
     """A convenience constructor that can accept zero to all alias types."""
     def copy(orig):
       return orig.copy() if orig else {}
     return cls(targets=copy(targets),
                objects=copy(objects),
-               context_aware_object_factories=copy(context_aware_object_factories),
-               target_macro_factories=copy(target_macro_factories))
+               context_aware_object_factories=copy(context_aware_object_factories))
 
   @classmethod
   def curry_context(cls, wrappee):

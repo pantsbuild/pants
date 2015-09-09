@@ -21,7 +21,7 @@ from pants.contrib.go.tasks.go_test import GoTest
 
 def build_file_aliases():
   return BuildFileAliases.create(
-    target_macro_factories={
+    targets={
       GoBinary.alias(): TargetMacro.Factory.wrap(GoBinary.create, GoBinary),
       GoLibrary.alias(): TargetMacro.Factory.wrap(GoLibrary.create, GoLibrary),
       'go_remote_libraries': TargetMacro.Factory.wrap(GoRemoteLibrary.from_packages,

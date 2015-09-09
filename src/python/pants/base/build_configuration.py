@@ -54,11 +54,12 @@ class BuildConfiguration(object):
               mappings.
     :rtype: :class:`pants.base.build_file_aliases.BuildFileAliases`
     """
+    target_factories_by_alias = self._target_by_alias.copy()
+    target_factories_by_alias.update(self._target_macro_factory_by_alias)
     return BuildFileAliases.create(
-        targets=self._target_by_alias,
-        objects=self._exposed_object_by_alias,
-        context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias,
-        target_macro_factories=self._target_macro_factory_by_alias)
+        targets=target_factories_by_alias,
+        objects=self._exposed_object_by_alias.copy(),
+        context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy())
 
   def register_aliases(self, aliases):
     """Registers the given aliases to be exposed in parsed BUILD files.
@@ -69,11 +70,14 @@ class BuildConfiguration(object):
     if not isinstance(aliases, BuildFileAliases):
       raise TypeError('The aliases must be a BuildFileAliases, given {}'.format(aliases))
 
-    for alias, target_type in aliases.targets.items():
-      self._register_target_alias(alias, target_type)
-
-    for alias, target_macro_factory in aliases.target_macro_factories.items():
-      self._register_target_macro_factory_alias(alias, target_macro_factory)
+    for alias, item in aliases.targets.items():
+      if self._is_target_type(item):
+        self._register_target_alias(alias, item)
+      elif self._is_target_macro_factory(item):
+        self._register_target_macro_factory_alias(alias, item)
+      else:
+        raise TypeError('Only Target types and TargetMacro.Factory instances can be registered '
+                        'via `targets`, given {}'.format(item))
 
     for alias, obj in aliases.objects.items():
       self._register_exposed_object(alias, obj)
