@@ -13,7 +13,7 @@ from collections import defaultdict
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyTaskMixin
 from pants.backend.jvm.tasks.jar_task import JarTask
@@ -25,7 +25,6 @@ from pants.base.target import Target
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
 from pants.java.executor import Executor
-from pants.java.jar.shader import Shader
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
 

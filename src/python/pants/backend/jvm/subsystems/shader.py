@@ -10,8 +10,8 @@ import re
 from collections import namedtuple
 from contextlib import contextmanager
 
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolMixin
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.subsystem.subsystem import Subsystem, SubsystemError

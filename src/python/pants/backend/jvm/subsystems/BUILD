@@ -53,3 +53,16 @@ python_library(
     'src/python/pants/subsystem',
   ],
 )
+
+python_library(
+  name = 'shader',
+  sources = ['shader.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
+  ]
+)

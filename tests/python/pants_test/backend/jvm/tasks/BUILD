@@ -43,12 +43,12 @@ python_tests(
   sources = ['test_bootstrap_jvm_tools.py'],
   dependencies = [
     'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
-    'src/python/pants/java/jar:shader',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
