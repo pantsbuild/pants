@@ -393,8 +393,9 @@ class Parser(object):
 
     config_val = None
     if action == 'append':
-      if env_val:
-        env_val = list_option(env_val)
+      if env_val is not None:
+        env_val = list_option(env_val_str)
+
       config_val_strs = self._config.getlist(config_section, dest) if self._config else None
       if config_val_strs is not None:
         config_val = [value_type(config_val_str) for config_val_str in config_val_strs]

@@ -56,6 +56,8 @@ class OptionsTest(unittest.TestCase):
     register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
     register_global('-x', '--xlong', action='store_true', recursive=True)
     register_global('--y', action='append', type=int)
+    register_global('--config-override', action='append')
+
     register_global('--pants-foo')
     register_global('--bar-baz')
     register_global('--store-true-flag', action='store_true', fingerprint=True)
@@ -170,6 +172,12 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --y=5 --y=-6 --y=77',
                           config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
+
+    options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': ['123','456']})
+    self.assertEqual(['123','456'], options.for_global_scope().config_override)
+
+    options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': ['']})
+    self.assertEqual([''], options.for_global_scope().config_override)
 
     # Test list-typed option.
     options = self._parse('./pants --listy=\'["c", "d"]\'',
