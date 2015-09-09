@@ -19,6 +19,7 @@ from pants.option.errors import ParseError, RegistrationError
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
+from pants.option.custom_types import list_option
 
 
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
@@ -394,6 +395,8 @@ class Parser(object):
     config_val = None
     if action == 'append':
       config_val_strs = self._config.getlist(config_section, dest) if self._config else None
+      if env_val:
+        env_val = list_option(env_val)
       if config_val_strs is not None:
         config_val = [value_type(config_val_str) for config_val_str in config_val_strs]
       default = []
