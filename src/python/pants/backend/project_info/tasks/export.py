@@ -9,6 +9,7 @@ import json
 import os
 from collections import defaultdict
 
+from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
@@ -20,6 +21,9 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.projectutils import get_jar_infos
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
@@ -27,7 +31,7 @@ from pants.java.distribution.distribution import DistributionLocator
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
 # Please add fkorotkov, tdesai to reviews for this file
-class Export(ConsoleTask):
+class Export(PythonTask, ConsoleTask):
   """Generates a JSON description of the targets as configured in pants.
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
@@ -44,7 +48,7 @@ class Export(ConsoleTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION='1.0.3'
+  DEFAULT_EXPORT_VERSION='1.0.4'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -130,6 +134,7 @@ class Export(ConsoleTask):
         ivy_info = ivy_info_list[0]
 
     ivy_jar_memo = {}
+    python_interpreter_targets_mapping = defaultdict(list)
 
     def process_target(current_target):
       """
@@ -174,6 +179,18 @@ class Export(ConsoleTask):
         info['globs'] = current_target.globs_relative_to_buildroot()
         if self.get_options().sources:
           info['sources'] = list(current_target.sources_relative_to_buildroot())
+
+      if isinstance(current_target, PythonRequirementLibrary):
+        reqs = current_target.payload.get_field_value('requirements', set())
+        """:type : set[pants.backend.python.python_requirement.PythonRequirement]"""
+        info['requirements'] = map(lambda req: req.key, reqs)
+
+      if isinstance(current_target, PythonTarget):
+        interpreter_for_target = self.select_interpreter_for_targets([current_target])
+        if interpreter_for_target is None:
+          raise TaskError('Unable to find suitable interpreter for {}'.format(current_target.address))
+        python_interpreter_targets_mapping[interpreter_for_target].append(current_target)
+        info['python_interpreter'] = str(interpreter_for_target.identity)
 
       target_libraries = OrderedSet()
       if isinstance(current_target, JarLibrary):
@@ -220,8 +237,9 @@ class Export(ConsoleTask):
     }
 
     graph_info = {
+      'version': self.DEFAULT_EXPORT_VERSION,
       'targets': targets_map,
-      'jvm_platforms' : jvm_platforms_map,
+      'jvm_platforms': jvm_platforms_map,
     }
     jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
     if jvm_distributions:
@@ -230,7 +248,26 @@ class Export(ConsoleTask):
     if self.get_options().libraries:
       graph_info['libraries'] = self._resolve_jars_info()
 
-    graph_info['version'] = self.DEFAULT_EXPORT_VERSION
+    if len(python_interpreter_targets_mapping) > 0:
+      default_interpreter = self.interpreter_cache.select_interpreter(python_interpreter_targets_mapping.keys())[0]
+
+      interpreters_info = {}
+      for interpreter, targets in python_interpreter_targets_mapping.iteritems():
+        chroot = self.cached_chroot(
+          interpreter=interpreter,
+          pex_info=PexInfo.default(),
+          targets=targets
+        )
+        interpreters_info[str(interpreter.identity)] = {
+          'binary': interpreter.binary,
+          'chroot': chroot.path()
+        }
+
+      graph_info['python_setup'] = {
+        'default_interpreter': str(default_interpreter.identity),
+        'interpreters': interpreters_info
+      }
+
 
     if self.format:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()

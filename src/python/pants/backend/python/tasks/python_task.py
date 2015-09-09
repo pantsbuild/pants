@@ -126,11 +126,13 @@ class PythonTask(Task):
                         extra_requirements=extra_requirements,
                         log=self.context.log)
 
-  def cached_chroot(self, interpreter, pex_info, targets, platforms,
+  def cached_chroot(self, interpreter, pex_info, targets, platforms=None,
                     extra_requirements=None, executable_file_content=None):
     """Returns a cached PythonChroot created with the specified args.
 
     The returned chroot will be cached for future use.
+
+    :rtype: pants.backend.python.python_chroot.PythonChroot
 
     TODO: Garbage-collect old chroots, so they don't pile up?
     TODO: Ideally chroots would just be products produced by some other task. But that's

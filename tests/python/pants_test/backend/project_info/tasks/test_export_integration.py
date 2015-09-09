@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 
+from twitter.common.collections import maybe_list
+
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -21,7 +23,7 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
 
   def run_export(self, test_target, workdir, load_libs=False, extra_args=None):
     export_out_file = os.path.join(workdir, 'export_out.txt')
-    args = ['export', '--output-file={out_file}'.format(out_file=export_out_file), test_target]
+    args = ['export', '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
     pants_run = self.run_pants_with_workdir(args + libs_args + (extra_args or []), workdir)
     self.assert_success(pants_run)
@@ -164,6 +166,7 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
         ' "linux": [ "/usr/lib/jdk7", "/usr/lib/jdk8"]'
         '}'
       ])
+      self.assertFalse('python_setup' in json_data)
       target_name = 'examples/src/java/org/pantsbuild/example/hello/simple:simple'
       targets = json_data.get('targets')
       self.assertEquals('java7', targets[target_name]['platform'])
@@ -188,3 +191,20 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
           }
         },
         json_data['jvm_platforms'])
+
+  def test_intellij_integration(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      targets = ['src/python/::', 'tests/python/pants_test:all', 'contrib/::']
+      json_data = self.run_export(targets, workdir, extra_args=['--exclude-target-regexp=.*examples.*'])
+
+      python_setup = json_data['python_setup']
+      self.assertIsNotNone(python_setup)
+      self.assertIsNotNone(python_setup['interpreters'])
+
+      default_interpreter = python_setup['default_interpreter']
+      self.assertIsNotNone(default_interpreter)
+      self.assertIsNotNone(python_setup['interpreters'][default_interpreter])
+
+      core_target = json_data['targets']['src/python/pants/backend/core:core']
+      self.assertIsNotNone(core_target)
+      self.assertEquals(default_interpreter, core_target['python_interpreter'])
