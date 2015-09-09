@@ -153,6 +153,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     ':build_environment',
+    'src/python/pants/util:eval',
     'src/python/pants/util:strutil',
   ]
 )

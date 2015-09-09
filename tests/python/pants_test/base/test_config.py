@@ -109,9 +109,7 @@ that.""",
     self.assertEquals('foo', self.config.getdefault('name', type=str))
 
   def test_getdefault_not_found(self):
-    # TODO(John Sirois): This is an odd test that highlights odd eval behavior buried in Config.
-    # Switch to ast.literal_eval, trap ValueError, and raise ConfigErrors.
-    with self.assertRaises(NameError):
+    with self.assertRaises(Config.ConfigError):
       self.config.getdefault('name', type=int)
 
   def test_default_section_fallback(self):
