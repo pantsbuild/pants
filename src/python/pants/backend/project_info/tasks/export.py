@@ -248,7 +248,7 @@ class Export(PythonTask, ConsoleTask):
     if self.get_options().libraries:
       graph_info['libraries'] = self._resolve_jars_info()
 
-    if len(python_interpreter_targets_mapping) > 0:
+    if python_interpreter_targets_mapping:
       default_interpreter = self.interpreter_cache.select_interpreter(python_interpreter_targets_mapping.keys())[0]
 
       interpreters_info = {}

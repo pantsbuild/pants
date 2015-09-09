@@ -195,7 +195,13 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
   def test_intellij_integration(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       targets = ['src/python/::', 'tests/python/pants_test:all', 'contrib/::']
-      json_data = self.run_export(targets, workdir, extra_args=['--exclude-target-regexp=.*examples.*'])
+      excludes = [
+        '--exclude-target-regexp=.*go/examples.*',
+        '--exclude-target-regexp=.*scrooge/tests/thrift.*',
+        '--exclude-target-regexp=.*spindle/tests/thrift.*',
+        '--exclude-target-regexp=.*spindle/tests/jvm.*'
+      ]
+      json_data = self.run_export(targets, workdir, extra_args=excludes)
 
       python_setup = json_data['python_setup']
       self.assertIsNotNone(python_setup)
@@ -204,6 +210,8 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       default_interpreter = python_setup['default_interpreter']
       self.assertIsNotNone(default_interpreter)
       self.assertIsNotNone(python_setup['interpreters'][default_interpreter])
+      self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['binary']))
+      self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['chroot']))
 
       core_target = json_data['targets']['src/python/pants/backend/core:core']
       self.assertIsNotNone(core_target)
