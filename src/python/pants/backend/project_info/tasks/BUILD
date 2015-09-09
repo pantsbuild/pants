@@ -68,17 +68,21 @@ python_library(
   name = 'export',
   sources = ['export.py'],
   dependencies = [
-    ':projectutils',
-    '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:pex',
+    ':projectutils',
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:console_task',
+    'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/java/distribution',
+    'src/python/pants/util:memo',
   ],
 )
 

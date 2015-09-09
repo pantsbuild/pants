@@ -32,7 +32,7 @@ class ScroogeGenTest(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_thrift_library': JavaThriftLibrary})
+    return BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary})
 
   def setUp(self):
     super(ScroogeGenTest, self).setUp()

@@ -159,7 +159,7 @@ class ContribPlugin(PantsPlugin):
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     objects={
       'pants_setup_py': pants_setup_py,
       'contrib_setup_py': contrib_setup_py

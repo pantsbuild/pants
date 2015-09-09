@@ -34,7 +34,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   @property
   def alias_groups(self):
-    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases.create(
+    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases(
       targets={
         'java_tests': JavaTests,
         'python_tests': PythonTests,

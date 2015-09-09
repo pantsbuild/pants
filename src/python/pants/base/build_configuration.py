@@ -5,15 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import inspect
 import logging
 from collections import Iterable, namedtuple
 
-from pants.base.addressable import Addressable, AddressableCallProxy
-from pants.base.build_file_aliases import BuildFileAliases, TargetMacro
+from pants.base.addressable import AddressableCallProxy
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.parse_context import ParseContext
-from pants.base.target import Target
 from pants.base.target_addressable import TargetAddressable
 from pants.subsystem.subsystem import Subsystem
 
@@ -21,21 +19,14 @@ from pants.subsystem.subsystem import Subsystem
 logger = logging.getLogger(__name__)
 
 
-def _is_subtype(cls, obj):
-  return inspect.isclass(obj) and issubclass(obj, cls)
-
-
 class BuildConfiguration(object):
   """Stores the types and helper functions exposed to BUILD files."""
 
   ParseState = namedtuple('ParseState', ['registered_addressable_instances', 'parse_globals'])
 
-  _is_subsystem_type = functools.partial(_is_subtype, Subsystem)
-  _is_target_type = functools.partial(_is_subtype, Target)
-
   @staticmethod
-  def _is_target_macro_factory(obj):
-    return isinstance(obj, TargetMacro.Factory)
+  def _is_subsystem_type(obj):
+    return inspect.isclass(obj) and issubclass(obj, Subsystem)
 
   def __init__(self):
     self._target_by_alias = {}
@@ -56,7 +47,7 @@ class BuildConfiguration(object):
     """
     target_factories_by_alias = self._target_by_alias.copy()
     target_factories_by_alias.update(self._target_macro_factory_by_alias)
-    return BuildFileAliases.create(
+    return BuildFileAliases(
         targets=target_factories_by_alias,
         objects=self._exposed_object_by_alias.copy(),
         context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy())
@@ -70,14 +61,11 @@ class BuildConfiguration(object):
     if not isinstance(aliases, BuildFileAliases):
       raise TypeError('The aliases must be a BuildFileAliases, given {}'.format(aliases))
 
-    for alias, item in aliases.targets.items():
-      if self._is_target_type(item):
-        self._register_target_alias(alias, item)
-      elif self._is_target_macro_factory(item):
-        self._register_target_macro_factory_alias(alias, item)
-      else:
-        raise TypeError('Only Target types and TargetMacro.Factory instances can be registered '
-                        'via `targets`, given {}'.format(item))
+    for alias, target_type in aliases.target_types.items():
+      self._register_target_alias(alias, target_type)
+
+    for alias, target_macro_factory in aliases.target_macro_factories.items():
+      self._register_target_macro_factory_alias(alias, target_macro_factory)
 
     for alias, obj in aliases.objects.items():
       self._register_exposed_object(alias, obj)
@@ -85,16 +73,10 @@ class BuildConfiguration(object):
     for alias, context_aware_object_factory in aliases.context_aware_object_factories.items():
       self._register_exposed_context_aware_object_factory(alias, context_aware_object_factory)
 
-  # TODO(John Sirois): Move all these checks to BuildFileAliases where they belong:
-  # See: https://github.com/pantsbuild/pants/issues/2124
   # TODO(John Sirois): Warn on alias override across all aliases since they share a global
   # namespace in BUILD files.
   # See: https://github.com/pantsbuild/pants/issues/2151
   def _register_target_alias(self, alias, target_type):
-    if not self._is_target_type(target_type):
-      raise TypeError('Only Target types can be registered via `register_target_alias`, given {}'
-                      .format(target_type))
-
     if alias in self._target_by_alias:
       logger.debug('Target alias {} has already been registered. Overwriting!'.format(alias))
 
@@ -102,11 +84,6 @@ class BuildConfiguration(object):
     self._subsystems.update(target_type.subsystems())
 
   def _register_target_macro_factory_alias(self, alias, target_macro_factory):
-    if not self._is_target_macro_factory(target_macro_factory):
-      raise TypeError('Only TargetMacro.Factory instances can be registered via'
-                      '`register_target_macro_factory_alias`, given {}'
-                      .format(target_macro_factory))
-
     if alias in self._target_macro_factory_by_alias:
       logger.debug('TargetMacro alias {} has already been registered. Overwriting!'.format(alias))
 
@@ -115,10 +92,6 @@ class BuildConfiguration(object):
       self._subsystems.update(target_type.subsystems())
 
   def _register_exposed_object(self, alias, obj):
-    if self._is_target_type(obj):
-      raise TypeError('The exposed object {} is a Target - these should be registered '
-                      'via `register_target_alias`'.format(obj))
-
     if alias in self._exposed_object_by_alias:
       logger.debug('Object alias {} has already been registered. Overwriting!'.format(alias))
 
@@ -128,14 +101,6 @@ class BuildConfiguration(object):
       self.register_subsystems(obj.subsystems())
 
   def _register_exposed_context_aware_object_factory(self, alias, context_aware_object_factory):
-    if self._is_target_type(context_aware_object_factory):
-      raise TypeError('The exposed context aware object factory {} is a Target - these '
-                      'should be registered via `register_target_alias`'
-                      .format(context_aware_object_factory))
-    if not callable(context_aware_object_factory):
-      raise TypeError('The given context aware object factory {} must be a callable.'
-                      .format(context_aware_object_factory))
-
     if alias in self._exposed_context_aware_object_factory_by_alias:
       logger.debug('This context aware object factory alias {} has already been registered. '
                    'Overwriting!'.format(alias))

@@ -17,7 +17,7 @@ from pants.contrib.cpp.tasks.cpp_run import CppRun
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       'cpp_library': CppLibrary,
       'cpp_binary': CppBinary,

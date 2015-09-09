@@ -75,11 +75,9 @@ python_tests(
   name = 'build_configuration',
   sources = ['test_build_configuration.py'],
   dependencies = [
-    'src/python/pants/base:address',
     'src/python/pants/base:build_configuration',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:build_graph',
     'src/python/pants/base:target',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -164,7 +162,9 @@ python_tests(
   name = 'build_file_aliases',
   sources = ['test_build_file_aliases.py'],
   dependencies = [
+    'src/python/pants/base:address',
     'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:build_graph',
     'src/python/pants/base:target',
   ]
 )

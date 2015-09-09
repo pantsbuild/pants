@@ -15,7 +15,7 @@ from pants.contrib.node.tasks.npm_resolve import NpmResolve
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       'node_module': NodeModule,
       'node_remote_module': NodeRemoteModule,

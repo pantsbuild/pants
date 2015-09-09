@@ -13,7 +13,7 @@ from pants.contrib.spindle.tasks.spindle_gen import SpindleGen
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       'spindle_thrift_library': SpindleThriftLibrary,
     }

@@ -27,6 +27,7 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
+from pants.util.memo import memoized_property
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
@@ -115,7 +116,6 @@ class Export(PythonTask, ConsoleTask):
   def __init__(self, *args, **kwargs):
     super(Export, self).__init__(*args, **kwargs)
     self.format = self.get_options().formatted
-    self.target_aliases_map = None
 
   def console_output(self, targets):
     targets_map = {}
@@ -290,12 +290,18 @@ class Export(PythonTask, ConsoleTask):
       mapping[self._jar_id(ivy_module_ref)].update(conf_to_jarfile_map)
     return mapping
 
+  @memoized_property
+  def target_aliases_map(self):
+    registered_aliases = self.context.build_file_parser.registered_aliases()
+    map = {}
+    for alias, target_types in registered_aliases.target_types_by_alias.items():
+      # If a target class is registered under multiple aliases returns the last one.
+      for target_type in target_types:
+        map[target_type] = alias
+    return map
+
   def _get_pants_target_alias(self, pants_target_type):
     """Returns the pants target alias for the given target"""
-    if not self.target_aliases_map:
-      target_aliases = self.context.build_file_parser.registered_aliases().targets
-      # If a target class is registered under multiple aliases returns the last one.
-      self.target_aliases_map = {classname: alias for alias, classname in target_aliases.items()}
     if pants_target_type in self.target_aliases_map:
       return self.target_aliases_map.get(pants_target_type)
     else:

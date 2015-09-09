@@ -29,7 +29,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'python_library': PythonLibrary,

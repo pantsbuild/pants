@@ -24,8 +24,8 @@ class JarLibraryTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'jar_library': JarLibrary},
-                                   objects={'jar': JarDependency})
+    return BuildFileAliases(targets={'jar_library': JarLibrary},
+                            objects={'jar': JarDependency})
 
   def test_validation(self):
     target = Target(name='mybird', address=Address.parse('//:mybird'),

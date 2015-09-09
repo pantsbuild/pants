@@ -24,7 +24,7 @@ class JvmToolTaskTestBase(TaskTestBase):
   @property
   def alias_groups(self):
     # Aliases appearing in our real BUILD.tools.
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'jar_library': JarLibrary,
       },

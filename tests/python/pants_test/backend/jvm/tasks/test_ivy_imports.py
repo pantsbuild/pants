@@ -28,7 +28,7 @@ class IvyImportsTest(NailgunTaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'unpacked_jars': UnpackedJars,
         'jar_library': JarLibrary,
