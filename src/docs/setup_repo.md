@@ -51,18 +51,20 @@ that combines DEFAULT values with others is in Pants'
 Configure Pants' own Runtime Dependencies
 -----------------------------------------
 
-Pants calls out to other tools. E.g., it uses `jmake` for part of Java compilation.
-Some special files in your workspace specify versions of these to fetch.
-When setting up your Pants repo, you want to copy these files over from a working Pants
-repo and perhaps change some version numbers to fit your situation.
-
-**JVM** `BUILD.tools` has JVM dependencies. For example, when Pants fetches `jmake`, it looks in
+Pants calls out to other tools. E.g., it optionally uses `scalastyle` to check scala source code.
+Most tools come pre-configured by Pants. A few do require more setup though and these rely on
+special targets in your workspace to specify versions of the tools to fetch. These targets all live
+in the `BUILD.tools` file by convention. For example, when Pants fetches `scalastyle`, it looks in
 `BUILD.tools` for that target:
 
-!inc[start-at=jmake&end-before=java](../../BUILD.tools)
+!inc[start-at=scalastyle&end-before=scrooge-gen](../../BUILD.tools)
 
-**Python** `build-support/python/pants.requirements.txt` has Pants' runtime Python requirements,
-expressed as a `requirements.txt` file.
+When setting up your Pants repo, you may want to copy this file over from a working Pants repo and
+perhaps change some version numbers to fit your situation.
+
+**Note**: pants ships expecting a specific main class and command line interface for all jvm tools
+it uses; so, if the version you specify does not match either of those expectations, pants will
+fail when it tries to call the tool.
 
 Configure Code Layout with `source_root`, `maven_layout`
 --------------------------------------------------------

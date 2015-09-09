@@ -9,6 +9,7 @@ import os
 import shutil
 
 from pants.backend.jvm.targets.benchmark import Benchmark
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
@@ -27,10 +28,24 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
     register('--debug', action='store_true',
              help='Run the benchmark tool with in process debugging.')
 
-    cls.register_jvm_tool(register, 'benchmark-tool', main=cls._CALIPER_MAIN,
-                          default=['//:benchmark-caliper-0.5'])
-    cls.register_jvm_tool(register, 'benchmark-agent',
-                          default=['//:benchmark-java-allocation-instrumenter-2.1'])
+    cls.register_jvm_tool(register,
+                          'benchmark-tool',
+                          classpath=[
+                            # TODO (Eric Ayers) Caliper is old. Add jmh support?
+                            # The caliper tool is shaded, and so shouldn't interfere with Guava 16.
+                            JarDependency(org='com.google.caliper', name='caliper', rev='0.5-rc1'),
+                          ],
+                          classpath_spec='//:benchmark-caliper-0.5',
+                          main=cls._CALIPER_MAIN)
+    cls.register_jvm_tool(register,
+                          'benchmark-agent',
+                          classpath=[
+                            JarDependency(org='com.google.code.java-allocation-instrumenter',
+                                          name='java-allocation-instrumenter',
+                                          rev='2.1',
+                                          intransitive=True),
+                          ],
+                          classpath_spec='//:benchmark-java-allocation-instrumenter-2.1')
 
   @classmethod
   def prepare(cls, options, round_manager):

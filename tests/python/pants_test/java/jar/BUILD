@@ -21,11 +21,12 @@ python_tests(
   name = 'shader',
   sources = ['test_shader.py'],
   dependencies = [
-    'src/python/pants/java/jar:shader',
     'src/python/pants/java/distribution',
+    'src/python/pants/java/jar:shader',
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
@@ -34,9 +35,10 @@ python_tests(
   sources=['test_shader_integration.py'],
   dependencies=[
     'src/python/pants/fs',
-    'src/python/pants/util:contextutil',
     'src/python/pants/java/distribution',
-    'tests/python/pants_test:int-test',
+    'src/python/pants/java:executor',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:int-test',
   ],
 )

@@ -13,6 +13,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.jar_dependency_utils import ResolvedJar
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
@@ -63,7 +64,11 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
-    cls.register_jvm_tool(register, 'xalan')
+    cls.register_jvm_tool(register,
+                          'xalan',
+                          classpath=[
+                            JarDependency(org='xalan', name='xalan', rev='2.7.1'),
+                          ])
 
   @classmethod
   def product_types(cls):
