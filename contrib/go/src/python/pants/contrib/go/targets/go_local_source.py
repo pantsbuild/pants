@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.wrapped_globs import Globs
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 
 from pants.contrib.go.targets.go_target import GoTarget
@@ -31,6 +33,30 @@ class GoLocalSource(GoTarget):
     :raises: `ValueError` if the address does not reside within the source root.
     """
     return cls.package_path(source_root, address.spec_path)
+
+  @classmethod
+  def create(cls, parse_context, **kwargs):
+    if 'name' in kwargs:
+      raise TargetDefinitionException(Address(parse_context.rel_path, kwargs['name']).spec,
+                                      'A {} does not accept a name; instead, the name is taken '
+                                      'from the the BUILD file location.'.format(cls.alias()))
+    name = os.path.basename(parse_context.rel_path)
+
+    if 'sources' in kwargs:
+      raise TargetDefinitionException(Address(parse_context.rel_path, name).spec,
+                                      'A {} does not accept sources; instead, it always globs all '
+                                      'the *.go sources in the BUILD file\'s '
+                                      'directory.'.format(cls.alias()))
+
+    parse_context.create_object(cls, type_alias=cls.alias(), name=name, **kwargs)
+
+  @classmethod
+  def alias(cls):
+    """Subclasses should return their desired BUILD file alias.
+
+    :rtype: string
+    """
+    raise NotImplementedError()
 
   def __init__(self, address=None, payload=None, **kwargs):
     globs = Globs(rel_path=os.path.join(get_buildroot(), address.spec_path))

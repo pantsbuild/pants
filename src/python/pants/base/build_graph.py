@@ -388,16 +388,20 @@ class BuildGraph(object):
     :param Address address:
     """
     try:
-      target = addressable.get_target_type()(build_graph=self,
-                                             address=address,
-                                             **addressable.kwargs)
+      # TODO(John Sirois): Today - in practice, Addressable is unusable.  BuildGraph assumes
+      # addressables are in fact TargetAddressables with dependencies (see:
+      # `inject_address_closure` for example), ie: leaf nameable things with - by definition - no
+      # deps cannot actually be used.  Clean up BuildGraph to handle addressables as they are
+      # abstracted today which does not necessarily mean them having dependencies and thus forming
+      # graphs.  They may only be multiply-referred to leaf objects.
+      target = addressable.instantiate(build_graph=self, address=address)
       return target
     except Exception:
       traceback.print_exc()
       logger.exception('Failed to instantiate Target with type {target_type} with name "{name}"'
                        ' at address {address}'
-                       .format(target_type=addressable.get_target_type(),
-                               name=addressable.name,
+                       .format(target_type=addressable.addressed_type,
+                               name=addressable.addressed_name,
                                address=address))
       raise
 

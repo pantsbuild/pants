@@ -5,12 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.contrib.go.targets.go_local_source import GoLocalSource
+from pants_test.base_test import BaseTest
+from pants_test.contrib.go.targets.go_local_source_test_base import GoLocalSourceTestBase
+
+from pants.contrib.go.targets.go_binary import GoBinary
 
 
-class GoBinary(GoLocalSource):
-  """Represents a local Go main package."""
+class GoBinaryTest(GoLocalSourceTestBase, BaseTest):
 
-  @classmethod
-  def alias(cls):
-    return 'go_binary'
+  @property
+  def target_type(self):
+    return GoBinary

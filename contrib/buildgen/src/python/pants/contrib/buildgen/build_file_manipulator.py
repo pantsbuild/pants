@@ -146,7 +146,6 @@ class BuildFileManipulator(object):
                                   .format(name=name, build_file=build_file))
 
     target_call = calls_by_name[name]
-    target_alias = target_call.func.id
 
     # lineno is 1-indexed
     target_interval_index = intervals.index(target_call.lineno - 1)
@@ -314,7 +313,6 @@ class BuildFileManipulator(object):
       deps_end = -1
 
     return cls(name=name,
-               target_alias=target_alias,
                build_file=build_file,
                build_file_source_lines=source_lines,
                target_source_lines=target_source_lines,
@@ -324,7 +322,6 @@ class BuildFileManipulator(object):
 
   def __init__(self,
                name,
-               target_alias,
                build_file,
                build_file_source_lines,
                target_source_lines,
@@ -333,9 +330,8 @@ class BuildFileManipulator(object):
                dependencies_interval):
     """See BuildFileManipulator.load() for how to construct one as a user."""
     self.name = name
-    self.target_alias = target_alias
     self.build_file = build_file
-    self.target_address = BuildFileAddress(build_file, target_alias, name)
+    self.target_address = BuildFileAddress(build_file, name)
     self._build_file_source_lines = build_file_source_lines
     self._target_source_lines = target_source_lines
     self._target_interval = target_interval

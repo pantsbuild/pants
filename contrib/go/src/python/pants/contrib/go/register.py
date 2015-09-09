@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -22,12 +22,11 @@ from pants.contrib.go.tasks.go_test import GoTest
 def build_file_aliases():
   return BuildFileAliases.create(
     targets={
-      'go_library': GoLibrary,
-      'go_binary': GoBinary,
-      'go_remote_library': GoRemoteLibrary,
-    },
-    context_aware_object_factories={
-      'go_remote_libraries': BuildFileAliases.curry_context(GoRemoteLibrary.from_packages),
+      GoBinary.alias(): TargetMacro.Factory.wrap(GoBinary.create, GoBinary),
+      GoLibrary.alias(): TargetMacro.Factory.wrap(GoLibrary.create, GoLibrary),
+      'go_remote_libraries': TargetMacro.Factory.wrap(GoRemoteLibrary.from_packages,
+                                                      GoRemoteLibrary),
+      'go_remote_library': TargetMacro.Factory.wrap(GoRemoteLibrary.from_package, GoRemoteLibrary),
     }
   )
 

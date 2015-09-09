@@ -150,28 +150,32 @@ class GoBuildgen(GoTask):
   @classmethod
   def _default_template(cls):
     return dedent("""\
+    {{#target.parameters?}}
     {{target.type}}(
-      {{#target.name}}
-      name='{{.}}',
-      {{/target.name}}
-      {{#target.deps?}}
+      {{#target.parameters}}
+      {{#deps?}}
       dependencies=[
-        {{#target.deps}}
+        {{#deps}}
         '{{.}}',
-        {{/target.deps}}
+        {{/deps}}
       ]
-      {{/target.deps?}}
-      {{#target.rev}}
+      {{/deps?}}
+      {{#rev}}
       rev='{{.}}',
-      {{/target.rev}}
-      {{#target.pkgs?}}
+      {{/rev}}
+      {{#pkgs?}}
       packages=[
-        {{#target.pkgs}}
+        {{#pkgs}}
         '{{.}}',
-        {{/target.pkgs}}
+        {{/pkgs}}
       ]
-      {{/target.pkgs?}}
+      {{/pkgs?}}
+      {{/target.parameters}}
     )
+    {{/target.parameters?}}
+    {{^target.parameters?}}
+    {{target.type}}()
+    {{/target.parameters?}}
     """)
 
   @classmethod
@@ -322,7 +326,6 @@ class GoBuildgen(GoTask):
     if len(targets) == 1 and self.is_local_src(targets[0]):
       local_target = targets[0]
       data = self._data(target_type='go_binary' if self.is_binary(local_target) else 'go_library',
-                        name=local_target.name,
                         deps=[d.address.reference() for d in local_target.dependencies])
       return self.TemplateResult(build_file_path=build_file_path,
                                  data=data,
@@ -333,7 +336,6 @@ class GoBuildgen(GoTask):
       if len(targets) == 1 and not targets[0].pkg:
         remote_lib = targets[0]
         data = self._data(target_type='go_remote_library',
-                          name=remote_lib.name,
                           rev=remote_lib.rev)
         return self.TemplateResult(build_file_path=build_file_path,
                                    data=data,
@@ -361,5 +363,6 @@ class GoBuildgen(GoTask):
     else:
       return None
 
-  def _data(self, target_type, name=None, deps=None, rev=None, pkgs=None):
-    return TemplateData(type=target_type, name=name, deps=deps, rev=rev, pkgs=pkgs)
+  def _data(self, target_type, deps=None, rev=None, pkgs=None):
+    parameters = TemplateData(deps=deps, rev=rev, pkgs=pkgs) if (deps or rev or pkgs) else None
+    return TemplateData(type=target_type, parameters=parameters)

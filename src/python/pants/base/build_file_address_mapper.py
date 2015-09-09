@@ -116,7 +116,8 @@ class BuildFileAddressMapper(object):
     """
     address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      build_file = self._build_file_type.from_cache(self.root_dir, address.spec_path, must_exist=False)
+      build_file = self._build_file_type.from_cache(self.root_dir, address.spec_path,
+                                                    must_exist=False)
       self._raise_incorrect_address_error(build_file, address.target_name, address_map)
     else:
       return address_map[address]
