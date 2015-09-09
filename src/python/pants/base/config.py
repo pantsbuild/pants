@@ -9,9 +9,10 @@ import getpass
 import itertools
 import os
 
-from six.moves import range
+import six
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.util.eval import parse_literal
 from pants.util.strutil import is_text_or_binary
 
 
@@ -115,14 +116,14 @@ class Config(object):
     """Equivalent to calling get with expected type dict."""
     return self.get(section, option, type=dict, default=default)
 
-  def getdefault(self, option, type=str, default=None):
+  def getdefault(self, option, type=six.string_types, default=None):
     """Retrieves option from the DEFAULT section if it exists and attempts to parse it as type.
 
     If there is no definition found, the default value supplied is returned.
     """
     return self.get(Config.DEFAULT_SECTION, option, type, default=default)
 
-  def get(self, section, option, type=str, default=None):
+  def get(self, section, option, type=six.string_types, default=None):
     """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as type.
 
     If the specified section does not exist or is missing a definition for the option, the value is
@@ -131,7 +132,7 @@ class Config(object):
     """
     return self._getinstance(section, option, type, default=default)
 
-  def get_required(self, section, option, type=str):
+  def get_required(self, section, option, type=six.string_types):
     """Retrieves option from the specified section and attempts to parse it as type.
 
     If the specified section is missing a definition for the option, the value is
@@ -150,40 +151,20 @@ class Config(object):
       raise Config.ConfigError('Required option {}.{} is not defined.'.format(section, option))
     return val
 
-  @staticmethod
-  def format_raw_value(raw_value):
-    lines = raw_value.splitlines()
-    for line_number in range(0, len(lines)):
-      lines[line_number] = "{line_number:{width}}: {line}".format(
-        line_number=line_number + 1,
-        line=lines[line_number],
-        width=len(str(len(lines))))
-    return '\n'.join(lines)
-
-  def _getinstance(self, section, option, type, default=None):
+  def _getinstance(self, section, option, type_, default=None):
     if not self.has_option(section, option):
       return default
+
     raw_value = self.get_value(section, option)
-    if issubclass(type, str):
+    # We jump through some hoops here to deal with the fact that `six.string_types` is a tuple of
+    # types.
+    if (type_ == six.string_types or
+        (isinstance(type_, type) and issubclass(type_, six.string_types))):
       return raw_value
 
-    try:
-      parsed_value = eval(raw_value, {}, {})
-    except SyntaxError as e:
-      raise Config.ConfigError('No valid {type_name} for {section}.{option}:\n{value}\n{error}'
-                               .format(type_name=type.__name__,
-                                       section=section,
-                                       option=option,
-                                       value=Config.format_raw_value(raw_value),
-                                       error=e))
-    if not isinstance(parsed_value, type):
-      raise Config.ConfigError('No valid {type_name} for {section}.{option}:\n{value}'
-                               .format(type_name=type.__name__,
-                                       section=section,
-                                       option=option,
-                                       value=Config.format_raw_value(raw_value)))
-
-    return parsed_value
+    key = '{}.{}'.format(section, option)
+    return parse_literal(name=key, val=raw_value, acceptable_types=type_,
+                         raise_type=self.ConfigError)
 
   # Subclasses must implement.
   def sources(self):
