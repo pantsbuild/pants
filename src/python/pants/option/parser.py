@@ -143,7 +143,7 @@ class Parser(object):
     namespace.add_forwardings(self._dest_forwardings)
     new_args = vars(self._argparser.parse_args(args))
     namespace.update(new_args)
-
+    namespace.add_forwardings(self._dest_forwardings)
     # Compute the inverse of the dest forwardings.
     # We do this here and not when creating the forwardings, because forwardings inherited
     # from outer scopes can be overridden in inner scopes, so this computation is only
