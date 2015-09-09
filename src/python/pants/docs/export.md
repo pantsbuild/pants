@@ -16,6 +16,9 @@ See the Changelog section below for differences between versions of the export f
   - "libraries" : Dictionary of paths to .jar files resolved by pants required to compile the
   project.
   - "targets" : Dictionary of targets defined in BUILD files.
+  - "distributions" : Information about JVM distributions.
+  - "jvm_platforms" : Information about JVM platforms(language level and additionals arguments).
+  - "python_setup" : Information about Python setup(interpreters and chroots for them).
 
 ## Version
 
@@ -67,13 +70,13 @@ The following is an abbreviated export file from the command in the pants repo:
     "version": "1.0.3",
     "libraries": {
         "commons-logging:commons-logging:1.1.1": {
-            "default": "/Users/zundel/.ivy2/pants/commons-logging/commons-logging/jars/commons-logging-1.1.1.jar"
+            "default": "/Users/user/.ivy2/pants/commons-logging/commons-logging/jars/commons-logging-1.1.1.jar"
         },
         "commons-codec:commons-codec:1.6": {
-            "default": "/Users/zundel/.ivy2/pants/commons-codec/commons-codec/jars/commons-codec-1.6.jar"
+            "default": "/Users/user/.ivy2/pants/commons-codec/commons-codec/jars/commons-codec-1.6.jar"
         },
         "org.apache.httpcomponents:httpclient:4.2.5": {
-            "default": "/Users/zundel/.ivy2/pants/org.apache.httpcomponents/httpclient/jars/httpclient-4.2.5.jar"
+            "default": "/Users/user/.ivy2/pants/org.apache.httpcomponents/httpclient/jars/httpclient-4.2.5.jar"
         },
         ...
     },
@@ -97,6 +100,15 @@ The following is an abbreviated export file from the command in the pants repo:
             }
         },
         "default_platform": "java6"
+    },
+    "python_setup": {
+        "interpreters": {
+            "CPython-2.7.10": {
+                "binary": "/Users/user/pants/build-support/pants_dev_deps.venv/bin/python2.7",
+                "chroot": "/Users/user/pants/.pants.d/python-setup/chroots/e8da2c200f36ca0a1b8a60c12590a59209250b1a"
+            }
+        },
+        "default_interpreter": "CPython-2.7.10"
     },
     "targets": {
         "examples/tests/java/org/pantsbuild/example/usethrift:usethrift": {
@@ -124,8 +136,29 @@ The following is an abbreviated export file from the command in the pants repo:
             ],
             "roots": [
                 {
-                    "source_root": "/Users/zundel/Src/pants/examples/tests/java/org/pantsbuild/example/usethrift",
+                    "source_root": "/Users/user/pants/examples/tests/java/org/pantsbuild/example/usethrift",
                     "package_prefix": "org.pantsbuild.example.usethrift"
+                }
+            ]
+        },
+        "examples/src/python/example/hello/greet:greet": {
+            "is_code_gen": false,
+            "python_interpreter": "CPython-2.7.10",
+            "target_type": "SOURCE",
+            "libraries": [],
+            "pants_target_type": "python_library",
+            "globs": {
+                "globs": [
+                    "examples/src/python/example/hello/greet/*.py"
+                ]
+            },
+            "targets": [
+                "3rdparty/python:ansicolors"
+            ],
+            "roots": [
+                {
+                    "source_root": "/Users/user/pants/examples/src/python/example/hello/greet",
+                    "package_prefix": "example.hello.greet"
                 }
             ]
         },
