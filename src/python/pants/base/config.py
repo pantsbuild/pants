@@ -159,7 +159,6 @@ class Config(object):
     # We jump through some hoops here to deal with the fact that `six.string_types` is a tuple of
     # types.
     if (type_ == six.string_types or
-        type_ in six.string_types or
         (isinstance(type_, type) and issubclass(type_, six.string_types))):
       return raw_value
 
