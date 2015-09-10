@@ -114,6 +114,7 @@ class OptionsTest(unittest.TestCase):
     options.register('fromfile', '--intvalue', type=int, fromfile=True)
     options.register('fromfile', '--dictvalue', type=dict_option, fromfile=True)
     options.register('fromfile', '--listvalue', type=list_option, fromfile=True)
+    options.register('fromfile', '--appendvalue', action='append', type=int, fromfile=True)
 
   def _create_config(self, config):
     with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
@@ -133,7 +134,8 @@ class OptionsTest(unittest.TestCase):
     self._register(options)
     return options
 
-  def _parse_type_int(self, args_str, env=None, config=None, bootstrap_option_values=None, action=None):
+  def _parse_type_int(self, args_str, env=None, config=None, bootstrap_option_values=None,
+                      action=None):
     args = shlex.split(str(args_str))
     options = Options.create(env=env or {},
                              config=self._create_config(config or {}),
@@ -144,7 +146,9 @@ class OptionsTest(unittest.TestCase):
     return options
 
   def test_env_type_int(self):
-    options = self._parse_type_int('./pants ', action='append', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
+    options = self._parse_type_int('./pants ',
+                                   action='append',
+                                   env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
     self.assertEqual([123, 456], options.for_global_scope().config_override)
 
     options = self._parse_type_int('./pants ', env={'PANTS_CONFIG_OVERRIDE': "123"})
@@ -684,7 +688,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(('', True), pairs[1])
     self.assertEquals((int, 77), pairs[2])
 
-  def assert_fromfile(self, parse_func):
+  def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
     def assert_fromfile(dest, expected, contents):
       with temporary_file() as fp:
         fp.write(contents)
@@ -709,10 +713,24 @@ class OptionsTest(unittest.TestCase):
        2]
       """))
 
+    expected_append = expected_append or [1, 2, 42]
+    append_contents = append_contents or dedent("""
+      [
+       1,
+       2,
+       42
+      ]
+      """)
+    assert_fromfile(dest='appendvalue', expected=expected_append, contents=append_contents)
+
   def test_fromfile_flags(self):
     def parse_func(dest, fromfile):
       return self._parse('./pants fromfile --{}=@{}'.format(dest.replace('_', '-'), fromfile))
-    self.assert_fromfile(parse_func)
+
+    # You can only append a single item at a time with append flags, ie: we don't override the
+    # default list like we do with env of config.  As such, send in a single append value here
+    # instead of a whole default list as in `test_fromfile_config` and `test_fromfile_env`.
+    self.assert_fromfile(parse_func, expected_append=[42], append_contents='42')
 
   def test_fromfile_config(self):
     def parse_func(dest, fromfile):
