@@ -25,7 +25,7 @@ class PrepTest(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'prep_command': PrepCommand,
       },

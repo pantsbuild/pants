@@ -18,7 +18,7 @@ class FilesetRelPathWrapperTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
       },

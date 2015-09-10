@@ -20,7 +20,7 @@ from pants.contrib.go.tasks.go_test import GoTest
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       GoBinary.alias(): TargetMacro.Factory.wrap(GoBinary.create, GoBinary),
       GoLibrary.alias(): TargetMacro.Factory.wrap(GoLibrary.create, GoLibrary),

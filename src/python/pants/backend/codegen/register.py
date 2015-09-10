@@ -24,7 +24,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       'java_antlr_library': JavaAntlrLibrary,
       'java_protobuf_library': JavaProtobufLibrary,

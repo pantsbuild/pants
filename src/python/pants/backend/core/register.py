@@ -53,7 +53,7 @@ class BuildFilePath(object):
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       # NB: the 'dependencies' alias is deprecated in favor of the 'target' alias
       'dependencies': DeprecatedDependencies,

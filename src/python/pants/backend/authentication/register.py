@@ -10,7 +10,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     objects={
       'netrc': Netrc,
     },

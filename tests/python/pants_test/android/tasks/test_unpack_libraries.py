@@ -39,7 +39,7 @@ class UnpackLibrariesTest(TestAndroidBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'android_dependency': AndroidDependency,
         'android_library': AndroidLibrary,

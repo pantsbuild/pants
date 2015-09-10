@@ -30,7 +30,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
   @property
   def alias_groups(self):
-    return super(JarCreateTestBase, self).alias_groups.merge(BuildFileAliases.create(
+    return super(JarCreateTestBase, self).alias_groups.merge(BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'java_thrift_library': JavaThriftLibrary,

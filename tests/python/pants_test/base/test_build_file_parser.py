@@ -64,7 +64,7 @@ class BuildFileParserTargetTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'fake': ErrorTarget})
+    return BuildFileAliases(targets={'fake': ErrorTarget})
 
   def test_trivial_target(self):
     self.add_to_build_file('BUILD', 'fake(name="foozle")')
@@ -151,7 +151,7 @@ class BuildFileParserExposedObjectTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(objects={'fake_object': object()})
+    return BuildFileAliases(objects={'fake_object': object()})
 
   def test_exposed_object(self):
     self.add_to_build_file('BUILD', """fake_object""")
@@ -231,7 +231,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'jar_library': self.JarLibrary,
         'java_library': self.JavaLibrary,

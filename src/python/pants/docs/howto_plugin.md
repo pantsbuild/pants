@@ -80,7 +80,7 @@ exposed in build files, targets, tasks and goals:
         from ext_maven_layout.ext_maven_layout import ext_maven_layout
 
         def build_file_aliases():
-         return BuildFileAliases.create(
+         return BuildFileAliases(
            context_aware_object_factories={
             'ext_maven_layout': BuildFileAliases.curry_context(ext_maven_layout)
            }

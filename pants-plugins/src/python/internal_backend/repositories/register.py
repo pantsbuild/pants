@@ -54,7 +54,7 @@ manual.builddict(suppress=True)(testing_repo)
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     objects={
       'public': public_repo,  # key 'public' must match name='public' above
       'testing': testing_repo,
