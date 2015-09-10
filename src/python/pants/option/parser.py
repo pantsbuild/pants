@@ -389,7 +389,14 @@ class Parser(object):
     if is_fromfile:
       kwargs['type'] = lambda flag_val_str: value_type(expand(flag_val_str))  # Expand flag values.
 
-    env_val = None if env_val_str is None else value_type(expand(env_val_str))  # Expand env values.
+    if env_val_str is None:
+      env_val = None
+    else:
+      expanded_env_val_str = expand(env_val_str)
+      try:
+        env_val = value_type(expanded_env_val_str)
+      except ValueError:
+        env_val = expanded_env_val_str
 
     config_val = None
     if action == 'append':

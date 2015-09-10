@@ -133,7 +133,7 @@ class OptionsTest(unittest.TestCase):
     self._register(options)
     return options
 
-  def _parse_negative(self, args_str, env=None, config=None, bootstrap_option_values=None):
+  def _parse_type_int(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
     options = Options.create(env=env or {},
                              config=self._create_config(config or {}),
@@ -143,9 +143,9 @@ class OptionsTest(unittest.TestCase):
     options.register(GLOBAL_SCOPE, '--config-override', action='append', type=int)
     return options
 
-  def test_env_negative(self):
-    with self.assertRaises(ValueError):
-      self._parse_negative('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
+  def test_env_type_int(self):
+    options = self._parse_type_int('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
+    self.assertEqual([123, 456], options.for_global_scope().config_override)
 
   def test_arg_scoping(self):
     # Some basic smoke tests.
