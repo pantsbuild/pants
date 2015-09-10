@@ -142,7 +142,7 @@ class OptionsTest(unittest.TestCase):
 
   def test_env_negative(self):
     with self.assertRaises(ValueError):
-      options = self._parse_negative('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
+      self._parse_negative('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
 
   def test_arg_scoping(self):
     # Some basic smoke tests.
