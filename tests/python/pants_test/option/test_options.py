@@ -135,8 +135,11 @@ class OptionsTest(unittest.TestCase):
 
   def _parse_negative(self, args_str, env=None, config=None, bootstrap_option_values=None):
     args = shlex.split(str(args_str))
-    options = Options.create(env or {}, FakeConfig(config or {}), OptionsTest._known_scope_infos,
-                             args, bootstrap_option_values=bootstrap_option_values)
+    options = Options.create(env=env or {},
+                             config=self._create_config(config or {}),
+                             known_scope_infos=OptionsTest._known_scope_infos,
+                             args=args,
+                             bootstrap_option_values=bootstrap_option_values)
     options.register(GLOBAL_SCOPE, '--config-override', action='append', type=int)
     return options
 
