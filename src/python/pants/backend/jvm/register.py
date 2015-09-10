@@ -10,6 +10,7 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository
+from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import Credentials
@@ -52,7 +53,6 @@ from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.java.jar.shader import Shading
 
 
 def build_file_aliases():

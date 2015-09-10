@@ -9,9 +9,10 @@ import os
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.java.jar.shader import Shader
 from pants.option.custom_types import dict_option, file_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import safe_open
@@ -41,6 +42,16 @@ class Checkstyle(NailgunTask):
              help='Run checkstyle with these extra jvm options.')
     cls.register_jvm_tool(register,
                           'checkstyle',
+                          classpath=[
+                            # Pants still officially supports java 6 as a tool; the supported
+                            # development environment for a pants hacker is based on that.  As
+                            # such, we use 6.1.1 here since its the last checkstyle version
+                            # compiled to java 6.  See the release notes here:
+                            # http://checkstyle.sourceforge.net/releasenotes.html
+                            JarDependency(org='com.puppycrawl.tools',
+                                          name='checkstyle',
+                                          rev='6.1.1'),
+                          ],
                           main=cls._CHECKSTYLE_MAIN,
                           custom_rules=[
                               # Checkstyle uses reflection to load checks and has an affordance that

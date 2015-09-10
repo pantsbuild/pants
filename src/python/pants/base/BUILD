@@ -21,6 +21,7 @@ python_library(
   sources = ['addressable.py'],
   dependencies = [
     ':address',
+    ':build_file_target_factory',
     'src/python/pants/util:meta',
   ]
 )
@@ -80,6 +81,9 @@ python_library(
 python_library(
   name = 'build_file_aliases',
   sources = ['build_file_aliases.py'],
+  dependencies = [
+    ':build_file_target_factory',
+  ]
 )
 
 python_library(
@@ -87,10 +91,14 @@ python_library(
   sources = ['build_file_parser.py'],
   dependencies = [
     '3rdparty/python:six',
-    ':address',
-    ':build_environment',
-    ':build_file',
-    ':build_graph',
+  ]
+)
+
+python_library(
+  name = 'build_file_target_factory',
+  sources = ['build_file_target_factory.py'],
+  dependencies = [
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -145,6 +153,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     ':build_environment',
+    'src/python/pants/util:eval',
     'src/python/pants/util:strutil',
   ]
 )
@@ -272,6 +281,7 @@ python_library(
   sources = ['source_root.py'],
   dependencies = [
     ':build_environment',
+    ':build_file_target_factory',
     ':build_manual',
     ':exceptions',
     ':parse_context',

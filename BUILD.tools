@@ -1,100 +1,6 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-jar_library(name = 'antlr-3.4',
-            jars = [jar(org = 'org.antlr', name = 'antlr', rev = '3.4')]
-           )
-
-jar_library(name = 'antlr-4',
-            jars = [
-              jar(org = 'org.antlr', name = 'antlr4', rev = '4.1'),
-              jar(org = 'org.antlr', name = 'antlr4-runtime', rev = '4.1'),
-            ])
-
-jar_library(name = 'xalan',
-            jars = [jar(org = 'xalan', name = 'xalan', rev = '2.7.1')])
-
-jar_library(name = 'jmake',
-            jars = [jar(org = 'org.pantsbuild', name = 'jmake', rev = '1.3.8-10')])
-
-jar_library(name = 'java-compiler',
-            jars = [
-              jar(org = 'org.pantsbuild.tools.compiler', name = 'java-compiler', rev = '0.0.1')
-            ])
-
-jar_library(name = 'nailgun-server',
-            jars = [jar(org = 'com.martiansoftware', name = 'nailgun-server', rev = '0.9.1')])
-
-jar_library(name = 'emma',
-            jars = [jar(org = 'emma', name = 'emma', rev = '2.1.5320')])
-
-# The Cobertura jar needs all its dependencies when instrumenting code.
-jar_library(name = 'cobertura-instrument',
-            jars = [
-              jar(
-                org = 'net.sourceforge.cobertura',
-                name = 'cobertura',
-                rev = '2.1.1'),
-              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
-            ])
-
-# Instrumented code needs cobertura.jar in the classpath to run, but not most of the dependencies.
-jar_library(name = 'cobertura-run',
-            jars = [
-              jar(
-                org = 'net.sourceforge.cobertura',
-                name = 'cobertura',
-                rev = '2.1.1',
-                intransitive = True),
-              jar(org = 'org.slf4j', name = 'slf4j-simple', rev = '1.7.5'),
-            ])
-
-jar_library(name = 'cobertura-report',
-            jars = [
-              jar(
-                org = 'net.sourceforge.cobertura',
-                name = 'cobertura',
-                rev = '2.1.1')
-            ])
-
-jar_library(name = 'benchmark-caliper-0.5',
-            jars = [
-              # TODO (Eric Ayers) Caliper is old. Add jmh support?
-              # The caliper tool is shaded, and so shouldn't interfere with Guava 16.
-              jar(org = 'com.google.caliper', name = 'caliper', rev = '0.5-rc1'),
-            ])
-
-jar_library(name = 'benchmark-java-allocation-instrumenter-2.1',
-            jars = [
-              jar(
-                org = 'com.google.code.java-allocation-instrumenter',
-                name = 'java-allocation-instrumenter',
-                rev = '2.1',
-                intransitive = True,
-              )])
-
-jar_library(name = 'zinc',
-            jars = [
-              jar(org = 'org.pantsbuild', name = 'zinc', rev = '1.0.8')
-            ])
-
-SBT_REV = '0.13.9'
-
-jar_library(name = 'compiler-interface',
-            jars = [
-              jar(org = 'com.typesafe.sbt', name = 'compiler-interface', rev = SBT_REV,
-                  classifier='sources',
-                  # We just want the single compiler-interface jar and not its dep on scala-lang
-                  intransitive=True)
-            ])
-
-jar_library(name = 'sbt-interface',
-            jars = [
-              jar(org = 'com.typesafe.sbt', name = 'sbt-interface', rev = SBT_REV,
-                  # We just want the single sbt-interface jar and not its dep on scala-lang
-                  intransitive=True)
-            ])
-
 # common rev for all org.scala-lang%* artifacts
 SCALA_REV = '2.10.4'
 
@@ -122,21 +28,6 @@ jar_library(name = 'scalastyle',
               jar(org='org.scalastyle', name='scalastyle_2.10', rev='0.3.2')
             ])
 
-jar_library(name = 'checkstyle',
-            jars = [
-              # Pants still officially supports java 6 as a tool; the supported development
-              # environment for a pants hacker is based on that.  As such, we use 6.1.1 here since
-              # its the last checkstyle version compiled to java 6.  See the release notes here:
-              # http://checkstyle.sourceforge.net/releasenotes.html
-              jar(org = 'com.puppycrawl.tools', name = 'checkstyle', rev = '6.1.1'),
-            ])
-
-jar_library(name = 'junit',
-            jars = [
-              jar(org = 'junit', name = 'junit', rev = '4.12'),
-              jar(org = 'org.pantsbuild', name = 'junit-runner', rev = '0.0.8'),
-            ])
-
 jar_library(name = 'scrooge-gen',
             jars = [
               jar(org='com.twitter', name='scrooge-generator_2.10', rev='3.20.0')
@@ -156,29 +47,4 @@ jar_library(name = 'scrooge-linter',
             ],
             dependencies = [
               '3rdparty:thrift',
-            ])
-
-jar_library(name = 'spindle-codegen',
-            jars = [
-              jar(org = 'com.foursquare', name = 'spindle-codegen-binary_2.10', rev = '3.0.0-M7'),
-            ])
-
-jar_library(name = 'jar-tool',
-            jars = [
-              jar(org = 'org.pantsbuild', name = 'jar-tool', rev = '0.0.7')
-            ])
-
-jar_library(name = 'jarjar',
-            jars=[
-              jar(org = 'org.pantsbuild.jarjar', name = 'jarjar', rev = '1.5')
-            ])
-
-jar_library(name = 'wire-runtime',
-            jars = [
-              jar(org = 'com.squareup.wire', name = 'wire-runtime', rev = '1.6.0')
-            ])
-
-jar_library(name = 'wire-compiler',
-            jars = [
-              jar(org = 'com.squareup.wire', name = 'wire-compiler', rev = '1.6.0')
             ])

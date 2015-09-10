@@ -205,30 +205,39 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None,
-               **kwargs):
+  def __init__(self, name, address, build_graph, type_alias=None, payload=None, tags=None,
+               description=None, **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the target address.
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
-    :param Address address: The Address that maps to this Target in the BuildGraph
-    :param BuildGraph build_graph: The BuildGraph that this Target lives within
-    :param Payload payload: The configuration encapsulated by this target.  Also in charge of
-      most fingerprinting details.
-    :param iterable<string> tags: Arbitrary string tags that describe this target. Usable
-        by downstream/custom tasks for reasoning about build graph. NOT included in payloads
-        and thus not used in fingerprinting, thus not suitable for anything that affects how
-        a particular target is built.
+    :param string name: The name of this target, which combined with this build file defines the
+                        target address.
+    :param dependencies: Target address specs of other targets that this target depends on.
+    :type dependencies: list of strings
+    :param address: The Address that maps to this Target in the BuildGraph.
+    :type address: :class:`pants.base.address.Address`
+    :param build_graph: The BuildGraph that this Target lives within.
+    :type build_graph: :class:`pants.base.build_graph.BuildGraph`
+    :param string type_alias: The type_alias used to construct this target, may be None if
+                              constructed directly.
+    :param payload: The configuration encapsulated by this target.  Also in charge of most
+                    fingerprinting details.
+    :type payload: :class:`pants.base.payload.Payload`
+    :param tags: Arbitrary string tags that describe this target. Usable by downstream/custom tasks
+                 for reasoning about the build graph. NOT included in payloads and thus not used in
+                 fingerprinting, thus not suitable for anything that affects how a particular
+                 target is built.
+    :type tags: :class:`collections.Iterable` of strings
     :param string description: Human-readable description of this target.
     """
-    # dependencies is listed above; implementation hides in TargetAddressable
+    # NB: dependencies are in the pydoc above as a BUILD dictionary hack only; implementation hides
+    # the dependencies via TargetAddressable.
+
     self.payload = payload or Payload()
     self.payload.freeze()
     self.name = name
     self.address = address
-    self._tags = set(tags or [])
     self._build_graph = build_graph
+    self._type_alias = type_alias
+    self._tags = set(tags or [])
     self.description = description
     self.labels = set()
 
@@ -249,10 +258,7 @@ class Target(AbstractTarget):
 
     :rtype: string
     """
-    if isinstance(self.address, BuildFileAddress):
-      return self.address.type_alias
-    else:
-      return type(self).__name__
+    return self._type_alias or type(self).__name__
 
   @property
   def tags(self):

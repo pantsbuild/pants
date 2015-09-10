@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
@@ -76,8 +77,18 @@ class JmakeCompile(JvmCompile):
     register('--use-jmake', advanced=True, action='store_true', default=True,
              fingerprint=True,
              help='Use jmake to compile Java targets')
-    cls.register_jvm_tool(register, 'jmake')
-    cls.register_jvm_tool(register, 'java-compiler')
+    cls.register_jvm_tool(register,
+                          'jmake',
+                          classpath=[
+                            JarDependency(org='org.pantsbuild', name='jmake', rev='1.3.8-10'),
+                          ])
+    cls.register_jvm_tool(register,
+                          'java-compiler',
+                          classpath=[
+                            JarDependency(org='org.pantsbuild.tools.compiler',
+                                          name='java-compiler',
+                                          rev='0.0.1'),
+                          ])
 
   @classmethod
   def subsystem_dependencies(cls):

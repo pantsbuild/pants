@@ -19,7 +19,7 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     super(ScalaRepl, cls).register_options(register)
     register('--main', default='scala.tools.nsc.MainGenericRunner',
              help='The entry point for running the repl.')
-    cls.register_jvm_tool(register, 'scala-repl', default=['//:scala-repl'])
+    cls.register_jvm_tool(register, 'scala-repl', classpath_spec='//:scala-repl')
 
   @classmethod
   def subsystem_dependencies(cls):

@@ -25,12 +25,12 @@ python_library(
     ':ossrh_publication_metadata',
     ':repository',
     'src/python/pants/backend/core/tasks:group_task',
+    'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/jvm/tasks:all',
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
-    'src/python/pants/java/jar:shader',
   ],
 )
 

@@ -73,9 +73,9 @@ class BuildFileParserTargetTest(BaseTest):
 
     self.assertEqual(len(address_map), 1)
     address, proxy = address_map.popitem()
-    self.assertEqual(address, BuildFileAddress(build_file, 'fake', 'foozle'))
-    self.assertEqual(proxy.name, 'foozle')
-    self.assertEqual(proxy.target_type, ErrorTarget)
+    self.assertEqual(address, BuildFileAddress(build_file, 'foozle'))
+    self.assertEqual(proxy.addressed_name, 'foozle')
+    self.assertEqual(proxy.addressed_type, ErrorTarget)
 
   def test_sibling_build_files(self):
     self.add_to_build_file('BUILD', dedent(
@@ -265,7 +265,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
     self.assertEqual(len(registered_proxies), 3)
     targets_created = {}
     for target_proxy in registered_proxies:
-      targets_created[target_proxy.name] = target_proxy.target_type
+      targets_created[target_proxy.addressed_name] = target_proxy.addressed_type
 
     self.assertEqual({'does_not_exists',
                       'create-java-libraries-scala',

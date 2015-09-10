@@ -101,13 +101,13 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.create_file(test_java_file_rel_path, content)
 
     # Invoke ivy to resolve classpath for junit.
-    distribution = DistributionLocator.cached(jdk=True)
-    executor = SubprocessExecutor(distribution=distribution)
     classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
     with subsystem_instance(IvySubsystem) as ivy_subsystem:
+      distribution = DistributionLocator.cached(jdk=True)
       ivy = Bootstrapper(ivy_subsystem=ivy_subsystem).ivy()
       ivy.execute(args=['-cachepath', classpath_file_abs_path,
-                        '-dependency', 'junit', 'junit-dep', '4.10'], executor=executor)
+                        '-dependency', 'junit', 'junit-dep', '4.10'],
+                  executor=SubprocessExecutor(distribution=distribution))
 
     with open(classpath_file_abs_path) as fp:
       classpath = fp.read()

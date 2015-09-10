@@ -200,11 +200,10 @@ class Address(AbstractClass):
 class BuildFileAddress(Address):
   """Represents the address of a type materialized from a BUILD file."""
 
-  def __init__(self, build_file, type_alias, target_name=None):
+  def __init__(self, build_file, target_name=None):
     """
     :param build_file: The build file that contains the object this address points to.
     :type build_file: :class:`pants.base.build_file.BuildFile`
-    :param string type_alias: The type alias this address points to; eg: 'java_library'.
     :param string target_name: The name of the target within the BUILD file; defaults to the default
                                target, aka the name of the BUILD file parent dir.
     """
@@ -212,7 +211,6 @@ class BuildFileAddress(Address):
     super(BuildFileAddress, self).__init__(spec_path=spec_path,
                                            target_name=target_name or os.path.basename(spec_path))
     self._build_file = build_file
-    self._type_alias = type_alias
 
   @property
   def build_file(self):
@@ -222,19 +220,9 @@ class BuildFileAddress(Address):
     """
     return self._build_file
 
-  @property
-  def type_alias(self):
-    """The type alias of the object this address points to; eg: 'java_library'.
-
-    :rtype: string
-    """
-    return self._type_alias
-
   def __repr__(self):
-    return ("BuildFileAddress({build_file}, {type_alias}, {target_name})"
-            .format(build_file=self.build_file,
-                    type_alias=self.type_alias,
-                    target_name=self.target_name))
+    return ('BuildFileAddress({build_file}, {target_name})'
+            .format(build_file=self.build_file, target_name=self.target_name))
 
 
 class SyntheticAddress(Address):

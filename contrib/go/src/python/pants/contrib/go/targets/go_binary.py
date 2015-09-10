@@ -10,3 +10,7 @@ from pants.contrib.go.targets.go_local_source import GoLocalSource
 
 class GoBinary(GoLocalSource):
   """Represents a local Go main package."""
+
+  @classmethod
+  def alias(cls):
+    return 'go_binary'
