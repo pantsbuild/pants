@@ -183,7 +183,7 @@ class Export(PythonTask, ConsoleTask):
       if isinstance(current_target, PythonRequirementLibrary):
         reqs = current_target.payload.get_field_value('requirements', set())
         """:type : set[pants.backend.python.python_requirement.PythonRequirement]"""
-        info['requirements'] = map(lambda req: req.key, reqs)
+        info['requirements'] = [req.key for req in reqs]
 
       if isinstance(current_target, PythonTarget):
         interpreter_for_target = self.select_interpreter_for_targets([current_target])
