@@ -13,7 +13,13 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
   <property name="m2.repo.artifact"
             value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
+
+  <property name="sbt.repo.relpath" value="[organization]/[module]/[revision]"/>
+  <property name="sbt.repo.artifact" value="${sbt.repo.relpath}/[type]s/[module].[ext]"/>
+  <property name="sbt.repo.pom" value="${sbt.repo.relpath}/poms/[module].pom"/>
+
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
+  <property name="sbt.repo.dir" value="${user.home}/.ivy2/local" override="false"/>
 
   <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
   <property name="android.repo.dir" value="${env.ANDROID_HOME}/extras/android/m2repository"/>
@@ -40,6 +46,12 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <filesystem name="local.m2" m2compatible="true" local="true" checkmodified="true">
         <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
         <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
+      </filesystem>
+
+      <!-- The sbt standard local filesystem repo/cache -->
+      <filesystem name="local.sbt" m2compatible="false" local="true" checkmodified="true">
+        <ivy pattern="${sbt.repo.dir}/${sbt.repo.pom}"/>
+        <artifact pattern="${sbt.repo.dir}/${sbt.repo.artifact}"/>
       </filesystem>
 
     </chain>
