@@ -60,14 +60,11 @@ fields defined in the target:
 
 # Example export output
 
-The following is an abbreviated export file from the command in the pants repo:
-
-`./pants export ./examples/tests/java/org/pantsbuild/example/usethrift`
-
+The following is an abbreviated export file from a command in the pants repo:
 
 ```
 {
-    "version": "1.0.3",
+    "version": "1.0.4",
     "libraries": {
         "commons-logging:commons-logging:1.1.1": {
             "default": "/Users/user/.ivy2/pants/commons-logging/commons-logging/jars/commons-logging-1.1.1.jar"
