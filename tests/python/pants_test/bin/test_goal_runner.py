@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import pytest
 from pkg_resources import WorkingSet
 
-from pants.bin.goal_runner import GoalRunner
+from pants.bin.goal_runner import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import temporary_dir
 
@@ -23,9 +23,9 @@ def test_version_request(version_flag):
     def exiter(exit_code):
       raise ExitException(exit_code)
 
-    goal_runner = GoalRunner(build_root, exiter=exiter)
     options_bootstrapper = OptionsBootstrapper(args=[version_flag])
 
     with pytest.raises(ExitException) as excinfo:
-      goal_runner.setup(options_bootstrapper=options_bootstrapper, working_set=WorkingSet())
+      OptionsInitializer(options_bootstrapper, WorkingSet(), exiter=exiter).setup()
+
     assert 0 == excinfo.value.exit_code

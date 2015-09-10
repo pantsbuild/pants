@@ -22,6 +22,7 @@ def is_exe(name):
   result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
   return result == 0
 
+
 def ensure_cached(task_cls, expected_num_artifacts=None):
   """Decorator for a task-executing unit test. Asserts that after running
   the decorated test function, the cache for task_cls contains expected_num_artifacts.
@@ -56,6 +57,7 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
     return wrapper
 
   return decorator
+
 
 class TaskTestBase(BaseTest):
   """A baseclass useful for testing a single Task type."""

@@ -179,7 +179,7 @@ have one. In the plugin, define a `Wiki` and register it:
 
     # in register.py:
     def build_file_aliases():
-      return BuildFileAliases.create(
+      return BuildFileAliases(
         # ...
         objects={
           # ...

@@ -14,6 +14,7 @@ class ListTargets(ConsoleTask):
 
   If no targets are specified, lists all targets in the workspace.
   """
+
   @classmethod
   def register_options(cls, register):
     super(ListTargets, cls).register_options(register)

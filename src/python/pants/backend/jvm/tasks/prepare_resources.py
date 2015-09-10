@@ -22,6 +22,7 @@ class PrepareResources(ResourcesTask):
   Currently this task does no form of resource filtering, it just copies resource files to
   dedicated, isolated resource chroots for use in the classpath as well as for packaging purposes.
   """
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(ResourcesTask, cls).prepare(options, round_manager)

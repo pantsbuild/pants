@@ -5,7 +5,6 @@ target(
   name = 'jar',
   dependencies = [
     ':manifest',
-    ':shader'
   ]
 )
 
@@ -14,17 +13,5 @@ python_tests(
   sources = ['test_manifest.py'],
   dependencies = [
     'src/python/pants/java/jar:manifest',
-  ]
-)
-
-python_tests(
-  name = 'shader',
-  sources = ['test_shader.py'],
-  dependencies = [
-    'src/python/pants/java/jar:shader',
-    'src/python/pants/java/distribution',
-    'src/python/pants/java:executor',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
   ]
 )

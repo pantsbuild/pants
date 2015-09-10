@@ -20,6 +20,7 @@ class TestDeferredSourcesTarget(Target):
     })
     super(TestDeferredSourcesTarget, self).__init__(payload=payload, *args, **kwargs)
 
+
 class TargetTest(BaseTest):
 
   def test_derived_from_chain(self):

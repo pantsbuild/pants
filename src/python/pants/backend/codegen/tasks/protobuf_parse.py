@@ -20,6 +20,7 @@ EXTEND_PARSER = re.compile(r'^\s*(extend)\s+([^\s{]+).*')
 
 PROTO_FILENAME_PATTERN = re.compile(r'^(.*).proto$')
 
+
 class ProtobufParse(object):
   """Parses a .proto file. """
 
@@ -106,6 +107,7 @@ def update_type_list(match, type_depth, outer_types):
   if match and type_depth < 2:  # This takes care of the case where { } are on the same line.
     type_name = match.group(2)
     outer_types.add(type_name)
+
 
 def get_outer_class_name(source):
   filename = re.sub(r'\.proto$', '', os.path.basename(source))

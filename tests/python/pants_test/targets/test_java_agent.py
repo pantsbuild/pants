@@ -14,7 +14,7 @@ from pants_test.base_test import BaseTest
 class JavaAgentTest(BaseTest):
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_agent': JavaAgent,
       },

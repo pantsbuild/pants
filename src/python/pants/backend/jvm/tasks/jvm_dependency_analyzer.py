@@ -33,9 +33,9 @@ class JvmDependencyAnalyzer(Task):
   def prepare(cls, options, round_manager):
     super(JvmDependencyAnalyzer, cls).prepare(options, round_manager)
     if not options.skip:
-      round_manager.require_data('actual_source_deps')
       round_manager.require_data('classes_by_target')
       round_manager.require_data('compile_classpath')
+      round_manager.require_data('product_deps_by_src')
 
   @classmethod
   def register_options(cls, register):
@@ -83,6 +83,7 @@ class JvmDependencyAnalyzer(Task):
     compile_classpath = self.context.products.get_data('compile_classpath')
     for jar_lib in self.context.targets(lambda t: isinstance(t, JarLibrary)):
       for _, artifact_path in compile_classpath.get_for_target(jar_lib, transitive=False):
+        targets_by_file[artifact_path].add(jar_lib)
         if artifact_path.endswith('.jar'):
           for cls in self._jar_classfiles(artifact_path):
             targets_by_file[cls].add(jar_lib)

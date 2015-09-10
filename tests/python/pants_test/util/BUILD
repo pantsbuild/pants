@@ -6,6 +6,7 @@ target(
   dependencies = [
     ':contextutil',
     ':dirutil',
+    ':eval',
     ':fileutil',
     ':memo',
     ':meta',
@@ -31,6 +32,15 @@ python_tests(
     '3rdparty/python:pytest',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'eval',
+  sources = ['test_eval.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    'src/python/pants/util:eval',
   ]
 )
 

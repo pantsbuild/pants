@@ -15,6 +15,8 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_task import JvmTask
@@ -25,7 +27,6 @@ from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
-from pants.java.jar.shader import Shader
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
@@ -97,6 +98,9 @@ class _JUnitRunner(object):
                   'treated as the minimum jvm to run.')
     register_jvm_tool(register,
                       'junit',
+                      classpath=[
+                        JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.8'),
+                      ],
                       main=JUnitRun._MAIN,
                       # TODO(John Sirois): Investigate how much less we can get away with.
                       # Clearly both tests and the runner need access to the same @Test, @Before,
@@ -149,6 +153,7 @@ class _JUnitRunner(object):
       return
 
     bootstrapped_cp = self._task_exports.tool_classpath('junit')
+
     def compute_complete_classpath():
       return self._task_exports.classpath(targets, cp=bootstrapped_cp)
 
@@ -270,7 +275,10 @@ class _JUnitRunner(object):
           str_failures = xml.get_attribute('testsuite', 'failures')
           int_failures = int(str_failures)
 
-          if target and (int_failures > 0):
+          str_errors = xml.get_attribute('testsuite', 'errors')
+          int_errors = int(str_errors)
+
+          if target and (int_failures or int_errors):
             failed_targets.append(target)
         except (XmlParser.XmlError, ValueError) as e:
           self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
@@ -339,7 +347,6 @@ class _JUnitRunner(object):
 
     return self._tests_by_property(tests_to_targets, combined_property)
 
-
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
     for i in range(0, len(tests), stride):
@@ -394,6 +401,7 @@ class _JUnitRunner(object):
     else:  # It's a classname.
       classname = classname_or_srcfile
       yield classname + methodname
+
 
 #TODO(jtrobec): move code coverage into tasks, and out of the general UT code.
 class _Coverage(_JUnitRunner):
@@ -479,7 +487,11 @@ class Emma(_Coverage):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register_jvm_tool(register, 'emma')
+    register_jvm_tool(register,
+                      'emma',
+                      classpath=[
+                        JarDependency(org='emma', name='emma', rev='2.1.5320')
+                      ])
 
   def instrument(self, targets, tests, compute_junit_classpath):
     junit_classpath = compute_junit_classpath()
@@ -569,9 +581,29 @@ class Cobertura(_Coverage):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register_jvm_tool(register, 'cobertura-instrument')
-    register_jvm_tool(register, 'cobertura-run')
-    register_jvm_tool(register, 'cobertura-report')
+    slf4j_jar = JarDependency(org='org.slf4j', name='slf4j-simple', rev='1.7.5')
+
+    def cobertura_jar(**kwargs):
+      return JarDependency(org='net.sourceforge.cobertura', name='cobertura', rev='2.1.1', **kwargs)
+
+    # The Cobertura jar needs all its dependencies when instrumenting code.
+    register_jvm_tool(register,
+                      'cobertura-instrument',
+                      classpath=[
+                        cobertura_jar(),
+                        slf4j_jar
+                      ])
+
+    # Instrumented code needs cobertura.jar in the classpath to run, but not most of the
+    # dependencies.
+    register_jvm_tool(register,
+                      'cobertura-run',
+                      classpath=[
+                        cobertura_jar(intransitive=True),
+                        slf4j_jar
+                      ])
+
+    register_jvm_tool(register, 'cobertura-report', classpath=[cobertura_jar()])
 
   def __init__(self, task_exports, context):
     super(Cobertura, self).__init__(task_exports, context)

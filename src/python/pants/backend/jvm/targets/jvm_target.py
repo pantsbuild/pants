@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.exclude import Exclude
@@ -83,17 +85,22 @@ class JvmTarget(Target, Jarable):
 
   @property
   def platform(self):
+    """Platform associated with this target.
+
+    :return: The jvm platform object.
+    :rtype: JvmPlatformSettings
+    """
     return JvmPlatform.global_instance().get_platform_for_target(self)
 
   @memoized_property
   def jar_dependencies(self):
-    return set(self.get_jar_dependencies())
+    return OrderedSet(self.get_jar_dependencies())
 
   def mark_extra_invalidation_hash_dirty(self):
     del self.jar_dependencies
 
   def get_jar_dependencies(self):
-    jar_deps = set()
+    jar_deps = OrderedSet()
 
     def collect_jar_deps(target):
       if isinstance(target, JarLibrary):

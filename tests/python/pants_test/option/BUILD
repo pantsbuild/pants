@@ -8,28 +8,10 @@ target(
   ],
 )
 
-python_library(
-  name = 'common',
-  sources = [
-    'fake_config.py',
-  ],
-)
-
 python_tests(
   name = 'testing',
-  sources = [
-    'test_arg_splitter.py',
-    'test_custom_types.py',
-    'test_help_formatter.py',
-    'test_help_info_extracter.py',
-    'test_option_value_container.py',
-    'test_optionable.py',
-    'test_options.py',
-    'test_options_bootstrapper.py',
-    'test_options_fingerprinter.py',
-  ],
+  sources = globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies = [
-    ':common',
     '3rdparty/python:mock',
     '3rdparty/python:pytest',
     'src/python/pants/base:build_environment',

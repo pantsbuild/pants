@@ -10,9 +10,10 @@ use_jmake: False
 
 
 [compile.zinc]
+name_hashing: True
 strategy: isolated
 worker_count: 4
-zinc: [':zinc']
+zinc: //:zinc
 jvm_options: [
     '-Xmx4g', '-XX:MaxPermSize=512m', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4',
     # bigger cache size for our big projects (default is just 5)

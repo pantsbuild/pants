@@ -15,6 +15,7 @@ from pants.util.contextutil import Timer
 
 _global_pinger_memo = {}  # netloc -> rt time in secs.
 
+
 class Pinger(object):
   # Signifies that a netloc is unreachable.
   UNREACHABLE = 999999

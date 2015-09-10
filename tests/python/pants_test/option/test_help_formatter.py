@@ -12,17 +12,25 @@ from pants.help.help_info_extracter import OptionHelpInfo
 
 
 class OptionHelpFormatterTest(unittest.TestCase):
-  def test_format_help(self):
+  def format_help_for_foo(self, **kwargs):
     ohi = OptionHelpInfo(registering_class=type(None), display_args=['--foo'],
                          scoped_cmd_line_args=['--foo'], unscoped_cmd_line_args=['--foo'],
-                         type=bool, default='MYDEFAULT', help='help for foo',
+                         typ=bool, fromfile=False, default=None, help='help for foo',
                          deprecated_version=None, deprecated_message=None, deprecated_hint=None)
-
+    ohi = ohi._replace(**kwargs)
     lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
                           color=False).format_option(ohi)
     self.assertEquals(len(lines), 2)
-    self.assertEquals('--foo (default: MYDEFAULT)', lines[0])
     self.assertIn('help for foo', lines[1])
+    return lines[0]
+
+  def test_format_help(self):
+    line = self.format_help_for_foo(default='MYDEFAULT')
+    self.assertEquals('--foo (default: MYDEFAULT)', line)
+
+  def test_format_help_fromfile(self):
+    line = self.format_help_for_foo(fromfile=True)
+    self.assertEquals('--foo (@fromfile value supported) (default: None)', line)
 
   def test_suppress_advanced(self):
     args = ['--foo']

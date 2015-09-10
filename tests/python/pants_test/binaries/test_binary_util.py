@@ -135,6 +135,7 @@ class BinaryUtilTest(BaseTest):
     self.assertEquals("supportdir/linux/x86_64/name/version",
                       binary_util._select_binary_base_path("supportdir", "name", "version",
                                                            uname_func=uname_func))
+
   def test_select_binary_base_path_darwin(self):
     binary_util = BinaryUtil([], 0, '/tmp')
 
@@ -144,6 +145,7 @@ class BinaryUtilTest(BaseTest):
     self.assertEquals("supportdir/mac/10.10/name/version",
                       binary_util._select_binary_base_path("supportdir", "name", "version",
                                                            uname_func=uname_func))
+
   def test_select_binary_base_path_missing_os(self):
     binary_util = BinaryUtil([], 0, '/tmp')
 
@@ -169,6 +171,7 @@ class BinaryUtilTest(BaseTest):
   def test_select_binary_base_path_override(self):
     binary_util = BinaryUtil([], 0, '/tmp',
                              {('darwin', '100'): ['skynet', '42']})
+
     def uname_func():
       return "darwin", "dontcare1", "100.99", "dontcare2", "t1000"
 

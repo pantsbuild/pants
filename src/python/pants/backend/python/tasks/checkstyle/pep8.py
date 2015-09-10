@@ -14,6 +14,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class PEP8Subsystem(Subsystem):
   options_scope = 'pycheck-pep8'
+
   @classmethod
   def register_options(cls, register):
     super(PEP8Subsystem, cls).register_options(register)

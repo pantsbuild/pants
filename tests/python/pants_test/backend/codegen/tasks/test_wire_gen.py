@@ -17,7 +17,9 @@ from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.base.source_root import SourceRoot
+from pants.base.target import Target
 from pants.base.validation import assert_list
 from pants.util.contextutil import temporary_file
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -311,3 +313,38 @@ class WireGenTest(TaskTestBase):
       '--proto_path={}/wire-other-src'.format(self.build_root),
       'foo.proto'],
       task.format_args_for_target(simple_wire_target))
+
+  def test_wire_compiler_version_robust(self):
+    # Here the wire compiler is both indirected, and not 1st in the classpath order.
+    guava = self.make_target('3rdparty:guava',
+                             JarLibrary,
+                             jars=[JarDependency('com.google.guava', 'guava', '18.0')])
+    wire = self.make_target('3rdparty:wire',
+                            JarLibrary,
+                            jars=[
+                              JarDependency('com.squareup.wire', 'wire-compiler', '3.0.0')
+                                .exclude('com.google.guava', 'guava')
+                            ])
+    alias = self.make_target('a/random/long/address:spec', Target, dependencies=[guava, wire])
+    self.set_options(wire_compiler='a/random/long/address:spec')
+    task = self.create_task(self.context(target_roots=[alias]))
+    self.assertEqual(Revision(3, 0, 0), task.wire_compiler_version)
+
+  def test_wire_compiler_version_none(self):
+    guava = self.make_target('3rdparty:guava',
+                             JarLibrary,
+                             jars=[JarDependency('com.google.guava', 'guava', '18.0')])
+    self.set_options(wire_compiler='3rdparty:guava')
+    task = self.create_task(self.context(target_roots=[guava]))
+    with self.assertRaises(task.WireCompilerVersionError):
+      task.wire_compiler_version
+
+  def test_wire_compiler_version_conflict(self):
+    george = self.make_target('3rdparty:george',
+                              JarLibrary,
+                              jars=[JarDependency('com.squareup.wire', 'wire-compiler', '3.0.0'),
+                                    JarDependency('com.squareup.wire', 'wire-compiler', '1.6.0')])
+    self.set_options(wire_compiler='3rdparty:george')
+    task = self.create_task(self.context(target_roots=[george]))
+    with self.assertRaises(task.WireCompilerVersionError):
+      task.wire_compiler_version

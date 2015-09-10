@@ -30,6 +30,7 @@ class PathFinder(ConsoleTask):
       log.debug('\t[{}]'.format(', '.join([target.address.reference() for target in path])))
 
   all_paths = defaultdict(lambda: defaultdict(list))
+
   @classmethod
   def _find_paths_rec(cls, from_target, to_target):
     if from_target == to_target:

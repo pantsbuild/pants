@@ -29,6 +29,11 @@ class NodeTaskTest(TaskTestBase):
   def task_type(cls):
     return cls.TestNodeTask
 
+  def test_is_npm_package(self):
+    self.assertTrue(NodeTask.is_npm_package(self.make_target(':a', NodeRemoteModule)))
+    self.assertTrue(NodeTask.is_npm_package(self.make_target(':b', NodeModule)))
+    self.assertFalse(NodeTask.is_npm_package(self.make_target(':c', Target)))
+
   def test_is_node_module(self):
     self.assertTrue(NodeTask.is_node_module(self.make_target(':a', NodeModule)))
     self.assertFalse(NodeTask.is_node_module(self.make_target(':b', NodeRemoteModule)))

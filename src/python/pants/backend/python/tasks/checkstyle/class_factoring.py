@@ -13,6 +13,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class ClassFactoringSubsystem(Subsystem):
   options_scope = 'pycheck-class-factoring'
+
   @classmethod
   def register_options(cls, register):
     super(ClassFactoringSubsystem, cls).register_options(register)

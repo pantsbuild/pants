@@ -34,7 +34,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   @property
   def alias_groups(self):
-    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases.create(
+    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases(
       targets={
         'java_tests': JavaTests,
         'python_tests': PythonTests,
@@ -72,6 +72,22 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
+  def test_junit_runner_error(self):
+    with self.assertRaises(TaskError) as cm:
+      self.execute_junit_runner(
+        dedent("""
+          import org.junit.Test;
+          public class FooTest {
+            @Test
+            public void testFoo() {
+              throw new RuntimeException("test error");
+            }
+          }
+        """)
+      )
+
+    self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+
   def execute_junit_runner(self, content):
 
     # Create the temporary base test directory
@@ -85,13 +101,13 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.create_file(test_java_file_rel_path, content)
 
     # Invoke ivy to resolve classpath for junit.
-    distribution = DistributionLocator.cached(jdk=True)
-    executor = SubprocessExecutor(distribution=distribution)
     classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
     with subsystem_instance(IvySubsystem) as ivy_subsystem:
+      distribution = DistributionLocator.cached(jdk=True)
       ivy = Bootstrapper(ivy_subsystem=ivy_subsystem).ivy()
       ivy.execute(args=['-cachepath', classpath_file_abs_path,
-                        '-dependency', 'junit', 'junit-dep', '4.10'], executor=executor)
+                        '-dependency', 'junit', 'junit-dep', '4.10'],
+                  executor=SubprocessExecutor(distribution=distribution))
 
     with open(classpath_file_abs_path) as fp:
       classpath = fp.read()

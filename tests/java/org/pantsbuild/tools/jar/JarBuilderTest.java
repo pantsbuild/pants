@@ -6,6 +6,7 @@ package org.pantsbuild.tools.jar;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.String;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,6 +40,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.pantsbuild.testing.EasyMockTest;
 import org.pantsbuild.testing.TearDownTestCase;
+import org.pantsbuild.tools.jar.JarBuilder;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateAction;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateEntryException;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateHandler;
@@ -787,6 +789,25 @@ public class JarBuilderTest {
       assertRelpath(new File("a/b/c"), new File("a/b/d"), "..", "c");
       assertRelpath(new File("a/b/c"), new File("a/d/e"), "..", "..", "b", "c");
       assertRelpath(new File("a/b/c"), new File("d/e/f"), "..", "..", "..", "a", "b", "c");
+    }
+  }
+
+  public static class PathJoinTest {
+
+    private static void assertJoinPath(String expected, String... components) {
+      assertEquals(expected, JarBuilder.joinJarPath(ImmutableList.copyOf(components)));
+    }
+
+    @Test
+    public void testJoin() {
+      assertJoinPath("a/b/c", "a", "b", "c");
+      assertJoinPath("a/b/c", "a/", "b", "c");
+      assertJoinPath("a/b/c", "a", "b/", "c");
+      assertJoinPath("a/b/c/", "a", "b", "c/");
+      assertJoinPath("a/b/c", "a", "b//", "c");
+      assertJoinPath("a/b/c/", "a", "b", "c/");
+      assertJoinPath("/a/b/c/", "/a", "b", "c/");
+      assertJoinPath("/a/b/c/", "//a", "b", "c/");
     }
   }
 }

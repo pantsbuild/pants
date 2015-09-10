@@ -26,7 +26,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return register_core().merge(register_codegen()).merge(BuildFileAliases.create({
+    return register_core().merge(register_codegen()).merge(BuildFileAliases({
       'dummy_library': SimpleCodegenTaskTest.DummyLibrary
     }))
 

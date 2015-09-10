@@ -35,6 +35,7 @@ class ChangedTargetTask(ChangedFileTaskMixin, NoopExecTask):
   product_type in that goal. See noop.py and NoopExecTask for noop tasks that can easily be
   installed in a goal to make it provide some known product type.
   """
+
   @classmethod
   def register_options(cls, register):
     super(ChangedTargetTask, cls).register_options(register)
@@ -56,6 +57,7 @@ class ChangedTargetTask(ChangedFileTaskMixin, NoopExecTask):
 
 class CompileChanged(ChangedTargetTask):
   """Find and compile changed targets."""
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(CompileChanged, cls).prepare(options, round_manager)
@@ -64,6 +66,7 @@ class CompileChanged(ChangedTargetTask):
 
 class TestChanged(ChangedTargetTask):
   """Find and test changed targets."""
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(TestChanged, cls).prepare(options, round_manager)

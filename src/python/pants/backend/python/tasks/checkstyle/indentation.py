@@ -13,10 +13,9 @@ from pants.subsystem.subsystem import Subsystem
 
 # TODO(wickman) Update this to sanitize line continuation styling as we have
 # disabled it from pep8.py due to mismatched indentation styles.
-
-
 class IndentationSubsystem(Subsystem):
   options_scope = 'pycheck-indentation'
+
   @classmethod
   def register_options(cls, register):
     super(IndentationSubsystem, cls).register_options(register)

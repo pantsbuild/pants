@@ -15,6 +15,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class TrailingWhitespaceSubsystem(Subsystem):
   options_scope = 'pycheck-trailing-whitespace'
+
   @classmethod
   def register_options(cls, register):
     super(TrailingWhitespaceSubsystem, cls).register_options(register)

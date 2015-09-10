@@ -48,10 +48,9 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-temperature-example-bundle')
 
-    java_run = subprocess.Popen(['java', '-cp', 'wire-temperature-example.jar',
-                                 'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample'],
-                                stdout=subprocess.PIPE,
-                                cwd=out_path)
+    args = ['java', '-cp', 'wire-temperature-example.jar',
+            'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample']
+    java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
     java_retcode = java_run.wait()
     java_out = java_run.stdout.read()
     self.assertEquals(java_retcode, 0)

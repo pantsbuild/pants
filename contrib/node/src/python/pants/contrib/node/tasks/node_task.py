@@ -12,6 +12,7 @@ from pants.util.memo import memoized_property
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
+from pants.contrib.node.targets.npm_package import NpmPackage
 
 
 class NodeTask(Task):
@@ -24,6 +25,11 @@ class NodeTask(Task):
   def node_distribution(self):
     """A bootstrapped node distribution for use by node tasks."""
     return NodeDistribution.Factory.global_instance().create()
+
+  @classmethod
+  def is_npm_package(cls, target):
+    """Returns `True` if the given target is an `NpmPackage`."""
+    return isinstance(target, NpmPackage)
 
   @classmethod
   def is_node_module(cls, target):
@@ -46,8 +52,8 @@ class NodeTask(Task):
     :rtype: A tuple of (int,
             :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
     """
-    npm_command = self.node_distribution.node_command(args=args)
-    return self._execute_command(npm_command,
+    node_command = self.node_distribution.node_command(args=args)
+    return self._execute_command(node_command,
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels,
                                  **kwargs)

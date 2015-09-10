@@ -8,11 +8,3 @@ python_library(
     '3rdparty/python:six',
   ]
 )
-
-python_library(
-  name='shader',
-  sources=['shader.py'],
-  dependencies=[
-    'src/python/pants/util:contextutil'
-  ]
-)

@@ -204,6 +204,7 @@ def ensure_headings_linkable(soups):
             tag['id'] = candidate_id
             break
 
+
 def add_here_links(soups):
   """Add the "pilcrow" links.
 
@@ -269,6 +270,7 @@ def get_title(soup):
 
 def generate_site_toc(config, precomputed, here):
   site_toc = []
+
   def recurse(tree, depth_so_far):
     for node in tree:
       if 'page' in node and node['page'] != 'index':
@@ -291,6 +293,7 @@ def generate_site_toc(config, precomputed, here):
 def generate_breadcrumbs(config, precomputed, here):
   """return template data for breadcrumbs"""
   breadcrumb_pages = []
+
   def recurse(tree, pages_so_far):
     pages_so_far_next = []
     for node in tree:

@@ -13,17 +13,19 @@ from pants.option.option_util import is_boolean_flag
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
     ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
-     'type', 'default', 'help', 'deprecated_version', 'deprecated_message', 'deprecated_hint'])):
+     'typ', 'fromfile', 'default', 'help', 'deprecated_version', 'deprecated_message',
+     'deprecated_hint'])):
   """A container for help information for a single option.
 
   registering_class: The type that registered the option.
-  display args: Arg strings suitable for display in help text, including value examples
+  display_args: Arg strings suitable for display in help text, including value examples
                 (e.g., [-f, --[no]-foo-bar, --baz=<metavar>].)
   scoped_cmd_line_args: The explicitly scoped raw flag names allowed anywhere on the cmd line,
                         (e.g., [--scope-baz, --no-scope-baz, --scope-qux])
   unscoped_cmd_line_args: The unscoped raw flag names allowed on the cmd line in this option's
                           scope context (e.g., [--baz, --no-baz, --qux])
-  type: The type of the option.
+  typ: The type of the option.
+  fromfile: `True` if the option supports @fromfile value loading.
   default: The value of this option if no flags are specified (derived from config and env vars).
   help: The help message registered for this option.
   deprecated_version: The version at which this option is to be removed, if any (None otherwise).
@@ -89,7 +91,7 @@ class HelpInfoExtracter(object):
       if typ == list_option or action == 'append':
         metavar = '"[\'str1\',\'str2\',...]"'
       elif typ == dict_option:
-        metavar = '"{ \'key1\': val1,\'key2\': val2,...}"'
+        metavar = '"{\'key1\':val1,\'key2\':val2,...}"'
       else:
         metavar = '<{}>'.format(typ.__name__)
     return metavar
@@ -160,7 +162,8 @@ class HelpInfoExtracter(object):
                          display_args=display_args,
                          scoped_cmd_line_args=scoped_cmd_line_args,
                          unscoped_cmd_line_args=unscoped_cmd_line_args,
-                         type=typ,
+                         typ=typ,
+                         fromfile=kwargs.get('fromfile', False),
                          default=default,
                          help=help_msg,
                          deprecated_version=deprecated_version,

@@ -20,6 +20,7 @@ _NOQA_LINE_SEARCH = re.compile(r'# noqa\b').search
 _NOQA_FILE_SEARCH = re.compile(r'# (flake8|checkstyle): noqa$').search
 lint_plugin = namedtuple('lint_plugin', 'name checker')
 
+
 def noqa_line_filter(python_file, line_number):
   return _NOQA_LINE_SEARCH(python_file.lines[line_number]) is not None
 
@@ -32,7 +33,6 @@ class PythonCheckStyleTask(PythonTask):
   _PYTHON_SOURCE_EXTENSION = '.py'
   _plugins = []
   _subsystems = tuple()
-
 
   def __init__(self, *args, **kwargs):
     super(PythonCheckStyleTask, self).__init__(*args, **kwargs)

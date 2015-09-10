@@ -50,6 +50,7 @@ python_library(
     ':simple_codegen_task',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/java:util',
@@ -151,7 +152,6 @@ python_library(
     'src/python/pants/base:revision',
     'src/python/pants/base:source_root',
     'src/python/pants/java/distribution',
-    'src/python/pants/option',
     'src/python/pants/util:memo',
   ],
 )

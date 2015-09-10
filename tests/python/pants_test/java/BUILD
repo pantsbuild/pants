@@ -6,6 +6,7 @@ target(
   dependencies = [
     ':executor',
     ':nailgun_client',
+    ':util',
     'tests/python/pants_test/java/distribution',
     'tests/python/pants_test/java/jar',
   ]
@@ -27,5 +28,15 @@ python_tests(
   sources = ['test_nailgun_client.py'],
   dependencies = [
     'src/python/pants/java:nailgun_client',
+  ]
+)
+
+python_tests(
+  name = 'util',
+  sources = ['test_util.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/java:util',
+    'src/python/pants/util:dirutil',
   ]
 )

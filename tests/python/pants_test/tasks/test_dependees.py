@@ -47,7 +47,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'target': Dependencies,
         'jar_library': JarLibrary,

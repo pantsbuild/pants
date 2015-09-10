@@ -18,6 +18,7 @@ from pants.option.options import Options
 
 class OptionsBootstrapper(object):
   """An object that knows how to create options in two stages: bootstrap, and then full options."""
+
   def __init__(self, env=None, configpath=None, args=None):
     self._env = env if env is not None else os.environ.copy()
     self._configpath = configpath
@@ -64,6 +65,7 @@ class OptionsBootstrapper(object):
       def bootstrap_options_from_config(config):
         bootstrap_options = Options.create(env=self._env, config=config,
             known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=bargs)
+
         def register_global(*args, **kwargs):
           bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
         GlobalOptionsRegistrar.register_bootstrap_options(register_global)
@@ -76,7 +78,8 @@ class OptionsBootstrapper(object):
       # from (typically pants.ini), then config override, then rcfiles.
       full_configpaths = pre_bootstrap_config.sources()
       if bootstrap_option_values.config_override:
-        full_configpaths.append(bootstrap_option_values.config_override)
+        full_configpaths.extend(bootstrap_option_values.config_override)
+
       if bootstrap_option_values.pantsrc:
         rcfiles = [os.path.expanduser(rcfile) for rcfile in bootstrap_option_values.pantsrc_files]
         existing_rcfiles = filter(os.path.exists, rcfiles)
