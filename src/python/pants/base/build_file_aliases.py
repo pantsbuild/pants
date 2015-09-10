@@ -300,8 +300,7 @@ class BuildFileAliases(object):
                             context_aware_object_factories=context_aware_object_factories)
 
   def _tuple(self):
-    def tuplize(map):
-      return tuple(sorted(map.items()))
+    tuplize = lambda d: tuple(sorted(d.items()))
     return (tuplize(self._target_types),
             tuplize(self._target_macro_factories),
             tuplize(self._objects),

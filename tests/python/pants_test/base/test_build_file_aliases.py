@@ -16,11 +16,18 @@ from pants.base.target import Target
 
 class BuildFileAliasesTest(unittest.TestCase):
 
-  target_macro_factory = TargetMacro.Factory.wrap(
-    lambda ctx: ctx.create_object(Target,
-                                  type_alias='jill',
-                                  name=os.path.basename(ctx.rel_path)),
-    Target)
+  class RedTarget(Target):
+    pass
+
+  class BlueTarget(Target):
+    pass
+
+  def setUp(self):
+    self.target_macro_factory = TargetMacro.Factory.wrap(
+      lambda ctx: ctx.create_object(self.BlueTarget,
+                                    type_alias='jill',
+                                    name=os.path.basename(ctx.rel_path)),
+      self.BlueTarget, self.RedTarget)
 
   def test_create(self):
     self.assertEqual(BuildFileAliases(targets={},
@@ -122,3 +129,16 @@ class BuildFileAliasesTest(unittest.TestCase):
         # combine
         context_aware_object_factories={'e': e_factory, 'f': f_factory})
     self.assertEqual(expected, first.merge(second))
+
+  def test_target_types(self):
+    aliases = BuildFileAliases(targets={'jake': Target, 'jill': self.target_macro_factory})
+    self.assertEqual({'jake': Target}, aliases.target_types)
+
+  def test_target_macro_factories(self):
+    aliases = BuildFileAliases(targets={'jake': Target, 'jill': self.target_macro_factory})
+    self.assertEqual({'jill': self.target_macro_factory}, aliases.target_macro_factories)
+
+  def test_target_types_by_alias(self):
+    aliases = BuildFileAliases(targets={'jake': Target, 'jill': self.target_macro_factory})
+    self.assertEqual({'jake': {Target}, 'jill': {self.BlueTarget, self.RedTarget}},
+                     aliases.target_types_by_alias)
