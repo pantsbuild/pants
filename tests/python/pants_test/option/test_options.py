@@ -173,10 +173,10 @@ class OptionsTest(unittest.TestCase):
                           config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
 
-    options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': ['123','456']})
+    options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
     self.assertEqual(['123','456'], options.for_global_scope().config_override)
 
-    options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': ['']})
+    options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['']"})
     self.assertEqual([''], options.for_global_scope().config_override)
 
     # Test list-typed option.
