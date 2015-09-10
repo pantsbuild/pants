@@ -255,13 +255,6 @@ class BuildFileAliases(object):
     """
     return self._context_aware_object_factories
 
-  def aliased_target_types(self, alias):
-    """Returns all the target types that can be produced from the given alias.
-
-    :rtype: set
-    """
-    return self.target_types_by_alias.get(alias, set())
-
   @memoized_property
   def target_types_by_alias(self):
     """Returns a mapping from target alias to the target types produced for that alias.
@@ -308,7 +301,7 @@ class BuildFileAliases(object):
 
   def _tuple(self):
     def tuplize(map):
-      return tuple(map.items())
+      return tuple(sorted(map.items()))
     return (tuplize(self._target_types),
             tuplize(self._target_macro_factories),
             tuplize(self._objects),

@@ -70,7 +70,7 @@ class Filter(ConsoleTask):
 
     def filter_for_type(name):
       registered_aliases = self.context.build_file_parser.registered_aliases()
-      target_types = registered_aliases.aliased_target_types(name)
+      target_types = registered_aliases.target_types_by_alias.get(name, None)
       if not target_types:
         raise TaskError('No Targets with type name: {}'.format(name))
       return lambda target: isinstance(target, tuple(target_types))

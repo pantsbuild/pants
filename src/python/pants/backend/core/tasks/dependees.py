@@ -44,10 +44,10 @@ class ReverseDepmap(ConsoleTask):
     buildfiles = OrderedSet()
     address_mapper = self.context.address_mapper
     if self._dependees_types:
+      registered_aliases = self.context.build_file_parser.registered_aliases()
       base_paths = OrderedSet()
       for dependees_type in self._dependees_types:
-        registered_aliases = self.context.build_file_parser.registered_aliases()
-        target_types = registered_aliases.aliased_target_types(dependees_type)
+        target_types = registered_aliases.target_types_by_alias.get(dependees_type, None)
         if not target_types:
           raise TaskError('No Targets with type name: {}'.format(dependees_type))
         # Try to find the SourceRoots for the given input type alias
