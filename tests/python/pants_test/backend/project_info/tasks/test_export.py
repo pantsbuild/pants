@@ -198,7 +198,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     result = get_json(self.execute_console_task(
       targets=[self.target('project_info:first')]
     ))
-    self.assertEqual('1.0.3', result['version'])
+    self.assertEqual('1.0.4', result['version'])
 
   def test_sources(self):
     result = get_json(self.execute_console_task(
