@@ -56,6 +56,8 @@ class OptionsTest(unittest.TestCase):
     register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
     register_global('-x', '--xlong', action='store_true', recursive=True)
     register_global('--y', action='append', type=int)
+    register_global('--config-override', action='append')
+
     register_global('--pants-foo')
     register_global('--bar-baz')
     register_global('--store-true-flag', action='store_true', fingerprint=True)
@@ -131,6 +133,23 @@ class OptionsTest(unittest.TestCase):
     self._register(options)
     return options
 
+  def _parse_type_int(self, args_str, env=None, config=None, bootstrap_option_values=None, action=None):
+    args = shlex.split(str(args_str))
+    options = Options.create(env=env or {},
+                             config=self._create_config(config or {}),
+                             known_scope_infos=OptionsTest._known_scope_infos,
+                             args=args,
+                             bootstrap_option_values=bootstrap_option_values)
+    options.register(GLOBAL_SCOPE, '--config-override', action=action, type=int)
+    return options
+
+  def test_env_type_int(self):
+    options = self._parse_type_int('./pants ', action='append', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
+    self.assertEqual([123, 456], options.for_global_scope().config_override)
+
+    options = self._parse_type_int('./pants ', env={'PANTS_CONFIG_OVERRIDE': "123"})
+    self.assertEqual(123, options.for_global_scope().config_override)
+
   def test_arg_scoping(self):
     # Some basic smoke tests.
     options = self._parse('./pants --verbose')
@@ -170,6 +189,12 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --y=5 --y=-6 --y=77',
                           config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
+
+    options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
+    self.assertEqual(['123','456'], options.for_global_scope().config_override)
+
+    options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['']"})
+    self.assertEqual([''], options.for_global_scope().config_override)
 
     # Test list-typed option.
     options = self._parse('./pants --listy=\'["c", "d"]\'',

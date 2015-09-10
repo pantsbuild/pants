@@ -15,6 +15,7 @@ import six
 
 from pants.base.deprecated import check_deprecated_semver
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import list_option
 from pants.option.errors import ParseError, RegistrationError
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
@@ -143,7 +144,6 @@ class Parser(object):
     namespace.add_forwardings(self._dest_forwardings)
     new_args = vars(self._argparser.parse_args(args))
     namespace.update(new_args)
-
     # Compute the inverse of the dest forwardings.
     # We do this here and not when creating the forwardings, because forwardings inherited
     # from outer scopes can be overridden in inner scopes, so this computation is only
@@ -389,15 +389,21 @@ class Parser(object):
     if is_fromfile:
       kwargs['type'] = lambda flag_val_str: value_type(expand(flag_val_str))  # Expand flag values.
 
-    env_val = None if env_val_str is None else value_type(expand(env_val_str))  # Expand env values.
-
     config_val = None
+    env_val = None
+
     if action == 'append':
+      if env_val_str is not None:
+        env_val = [value_type(x) for x in list_option(expand(env_val_str))]
+
       config_val_strs = self._config.getlist(config_section, dest) if self._config else None
       if config_val_strs is not None:
         config_val = [value_type(config_val_str) for config_val_str in config_val_strs]
       default = []
     else:
+      if env_val_str is not None:
+        env_val = value_type(expand(env_val_str))
+
       config_val_str = (self._config.get(config_section, dest, default=None)
                         if self._config else None)
       if config_val_str is not None:
