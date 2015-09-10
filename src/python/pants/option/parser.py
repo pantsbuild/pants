@@ -389,25 +389,21 @@ class Parser(object):
     if is_fromfile:
       kwargs['type'] = lambda flag_val_str: value_type(expand(flag_val_str))  # Expand flag values.
 
-    if env_val_str is None:
-      env_val = None
-    else:
-      expanded_env_val_str = expand(env_val_str)
-      try:
-        env_val = value_type(expanded_env_val_str)
-      except ValueError:
-        env_val = expanded_env_val_str
-
     config_val = None
+    env_val = None
+
     if action == 'append':
-      if env_val is not None:
-        env_val = [value_type(x) for x in list_option(env_val_str)]
+      if env_val_str is not None:
+        env_val = [value_type(x) for x in list_option(expand(env_val_str))]
 
       config_val_strs = self._config.getlist(config_section, dest) if self._config else None
       if config_val_strs is not None:
         config_val = [value_type(config_val_str) for config_val_str in config_val_strs]
       default = []
     else:
+      if env_val_str is not None:
+        env_val = value_type(expand(env_val_str))
+
       config_val_str = (self._config.get(config_section, dest, default=None)
                         if self._config else None)
       if config_val_str is not None:
