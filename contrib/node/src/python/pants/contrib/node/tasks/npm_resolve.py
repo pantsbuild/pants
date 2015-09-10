@@ -128,9 +128,6 @@ class NpmResolve(NodeTask):
 
     if not package.has_key('version'):
       package['version'] = '0.0.0'
-    elif package['version'] != npm_package.version:
-      raise TaskError('Version in package.json not the same as the BUILD target name for {}'
-                      .format(npm_package.address.reference()))
 
     if not package.has_key('dependencies'):
       package['dependencies'] = dependencies
