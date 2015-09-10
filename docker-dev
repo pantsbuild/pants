@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+set -o pipefail
+
+PANTS_SERVER_PORT=${PANTS_SERVER_PORT:-22222}
+
+DOCKERFILE="${HOME}/.cache/pantsbuild/docker/dev/local/Dockerfile"
+
+if [[ ! -f "${DOCKERFILE}" ]]
+then
+  echo "=== Building a customized image for $(id -run):$(id -rgn) ($(id -ru):$(id -rg)) ==="
+
+  mkdir -p $(dirname ${DOCKERFILE})
+  dockerdir="$(mktemp -d /tmp/pantsbuild.docker.XXXXXX)"
+  trap "rm -rf "${dockerdir}"" EXIT
+
+  cat << EOF > "${dockerdir}/Dockerfile"
+FROM pantsbuild/pants:latest
+
+LABEL org.pantsbuild.pants-dev-local="latest"
+
+RUN groupadd --gid $(id -rg) -r pantsbuild && \\
+    useradd --uid $(id -ru)  -r -m -g pantsbuild pantsbuild
+
+VOLUME /home/pantsbuild/pants
+
+USER pantsbuild
+ENV HOME /home/pantsbuild
+
+# We have files with unicode path segments that require a unicode-supporting locale to read from
+# python.
+ENV LANG=en_US.UTF-8
+
+WORKDIR /home/pantsbuild/pants
+CMD ["bash"]
+EOF
+
+  docker build --rm -t pants-dev-local:latest "${dockerdir}" && \
+    mv "${dockerdir}/Dockerfile" "${DOCKERFILE}"
+fi
+
+docker run --rm -it \
+  --name=pants-dev \
+  -p ${PANTS_SERVER_PORT}:${PANTS_SERVER_PORT} \
+  -e PANTS_SERVER_PORT=${PANTS_SERVER_PORT} \
+  --net=host \
+  -v $PWD:/home/pantsbuild/pants \
+  $(docker images -q -f label=org.pantsbuild.pants-dev-local=latest)
+
