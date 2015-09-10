@@ -15,6 +15,7 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -26,7 +27,6 @@ from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
-from pants.java.jar.shader import Shader
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)

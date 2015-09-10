@@ -9,9 +9,9 @@ import os
 import tempfile
 import unittest
 
+from pants.backend.jvm.subsystems.shader import Shader, Shading
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
-from pants.java.jar.shader import Shader, Shading
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
 from pants_test.subsystem.subsystem_util import subsystem_instance
