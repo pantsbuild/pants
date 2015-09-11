@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.core.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -15,7 +16,7 @@ from pants.base.exceptions import TaskError
 from pants.util.filtering import create_filters, wrap_filters
 
 
-class Filter(ConsoleTask):
+class Filter(TargetFilterTaskMixin, ConsoleTask):
   """Filter the input targets based on various criteria.
 
   Each of the filtering options below is a comma-separated list of filtering criteria, with an
@@ -69,10 +70,7 @@ class Filter(ConsoleTask):
     self._filters.extend(create_filters(self.get_options().target, filter_for_address))
 
     def filter_for_type(name):
-      registered_aliases = self.context.build_file_parser.registered_aliases()
-      target_types = registered_aliases.target_types_by_alias.get(name, None)
-      if not target_types:
-        raise TaskError('No Targets with type name: {}'.format(name))
+      target_types = self.target_types_for_alias(name)
       return lambda target: isinstance(target, tuple(target_types))
     self._filters.extend(create_filters(self.get_options().type, filter_for_type))
 

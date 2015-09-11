@@ -5,9 +5,12 @@ target(
   name='tasks',
   dependencies=[
     ':bash_completion',
+    ':dependees',
+    ':filter',
     ':markdown_to_html',
     ':mutex_task_mixin',
     ':scm_publish',
+    ':target_filter_task_mixin',
   ],
 )
 
@@ -32,6 +35,37 @@ python_tests(
     'tests/python/pants_test:int-test',
     'src/python/pants/util:contextutil',
   ]
+)
+
+python_tests(
+  name = 'dependees',
+  sources = ['test_dependees.py'],
+  dependencies = [
+    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/tasks:dependees',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:source_root',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'filter',
+  sources = ['test_filter.py'],
+  dependencies = [
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/tasks:filter',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
 )
 
 python_tests(
@@ -81,5 +115,16 @@ python_tests(
   dependencies=[
     '3rdparty/python:mock',
     'src/python/pants/backend/core/tasks:scm_publish',
+  ]
+)
+
+python_tests(
+  name='target_filter_task_mixin',
+  sources=['test_target_filter_task_mixin.py'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:target_filter_task_mixin',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:target',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )

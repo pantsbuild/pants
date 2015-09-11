@@ -47,6 +47,7 @@ class BuildConfigurationTest(unittest.TestCase):
 
     target_call_proxy = parse_state.parse_globals['fred']
     target_call_proxy(name='jake')
+
     self.assertEqual(1, len(parse_state.registered_addressable_instances))
     name, target_proxy = parse_state.registered_addressable_instances.pop()
     self.assertEqual('jake', target_proxy.addressed_name)
@@ -88,6 +89,7 @@ class BuildConfigurationTest(unittest.TestCase):
 
     target_call_proxy = parse_state.parse_globals['fred']
     target_call_proxy(name='jake')
+
     self.assertEqual(1, len(parse_state.registered_addressable_instances))
     name, target_proxy = parse_state.registered_addressable_instances.pop()
     self.assertEqual('frog', target_proxy.addressed_name)
