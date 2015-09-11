@@ -335,7 +335,7 @@ python_library(
   name = 'target_filter_task_mixin',
   sources = ['target_filter_task_mixin.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
   ]
 )
