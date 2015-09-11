@@ -103,7 +103,7 @@ class BuildInvalidator(object):
   def needs_update(self, cache_key):
     """Check if the given cached item is invalid.
 
-    :param cache_key: A CacheKey object (as returned by BuildInvalidator.key_for().
+    :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
     :returns: True if the cached version of the item is out of date.
     """
     return self._read_sha(cache_key) != cache_key.hash
@@ -111,7 +111,7 @@ class BuildInvalidator(object):
   def update(self, cache_key):
     """Makes cache_key the valid version of the corresponding target set.
 
-    :param cache_key: A CacheKey object (typically returned by BuildInvalidator.key_for()).
+    :param cache_key: A CacheKey object (typically returned by CacheKeyGenerator.key_for()).
     """
     self._write_sha(cache_key)
 

@@ -12,12 +12,13 @@ from textwrap import dedent
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.core.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 
 
-class ReverseDepmap(ConsoleTask):
+class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
   """Outputs all targets whose dependencies include at least one of the input targets."""
 
   @classmethod
@@ -44,12 +45,9 @@ class ReverseDepmap(ConsoleTask):
     buildfiles = OrderedSet()
     address_mapper = self.context.address_mapper
     if self._dependees_types:
-      registered_aliases = self.context.build_file_parser.registered_aliases()
       base_paths = OrderedSet()
       for dependees_type in self._dependees_types:
-        target_types = registered_aliases.target_types_by_alias.get(dependees_type, None)
-        if not target_types:
-          raise TaskError('No Targets with type name: {}'.format(dependees_type))
+        target_types = self.target_types_for_alias(dependees_type)
         # Try to find the SourceRoots for the given input type alias
         for target_type in target_types:
           try:

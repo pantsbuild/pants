@@ -129,6 +129,7 @@ python_library(
   dependencies = [
     ':common',
     ':console_task',
+    ':target_filter_task_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
@@ -149,6 +150,7 @@ python_library(
   sources = ['filter.py'],
   dependencies = [
     ':console_task',
+    ':target_filter_task_mixin',
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',
@@ -327,6 +329,15 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.util',
     'src/python/pants/base:target',
   ],
+)
+
+python_library(
+  name = 'target_filter_task_mixin',
+  sources = ['target_filter_task_mixin.py'],
+  dependencies = [
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
+  ]
 )
 
 python_library(
