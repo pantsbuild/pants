@@ -7,11 +7,9 @@ RELEASE HISTORY
 Release Notes
 ~~~~~~~~~~~~~
 
-This release of pants bumps the export goal version to 1.0.4 in order to include Python and JVM distribution information for consumption in IntelliJ.
+By defaulting the versions of most built in tools, this release makes pants significantly easier to configure! Tools like antlr, jmake, nailgun, etc, will use default classpaths unless override targets are provided.
 
-Additionally, by defaulting the versions of most built in tools, pants became significantly easier to configure. Tools like antlr, jmake, nailgun, etc, will use default classpaths unless override targets are configured.
-
-Finally, this release adds native support for shading JVM binaries, which helps to isolate them from their deployment environment.
+Additionally, this release adds native support for shading JVM binaries, which helps to isolate them from their deployment environment.
 
 Thanks to all contributors!
 
