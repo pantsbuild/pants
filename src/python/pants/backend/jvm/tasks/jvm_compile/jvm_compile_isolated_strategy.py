@@ -120,7 +120,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
     with self.context.new_workunit('validate-{}-analysis'.format(self._compile_task_name)):
-      # for vts in invalidation_check.all_vts:
       for vts in invalidation_check.all_vts:
         assert len(vts.targets) == 1
 
