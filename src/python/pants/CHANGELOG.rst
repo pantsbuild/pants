@@ -7,7 +7,7 @@ RELEASE HISTORY
 Release Notes
 ~~~~~~~~~~~~~
 
-By defaulting the versions of most built in tools, this release makes pants significantly easier to configure! Tools like antlr, jmake, nailgun, etc, will use default classpaths unless override targets are provided.
+By defaulting the versions of most built-in tools, this release makes pants significantly easier to configure! Tools like antlr, jmake, nailgun, etc, will use default classpaths unless override targets are provided.
 
 Additionally, this release adds native support for shading JVM binaries, which helps to isolate them from their deployment environment.
 
@@ -84,7 +84,7 @@ Small improvements, Refactoring and Tooling
 * Centralize finding target types for an alias.
   `RB #2796 <https://rbcommons.com/s/twitter/r/2796>`_
 
-* Store timeing stats in a structured way, instead of as json.
+* Store timing stats in a structured way, instead of as json.
   `RB #2797 <https://rbcommons.com/s/twitter/r/2797>`_
 
 Documentation
