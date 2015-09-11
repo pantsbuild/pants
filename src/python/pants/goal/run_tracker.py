@@ -22,7 +22,7 @@ from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.reporting.report import Report
-from pants.stats.statsdb import StatsDB
+from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
@@ -55,7 +55,7 @@ class RunTracker(Subsystem):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (StatsDB,)
+    return (StatsDBFactory,)
 
   @classmethod
   def register_options(cls, register):
@@ -259,7 +259,7 @@ class RunTracker(Subsystem):
     safe_file_dump(stats_file, json.dumps(stats))
 
     # Add to local stats db.
-    StatsDB.global_instance().get_db().safe_insert_stats(stats)
+    StatsDBFactory.global_instance().get_db().insert_stats(stats)
 
     # Upload to remote stats db.
     stats_url = self.get_options().stats_upload_url

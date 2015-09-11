@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.stats.statsdb import StatsDBImpl
+from pants.stats.statsdb import StatsDB
 from pants.util.contextutil import temporary_dir
 
 
@@ -20,8 +20,9 @@ class StatsDBTest(unittest.TestCase):
   def test_statsdb(self):
     with temporary_dir() as tmpdir:
       path = os.path.join(tmpdir, 'statsdb.sqlite')
-      statsdb = StatsDBImpl(path)
-      statsdb.safe_insert_stats({
+      statsdb = StatsDB(path)
+      statsdb.ensure_tables()
+      statsdb.insert_stats({
         'run_info': {
           'id': 'run1',
           'timestamp': '1438600000',
@@ -35,7 +36,7 @@ class StatsDBTest(unittest.TestCase):
         'cumulative_timings': [],
         'self_timings': [t('compile.java', 12.34), t('resolve.ivy', 56)]
       })
-      statsdb.safe_insert_stats({
+      statsdb.insert_stats({
         'run_info': {
           'id': 'run2',
           'timestamp': '1438600000',
@@ -51,11 +52,11 @@ class StatsDBTest(unittest.TestCase):
       })
 
       stats = list(statsdb.get_stats_for_cmd_line('self_timings', '% compile %'))
-      self.assertListEqual(
-        [('compile.java', 9000), ('compile.java', 12340), ('resolve.ivy', 56000)],
+      self.assertEqual(
+        sorted([('compile.java', 9000), ('compile.java', 12340), ('resolve.ivy', 56000)]),
         sorted(stats))
 
       aggs = list(statsdb.get_aggregated_stats_for_cmd_line('self_timings', '% compile %'))
-      self.assertListEqual(
-        [('2015-08-03', 'compile.java', 2, 21340), ('2015-08-03', 'resolve.ivy', 1, 56000)],
+      self.assertEqual(
+        sorted([('2015-08-03', 'compile.java', 2, 21340), ('2015-08-03', 'resolve.ivy', 1, 56000)]),
         sorted(aggs))

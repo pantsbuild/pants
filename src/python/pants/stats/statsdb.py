@@ -12,46 +12,33 @@ from contextlib import contextmanager
 from pants.subsystem.subsystem import Subsystem
 
 
-def to_ms(timing_secs):
-  return int(float(timing_secs) * 1000 + 0.5)
-
-
 class StatsDBError(Exception): pass
 
 
-class StatsDB(Subsystem):
+class StatsDBFactory(Subsystem):
   options_scope = 'statsdb'
 
   @classmethod
   def register_options(cls, register):
-    super(StatsDB, cls).register_options(register)
+    super(StatsDBFactory, cls).register_options(register)
     register('--path',
              default=os.path.join(register.bootstrap.pants_bootstrapdir, 'stats', 'statsdb.sqlite'),
              help='Location of statsdb file.')
 
   def get_db(self):
-    return StatsDBImpl(self.get_options().path)
+    """Returns a StatsDB instance configured by this factory."""
+    ret = StatsDB(self.get_options().path)
+    ret.ensure_tables()
+    return ret
 
 
-class StatsDBImpl(object):
+class StatsDB(object):
   def __init__(self, path):
-    super(StatsDBImpl, self).__init__()
+    super(StatsDB, self).__init__()
     self._path = path
 
-  @contextmanager
-  def connection(self):
-    conn = sqlite3.connect(self._path)
-    yield conn
-    conn.commit()
-    conn.close()
-
-  @contextmanager
-  def cursor(self):
-    with self.connection() as conn:
-      yield conn.cursor()
-
   def ensure_tables(self):
-    with self.cursor() as c:
+    with self._cursor() as c:
       def create_index(tab, col):
         c.execute("""CREATE INDEX IF NOT EXISTS {tab}_{col}_idx ON {tab}({col})""".format(
           tab=tab, col=col))
@@ -84,13 +71,9 @@ class StatsDBImpl(object):
       create_timings_table('cumulative_timings')
       create_timings_table('self_timings')
 
-  def safe_insert_stats(self, stats):
-    self.ensure_tables()
-    self.insert_stats(stats)
-
   def insert_stats(self, stats):
     try:
-      with self.cursor() as c:
+      with self._cursor() as c:
         ri = stats['run_info']
         try:
           c.execute("""INSERT INTO run_info VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -106,7 +89,7 @@ class StatsDBImpl(object):
           for timing in timings:
             try:
               c.execute("""INSERT INTO {} VALUES (?, ?, ?)""".format(table),
-                        [rid, timing['label'], to_ms(timing['timing'])])
+                        [rid, timing['label'], self._to_ms(timing['timing'])])
             except KeyError as e:
               raise StatsDBError('Failed to insert stats. Key {} not found in timing: {}'.format(
                 e.args[0], str(timing)))
@@ -121,7 +104,7 @@ class StatsDBImpl(object):
     :param timing_table: One of 'cumulative_timings' or 'self_timings'.
     :param cmd_line_like: Look at all cmd lines that are LIKE this string, in the sql sense.
     """
-    with self.cursor() as c:
+    with self._cursor() as c:
       for row in c.execute("""
         SELECT t.label, t.timing
         FROM {} AS t INNER JOIN run_info AS ri ON (t.run_info_id=ri.id)
@@ -135,7 +118,7 @@ class StatsDBImpl(object):
     :param timing_table: One of 'cumulative_timings' or 'self_timings'.
     :param cmd_line_like: Look at all cmd lines that are LIKE this string, in the sql sense.
     """
-    with self.cursor() as c:
+    with self._cursor() as c:
       for row in c.execute("""
           SELECT date(ri.timestamp, 'unixepoch') as dt, t.label as label, count(*), sum(t.timing)
           FROM {} AS t INNER JOIN run_info AS ri ON (t.run_info_id=ri.id)
@@ -144,3 +127,20 @@ class StatsDBImpl(object):
           ORDER BY dt, label
         """.format(timing_table), [cmd_line_like]):
         yield row
+
+  @staticmethod
+  def _to_ms(timing_secs):
+    """Convert a string representing a float of seconds to an int representing milliseconds."""
+    return int(float(timing_secs) * 1000 + 0.5)
+
+  @contextmanager
+  def _connection(self):
+    conn = sqlite3.connect(self._path)
+    yield conn
+    conn.commit()
+    conn.close()
+
+  @contextmanager
+  def _cursor(self):
+    with self._connection() as conn:
+      yield conn.cursor()
