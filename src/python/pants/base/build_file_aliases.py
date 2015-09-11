@@ -151,7 +151,7 @@ class BuildFileAliases(object):
   @classmethod
   def _validate_alias(cls, category, alias, obj):
     if not isinstance(alias, six.string_types):
-      raise TypeError('Aliases must be strings, given {category} entry {alias} of type {typ} as '
+      raise TypeError('Aliases must be strings, given {category} entry {alias!r} of type {typ} as '
                       'the alias of {obj}'
                       .format(category=category, alias=alias, typ=type(alias).__name__, obj=obj))
 
@@ -259,7 +259,7 @@ class BuildFileAliases(object):
   def target_types_by_alias(self):
     """Returns a mapping from target alias to the target types produced for that alias.
 
-    Normally there is 1 target type per alias, but macros can expand a single alias o several
+    Normally there is 1 target type per alias, but macros can expand a single alias to several
     target types.
 
     :rtype: dict
@@ -278,7 +278,7 @@ class BuildFileAliases(object):
 
     :param other: The BuildFileAliases to merge in.
     :type other: :class:`BuildFileAliases`
-    :returns: A new BuildFileAliases containing other's aliases merged into ours.
+    :returns: A new BuildFileAliases containing `other`'s aliases merged into ours.
     :rtype: :class:`BuildFileAliases`
     """
     if not isinstance(other, BuildFileAliases):

@@ -30,7 +30,7 @@ class JvmToolMixin(object):
     def dep_spec(self, options):
       """Returns the target address spec that points to this JVM tool's classpath dependencies.
 
-      :rtype string
+      :rtype: string
       """
       option = self.key.replace('-', '_')
       dep_spec = options.for_scope(self.scope)[option]
@@ -43,6 +43,13 @@ class JvmToolMixin(object):
           {key}: //tool/classpath:address
           """.format(scope=self.scope, key=self.key)))
       return dep_spec
+
+    def is_default(self, options):
+      """Return `True` if this option was not set by the user.
+
+      :rtype: bool
+      """
+      return options.for_scope(self.scope).is_default(self.key.replace('-', '_'))
 
   _jvm_tools = []  # List of JvmTool objects.
 

@@ -345,7 +345,7 @@ class Parser(object):
     """
     is_fromfile = kwargs.get('fromfile', False)
     action = kwargs.get('action')
-    if is_fromfile and action:
+    if is_fromfile and action and action != 'append':
       raise ParseError('Cannot fromfile {} with an action ({}) in scope {}'
                        .format(dest, action, self._scope))
 
@@ -374,6 +374,8 @@ class Parser(object):
           env_val_str = self._env.get(env_var)
           break
 
+    config_val_str = self._config.get(config_section, dest, default=None)
+
     def expand(val_str):
       if is_fromfile and val_str and val_str.startswith('@') and not val_str.startswith('@@'):
         fromfile = val_str[1:]
@@ -386,31 +388,24 @@ class Parser(object):
         # Support a literal @ for fromfile values via @@.
         return val_str[1:] if is_fromfile and val_str.startswith('@@') else val_str
 
+    def parse_typed_list(val_str):
+      return None if val_str is None else [value_type(x) for x in list_option(expand(val_str))]
+
+    def parse_typed_item(val_str):
+      return None if val_str is None else value_type(expand(val_str))
+
+    # Handle the forthcoming conversions argparse will need to do by placing our parse hook - we
+    # handle the conversions for env and config ourselves below.  Unlike the env and config
+    # handling, `action='append'` does not need to be handled specially since appended flag values
+    # come as single items' thus only `parse_typed_item` is ever needed for the flag value type
+    # conversions.
     if is_fromfile:
-      kwargs['type'] = lambda flag_val_str: value_type(expand(flag_val_str))  # Expand flag values.
+      kwargs['type'] = parse_typed_item
 
-    config_val = None
-    env_val = None
-
-    if action == 'append':
-      if env_val_str is not None:
-        env_val = [value_type(x) for x in list_option(expand(env_val_str))]
-
-      config_val_strs = self._config.getlist(config_section, dest) if self._config else None
-      if config_val_strs is not None:
-        config_val = [value_type(config_val_str) for config_val_str in config_val_strs]
-      default = []
-    else:
-      if env_val_str is not None:
-        env_val = value_type(expand(env_val_str))
-
-      config_val_str = (self._config.get(config_section, dest, default=None)
-                        if self._config else None)
-      if config_val_str is not None:
-        config_val = value_type(expand(config_val_str))  # Expand config values.
-      default = None
-
-    hardcoded_val = kwargs.get('default')  # We don't expand hard coded defaults.
+    default, parse = ([], parse_typed_list) if action == 'append' else (None, parse_typed_item)
+    config_val = parse(config_val_str)
+    env_val = parse(env_val_str)
+    hardcoded_val = kwargs.get('default')
     return RankedValue.choose(None, env_val, config_val, hardcoded_val, default)
 
   def _create_inverse_args(self, args):

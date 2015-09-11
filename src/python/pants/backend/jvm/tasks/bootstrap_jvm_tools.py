@@ -121,6 +121,29 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
           if jvm_tool.classpath is None:
             raise cls._tool_resolve_error(e, dep_spec, jvm_tool)
           else:
+            if not jvm_tool.is_default(options):
+              # The user specified a target spec for this jvm tool that doesn't actually exist.
+              # We want to error out here instead of just silently using the default option while
+              # appearing to respect their config.
+              raise cls.ToolResolveError(dedent("""
+                  Failed to resolve target for tool: {tool}. This target was obtained from
+                  option {option} in scope {scope}.
+
+                  Make sure you didn't make a typo in the tool's address. You specified that the
+                  tool should use the target found at "{tool}".
+
+                  This target has a default classpath configured, so you can simply remove:
+                    [{scope}]
+                    {option}: {tool}
+                  from pants.ini (or any other config file) to use the default tool.
+
+                  The default classpath is: {default_classpath}
+
+                  Note that tool target addresses in pants.ini should be specified *without* quotes.
+                """).strip().format(tool=dep_spec,
+                                    option=jvm_tool.key,
+                                    scope=jvm_tool.scope,
+                                    default_classpath=':'.join(map(str, jvm_tool.classpath or ()))))
             if jvm_tool.classpath:
               tool_classpath_target = JarLibrary(name=dep_address.target_name,
                                                  address=dep_address,

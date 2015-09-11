@@ -37,7 +37,7 @@ class UnreadableArtifact(object):
     :param err: Any additional information on the nature of the read error.
     """
     self.key = key
-    self.err = None
+    self.err = err
 
   # For python 3
   def __bool__(self):
@@ -124,7 +124,7 @@ class ArtifactCache(object):
 
     Implementations may choose to return an UnreadableArtifact instance instead
     of `False` to indicate an artifact was in the cache but could not be read,
-    due to anerror or corruption. UnreadableArtifact evaluates as False-y, so
+    due to an error or corruption. UnreadableArtifact evaluates as False-y, so
     callers can treat the result as a boolean if they are only concerned with
     whether or not an artifact was read.
 

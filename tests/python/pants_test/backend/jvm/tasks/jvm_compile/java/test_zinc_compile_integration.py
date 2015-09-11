@@ -60,4 +60,4 @@ class JvmExamplesCompileIntegrationTest(BaseCompileIT):
           ],
           clean_all=True,
         )
-        self.assertEqual(0, pants_run.returncode)
+        self.assert_success(pants_run)
