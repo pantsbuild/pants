@@ -115,16 +115,25 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def prepare_compile(self, cache_manager, all_targets, relevant_targets):
     super(JvmCompileIsolatedStrategy, self).prepare_compile(cache_manager, all_targets,
                                                             relevant_targets)
+    invalidation_check = cache_manager.check(relevant_targets)
 
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
-
     with self.context.new_workunit('validate-{}-analysis'.format(self._compile_task_name)):
-      for target in relevant_targets:
+      # for vts in invalidation_check.all_vts:
+      for vts in invalidation_check.all_vts:
+        assert len(vts.targets) == 1
+
+        target = vts.targets[0]
         cc = self.compile_context(target)
-        safe_mkdir(cc.classes_dir)
+        safe_mkdir(cc.classes_dir, clean=not vts.valid)
         compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
-        self.validate_analysis(cc.analysis_file)
+        if vts.valid:
+          self.validate_analysis(cc.analysis_file)
+
+    # Don't create worker pools if there is no work.
+    if not invalidation_check.invalid_vts:
+      return
 
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._compile_task_name)) \
