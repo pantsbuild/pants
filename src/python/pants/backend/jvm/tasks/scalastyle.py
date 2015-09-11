@@ -71,6 +71,10 @@ class Scalastyle(NailgunTask):
                   '(relative to the repo root) matches any of these regexes.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run scalastyle with these extra jvm options.')
+    register('--verbose', action='store_true', default=False,
+             help='Enable verbose scalastyle output.')
+    register('--quiet', action='store_true', default=False,
+             help='Silence scalastyle error messages.')
     cls.register_jvm_tool(register, 'scalastyle')
 
   @classmethod
@@ -126,6 +130,8 @@ class Scalastyle(NailgunTask):
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
 
       scalastyle_config = self.validate_scalastyle_config()
+      scalastyle_verbose = self.get_options().verbose
+      scalastyle_quiet = self.get_options().quiet
       scalastyle_excluder = self.create_file_excluder()
 
       self.context.log.debug('Non synthetic scala targets to be checked:')
@@ -140,10 +146,15 @@ class Scalastyle(NailgunTask):
       if scala_sources:
         def call(srcs):
           cp = self.tool_classpath('scalastyle')
+          scalastyle_args = [
+            '-c', scalastyle_config,
+            '-v', str(scalastyle_verbose).lower(),
+            '-q', str(scalastyle_quiet).lower(),
+            ]
           return self.runjava(classpath=cp,
                               main=self._MAIN,
                               jvm_options=self.get_options().jvm_options,
-                              args=['-c', scalastyle_config] + srcs)
+                              args=scalastyle_args + srcs)
 
         result = Xargs(call).execute(scala_sources)
         if result != 0:
