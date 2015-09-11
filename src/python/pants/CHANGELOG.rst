@@ -1,6 +1,103 @@
 RELEASE HISTORY
 ===============
 
+0.0.47 (9/11/2015)
+-----------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release of pants bumps the export version to 1.0.4 in order to include Python and JVM distribution information.
+
+Additionally, by defaulting the versions of most built in tools, pants became significantly easier to configure. Tools like antlr, jmake, nailgun, etc, will use default classpaths unless override targets are configured.
+
+Finally, this release adds native support for shading JVM binaries, which helps to isolate them from their deployment environment.
+
+Thanks to all contributors!
+
+API Changes
+~~~~~~~~~~~
+
+* Add JVM distributions and platforms to the export format.
+  `RB #2784 <https://rbcommons.com/s/twitter/r/2784>`_
+
+* Added Python setup to export goal to consume in the Pants Plugin for IntelliJ.
+  `RB #2785 <https://rbcommons.com/s/twitter/r/2785>`_
+  `RB #2786 <https://rbcommons.com/s/twitter/r/2786>`_
+
+* Introduce anonymous targets built by macros.
+  `RB #2759 <https://rbcommons.com/s/twitter/r/2759>`_
+
+* Upgrade to the re-merged Node.js/io.js as the default.
+  `RB #2800 <https://rbcommons.com/s/twitter/r/2800>`_
+
+Bugfixes
+~~~~~~~~
+
+* Don't create directory entries in the isolated compile context jar
+  `RB #2775 <https://rbcommons.com/s/twitter/r/2775>`_
+
+* Bump jar-tool release version to 0.0.7 to pick up double-slashed directory fixes
+  `RB #2763 <https://rbcommons.com/s/twitter/r/2763>`_
+  `RB #2779 <https://rbcommons.com/s/twitter/r/2779>`_
+
+* junit_run now parses errors (in addition to failures) to correctly set failing target
+  `RB #2782 <https://rbcommons.com/s/twitter/r/2782>`_
+
+* Fix the zinc name-hashing flag for unicode symbols
+  `RB #2776 <https://rbcommons.com/s/twitter/r/2776>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support for shading rules for jvm_binary.
+  `RB #2754 <https://rbcommons.com/s/twitter/r/2754>`_
+
+* Add support for @fromfile option values.
+  `RB #2783 <https://rbcommons.com/s/twitter/r/2783>`_
+  `RB #2794 <https://rbcommons.com/s/twitter/r/2794>`_
+
+* --config-override made appendable, to support multiple pants.ini files.
+  `RB #2774 <https://rbcommons.com/s/twitter/r/2774>`_
+
+* JVM tools can now carry their own classpath, meaning that most don't need to be configured
+  `RB #2778 <https://rbcommons.com/s/twitter/r/2778>`_
+  `RB #2795 <https://rbcommons.com/s/twitter/r/2795>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Added migration of --jvm-jdk-paths to --jvm-distributions-paths
+  `RB #2677 <https://rbcommons.com/s/twitter/r/2677>`_
+  `RB #2781 <https://rbcommons.com/s/twitter/r/2781>`_
+
+* Example of problem with annotation processors that reference external dependencies.
+  `RB #2777 <https://rbcommons.com/s/twitter/r/2777>`_
+
+* Replace eval use with a parse_literal util.
+  `RB #2787 <https://rbcommons.com/s/twitter/r/2787>`_
+
+* Move Shader from pants.java to the jvm backend.
+  `RB #2788 <https://rbcommons.com/s/twitter/r/2788>`_
+
+* Move BuildFileAliases validation to BuildFileAliases.
+  `RB #2790 <https://rbcommons.com/s/twitter/r/2790>`_
+
+* Centralize finding target types for an alias.
+  `RB #2796 <https://rbcommons.com/s/twitter/r/2796>`_
+
+* Store timeing stats in a structured way, instead of as json.
+  `RB #2797 <https://rbcommons.com/s/twitter/r/2797>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Added a step to publish RELEASE HISTORY back to the public website [DOC]
+  `RB #2780 <https://rbcommons.com/s/twitter/r/2780>`_
+
+* Fix buildcache doc typos, use err param rather than ignoring it in UnreadableArtifact
+  `RB #2801 <https://rbcommons.com/s/twitter/r/2801>`_
+
 0.0.46 (9/4/2015)
 -----------------
 
