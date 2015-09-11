@@ -23,7 +23,7 @@ class ParserHierarchy(object):
   empty string.)
   """
 
-  def __init__(self, env, config, scope_infos):
+  def __init__(self, env, config, scope_infos, option_tracker):
     # Sorting ensures that ancestors precede descendants.
     scope_infos = sorted(set(list(scope_infos)), key=lambda si: si.scope)
     self._parser_by_scope = {}
@@ -31,7 +31,8 @@ class ParserHierarchy(object):
       scope = scope_info.scope
       parent_parser = (None if scope == GLOBAL_SCOPE else
                        self._parser_by_scope[enclosing_scope(scope)])
-      self._parser_by_scope[scope] = Parser(env, config, scope_info, parent_parser)
+      self._parser_by_scope[scope] = Parser(env, config, scope_info, parent_parser,
+                                            option_tracker=option_tracker)
 
   def get_parser_by_scope(self, scope):
     try:

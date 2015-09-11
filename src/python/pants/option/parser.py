@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import os
 import re
 import warnings
 from argparse import ArgumentParser, _HelpAction
@@ -78,7 +79,7 @@ class Parser(object):
     else:
       raise Parser.BooleanConversionError('Got {0}. Expected True or False.'.format(s))
 
-  def __init__(self, env, config, scope_info, parent_parser):
+  def __init__(self, env, config, scope_info, parent_parser, option_tracker):
     """Create a Parser instance.
 
     :param env: a dict of environment variables.
@@ -86,11 +87,13 @@ class Parser(object):
     :param scope_info: the scope this parser acts for.
     :param parent_parser: the parser for the scope immediately enclosing this one, or
                           None if this is the global scope.
+    :param option_tracker: the option tracker to record where option values came from.
     """
     self._env = env
     self._config = config
     self._scope_info = scope_info
     self._scope = self._scope_info.scope
+    self._option_tracker = option_tracker
 
     # If True, no more registration is allowed on this parser.
     self._frozen = False
@@ -375,6 +378,9 @@ class Parser(object):
           break
 
     config_val_str = self._config.get(config_section, dest, default=None)
+    config_source_file = self._config.get_source_for_option(config_section, dest)
+    if config_source_file is not None:
+      config_source_file = os.path.relpath(config_source_file)
 
     def expand(val_str):
       if is_fromfile and val_str and val_str.startswith('@') and not val_str.startswith('@@'):
@@ -406,7 +412,16 @@ class Parser(object):
     config_val = parse(config_val_str)
     env_val = parse(env_val_str)
     hardcoded_val = kwargs.get('default')
-    return RankedValue.choose(None, env_val, config_val, hardcoded_val, default)
+
+    config_details = 'in {}'.format(config_source_file) if config_source_file else None
+
+    choices = list(RankedValue.prioritized_iter(None, env_val, config_val, hardcoded_val, default))
+    for choice in reversed(choices):
+      details = config_details if choice.rank == RankedValue.CONFIG else None
+      self._option_tracker.record_option(scope=self._scope, option=dest, value=choice.value,
+                                         rank=choice.rank, details=details)
+
+    return choices[0]
 
   def _create_inverse_args(self, args):
     inverse_args = []

@@ -12,6 +12,7 @@ import sys
 from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_boolean_flag
 from pants.option.options import Options
 
@@ -26,6 +27,7 @@ class OptionsBootstrapper(object):
     self._args = sys.argv if args is None else args
     self._bootstrap_options = None  # We memoize the bootstrap options here.
     self._full_options = {}  # We memoize the full options here.
+    self._option_tracker = OptionTracker()
 
   def get_bootstrap_options(self):
     """:returns: an Options instance that only knows about the bootstrap options.
@@ -64,7 +66,8 @@ class OptionsBootstrapper(object):
 
       def bootstrap_options_from_config(config):
         bootstrap_options = Options.create(env=self._env, config=config,
-            known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=bargs)
+            known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=bargs,
+            option_tracker=self._option_tracker)
 
         def register_global(*args, **kwargs):
           bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
@@ -111,5 +114,6 @@ class OptionsBootstrapper(object):
                                                self._post_bootstrap_config,
                                                known_scope_infos,
                                                args=self._args,
-                                               bootstrap_option_values=bootstrap_option_values)
+                                               bootstrap_option_values=bootstrap_option_values,
+                                               option_tracker=self._option_tracker)
     return self._full_options[key]

@@ -57,18 +57,54 @@ class RankedValue(object):
   }
 
   @classmethod
+  def get_rank_name(cls, rank):
+    """Returns the string name for the given rank integer.
+
+    :param int rank: the integer rank constant (E.g., RankedValue.HARDCODED).
+    :returns: the string name of the rank.
+    :rtype: string
+    """
+    return cls._RANK_NAMES.get(rank, 'UNKNOWN')
+
+  @classmethod
+  def get_rank_value(cls, name):
+    """Returns the integer constant value for the given rank name.
+
+    :param string rank: the string rank name (E.g., 'HARDCODED').
+    :returns: the integer constant value of the rank.
+    :rtype: int
+    """
+    if name in cls._RANK_NAMES.values():
+      return getattr(cls, name, None)
+    return None
+
+  @classmethod
+  def get_names(cls):
+    """Returns the list of rank names.
+
+    :returns: the rank names as a list (I.e., ['NONE', 'HARDCODED', 'CONFIG', ...])
+    :rtype: list
+    """
+    return sorted(cls._RANK_NAMES.values(), key=cls.get_rank_value)
+
+  @classmethod
+  def prioritized_iter(cls, flag_val, env_val, config_val, hardcoded_val, default):
+    """Yield the non-None values from highest-ranked to lowest, wrapped in RankedValue instances."""
+    if flag_val is not None:
+      yield RankedValue(cls.FLAG, flag_val)
+    if env_val is not None:
+      yield RankedValue(cls.ENVIRONMENT, env_val)
+    if config_val is not None:
+      yield RankedValue(cls.CONFIG, config_val)
+    if hardcoded_val is not None:
+      yield RankedValue(cls.HARDCODED, hardcoded_val)
+    yield RankedValue(cls.NONE, default)
+
+  @classmethod
   def choose(cls, flag_val, env_val, config_val, hardcoded_val, default):
     """Return the highest-ranked non-None value, wrapped in a RankedValue instance."""
-    if flag_val is not None:
-      return RankedValue(cls.FLAG, flag_val)
-    elif env_val is not None:
-      return RankedValue(cls.ENVIRONMENT, env_val)
-    elif config_val is not None:
-      return RankedValue(cls.CONFIG, config_val)
-    elif hardcoded_val is not None:
-      return RankedValue(cls.HARDCODED, hardcoded_val)
-    else:
-      return RankedValue(cls.NONE, default)
+    for value in cls.prioritized_iter(flag_val, env_val, config_val, hardcoded_val, default):
+      return value # Just return the first value.
 
   def __init__(self, rank, value):
     self._rank = rank
@@ -90,8 +126,8 @@ class RankedValue(object):
     # the underlying list here.
     return copy.copy(self._value)
 
-  def __eq__(self):
-    return self._rank == self._rank and self._value == self._value
+  def __eq__(self, other):
+    return self._rank == other._rank and self._value == other._value
 
   def __repr__(self):
-    return '({}, {})'.format(self._RANK_NAMES.get(self._rank, 'UNKNOWN'), self._value)
+    return '({0}, {1})'.format(self.get_rank_name(self._rank), self._value)
