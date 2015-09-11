@@ -26,16 +26,19 @@ What if you want to create a custom build of pants with some unpublished patches
 In that case, you want to build a production ready version of pants including dependencies for
 all platforms, not just your development environment.
 
-In the following examples, you'll be using 2 local repos.  The path to the pantsbuild/pants clone
-will be `/tmp/pantsbuild` and the path to your repo `/your/repo` in all the examples below; make
-sure to substitute your own paths when adapting this recipe to your environment.
+In the following examples, you'll be using 2 local git repositories - both of them pants clones. The
+first will be an unmodified copy of upstream pants (i.e., `pantsbuild/pants`). The second will be
+the repository containing your own changes that you want to incorporate into the PEX. We will call
+these two `/path/to/upstream-pants` and `/path/to/your-pants` respectively. You will have to make
+the appropriate substitutions in the following instructions
 
-You'll need to setup some files one-time in your own repo:
+You'll need to perform a one-time setup of some files in your own pants repository:
 
     :::bash
+    $ cd /path/to/your-pants
     $ cat pants-production.requirements.txt
     # Replace this path with the path to your pantsbuild.pants clone.
-    -f /tmp/pantsbuild/dist/
+    -f /path/to/upstream-pants
     pantsbuild.pants
 
     $ cat BUILD.pants-production
@@ -73,25 +76,29 @@ You'll need to setup some files one-time in your own repo:
 
 To (re-)generate a `pants.pex` you then run these 2 commands:
 
-1. In your pantsbuild/pants clone, create a local pants release from master:
+1. Create a local pants release from upstream master pants:
 
         :::bash
+        $ cd /path/to/upstream-pants
         $ rm -rf dist && ./build-support/bin/release.sh -n
 
 2. In your own repo the following command will create a locally built `pants.pex` for all platforms:
 
         :::bash
-        $ /tmp/pantsbuild/pants --config-override=pants-production.ini clean-all binary //:pants
+        $ cd /path/to/your-pants
+        $ /path/to/upstream-pants/pants --config-override=pants-production.ini clean-all binary //:pants
 
 The resulting `pants.pex` will be in the `dist/` directory:
 
     :::bash
+    $ cd /path/to/your-pants
     $ ls -l dist/pants.pex
     -rwxr-xr-x  1 pantsdev  pantsdev  5561254 Oct  8 09:52 dist/pants.pex
 
 You can see that the pex contains bundled dependencies for both mac and linux:
 
     :::bash
+    $ cd /path/to/your-pants
     $ unzip -l dist/pants.pex | grep -e 'macos\|linux'
 
 You can distribute the resulting `pants.pex` file to your users via your favorite method.
