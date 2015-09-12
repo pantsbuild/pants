@@ -145,11 +145,14 @@ class Scalastyle(NailgunTask):
 
       if scala_sources:
         def call(srcs):
+          def to_java_boolean(x):
+            return str(x).lower()
+
           cp = self.tool_classpath('scalastyle')
           scalastyle_args = [
             '-c', scalastyle_config,
-            '-v', str(scalastyle_verbose).lower(),
-            '-q', str(scalastyle_quiet).lower(),
+            '-v', to_java_boolean(scalastyle_verbose),
+            '-q', to_java_boolean(scalastyle_quiet),
             ]
           return self.runjava(classpath=cp,
                               main=self._MAIN,
