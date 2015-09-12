@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 from textwrap import dedent
+
 from pants.base.build_environment import get_buildroot
-from pants.util.dirutil import safe_open
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_open
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
