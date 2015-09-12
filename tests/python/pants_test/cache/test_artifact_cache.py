@@ -52,6 +52,7 @@ class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   """Reject all requests"""
+
   def __init__(self, request, client_address, server):
     SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
 

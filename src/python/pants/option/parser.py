@@ -15,6 +15,7 @@ import six
 
 from pants.base.deprecated import check_deprecated_semver
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import list_option
 from pants.option.errors import ParseError, RegistrationError
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
@@ -56,8 +57,10 @@ class Parser(object):
   """
 
   class BooleanConversionError(ParseError):
-    """Raised when a value other than 'True' or 'False' is encountered."""
-    pass
+    """Indicates a value other than 'True' or 'False' when attempting to parse a bool."""
+
+  class FromfileError(ParseError):
+    """Indicates a problem reading a value @fromfile."""
 
   @staticmethod
   def str_to_bool(s):
@@ -141,7 +144,6 @@ class Parser(object):
     namespace.add_forwardings(self._dest_forwardings)
     new_args = vars(self._argparser.parse_args(args))
     namespace.update(new_args)
-
     # Compute the inverse of the dest forwardings.
     # We do this here and not when creating the forwardings, because forwardings inherited
     # from outer scopes can be overridden in inner scopes, so this computation is only
@@ -234,7 +236,7 @@ class Parser(object):
     return '{}. {}'.format(message, hint)
 
   _custom_kwargs = ('advanced', 'recursive', 'recursive_root', 'subsystem', 'registering_class',
-                    'fingerprint', 'deprecated_version', 'deprecated_hint')
+                    'fingerprint', 'deprecated_version', 'deprecated_hint', 'fromfile')
 
   def _clean_argparse_kwargs(self, dest, args, kwargs):
     ranked_default = self._compute_default(dest, kwargs=kwargs)
@@ -341,6 +343,12 @@ class Parser(object):
 
     The source of the default value is chosen according to the ranking in RankedValue.
     """
+    is_fromfile = kwargs.get('fromfile', False)
+    action = kwargs.get('action')
+    if is_fromfile and action and action != 'append':
+      raise ParseError('Cannot fromfile {} with an action ({}) in scope {}'
+                       .format(dest, action, self._scope))
+
     config_section = 'DEFAULT' if self._scope == GLOBAL_SCOPE else self._scope
     udest = dest.upper()
     if self._scope == GLOBAL_SCOPE:
@@ -356,24 +364,47 @@ class Parser(object):
     else:
       sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', config_section.upper())
       env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
+
     value_type = self.str_to_bool if is_boolean_flag(kwargs) else kwargs.get('type', str)
+
     env_val_str = None
     if self._env:
       for env_var in env_vars:
         if env_var in self._env:
           env_val_str = self._env.get(env_var)
           break
-    env_val = None if env_val_str is None else value_type(env_val_str)
-    if kwargs.get('action') == 'append':
-      config_val_strs = self._config.getlist(config_section, dest) if self._config else None
-      config_val = (None if config_val_strs is None else
-                    [value_type(config_val_str) for config_val_str in config_val_strs])
-      default = []
-    else:
-      config_val_str = (self._config.get(config_section, dest, default=None)
-                        if self._config else None)
-      config_val = None if config_val_str is None else value_type(config_val_str)
-      default = None
+
+    config_val_str = self._config.get(config_section, dest, default=None)
+
+    def expand(val_str):
+      if is_fromfile and val_str and val_str.startswith('@') and not val_str.startswith('@@'):
+        fromfile = val_str[1:]
+        try:
+          with open(fromfile) as fp:
+            return fp.read().strip()
+        except IOError as e:
+          raise self.FromfileError('Failed to read {} from file {}: {}'.format(dest, fromfile, e))
+      else:
+        # Support a literal @ for fromfile values via @@.
+        return val_str[1:] if is_fromfile and val_str.startswith('@@') else val_str
+
+    def parse_typed_list(val_str):
+      return None if val_str is None else [value_type(x) for x in list_option(expand(val_str))]
+
+    def parse_typed_item(val_str):
+      return None if val_str is None else value_type(expand(val_str))
+
+    # Handle the forthcoming conversions argparse will need to do by placing our parse hook - we
+    # handle the conversions for env and config ourselves below.  Unlike the env and config
+    # handling, `action='append'` does not need to be handled specially since appended flag values
+    # come as single items' thus only `parse_typed_item` is ever needed for the flag value type
+    # conversions.
+    if is_fromfile:
+      kwargs['type'] = parse_typed_item
+
+    default, parse = ([], parse_typed_list) if action == 'append' else (None, parse_typed_item)
+    config_val = parse(config_val_str)
+    env_val = parse(env_val_str)
     hardcoded_val = kwargs.get('default')
     return RankedValue.choose(None, env_val, config_val, hardcoded_val, default)
 

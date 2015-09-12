@@ -146,7 +146,6 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     def __hash__(self):
       return hash(type(self).__name__)
 
-
   @classmethod
   def product_types(cls):
     # NB(gmalmquist): These are fake products inserted to make sure validation is run very early.

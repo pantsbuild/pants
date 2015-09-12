@@ -11,7 +11,6 @@ from pants.util.strutil import camelcase
 
 
 # TODO(Eric Ayers): Backfill tests for other methods in strutil.py
-
 class StrutilTest(unittest.TestCase):
 
   def test_camelcase(self):

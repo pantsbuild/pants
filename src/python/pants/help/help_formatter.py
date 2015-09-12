@@ -63,8 +63,11 @@ class HelpFormatter(object):
 
   def format_option(self, ohi):
     lines = []
-    arg_line = '{args} {dflt}'.format(args=self._maybe_cyan(', '.join(ohi.display_args)),
-                                      dflt=self._maybe_green('(default: {})'.format(ohi.default)))
+    arg_line = ('{args} {fromfile}{dflt}'
+                .format(args=self._maybe_cyan(', '.join(ohi.display_args)),
+                        dflt=self._maybe_green('(default: {})'.format(ohi.default)),
+                        fromfile=self._maybe_green('(@fromfile value supported) ' if ohi.fromfile
+                                                   else '')))
     lines.append(arg_line)
 
     indent = '    '

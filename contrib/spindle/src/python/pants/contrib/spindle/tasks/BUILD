@@ -14,6 +14,7 @@ python_library(
   dependencies = [
     'contrib/spindle/src/python/pants/contrib/spindle/targets',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:address',

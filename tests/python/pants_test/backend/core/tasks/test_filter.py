@@ -22,7 +22,7 @@ class BaseFilterTest(ConsoleTaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'target': Dependencies,
         'java_library': JavaLibrary,
@@ -146,16 +146,14 @@ class FilterTest(BaseFilterTest):
       'overlaps:foo',
       targets=self.targets('::'),
       # Note that the comma is inside the string, so these are ORed.
-      options={'type': ['python_requirement_library,'
-                        'pants.backend.python.targets.python_library.PythonLibrary']}
+      options={'type': ['python_requirement_library,python_library']}
     )
 
   def test_filter_multiple_types(self):
     # A target can only have one type, so the output should be empty.
     self.assert_console_output(
       targets=self.targets('::'),
-      options={'type': ['python_requirement_library',
-                        'pants.backend.python.targets.python_library.PythonLibrary']}
+      options={'type': ['python_requirement_library', 'python_library']}
     )
 
   def test_filter_target(self):

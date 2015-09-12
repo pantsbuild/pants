@@ -211,7 +211,7 @@ For help with things that aren't goals (global options, other kinds of help), us
 
 If you want help diagnosing some strange Pants behavior, you might want verbose output.
 To get this, instead of just invoking `./pants`, set some environment variables and request
-more logging: `PEX_VERBOSE=1 PANTS_VERBOSE=1 ./pants -ldebug`.
+more logging: `PEX_VERBOSE=5 ./pants -ldebug`.
 
 BUILD Files
 -----------

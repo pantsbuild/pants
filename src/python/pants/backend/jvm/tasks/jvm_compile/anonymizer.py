@@ -44,9 +44,8 @@ _default_word_map = {
   'benjy': 'kermit'
 }
 
+
 # TODO: Move somewhere more general? Could also be used to anonymize source files.
-
-
 class TokenTranslator(object):
   """Processes tokens (typically from analysis files), mapping them to randomly chosen words.
 

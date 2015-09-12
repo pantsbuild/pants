@@ -20,6 +20,7 @@ migrations = {
   ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
 
   ('jvm', 'missing_deps_target_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
+  ('jvm', 'jdk_paths'): ('jvm-distributions', 'paths'),
   ('compile.java', 'missing_deps'): ('compile.jvm-dep-check', 'missing_deps'),
   ('compile.java', 'missing_direct_deps'): ('compile.jvm-dep-check', 'missing_direct_deps'),
   ('compile.java', 'missing_deps_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
@@ -271,6 +272,59 @@ migrations = {
   ('compile.zinc', 'jar'): None,
 
   ('unknown-arguments', 'ignored'): None,
+
+  # Tool specs, migrated from a list to a single string.
+  ('bench', 'benchmark-agent'): None,
+  ('bench', 'benchmark-tool'): None,
+  ('binary', 'nailgun-server'): None,
+  ('binary.dex', 'nailgun-server'): None,
+  ('binary.dup', 'nailgun-server'): None,
+  ('bootstrap.bootstrap-jvm-tools', 'jarjar'): None,
+  ('bootstrap.bootstrap-jvm-tools', 'nailgun-server'): None,
+  ('bundle', 'nailgun-server'): None,
+  ('bundle.dup', 'nailgun-server'): None,
+  ('compile.apt', 'java-compiler'): None,
+  ('compile.apt', 'jmake'): None,
+  ('compile.apt', 'nailgun-server'): None,
+  ('compile.checkstyle', 'checkstyle'): None,
+  ('compile.checkstyle', 'nailgun-server'): None,
+  ('compile.java', 'java-compiler'): None,
+  ('compile.java', 'jmake'): None,
+  ('compile.java', 'nailgun-server'): None,
+  ('compile.scalastyle', 'nailgun-server'): None,
+  ('compile.scalastyle', 'scalastyle'): None,
+  ('compile.zinc', 'compiler-interface'): None,
+  ('compile.zinc', 'nailgun-server'): None,
+  ('compile.zinc', 'plugin-jars'): None,
+  ('compile.zinc', 'sbt-interface'): None,
+  ('compile.zinc', 'zinc'): None,
+  ('detect-duplicates', 'nailgun-server'): None,
+  ('gen.antlr', 'antlr3'): None,
+  ('gen.antlr', 'antlr4'): None,
+  ('gen.antlr', 'nailgun-server'): None,
+  ('gen.jaxb', 'nailgun-server'): None,
+  ('gen.scrooge', 'nailgun-server'): None,
+  ('gen.scrooge', 'scrooge-gen'): None,
+  ('gen.spindle', 'nailgun-server'): None,
+  ('gen.spindle', 'spindle-codegen'): None,
+  ('gen.wire', 'javadeps'): None,
+  ('gen.wire', 'wire-compiler'): None,
+  ('imports.ivy-imports', 'nailgun-server'): None,
+  ('jar', 'nailgun-server'): None,
+  ('jar-tool', 'jar-tool'): None,
+  ('publish.jar', 'nailgun-server'): None,
+  ('repl-dirty.scala-dirty', 'scala-repl'): None,
+  ('repl.scala', 'scala-repl'): None,
+  ('resolve.ivy', 'nailgun-server'): None,
+  ('resolve.ivy', 'xalan'): None,
+  ('scala-platform', 'scalac'): None,
+  ('test.junit', 'cobertura-instrument'): None,
+  ('test.junit', 'cobertura-report'): None,
+  ('test.junit', 'cobertura-run'): None,
+  ('test.junit', 'emma'): None,
+  ('test.junit', 'junit'): None,
+  ('thrift-linter', 'nailgun-server'): None,
+  ('thrift-linter', 'scrooge-linter'): None,
 }
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
@@ -286,6 +340,12 @@ scrooge_gen_deps_note = ('The scrooge-gen per-language config fields have been r
                          'two options: one for service deps, and one for structs deps.')
 compile_jar_note = ('The isolated jvm compile `jar` option is critical to performant operation '
                     'and can no longer be disabled.')
+
+jvm_tool_spec_override = ('JVM tool classpath spec overrides have migrated from a list of target'
+                          'addresses to a single target address.  To migrate a list of addresses '
+                          'you\'ll need to create a new aggregator target to hold the list like '
+                          'so: `target(name=<your choice>, dependencies=[<list of addresses>])` '
+                          'and then point to its single address.')
 
 notes = {
   ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or '
@@ -386,7 +446,59 @@ notes = {
   ('unknown-arguments', 'ignored'): 'Target name keys are now expected to be the alias used in '
                                     'BUILD files and not the target type\'s simple class name. '
                                     'For example, if you had \'JavaLibrary\' key you\'d now use '
-                                    '\'java_library\' instead.'
+                                    '\'java_library\' instead.',
+
+  ('bench', 'benchmark-agent'): jvm_tool_spec_override,
+  ('bench', 'benchmark-tool'): jvm_tool_spec_override,
+  ('binary', 'nailgun-server'): jvm_tool_spec_override,
+  ('binary.dex', 'nailgun-server'): jvm_tool_spec_override,
+  ('binary.dup', 'nailgun-server'): jvm_tool_spec_override,
+  ('bootstrap.bootstrap-jvm-tools', 'jarjar'): jvm_tool_spec_override,
+  ('bootstrap.bootstrap-jvm-tools', 'nailgun-server'): jvm_tool_spec_override,
+  ('bundle', 'nailgun-server'): jvm_tool_spec_override,
+  ('bundle.dup', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.apt', 'java-compiler'): jvm_tool_spec_override,
+  ('compile.apt', 'jmake'): jvm_tool_spec_override,
+  ('compile.apt', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.checkstyle', 'checkstyle'): jvm_tool_spec_override,
+  ('compile.checkstyle', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.java', 'java-compiler'): jvm_tool_spec_override,
+  ('compile.java', 'jmake'): jvm_tool_spec_override,
+  ('compile.java', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.scalastyle', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.scalastyle', 'scalastyle'): jvm_tool_spec_override,
+  ('compile.zinc', 'compiler-interface'): jvm_tool_spec_override,
+  ('compile.zinc', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.zinc', 'plugin-jars'): jvm_tool_spec_override,
+  ('compile.zinc', 'sbt-interface'): jvm_tool_spec_override,
+  ('compile.zinc', 'zinc'): jvm_tool_spec_override,
+  ('detect-duplicates', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.antlr', 'antlr3'): jvm_tool_spec_override,
+  ('gen.antlr', 'antlr4'): jvm_tool_spec_override,
+  ('gen.antlr', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.jaxb', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.scrooge', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.scrooge', 'scrooge-gen'): jvm_tool_spec_override,
+  ('gen.spindle', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.spindle', 'spindle-codegen'): jvm_tool_spec_override,
+  ('gen.wire', 'javadeps'): jvm_tool_spec_override,
+  ('gen.wire', 'wire-compiler'): jvm_tool_spec_override,
+  ('imports.ivy-imports', 'nailgun-server'): jvm_tool_spec_override,
+  ('jar', 'nailgun-server'): jvm_tool_spec_override,
+  ('jar-tool', 'jar-tool'): jvm_tool_spec_override,
+  ('publish.jar', 'nailgun-server'): jvm_tool_spec_override,
+  ('repl-dirty.scala-dirty', 'scala-repl'): jvm_tool_spec_override,
+  ('repl.scala', 'scala-repl'): jvm_tool_spec_override,
+  ('resolve.ivy', 'nailgun-server'): jvm_tool_spec_override,
+  ('resolve.ivy', 'xalan'): jvm_tool_spec_override,
+  ('scala-platform', 'scalac'): jvm_tool_spec_override,
+  ('test.junit', 'cobertura-instrument'): jvm_tool_spec_override,
+  ('test.junit', 'cobertura-report'): jvm_tool_spec_override,
+  ('test.junit', 'cobertura-run'): jvm_tool_spec_override,
+  ('test.junit', 'emma'): jvm_tool_spec_override,
+  ('test.junit', 'junit'): jvm_tool_spec_override,
+  ('thrift-linter', 'nailgun-server'): jvm_tool_spec_override,
+  ('thrift-linter', 'scrooge-linter'): jvm_tool_spec_override,
 }
 
 
@@ -407,7 +519,7 @@ def check_option(cp, src, dst):
       return cp.has_section(section) and (key in cp._sections[section])
 
   def section(s):
-    return cyan('[{0}]'.format(s))
+    return cyan('[{}]'.format(s))
 
   src_section, src_key = src
   if has_explicit_option(src_section, src_key):
@@ -423,7 +535,10 @@ def check_option(cp, src, dst):
             'codebase.'.format(src_key=red(src_key), src_section=red(src_section)))
 
     if (src_section, src_key) in notes:
-      print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
+      print('  Note for {src_key} in section {src_section}: {note}'
+            .format(src_key=green(src_key),
+                    src_section=section(src_section),
+                    note=yellow(notes[(src_section, src_key)])))
 
 
 def check_config_file(path):
@@ -431,10 +546,10 @@ def check_config_file(path):
   with open(path, 'r') as ini:
     cp.readfp(ini)
 
-  print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
+  print('Checking config file at {} for unmigrated keys.'.format(path), file=sys.stderr)
 
   def section(s):
-    return cyan('[{0}]'.format(s))
+    return cyan('[{}]'.format(s))
 
   for src, dst in migrations.items():
     check_option(cp, src, dst)

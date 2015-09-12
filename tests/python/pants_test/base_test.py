@@ -125,7 +125,7 @@ class BaseTest(unittest.TestCase):
     # backend here since the `BaseTest` is used by lower level tests in base and since the
     # `Dependencies` type itself is nothing more than an alias for Target that carries along a
     # pydoc for the BUILD dictionary.
-    return BuildFileAliases.create(targets={'target': Target})
+    return BuildFileAliases(targets={'target': Target})
 
   def setUp(self):
     super(BaseTest, self).setUp()

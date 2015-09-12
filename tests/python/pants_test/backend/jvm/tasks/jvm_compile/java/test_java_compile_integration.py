@@ -214,3 +214,14 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # Use zinc.
       args=['--no-compile-java-use-jmake']
     )
+
+  @provide_compile_strategies
+  def test_java_compile_missing_jar_dep_analysis_whitelist_zinc(self, strategy):
+    self._whitelist_test(
+      'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
+      'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
+      strategy,
+      '--compile-jvm-dep-check-missing-direct-deps=fatal',
+      # Use zinc.
+      args=['--no-compile-java-use-jmake']
+    )

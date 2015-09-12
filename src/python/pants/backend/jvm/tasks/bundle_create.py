@@ -66,9 +66,9 @@ class BundleCreate(JvmBinaryTask):
     for target in self.context.target_roots:
       for app in map(self.App, filter(self.App.is_app, [target])):
         basedir = self.bundle(app)
-        # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since 
+        # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
         # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
-        # expect the product to be cached, a user running an 'rm' on the dist/ directory could 
+        # expect the product to be cached, a user running an 'rm' on the dist/ directory could
         # cause inconsistencies.
         jvm_bundles_product = self.context.products.get('jvm_bundles')
         jvm_bundles_product.add(target, os.path.dirname(basedir)).append(os.path.basename(basedir))
@@ -123,7 +123,11 @@ class BundleCreate(JvmBinaryTask):
       # Add external dependencies to the bundle.
       for basedir, external_jar in self.list_external_jar_dependencies(app.binary):
         path = os.path.join(basedir, external_jar)
-        verbose_symlink(path, os.path.join(lib_dir, external_jar))
+        destination = os.path.join(lib_dir, external_jar)
+        verbose_symlink(path, destination)
+        if app.binary.shading_rules:
+          self.shade_jar(binary=app.binary, jar_id=os.path.basename(external_jar),
+                         jar_path=destination)
         classpath.add(external_jar)
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))

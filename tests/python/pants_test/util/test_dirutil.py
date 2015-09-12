@@ -29,12 +29,14 @@ class DirutilTest(unittest.TestCase):
     self._mox.UnsetStubs()
 
   def test_fast_relpath(self):
-    def assertRelpathC(path, start):
-      self.assertEquals('c', fast_relpath(path, start))
-    assertRelpathC('/a/b/c', '/a/b')
-    assertRelpathC('/a/b/c', '/a/b/')
-    assertRelpathC('b/c', 'b')
-    assertRelpathC('b/c', 'b/')
+    def assertRelpath(expected, path, start):
+      self.assertEquals(expected, fast_relpath(path, start))
+    assertRelpath('c', '/a/b/c', '/a/b')
+    assertRelpath('c', '/a/b/c', '/a/b/')
+    assertRelpath('c', 'b/c', 'b')
+    assertRelpath('c', 'b/c', 'b/')
+    assertRelpath('c/', 'b/c/', 'b')
+    assertRelpath('c/', 'b/c/', 'b/')
 
   def test_fast_relpath_invalid(self):
     with self.assertRaises(ValueError):

@@ -15,7 +15,7 @@ from pants_test.base_test import BaseTest
 class MavenLayoutTest(BaseTest):
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'junit_tests': JavaTests,

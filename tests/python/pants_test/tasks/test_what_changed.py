@@ -13,7 +13,7 @@ from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibr
 from pants.backend.core.from_target import FromTarget
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.what_changed import WhatChanged
-from pants.backend.core.wrapped_globs import RGlobs, Globs
+from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -29,7 +29,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'python_library': PythonLibrary,

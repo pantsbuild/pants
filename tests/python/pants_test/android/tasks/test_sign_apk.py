@@ -23,6 +23,7 @@ class SignApkTest(TestAndroidBase):
     return SignApkTask
 
   class FakeKeystore(object):
+
     # Mock keystore to test the render_args method.
     def __init__(self):
       self.build_type = 'debug'
@@ -33,6 +34,7 @@ class SignApkTest(TestAndroidBase):
       self.key_password = 'key_password'
 
   class FakeDistribution(object):
+
     # Mock JDK distribution to test the render_args method.
     @classmethod
     def binary(cls, tool):

@@ -23,7 +23,9 @@ def resolved_example_jar_at(path, org='com.example', name='lib'):
                      cache_path=path,
                      pants_path=path)
 
+
 class ClasspathProductsTest(BaseTest):
+
   def test_single_classpath_element_no_excludes(self):
     a = self.make_target('a', JvmTarget)
 
@@ -54,7 +56,6 @@ class ClasspathProductsTest(BaseTest):
     self.assertEqual(
       'Classpath entry /dev/null for target a:a is located outside the buildroot.',
       str(cm.exception))
-
 
   def test_excluded_classpath_element(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])

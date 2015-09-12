@@ -9,10 +9,9 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from pants.base.address import Address
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import FilesystemBuildFile
-from pants.base.build_graph import BuildGraph
+from pants.base.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.base.target import Target
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
@@ -22,15 +21,23 @@ class BuildConfigurationTest(unittest.TestCase):
   def setUp(self):
     self.build_configuration = BuildConfiguration()
 
+  def _register_aliases(self, **kwargs):
+    self.build_configuration.register_aliases(BuildFileAliases(**kwargs))
+
+  def test_register_bad(self):
+    with self.assertRaises(TypeError):
+      self.build_configuration.register_aliases(42)
+
   def test_register_target_alias(self):
     class Fred(Target):
       pass
 
-    self.build_configuration.register_target_alias('fred', Fred)
+    self._register_aliases(targets={'fred': Fred})
     aliases = self.build_configuration.registered_aliases()
+    self.assertEqual({}, aliases.target_macro_factories)
     self.assertEqual({}, aliases.objects)
     self.assertEqual({}, aliases.context_aware_object_factories)
-    self.assertEqual(dict(fred=Fred), aliases.targets)
+    self.assertEqual(dict(fred=Fred), aliases.target_types)
 
     build_file = FilesystemBuildFile('/tmp', 'fred', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
@@ -40,24 +47,61 @@ class BuildConfigurationTest(unittest.TestCase):
 
     target_call_proxy = parse_state.parse_globals['fred']
     target_call_proxy(name='jake')
+
     self.assertEqual(1, len(parse_state.registered_addressable_instances))
     name, target_proxy = parse_state.registered_addressable_instances.pop()
-    self.assertEqual('jake', target_proxy.name)
-    self.assertEqual(Fred, target_proxy.target_type)
+    self.assertEqual('jake', target_proxy.addressed_name)
+    self.assertEqual(Fred, target_proxy.addressed_type)
 
-  def test_register_bad_target_alias(self):
-    with self.assertRaises(TypeError):
-      self.build_configuration.register_target_alias('fred', object())
+  def test_register_target_macro_facory(self):
+    class Fred(Target):
+      pass
 
-    target = Target('fred', Address.parse('a:b'), BuildGraph(address_mapper=None))
-    with self.assertRaises(TypeError):
-      self.build_configuration.register_target_alias('fred', target)
+    class FredMacro(TargetMacro):
+      def __init__(self, parse_context):
+        self._parse_context = parse_context
+
+      def expand(self, *args, **kwargs):
+        return self._parse_context.create_object(Fred, name='frog', dependencies=[kwargs['name']])
+
+    class FredFactory(TargetMacro.Factory):
+      @property
+      def target_types(self):
+        return {Fred}
+
+      def macro(self, parse_context):
+        return FredMacro(parse_context)
+
+    factory = FredFactory()
+
+    self._register_aliases(targets={'fred': factory})
+    aliases = self.build_configuration.registered_aliases()
+    self.assertEqual({}, aliases.target_types)
+    self.assertEqual({}, aliases.objects)
+    self.assertEqual({}, aliases.context_aware_object_factories)
+    self.assertEqual(dict(fred=factory), aliases.target_macro_factories)
+
+    build_file = FilesystemBuildFile('/tmp', 'fred', must_exist=False)
+    parse_state = self.build_configuration.initialize_parse_state(build_file)
+
+    self.assertEqual(0, len(parse_state.registered_addressable_instances))
+    self.assertEqual(1, len(parse_state.parse_globals))
+
+    target_call_proxy = parse_state.parse_globals['fred']
+    target_call_proxy(name='jake')
+
+    self.assertEqual(1, len(parse_state.registered_addressable_instances))
+    name, target_proxy = parse_state.registered_addressable_instances.pop()
+    self.assertEqual('frog', target_proxy.addressed_name)
+    self.assertEqual(Fred, target_proxy.addressed_type)
+    self.assertEqual(['jake'], target_proxy.dependency_specs)
 
   def test_register_exposed_object(self):
-    self.build_configuration.register_exposed_object('jane', 42)
+    self._register_aliases(objects={'jane': 42})
 
     aliases = self.build_configuration.registered_aliases()
-    self.assertEqual({}, aliases.targets)
+    self.assertEqual({}, aliases.target_types)
+    self.assertEqual({}, aliases.target_macro_factories)
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(jane=42), aliases.objects)
 
@@ -67,10 +111,6 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
     self.assertEqual(1, len(parse_state.parse_globals))
     self.assertEqual(42, parse_state.parse_globals['jane'])
-
-  def test_register_bad_exposed_object(self):
-    with self.assertRaises(TypeError):
-      self.build_configuration.register_exposed_object('jane', Target)
 
   def test_register_exposed_context_aware_function(self):
     self.do_test_exposed_context_aware_function(lambda context: lambda: context.rel_path)
@@ -113,11 +153,11 @@ class BuildConfigurationTest(unittest.TestCase):
 
   @contextmanager
   def do_test_exposed_context_aware_object(self, context_aware_object_factory):
-    self.build_configuration.register_exposed_context_aware_object_factory(
-        'george', context_aware_object_factory)
+    self._register_aliases(context_aware_object_factories={'george': context_aware_object_factory})
 
     aliases = self.build_configuration.registered_aliases()
-    self.assertEqual({}, aliases.targets)
+    self.assertEqual({}, aliases.target_types)
+    self.assertEqual({}, aliases.target_macro_factories)
     self.assertEqual({}, aliases.objects)
     self.assertEqual(dict(george=context_aware_object_factory),
                      aliases.context_aware_object_factories)
@@ -131,7 +171,3 @@ class BuildConfigurationTest(unittest.TestCase):
       self.assertEqual(0, len(parse_state.registered_addressable_instances))
       self.assertEqual(1, len(parse_state.parse_globals))
       yield parse_state.parse_globals['george']
-
-  def test_register_bad_exposed_context_aware_object(self):
-    with self.assertRaises(TypeError):
-      self.build_configuration.register_exposed_context_aware_object_factory('george', 1)

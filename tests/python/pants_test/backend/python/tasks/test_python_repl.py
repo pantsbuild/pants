@@ -10,6 +10,7 @@ import sys
 from contextlib import contextmanager
 from textwrap import dedent
 
+from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -29,14 +30,12 @@ class PythonReplTest(PythonTaskTestBase):
     return PythonRepl
 
   class JvmTarget(Target):
-    def __init__(self, *args, **kwargs):
-      super(PythonReplTest.JvmTarget, self).__init__(*args, **kwargs)
-      self.add_labels('jvm')
+    pass
 
   @property
   def alias_groups(self):
     return super(PythonReplTest, self).alias_groups.merge(
-        BuildFileAliases.create(targets={'jvm_target': self.JvmTarget}))
+        BuildFileAliases(targets={'jvm_target': self.JvmTarget}))
 
   def create_non_python_target(self, relpath, name):
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""
@@ -73,6 +72,7 @@ class PythonReplTest(PythonTaskTestBase):
   def tearDown(self):
     super(PythonReplTest, self).tearDown()
     SourceRoot.reset()
+    ReplTaskMixin.reset_implementations()
 
   @contextmanager
   def new_io(self, input):
@@ -93,10 +93,31 @@ class PythonReplTest(PythonTaskTestBase):
   def do_test_repl(self, code, expected, targets, options=None):
     if options:
       self.set_options(**options)
-    python_repl = self.create_task(self.context(target_roots=targets))
 
+    class JvmRepl(ReplTaskMixin):
+      options_scope = 'test_scope_jvm_repl'
+
+      @classmethod
+      def select_targets(cls, target):
+        return isinstance(target, self.JvmTarget)
+
+      def setup_repl_session(_, targets):
+        raise AssertionError()
+
+      def launch_repl(_, session_setup):
+        raise AssertionError()
+
+    # Add a competing REPL impl.
+    JvmRepl.prepare(self.options, round_manager=None)
+
+    python_repl = self.create_task(self.context(target_roots=targets))
+    original_launcher = python_repl.launch_repl
     with self.new_io('\n'.join(code)) as (inp, out, err):
-      python_repl.execute(stdin=inp, stdout=out, stderr=err)
+      def custom_io_patched_launcher(pex):
+        return original_launcher(pex, stdin=inp, stdout=out, stderr=err)
+      python_repl.launch_repl = custom_io_patched_launcher
+
+      python_repl.execute()
       with open(out.name) as fp:
         lines = fp.read()
         if not expected:

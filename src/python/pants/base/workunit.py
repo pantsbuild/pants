@@ -76,9 +76,6 @@ class WorkUnit(object):
     """Returns a human-readable string describing the outcome."""
     return ['ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN'][outcome]
 
-
-
-
   def __init__(self, run_info_dir, parent, name, labels=None, cmd='', log_config=None):
     """
     - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.

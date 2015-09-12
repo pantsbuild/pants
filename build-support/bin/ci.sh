@@ -94,7 +94,7 @@ fi
 if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
   banner "Running pre-commit checks"
 
-  ./build-support/bin/pre-commit.sh || exit 1
+  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
 fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary

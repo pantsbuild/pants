@@ -44,6 +44,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 class BuildFilePath(object):
   """Returns path containing this ``BUILD`` file."""
+
   def __init__(self, parse_context):
     self.rel_path = parse_context.rel_path
 
@@ -52,7 +53,7 @@ class BuildFilePath(object):
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       # NB: the 'dependencies' alias is deprecated in favor of the 'target' alias
       'dependencies': DeprecatedDependencies,

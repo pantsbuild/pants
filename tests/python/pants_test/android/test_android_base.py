@@ -88,6 +88,7 @@ class TestAndroidBase(TaskTestBase):
                              target_type=AndroidLibrary) as library:
       yield library
 
+
 @contextmanager
 def distribution(installed_sdks=('18', '19'),
                  installed_build_tools=('19.1.0', '20.0.0'),

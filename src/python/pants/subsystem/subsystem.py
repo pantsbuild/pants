@@ -46,6 +46,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
   class CycleException(Exception):
     """Thrown when a circular dependency is detected."""
+
     def __init__(self, cycle):
       message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
           '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
@@ -104,6 +105,10 @@ class Subsystem(SubsystemClientMixin, Optionable):
   # The full Options object for this pants run.  Will be set after options are parsed.
   # TODO: A less clunky way to make option values available?
   _options = None
+
+  @classmethod
+  def set_options(cls, options):
+    cls._options = options
 
   # A cache of (cls, scope) -> the instance of cls tied to that scope.
   _scoped_instances = {}

@@ -3,6 +3,6 @@
 
 jar_library(name='value',
   jars=[
-    jar(org='com.google.auto.value', name='auto-value', rev='1.0'),
+    jar(org='com.google.auto.value', name='auto-value', rev='1.1'),
   ],
 )

@@ -25,6 +25,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Evan Jones
 + Fedor Korotkov
 + Florian Leibert
++ Gabriel Gonzalez
 + Garrett Malmquist
 + Harley Cooper
 + Hwasung Lee
@@ -91,6 +92,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Stu Hood
 + Ted Dziuba
 + Tejal Desai
++ Tianshuo Deng
 + Tien Nguyen
 + Tina Huang
 + Todd Stumpf
@@ -98,3 +100,4 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tom Howland
 + Travis Crawford
 + Ugo Di Girolamo
++ Yi Cheng

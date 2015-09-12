@@ -22,7 +22,6 @@ from pants.base.build_file_parser import BuildFileParser
 #     so that callers do not have to reference those modules
 #
 # Note: 'spec' should not be a user visible term, substitute 'address' instead.
-
 class BuildFileAddressMapper(object):
   """Maps addresses in the pants virtual address space to corresponding BUILD file declarations.
   """
@@ -117,7 +116,8 @@ class BuildFileAddressMapper(object):
     """
     address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      build_file = self._build_file_type.from_cache(self.root_dir, address.spec_path, must_exist=False)
+      build_file = self._build_file_type.from_cache(self.root_dir, address.spec_path,
+                                                    must_exist=False)
       self._raise_incorrect_address_error(build_file, address.target_name, address_map)
     else:
       return address_map[address]

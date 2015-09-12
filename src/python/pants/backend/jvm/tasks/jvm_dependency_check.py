@@ -79,9 +79,9 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
     with self.invalidated(self.context.targets(),
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
-        actual_source_deps = self.context.products.get_data('actual_source_deps').get(vt.target)
-        if actual_source_deps is not None:
-          self.check(vt.target, actual_source_deps)
+        product_deps_by_src = self.context.products.get_data('product_deps_by_src').get(vt.target)
+        if product_deps_by_src is not None:
+          self.check(vt.target, product_deps_by_src)
 
   def check(self, src_tgt, actual_deps):
     """Check for missing deps.

@@ -29,7 +29,7 @@ class AntlrGenTest(NailgunTaskTestBase):
 
   @property
   def alias_groups(self):
-    return super(AntlrGenTest, self).alias_groups.merge(BuildFileAliases.create(
+    return super(AntlrGenTest, self).alias_groups.merge(BuildFileAliases(
       targets={
         'java_antlr_library': JavaAntlrLibrary,
       },
