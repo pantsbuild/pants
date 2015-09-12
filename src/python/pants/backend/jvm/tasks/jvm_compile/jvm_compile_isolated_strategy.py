@@ -125,6 +125,9 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
         target = vts.targets[0]
         cc = self.compile_context(target)
+
+        # If the vts isn't valid, then Pants will either extract artifacts from cache
+        # or compile fresh artifacts.
         safe_mkdir(cc.classes_dir, clean=not vts.valid)
         compile_classpaths.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
         if vts.valid:
