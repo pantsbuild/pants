@@ -370,7 +370,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
         raise TargetDefinitionException(target, 'no thrift files found')
 
   @property
-  def synthetic_target_type(self, a=None):
+  def synthetic_target_type(self):
     # language = kwargs['name'].split('-')[-1]
     # target_type = _TARGET_TYPE_FOR_LANG[language]
     # # target_type['address'] =  kwargs['address']
