@@ -10,7 +10,7 @@ target(
     ':anonymizer',
     ':java',
     ':jvm_compile',
-    ':scala',
+    ':zinc',
   ],
 )
 
@@ -148,8 +148,8 @@ python_library(
 )
 
 python_library(
-  name = 'scala',
-  sources = globs('scala/*.py'),
+  name = 'zinc',
+  sources = globs('zinc/*.py'),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
@@ -173,10 +173,10 @@ python_library(
 
 python_binary(
   name = 'anonymize_zinc_analysis',
-  source = 'scala/bin/anonymize_analysis.py',
+  source = 'zinc/bin/anonymize_analysis.py',
   dependencies = [
     ':anonymizer',
-    ':scala',
+    ':zinc',
     'src/python/pants/util:dirutil',
   ],
 )

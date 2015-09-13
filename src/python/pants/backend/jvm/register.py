@@ -39,7 +39,7 @@ from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import ZincCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
