@@ -67,51 +67,23 @@ python_library(
   name = 'jvm_compile',
   sources = ['jvm_compile.py'],
   dependencies = [
-    ':jvm_compile_global_strategy',
-    ':jvm_compile_isolated_strategy',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':compile_context',
+    ':execution_graph',
+    ':resource_mapping',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:target',
+    'src/python/pants/base:worker_pool',
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/base:fingerprint_strategy',
-  ],
-)
-
-python_library(
-  name = 'jvm_compile_global_strategy',
-  sources = ['jvm_compile_global_strategy.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':compile_context',
-    ':jvm_compile_strategy',
-    ':resource_mapping',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/tasks:classpath_util',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:target',
-    'src/python/pants/base:worker_pool',
-    'src/python/pants/option',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name = 'jvm_compile_isolated_strategy',
-  sources = ['jvm_compile_isolated_strategy.py'],
-  dependencies = [
-    ':compile_context',
-    ':execution_graph',
-    ':jvm_compile_strategy',
-    ':resource_mapping',
-    'src/python/pants/backend/jvm/tasks:classpath_util',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:target',
-    'src/python/pants/base:worker_pool',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
   ],
@@ -122,18 +94,6 @@ python_library(
   sources = ['execution_graph.py'],
   dependencies = [
     'src/python/pants/base:worker_pool',
-  ],
-)
-
-python_library(
-  name = 'jvm_compile_strategy',
-  sources = ['jvm_compile_strategy.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:contextutil',
   ],
 )
 

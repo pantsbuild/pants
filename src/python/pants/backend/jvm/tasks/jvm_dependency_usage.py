@@ -10,7 +10,6 @@ import os
 from collections import defaultdict, namedtuple
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import create_size_estimators
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.util.fileutil import create_size_estimators

@@ -18,6 +18,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.fileutil import atomic_copy, create_size_estimators
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):
