@@ -22,19 +22,19 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   </publications>
 
   <dependencies>
-    <dependency org="org.scala-lang" name="scala-library" rev="2.10.4">
-      <conf name="default" mapped="default"/>
-    </dependency>
-    <dependency org="com.typesafe.sbt" name="sbt-interface" rev="0.13.7" transitive="false">
-      <conf name="default" mapped="default"/>
-      <artifact name="sbt-interface" type="jar" m:classifier="javadoc"/>
-    </dependency>
     <dependency org="com.typesafe.sbt" name="compiler-interface" rev="0.13.7" transitive="false">
       <conf name="default" mapped="default"/>
       <artifact name="compiler-interface" type="jar" m:classifier="javadoc"/>
       <artifact name="compiler-interface" type="jar" m:classifier="sources"/>
     </dependency>
     <dependency org="com.typesafe.sbt" name="incremental-compiler" rev="0.13.7" transitive="false">
+      <conf name="default" mapped="default"/>
+    </dependency>
+    <dependency org="com.typesafe.sbt" name="sbt-interface" rev="0.13.7" transitive="false">
+      <conf name="default" mapped="default"/>
+      <artifact name="sbt-interface" type="jar" m:classifier="javadoc"/>
+    </dependency>
+    <dependency org="org.scala-lang" name="scala-library" rev="2.10.4">
       <conf name="default" mapped="default"/>
     </dependency>
   </dependencies>

@@ -86,12 +86,12 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
   @ensure_cached(expected_num_artifacts=2)
   def test_jvm_tool_changes_invalidate_targets(self, cache_args):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      # Ensure that only the second '//:checkstyle' will not invalidate anything.
-      for checkstyle_jar in ('//:checkstyle', 'testprojects/3rdparty/checkstyle', '//:checkstyle'):
+      # Ensure that only the second use of the default checkstyle will not invalidate anything.
+      for checkstyle_jar in (None, 'testprojects/3rdparty/checkstyle', None):
         args = [
             'compile.checkstyle',
             cache_args,
-            '--checkstyle=["{}"]'.format(checkstyle_jar),
+            '--checkstyle={}'.format(checkstyle_jar) if checkstyle_jar else '',
             'examples/src/java/org/pantsbuild/example/hello/simple'
           ]
         pants_run = self.run_pants_with_workdir(args, workdir)

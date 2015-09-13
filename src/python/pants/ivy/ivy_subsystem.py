@@ -9,6 +9,7 @@ import os
 
 from six.moves import urllib
 
+from pants.java.distribution.distribution import DistributionLocator
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -38,6 +39,10 @@ class IvySubsystem(Subsystem):
              help='Directory to store artifacts retrieved by Ivy.')
     register('--ivy-settings', advanced=True,
              help='Location of XML configuration file for Ivy settings.')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(IvySubsystem, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def http_proxy(self):
     """Set ivy to use an http proxy.

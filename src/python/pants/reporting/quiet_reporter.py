@@ -20,7 +20,7 @@ class QuietReporter(Reporter):
   Settings = namedtuple('Settings', Reporter.Settings._fields + ('color', ))
 
   def __init__(self, run_tracker, settings):
-    Reporter.__init__(self, run_tracker, settings._replace(log_level=Report.ERROR))
+    Reporter.__init__(self, run_tracker, settings)
 
   def open(self):
     """Implementation of Reporter callback."""
@@ -54,3 +54,7 @@ class QuietReporter(Reporter):
 
   def _emit(self, s):
     sys.stdout.write(s)
+
+  def level_for_workunit(self, workunit, default_level):
+    """Force the reporter to consider every workunit to be logging for level Report.ERROR"""
+    return Report.ERROR

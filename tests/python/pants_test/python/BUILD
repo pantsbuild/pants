@@ -21,7 +21,6 @@ target(
   name = 'integration',
   dependencies = [
     ':interpreter_selection_integration',
-    ':python_repl_integration',
     ':python_run_integration',
   ]
 )
@@ -69,14 +68,7 @@ python_tests(
   name = 'python_run_integration',
   sources = ['test_python_run_integration.py'],
   dependencies = [
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_tests(
-  name = 'python_repl_integration',
-  sources = ['test_python_repl_integration.py'],
-  dependencies = [
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
 )

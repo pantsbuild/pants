@@ -9,8 +9,10 @@ import ConfigParser
 import os
 import subprocess
 import unittest
-from collections import namedtuple
+from collections import Counter, defaultdict, namedtuple
 from operator import eq, ne
+
+from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
@@ -178,3 +180,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
+
+  def assert_contains_exact_files(self, directory, expected_files, ignore_links=True):
+    """Asserts that the only files which directory contains are expected_files.
+
+    :param str directory: Path to directory to search.
+    :param set expected_files: Set of filepaths relative to directory to search for.
+    :param bool ignore_links: Indicates to ignore any file links.
+    """
+    found = set()
+    for root, _, files in os.walk(directory):
+      for f in files:
+        p = os.path.join(root, f)
+        if ignore_links and os.path.islink(p):
+          continue
+        found.add(os.path.relpath(p, directory))
+
+    self.assertEqual(expected_files, found)
+
+  def normalize(self, s):
+    """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
+    return ''.join(strip_color(s).split())

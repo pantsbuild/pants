@@ -11,7 +11,7 @@ from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 
 
@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class BuildGraph(object):
-  """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
-  """
+  """A directed acyclic graph of Targets and dependencies. Not necessarily connected."""
 
   class DuplicateAddressError(AddressLookupError):
     """The same address appears multiple times in a dependency list"""
@@ -28,9 +27,8 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
-  def __init__(self, address_mapper, run_tracker=None):
+  def __init__(self, address_mapper):
     self._address_mapper = address_mapper
-    self.run_tracker = run_tracker
     self.reset()
 
   @property
@@ -49,8 +47,8 @@ class BuildGraph(object):
     return address in self._target_by_address
 
   def get_target_from_spec(self, spec, relative_to=''):
-    """Converts `spec` into a SyntheticAddress and returns the result of `get_target`"""
-    return self.get_target(SyntheticAddress.parse(spec, relative_to=relative_to))
+    """Converts `spec` into an address and returns the result of `get_target`"""
+    return self.get_target(Address.parse(spec, relative_to=relative_to))
 
   def get_target(self, address):
     """Returns the Target at `address` if it has been injected into the BuildGraph, otherwise None.
@@ -196,6 +194,7 @@ class BuildGraph(object):
       that would only be reachable through Targets that fail the predicate.
     """
     walked = set()
+
     def _walk_rec(address):
       if address not in walked:
         walked.add(address)
@@ -218,6 +217,7 @@ class BuildGraph(object):
     `walk_transitive_dependency_graph`.
     """
     walked = set()
+
     def _walk_rec(address):
       if address not in walked:
         walked.add(address)
@@ -388,22 +388,26 @@ class BuildGraph(object):
     :param Address address:
     """
     try:
-      target = addressable.get_target_type()(build_graph=self,
-                                             address=address,
-                                             **addressable.kwargs)
+      # TODO(John Sirois): Today - in practice, Addressable is unusable.  BuildGraph assumes
+      # addressables are in fact TargetAddressables with dependencies (see:
+      # `inject_address_closure` for example), ie: leaf nameable things with - by definition - no
+      # deps cannot actually be used.  Clean up BuildGraph to handle addressables as they are
+      # abstracted today which does not necessarily mean them having dependencies and thus forming
+      # graphs.  They may only be multiply-referred to leaf objects.
+      target = addressable.instantiate(build_graph=self, address=address)
       return target
     except Exception:
       traceback.print_exc()
       logger.exception('Failed to instantiate Target with type {target_type} with name "{name}"'
                        ' at address {address}'
-                       .format(target_type=addressable.get_target_type(),
-                               name=addressable.name,
+                       .format(target_type=addressable.addressed_type,
+                               name=addressable.addressed_name,
                                address=address))
       raise
 
   def resolve(self, spec):
     """Returns an iterator over the target(s) the given address points to."""
-    address = SyntheticAddress.parse(spec)
+    address = Address.parse(spec)
     # NB: This is an idempotent, short-circuiting call.
     self.inject_address_closure(address)
     return self.transitive_subgraph_of_addresses([address])
@@ -411,10 +415,12 @@ class BuildGraph(object):
 
 class CycleException(Exception):
   """Thrown when a circular dependency is detected."""
+
   def __init__(self, cycle):
     Exception.__init__(self, 'Cycle detected:\n\t{}'.format(
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
+
 
 def invert_dependencies(targets):
   """:return: the full graph of dependencies for `targets` and the list of roots."""
@@ -445,6 +451,7 @@ def invert_dependencies(targets):
     invert(target)
 
   return roots, inverted_deps
+
 
 def sort_targets(targets):
   """:return: the targets that `targets` depend on sorted from most dependent to least."""

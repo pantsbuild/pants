@@ -20,10 +20,12 @@ target(
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
+    ':mutex_task_mixin',
     ':noop',
     ':pathdeps',
     ':paths',
     ':reporting_server',
+    ':repl_task_mixin',
     ':roots',
     ':run_prep_command',
     ':scm_publish',
@@ -52,6 +54,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/goal',
+    'src/python/pants/help',
     'src/python/pants/option',
     ],
   )
@@ -126,6 +129,7 @@ python_library(
   dependencies = [
     ':common',
     ':console_task',
+    ':target_filter_task_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
@@ -145,12 +149,12 @@ python_library(
   name = 'filter',
   sources = ['filter.py'],
   dependencies = [
-    ':common',
     ':console_task',
-    'src/python/pants/base:address',
+    ':target_filter_task_mixin',
+    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/base:target',
+    'src/python/pants/base:exceptions',
     'src/python/pants/util:filtering',
   ],
 )
@@ -216,6 +220,15 @@ python_library(
 )
 
 python_library(
+  name = 'mutex_task_mixin',
+  sources = ['mutex_task_mixin.py'],
+  dependencies = [
+    ':task',
+    'src/python/pants/base:exceptions',
+  ]
+)
+
+python_library(
   name = 'noop',
   sources = ['noop.py'],
   dependencies = [
@@ -241,6 +254,16 @@ python_library(
 )
 
 python_library(
+  name = 'repl_task_mixin',
+  sources = ['repl_task_mixin.py'],
+  dependencies = [
+    ':mutex_task_mixin',
+    'src/python/pants/base:workunit',
+    'src/python/pants/console:stty_utils',
+  ]
+)
+
+python_library(
   name = 'reporting_server',
   sources = ['reporting_server.py'],
   dependencies = [
@@ -263,6 +286,7 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
     'src/python/pants/goal:goal',
+    'src/python/pants/help',
     'src/python/pants/option',
   ],
 )
@@ -308,6 +332,15 @@ python_library(
 )
 
 python_library(
+  name = 'target_filter_task_mixin',
+  sources = ['target_filter_task_mixin.py'],
+  dependencies = [
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
+  ]
+)
+
+python_library(
   name = 'targets_help',
   sources = ['targets_help.py'],
   resources = globs('templates/targets_help/*.mustache'),
@@ -334,6 +367,7 @@ python_library(
     'src/python/pants/ivy',
     'src/python/pants/java:executor',
     'src/python/pants/reporting',
+    'src/python/pants/subsystem',
     'src/python/pants/util:meta',
   ],
 )
@@ -345,7 +379,7 @@ python_library(
     ':console_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:lazy_source_mapper',
+    'src/python/pants/base:source_mapper',
     'src/python/pants/goal:workspace',
   ],
 )

@@ -35,3 +35,22 @@ class ScalastyleIntegrationTest(PantsRunIntegrationTest):
         # implying there was as a cache hit
         self.assertNotIn('abc_Scalastyle_compile_scalastyle will write to local artifact cache',
             pants_run.stdout_data)
+
+  def test_scalastyle_without_quiet(self):
+    scalastyle_args = [
+      'compile.scalastyle',
+      '--config=examples/src/scala/org/pantsbuild/example/styleissue/style.xml',
+      'examples/src/scala/org/pantsbuild/example/styleissue',
+      ]
+    pants_run = self.run_pants(scalastyle_args)
+    self.assertIn('Found 2 errors', pants_run.stdout_data)
+
+  def test_scalastyle_with_quiet(self):
+    scalastyle_args = [
+      'compile.scalastyle',
+      '--config=examples/src/scala/org/pantsbuild/example/styleissue/style.xml',
+      '--quiet',
+      'examples/src/scala/org/pantsbuild/example/styleissue',
+      ]
+    pants_run = self.run_pants(scalastyle_args)
+    self.assertNotIn('Found 2 errors', pants_run.stdout_data)

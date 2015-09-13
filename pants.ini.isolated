@@ -10,10 +10,9 @@ use_jmake: False
 
 
 [compile.zinc]
+name_hashing: True
 strategy: isolated
-capture_log: True
 worker_count: 4
-zinc: [':zinc']
 jvm_options: [
     '-Xmx4g', '-XX:MaxPermSize=512m', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4',
     # bigger cache size for our big projects (default is just 5)
@@ -21,8 +20,6 @@ jvm_options: [
   ]
 
 args: [
-    '-C-source', '-C1.7',
-    '-C-target', '-C1.7',
     '-S-encoding', '-SUTF-8',
     '-S-g:vars',
   ]

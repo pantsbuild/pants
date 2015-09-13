@@ -26,7 +26,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.target import Target
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -120,7 +120,7 @@ class PytestRun(PythonTask):
     if test_targets:
       self.context.release_lock()
       with self.context.new_workunit(name='run',
-                                     labels=[WorkUnit.TOOL, WorkUnit.TEST]) as workunit:
+                                     labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         # pytest uses py.io.terminalwriter for output. That class detects the terminal
         # width and attempts to use all of it. However we capture and indent the console
         # output, leading to weird-looking line wraps. So we trick the detection code
@@ -405,19 +405,19 @@ class PytestRun(PythonTask):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
 
-    with self.cached_chroot(interpreter=interpreter,
-                            pex_info=pex_info,
-                            targets=targets,
-                            platforms=('current',),
-                            extra_requirements=self._TESTING_TARGETS) as chroot:
-      pex = chroot.pex()
-      with self._maybe_shard() as shard_args:
-        with self._maybe_emit_junit_xml(targets) as junit_args:
-          with self._maybe_emit_coverage_data(targets,
-                                              chroot.path(),
-                                              pex,
-                                              workunit) as coverage_args:
-            yield pex, shard_args + junit_args + coverage_args
+    chroot = self.cached_chroot(interpreter=interpreter,
+                                pex_info=pex_info,
+                                targets=targets,
+                                platforms=('current',),
+                                extra_requirements=self._TESTING_TARGETS)
+    pex = chroot.pex()
+    with self._maybe_shard() as shard_args:
+      with self._maybe_emit_junit_xml(targets) as junit_args:
+        with self._maybe_emit_coverage_data(targets,
+                                            chroot.path(),
+                                            pex,
+                                            workunit) as coverage_args:
+          yield pex, shard_args + junit_args + coverage_args
 
   def _do_run_tests_with_args(self, pex, workunit, args):
     try:
@@ -440,9 +440,10 @@ class PytestRun(PythonTask):
       self.context.log.info(traceback.format_exc())
       return PythonTestResult.exception()
 
-  # Pattern for lines such as:
+  # Pattern for lines such as ones below.  The second one is from a test inside a class.
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
-  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+)::(.+)')
+  # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
+  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+?)::(.+)')
 
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):

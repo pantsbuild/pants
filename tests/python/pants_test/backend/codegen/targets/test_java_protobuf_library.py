@@ -18,9 +18,9 @@ class JavaProtobufLibraryTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_protobuf_library': JavaProtobufLibrary,
-                                            'jar_library': JarLibrary},
-                                   objects={'jar': JarDependency})
+    return BuildFileAliases(targets={'java_protobuf_library': JavaProtobufLibrary,
+                                     'jar_library': JarLibrary},
+                            objects={'jar': JarDependency})
 
   def test_empty(self):
     self.add_to_build_file('BUILD', dedent('''

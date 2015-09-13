@@ -8,8 +8,8 @@ import java.io.File
 import java.net.URLClassLoader
 import sbt.compiler.javac
 import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, Logger, LoggerReporter, ScalaInstance }
-import sbt.compiler.{ AggressiveCompile, AnalyzingCompiler, CompilerCache, CompileOutput, IC }
-import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore }
+import sbt.compiler.{ AnalyzingCompiler, CompilerCache, CompileOutput, MixedAnalyzingCompiler, IC }
+import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore, ZincPrivateAnalysis }
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 
@@ -89,8 +89,10 @@ object Compiler {
 
   /**
    * Create an analysis store backed by analysisCache.
+   *
+   * TODO: for all but the "output" analysis, the synchronization is overkill; everything upstream is immutable
    */
-  def analysisStore(cacheFile: File): AnalysisStore = {
+  def cachedAnalysisStore(cacheFile: File): AnalysisStore = {
     val fileStore = AnalysisStore.cached(FileBasedStore(cacheFile))
 
     val fprintStore = new AnalysisStore {
@@ -113,21 +115,14 @@ object Compiler {
   /**
    * Analysis for the given file if it is already cached.
    */
-  def analysisOption(cacheFile: File): Option[Analysis] =
-    analysisStore(cacheFile).get map (_._1)
-
-  /**
-   * Analysis for the given file, or Analysis.Empty if it is not in the cache.
-   */
-  def analysis(cacheFile: File): Analysis =
-    analysisOption(cacheFile) getOrElse Analysis.Empty
+  def analysisOptionFor(cacheFile: File): Option[Analysis] =
+    cachedAnalysisStore(cacheFile).get map (_._1)
 
   /**
    * Check whether an analysis is empty.
    */
-  def analysisIsEmpty(cacheFile: File): Boolean = {
-    analysis(cacheFile) eq Analysis.Empty
-  }
+  def analysisIsEmpty(cacheFile: File): Boolean =
+    analysisOptionFor(cacheFile).isEmpty
 
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.
@@ -174,48 +169,49 @@ object Compiler {
 class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
 
   /**
-   * Run a compile. The resulting analysis is also cached in memory.
-   *  Note:  This variant automatically contructs an error-reporter.
+   * Run a compile. The resulting analysis is pesisted to `inputs.cacheFile`.
    */
-  def compile(inputs: Inputs)(log: Logger): Analysis = compile(inputs, None)(log)
-
-  /**
-   * Run a compile. The resulting analysis is also cached in memory.
-   *
-   *  Note:  This variant automatically contructs an error-reporter.
-   */
-  def compile(inputs: Inputs, cwd: Option[File])(log: Logger): Analysis = {
-    val maxErrors     = 100
-    compile(inputs, cwd, new LoggerReporter(maxErrors, log, identity))(log)
-  }
-
-  /**
-   * Run a compile. The resulting analysis is also cached in memory.
-   *
-   *  Note: This variant does not report progress updates
-   */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter)(log: Logger): Analysis = {
-    val progress = Some(new SimpleCompileProgress(setup.consoleLog.logPhases, setup.consoleLog.printProgress, setup.consoleLog.heartbeatSecs)(log))
-    compile(inputs, cwd, reporter, progress)(log)
-  }
-
-  /**
-   * Run a compile. The resulting analysis is also cached in memory.
-   */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: Option[xsbti.compile.CompileProgress])(log: Logger): Analysis = {
+  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
     import inputs._
-    if (forceClean && Compiler.analysisIsEmpty(cacheFile)) Util.cleanAllClasses(classesDirectory)
-    val getAnalysis: File => Option[Analysis] = analysisMap.get
-    val aggressive    = new AggressiveCompile(cacheFile)
-    val cp            = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath)
-    val compileOutput = CompileOutput(classesDirectory)
-    val globalsCache  = Compiler.residentCache
-    val skip          = false
-    val incOpts       = incOptions.options
-    val compileSetup  = new CompileSetup(compileOutput, new CompileOptions(scalacOptions, javacOptions), scalac.scalaInstance.actualVersion, compileOrder, incOpts.nameHashing)
-    val analysisStore = Compiler.analysisStore(cacheFile)
+    if (forceClean && Compiler.analysisIsEmpty(cacheFile)) {
+      Util.cleanAllClasses(classesDirectory)
+    }
 
-    aggressive.compile1(sources, cp, compileSetup, progress, analysisStore, getAnalysis, definesClass, scalac, javac, reporter, skip, globalsCache, incOpts)(log)
+    // load the existing analysis
+    // TODO: differentiate output analysis from input analysis
+    val targetAnalysisStore = Compiler.cachedAnalysisStore(cacheFile)
+    val (previousAnalysis, previousSetup) =
+      targetAnalysisStore.get().map {
+        case (a, s) => (a, Some(s))
+      } getOrElse {
+        (ZincPrivateAnalysis.empty(incOptions.nameHashing), None)
+      }
+
+    val result =
+      IC.incrementalCompile(
+        scalac,
+        javac,
+        sources,
+        classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath),
+        output = CompileOutput(classesDirectory),
+        cache = Compiler.residentCache,
+        Some(progress),
+        options = scalacOptions,
+        javacOptions,
+        previousAnalysis,
+        previousSetup,
+        analysisMap = analysisMap.get,
+        definesClass,
+        reporter,
+        compileOrder,
+        skip = false,
+        incOptions.options
+      )(log)
+
+    // if the compile resulted in modified analysis, persist it
+    if (result.hasModified) {
+      targetAnalysisStore.set(result.analysis, result.setup)
+    }
   }
 
   /**

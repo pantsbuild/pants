@@ -216,6 +216,7 @@ class JarTask(NailgunTask):
   All subclasses will share the same underlying nailgunned jar tool and thus benefit from fast
   invocations.
   """
+
   @classmethod
   def global_subsystems(cls):
     return super(JarTask, cls).global_subsystems() + (JarTool, )
@@ -241,7 +242,6 @@ class JarTask(NailgunTask):
   def __init__(self, *args, **kwargs):
     super(JarTask, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
-
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
 

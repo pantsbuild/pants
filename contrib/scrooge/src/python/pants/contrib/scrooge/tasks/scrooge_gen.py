@@ -16,7 +16,7 @@ from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -31,7 +31,7 @@ from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 _CONFIG_SECTION = 'scrooge-gen'
 
-_TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary)
+_TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary, android=JavaLibrary)
 
 
 class ScroogeGen(NailgunTask):
@@ -60,7 +60,7 @@ class ScroogeGen(NailgunTask):
   def register_options(cls, register):
     super(ScroogeGen, cls).register_options(register)
     register('--verbose', default=False, action='store_true', help='Emit verbose output.')
-    register('--strict', default=False, action='store_true', help='Enable strict compilation.')
+    register('--strict', fingerprint=True, default=False, action='store_true', help='Enable strict compilation.')
     register('--jvm-options', default=[], advanced=True, type=list_option,
              help='Use these jvm options when running Scrooge.')
     register('--service-deps', default={}, advanced=True, type=dict_option,
@@ -73,7 +73,7 @@ class ScroogeGen(NailgunTask):
 
   @classmethod
   def global_subsystems(cls):
-    return (ThriftDefaults,)
+    return super(ScroogeGen, cls).global_subsystems() + (ThriftDefaults,)
 
   @classmethod
   def product_types(cls):
@@ -234,7 +234,7 @@ class ScroogeGen(NailgunTask):
 
     def create_target(files, deps, target_type):
       spec = '{spec_path}:{name}'.format(spec_path=outdir, name=gentarget.id)
-      address = SyntheticAddress.parse(spec=spec)
+      address = Address.parse(spec=spec)
       return self.context.add_new_target(address,
                                          target_type,
                                          sources=files,
@@ -319,7 +319,7 @@ class ScroogeGen(NailgunTask):
       return False
 
     language = self._thrift_defaults.language(target)
-    if language not in ('scala', 'java'):
+    if language not in ('scala', 'java', 'android'):
       raise TaskError('Scrooge can not generate {0}'.format(language))
     return True
 

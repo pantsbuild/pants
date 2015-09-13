@@ -8,15 +8,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 
 from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.backend.core.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
 from pants.util.filtering import create_filters, wrap_filters
 
 
-class Filter(ConsoleTask):
+class Filter(TargetFilterTaskMixin, ConsoleTask):
   """Filter the input targets based on various criteria.
 
   Each of the filtering options below is a comma-separated list of filtering criteria, with an
@@ -27,6 +27,7 @@ class Filter(ConsoleTask):
   Each of the filtering options may be specified multiple times, with an implied logical AND
   between them.
   """
+
   @classmethod
   def register_options(cls, register):
     super(Filter, cls).register_options(register)
@@ -69,22 +70,8 @@ class Filter(ConsoleTask):
     self._filters.extend(create_filters(self.get_options().target, filter_for_address))
 
     def filter_for_type(name):
-      # FIXME(pl): This should be a standard function provided by the plugin/BuildFileParser
-      # machinery
-      try:
-        # Try to do a fully qualified import 1st for filtering on custom types.
-        from_list, module, type_name = name.rsplit('.', 2)
-        module = __import__('{}.{}'.format(from_list, module), fromlist=[from_list])
-        target_type = getattr(module, type_name)
-      except (ImportError, ValueError):
-        # Fall back on pants provided target types.
-        registered_aliases = self.context.build_file_parser.registered_aliases()
-        if name not in registered_aliases.targets:
-          raise TaskError('Invalid type name: {}'.format(name))
-        target_type = registered_aliases.targets[name]
-      if not issubclass(target_type, Target):
-        raise TaskError('Not a Target type: {}'.format(name))
-      return lambda target: isinstance(target, target_type)
+      target_types = self.target_types_for_alias(name)
+      return lambda target: isinstance(target, tuple(target_types))
     self._filters.extend(create_filters(self.get_options().type, filter_for_type))
 
     def filter_for_ancestor(spec):

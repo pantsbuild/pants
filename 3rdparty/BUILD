@@ -80,7 +80,7 @@ jar_library(name='protobuf-test-import',
 jar_library(name='scrooge-core',
             jars = [
               # used by scrooge-generator in BUILD.tools:scrooge-gen
-              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.17.0'),
+              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.20.0'),
             ])
 
 jar_library(name='shapeless',
@@ -121,6 +121,11 @@ jar_library(name='easymock',
             jars=[
               jar('org.easymock', 'easymock', '3.3.1')
             ])
+
+jar_library(name='gson',
+	    jars = [
+	      jar(org='com.google.code.gson', name='gson', rev='2.3.1')
+	    ])
 
 jar_library(name='guava-testlib',
             jars=[

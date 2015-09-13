@@ -53,7 +53,7 @@ class DummyTarget(Target):
 
   @classmethod
   def subsystems(cls):
-    return super(DummyTarget, cls).subsystems() + (DummySubsystem1, )
+    return (DummySubsystem1,)
 
 
 class DummyObject1(object):
@@ -65,7 +65,7 @@ class DummyObject2(object):
 
   @classmethod
   def subsystems(cls):
-    return (DummySubsystem2, )
+    return (DummySubsystem2,)
 
 
 class DummyTask(Task):
@@ -85,7 +85,8 @@ class LoaderTest(unittest.TestCase):
     Goal.clear()
 
   @contextmanager
-  def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None, module_name='register'):
+  def create_register(self, build_file_aliases=None, register_goals=None, global_subsystems=None,
+                      module_name='register'):
 
     package_name = b'__test_package_{0}'.format(uuid.uuid4().hex)
     self.assertFalse(package_name in sys.modules)
@@ -112,7 +113,8 @@ class LoaderTest(unittest.TestCase):
 
   def assert_empty_aliases(self):
     registered_aliases = self.build_configuration.registered_aliases()
-    self.assertEqual(0, len(registered_aliases.targets))
+    self.assertEqual(0, len(registered_aliases.target_types))
+    self.assertEqual(0, len(registered_aliases.target_macro_factories))
     self.assertEqual(0, len(registered_aliases.objects))
     self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
     self.assertEqual(self.build_configuration.subsystems(), set())
@@ -123,17 +125,16 @@ class LoaderTest(unittest.TestCase):
       self.assert_empty_aliases()
 
   def test_load_valid_partial_aliases(self):
-    aliases = BuildFileAliases.create(targets={'bob': DummyTarget},
-                                      objects={'obj1': DummyObject1,
-                                               'obj2': DummyObject2})
+    aliases = BuildFileAliases(targets={'bob': DummyTarget},
+                               objects={'obj1': DummyObject1,
+                                        'obj2': DummyObject2})
     with self.create_register(build_file_aliases=lambda: aliases) as backend_package:
       load_backend(self.build_configuration, backend_package)
       registered_aliases = self.build_configuration.registered_aliases()
-      self.assertEqual(DummyTarget, registered_aliases.targets['bob'])
+      self.assertEqual(DummyTarget, registered_aliases.target_types['bob'])
       self.assertEqual(DummyObject1, registered_aliases.objects['obj1'])
       self.assertEqual(DummyObject2, registered_aliases.objects['obj2'])
-      self.assertEqual(self.build_configuration.subsystems(),
-                       set([DummySubsystem1, DummySubsystem2]))
+      self.assertEqual(self.build_configuration.subsystems(), {DummySubsystem1, DummySubsystem2})
 
   def test_load_valid_partial_goals(self):
     def register_goals():
@@ -155,7 +156,7 @@ class LoaderTest(unittest.TestCase):
 
   def test_load_invalid_entrypoint(self):
     def build_file_aliases(bad_arg):
-      return BuildFileAliases.create()
+      return BuildFileAliases()
 
     with self.create_register(build_file_aliases=build_file_aliases) as backend_package:
       with self.assertRaises(BuildConfigurationError):
@@ -181,8 +182,8 @@ class LoaderTest(unittest.TestCase):
     their name (foo/bar/baz in fake module) is added as the requested entry point to the mocked
     metadata added to the returned dist.
 
-    :param str name: project_name for distribution (see pkg_resources)
-    :param str version: version for distribution (see pkg_resources)
+    :param string name: project_name for distribution (see pkg_resources)
+    :param string version: version for distribution (see pkg_resources)
     :param callable reg: Optional callable for goal registration entry point
     :param callable alias: Optional callable for build_file_aliases entry point
     :param callable after: Optional callable for load_after list entry point
@@ -218,7 +219,7 @@ class LoaderTest(unittest.TestCase):
     return Distribution(project_name=name, version=version, metadata=MockMetadata(metadata))
 
   def load_plugins(self, plugins):
-    load_plugins(self.build_configuration, plugins, load_from=self.working_set)
+    load_plugins(self.build_configuration, plugins, self.working_set)
 
   def test_plugin_load_and_order(self):
     d1 = self.get_mock_plugin('demo1', '0.0.1', after=lambda: ['demo2'])
@@ -258,9 +259,9 @@ class LoaderTest(unittest.TestCase):
 
   def test_plugin_installs_alias(self):
     def reg_alias():
-      return BuildFileAliases.create(targets={'pluginalias': DummyTarget},
-                                     objects={'FROMPLUGIN1': DummyObject1,
-                                              'FROMPLUGIN2': DummyObject2})
+      return BuildFileAliases(targets={'pluginalias': DummyTarget},
+                              objects={'FROMPLUGIN1': DummyObject1,
+                                       'FROMPLUGIN2': DummyObject2})
     self.working_set.add(self.get_mock_plugin('aliasdemo', '0.0.1', alias=reg_alias))
 
     # Start with no aliases.
@@ -271,11 +272,10 @@ class LoaderTest(unittest.TestCase):
 
     # Aliases now exist.
     registered_aliases = self.build_configuration.registered_aliases()
-    self.assertEqual(DummyTarget, registered_aliases.targets['pluginalias'])
+    self.assertEqual(DummyTarget, registered_aliases.target_types['pluginalias'])
     self.assertEqual(DummyObject1, registered_aliases.objects['FROMPLUGIN1'])
     self.assertEqual(DummyObject2, registered_aliases.objects['FROMPLUGIN2'])
-    self.assertEqual(self.build_configuration.subsystems(),
-                     {DummySubsystem1, DummySubsystem2})
+    self.assertEqual(self.build_configuration.subsystems(), {DummySubsystem1, DummySubsystem2})
 
   def test_subsystems(self):
     def global_subsystems():

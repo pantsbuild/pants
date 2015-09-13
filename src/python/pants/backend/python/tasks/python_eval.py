@@ -13,12 +13,13 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 
 
 class PythonEval(PythonTask):
   class Error(TaskError):
     """A richer failure exception type useful for tests."""
+
     def __init__(self, *args, **kwargs):
       compiled = kwargs.pop('compiled')
       failed = kwargs.pop('failed')
@@ -49,7 +50,7 @@ class PythonEval(PythonTask):
       return compiled  # Collected and returned for tests
 
   def _compile_targets(self, invalid_vts):
-    with self.context.new_workunit(name='eval-targets', labels=[WorkUnit.MULTITOOL]):
+    with self.context.new_workunit(name='eval-targets', labels=[WorkUnitLabel.MULTITOOL]):
       compiled = []
       failed = []
       for vt in invalid_vts:
@@ -133,15 +134,18 @@ class PythonEval(PythonTask):
                             chroot_parent=self.chroot_cache_dir, modules=modules)
       executable_file_content = generator.render()
 
-      with self.cached_chroot(interpreter=interpreter, pex_info=pexinfo,
-                              targets=[target], platforms=platforms,
-                              executable_file_content=executable_file_content) as chroot:
-        pex = chroot.pex()
-        with self.context.new_workunit(name='eval',
-                                       labels=[WorkUnit.COMPILER, WorkUnit.RUN, WorkUnit.TOOL],
-                                       cmd=' '.join(pex.cmdline())) as workunit:
-          returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-          workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
-          if returncode != 0:
-            self.context.log.error('Failed to eval {}'.format(target.address.spec))
-          return returncode
+      chroot = self.cached_chroot(interpreter=interpreter,
+                                  pex_info=pexinfo,
+                                  targets=[target],
+                                  platforms=platforms,
+                                  executable_file_content=executable_file_content)
+      pex = chroot.pex()
+      with self.context.new_workunit(name='eval',
+                                     labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.RUN,
+                                             WorkUnitLabel.TOOL],
+                                     cmd=' '.join(pex.cmdline())) as workunit:
+        returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+        workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
+        if returncode != 0:
+          self.context.log.error('Failed to eval {}'.format(target.address.spec))
+        return returncode

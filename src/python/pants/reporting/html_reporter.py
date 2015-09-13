@@ -16,7 +16,7 @@ from six.moves import range
 
 from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.reporting.linkify import linkify
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
@@ -75,10 +75,10 @@ class HtmlReporter(Reporter):
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
     # We use these properties of the workunit to decide how to render information about it.
-    is_bootstrap = workunit.has_label(WorkUnit.BOOTSTRAP)
-    is_tool = workunit.has_label(WorkUnit.TOOL)
-    is_multitool = workunit.has_label(WorkUnit.MULTITOOL)
-    is_test = workunit.has_label(WorkUnit.TEST)
+    is_bootstrap = workunit.has_label(WorkUnitLabel.BOOTSTRAP)
+    is_tool = workunit.has_label(WorkUnitLabel.TOOL)
+    is_multitool = workunit.has_label(WorkUnitLabel.MULTITOOL)
+    is_test = workunit.has_label(WorkUnitLabel.TEST)
 
     # Get useful properties from the workunit.
     workunit_dict = workunit.to_dict()
@@ -133,7 +133,7 @@ class HtmlReporter(Reporter):
             'aborted': workunit.outcome() == WorkUnit.ABORTED}
 
     s = ''
-    if workunit.has_label(WorkUnit.TOOL):
+    if workunit.has_label(WorkUnitLabel.TOOL):
       s += self._renderer.render_name('tool_invocation_end', args)
     s += self._renderer.render_name('workunit_end', args)
     self._emit(s)

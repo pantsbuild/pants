@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import shlex
 import unittest
 
-from pants.option.arg_splitter import ArgSplitter
+from pants.option.arg_splitter import ArgSplitter, NoGoalHelp, OptionsHelp, UnknownGoalHelp
 from pants.option.scope import ScopeInfo
 
 
@@ -43,10 +43,11 @@ class ArgSplitterTest(unittest.TestCase):
     self.assertEquals(expected_passthru_owner, passthru_owner)
     self.assertEquals(expected_is_help, splitter.help_request is not None)
     self.assertEquals(expected_help_advanced,
-                      splitter.help_request is not None and splitter.help_request.advanced)
+                      (isinstance(splitter.help_request, OptionsHelp) and
+                       splitter.help_request.advanced))
     self.assertEquals(expected_help_all,
-                      splitter.help_request is not None and splitter.help_request.all_scopes)
-    self.assertFalse(splitter.help_request is not None and splitter.help_request.version)
+                      (isinstance(splitter.help_request, OptionsHelp) and
+                       splitter.help_request.all_scopes))
 
   def _split_help(self, args_str, expected_goals, expected_scope_to_flags, expected_target_specs,
                   expected_help_advanced=False, expected_help_all=False):
@@ -56,11 +57,16 @@ class ArgSplitterTest(unittest.TestCase):
                 expected_help_advanced=expected_help_advanced,
                 expected_help_all=expected_help_all)
 
-  def _split_version(self, args_str):
+  def _split_unknown_goal(self, args_str, unknown_goals):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
-    args = shlex.split(args_str)
-    splitter.split_args(args)
-    self.assertTrue(splitter.help_request is not None and splitter.help_request.version)
+    splitter.split_args(shlex.split(args_str))
+    self.assertTrue(isinstance(splitter.help_request, UnknownGoalHelp))
+    self.assertSetEqual(set(unknown_goals), set(splitter.help_request.unknown_goals))
+
+  def _split_no_goal(self, args_str):
+    splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+    splitter.split_args(shlex.split(args_str))
+    self.assertTrue(isinstance(splitter.help_request, NoGoalHelp))
 
   def test_basic_arg_splitting(self):
     # Various flag combos.
@@ -96,25 +102,26 @@ class ArgSplitterTest(unittest.TestCase):
     self._split('./pants test //test', ['test'], {'': [], 'test': []}, ['//test'])
 
   def test_descoping_qualified_flags(self):
-    self._split('./pants compile test --compile-java-bar --no-test-junit-baz foo',
+    self._split('./pants compile test --compile-java-bar --no-test-junit-baz foo/bar',
                 ['compile', 'test'],
                 {'': [], 'compile': [], 'compile.java': ['--bar'], 'test': [],
-                 'test.junit': ['--no-baz']}, ['foo'])
+                 'test.junit': ['--no-baz']}, ['foo/bar'])
 
     # Qualified flags don't count as explicit goals.
-    self._split('./pants compile --test-junit-bar foo',
+    self._split('./pants compile --test-junit-bar foo/bar',
                 ['compile'],
-                {'': [], 'compile': [], 'test.junit': ['--bar']}, ['foo'])
+                {'': [], 'compile': [], 'test.junit': ['--bar']}, ['foo/bar'])
 
   def test_passthru_args(self):
-    self._split('./pants test foo -- -t arg',
+    self._split('./pants test foo/bar -- -t arg',
                 ['test'],
                 {'': [], 'test': []},
-                ['foo'],
+                ['foo/bar'],
                 expected_passthru=['-t', 'arg'],
                 expected_passthru_owner='test')
     self._split('./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii '
-                '--compile-java-long-flag src/java/org/pantsbuild/foo src/java/org/pantsbuild/bar:baz '
+                '--compile-java-long-flag src/java/org/pantsbuild/foo '
+                'src/java/org/pantsbuild/bar:baz '
                 '-- passthru1 passthru2',
                 ['compile', 'test'],
                 {
@@ -129,25 +136,25 @@ class ArgSplitterTest(unittest.TestCase):
 
   def test_subsystem_flags(self):
     # Global subsystem flag in global scope.
-    self._split('./pants --jvm-options=-Dbar=baz test foo',
+    self._split('./pants --jvm-options=-Dbar=baz test foo:bar',
                 ['test'],
-                {'': [], 'jvm': ['--options=-Dbar=baz'], 'test': []}, ['foo'])
+                {'': [], 'jvm': ['--options=-Dbar=baz'], 'test': []}, ['foo:bar'])
     # Qualified task subsystem flag in global scope.
-    self._split('./pants --jvm-test-junit-options=-Dbar=baz test foo',
+    self._split('./pants --jvm-test-junit-options=-Dbar=baz test foo:bar',
                 ['test'],
-                {'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test': []}, ['foo'])
+                {'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test': []}, ['foo:bar'])
     # Unqualified task subsystem flag in task scope.
     # Note that this exposes a small problem: You can't set an option on the cmd-line if that
     # option's name begins with any subsystem scope. For example, if test.junit has some option
     # named --jvm-foo, then it cannot be set on the cmd-line, because the ArgSplitter will assume
     # it's an option --foo on the jvm subsystem.
-    self._split('./pants test.junit --jvm-options=-Dbar=baz foo',
+    self._split('./pants test.junit --jvm-options=-Dbar=baz foo:bar',
                 ['test'],
-                {'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test.junit': []}, ['foo'])
+                {'': [], 'jvm.test.junit': ['--options=-Dbar=baz'], 'test.junit': []}, ['foo:bar'])
     # Global-only flag in task scope.
-    self._split('./pants test.junit --reporting-template-dir=path foo',
+    self._split('./pants test.junit --reporting-template-dir=path foo:bar',
                 ['test'],
-                {'': [], 'reporting': ['--template-dir=path'], 'test.junit': []}, ['foo'])
+                {'': [], 'reporting': ['--template-dir=path'], 'test.junit': []}, ['foo:bar'])
 
   def test_help_detection(self):
     self._split_help('./pants', [], {'': []}, [])
@@ -188,12 +195,11 @@ class ArgSplitterTest(unittest.TestCase):
     self._split_help('./pants compile help-all test --help', ['compile', 'test'],
                      {'': [], 'compile': [], 'test': []}, [], False, True)
 
-  def test_version_request_detection(self):
-    self._split_version('./pants -V')
-    self._split_version('./pants --version')
+  def test_unknown_goal_detection(self):
+    self._split_unknown_goal('./pants foo', ['foo'])
+    self._split_unknown_goal('./pants compile foo', ['foo'])
+    self._split_unknown_goal('./pants foo bar baz:qux', ['foo', 'bar'])
+    self._split_unknown_goal('./pants foo compile bar baz:qux', ['foo', 'bar'])
 
-    # --version in a non-global scope is OK, and not a version request.
-    self._split('./pants compile --version src/java/org/pantsbuild/foo',
-                ['compile'],
-                {'': [], 'compile': ['--version']},
-                ['src/java/org/pantsbuild/foo'])
+  def test_no_goal_detection(self):
+    self._split_no_goal('./pants foo/bar:baz')

@@ -65,6 +65,12 @@ class TestProcessManager(unittest.TestCase):
   def setUp(self):
     self.pm = ProcessManager('test')
 
+  def test_callbacks(self):
+    # For coverage.
+    self.pm.pre_fork()
+    self.pm.post_fork_child()
+    self.pm.post_fork_parent()
+
   def test_process_properties(self):
     with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(name='name',
@@ -114,6 +120,10 @@ class TestProcessManager(unittest.TestCase):
   def test_as_process_none(self):
     self.assertEqual(self.pm._as_process(), None)
 
+  def test_deadline_until(self):
+    with self.assertRaises(self.pm.Timeout):
+      self.pm._deadline_until(lambda: False, timeout=.1)
+
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
@@ -156,11 +166,11 @@ class TestProcessManager(unittest.TestCase):
 
   @mock.patch('pants.pantsd.process_manager.safe_delete')
   def test_purge_metadata(self, *args):
-    with mock.patch.object(ProcessManager, 'is_alive') as mock_alive:
-      with mock.patch('os.path.exists') as mock_exists:
-        mock_alive.return_value = False
-        mock_exists.return_value = True
-        self.pm._purge_metadata()
+    with mock.patch.object(ProcessManager, 'is_alive') as mock_alive, \
+         mock.patch('os.path.exists') as mock_exists:
+      mock_alive.return_value = False
+      mock_exists.return_value = True
+      self.pm._purge_metadata()
 
   def test_get_metadata_dir(self):
     self.assertEqual(self.pm.get_metadata_dir(),
@@ -175,18 +185,18 @@ class TestProcessManager(unittest.TestCase):
                      os.path.join(self.pm._buildroot, '.pids', self.pm._name, 'socket'))
 
   def test_write_pid(self):
-    with mock.patch.object(ProcessManager, '_write_file') as patched_write:
-      with mock.patch.object(ProcessManager, '_maybe_init_metadata_dir') as patched_init:
-        self.pm.write_pid(3333)
-        patched_write.assert_called_once_with(self.pm.get_pid_path(), '3333')
-        patched_init.assert_called_once_with()
+    with mock.patch.object(ProcessManager, '_write_file') as patched_write, \
+         mock.patch.object(ProcessManager, '_maybe_init_metadata_dir') as patched_init:
+      self.pm.write_pid(3333)
+      patched_write.assert_called_once_with(self.pm.get_pid_path(), '3333')
+      patched_init.assert_called_once_with()
 
   def test_write_socket(self):
-    with mock.patch.object(ProcessManager, '_write_file') as patched_write:
-      with mock.patch.object(ProcessManager, '_maybe_init_metadata_dir') as patched_init:
-        self.pm.write_socket(3333)
-        patched_write.assert_called_once_with(self.pm.get_socket_path(), '3333')
-        patched_init.assert_called_once_with()
+    with mock.patch.object(ProcessManager, '_write_file') as patched_write, \
+         mock.patch.object(ProcessManager, '_maybe_init_metadata_dir') as patched_init:
+      self.pm.write_socket(3333)
+      patched_write.assert_called_once_with(self.pm.get_socket_path(), '3333')
+      patched_init.assert_called_once_with()
 
   def test_get_pid(self):
     with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_pm:
@@ -241,33 +251,53 @@ class TestProcessManager(unittest.TestCase):
       self.pm._kill(0)
       self.assertFalse(mock_kill.called, 'If we have no pid, kills should noop gracefully.')
 
-  def test_terminate(self):
-    with mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive:
-      with mock.patch('os.kill', **PATCH_OPTS):
-        mock_alive.return_value = True
-        with self.assertRaises(self.pm.NonResponsiveProcess):
-          self.pm.terminate(kill_wait=.1, purge=False)
+  @contextmanager
+  def setup_terminate(self, assert_purged=True):
+    with mock.patch.object(ProcessManager, '_kill', **PATCH_OPTS) as mock_kill, \
+         mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive, \
+         mock.patch.object(ProcessManager, '_purge_metadata', **PATCH_OPTS) as mock_purge:
+      yield mock_kill, mock_alive
+      if assert_purged:
+        mock_purge.assert_called_once_with(self.pm)
 
-  def test_run_subprocess(self):
+  def test_terminate_quick_death(self):
+    with self.setup_terminate() as (mock_kill, mock_alive):
+      mock_kill.side_effect = OSError('oops')
+      mock_alive.side_effect = [True, False]
+      self.pm.terminate(kill_wait=.1)
+
+  def test_terminate(self):
+    with self.setup_terminate(assert_purged=False) as (mock_kill, mock_alive):
+      mock_alive.return_value = True
+      with self.assertRaises(self.pm.NonResponsiveProcess):
+        self.pm.terminate(kill_wait=.1, purge=False)
+
+  def test_get_subprocess_output(self):
     test_str = '333'
-    proc = self.pm.run_subprocess(['echo', test_str], stdout=subprocess.PIPE)
-    proc.wait()
-    self.assertEqual(proc.communicate()[0].strip(), test_str)
+    self.assertEqual(self.pm.get_subprocess_output(['echo', '-n', test_str]), test_str)
+
+  def test_get_subprocess_output_oserror_exception(self):
+    with self.assertRaises(self.pm.ExecutionError):
+      self.pm.get_subprocess_output(['i_do_not_exist'])
+
+  def test_get_subprocess_output_failure_exception(self):
+    with self.assertRaises(self.pm.ExecutionError):
+      self.pm.get_subprocess_output(['false'])
 
   @contextmanager
   def mock_daemonize_context(self, chk_pre=True, chk_post_child=False, chk_post_parent=False):
-    with mock.patch.object(ProcessManager, 'post_fork_parent', **PATCH_OPTS) as mock_post_parent:
-      with mock.patch.object(ProcessManager, 'post_fork_child', **PATCH_OPTS) as mock_post_child:
-        with mock.patch.object(ProcessManager, 'pre_fork', **PATCH_OPTS) as mock_pre:
-          with mock.patch('os.chdir', **PATCH_OPTS):
-            with mock.patch('os._exit', **PATCH_OPTS):
-              with mock.patch('os.setsid', **PATCH_OPTS):
-                with mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
-                  yield mock_fork
+    with mock.patch.object(ProcessManager, 'post_fork_parent', **PATCH_OPTS) as mock_post_parent, \
+         mock.patch.object(ProcessManager, 'post_fork_child', **PATCH_OPTS) as mock_post_child, \
+         mock.patch.object(ProcessManager, 'pre_fork', **PATCH_OPTS) as mock_pre, \
+         mock.patch('os.chdir', **PATCH_OPTS), \
+         mock.patch('os._exit', **PATCH_OPTS), \
+         mock.patch('os.setsid', **PATCH_OPTS), \
+         mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
+      yield mock_fork
 
-                  if chk_pre: mock_pre.assert_called_once_with(self.pm)
-                  if chk_post_child: mock_post_child.assert_called_once_with(self.pm)
-                  if chk_post_parent: mock_post_parent.assert_called_once_with(self.pm)
+      if chk_pre: mock_pre.assert_called_once_with(self.pm)
+      if chk_post_child: mock_post_child.assert_called_once_with(self.pm)
+      if chk_post_parent: mock_post_parent.assert_called_once_with(self.pm)
 
   def test_daemonize_parent(self, *args):
     with self.mock_daemonize_context() as mock_fork:

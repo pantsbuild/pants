@@ -48,12 +48,13 @@ class TestContext(Context):
     """A runtracker stand-in that does no actual tracking."""
     class DummyArtifactCacheStats(object):
       def add_hit(self, cache_name, tgt): pass
+
       def add_miss(self, cache_name, tgt): pass
 
     artifact_cache_stats = DummyArtifactCacheStats()
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd=''):
+  def new_workunit(self, name, labels=None, cmd='', log_config=None):
     sys.stderr.write('\nStarting workunit {}\n'.format(name))
     yield TestContext.DummyWorkUnit()
 

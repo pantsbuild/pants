@@ -24,6 +24,10 @@ class DummyOptionable(Optionable):
   options_scope = 'foo'
 
 
+class UninitializedSubsystem(Subsystem):
+  options_scope = 'uninitialized-scope'
+
+
 class SubsystemTest(unittest.TestCase):
   def setUp(self):
     DummySubsystem._options = DummyOptions()
@@ -57,7 +61,7 @@ class SubsystemTest(unittest.TestCase):
       options_scope = 'a'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (DummySubsystem, SubsystemB)
 
     self.assertEqual({DummySubsystem, SubsystemA, SubsystemB}, Subsystem.closure((SubsystemA,)))
@@ -71,14 +75,14 @@ class SubsystemTest(unittest.TestCase):
       options_scope = 'b'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (DummySubsystem,)
 
     class SubsystemA(Subsystem):
       options_scope = 'a'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (DummySubsystem, SubsystemB)
 
     self.assertEqual({DummySubsystem, SubsystemB}, Subsystem.closure((SubsystemB,)))
@@ -94,23 +98,38 @@ class SubsystemTest(unittest.TestCase):
       options_scope = 'c'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (SubsystemA,)
 
     class SubsystemB(Subsystem):
       options_scope = 'b'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (SubsystemC,)
 
     class SubsystemA(Subsystem):
       options_scope = 'a'
 
       @classmethod
-      def dependencies(cls):
+      def subsystem_dependencies(cls):
         return (SubsystemB,)
 
     for root in SubsystemA, SubsystemB, SubsystemC:
       with self.assertRaises(Subsystem.CycleException):
         Subsystem.closure((root,))
+
+  def test_uninitialized_global(self):
+
+    with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,
+                                 r'UninitializedSubsystem.*uninitialized-scope'):
+      UninitializedSubsystem.global_instance()
+
+  def test_uninitialized_scoped_instance(self):
+    class UninitializedOptional(Optionable):
+      options_scope = 'optional'
+
+    optional = UninitializedOptional()
+    with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,
+                                 r'UninitializedSubsystem.*uninitialized-scope'):
+      UninitializedSubsystem.scoped_instance(optional)

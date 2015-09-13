@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
-from pants.util.contextutil import temporary_file
+from pants.util.contextutil import temporary_file, temporary_file_path
 
 
 class BootstrapOptionsTest(unittest.TestCase):
@@ -122,6 +122,80 @@ class BootstrapOptionsTest(unittest.TestCase):
       opts.register('fruit', '--apple')
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)
     self.assertEquals('/pear/banana', opts.for_scope('fruit').apple)
+
+  def test_create_bootstrapped_multiple_config_override(self):
+    # check with multiple config files, the latest values always get taken
+    # in this case strategy will be overwritten, while fruit stays the same
+    with temporary_file() as fp:
+      fp.write(dedent("""
+      [compile.apt]
+      strategy: global
+
+      [fruit]
+      apple: red
+      """))
+      fp.close()
+
+      bootstrapper_single_config = OptionsBootstrapper(configpath=fp.name,
+                                                       args=['--config-override={}'.format(fp.name)])
+
+      opts_single_config  = bootstrapper_single_config.get_full_options(known_scope_infos=[
+          ScopeInfo('', ScopeInfo.GLOBAL),
+          ScopeInfo('compile.apt', ScopeInfo.TASK),
+          ScopeInfo('fruit', ScopeInfo.TASK),
+      ])
+      opts_single_config.register('', '--config-override')  # So we don't choke on it on the cmd line.
+      opts_single_config.register('compile.apt', '--strategy')
+      opts_single_config.register('fruit', '--apple')
+
+      self.assertEquals('global', opts_single_config.for_scope('compile.apt').strategy)
+      self.assertEquals('red', opts_single_config.for_scope('fruit').apple)
+
+      with temporary_file() as fp2:
+        fp2.write(dedent("""
+        [compile.apt]
+        strategy: isolated
+        """))
+        fp2.close()
+
+        bootstrapper_double_config = OptionsBootstrapper(
+            configpath=fp.name,
+            args=['--config-override={}'.format(fp.name),
+                  '--config-override={}'.format(fp2.name)])
+
+        opts_double_config = bootstrapper_double_config.get_full_options(known_scope_infos=[
+          ScopeInfo('', ScopeInfo.GLOBAL),
+          ScopeInfo('compile.apt', ScopeInfo.TASK),
+          ScopeInfo('fruit', ScopeInfo.TASK),
+        ])
+        opts_double_config.register('', '--config-override')  # So we don't choke on it on the cmd line.
+        opts_double_config.register('compile.apt', '--strategy')
+        opts_double_config.register('fruit', '--apple')
+
+        self.assertEquals('isolated', opts_double_config.for_scope('compile.apt').strategy)
+        self.assertEquals('red', opts_double_config.for_scope('fruit').apple)
+
+  def test_full_options_caching(self):
+    with temporary_file_path() as config:
+      bootstrapper = OptionsBootstrapper(env={}, configpath=config, args=[])
+
+      opts1 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL),
+                                                               ScopeInfo('foo', ScopeInfo.TASK)])
+      opts2 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('foo', ScopeInfo.TASK),
+                                                               ScopeInfo('', ScopeInfo.GLOBAL)])
+      self.assertIs(opts1, opts2)
+
+      opts3 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL),
+                                                               ScopeInfo('foo', ScopeInfo.TASK),
+                                                               ScopeInfo('', ScopeInfo.GLOBAL)])
+      self.assertIs(opts1, opts3)
+
+      opts4 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL)])
+      self.assertIsNot(opts1, opts4)
+
+      opts5 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo('', ScopeInfo.GLOBAL)])
+      self.assertIs(opts4, opts5)
+      self.assertIsNot(opts1, opts5)
 
   def test_bootstrap_short_options(self):
     def parse_options(*args):

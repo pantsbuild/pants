@@ -66,7 +66,7 @@ class BuildBuildDictionary(Task):
   @classmethod
   def register_options(cls, register):
     super(BuildBuildDictionary, cls).register_options(register)
-    register('--omit-impl-re', action='append',
+    register('--omit-impl-re', action='append', fingerprint=True,
              help='Omit goals who have a task matching one of these regexps.')
 
   def execute(self):

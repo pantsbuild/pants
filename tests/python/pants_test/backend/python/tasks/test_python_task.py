@@ -66,11 +66,11 @@ class PythonTaskTest(PythonTaskTestBase):
     pex_info = self.binary.pexinfo
     platforms = self.binary.platforms
 
-    with python_task.cached_chroot(interpreter, pex_info, [self.binary], platforms) as chroot:
-      with temporary_file_path() as pex:
-        chroot.dump()
-        chroot.package_pex(pex)
-        yield chroot, pex
+    chroot = python_task.cached_chroot(interpreter, pex_info, [self.binary], platforms)
+    with temporary_file_path() as pex:
+      chroot.dump()
+      chroot.package_pex(pex)
+      yield chroot, pex
 
   def test_cached_chroot_reuse(self):
     with self.cached_chroot() as (chroot1, pex1):
@@ -81,7 +81,6 @@ class PythonTaskTest(PythonTaskTestBase):
 
   # TODO(John Sirois): Test direct python_binary.source modification after moving
   # PythonTaskTestBase to self.make_target
-
   def test_cached_chroot_direct_dep_invalidation(self):
     with self.cached_chroot() as (chroot1, pex1):
       self.rebind_targets()

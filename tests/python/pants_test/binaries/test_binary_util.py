@@ -60,8 +60,9 @@ class BinaryUtilTest(BaseTest):
 
   @classmethod
   def _fake_url(cls, binaries, base, binary_key):
+    binary_util = BinaryUtil([], 0, '/tmp')
     supportdir, version, name = binaries[binary_key]
-    binary = BinaryUtil._select_binary_base_path(supportdir, version, binary_key)
+    binary = binary_util._select_binary_base_path(supportdir, version, binary_key)
     return '{base}/{binary}'.format(base=base, binary=binary)
 
   def test_nobases(self):
@@ -124,3 +125,56 @@ class BinaryUtilTest(BaseTest):
         self.assertEqual(stream(), 'SEEN ' + name.upper())
         unseen.remove(stream())
     self.assertEqual(0, len(unseen))  # Make sure we've seen all the SEENs.
+
+  def test_select_binary_base_path_linux(self):
+    binary_util =  BinaryUtil([], 0, '/tmp')
+
+    def uname_func():
+      return "linux", "dontcare1", "dontcare2", "dontcare3", "amd64"
+
+    self.assertEquals("supportdir/linux/x86_64/name/version",
+                      binary_util._select_binary_base_path("supportdir", "name", "version",
+                                                           uname_func=uname_func))
+
+  def test_select_binary_base_path_darwin(self):
+    binary_util = BinaryUtil([], 0, '/tmp')
+
+    def uname_func():
+      return "darwin", "dontcare1", "14.9", "dontcare2", "dontcare3",
+
+    self.assertEquals("supportdir/mac/10.10/name/version",
+                      binary_util._select_binary_base_path("supportdir", "name", "version",
+                                                           uname_func=uname_func))
+
+  def test_select_binary_base_path_missing_os(self):
+    binary_util = BinaryUtil([], 0, '/tmp')
+
+    def uname_func():
+      return "vms", "dontcare1", "999.9", "dontcare2", "VAX9"
+
+    with self.assertRaisesRegexp(BinaryUtil.MissingMachineInfo,
+                                 r'Pants has no binaries for vms'):
+      binary_util._select_binary_base_path("supportdir", "name", "version",
+                                           uname_func=uname_func)
+
+  def test_select_binary_base_path_missing_version(self):
+    binary_util = BinaryUtil([], 0, '/tmp')
+
+    def uname_func():
+      return "darwin", "dontcare1", "999.9", "dontcare2", "x86_64"
+
+    with self.assertRaisesRegexp(BinaryUtil.MissingMachineInfo,
+                                 r'Update --binaries-path-by-id to find binaries for darwin x86_64 999\.9\.'):
+      binary_util._select_binary_base_path("supportdir", "name", "version",
+                                           uname_func=uname_func)
+
+  def test_select_binary_base_path_override(self):
+    binary_util = BinaryUtil([], 0, '/tmp',
+                             {('darwin', '100'): ['skynet', '42']})
+
+    def uname_func():
+      return "darwin", "dontcare1", "100.99", "dontcare2", "t1000"
+
+    self.assertEquals("supportdir/skynet/42/name/version",
+                      binary_util._select_binary_base_path("supportdir", "name", "version",
+                                                           uname_func=uname_func))

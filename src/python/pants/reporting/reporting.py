@@ -10,8 +10,11 @@ import sys
 
 from six import StringIO
 
+from pants.base.workunit import WorkUnitLabel
+from pants.option.custom_types import dict_option, list_option
 from pants.reporting.html_reporter import HtmlReporter
-from pants.reporting.plaintext_reporter import PlainTextReporter
+from pants.reporting.invalidation_report import InvalidationReport
+from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
 from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report, ReportingError
 from pants.reporting.reporting_server import ReportingServerManager
@@ -32,6 +35,16 @@ class Reporting(Subsystem):
              help='Write reports to this dir.')
     register('--template-dir', advanced=True, metavar='<dir>', default=None,
              help='Find templates for rendering in this dir.')
+    register('--console-label-format', advanced=True, type=dict_option,
+             default=PlainTextReporter.LABEL_FORMATTING,
+             help='Controls the printing of workunit labels to the console.  Workunit types are '
+                  '{workunits}.  Possible formatting values are {formats}'.format(
+               workunits=WorkUnitLabel.keys(), formats=LabelFormat.keys()))
+    register('--console-tool-output-format', advanced=True, type=dict_option,
+             default=PlainTextReporter.TOOL_OUTPUT_FORMATTING,
+             help='Controls the printing of workunit tool output to the console. Workunit types are '
+                  '{workunits}.  Possible formatting values are {formats}'.format(
+               workunits=WorkUnitLabel.keys(), formats=ToolOutputFormat.keys()))
 
   def initial_reporting(self, run_tracker):
     """Sets up the initial reporting configuration.
@@ -56,9 +69,12 @@ class Reporting(Subsystem):
     # Capture initial console reporting into a buffer. We'll do something with it once
     # we know what the cmd-line flag settings are.
     outfile = StringIO()
-    capturing_reporter_settings = PlainTextReporter.Settings(outfile=outfile, log_level=Report.INFO,
-                                                             color=False, indent=True, timing=False,
-                                                             cache_stats=False)
+    capturing_reporter_settings = PlainTextReporter.Settings(
+      outfile=outfile, log_level=Report.INFO,
+      color=False, indent=True, timing=False,
+      cache_stats=False,
+      label_format=self.get_options().console_label_format,
+      tool_output_format=self.get_options().console_tool_output_format)
     capturing_reporter = PlainTextReporter(run_tracker, capturing_reporter_settings)
     report.add_reporter('capturing', capturing_reporter)
 
@@ -77,7 +93,10 @@ class Reporting(Subsystem):
 
     return report
 
-  def update_reporting(self, global_options, is_quiet_task, run_tracker, invalidation_report=None):
+  def _get_invalidation_report(self):
+    return InvalidationReport() if self.get_options().invalidation_report else None
+
+  def update_reporting(self, global_options, is_quiet_task, run_tracker):
     """Updates reporting config once we've parsed cmd-line flags."""
 
     # Get any output silently buffered in the old console reporter, and remove it.
@@ -99,7 +118,9 @@ class Reporting(Subsystem):
     else:
       # Set up the new console reporter.
       settings = PlainTextReporter.Settings(log_level=log_level, outfile=sys.stdout, color=color,
-                                            indent=True, timing=timing, cache_stats=cache_stats)
+                                            indent=True, timing=timing, cache_stats=cache_stats,
+                                            label_format=self.get_options().console_label_format,
+                                            tool_output_format=self.get_options().console_tool_output_format)
       console_reporter = PlainTextReporter(run_tracker, settings)
       console_reporter.emit(buffered_output)
       console_reporter.flush()
@@ -111,13 +132,18 @@ class Reporting(Subsystem):
       run_id = run_tracker.run_info.get_info('id')
       outfile = open(os.path.join(global_options.logdir, '{}.log'.format(run_id)), 'w')
       settings = PlainTextReporter.Settings(log_level=log_level, outfile=outfile, color=False,
-                                            indent=True, timing=True, cache_stats=True)
+                                            indent=True, timing=True, cache_stats=True,
+                                            label_format=self.get_options().console_label_format,
+                                            tool_output_format=self.get_options().console_tool_output_format)
       logfile_reporter = PlainTextReporter(run_tracker, settings)
       logfile_reporter.emit(buffered_output)
       logfile_reporter.flush()
       run_tracker.report.add_reporter('logfile', logfile_reporter)
 
+    invalidation_report = self._get_invalidation_report()
     if invalidation_report:
       run_id = run_tracker.run_info.get_info('id')
       outfile = os.path.join(self.get_options().reports_dir, run_id, 'invalidation-report.csv')
       invalidation_report.set_filename(outfile)
+
+    return invalidation_report

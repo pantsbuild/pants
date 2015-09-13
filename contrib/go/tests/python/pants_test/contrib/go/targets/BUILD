@@ -1,0 +1,54 @@
+target(
+  name='targets',
+  dependencies=[
+    ':go_binary',
+    ':go_library',
+    ':go_local_source_test_base',
+    ':go_remote_library',
+  ]
+)
+
+python_tests(
+  name='go_binary',
+  sources=['test_go_binary.py'],
+  dependencies=[
+    ':go_local_source_test_base',
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name='go_library',
+  sources=['test_go_library.py'],
+  dependencies=[
+    ':go_local_source_test_base',
+    'contrib/go/src/python/pants/contrib/go/targets:go_library',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_library(
+  name='go_local_source_test_base',
+  sources=['go_local_source_test_base.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'contrib/go/src/python/pants/contrib/go:plugin',
+    'src/python/pants/base:address_lookup_error',
+    'src/python/pants/base:source_root',
+    'src/python/pants/util:meta',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name='go_remote_library',
+  sources=['test_go_remote_library.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
+    'contrib/go/src/python/pants/contrib/go:plugin',
+    'src/python/pants/base:address_lookup_error',
+    'src/python/pants/base:source_root',
+    'tests/python/pants_test:base_test',
+  ]
+)

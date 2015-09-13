@@ -87,8 +87,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           '--interpreter=CPython>=3.3',
           '--test-junit-coverage-processor=emma',
           '--test-junit-coverage',
-          '--test-junit-coverage-xml',
-          '--test-junit-coverage-html',
           '--test-junit-coverage-jvm-options=-Xmx1g',
           '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
           workdir)
@@ -127,8 +125,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           '--interpreter=CPython>=3.3',
           '--test-junit-coverage-processor=cobertura',
           '--test-junit-coverage',
-          '--test-junit-coverage-xml',
-          '--test-junit-coverage-html',
           '--test-junit-coverage-jvm-options=-Xmx1g',
           '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
           workdir)

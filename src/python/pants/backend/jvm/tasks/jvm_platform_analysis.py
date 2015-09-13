@@ -7,13 +7,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 from collections import defaultdict, namedtuple
+from hashlib import sha1
 
 from colors import red
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.build_graph import CycleException, sort_targets
 from pants.base.exceptions import TaskError
+from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.util.memo import memoized_property
 
 
@@ -30,26 +33,90 @@ class JvmPlatformAnalysisMixin(object):
 
   @memoized_property
   def jvm_targets(self):
-    return self.context.targets(self._is_jvm_target)
+    return frozenset(self.context.targets(self._is_jvm_target))
 
-  @memoized_property
-  def transitive_dependency_map(self):
+  def _unfiltered_jvm_dependency_map(self, fully_transitive=False):
+    """Jvm dependency map without filtering out non-JvmTarget keys, exposed for testing.
+
+    Unfiltered because the keys in the resulting map include non-JvmTargets.
+
+    See the explanation in the jvm_dependency_map() docs for what this method produces.
+
+    :param fully_transitive: if true, the elements of the map will be the full set of transitive
+      JvmTarget dependencies, not just the "direct" ones. (see jvm_dependency_map for the definition
+      of "direct")
+    :return: map of target -> set of JvmTarget "direct" dependencies.
+    """
     targets = self.jvm_targets
-    transitive_deps = defaultdict(set)
+    jvm_deps = defaultdict(set)
 
-    def accumulate_transitive_deps(target):
+    def accumulate_jvm_deps(target):
       for dep in target.dependencies:
-        transitive_deps[target].add(dep)
-        transitive_deps[target].update(transitive_deps[dep])
+        if self._is_jvm_target(dep):
+          jvm_deps[target].add(dep)
+          if not fully_transitive:
+            continue
+        # If 'dep' isn't in jvm_deps, that means that it isn't in the `targets` list at all
+        # (since this is a post-order traversal). If it's not in the targets list at all,
+        # that means it cannot have any JvmTargets as transitive dependencies. In which case
+        # we don't care about it, so it's fine that the line below is a no-op.
+        #
+        # Otherwise, we add in any transitive dependencies that were previously collected.
+        jvm_deps[target].update(jvm_deps[dep])
 
+    # Vanilla DFS runs in O(|V|+|E|), and the code inside the loop in accumulate_jvm_deps ends up
+    # being run once for each in the graph over the course of the entire search, which means that
+    # the total asymptotic runtime complexity is O(|V|+2|E|), which is still O(|V|+|E|).
     self.context.build_graph.walk_transitive_dependency_graph(
       addresses=[t.address for t in targets],
-      work=accumulate_transitive_deps,
-      postorder=True,
+      work=accumulate_jvm_deps,
+      postorder=True
     )
 
-    return {target: filter(self._is_jvm_target, deps)
-            for target, deps in transitive_deps.items() if self._is_jvm_target(target)}
+    return jvm_deps
+
+  @memoized_property
+  def jvm_dependency_map(self):
+    """A map of each JvmTarget in the context to the set of JvmTargets it depends on "directly".
+
+    "Directly" is in quotes here because it isn't quite the same as its normal use, which would be
+    filter(self._is_jvm_target, target.dependencies).
+
+    For this method, we define the set of dependencies which `target` depends on "directly" as:
+
+    { dep | dep is a JvmTarget and exists a directed path p from target to dep such that |p| = 1 }
+
+    Where |p| is computed as the weighted sum of all edges in the path, where edges to a JvmTarget
+    have weight 1, and all other edges have weight 0.
+
+    In other words, a JvmTarget 'A' "directly" depends on a JvmTarget 'B' iff there exists a path in
+    the directed dependency graph from 'A' to 'B' such that there are no internal vertices in the
+    path that are JvmTargets.
+
+    This set is a (not necessarily proper) subset of the set of all JvmTargets that the target
+    transitively depends on. The algorithms using this map *would* operate correctly on the full
+    transitive superset, but it is more efficient to use this subset.
+
+    The intuition for why we can get away with using this subset: Consider targets A, b, C, D,
+    such that A depends on b, which depends on C, which depends on D. Say A,C,D are JvmTargets.
+
+    If A is on java 6 and C is on java 7, we obviously have a problem, and this will be correctly
+    identified when verifying the jvm dependencies of A, because the path A->b->C has length 1.
+
+    If instead, A is on java 6, and C is on java 6, but D is on java 7, we still have a problem.
+    It will not be detected when processing A, because A->b->C->D has length 2. But when we process
+    C, it will be picked up, because C->D has length 1.
+
+    Unfortunately, we can't do something as simple as just using actual direct dependencies, because
+    it's perfectly legal for a java 6 A to depend on b (which is a non-JvmTarget), and legal for
+    b to depend on a java 7 C, so the transitive information is needed to correctly identify the
+    problem.
+
+    :return: the dict mapping JvmTarget -> set of JvmTargets.
+    """
+    jvm_deps = self._unfiltered_jvm_dependency_map()
+    return {target: deps for target, deps in jvm_deps.items()
+            if deps and self._is_jvm_target(target)}
 
 
 class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
@@ -64,6 +131,21 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     E.g., a java_library targeted for Java 6 depends on a java_library targeted for java 7.
     """
 
+  class PlatformFingerprintStrategy(FingerprintStrategy):
+    """Fingerprint strategy which only cares a target's platform and dependency ids."""
+
+    def compute_fingerprint(self, target):
+      hasher = sha1()
+      if hasattr(target, 'platform'):
+        hasher.update(str(tuple(target.platform)))
+      return hasher.hexdigest()
+
+    def __eq__(self, other):
+      return type(self) == type(other)
+
+    def __hash__(self):
+      return hash(type(self).__name__)
+
   @classmethod
   def product_types(cls):
     # NB(gmalmquist): These are fake products inserted to make sure validation is run very early.
@@ -73,9 +155,10 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
   @classmethod
   def register_options(cls, register):
     super(JvmPlatformValidate, cls).register_options(register)
-    register('--check', default='fatal', choices=['off', 'warn', 'fatal'],
+    register('--check', default='fatal', choices=['off', 'warn', 'fatal'], fingerprint=True,
              help='Check to make sure no jvm targets target an earlier jdk than their dependencies')
     register('--children-before-parents', default=False, action='store_true',
+             fingerprint=True,
              help='Organize output in the form target -> dependencies, rather than '
                   'target -> dependees.')
 
@@ -92,20 +175,38 @@ class JvmPlatformValidate(JvmPlatformAnalysisMixin, Task):
     nice to have a comprehensive list of all errors rather than just the first one we happened to
     hit.
     """
-    invalids = []
+    conflicts = []
 
-    def is_invalid(target, dependency):
+    def is_conflicting(target, dependency):
       return self.jvm_version(dependency) > self.jvm_version(target)
 
-    for target, deps in self.transitive_dependency_map.items():
-      invalid_dependencies = [dep for dep in deps if is_invalid(target, dep)]
-      if invalid_dependencies:
-        invalids.append((target, invalid_dependencies))
+    try:
+      sort_targets(self.jvm_targets)
+    except CycleException:
+      self.context.log.warn('Cannot validate dependencies when cycles exist in the build graph.')
+      return
 
-    if invalids:
-      error_message = self._create_full_error_message(invalids)
+    try:
+      with self.invalidated(self.jvm_targets,
+                            fingerprint_strategy=self.PlatformFingerprintStrategy(),
+                            invalidate_dependents=True) as vts:
+        dependency_map = self.jvm_dependency_map
+        for vts_target in vts.invalid_vts:
+          for target in vts_target.targets:
+            if target in dependency_map:
+              deps = dependency_map[target]
+              invalid_dependencies = [dep for dep in deps if is_conflicting(target, dep)]
+              if invalid_dependencies:
+                conflicts.append((target, invalid_dependencies))
+        if conflicts:
+          # NB(gmalmquist): It's important to unconditionally raise an exception, then decide later
+          # whether to continue raising it or just print a warning, to make sure the targets aren't
+          # marked as valid if there are invalid platform dependencies.
+          error_message = self._create_full_error_message(conflicts)
+          raise self.IllegalJavaTargetLevelDependency(error_message)
+    except self.IllegalJavaTargetLevelDependency as e:
       if self.check == 'fatal':
-        raise self.IllegalJavaTargetLevelDependency(error_message)
+        raise e
       else:
         assert self.check == 'warn'
         self.context.log.warn(error_message)
@@ -184,6 +285,8 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     register('--filter',
              help='Limit jvm platform possibility explanation to targets whose specs match this '
                   'regex pattern.')
+    register('--transitive', action='store_true', default=False,
+             help='List transitive dependencies in analysis output.')
 
   def __init__(self, *args, **kwargs):
     super(JvmPlatformExplain, self).__init__(*args, **kwargs)
@@ -191,6 +294,7 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
                           else None)
     self.detailed = self.get_options().detailed
     self.only_broken = self.get_options().only_broken
+    self.transitive = self.get_options().transitive
 
   def _format_error(self, text):
     if self.get_options().colors:
@@ -201,9 +305,17 @@ class JvmPlatformExplain(JvmPlatformAnalysisMixin, ConsoleTask):
     return not self.explain_regex or self.explain_regex.match(target.address.spec)
 
   @memoized_property
+  def dependency_map(self):
+    if not self.transitive:
+      return self.jvm_dependency_map
+    full_map = self._unfiltered_jvm_dependency_map(fully_transitive=True)
+    return {target: deps for target, deps in full_map.items()
+            if self._is_jvm_target(target) and deps}
+
+  @memoized_property
   def _ranges(self):
     target_dependencies = defaultdict(set)
-    target_dependencies.update(self.transitive_dependency_map)
+    target_dependencies.update(self.dependency_map)
 
     target_dependees = defaultdict(set)
     for target, deps in target_dependencies.items():

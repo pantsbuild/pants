@@ -36,7 +36,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/goal:context',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/option/util',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
@@ -46,6 +45,20 @@ python_tests(
   sources=['test_thrift_linter_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
+  name='thrift_linter_test',
+  sources=['test_thrift_linter.py'],
+  dependencies=[
+     '3rdparty/python:mock',
+     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_linter',
+     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_util',
+     'src/python/pants/backend/codegen/targets:java',
+     'src/python/pants/base:build_file_aliases',
+     'tests/python/pants_test/tasks:task_test_base',
+     'tests/python/pants_test/testutils',
   ],
 )
 

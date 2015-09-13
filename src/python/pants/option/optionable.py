@@ -21,10 +21,16 @@ class Optionable(AbstractClass):
 
   @classmethod
   def get_scope_info(cls):
+    """Returns a ScopeInfo instance representing this Optionable's options scope."""
     if cls.options_scope is None or cls.options_scope_category is None:
       raise OptionsError(
         '{} must set options_scope and options_scope_category.'.format(cls.__name__))
     return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
+
+  @classmethod
+  def get_description(cls):
+    # First line of docstring.
+    return '' if cls.__doc__ is None else cls.__doc__.partition('\n')[0]
 
   @classmethod
   def register_options(cls, register):

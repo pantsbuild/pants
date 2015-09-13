@@ -12,6 +12,7 @@ class Analysis(object):
   An analysis provides information on the src -> class product mappings
   and on the src -> {src|class|jar} file dependency mappings.
   """
+
   @classmethod
   def merge(cls, analyses):
     """Merge multiple analysis instances into one."""

@@ -9,10 +9,11 @@ import os
 import re
 from collections import defaultdict
 
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -46,7 +47,13 @@ class SpindleGen(NailgunTask):
       type=list_option,
       help='A list of targets that all spindle codegen depends on at runtime.',
     )
-    cls.register_jvm_tool(register, 'spindle-codegen')
+    cls.register_jvm_tool(register,
+                          'spindle-codegen',
+                          classpath=[
+                            JarDependency(org='com.foursquare',
+                                          name='spindle-codegen-binary_2.10',
+                                          rev='3.0.0-M7'),
+                          ])
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -120,8 +127,7 @@ class SpindleGen(NailgunTask):
       for target in targets:
         java_synthetic_name = '{0}-{1}'.format(target.id, 'java')
         java_sources_rel_path = os.path.relpath(self.namespace_out, get_buildroot())
-        java_spec_path = java_sources_rel_path
-        java_synthetic_address = SyntheticAddress(java_spec_path, java_synthetic_name)
+        java_synthetic_address = Address(java_sources_rel_path, java_synthetic_name)
         java_generated_sources = [
           os.path.join(os.path.dirname(source), 'java_{0}.java'.format(os.path.basename(source)))
           for source in self.sources_generated_by_target(target)
@@ -140,7 +146,6 @@ class SpindleGen(NailgunTask):
           target_type=JavaLibrary,
           dependencies=[dep.address for dep in self.synthetic_target_extra_dependencies],
           derived_from=target,
-          sources_rel_path=java_sources_rel_path,
           sources=java_relative_generated_sources,
         )
         java_synthetic_target = build_graph.get_target(java_synthetic_address)
@@ -161,8 +166,7 @@ class SpindleGen(NailgunTask):
 
         synthetic_name = '{0}-{1}'.format(target.id, 'scala')
         sources_rel_path = os.path.relpath(self.namespace_out, get_buildroot())
-        spec_path = sources_rel_path
-        synthetic_address = SyntheticAddress(spec_path, synthetic_name)
+        synthetic_address = Address(sources_rel_path, synthetic_name)
         generated_sources = [
           '{0}.{1}'.format(source, 'scala')
           for source in self.sources_generated_by_target(target)
@@ -173,7 +177,6 @@ class SpindleGen(NailgunTask):
           address=synthetic_address,
           target_type=ScalaLibrary,
           dependencies=self.synthetic_target_extra_dependencies,
-          sources_rel_path=sources_rel_path,
           sources=relative_generated_sources,
           derived_from=target,
           java_sources=[java_synthetic_target.address.spec],
@@ -215,11 +218,11 @@ class SpindleGen(NailgunTask):
       target.walk(collect_sources)
     return sources
 
-
 # Slightly hacky way to figure out which files get generated from a particular thrift source.
 # TODO(benjy): This could be emitted by the codegen tool.
 # That would also allow us to easily support 1:many codegen.
 NAMESPACE_PARSER = re.compile(r'^\s*namespace\s+([^\s]+)\s+([^\s]+)\s*$')
+
 
 def calculate_genfiles(source):
   abs_source = os.path.join(get_buildroot(), source)

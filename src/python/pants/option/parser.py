@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
-import sys
+import re
 import warnings
 from argparse import ArgumentParser, _HelpAction
 from collections import defaultdict
@@ -15,11 +15,11 @@ import six
 
 from pants.base.deprecated import check_deprecated_semver
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import list_option
 from pants.option.errors import ParseError, RegistrationError
-from pants.option.help_formatter import HelpFormatter
-from pants.option.help_info_extracter import HelpInfoExtracter
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
+from pants.option.scope import ScopeInfo
 
 
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
@@ -57,8 +57,10 @@ class Parser(object):
   """
 
   class BooleanConversionError(ParseError):
-    """Raised when a value other than 'True' or 'False' is encountered."""
-    pass
+    """Indicates a value other than 'True' or 'False' when attempting to parse a bool."""
+
+  class FromfileError(ParseError):
+    """Indicates a problem reading a value @fromfile."""
 
   @staticmethod
   def str_to_bool(s):
@@ -142,7 +144,6 @@ class Parser(object):
     namespace.add_forwardings(self._dest_forwardings)
     new_args = vars(self._argparser.parse_args(args))
     namespace.update(new_args)
-
     # Compute the inverse of the dest forwardings.
     # We do this here and not when creating the forwardings, because forwardings inherited
     # from outer scopes can be overridden in inner scopes, so this computation is only
@@ -166,37 +167,27 @@ class Parser(object):
                           stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
     return namespace
 
+  @property
+  def registration_args(self):
+    """Returns the registration args, in registration order.
+
+    :return: A list of (args, kwargs) pairs.
+    """
+    return self._registration_args
+
   def registration_args_iter(self):
     """Returns an iterator over the registration arguments of each option in this parser.
 
     Each yielded item is a (dest, args, kwargs) triple.  `dest` is the canonical name that can be
     used to retrieve the option value, if the option has multiple names.
     See comment on self._registration_args above for caveats re (args, kwargs).
+
     For consistency, items are iterated over in lexicographical order, not registration order.
     """
     for args, kwargs in sorted(self._registration_args):
       if args:  # Otherwise all args have been shadowed, so ignore.
         dest = self._select_dest(args)
         yield dest, args, kwargs
-
-  def get_help_info(self):
-    """Returns a dict of help information for the options registered on this object.
-
-    Callers can format this dict into cmd-line help, HTML or whatever.
-    """
-    return HelpInfoExtracter(self._scope).get_option_scope_help_info(self._registration_args)
-
-  def format_help(self, header, show_advanced=False, color=None):
-    """Return a help message for the options registered on this object.
-
-    :param header: Value to display as a header.
-    :param bool show_advanced: Whether to display advanced options.
-    :param bool color: Whether to use color. If None, use color only if writing to a terminal.
-    """
-    if color is None:
-      color = sys.stdout.isatty()
-    help_formatter = HelpFormatter(scope=self._scope, show_advanced=show_advanced, color=color)
-    return '\n'.join(help_formatter.format_options(header, self._registration_args))
 
   def register(self, *args, **kwargs):
     """Register an option, using argparse params.
@@ -221,7 +212,12 @@ class Parser(object):
     self._validate(args, kwargs)
     dest = self._set_dest(args, kwargs)
     if 'recursive' in kwargs:
+      if self._scope_info.category == ScopeInfo.SUBSYSTEM:
+        raise ParseError('Option {} in scope {} registered as recursive, but subsystem options '
+                         'may not set recursive=True.'.format(args[0], self.scope))
       kwargs['recursive_root'] = True  # So we can distinguish the original registrar.
+    if self._scope_info.category == ScopeInfo.SUBSYSTEM:
+      kwargs['subsystem'] = True
     self._register(dest, args, kwargs)  # Note: May modify kwargs (to remove recursive_root).
 
   def _deprecated_message(self, dest):
@@ -239,6 +235,9 @@ class Parser(object):
     hint = deprecated_hint or ''
     return '{}. {}'.format(message, hint)
 
+  _custom_kwargs = ('advanced', 'recursive', 'recursive_root', 'subsystem', 'registering_class',
+                    'fingerprint', 'deprecated_version', 'deprecated_hint', 'fromfile')
+
   def _clean_argparse_kwargs(self, dest, args, kwargs):
     ranked_default = self._compute_default(dest, kwargs=kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
@@ -251,25 +250,22 @@ class Parser(object):
       self._arg_lists_by_arg[arg] = args_copy
     self._registration_args.append((args_copy, kwargs_with_default))
 
-    # For argparse registration, remove our custom kwargs.
-    argparse_kwargs = dict(kwargs_with_default)
-    argparse_kwargs.pop('advanced', False)
-    recursive = argparse_kwargs.pop('recursive', False)
-    argparse_kwargs.pop('recursive_root', False)
-    argparse_kwargs.pop('registering_class', None)
-    argparse_kwargs.pop('fingerprint', False)
-    deprecated_version = argparse_kwargs.pop('deprecated_version', None)
-    deprecated_hint = argparse_kwargs.pop('deprecated_hint', '')
+    deprecated_version = kwargs.get('deprecated_version', None)
+    deprecated_hint = kwargs.get('deprecated_hint', '')
 
     if deprecated_version is not None:
       check_deprecated_semver(deprecated_version)
       self._deprecated_option_dests[dest] = (deprecated_version, deprecated_hint)
 
-    return argparse_kwargs, recursive
+    # For argparse registration, remove our custom kwargs.
+    argparse_kwargs = dict(kwargs_with_default)
+    for custom_kwarg in self._custom_kwargs:
+      argparse_kwargs.pop(custom_kwarg, None)
+    return argparse_kwargs
 
   def _register(self, dest, args, kwargs):
     """Register the option for parsing (recursively if needed)."""
-    argparse_kwargs, recursive = self._clean_argparse_kwargs(dest, args, kwargs)
+    argparse_kwargs = self._clean_argparse_kwargs(dest, args, kwargs)
     if is_boolean_flag(argparse_kwargs):
       inverse_args = self._create_inverse_args(args)
       if inverse_args:
@@ -282,7 +278,7 @@ class Parser(object):
     else:
       self._argparser.add_argument(*args, **argparse_kwargs)
 
-    if recursive:
+    if kwargs.get('recursive', False) or kwargs.get('subsystem', False):
       # Propagate registration down to inner scopes.
       for child_parser in self._child_parsers:
         kwargs.pop('recursive_root', False)
@@ -331,6 +327,8 @@ class Parser(object):
       self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
     return dest
 
+  _ENV_SANITIZER_RE = re.compile(r'[.-]')
+
   def _select_dest(self, args):
     """Select the dest name for the option.
 
@@ -345,6 +343,12 @@ class Parser(object):
 
     The source of the default value is chosen according to the ranking in RankedValue.
     """
+    is_fromfile = kwargs.get('fromfile', False)
+    action = kwargs.get('action')
+    if is_fromfile and action and action != 'append':
+      raise ParseError('Cannot fromfile {} with an action ({}) in scope {}'
+                       .format(dest, action, self._scope))
+
     config_section = 'DEFAULT' if self._scope == GLOBAL_SCOPE else self._scope
     udest = dest.upper()
     if self._scope == GLOBAL_SCOPE:
@@ -358,25 +362,49 @@ class Parser(object):
       if udest.startswith('PANTS_'):
         env_vars.append(udest)
     else:
-      env_vars = ['PANTS_{0}_{1}'.format(config_section.upper().replace('.', '_'), udest)]
+      sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', config_section.upper())
+      env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
+
     value_type = self.str_to_bool if is_boolean_flag(kwargs) else kwargs.get('type', str)
+
     env_val_str = None
     if self._env:
       for env_var in env_vars:
         if env_var in self._env:
           env_val_str = self._env.get(env_var)
           break
-    env_val = None if env_val_str is None else value_type(env_val_str)
-    if kwargs.get('action') == 'append':
-      config_val_strs = self._config.getlist(config_section, dest) if self._config else None
-      config_val = (None if config_val_strs is None else
-                    [value_type(config_val_str) for config_val_str in config_val_strs])
-      default = []
-    else:
-      config_val_str = (self._config.get(config_section, dest, default=None)
-                        if self._config else None)
-      config_val = None if config_val_str is None else value_type(config_val_str)
-      default = None
+
+    config_val_str = self._config.get(config_section, dest, default=None)
+
+    def expand(val_str):
+      if is_fromfile and val_str and val_str.startswith('@') and not val_str.startswith('@@'):
+        fromfile = val_str[1:]
+        try:
+          with open(fromfile) as fp:
+            return fp.read().strip()
+        except IOError as e:
+          raise self.FromfileError('Failed to read {} from file {}: {}'.format(dest, fromfile, e))
+      else:
+        # Support a literal @ for fromfile values via @@.
+        return val_str[1:] if is_fromfile and val_str.startswith('@@') else val_str
+
+    def parse_typed_list(val_str):
+      return None if val_str is None else [value_type(x) for x in list_option(expand(val_str))]
+
+    def parse_typed_item(val_str):
+      return None if val_str is None else value_type(expand(val_str))
+
+    # Handle the forthcoming conversions argparse will need to do by placing our parse hook - we
+    # handle the conversions for env and config ourselves below.  Unlike the env and config
+    # handling, `action='append'` does not need to be handled specially since appended flag values
+    # come as single items' thus only `parse_typed_item` is ever needed for the flag value type
+    # conversions.
+    if is_fromfile:
+      kwargs['type'] = parse_typed_item
+
+    default, parse = ([], parse_typed_list) if action == 'append' else (None, parse_typed_item)
+    config_val = parse(config_val_str)
+    env_val = parse(env_val_str)
     hardcoded_val = kwargs.get('default')
     return RankedValue.choose(None, env_val, config_val, hardcoded_val, default)
 

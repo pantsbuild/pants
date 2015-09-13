@@ -11,17 +11,25 @@ import re
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.java import util
 
 
 logger = logging.getLogger(__name__)
+
+
+def antlr4_jar(name):
+  return JarDependency(org='org.antlr', name=name, rev='4.1')
+
+
 _DEFAULT_ANTLR_DEPS = {
-  'antlr3': '//:antlr-3.4',
-  'antlr4': '//:antlr-4'
+  'antlr3': ('//:antlr-3.4', [JarDependency(org='org.antlr', name='antlr', rev='3.4')]),
+  'antlr4': ('//:antlr-4', [antlr4_jar(name='antlr4'),
+                            antlr4_jar(name='antlr4-runtime')])
 }
+
 
 class AntlrGen(SimpleCodegenTask, NailgunTask):
 
@@ -36,12 +44,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(AntlrGen, cls).register_options(register)
-    for key, value in _DEFAULT_ANTLR_DEPS.items():
-      cls.register_jvm_tool(register, key, [value])
-
-  @property
-  def config_section(self):
-    return 'antlr'
+    for key, (classpath_spec, classpath) in _DEFAULT_ANTLR_DEPS.items():
+      cls.register_jvm_tool(register, key, classpath=classpath, classpath_spec=classpath_spec)
 
   def is_gentarget(self, target):
     return isinstance(target, JavaAntlrLibrary)
@@ -76,8 +80,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
       antlr_classpath = self.tool_classpath(compiler)
       sources = self._calculate_sources([target])
       args.extend(sources)
-      result = util.execute_java(classpath=antlr_classpath, main=java_main,
-                                 args=args, workunit_name='antlr')
+      result = self.runjava(classpath=antlr_classpath, main=java_main, args=args,
+                            workunit_name='antlr')
       if result != 0:
         raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
 
@@ -87,7 +91,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
 
   def synthetic_target_extra_dependencies(self, target):
     # Fetch the right java dependency from the target's compiler option
-    return self.resolve_deps(self.get_options()[target.compiler])
+    compiler_classpath_spec = self.get_options()[target.compiler]
+    return self.resolve_deps([compiler_classpath_spec])
 
   # This checks to make sure that all of the sources have an identical package source structure, and
   # if they do, uses that as the package. If they are different, then the user will need to set the

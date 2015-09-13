@@ -34,7 +34,7 @@ function pkg_pants_install_test() {
   PIP_ARGS="$@"
   pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) || die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || die "'pants list src::' failed in venv!"
-  [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
+  [[ "$(execute_packaged_pants_with_internal_backends --pants-version 2>/dev/null)" \
      == "$(local_version)" ]] || die "Installed version of pants does match local version!"
 }
 
@@ -55,9 +55,9 @@ PKG_PANTS_BACKEND_ANDROID=(
   "pkg_pants_backend_android_install_test"
 )
 function pkg_pants_backend_android_install_test() {
-  PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.backend.android==$(local_version) && \
-  python -c "from pants.backend.android import *"
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.backend.android==$(local_version)']" \
+    goals | grep "apk" &> /dev/null
 }
 
 # Once an individual (new) package is declared above, insert it into the array below)
@@ -83,24 +83,26 @@ function run_local_pants() {
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
 function execute_packaged_pants_with_internal_backends() {
-  local extra_backend_packages
-  if [[ "$1" =~ "extra_backend_packages=" ]]; then
-    extra_backend_packages=${1#*=}
+  local extra_bootstrap_buildfiles
+  if [[ "$1" =~ "extra_bootstrap_buildfiles" ]]; then
+    extra_bootstrap_buildfiles=${1#*=}
     shift
   fi
 
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
-  pants \
+  PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[ \
         'internal_backend.optional', \
         'internal_backend.repositories', \
         'internal_backend.sitegen', \
         'internal_backend.utilities', \
-        ${extra_backend_packages}
       ]" \
-    --goals-bootstrap-buildfiles="['${ROOT}/BUILD']" \
+    --goals-bootstrap-buildfiles="[ \
+        '${ROOT}/BUILD', \
+        ${extra_bootstrap_buildfiles}
+      ]" \
     "$@"
 }
 
@@ -123,7 +125,7 @@ function pkg_install_test_func() {
 }
 
 function local_version() {
-  run_local_pants --version 2>/dev/null
+  run_local_pants --pants-version 2>/dev/null
 }
 
 function build_packages() {
@@ -316,6 +318,10 @@ function tag_release() {
   git push git@github.com:pantsbuild/pants.git ${tag_name}
 }
 
+function publish_docs() {
+  ${ROOT}/build-support/bin/publish_docs.sh -p -y
+}
+
 function list_packages() {
   echo "Releases the following source distributions to PyPi."
   version="$(local_version)"
@@ -323,6 +329,12 @@ function list_packages() {
   do
     echo "  $(pkg_name $PACKAGE)-${version}"
   done
+}
+
+function package_exists() {
+  package_name="$1"
+
+  curl --fail --head https://pypi.python.org/pypi/${package_name} &>/dev/null
 }
 
 function get_owners() {
@@ -342,21 +354,26 @@ function list_owners() {
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     package_name=$(pkg_name $PACKAGE)
-    echo "Owners of ${package_name}:"
-    owners=($(get_owners ${package_name}))
-    for owner in "${owners[@]}"
-    do
-      echo "  ${owner}"
-    done
+    if package_exists ${package_name}
+    then
+      echo "Owners of ${package_name}:"
+      owners=($(get_owners ${package_name}))
+      for owner in "${owners[@]}"
+      do
+        echo "  ${owner}"
+      done
+    else
+      echo "The ${package_name} package is new!  There are no owners yet."
+    fi
     echo
   done
 }
 
 function check_owner() {
    username="$1"
-   packagename="$2"
+   package_name="$2"
 
-   for owner in $(get_owners ${packagename})
+   for owner in $(get_owners ${package_name})
    do
      if [[ "${username}" == "${owner}" ]]
      then
@@ -376,11 +393,16 @@ function check_owners() {
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     index=$((index+1))
-    packagename="$(pkg_name $PACKAGE)"
-    banner "[${index}/${total}] checking that ${username} owns ${packagename}..."
-    if ! check_owner "${username}" "${packagename}"
+    package_name="$(pkg_name $PACKAGE)"
+    banner "[${index}/${total}] checking that ${username} owns ${package_name}..."
+    if package_exists ${package_name}
     then
-      dont_own+=("${packagename}")
+      if ! check_owner "${username}" "${package_name}"
+      then
+        dont_own+=("${package_name}")
+      fi
+    else
+      echo "The ${package_name} package is new!  There are no owners yet."
     fi
   done
 
@@ -458,7 +480,7 @@ else
   banner "Releasing packages to PyPi." && \
   (
     check_origin && check_clean_master && check_pgp && check_owners && \
-      dry_run_install && publish_packages && tag_release && \
-        banner "Successfully released packages to PyPi."
+      dry_run_install && publish_packages && tag_release && publish_docs && \
+      banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
 fi

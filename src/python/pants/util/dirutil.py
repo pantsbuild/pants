@@ -18,6 +18,22 @@ from collections import defaultdict
 from pants.util.strutil import ensure_text
 
 
+def fast_relpath(path, start):
+  """A prefix-based relpath, with no normalization or support for returning `..`."""
+  if not path.startswith(start):
+    raise ValueError('{} is not a prefix of {}'.format(start, path))
+
+  # Confirm that the split occurs on a directory boundary.
+  if start[-1] == '/':
+    slash_offset = 0
+  elif path[len(start)] == '/':
+    slash_offset = 1
+  else:
+    raise ValueError('{} is not a directory containing {}'.format(start, path))
+
+  return path[len(start)+slash_offset:]
+
+
 def safe_mkdir(directory, clean=False):
   """Ensure a directory is present.
 
@@ -231,3 +247,14 @@ def touch(path, times=None):
 
   with safe_open(path, 'a'):
     os.utime(path, times)
+
+
+def get_basedir(path):
+  """Returns the base directory of a path.
+
+  Examples:
+    get_basedir('foo/bar/baz') --> 'foo'
+    get_basedir('/foo/bar/baz') --> ''
+    get_basedir('foo') --> 'foo'
+  """
+  return path[:path.index(os.sep)] if os.sep in path else path

@@ -19,6 +19,7 @@ class ConsoleTask(QuietTaskMixin, Task):
 
   ConsoleTasks are not intended to modify build state.
   """
+
   @classmethod
   def register_options(cls, register):
     super(ConsoleTask, cls).register_options(register)

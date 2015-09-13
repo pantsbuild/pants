@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 
+from twitter.common.collections import maybe_list
+
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -21,7 +23,7 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
 
   def run_export(self, test_target, workdir, load_libs=False, extra_args=None):
     export_out_file = os.path.join(workdir, 'export_out.txt')
-    args = ['export', '--output-file={out_file}'.format(out_file=export_out_file), test_target]
+    args = ['export', '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
     pants_run = self.run_pants_with_workdir(args + libs_args + (extra_args or []), workdir)
     self.assert_success(pants_run)
@@ -136,9 +138,10 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
         avro_lib_info.get('default'),
         os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
       )
-      # TODO(Eric Ayers): this BUILD file also requests the avro 'tests' jar using
-      # a classifier in the JarDependency.  See https://github.com/pantsbuild/pants/issues/1489
-
+      self.assertEquals(
+        avro_lib_info.get('tests'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
+      )
       # TODO(Eric Ayers): Pants does not properly download javadoc and test jars
       #self.assertEquals(
       #  common_lang_lib_info.get('javadoc'),
@@ -148,3 +151,68 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       #  common_lang_lib_info.get('sources'),
       #  os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-sources.jar')
       #)
+
+  def test_distributions_and_platforms(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      test_target = 'examples/src/java/org/pantsbuild/example/hello/simple'
+      json_data = self.run_export(test_target, workdir, load_libs=False, extra_args=[
+        '--jvm-platform-default-platform=java7',
+        '--jvm-platform-platforms={'
+        ' "java7": {"source": "1.7", "target": "1.7", "args": [ "-X123" ]},'
+        ' "java8": {"source": "1.8", "target": "1.8", "args": [ "-X456" ]}'
+        '}',
+        '--jvm-distributions-paths={'
+        ' "macos": [ "/Library/JDK" ],'
+        ' "linux": [ "/usr/lib/jdk7", "/usr/lib/jdk8"]'
+        '}'
+      ])
+      self.assertFalse('python_setup' in json_data)
+      target_name = 'examples/src/java/org/pantsbuild/example/hello/simple:simple'
+      targets = json_data.get('targets')
+      self.assertEquals('java7', targets[target_name]['platform'])
+      self.assertEquals(
+        {
+          'darwin': ['/Library/JDK'],
+          'linux': ['/usr/lib/jdk7', u'/usr/lib/jdk8'],
+        },
+        json_data['jvm_distributions'])
+      self.assertEquals(
+        {
+          'default_platform' : 'java7',
+          'platforms': {
+            'java7': {
+              'source_level': '1.7',
+              'args': ['-X123'],
+              'target_level': '1.7'},
+            'java8': {
+              'source_level': '1.8',
+              'args': ['-X456'],
+              'target_level': '1.8'},
+          }
+        },
+        json_data['jvm_platforms'])
+
+  def test_intellij_integration(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      targets = ['src/python/::', 'tests/python/pants_test:all', 'contrib/::']
+      excludes = [
+        '--exclude-target-regexp=.*go/examples.*',
+        '--exclude-target-regexp=.*scrooge/tests/thrift.*',
+        '--exclude-target-regexp=.*spindle/tests/thrift.*',
+        '--exclude-target-regexp=.*spindle/tests/jvm.*'
+      ]
+      json_data = self.run_export(targets, workdir, extra_args=excludes)
+
+      python_setup = json_data['python_setup']
+      self.assertIsNotNone(python_setup)
+      self.assertIsNotNone(python_setup['interpreters'])
+
+      default_interpreter = python_setup['default_interpreter']
+      self.assertIsNotNone(default_interpreter)
+      self.assertIsNotNone(python_setup['interpreters'][default_interpreter])
+      self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['binary']))
+      self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['chroot']))
+
+      core_target = json_data['targets']['src/python/pants/backend/core:core']
+      self.assertIsNotNone(core_target)
+      self.assertEquals(default_interpreter, core_target['python_interpreter'])

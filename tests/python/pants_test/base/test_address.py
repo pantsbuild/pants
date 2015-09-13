@@ -9,7 +9,7 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from pants.base.address import BuildFileAddress, SyntheticAddress, parse_spec
+from pants.base.address import Address, BuildFileAddress, parse_spec
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_root import BuildRoot
 from pants.util.contextutil import pushd, temporary_dir
@@ -106,16 +106,21 @@ class BaseAddressTest(unittest.TestCase):
     self.assertEqual(target_name, address.target_name)
 
 
-class SyntheticAddressTest(BaseAddressTest):
-  def test_synthetic_forms(self):
-    self.assert_address('a/b', 'target', SyntheticAddress.parse('a/b:target'))
-    self.assert_address('a/b', 'target', SyntheticAddress.parse('//a/b:target'))
-    self.assert_address('a/b', 'b', SyntheticAddress.parse('a/b'))
-    self.assert_address('a/b', 'b', SyntheticAddress.parse('//a/b'))
-    self.assert_address('a/b', 'target', SyntheticAddress.parse(':target', relative_to='a/b'))
-    self.assert_address('', 'target', SyntheticAddress.parse('//:target', relative_to='a/b'))
-    self.assert_address('', 'target', SyntheticAddress.parse(':target'))
-    self.assert_address('a/b', 'target', SyntheticAddress.parse(':target', relative_to='a/b'))
+class AddressTest(BaseAddressTest):
+  def test_equivalence(self):
+    self.assertEqual(Address('a/b', 'c'), Address('a/b', 'c'))
+    self.assertEqual(Address('a/b', 'c'), Address.parse('a/b:c'))
+    self.assertEqual(Address.parse('a/b:c'), Address.parse('a/b:c'))
+
+  def test_parse(self):
+    self.assert_address('a/b', 'target', Address.parse('a/b:target'))
+    self.assert_address('a/b', 'target', Address.parse('//a/b:target'))
+    self.assert_address('a/b', 'b', Address.parse('a/b'))
+    self.assert_address('a/b', 'b', Address.parse('//a/b'))
+    self.assert_address('a/b', 'target', Address.parse(':target', relative_to='a/b'))
+    self.assert_address('', 'target', Address.parse('//:target', relative_to='a/b'))
+    self.assert_address('', 'target', Address.parse(':target'))
+    self.assert_address('a/b', 'target', Address.parse(':target', relative_to='a/b'))
 
 
 class BuildFileAddressTest(BaseAddressTest):

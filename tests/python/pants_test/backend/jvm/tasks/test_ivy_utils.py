@@ -12,7 +12,7 @@ from textwrap import dedent
 from mock import Mock
 
 from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyUtils
+from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyResolveMappingError, IvyUtils
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.ivy.ivy_subsystem import IvySubsystem
@@ -28,13 +28,6 @@ class IvyUtilsTestBase(BaseTest):
 
 
 class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
-
-  # TODO(John Sirois): increase coverage.
-  # Some examples:
-  # + multiple confs - via with_sources and with_docs for example
-  # + excludes
-  # + classifiers
-  # + with_artifact
 
   def setUp(self):
     super(IvyUtilsGenerateIvyTest, self).setUp()
@@ -132,6 +125,10 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     jars.sort(key=lambda jar: jar.classifier)
 
     self.assertEquals(['fleem', 'morx'], [jar.classifier for jar in jars])
+
+  def test_module_ref_str_minus_classifier(self):
+    module_ref = IvyModuleRef(org='org', name='name', rev='rev')
+    self.assertEquals("IvyModuleRef(org:name:rev:)", str(module_ref))
 
   def test_force_override(self):
     jars = list(self.a.payload.jars)
@@ -248,6 +245,10 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             IvyModuleRef(org='org3', name='name3', rev='0.0.1')
           },
           result1)
+
+  def test_parse_fails_when_same_classifier_different_type(self):
+    with self.assertRaises(IvyResolveMappingError):
+      self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_same_classifier_different_type.xml')
 
   def find_single(self, elem, xpath):
     results = list(elem.findall(xpath))

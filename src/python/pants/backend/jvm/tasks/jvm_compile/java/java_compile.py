@@ -7,13 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis import JMakeAnalysis
 from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import relativize_paths, safe_mkdir
 
 
@@ -43,6 +45,7 @@ _JMAKE_ERROR_CODES.update((256 + code, msg) for code, msg in _JMAKE_ERROR_CODES.
 
 
 class JmakeCompile(JvmCompile):
+  """Compile Java code using JMake."""
   _name = 'java'
   _file_suffix = '.java'
   _supports_concurrent_execution = False
@@ -71,18 +74,25 @@ class JmakeCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(JmakeCompile, cls).register_options(register)
-    register('--use-jmake', action='store_true', default=True, help='Use jmake to compile Java targets')
-    register('--source', advanced=True, fingerprint=True,
-             help='Provide source compatibility with this release. Overrides the jvm platform '
-                  'source.',
-             deprecated_hint='The -source arg to javac should be specified by the jvm-platform.',
-             deprecated_version='0.0.43')
-    register('--target', advanced=True, fingerprint=True,
-             help='Generate class files for this JVM version. Overrides the jvm platform target.',
-             deprecated_hint='The -target arg to javac should be specified by the jvm-platform.',
-             deprecated_version='0.0.43')
-    cls.register_jvm_tool(register, 'jmake', fingerprint=True)
-    cls.register_jvm_tool(register, 'java-compiler', fingerprint=True)
+    register('--use-jmake', advanced=True, action='store_true', default=True,
+             fingerprint=True,
+             help='Use jmake to compile Java targets')
+    cls.register_jvm_tool(register,
+                          'jmake',
+                          classpath=[
+                            JarDependency(org='org.pantsbuild', name='jmake', rev='1.3.8-10'),
+                          ])
+    cls.register_jvm_tool(register,
+                          'java-compiler',
+                          classpath=[
+                            JarDependency(org='org.pantsbuild.tools.compiler',
+                                          name='java-compiler',
+                                          rev='0.0.1'),
+                          ])
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JmakeCompile, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def select(self, target):
     return self.get_options().use_jmake and super(JmakeCompile, self).select(target)
@@ -105,7 +115,8 @@ class JmakeCompile(JvmCompile):
     return os.path.join(self._depfile_folder, 'global_depfile')
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context.java_home, JMakeAnalysisParser(), JMakeAnalysis)
+    return AnalysisTools(DistributionLocator.cached().real_home, JMakeAnalysisParser(),
+                         JMakeAnalysis)
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
               log_file, settings):
@@ -137,21 +148,17 @@ class JmakeCompile(JvmCompile):
     args.extend(settings.args)
 
     if '-C-source' in args:
-      raise TaskError("Set the source Java version with the 'source' or with the jvm platform, not "
-                      "in 'args'.")
+      raise TaskError("Define a [jvm-platform] with the desired 'source' level instead of "
+                      "supplying one via 'args'.")
     if '-C-target' in args:
-      raise TaskError("Set the target JVM version with the 'target' option or with the jvm "
-                      "platform, not in 'args'.")
+      raise TaskError("Define a [jvm-platform] with the desired 'target' level instead of "
+                      "supplying one via 'args'.")
 
-    if self.get_options().source or self.get_options().target:
-      self.context.log.warn('--compile-java-source and --compile-java-target trample and override '
-                            'target jvm platform settings, and probably should not be used except '
-                            'for testing.')
-
-    source_level = self.get_options().source or settings.source_level
-    target_level = self.get_options().target or settings.target_level
+    source_level = settings.source_level
+    target_level = settings.target_level
     if source_level:
       args.extend(['-C-source', '-C{0}'.format(source_level)])
+
     if target_level:
       args.extend(['-C-target', '-C{0}'.format(target_level)])
 
@@ -166,7 +173,7 @@ class JmakeCompile(JvmCompile):
                           jvm_options=jvm_options,
                           args=args,
                           workunit_name='jmake',
-                          workunit_labels=[WorkUnit.COMPILER])
+                          workunit_labels=[WorkUnitLabel.COMPILER])
     if result:
       default_message = 'Unexpected error - JMake returned {}'.format(result)
       raise TaskError(_JMAKE_ERROR_CODES.get(result, default_message))

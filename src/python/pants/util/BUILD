@@ -11,16 +11,19 @@ python_library(
 )
 
 python_library(
-  name = 'memo',
-  sources = ['memo.py'],
-)
-
-python_library(
   name = 'dirutil',
   sources = ['dirutil.py'],
   dependencies = [
     ':strutil',
   ],
+)
+
+python_library(
+  name = 'eval',
+  sources = ['eval.py'],
+  dependencies = [
+    '3rdparty/python:six',
+  ]
 )
 
 python_library(
@@ -38,8 +41,18 @@ python_library(
 )
 
 python_library(
+  name = 'memo',
+  sources = ['memo.py'],
+)
+
+python_library(
   name = 'meta',
   sources = ['meta.py'],
+)
+
+python_library(
+  name = 'osutil',
+  sources = ['osutil.py'],
 )
 
 python_library(

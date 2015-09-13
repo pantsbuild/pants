@@ -10,6 +10,7 @@ import os
 import sys
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 
 import requests
@@ -21,6 +22,7 @@ from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.reporting.report import Report
+from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
@@ -52,6 +54,10 @@ class RunTracker(Subsystem):
   BACKGROUND_ROOT_NAME = 'background'
 
   @classmethod
+  def subsystem_dependencies(cls):
+    return (StatsDBFactory,)
+
+  @classmethod
   def register_options(cls, register):
     register('--stats-upload-url', advanced=True, default=None,
              help='Upload stats to this URL on run completion.')
@@ -64,18 +70,19 @@ class RunTracker(Subsystem):
 
   def __init__(self, *args, **kwargs):
     super(RunTracker, self).__init__(*args, **kwargs)
-    self.run_timestamp = time.time()  # A double, so we get subsecond precision for ids.
-    cmd_line = ' '.join(['./pants'] + sys.argv[1:])
+    run_timestamp = time.time()
+    cmd_line = ' '.join(['pants'] + sys.argv[1:])
 
     # run_id is safe for use in paths.
-    millis = int((self.run_timestamp * 1000) % 1000)
-    run_id = 'pants_run_{}_{}'.format(
-               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
+    millis = int((run_timestamp * 1000) % 1000)
+    run_id = 'pants_run_{}_{}_{}'.format(
+               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
+               uuid.uuid4().hex)
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
     self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
-    self.run_info.add_basic_info(run_id, self.run_timestamp)
+    self.run_info.add_basic_info(run_id, run_timestamp)
     self.run_info.add_info('cmd_line', cmd_line)
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
@@ -148,7 +155,7 @@ class RunTracker(Subsystem):
     self._main_root_workunit.set_outcome(outcome)
 
   @contextmanager
-  def new_workunit(self, name, labels=None, cmd=''):
+  def new_workunit(self, name, labels=None, cmd='', log_config=None):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -156,10 +163,11 @@ class RunTracker(Subsystem):
               display information about this work.
     - cmd: An optional longer string representing this work.
            E.g., the cmd line of a compiler invocation.
+    - log_config: An optional tuple WorkUnit.LogConfig of task-level options affecting reporting.
 
     Use like this:
 
-    with run_tracker.new_workunit(name='compile', labels=[WorkUnit.TASK]) as workunit:
+    with run_tracker.new_workunit(name='compile', labels=[WorkUnitLabel.TASK]) as workunit:
       <do scoped work here>
       <set the outcome on workunit if necessary>
 
@@ -168,7 +176,8 @@ class RunTracker(Subsystem):
     outcome explicitly if you want to set it to warning.
     """
     parent = self._threadlocal.current_workunit
-    with self.new_workunit_under_parent(name, parent=parent, labels=labels, cmd=cmd) as workunit:
+    with self.new_workunit_under_parent(name, parent=parent, labels=labels, cmd=cmd,
+                                        log_config=log_config) as workunit:
       self._threadlocal.current_workunit = workunit
       try:
         yield workunit
@@ -176,7 +185,7 @@ class RunTracker(Subsystem):
         self._threadlocal.current_workunit = parent
 
   @contextmanager
-  def new_workunit_under_parent(self, name, parent, labels=None, cmd=''):
+  def new_workunit_under_parent(self, name, parent, labels=None, cmd='', log_config=None):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
     - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
@@ -188,7 +197,8 @@ class RunTracker(Subsystem):
 
     Task code should not typically call this directly.
     """
-    workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels, cmd=cmd)
+    workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels,
+                        cmd=cmd, log_config=log_config)
     workunit.start()
     try:
       self.report.start_workunit(workunit)
@@ -234,18 +244,24 @@ class RunTracker(Subsystem):
       return error("Error: {}".format(e))
     return True
 
-  def upload_stats(self):
-    """Write stats to local cache, and upload to server, if needed."""
+  def store_stats(self):
+    """Store stats about this run in local and optionally remote stats dbs."""
     stats = {
       'run_info': self.run_info.get_as_dict(),
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all()
     }
+    # Dump individual stat file.
+    # TODO(benjy): Do we really need these, once the statsdb is mature?
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
     safe_file_dump(stats_file, json.dumps(stats))
 
+    # Add to local stats db.
+    StatsDBFactory.global_instance().get_db().insert_stats(stats)
+
+    # Upload to remote stats db.
     stats_url = self.get_options().stats_upload_url
     if stats_url:
       self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
@@ -283,13 +299,11 @@ class RunTracker(Subsystem):
     self.log(log_level, outcome_str)
 
     if self.run_info.get_info('outcome') is None:
-      try:
-        self.run_info.add_info('outcome', outcome_str)
-      except IOError:
-        pass  # If the goal is clean-all then the run info dir no longer exists...
+      # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
+      self.run_info.add_info('outcome', outcome_str, ignore_errors=True)
 
     self.report.close()
-    self.upload_stats()
+    self.store_stats()
 
   def end_workunit(self, workunit):
     self.report.end_workunit(workunit)

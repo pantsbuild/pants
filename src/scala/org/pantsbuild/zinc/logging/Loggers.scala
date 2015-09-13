@@ -8,18 +8,16 @@ package org.pantsbuild.zinc.logging
 
 import java.io.{ BufferedOutputStream, File, FileOutputStream, PrintWriter }
 import sbt.{ AbstractLogger, ConsoleLogger, FullLogger, ConsoleOut, Level, Logger, MultiLogger }
-import scala.util.matching.Regex
 
 object Loggers {
   /**
-   * Create a new console logger based on level, color, and filter settings. If captureLog is
+   * Create a new console logger based on level and color settings. If captureLog is
    * specified, a compound logger is created that will additionally log all output (unfiltered)
    * to a file.
    */
   def create(
     level: Level.Value,
     color: Boolean,
-    filters: Seq[Regex],
     out: ConsoleOut = ConsoleOut.systemOut,
     captureLog: Option[File] = None
   ): Logger = {
@@ -29,14 +27,7 @@ object Loggers {
       cl.setLevel(level)
       cl
     }
-    // add filtering if defined
-    val filteredLogger =
-      if (filters.nonEmpty) {
-        new FullLogger(new RegexFilterLogger(consoleLogger, filters))
-      } else {
-        consoleLogger
-      }
-    // if a capture log was specified, add it as an additional unfiltered destination
+    // if a capture log was specified, add it as an additional destination
     captureLog.map { captureLogFile =>
       // NB: we append to the capture log, in order to record the complete history of a compile
       val fileLogger = {
@@ -44,9 +35,9 @@ object Loggers {
         fl.setLevel(Level.Debug)
         fl
       }
-      new MultiLogger(List(filteredLogger, fileLogger))
+      new MultiLogger(List(consoleLogger, fileLogger))
     }.getOrElse {
-      filteredLogger
+      consoleLogger
     }
   }
 }
@@ -69,22 +60,4 @@ class FileLogger(file: File, append: Boolean) extends Logger {
     log(Level.Info, message)
 
   def trace(t: => Throwable): Unit = ()
-}
-
-class RegexFilterLogger(underlying: AbstractLogger, filters: Seq[Regex]) extends Logger {
-  override def log(level: Level.Value, msg: => String): Unit = {
-    // only apply filters if there is a chance that the underlying logger will try to log this
-    if (level.id >= underlying.getLevel.id) {
-      val message = msg
-      if (!filters.exists(_.findFirstIn(message).isDefined)) {
-        underlying.log(level, message)
-      }
-    }
-  }
-
-  def success(message: => String): Unit =
-    underlying.success(message)
-
-  def trace(t: => Throwable): Unit =
-    underlying.trace(t)
 }

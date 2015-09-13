@@ -21,7 +21,7 @@ class IdeaGenTest(BaseTest):
     SourceRoot.register("tests/java", JavaTests, JavaLibrary)
     SourceRoot.register("tests/resources", Resources)
 
-    src_java = SourceSet("repo-root", "src/java/com/pats", "project/lib", False)
+    src_java = SourceSet("repo-root", "src/java/com/pants", "project/lib", False)
     self.assertFalse(IdeaGen._sibling_is_test(src_java))
 
     src_resources = SourceSet("repo-root", "src/resources/org/pantsbuild", "project/lib", False,

@@ -36,6 +36,7 @@ from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
 logger = logging.getLogger(__name__)
 
+
 class PythonChroot(object):
   _VALID_DEPENDENCIES = {
     PrepCommand: 'prep',
@@ -46,8 +47,6 @@ class PythonChroot(object):
     PythonAntlrLibrary: 'antlrs',
     PythonTests: 'tests'
   }
-
-  MEMOIZED_THRIFTS = {}
 
   class InvalidDependencyException(Exception):
     def __init__(self, target):
@@ -66,7 +65,8 @@ class PythonChroot(object):
                builder,
                targets,
                platforms,
-               extra_requirements=None):
+               extra_requirements=None,
+               log=None):
     self._python_setup = python_setup
     self._python_repos = python_repos
     self._ivy_bootstrapper = ivy_bootstrapper
@@ -77,6 +77,7 @@ class PythonChroot(object):
     self._targets = targets
     self._platforms = platforms
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
+    self._logger = log or logger
 
     # Note: unrelated to the general pants artifact cache.
     self._artifact_cache_root = os.path.join(
@@ -88,9 +89,8 @@ class PythonChroot(object):
     """Deletes this chroot from disk if it has been dumped."""
     safe_rmtree(self.path())
 
-  def debug(self, msg, indent=0):
-    if os.getenv('PANTS_VERBOSE') is not None:
-      print('{}{}'.format(' ' * indent, msg))
+  def debug(self, msg):
+    self._logger.debug(msg)
 
   def path(self):
     return os.path.realpath(self._builder.path())
@@ -197,11 +197,8 @@ class PythonChroot(object):
 
     generated_reqs = OrderedSet()
     if targets['thrifts']:
-      for thr in set(targets['thrifts']):
-        if thr not in self.MEMOIZED_THRIFTS:
-          self.MEMOIZED_THRIFTS[thr] = self._generate_thrift_requirement(thr)
-        generated_reqs.add(self.MEMOIZED_THRIFTS[thr])
-
+      for thr in targets['thrifts']:
+        generated_reqs.add(self._generate_thrift_requirement(thr))
       generated_reqs.add(PythonRequirement('thrift', use_2to3=True))
 
     for antlr in targets['antlrs']:
@@ -255,13 +252,14 @@ class PythonChroot(object):
     context = self._python_repos.get_network_context()
 
     for platform in platforms:
+      requirements_cache_dir = os.path.join(self._python_setup.resolver_cache_dir, str(self._interpreter.identity))
       distributions[platform] = resolve(
         requirements=[req.requirement for req in requirements],
         interpreter=self._interpreter,
         fetchers=fetchers,
         platform=platform,
         context=context,
-        cache=self._python_setup.resolver_cache_dir,
+        cache=requirements_cache_dir,
         cache_ttl=self._python_setup.resolver_cache_ttl)
 
     return distributions

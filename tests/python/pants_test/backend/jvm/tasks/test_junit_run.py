@@ -18,22 +18,15 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.goal.products import MultipleRootedProducts
 from pants.ivy.bootstrapper import Bootstrapper
-from pants.java.distribution.distribution import Distribution
+from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 class JUnitRunnerTest(JvmToolTaskTestBase):
   """Tests for junit_run._JUnitRunner class"""
-
-  def setUp(self):
-    super(JUnitRunnerTest, self).setUp()
-
-    # JUnitRun uses the safe_args context manager to guard long command lines, and it needs this
-    # option set
-    self.set_options_for_scope('', max_subprocess_args=100)
-    # Hack to make sure subsystems are initialized
-    self.context()
 
   @classmethod
   def task_type(cls):
@@ -41,7 +34,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
   @property
   def alias_groups(self):
-    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases.create(
+    return super(JUnitRunnerTest, self).alias_groups.merge(BuildFileAliases(
       targets={
         'java_tests': JavaTests,
         'python_tests': PythonTests,
@@ -79,6 +72,22 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
+  def test_junit_runner_error(self):
+    with self.assertRaises(TaskError) as cm:
+      self.execute_junit_runner(
+        dedent("""
+          import org.junit.Test;
+          public class FooTest {
+            @Test
+            public void testFoo() {
+              throw new RuntimeException("test error");
+            }
+          }
+        """)
+      )
+
+    self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+
   def execute_junit_runner(self, content):
 
     # Create the temporary base test directory
@@ -92,12 +101,14 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.create_file(test_java_file_rel_path, content)
 
     # Invoke ivy to resolve classpath for junit.
-    distribution = Distribution.cached(jdk=True)
-    executor = SubprocessExecutor(distribution=distribution)
     classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
-    ivy = Bootstrapper.default_ivy()
-    ivy.execute(args=['-cachepath', classpath_file_abs_path,
-                      '-dependency', 'junit', 'junit-dep', '4.10'], executor=executor)
+    with subsystem_instance(IvySubsystem) as ivy_subsystem:
+      distribution = DistributionLocator.cached(jdk=True)
+      ivy = Bootstrapper(ivy_subsystem=ivy_subsystem).ivy()
+      ivy.execute(args=['-cachepath', classpath_file_abs_path,
+                        '-dependency', 'junit', 'junit-dep', '4.10'],
+                  executor=SubprocessExecutor(distribution=distribution))
+
     with open(classpath_file_abs_path) as fp:
       classpath = fp.read()
 
@@ -132,9 +143,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # Also we need to add the FooTest.class's classpath to the compile_classpath
     # products data mapping so JUnitRun will be able to add that into the final
     # classpath under which the junit will be executed.
-    self.populate_compile_classpath(
-      context=context,
-      classpath=[test_abs_path])
+    self.populate_compile_classpath(context=context, classpath=[test_abs_path])
 
     # Finally execute the task.
     self.execute(context)
@@ -166,13 +175,3 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'must include a non-empty set of sources'):
       task.execute()
-
-
-class EmmaTest(JvmToolTaskTestBase):
-  """Tests for junit_run.Emma class"""
-  # TODO(Jin Feng) to be implemented
-
-
-class CoberturaTest(JvmToolTaskTestBase):
-  """Tests for junit_run.Cobertura class"""
-  # TODO(Jin Feng) to be implemented

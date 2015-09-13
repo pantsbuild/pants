@@ -18,7 +18,13 @@ class NailgunSession(object):
   """Handles a single nailgun command session."""
 
   class ProtocolError(Exception):
-    """Thrown if there is an error in the underlying nailgun protocol."""
+    """Raised if there is an error in the underlying nailgun protocol."""
+
+  class TruncatedHeaderError(ProtocolError):
+    """Raised if there is a socket error while reading the header bytes."""
+
+  class TruncatedPayloadError(ProtocolError):
+    """Raised if there is a socket error while reading the payload bytes."""
 
   # See: http://www.martiansoftware.com/nailgun/protocol.html
   HEADER_FMT = b'>Ic'
@@ -111,12 +117,26 @@ class NailgunSession(object):
 
   def _read_chunk(self, buff):
     while len(buff) < self.HEADER_LENGTH:
-      buff += self._sock.recv(self.BUFF_SIZE)
+      received_bytes = self._sock.recv(self.BUFF_SIZE)
+      if not received_bytes:
+        raise self.TruncatedHeaderError(
+          'While reading chunk for payload length and command, socket.recv returned no bytes'
+          ' (client shut down).  Accumulated buffer was:\n{}\n'
+          .format(buff.decode('utf-8', errors='replace'))
+        )
+      buff += received_bytes
 
     payload_length, command = struct.unpack(self.HEADER_FMT, buff[:self.HEADER_LENGTH])
     buff = buff[self.HEADER_LENGTH:]
     while len(buff) < payload_length:
-      buff += self._sock.recv(self.BUFF_SIZE)
+      received_bytes = self._sock.recv(self.BUFF_SIZE)
+      if not received_bytes:
+        raise self.TruncatedPayloadError(
+          'While reading chunk for payload content, socket.recv returned no bytes'
+          ' (client shut down).  Accumulated buffer was:\n{}\n'
+          .format(buff.decode('utf-8', errors='replace'))
+        )
+      buff += received_bytes
 
     payload = buff[:payload_length]
     rest = buff[payload_length:]

@@ -25,10 +25,11 @@ from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.meta import AbstractClass
 
 
-class TaskBase(Optionable, AbstractClass):
+class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 
@@ -104,8 +105,9 @@ class TaskBase(Optionable, AbstractClass):
     # The task's own scope.
     yield cls.get_scope_info()
     # The scopes of any task-specific subsystems it uses.
-    for subsystem in cls.task_subsystems():
-      yield subsystem.get_scope_info(subscope=cls.options_scope)
+    for dep in cls.subsystem_dependencies_iter():
+      if not dep.is_global():
+        yield dep.subsystem_cls.get_scope_info(subscope=dep.scope)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -223,9 +225,8 @@ class TaskBase(Optionable, AbstractClass):
     if not self._fingerprint:
       hasher = sha1()
       hasher.update(self._options_fingerprint(self.options_scope))
-      for subsystem in self.task_subsystems():
-        hasher.update(self._options_fingerprint(subsystem.subscope(self.options_scope)))
-        hasher.update(self._options_fingerprint(subsystem.options_scope))
+      for dep in self.subsystem_dependencies_iter():
+        hasher.update(self._options_fingerprint(dep.options_scope()))
       self._fingerprint = str(hasher.hexdigest())
     return self._fingerprint
 
@@ -507,34 +508,6 @@ class TaskBase(Optionable, AbstractClass):
       raise TaskError('Multiple targets specified: {}'
                       .format(', '.join([repr(t) for t in target_roots])))
     return target_roots[0]
-
-  def require_homogeneous_targets(self, accept_predicate, reject_predicate):
-    """Ensures that there is no ambiguity in the context according to the given predicates.
-
-    If any targets in the context satisfy the accept_predicate, and no targets satisfy the
-    reject_predicate, returns the accepted targets.
-
-    If no targets satisfy the accept_predicate, returns None.
-
-    Otherwise throws TaskError.
-    """
-    if len(self.context.target_roots) == 0:
-      raise TaskError('No target specified.')
-
-    accepted = self.context.targets(accept_predicate)
-    rejected = self.context.targets(reject_predicate)
-    if len(accepted) == 0:
-      # no targets were accepted, regardless of rejects
-      return None
-    elif len(rejected) == 0:
-      # we have at least one accepted target, and no rejected targets
-      return accepted
-    else:
-      # both accepted and rejected targets
-      # TODO: once https://github.com/pantsbuild/pants/issues/425 lands, we should add
-      # language-specific flags that would resolve the ambiguity here
-      raise TaskError('Mutually incompatible targets specified: {} vs {} (and {} others)'
-                      .format(accepted[0], rejected[0], len(accepted) + len(rejected) - 2))
 
 
 class Task(TaskBase):

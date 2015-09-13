@@ -16,7 +16,7 @@ from pants_test.base_test import BaseTest
 class PythonRequirementListTest(BaseTest):
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
         targets={
             'python_requirement_library': PythonRequirementLibrary,
         },

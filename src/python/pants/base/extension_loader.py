@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import importlib
 import traceback
 
-from pkg_resources import Requirement, working_set
+from pkg_resources import Requirement
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_configuration import BuildConfiguration
@@ -24,27 +24,28 @@ class PluginNotFound(PluginLoadingError): pass
 class PluginLoadOrderError(PluginLoadingError): pass
 
 
-def load_plugins_and_backends(plugins=None, backends=None):
+def load_plugins_and_backends(plugins, working_set, backends):
   """Load named plugins and source backends
 
   :param list<str> plugins: Plugins to load (see `load_plugins`).
+  :param WorkingSet working_set: A pkg_resources.WorkingSet to load plugins from.
   :param list<str> backends: Source backends to load (see `load_build_configuration_from_source`).
   """
   build_configuration = BuildConfiguration()
-  load_plugins(build_configuration, plugins or [])
+  load_plugins(build_configuration, plugins or [], working_set)
   load_build_configuration_from_source(build_configuration, additional_backends=backends or [])
   return build_configuration
 
 
-def load_plugins(build_configuration, plugins, load_from=None):
+def load_plugins(build_configuration, plugins, working_set):
   """Load named plugins from the current working_set into the supplied build_configuration
 
   "Loading" a plugin here refers to calling registration methods -- it is assumed each plugin
   is already on the path and an error will be thrown if it is not. Plugins should define their
   entrypoints in the `pantsbuild.plugin` group when configuring their distribution.
 
-  Like source backends, the `build_file_aliases`, `global_subsystems` and `register_goals` methods are called if
-  those entry points are defined.
+  Like source backends, the `build_file_aliases`, `global_subsystems` and `register_goals` methods
+  are called if those entry points are defined.
 
   * Plugins are loaded in the order they are provided. *
 
@@ -58,13 +59,12 @@ def load_plugins(build_configuration, plugins, load_from=None):
   :param BuildConfiguration build_configuration: The BuildConfiguration (for adding aliases).
   :param list<str> plugins: A list of plugin names optionally with versions, in requirement format.
                             eg ['widgetpublish', 'widgetgen==1.2'].
-  :param WorkingSet load_from: A pkg_resources.WorkingSet to use instead of global (for testing).
+  :param WorkingSet working_set: A pkg_resources.WorkingSet to load plugins from.
   """
-  load_from = load_from or working_set
   loaded = {}
   for plugin in plugins:
     req = Requirement.parse(plugin)
-    dist = load_from.find(req)
+    dist = working_set.find(req)
 
     if not dist:
       raise PluginNotFound('Could not find plugin: {}'.format(req))

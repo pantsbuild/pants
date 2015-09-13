@@ -26,7 +26,6 @@ class ZincAnalysisParser(AnalysisParser):
     self._underlying_parser = UnderlyingParser()
 
   # Implement AnalysisParser methods.
-
   def parse(self, infile):
     """Parse a ZincAnalysis instance from an open text file."""
     with raise_on_eof(infile):
@@ -43,10 +42,10 @@ class ZincAnalysisParser(AnalysisParser):
       except UnderlyingParser.ParseError as e:
         raise ParseError(e)
 
-  def parse_deps(self, infile, classpath_indexer, classes_dir):
+  def parse_deps(self, infile):
     with raise_on_eof(infile):
       try:
-        return self._underlying_parser.parse_deps(infile, classes_dir)
+        return self._underlying_parser.parse_deps(infile, "")
       except UnderlyingParser.ParseError as e:
         raise ParseError(e)
 

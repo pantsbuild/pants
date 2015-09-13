@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import copy
 import os
 import unittest
 from collections import defaultdict
@@ -13,8 +12,7 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_address_mapper import BuildFileAddressMapper
@@ -28,13 +26,11 @@ from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.goal.goal import Goal
 from pants.goal.products import MultipleRootedProducts, UnionProducts
-from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.global_options import GlobalOptionsRegistrar
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
 from pants_test.base.context_utils import create_context
-from pants_test.option.util.fakes import create_option_values, options_registration_function
+from pants_test.option.util.fakes import create_options_for_optionables
 
 
 # TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
@@ -84,25 +80,52 @@ class BaseTest(unittest.TestCase):
                   spec='',
                   target_type=Target,
                   dependencies=None,
-                  resources=None,
                   derived_from=None,
                   **kwargs):
-    address = SyntheticAddress.parse(spec)
+    """Creates a target and injects it into the test's build graph.
+
+    :param string spec: The target address spec that locates this target.
+    :param type target_type: The concrete target subclass to create this new target from.
+    :param list dependencies: A list of target instances this new target depends on.
+    :param derived_from: The target this new target was derived from.
+    :type derived_from: :class:`pants.base.target.Target`
+    """
+    address = Address.parse(spec)
     target = target_type(name=address.target_name,
                          address=address,
                          build_graph=self.build_graph,
                          **kwargs)
     dependencies = dependencies or []
-    dependencies.extend(resources or [])
 
     self.build_graph.inject_target(target,
                                    dependencies=[dep.address for dep in dependencies],
                                    derived_from=derived_from)
+
+    # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
+    # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
+    for traversable_dependency_spec in target.traversable_dependency_specs:
+      traversable_dependency_address = Address.parse(traversable_dependency_spec,
+                                                     relative_to=address.spec_path)
+      traversable_dependency_target = self.build_graph.get_target(traversable_dependency_address)
+      if not traversable_dependency_target:
+        raise ValueError('Tests must make targets for traversable dependency specs ahead of them '
+                         'being traversed, {} tried to traverse {} which does not exist.'
+                         .format(target, traversable_dependency_address))
+      if traversable_dependency_target not in target.dependencies:
+        self.build_graph.inject_dependency(dependent=target.address,
+                                           dependency=traversable_dependency_address)
+        target.mark_transitive_invalidation_hash_dirty()
+
     return target
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'target': Dependencies})
+    # NB: In a normal pants deployment, 'target' is an alias for
+    # `pants.backend.core.targets.dependencies.Dependencies`.  We avoid that dependency on the core
+    # backend here since the `BaseTest` is used by lower level tests in base and since the
+    # `Dependencies` type itself is nothing more than an alias for Target that carries along a
+    # pydoc for the BUILD dictionary.
+    return BuildFileAliases(targets={'target': Target})
 
   def setUp(self):
     super(BaseTest, self).setUp()
@@ -137,6 +160,19 @@ class BaseTest(unittest.TestCase):
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
+  def buildroot_files(self, relpath=None):
+    """Returns the set of all files under the test build root.
+
+    :param string relpath: If supplied, only collect files from this subtree.
+    :returns: All file paths found.
+    :rtype: set
+    """
+    def scan():
+      for root, dirs, files in os.walk(os.path.join(self.build_root, relpath or '')):
+        for f in files:
+          yield os.path.relpath(os.path.join(root, f), self.build_root)
+    return set(scan())
+
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
@@ -145,73 +181,39 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None):
-    for_task_types = for_task_types or []
-    options = options or {}
+  def context(self, for_task_types=None, options=None, target_roots=None, console_outstream=None,
+              workspace=None, for_subsystems=None):
 
-    option_values = defaultdict(dict)
-    registered_subsystems = set()
-    bootstrap_option_values = None  # We fill these in after registering bootstrap options.
+    optionables = set()
+    extra_scopes = set()
 
-    # We provide our own test-only registration implementation, bypassing argparse.
-    # When testing we set option values directly, so we don't care about cmd-line flags, config,
-    # env vars etc. In fact, for test isolation we explicitly don't want to look at those.
-    # All this does is make the names available in code, with the default values.
-    # Individual tests can then override the option values they care about.
-    def register_func(on_scope):
-      scoped_options = option_values[on_scope]
-      register = options_registration_function(scoped_options)
-      register.bootstrap = bootstrap_option_values
-      register.scope = on_scope
-      return register
+    for_subsystems = for_subsystems or ()
+    for subsystem in for_subsystems:
+      if subsystem.options_scope is None:
+        raise TaskError('You must set a scope on your subsystem type before using it in tests.')
+      optionables.add(subsystem)
 
-    # TODO: This sequence is a bit repetitive of the real registration sequence.
-
-    # Register bootstrap options and grab their default values for use in subsequent registration.
-    GlobalOptionsRegistrar.register_bootstrap_options(register_func(GLOBAL_SCOPE))
-    bootstrap_option_values = create_option_values(copy.copy(option_values[GLOBAL_SCOPE]))
-
-    # Now register the full global scope options.
-    GlobalOptionsRegistrar.register_options(register_func(GLOBAL_SCOPE))
-
-    # Now register task and subsystem options for relevant tasks.
+    for_task_types = for_task_types or ()
     for task_type in for_task_types:
       scope = task_type.options_scope
       if scope is None:
         raise TaskError('You must set a scope on your task type before using it in tests.')
-      task_type.register_options(register_func(scope))
-      for subsystem in Subsystem.closure(set(task_type.global_subsystems()) |
-                                         set(task_type.task_subsystems()) |
-                                         self._build_configuration.subsystems()):
-        if subsystem not in registered_subsystems:
-          subsystem.register_options(register_func(subsystem.options_scope))
-          registered_subsystems.add(subsystem)
+      optionables.add(task_type)
+      extra_scopes.update([si.scope for si in task_type.known_scope_infos()])
+      optionables.update(Subsystem.closure(
+        set([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()]) |
+            self._build_configuration.subsystems()))
 
-    # Now default option values override with any caller-specified values.
+    # Now default the option values and override with any caller-specified values.
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
+    options = options.copy() if options else {}
+    for s, opts in self.options.items():
+      scoped_opts = options.setdefault(s, {})
+      scoped_opts.update(opts)
 
-    for scope, opts in options.items():
-      for key, val in opts.items():
-        option_values[scope][key] = val
-
-    for scope, opts in self.options.items():
-      for key, val in opts.items():
-        option_values[scope][key] = val
-
-    # Make inner scopes inherit option values from their enclosing scopes.
-    all_scopes = set(option_values.keys())
-    for task_type in for_task_types:  # Make sure we know about pre-task subsystem scopes.
-      all_scopes.update([si.scope for si in task_type.known_scope_infos()])
-    # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
-    # and therefore only have to inherit from our immediately enclosing scope.
-    for scope in sorted(all_scopes):
-      if scope != GLOBAL_SCOPE:
-        enclosing_scope = scope.rpartition('.')[0]
-        opts = option_values[scope]
-        for key, val in option_values.get(enclosing_scope, {}).items():
-          if key not in opts:  # Inner scope values override the inherited ones.
-            opts[key] = val
+    option_values = create_options_for_optionables(optionables,
+                                                   extra_scopes=extra_scopes,
+                                                   options=options)
 
     context = create_context(options=option_values,
                              target_roots=target_roots,
@@ -226,6 +228,7 @@ class BaseTest(unittest.TestCase):
   def tearDown(self):
     SourceRoot.reset()
     FilesystemBuildFile.clear_cache()
+    Subsystem.reset()
 
   def target(self, spec):
     """Resolves the given target address to a Target object.
@@ -234,7 +237,7 @@ class BaseTest(unittest.TestCase):
 
     Returns the corresponding Target or else None if the address does not point to a defined Target.
     """
-    address = SyntheticAddress.parse(spec)
+    address = Address.parse(spec)
     self.build_graph.inject_address_closure(address)
     return self.build_graph.get_target(address)
 
@@ -319,11 +322,13 @@ class BaseTest(unittest.TestCase):
     in the context, which holds the classpath value for targets.
 
     :param context: The execution context where the products data mapping lives.
-    :param classpath: a list of classpath strings. If not specified, [os.path.join(self.buildroot, 'none')] will be used.
+    :param classpath: a list of classpath strings. If not specified,
+                      [os.path.join(self.buildroot, 'none')] will be used.
     """
     classpath = classpath or [os.path.join(self.build_root, 'none')]
     compile_classpaths = context.products.get_data('compile_classpath', lambda: UnionProducts())
-    compile_classpaths.add_for_targets(context.targets(), [('default', entry) for entry in classpath])
+    compile_classpaths.add_for_targets(context.targets(),
+                                       [('default', entry) for entry in classpath])
 
   @contextmanager
   def add_data(self, context_products, data_type, target, *products):

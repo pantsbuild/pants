@@ -37,7 +37,7 @@ class UnreadableArtifact(object):
     :param err: Any additional information on the nature of the read error.
     """
     self.key = key
-    self.err = None
+    self.err = err
 
   # For python 3
   def __bool__(self):
@@ -46,6 +46,9 @@ class UnreadableArtifact(object):
   # For python 2
   def __nonzero__(self):
     return self.__bool__()
+
+  def __str__(self):
+    return "key={} err={}".format(self.key, self.err)
 
 
 class ArtifactCache(object):
@@ -121,7 +124,7 @@ class ArtifactCache(object):
 
     Implementations may choose to return an UnreadableArtifact instance instead
     of `False` to indicate an artifact was in the cache but could not be read,
-    due to anerror or corruption. UnreadableArtifact evaluates as False-y, so
+    due to an error or corruption. UnreadableArtifact evaluates as False-y, so
     callers can treat the result as a boolean if they are only concerned with
     whether or not an artifact was read.
 
@@ -150,13 +153,18 @@ def call_use_cached_files(tup):
 
   :param tup: A tuple of an ArtifactCache and arg (eg CacheKey) for ArtifactCache.use_cached_files.
   """
-  cache, key = tup
-  res = cache.use_cached_files(key)
-  if res:
-    sys.stderr.write('.')
-  else:
-    sys.stderr.write(' ')
-  return res
+
+  try:
+    cache, key = tup
+    res = cache.use_cached_files(key)
+    if res:
+      sys.stderr.write('.')
+    else:
+      sys.stderr.write(' ')
+    return res
+  except NonfatalArtifactCacheError as e:
+    logger.warn('Error calling use_cached_files in artifact cache: {0}'.format(e))
+    return False
 
 
 def call_insert(tup):
@@ -168,5 +176,9 @@ def call_insert(tup):
               eg (some_cache_instance, cache_key, [some_file, another_file], False)
 
   """
-  cache, key, files, overwrite = tup
-  return cache.insert(key, files, overwrite)
+  try:
+    cache, key, files, overwrite = tup
+    return cache.insert(key, files, overwrite)
+  except NonfatalArtifactCacheError as e:
+    logger.warn('Error while inserting into artifact cache: {0}'.format(e))
+    return False

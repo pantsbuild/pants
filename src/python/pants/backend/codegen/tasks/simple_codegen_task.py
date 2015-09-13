@@ -12,12 +12,12 @@ from abc import abstractmethod
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -40,19 +40,19 @@ class SimpleCodegenTask(Task):
   @classmethod
   def register_options(cls, register):
     super(SimpleCodegenTask, cls).register_options(register)
-    register('--allow-empty', action='store_true', default=True,
+    register('--allow-empty', action='store_true', default=True, fingerprint=True,
              help='Skip targets with no sources defined.',
              advanced=True)
     strategy_names = [strategy.name() for strategy in cls.supported_strategy_types()]
     if cls.forced_codegen_strategy() is None:
-      register('--strategy', choices=strategy_names,
+      register('--strategy', choices=strategy_names, fingerprint=True,
                default=strategy_names[0],
                help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                     'global directory for all generated code, and the "isolated" strategy uses '
                     'per-target codegen directories.',
                advanced=True)
     if 'isolated' in strategy_names:
-      register('--allow-dups', action='store_true', default=False,
+      register('--allow-dups', action='store_true', default=False, fingerprint=True,
                help='Allow multiple targets specifying the same sources when using the isolated '
                     'strategy. If duplicates are allowed, the logic of find_sources in '
                     'IsolatedCodegenStrategy will associate generated sources with '
@@ -222,7 +222,7 @@ class SimpleCodegenTask(Task):
         target_workdir = self.codegen_workdir(target)
         synthetic_name = target.id
         sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
-        synthetic_address = SyntheticAddress(sources_rel_path, synthetic_name)
+        synthetic_address = Address(sources_rel_path, synthetic_name)
         raw_generated_sources = list(self.codegen_strategy.find_sources(target))
         # Make the sources robust regardless of whether subclasses return relative paths, or
         # absolute paths that are subclasses of the workdir.
@@ -236,9 +236,14 @@ class SimpleCodegenTask(Task):
           address=synthetic_address,
           target_type=self.synthetic_target_type,
           dependencies=self.synthetic_target_extra_dependencies(target),
-          sources_rel_path=sources_rel_path,
           sources=relative_generated_sources,
           derived_from=target,
+
+          # TODO(John Sirois): This assumes - currently, a JvmTarget or PythonTarget which both
+          # happen to have this attribute for carrying publish metadata but share no interface
+          # that defines this canonical property.  Lift up an interface and check for it or else
+          # add a way for SimpleCodeGen subclasses to specify extra attribute names that should be
+          # copied over from the target to its derived target.
           provides=target.provides,
         )
         synthetic_target = self.target
@@ -336,7 +341,7 @@ class SimpleCodegenTask(Task):
       return 'global'
 
     def execute_codegen(self, targets):
-      with self._task.context.new_workunit(name='execute', labels=[WorkUnit.MULTITOOL]):
+      with self._task.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         self._do_execute_codegen(targets)
 
     @abstractmethod
@@ -368,7 +373,7 @@ class SimpleCodegenTask(Task):
       return 'isolated'
 
     def execute_codegen(self, targets):
-      with self._task.context.new_workunit(name='execute', labels=[WorkUnit.MULTITOOL]):
+      with self._task.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         ordered = [target for target in reversed(sort_targets(targets)) if target in targets]
         for target in ordered:
           with self._task.context.new_workunit(name=target.address.spec):

@@ -14,8 +14,8 @@ import mox
 
 from pants.util import dirutil
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import (_mkdtemp_unregister_cleaner, relative_symlink, relativize_paths,
-                                safe_mkdir)
+from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir,
+                                relative_symlink, relativize_paths, safe_mkdir)
 
 
 class DirutilTest(unittest.TestCase):
@@ -27,6 +27,22 @@ class DirutilTest(unittest.TestCase):
 
   def tearDown(self):
     self._mox.UnsetStubs()
+
+  def test_fast_relpath(self):
+    def assertRelpath(expected, path, start):
+      self.assertEquals(expected, fast_relpath(path, start))
+    assertRelpath('c', '/a/b/c', '/a/b')
+    assertRelpath('c', '/a/b/c', '/a/b/')
+    assertRelpath('c', 'b/c', 'b')
+    assertRelpath('c', 'b/c', 'b/')
+    assertRelpath('c/', 'b/c/', 'b')
+    assertRelpath('c/', 'b/c/', 'b/')
+
+  def test_fast_relpath_invalid(self):
+    with self.assertRaises(ValueError):
+      fast_relpath('/a/b', '/a/baseball')
+    with self.assertRaises(ValueError):
+      fast_relpath('/a/baseball', '/a/b')
 
   def test_mkdtemp_setup_teardown(self):
     def faux_cleaner():
@@ -127,3 +143,8 @@ class DirutilTest(unittest.TestCase):
       link = os.path.join('foo', 'bar')
       with self.assertRaisesRegexp(ValueError, r'Path for link.*absolute'):
         relative_symlink(source, link)
+
+  def test_get_basedir(self):
+    self.assertEquals(get_basedir('foo/bar/baz'), 'foo')
+    self.assertEquals(get_basedir('/foo/bar/baz'), '')
+    self.assertEquals(get_basedir('foo'), 'foo')

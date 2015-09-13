@@ -15,6 +15,7 @@ class _RWBuf(object):
 
   Can be used as a file-like object for reading and writing.
   Subclasses implement write functionality."""
+
   def __init__(self, io):
     self._lock = threading.Lock()
     self._io = io
@@ -53,6 +54,7 @@ class InMemoryRWBuf(_RWBuf):
 
   Can be used as a file-like object for reading and writing. Note that it can't be used in
   situations that require a real file (e.g., redirecting stdout/stderr of subprocess.Popen())."""
+
   def __init__(self):
     _RWBuf.__init__(self, StringIO())
     self._writepos = 0
@@ -69,6 +71,7 @@ class FileBackedRWBuf(_RWBuf):
   Can be used as a file-like object for reading and writing the underlying file. Has a fileno,
   so you can redirect stdout/stderr of subprocess.Popen() etc. to this object. This is useful
   when you want to poll the output of long-running subprocesses in a separate thread."""
+
   def __init__(self, backing_file):
     _RWBuf.__init__(self, open(backing_file, 'a+'))
     self.fileno = self._io.fileno

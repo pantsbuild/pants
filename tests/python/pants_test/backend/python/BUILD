@@ -16,14 +16,17 @@ python_tests(
   dependencies=[
     '3rdparty/python:pex',
     'src/python/pants/backend/codegen/targets:python',
+
+    # TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
+    # in pants java since non-jvm backends depend on it to run things.
+    'src/python/pants/backend/jvm/subsystems:jvm',
+
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_chroot',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python:python_setup',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:source_root',
-    'src/python/pants/binaries:binary_util',
     'src/python/pants/binaries:thrift_util',
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',

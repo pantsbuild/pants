@@ -47,7 +47,8 @@ case class ConsoleOptions(
   logPhases: Boolean         = false,
   printProgress: Boolean     = false,
   heartbeatSecs: Int         = 0,
-  logFilters: Seq[Regex]     = Seq.empty
+  fileFilters: Seq[Regex]    = Seq.empty,
+  msgFilters: Seq[Regex]     = Seq.empty
 )
 
 /**
@@ -197,8 +198,10 @@ object Settings {
       (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(printProgress = true))),
     int(       "-heartbeat", "interval (sec)", "Print '.' to stdout every n seconds while compiling",
       (s: Settings, b: Int) => s.copy(consoleLog = s.consoleLog.copy(heartbeatSecs = b))),
-    string(    "-log-filter", "regex",         "Filter log messages matching the regex from stdout",
-      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(logFilters = s.consoleLog.logFilters :+ re.r))),
+    string(    "-msg-filter", "regex",         "Filter warning messages matching the given regex",
+      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ re.r))),
+    string(    "-file-filter", "regex",        "Filter warning messages from filenames matching the given regex",
+      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ re.r))),
     file(      "-capture-log", "file",         "Captures all logging (unfiltered) to the given file",
       (s: Settings, f: File) => s.copy(captureLog = Some(f))),
 

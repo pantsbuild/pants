@@ -12,7 +12,7 @@ import subprocess
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.android_task import AndroidTask
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
 
@@ -69,7 +69,7 @@ class Zipalign(AndroidTask):
       for package in packages:
         safe_mkdir(self.zipalign_out(target))
         args = self._render_args(package, target)
-        with self.context.new_workunit(name='zipalign', labels=[WorkUnit.MULTITOOL]) as workunit:
+        with self.context.new_workunit(name='zipalign', labels=[WorkUnitLabel.MULTITOOL]) as workunit:
           returncode = subprocess.call(args, stdout=workunit.output('stdout'),
                                        stderr=workunit.output('stderr'))
           if returncode:

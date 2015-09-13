@@ -5,13 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 from hashlib import sha1
 
 from six import string_types
 
 from pants.backend.core.wrapped_globs import FilesetWithSpec
-from pants.base.address import Addresses, SyntheticAddress
+from pants.base.address import Address, Addresses, BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -21,6 +22,11 @@ from pants.base.payload_field import DeferredSourcesField, SourcesField
 from pants.base.source_root import SourceRoot
 from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
+from pants.option.custom_types import dict_option
+from pants.subsystem.subsystem import Subsystem
+
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractTarget(object):
@@ -120,30 +126,47 @@ class Target(AbstractTarget):
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses"""
 
-  class UnknownArguments(TargetDefinitionException):
-    """Unknown keyword arguments supplied to Target."""
-
   class IllegalArgument(TargetDefinitionException):
     """Argument that isn't allowed supplied to Target."""
 
-  LANG_DISCRIMINATORS = {
-    'java': lambda t: t.is_jvm,
-    'python': lambda t: t.is_python,
-  }
+  class UnknownArguments(Subsystem):
+    """Subsystem for validating unknown keyword arguments."""
+
+    class Error(TargetDefinitionException):
+      """Unknown keyword arguments supplied to Target."""
+
+    options_scope = 'unknown-arguments'
+
+    @classmethod
+    def register_options(cls, register):
+      register('--ignored', advanced=True, type=dict_option,
+               help='Map of target name to a list of keyword arguments that should be ignored if a '
+                    'target receives them unexpectedly. Typically used to allow usage of arguments '
+                    'in BUILD files that are not yet available in the current version of pants.')
+
+    @classmethod
+    def check(cls, target, kwargs):
+      cls.global_instance().check_unknown(target, kwargs)
+
+    def check_unknown(self, target, kwargs):
+      ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
+      unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
+      ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
+      if ignored_args:
+        logger.debug('{target} ignoring the unimplemented arguments: {args}'
+                     .format(target=target.address.spec,
+                             args=', '.join('{} = {}'.format(key, val)
+                                            for key, val in ignored_args.items())))
+      if unknown_args:
+        error_message = '{target_type} received unknown arguments: {args}'
+        raise self.Error(target.address.spec, error_message.format(
+          target_type=type(target).__name__,
+          args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
+        ))
 
   @classmethod
-  def lang_discriminator(cls, lang):
-    """Returns a tuple of target predicates that select the given lang vs all other supported langs.
-
-       The left hand side accepts targets for the given language; the right hand side accepts
-       targets for all other supported languages.
-    """
-    def is_other_lang(target):
-      for name, discriminator in cls.LANG_DISCRIMINATORS.items():
-        if name != lang and discriminator(target):
-          return True
-      return False
-    return (cls.LANG_DISCRIMINATORS[lang], is_other_lang)
+  def subsystems(cls):
+    return super(Target, cls).subsystems() + (cls.UnknownArguments,)
 
   @classmethod
   def get_addressable_type(target_cls):
@@ -182,42 +205,60 @@ class Target(AbstractTarget):
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
-  def __init__(self, name, address, build_graph, payload=None, tags=None, description=None,
-               **kwargs):
+  def __init__(self, name, address, build_graph, type_alias=None, payload=None, tags=None,
+               description=None, **kwargs):
     """
-    :param string name: The name of this target, which combined with this
-      build file defines the target address.
-    :param dependencies: Other targets that this target depends on.
-    :type dependencies: list of target specs
-    :param Address address: The Address that maps to this Target in the BuildGraph
-    :param BuildGraph build_graph: The BuildGraph that this Target lives within
-    :param Payload payload: The configuration encapsulated by this target.  Also in charge of
-      most fingerprinting details.
-    :param iterable<string> tags: Arbitrary string tags that describe this target. Usable
-        by downstream/custom tasks for reasoning about build graph. NOT included in payloads
-        and thus not used in fingerprinting, thus not suitable for anything that affects how
-        a particular target is built.
+    :param string name: The name of this target, which combined with this build file defines the
+                        target address.
+    :param dependencies: Target address specs of other targets that this target depends on.
+    :type dependencies: list of strings
+    :param address: The Address that maps to this Target in the BuildGraph.
+    :type address: :class:`pants.base.address.Address`
+    :param build_graph: The BuildGraph that this Target lives within.
+    :type build_graph: :class:`pants.base.build_graph.BuildGraph`
+    :param string type_alias: The type_alias used to construct this target, may be None if
+                              constructed directly.
+    :param payload: The configuration encapsulated by this target.  Also in charge of most
+                    fingerprinting details.
+    :type payload: :class:`pants.base.payload.Payload`
+    :param tags: Arbitrary string tags that describe this target. Usable by downstream/custom tasks
+                 for reasoning about the build graph. NOT included in payloads and thus not used in
+                 fingerprinting, thus not suitable for anything that affects how a particular
+                 target is built.
+    :type tags: :class:`collections.Iterable` of strings
     :param string description: Human-readable description of this target.
     """
-    # dependencies is listed above; implementation hides in TargetAddressable
+    # NB: dependencies are in the pydoc above as a BUILD dictionary hack only; implementation hides
+    # the dependencies via TargetAddressable.
+
     self.payload = payload or Payload()
     self.payload.freeze()
     self.name = name
     self.address = address
-    self._tags = set(tags or [])
     self._build_graph = build_graph
+    self._type_alias = type_alias
+    self._tags = set(tags or [])
     self.description = description
     self.labels = set()
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
-
     if kwargs:
-      error_message = '{target_type} received unknown arguments: {args}'
-      raise self.UnknownArguments(address.spec, error_message.format(
-        target_type=type(self).__name__,
-        args=''.join('\n  {} = {}'.format(key, value) for key, value in kwargs.items())
-      ))
+      self.UnknownArguments.check(self, kwargs)
+
+  @property
+  def type_alias(self):
+    """Returns the type alias this target was constructed via.
+
+    For a target read from a BUILD file, this will be target alias, like 'java_library'.
+    For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
+
+    The end result is that the type alias should be the most natural way to refer to this target's
+    type to the author of the target instance.
+
+    :rtype: string
+    """
+    return self._type_alias or type(self).__name__
 
   @property
   def tags(self):
@@ -495,8 +536,7 @@ class Target(AbstractTarget):
         raise self.WrongNumberOfAddresses(
           "Expected a single address to from_target() as argument to {spec}"
           .format(spec=address.spec))
-      referenced_address = SyntheticAddress.parse(sources.addresses[0],
-                                                  relative_to=sources.rel_path)
+      referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
       return DeferredSourcesField(ref_address=referenced_address)
     elif isinstance(sources, FilesetWithSpec):
       filespec = sources.filespec

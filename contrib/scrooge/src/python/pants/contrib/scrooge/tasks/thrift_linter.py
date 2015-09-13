@@ -7,8 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.option.custom_types import list_option
+
+from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
 class ThriftLintError(Exception):
@@ -28,14 +30,15 @@ class ThriftLinter(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(ThriftLinter, cls).register_options(register)
-    register('--skip', action='store_true', help='Skip thrift linting.')
-    register('--strict', default=None, action='store_true',
+    register('--skip', action='store_true', fingerprint=True, help='Skip thrift linting.')
+    register('--strict', default=None, action='store_true', fingerprint=True,
              help='Fail the goal if thrift linter errors are found. Overrides the '
                   '`strict-default` option.')
     register('--strict-default', default=False, advanced=True, action='store_true',
+             fingerprint=True,
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
-    register('--linter-args', default=[], advanced=True, type=list_option,
+    register('--linter-args', default=[], advanced=True, type=list_option, fingerprint=True,
              help='Additional options passed to the linter.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run with these extra jvm options.')
@@ -55,6 +58,10 @@ class ThriftLinter(NailgunTask):
   @property
   def config_section(self):
     return self._CONFIG_SECTION
+
+  @property
+  def cache_target_dirs(self):
+    return True
 
   @staticmethod
   def _to_bool(value):
@@ -86,9 +93,13 @@ class ThriftLinter(NailgunTask):
     if not self._is_strict(target):
       config_args.append('--ignore-errors')
 
-    paths = target.sources_relative_to_buildroot()
+    include_paths , paths = calculate_compile_sources([target], self._is_thrift)
+    for p in include_paths:
+      config_args.extend(['--include-path', p])
 
-    args = config_args + paths
+    args = config_args + list(paths)
+
+
 
     # If runjava returns non-zero, this marks the workunit as a
     # FAILURE, and there is no way to wrap this here.
@@ -96,7 +107,7 @@ class ThriftLinter(NailgunTask):
                               main='com.twitter.scrooge.linter.Main',
                               args=args,
                               jvm_options=self.get_options().jvm_options,
-                              workunit_labels=[WorkUnit.COMPILER])  # to let stdout/err through.
+                              workunit_labels=[WorkUnitLabel.COMPILER])  # to let stdout/err through.
 
     if returncode != 0:
       raise ThriftLintError(

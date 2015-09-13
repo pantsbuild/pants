@@ -9,11 +9,42 @@ import os
 import re
 import time
 import uuid
+from collections import namedtuple
 
 from six.moves import range
 
 from pants.rwbuf.read_write_buffer import FileBackedRWBuf
 from pants.util.dirutil import safe_mkdir_for
+from pants.util.memo import memoized_method
+
+
+class WorkUnitLabel(object):
+  # Labels describing a workunit.  Reporting code can use this to decide how to display
+  # information about this workunit.
+  #
+  # Note that a workunit can have multiple labels where this makes sense, e.g., TOOL, COMPILER
+  # and NAILGUN.
+  SETUP = 'SETUP'         # Parsing build files etc.
+  GOAL = 'GOAL'           # Executing a goal.
+  TASK = 'TASK'           # Executing a task within a goal.
+  GROUP = 'GROUP'         # Executing a group.
+
+  BOOTSTRAP = 'BOOTSTRAP' # Invocation of code to fetch a tool.
+  TOOL = 'TOOL'           # Single invocations of a tool.
+  MULTITOOL = 'MULTITOOL' # Multiple consecutive invocations of the same tool.
+  COMPILER = 'COMPILER'   # Invocation of a compiler.
+
+  TEST = 'TEST'           # Running a test.
+  JVM = 'JVM'             # Running a tool via the JVM.
+  NAILGUN = 'NAILGUN'     # Running a tool via nailgun.
+  RUN = 'RUN'             # Running a binary.
+  REPL = 'REPL'           # Running a repl.
+  PREP = 'PREP'           # Running a prep command
+
+  @classmethod
+  @memoized_method
+  def keys(cls):
+    return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
 
 
 class WorkUnit(object):
@@ -35,35 +66,17 @@ class WorkUnit(object):
   SUCCESS = 3
   UNKNOWN = 4
 
+  # Generic workunit log config.
+  #   log_level: Display log messages up to this level.
+  #   color: log color settings.
+  LogConfig = namedtuple('LogConfig', ['level', 'colors'])
+
   @staticmethod
   def outcome_string(outcome):
     """Returns a human-readable string describing the outcome."""
     return ['ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN'][outcome]
 
-  # Labels describing a workunit.  Reporting code can use this to decide how to display
-  # information about this workunit.
-  #
-  # Note that a workunit can have multiple labels where this makes sense, e.g., TOOL, COMPILER
-  # and NAILGUN.
-  SETUP = 0      # Parsing build files etc.
-  GOAL = 1       # Executing a goal.
-  TASK = 2       # Executing a task within a goal.
-  GROUP = 3      # Executing a group.
-
-  BOOTSTRAP = 4  # Invocation of code to fetch a tool.
-  TOOL = 5       # Single invocations of a tool.
-  MULTITOOL = 6  # Multiple consecutive invocations of the same tool.
-  COMPILER = 7   # Invocation of a compiler.
-
-  TEST = 8       # Running a test.
-  JVM = 9        # Running a tool via the JVM.
-  NAILGUN = 10   # Running a tool via nailgun.
-  RUN = 11       # Running a binary.
-  REPL = 12      # Running a repl.
-
-  PREP = 13      # Running a prep command
-
-  def __init__(self, run_info_dir, parent, name, labels=None, cmd=''):
+  def __init__(self, run_info_dir, parent, name, labels=None, cmd='', log_config=None):
     """
     - run_info_dir: The path of the run_info_dir from the RunTracker that tracks this WorkUnit.
     - parent: The containing workunit, if any. E.g., 'compile' might contain 'java', 'scala' etc.,
@@ -73,6 +86,7 @@ class WorkUnit(object):
               display information about this work.
     - cmd: An optional longer string representing this work.
             E.g., the cmd line of a compiler invocation.
+    - log_config: An optional tuple of registered options affecting reporting output.
     """
     self._outcome = WorkUnit.UNKNOWN
 
@@ -84,6 +98,7 @@ class WorkUnit(object):
     self.labels = set(labels or ())
     self.cmd = cmd
     self.id = uuid.uuid4()
+    self.log_config = log_config
 
     # In seconds since the epoch. Doubles, to account for fractional seconds.
     self.start_time = 0
@@ -97,7 +112,10 @@ class WorkUnit(object):
     # Do this last, as the parent's _self_time() might get called before we're
     # done initializing ourselves.
     # TODO: Ensure that a parent can't be ended before all its children are.
+
     if self.parent:
+      if not log_config:
+        self.log_config = self.parent.log_config
       self.parent.children.append(self)
 
   def has_label(self, label):
@@ -112,7 +130,7 @@ class WorkUnit(object):
     self.end_time = time.time()
     for output in self._outputs.values():
       output.close()
-    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnit.TOOL)
+    return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnitLabel.TOOL)
 
   def outcome(self):
     """Returns the outcome of this workunit."""

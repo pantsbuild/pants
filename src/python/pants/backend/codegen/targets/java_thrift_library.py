@@ -17,7 +17,7 @@ class JavaThriftLibrary(JvmTarget):
   # target that can be used by at least 2 tasks - ThriftGen and ScroogeGen.  This is likely not
   # uncommon (gcc & clang) so the arrangement needs to be cleaned up and supported well.
   _COMPILERS = frozenset(['thrift', 'scrooge'])
-  _LANGUAGES = frozenset(['java', 'scala'])
+  _LANGUAGES = frozenset(['java', 'scala', 'android'])
   _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 
   def __init__(self,

@@ -49,9 +49,8 @@ class JMakeAnalysisParser(AnalysisParser):
       ret[src].append(clsfile)
     return ret
 
-  def parse_deps(self, lines_iter, classpath_indexer, classes_dir):
+  def parse_deps(self, lines_iter):
     buildroot = get_buildroot()
-    classpath_elements_by_class = classpath_indexer()
     self._expect_header(next(lines_iter), b'pcd entries')
     num_pcd_entries = self.parse_num_items(next(lines_iter))
     for _ in range(0, num_pcd_entries):
@@ -60,16 +59,7 @@ class JMakeAnalysisParser(AnalysisParser):
     ret = defaultdict(set)
     for src, deps in src_to_deps.items():
       for dep in deps:
-        rel_classfile = dep + b'.class'
-        # Check if we have an internal class first.
-        internal_classfile = os.path.join(buildroot, classes_dir, rel_classfile)
-        if os.path.exists(internal_classfile):
-          # Dep is on an internal class.
-          ret[src].add(internal_classfile)
-        elif rel_classfile in classpath_elements_by_class:
-          # Dep is on an external jar/classes dir.
-          ret[src].add(classpath_elements_by_class.get(rel_classfile))
-
+        ret[src].add(dep + b'.class')
     return ret
 
   def rebase(self, lines_iter, outfile, pants_home_from, pants_home_to, java_home=None):

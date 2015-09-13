@@ -10,7 +10,7 @@ import unittest
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import SyntheticAddress, parse_spec
+from pants.base.address import Address, parse_spec
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.source_root import SourceRoot, SourceRootTree
 from pants.base.target import Target
@@ -20,21 +20,21 @@ class TestTarget(Target):
 
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
-    super(TestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+    super(TestTarget, self).__init__(target_name, Address.parse(spec), None)
 
 
 class NotTestTarget(Target):
 
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
-    super(NotTestTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+    super(NotTestTarget, self).__init__(target_name, Address.parse(spec), None)
 
 
 class AnotherTarget(Target):
 
   def __init__(self, spec):
     spec_path, target_name = parse_spec(spec)
-    super(AnotherTarget, self).__init__(target_name, SyntheticAddress.parse(spec), None)
+    super(AnotherTarget, self).__init__(target_name, Address.parse(spec), None)
 
 
 class SourceRootTest(unittest.TestCase):

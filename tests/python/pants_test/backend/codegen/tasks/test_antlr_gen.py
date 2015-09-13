@@ -14,7 +14,7 @@ from twitter.common.dirutil.fileset import Fileset
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.antlr_gen import AntlrGen
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
@@ -29,7 +29,7 @@ class AntlrGenTest(NailgunTaskTestBase):
 
   @property
   def alias_groups(self):
-    return super(AntlrGenTest, self).alias_groups.merge(BuildFileAliases.create(
+    return super(AntlrGenTest, self).alias_groups.merge(BuildFileAliases(
       targets={
         'java_antlr_library': JavaAntlrLibrary,
       },
@@ -73,7 +73,7 @@ class AntlrGenTest(NailgunTaskTestBase):
   def get_antlr_syn_target(self, task):
     target = self.get_antlr_target()
     target_workdir = task.codegen_workdir(target)
-    syn_address = SyntheticAddress(os.path.relpath(target_workdir, get_buildroot()), target.id)
+    syn_address = Address(os.path.relpath(target_workdir, get_buildroot()), target.id)
     return task.context.build_graph.get_target(syn_address)
 
   def execute_antlr_test(self, expected_package):

@@ -8,10 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
+from pants.backend.jvm.targets.benchmark import Benchmark
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.java.util import execute_java
 
 
@@ -23,9 +25,27 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
     super(BenchmarkRun, cls).register_options(register)
     register('--target', help='Name of the benchmark class. This is a mandatory argument.')
     register('--memory', default=False, action='store_true', help='Enable memory profiling.')
-    cls.register_jvm_tool(register, 'benchmark-tool', main=cls._CALIPER_MAIN, default=['//:benchmark-caliper-0.5'])
-    cls.register_jvm_tool(register, 'benchmark-agent',
-                          default=['//:benchmark-java-allocation-instrumenter-2.1'])
+    register('--debug', action='store_true',
+             help='Run the benchmark tool with in process debugging.')
+
+    cls.register_jvm_tool(register,
+                          'benchmark-tool',
+                          classpath=[
+                            # TODO (Eric Ayers) Caliper is old. Add jmh support?
+                            # The caliper tool is shaded, and so shouldn't interfere with Guava 16.
+                            JarDependency(org='com.google.caliper', name='caliper', rev='0.5-rc1'),
+                          ],
+                          classpath_spec='//:benchmark-caliper-0.5',
+                          main=cls._CALIPER_MAIN)
+    cls.register_jvm_tool(register,
+                          'benchmark-agent',
+                          classpath=[
+                            JarDependency(org='com.google.code.java-allocation-instrumenter',
+                                          name='java-allocation-instrumenter',
+                                          rev='2.1',
+                                          intransitive=True),
+                          ],
+                          classpath_spec='//:benchmark-java-allocation-instrumenter-2.1')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -52,6 +72,10 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
       self.args.append('--debug')
 
   def execute(self):
+    targets = self.context.targets()
+    if not any(isinstance(t, Benchmark) for t in targets):
+      raise TaskError('No jvm targets specified for benchmarking.')
+
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
     # the JAR manifest as something that goes in the bootclasspath.
     # The MANIFEST list a jar 'allocation.jar' this is why we have to rename it
@@ -66,7 +90,7 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
     benchmark_tools_classpath = self.tool_classpath('benchmark-tool')
 
-    classpath = self.classpath(self.context.targets(), benchmark_tools_classpath)
+    classpath = self.classpath(targets, benchmark_tools_classpath)
 
     exit_code = execute_java(classpath=classpath,
                              main=self._CALIPER_MAIN,
@@ -74,6 +98,6 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
                              args=self.args,
                              workunit_factory=self.context.new_workunit,
                              workunit_name='caliper',
-                             workunit_labels=[WorkUnit.RUN])
+                             workunit_labels=[WorkUnitLabel.RUN])
     if exit_code != 0:
       raise TaskError('java {} ... exited non-zero ({})'.format(self._CALIPER_MAIN, exit_code))

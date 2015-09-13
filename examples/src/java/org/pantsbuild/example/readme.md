@@ -214,28 +214,51 @@ Pants uses Jmake, a dependency tracking compiler facade.
 Java7 vs Java6, Which Java
 --------------------------
 
-Normally, Pants uses the first java it finds in `JDK_HOME`, `JAVA_HOME`, or `PATH`. To specify a
-specific java version for just one pants invocation:
+Pants first looks through any jdks specified by the jdk_paths map in pants.ini, eg:
+
+    :::ini
+    [jvm]
+    jdk_paths = {
+        'macos': [
+          '/Library/Java/JavaVirtualMachines/jdk1.7.0_79.jdk',
+          '/Library/Java/JavaVirtualMachines/jdk1.8.0_45.jdk',
+        ],
+        'linux': [
+          '/usr/java/jdk1.7.0_80',
+        ]
+      }
+
+If no jvms are found there, Pants uses the first java it finds in `JDK_HOME`, `JAVA_HOME`,
+or `PATH`. If no jdk_paths are set, you can specify a specific java version for just one
+pants invocation:
 
     :::bash
     $ JDK_HOME=/usr/lib/jvm/java-1.7.0-openjdk-amd64 ./pants ...
 
-If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can use a
-`compile.java` command-line arg to specify Java version:
+If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can define
+jvm-platforms in pants.ini, and set what targets use which platforms. For example, in pants.ini:
+
+    :::ini
+    [jvm-platform]
+    default_platform: java6
+    platforms: {
+        'java6': {'source': '6', 'target': '6', 'args': [] },
+        'java7': {'source': '7', 'target': '7', 'args': [] },
+        'java8': {'source': '8', 'target': '8', 'args': [] },
+      }
+
+And then in a BUILD file:
+
+    :::python
+    java_library(name='my-library',
+      sources=globs('*.java'),
+      platform='java7',
+    )
+
+You can also override these on the cli:
 
     :::bash
-    ./pants bundle compile.java --target=7 --source=7 examples/src/java/org/pantsbuild/example/hello/main
-
-*BUT* beware: if you switch between Java versions, Pants doesn't realize
-when it needs to rebuild. If you build with version 7, change some code,
-then build with version 6, java 6 will try to understand java
-7-generated classfiles and fail. Thus, if you've been building with one
-Java version and are switching to another, you probably need to:
-
-    :::bash
-    $ ./pants clean-all
-
-so that the next build starts from scratch.
+    ./pants compile --jvm-platform-default-platform=java8 examples/src/java/org/pantsbuild/example/hello/main
 
 **Note:** Currently, pants is known to work with OpenJDK version 7 or greater,
 and Oracle JDK version 6 or greater.
@@ -392,6 +415,70 @@ After building our `hello` example, if we check the binary jar's contents, there
     org/pantsbuild/example/hello/
     org/pantsbuild/example/hello/world.txt
     $
+
+Shading
+-------
+
+Sometimes you have dependencies that have conflicting package or class names. This typically occurs
+in the following scenario: Your jvm_binary depends on a 3rdparty library A (rev 1.0), and a 3rdparty
+library B (rev 1.3). It turns out that A happens to also depend on B, but it depends on B (rev 2.0),
+which is backwards-incompatible with rev 1.3. Now B (1.3) and B (2.0) define different versions of
+the same classes, with the same fully-qualified class names, and you're pulling them all onto the
+classpath for your project.
+
+This is where shading comes in: you can rename the fully-qualified names of the classes that
+conflict, typically by applying a prefix (eg, `__shaded_by_pants__.org.foobar.example`).
+
+Pants uses jarjar for shading, and allows shading rules to be specified on `jvm_binary` targets with
+the `shading_rules` argument. The `shading_rules` argument is a list of rules. Available rules
+include: <a pantsref='bdict_shading_relocate'>`shading_relocate`</a>,
+<a pantsref='bdict_shading_exclude'>`shading_exclude`</a>,
+<a pantsref='bdict_shading_relocate_package'>`shading_relocate_package`</a>, and
+<a pantsref='bdict_shading_exclude_package'>`shading_exclude_package`</a>.
+
+The order of rules in the list matters, as typical of shading
+logic in general.
+
+These rules are powerful enough to take advantage of jarjar's more
+advanced syntax, like using wildcards in the middle of package
+names. E.g., this syntax works:
+
+    :::python
+    # Destination pattern will be inferred to be
+    # __shaded_by_pants__.com.@1.foo.bar.@2
+    shading_relocate('com.*.foo.bar.**')
+
+Which can also be done by:
+
+   :::python
+   shading_relocate_package('com.*.foo.bar')
+
+The default shading prefix is `__shaded_by_pants__`, but you can change it:
+
+    :::python
+    shading_relocate_package('com.foo.bar', shade_prefix='__my_prefix__.')
+
+You can rename a specific class:
+
+    :::python
+    shading_relocate('com.example.foo.Main', 'org.example.bar.NotMain')
+
+If you want to shade everything in a package except a particular file (or subpackage), you can use
+the <a pantsref='bdict_shading_exclude'>`shading_exclude`</a> rule.
+
+    :::python
+    shading_exclude('com.example.foobar.Main') # Omit the Main class.
+    shading_exclude_package('com.example.foobar.api') # Omit the api subpackage.
+    shading_relocate_package('com.example.foobar')
+
+Again, order matters here: excludes have to appear __first__.
+
+To see an example, take a look at `testprojects/src/java/org/pantsbuild/testproject/shading/BUILD`,
+and try running
+
+    :::bash
+    ./pants binary testprojects/src/java/org/pantsbuild/testproject/shading
+    jar -tf dist/shading.jar
 
 Further Reading
 ---------------

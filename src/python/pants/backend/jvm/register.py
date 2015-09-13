@@ -10,6 +10,7 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository
+from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import Credentials
@@ -39,6 +40,8 @@ from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import ZincCompile
+from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
+from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
@@ -53,7 +56,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       'annotation_processor': AnnotationProcessor,
       'benchmark': Benchmark,
@@ -84,6 +87,10 @@ def build_file_aliases():
       'jar_rules': JarRules,
       'Repository': Repository,
       'Skip': Skip,
+      'shading_relocate': Shading.Relocate.new,
+      'shading_exclude': Shading.Exclude.new,
+      'shading_relocate_package': Shading.RelocatePackage.new,
+      'shading_exclude_package': Shading.ExcludePackage.new,
     },
     context_aware_object_factories={
       'bundle': Bundle.factory,
@@ -122,7 +129,7 @@ def register_goals():
   # Compilation.
   jvm_compile = GroupTask.named(
       'jvm-compilers',
-      product_type=['classes_by_target', 'classes_by_source'],
+      product_type=['classes_by_target', 'classes_by_source', 'resources_by_target', 'product_deps_by_src'],
       flag_namespace=['compile'])
 
   # It's important we add AptCompile before other java-compiling tasks since the first selector wins,
@@ -132,6 +139,11 @@ def register_goals():
   jvm_compile.add_member(ZincCompile)
 
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
+  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile').with_description(
+      'Check that used dependencies have been requested.')
+
+  task(name='jvm', action=JvmDependencyUsage).install('dep-usage').with_description(
+      'Collect target dependency usage data.')
 
   # Generate documentation.
   task(name='javadoc', action=JavadocGen).install('doc').with_description('Create documentation.')

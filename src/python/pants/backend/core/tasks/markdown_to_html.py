@@ -22,11 +22,11 @@ from six.moves import range
 
 from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.task import Task
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.util.dirutil import safe_mkdir, safe_open
 
@@ -230,12 +230,15 @@ class MarkdownToHtml(Task):
   @classmethod
   def register_options(cls, register):
     register('--code-style', choices=list(get_all_styles()), default='friendly',
+             fingerprint=True,
              help='Use this stylesheet for code highlights.')
     register('--open', action='store_true',
              help='Open the generated documents in a browser.')
     register('--fragment', action='store_true',
+             fingerprint=True,
              help='Generate a fragment of html to embed in a page.')
     register('--ignore-failure', default=False, action='store_true',
+             fingerprint=True,
              help='Do not consider rendering errors to be build errors.')
 
   @classmethod
@@ -274,7 +277,7 @@ class MarkdownToHtml(Task):
         if not page.dependencies and page not in interior_nodes:
           roots.add(page)
 
-    with self.context.new_workunit(name='render', labels=[WorkUnit.MULTITOOL]):
+    with self.context.new_workunit(name='render', labels=[WorkUnitLabel.MULTITOOL]):
       plaingenmap = self.context.products.get('markdown_html')
       wikigenmap = self.context.products.get('wiki_html')
       show = []
@@ -329,7 +332,7 @@ class MarkdownToHtml(Task):
     def parse_url(spec):
       match = self.PANTS_LINK.match(spec)
       if match:
-        address = SyntheticAddress.parse(match.group(1), relative_to=get_buildroot())
+        address = Address.parse(match.group(1), relative_to=get_buildroot())
         page = self.context.build_graph.get_target(address)
         anchor = match.group(2) or ''
         if not page:

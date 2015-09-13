@@ -1,10 +1,18 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_tests(
+target(
   name = 'option',
-  sources = globs('*.py'),
   dependencies = [
+    ':testing'
+  ],
+)
+
+python_tests(
+  name = 'testing',
+  sources = globs('*.py', exclude=[globs('*_integration.py')]),
+  dependencies = [
+    '3rdparty/python:mock',
     '3rdparty/python:pytest',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
@@ -15,9 +23,11 @@ python_tests(
 )
 
 python_tests(
-  name='testing',
-  sources=globs('*.py'),
-  dependencies=[
-    'src/python/pants/option',
+  name='help_integration',
+  sources = [
+    'test_help_integration.py',
+  ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
   ],
 )

@@ -44,6 +44,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 class BuildFilePath(object):
   """Returns path containing this ``BUILD`` file."""
+
   def __init__(self, parse_context):
     self.rel_path = parse_context.rel_path
 
@@ -51,21 +52,8 @@ class BuildFilePath(object):
     return os.path.join(get_buildroot(), self.rel_path)
 
 
-class PantsObsolete(object):
-  _warning_emitted = False
-
-  @classmethod
-  def pants(cls, target):
-    if not cls._warning_emitted:
-      cls._warning_emitted = True
-      print('*** pants() wrapper is obsolete and will be removed in a future release. '
-            'See http://pantsbuild.github.io/build_files.html ***',
-            file=sys.stderr)
-    return target
-
-
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       # NB: the 'dependencies' alias is deprecated in favor of the 'target' alias
       'dependencies': DeprecatedDependencies,
@@ -78,18 +66,16 @@ def build_file_aliases():
       'ConfluencePublish': ConfluencePublish,
       'get_buildroot': get_buildroot,
       'pants_version': pants_version,
-      # TODO(Eric Ayers) pants() was officially deprecated in 0.0.24. Remove this function soon.
-      'pants': PantsObsolete.pants,
       'wiki_artifact': WikiArtifact,
       'Wiki': Wiki,
     },
     context_aware_object_factories={
       'buildfile_path': BuildFilePath,
-      'globs': Globs,
+      'globs': Globs.factory,
       'from_target': FromTarget,
-      'rglobs': RGlobs,
+      'rglobs': RGlobs.factory,
       'source_root': SourceRoot.factory,
-      'zglobs': ZGlobs,
+      'zglobs': ZGlobs.factory,
     }
   )
 

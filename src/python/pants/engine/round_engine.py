@@ -11,7 +11,7 @@ from collections import OrderedDict, namedtuple
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.engine.engine import Engine
 from pants.engine.round_manager import RoundManager
 
@@ -35,14 +35,15 @@ class GoalExecutor(object):
     """
     goal_workdir = os.path.join(self._context.options.for_global_scope().pants_workdir,
                                 self._goal.name)
-    with self._context.new_workunit(name=self._goal.name, labels=[WorkUnit.GOAL]):
+    with self._context.new_workunit(name=self._goal.name, labels=[WorkUnitLabel.GOAL]):
       for name, task_type in reversed(self._tasktypes_by_name.items()):
-        with self._context.new_workunit(name=name, labels=[WorkUnit.TASK]):
+        task_workdir = os.path.join(goal_workdir, name)
+        task = task_type(self._context, task_workdir)
+        log_config = WorkUnit.LogConfig(level=task.get_options().level, colors=task.get_options().colors)
+        with self._context.new_workunit(name=name, labels=[WorkUnitLabel.TASK], log_config=log_config):
           if explain:
             self._context.log.debug('Skipping execution of {} in explain mode'.format(name))
           else:
-            task_workdir = os.path.join(goal_workdir, name)
-            task = task_type(self._context, task_workdir)
             task.execute()
 
       if explain:
@@ -53,7 +54,6 @@ class GoalExecutor(object):
 
 
 class RoundEngine(Engine):
-
   class DependencyError(ValueError):
     """Indicates a Task has an unsatisfiable data dependency."""
 

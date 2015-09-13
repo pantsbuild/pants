@@ -207,7 +207,6 @@ class DxCompileTest(TestAndroidBase):
   # more than one copy of a class is packed into the dex file and it is very easy to fetch
   # duplicate libraries (as well as conflicting versions) from the Android SDK. As long as the
   # version number is the same, pants silently dedupes. Version conflicts raise an exception.
-
   def test_filter_unpacked_dir(self):
     with self.android_library() as android_library:
       with self.android_binary(dependencies=[android_library]) as binary:
@@ -251,7 +250,6 @@ class DxCompileTest(TestAndroidBase):
           dx_task._gather_classes(binary)
 
   # Test misc. methods
-
   def test_render_args(self):
     tempdir = '/temp/out'
     dx_task = self.create_task(self.context())

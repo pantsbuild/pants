@@ -25,7 +25,7 @@ class ScalaPlatform(JvmToolMixin, Subsystem):
     # dependency for the scala_library target.
     register('--runtime', advanced=True, type=list_option, default=['//:scala-library'],
              help='Target specs pointing to the scala runtime libraries.')
-    cls.register_jvm_tool(register, 'scalac', default=['//:scala-compiler'], fingerprint=True)
+    cls.register_jvm_tool(register, 'scalac', classpath_spec='//:scala-compiler')
 
   def compiler_classpath(self, products):
     return self.tool_classpath_from_products(products, 'scalac', scope=self.options_scope)

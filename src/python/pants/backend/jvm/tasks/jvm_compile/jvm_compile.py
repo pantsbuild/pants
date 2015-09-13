@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
+import os
 import sys
 from collections import defaultdict
 
@@ -14,9 +15,9 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmCompileGlobalStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
-from pants.backend.jvm.tasks.jvm_compile.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
+from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
@@ -32,44 +33,45 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
-    register('--partition-size-hint', type=int, default=sys.maxint, metavar='<# source files>',
+    register('--partition-size-hint', advanced=True, type=int, default=sys.maxint,
+             metavar='<# source files>',
              help='Roughly how many source files to attempt to compile together. Set to a large '
                   'number to compile all sources together. Set to 0 to compile target-by-target.')
 
-    register('--jvm-options', type=list_option, default=[],
+    register('--jvm-options', advanced=True, type=list_option, default=[],
              help='Run the compiler with these JVM options.')
 
-    register('--args', action='append',
+    register('--args', advanced=True, action='append',
              default=list(cls.get_args_default(register.bootstrap)), fingerprint=True,
              help='Pass these args to the compiler.')
 
-    register('--confs', type=list_option, default=['default'],
+    register('--confs', advanced=True, type=list_option, default=['default'],
              help='Compile for these Ivy confs.')
 
     # TODO: Stale analysis should be automatically ignored via Task identities:
     # https://github.com/pantsbuild/pants/issues/1351
-    register('--clear-invalid-analysis', default=False, action='store_true',
-             advanced=True,
+    register('--clear-invalid-analysis', advanced=True, default=False, action='store_true',
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
     register('--warnings', default=True, action='store_true',
              help='Compile with all configured warnings enabled.')
 
-    register('--warning-args', action='append', default=list(cls.get_warning_args_default()),
-             advanced=True,
+    register('--warning-args', advanced=True, action='append',
+             default=list(cls.get_warning_args_default()),
              help='Extra compiler args to use when warnings are enabled.')
 
-    register('--no-warning-args', action='append', default=list(cls.get_no_warning_args_default()),
-             advanced=True,
+    register('--no-warning-args', advanced=True, action='append',
+             default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--strategy', choices=['global', 'isolated'], default='global', fingerprint=True,
+    register('--strategy', advanced=True, choices=['global', 'isolated'], default='global',
+             fingerprint=True,
              help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                   'global classpath for all compiled classes, and the "isolated" strategy uses '
                   'per-target classpaths.')
 
-    register('--delete-scratch', default=True, action='store_true',
+    register('--delete-scratch', advanced=True, default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
     JvmCompileGlobalStrategy.register_options(register, cls._name, cls._supports_concurrent_execution)
@@ -77,14 +79,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   @classmethod
   def product_types(cls):
-    return ['classes_by_target', 'classes_by_source', 'resources_by_target']
+    raise TaskError('Expected to be installed in GroupTask, which has its own '
+                    'product_types implementation.')
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmCompile, cls).prepare(options, round_manager)
-
-    # This task uses JvmDependencyAnalyzer as a helper, get its product needs
-    JvmDependencyAnalyzer.prepare(options, round_manager)
 
     round_manager.require_data('compile_classpath')
     round_manager.require_data('ivy_resolve_symlink_map')
@@ -225,6 +225,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                           self.create_analysis_tools(),
                                           self._name,
                                           self.select_source)
+    # Maps CompileContext --> dict of upstream class to paths.
+    self._upstream_class_to_paths = {}
 
   def _fingerprint_strategy(self):
     return TaskIdentityFingerprintStrategy(self)
@@ -285,6 +287,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # Nothing to build. Register products for all the targets in one go.
         self._register_vts([self._strategy.compile_context(t) for t in relevant_targets])
 
+  def finalize_execute(self, chunks):
+    targets_in_chunks = list(itertools.chain(*chunks))
+    self._strategy.finalize_compile(targets_in_chunks)
+
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
                    log_file, progress_message, settings):
     """Compiles sources for the given vts into the given output dir.
@@ -313,7 +319,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         ' (',
         progress_message,
         ').')
-      with self.context.new_workunit('compile'):
+      with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]):
         # The compiler may delete classfiles, then later exit on a compilation error. Then if the
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
@@ -334,14 +340,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # uses it internally.
     self.context.products.safe_create_data('resources_by_target', make_products)
 
-    # JvmDependencyAnalyzer uses classes_by_target within this run
+    # JvmDependencyCheck uses classes_by_target
     self.context.products.safe_create_data('classes_by_target', make_products)
+
+    self.context.products.safe_create_data('product_deps_by_src', dict)
 
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     classes_by_target = self.context.products.get_data('classes_by_target')
     compile_classpath = self.context.products.get_data('compile_classpath')
     resources_by_target = self.context.products.get_data('resources_by_target')
+    product_deps_by_src = self.context.products.get_data('product_deps_by_src')
 
     # Register class products (and resources generated by annotation processors.)
     computed_classes_by_source_by_context = self._strategy.compute_classes_by_source(
@@ -381,8 +390,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         )
         add_products_by_target(unclaimed_classes)
 
-    # Register resource products.
     for compile_context in compile_contexts:
+      # Register resource products.
       extra_resources = self.extra_products(compile_context.target)
       # Add to resources_by_target (if it was requested).
       if resources_by_target is not None:
@@ -394,3 +403,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       # are not available during compilation. https://github.com/pantsbuild/pants/issues/206
       entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
       compile_classpath.add_for_target(compile_context.target, entries)
+
+      if self.context.products.is_required_data('product_deps_by_src'):
+        product_deps_by_src[compile_context.target] = self._strategy.parse_deps(compile_context.analysis_file)

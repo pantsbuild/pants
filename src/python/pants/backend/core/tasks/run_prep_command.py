@@ -11,7 +11,7 @@ from collections import namedtuple
 
 from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 
 
 class RunPrepCommand(Task):
@@ -36,7 +36,7 @@ class RunPrepCommand(Task):
     if not cmdlines:
       return
 
-    with self.context.new_workunit(name='prep_command', labels=[WorkUnit.PREP]) as workunit:
+    with self.context.new_workunit(name='prep_command', labels=[WorkUnitLabel.PREP]) as workunit:
       completed_cmdlines = set()
       for item in cmdlines:
         cmdline = item.cmdline
