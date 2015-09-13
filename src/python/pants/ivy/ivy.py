@@ -9,6 +9,7 @@ from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.java import util
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import Executor, SubprocessExecutor
 
 
@@ -59,8 +60,13 @@ class Ivy(object):
     """Executes the ivy commandline client with the given args.
 
     Raises Ivy.Error if the command fails for any reason.
+    :param executor: Java executor to run ivy with.
     """
-    executor = executor or SubprocessExecutor()
+    # NB(gmalmquist): It should be OK that we can't declare a subsystem_dependency in this file
+    # (because it's just a plain old object), because Ivy is only constructed by Bootstrapper, which
+    # makes an explicit call to IvySubsystem.global_instance() in its constructor, which in turn has
+    # a declared dependency on DistributionLocator.
+    executor = executor or SubprocessExecutor(DistributionLocator.cached())
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
       result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
@@ -74,7 +80,7 @@ class Ivy(object):
     """Creates an ivy commandline client runner for the given args."""
     args = args or []
     jvm_options = jvm_options or []
-    executor = executor or SubprocessExecutor()
+    executor = executor or SubprocessExecutor(DistributionLocator.cached())
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))

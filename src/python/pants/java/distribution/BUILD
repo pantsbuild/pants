@@ -7,8 +7,10 @@ python_library(
   resources = globs('*.class'),
   dependencies = [
     '3rdparty/python:six',
-    'src/python/pants/backend/jvm/subsystems:jvm',
     'src/python/pants/base:revision',
+    'src/python/pants/java:util',
+    'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
-  ]
+    'src/python/pants/util:osutil',
+  ],
 )

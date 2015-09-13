@@ -61,8 +61,9 @@ class ProcessManager(object):
   class NonResponsiveProcess(Exception): pass
   class Timeout(Exception): pass
 
-  WAIT_INTERVAL = .1
-  KILL_WAIT = 1
+  WAIT_INTERVAL_SEC = .1
+  FILE_WAIT_SEC = 10
+  KILL_WAIT_SEC = 5
   KILL_CHAIN = (signal.SIGTERM, signal.SIGKILL)
 
   def __init__(self, name, pid=None, socket=None, process_name=None, socket_type=None):
@@ -148,17 +149,37 @@ class ProcessManager(object):
     with safe_open(filename, 'wb') as f:
       f.write(payload)
 
-  def _wait_for_file(self, filename, timeout=10, want_content=True):
-    """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
-    start_time = time.time()
-    while 1:
-      if os.path.exists(filename) and (not want_content or os.path.getsize(filename)): return
+  def _deadline_until(self, closure, timeout, wait_interval=WAIT_INTERVAL_SEC):
+    """Execute a function/closure repeatedly until a True condition or timeout is met.
 
-      if time.time() - start_time > timeout:
-        raise self.Timeout('exceeded timeout of {sec} seconds while waiting for file {filename}'
-                           .format(sec=timeout, filename=filename))
-      else:
-        time.sleep(self.WAIT_INTERVAL)
+    :param func closure: the function/closure to execute (should not block for long periods of time
+                         and must return True on success).
+    :param float timeout: the maximum amount of time to wait for a true result from the closure in
+                          seconds. N.B. this is timing based, so won't be exact if the runtime of
+                          the closure exceeds the timeout.
+    :param float wait_interval: the amount of time to sleep between closure invocations.
+    :raises: :class:`ProcessManager.Timeout` on execution timeout.
+    """
+    deadline = time.time() + timeout
+    while 1:
+      if closure():
+        return True
+      elif time.time() > deadline:
+        raise self.Timeout('exceeded timeout of {} seconds for {}'.format(timeout, closure))
+      elif wait_interval:
+        time.sleep(wait_interval)
+
+  def _wait_for_file(self, filename, timeout=FILE_WAIT_SEC, want_content=True):
+    """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
+    def file_waiter():
+      return os.path.exists(filename) and (not want_content or os.path.getsize(filename))
+
+    try:
+      return self._deadline_until(file_waiter, timeout)
+    except self.Timeout:
+      # Re-raise with a more helpful exception message.
+      raise self.Timeout('exceeded timeout of {} seconds while waiting for file {} to appear'
+                         .format(timeout, filename))
 
   def await_pid(self, timeout):
     """Wait up to a given timeout for a process to launch."""
@@ -223,8 +244,12 @@ class ProcessManager(object):
     except (IOError, OSError):
       return None
 
+  def is_dead(self):
+    """Return a boolean indicating whether the process is dead or not."""
+    return not self.is_alive()
+
   def is_alive(self):
-    """Return a boolean indicating whether the process is running."""
+    """Return a boolean indicating whether the process is running or not."""
     try:
       process = self._as_process()
       if not process:
@@ -244,24 +269,32 @@ class ProcessManager(object):
     if self.pid:
       os.kill(self.pid, kill_sig)
 
-  def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT, purge=True):
+  def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT_SEC, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
-    if self.is_alive():
+    alive = self.is_alive()
+    if alive:
       for signal_type in signal_chain:
         try:
           self._kill(signal_type)
         except OSError as e:
           logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
                          .format(e=e, signal=signal_type, pid=self.pid))
-        time.sleep(kill_wait)
-        if not self.is_alive():
-          break
 
-    if not self.is_alive():
-      if purge: self._purge_metadata()
-    else:
+        # Wait up to kill_wait seconds to terminate or move onto the next signal.
+        try:
+          if self._deadline_until(self.is_dead, kill_wait):
+            alive = False
+            break
+        except self.Timeout:
+          # Loop to the next kill signal on timeout.
+          pass
+
+    if alive:
       raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
+
+    if purge:
+      self._purge_metadata()
 
   def get_subprocess_output(self, *args):
     try:

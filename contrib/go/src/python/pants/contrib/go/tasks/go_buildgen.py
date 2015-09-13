@@ -11,7 +11,7 @@ import subprocess
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
@@ -84,7 +84,7 @@ class GoTargetGenerator(object):
             remote_root = fetcher.root(import_path)
             remote_pkg_path = GoRemoteLibrary.remote_package_path(remote_root, import_path)
             name = remote_pkg_path or os.path.basename(import_path)
-            address = SyntheticAddress(os.path.join(self._remote_source_root, remote_root), name)
+            address = Address(os.path.join(self._remote_source_root, remote_root), name)
             found = self._build_graph.get_target(address)
             if not found:
               if not self._generate_remotes:
@@ -95,8 +95,8 @@ class GoTargetGenerator(object):
                                                         pkg=remote_pkg_path)
           else:
             # Recurse on local targets.
-            address = SyntheticAddress(os.path.join(self._local_source_root, import_path),
-                                       os.path.basename(import_path))
+            address = Address(os.path.join(self._local_source_root, import_path),
+                              os.path.basename(import_path))
             name, import_paths = self._list_deps(gopath, address)
             self._generate_missing(gopath, address, name, import_paths, visited)
           visited[import_path] = address
@@ -150,28 +150,32 @@ class GoBuildgen(GoTask):
   @classmethod
   def _default_template(cls):
     return dedent("""\
+    {{#target.parameters?}}
     {{target.type}}(
-      {{#target.name}}
-      name='{{.}}',
-      {{/target.name}}
-      {{#target.deps?}}
+      {{#target.parameters}}
+      {{#deps?}}
       dependencies=[
-        {{#target.deps}}
+        {{#deps}}
         '{{.}}',
-        {{/target.deps}}
+        {{/deps}}
       ]
-      {{/target.deps?}}
-      {{#target.rev}}
+      {{/deps?}}
+      {{#rev}}
       rev='{{.}}',
-      {{/target.rev}}
-      {{#target.pkgs?}}
+      {{/rev}}
+      {{#pkgs?}}
       packages=[
-        {{#target.pkgs}}
+        {{#pkgs}}
         '{{.}}',
-        {{/target.pkgs}}
+        {{/pkgs}}
       ]
-      {{/target.pkgs?}}
+      {{/pkgs?}}
+      {{/target.parameters}}
     )
+    {{/target.parameters?}}
+    {{^target.parameters?}}
+    {{target.type}}()
+    {{/target.parameters?}}
     """)
 
   @classmethod
@@ -183,11 +187,8 @@ class GoBuildgen(GoTask):
              help='Instead of just auto-generating missing go_binary and go_library targets in '
                   'memory, (re-)generate them on disk using the installed Go BUILD file template.')
 
-    # TODO(John Sirois): Support loading the template from disk and add docs for the template
-    # parameters.
-    # This disk loading will come for free when the options system supports argfile syntax, ie:
-    #   --template=@argfile
-    register('--template', metavar='<template>',
+    # TODO(John Sirois): Add docs for the template parameters.
+    register('--template', metavar='<template>', fromfile=True,
              default=cls._default_template(),
              advanced=True, fingerprint=True,
              help='A Go BUILD file mustache template to use with --materialize.')
@@ -211,6 +212,7 @@ class GoBuildgen(GoTask):
 
   class TemplateResult(namedtuple('TemplateResult', ['build_file_path', 'data', 'import_paths',
                                                      'needs_rev', 'rev'])):
+
     def log(self, logger):
       log = logger.warn if (self.needs_rev and not self.rev) else logger.info
       log('\t{} ({}){}'.format(self.build_file_path,
@@ -237,6 +239,7 @@ class GoBuildgen(GoTask):
 
   class GenerationError(TaskError):
     """Indicates an error generating Go targets."""
+
     def __init__(self, cause):
       super(GoBuildgen.GenerationError, self).__init__(str(cause))
       self.cause = cause
@@ -323,7 +326,6 @@ class GoBuildgen(GoTask):
     if len(targets) == 1 and self.is_local_src(targets[0]):
       local_target = targets[0]
       data = self._data(target_type='go_binary' if self.is_binary(local_target) else 'go_library',
-                        name=local_target.name,
                         deps=[d.address.reference() for d in local_target.dependencies])
       return self.TemplateResult(build_file_path=build_file_path,
                                  data=data,
@@ -334,7 +336,6 @@ class GoBuildgen(GoTask):
       if len(targets) == 1 and not targets[0].pkg:
         remote_lib = targets[0]
         data = self._data(target_type='go_remote_library',
-                          name=remote_lib.name,
                           rev=remote_lib.rev)
         return self.TemplateResult(build_file_path=build_file_path,
                                    data=data,
@@ -362,5 +363,6 @@ class GoBuildgen(GoTask):
     else:
       return None
 
-  def _data(self, target_type, name=None, deps=None, rev=None, pkgs=None):
-    return TemplateData(type=target_type, name=name, deps=deps, rev=rev, pkgs=pkgs)
+  def _data(self, target_type, deps=None, rev=None, pkgs=None):
+    parameters = TemplateData(deps=deps, rev=rev, pkgs=pkgs) if (deps or rev or pkgs) else None
+    return TemplateData(type=target_type, parameters=parameters)

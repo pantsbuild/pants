@@ -12,7 +12,7 @@ from mock import MagicMock
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
@@ -32,7 +32,7 @@ class ScroogeGenTest(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_thrift_library': JavaThriftLibrary})
+    return BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary})
 
   def setUp(self):
     super(ScroogeGenTest, self).setUp()
@@ -134,7 +134,7 @@ class ScroogeGenTest(TaskTestBase):
       task.execute()
       relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
       spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
-      address = SyntheticAddress.parse(spec=spec)
+      address = Address.parse(spec=spec)
       Context.add_new_target.assert_called_once_with(address,
                                                      library_type,
                                                      sources=sources,

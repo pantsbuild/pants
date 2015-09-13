@@ -29,10 +29,9 @@ from pants.subsystem.subsystem import Subsystem
 #
 # Class internals:
 #   __metaclass__
-
-
 class FutureCompatibilitySubsystem(Subsystem):
   options_scope = 'pycheck-future-compat'
+
   @classmethod
   def register_options(cls, register):
     super(FutureCompatibilitySubsystem, cls).register_options(register)

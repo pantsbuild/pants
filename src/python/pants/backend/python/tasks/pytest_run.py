@@ -405,19 +405,19 @@ class PytestRun(PythonTask):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
 
-    with self.cached_chroot(interpreter=interpreter,
-                            pex_info=pex_info,
-                            targets=targets,
-                            platforms=('current',),
-                            extra_requirements=self._TESTING_TARGETS) as chroot:
-      pex = chroot.pex()
-      with self._maybe_shard() as shard_args:
-        with self._maybe_emit_junit_xml(targets) as junit_args:
-          with self._maybe_emit_coverage_data(targets,
-                                              chroot.path(),
-                                              pex,
-                                              workunit) as coverage_args:
-            yield pex, shard_args + junit_args + coverage_args
+    chroot = self.cached_chroot(interpreter=interpreter,
+                                pex_info=pex_info,
+                                targets=targets,
+                                platforms=('current',),
+                                extra_requirements=self._TESTING_TARGETS)
+    pex = chroot.pex()
+    with self._maybe_shard() as shard_args:
+      with self._maybe_emit_junit_xml(targets) as junit_args:
+        with self._maybe_emit_coverage_data(targets,
+                                            chroot.path(),
+                                            pex,
+                                            workunit) as coverage_args:
+          yield pex, shard_args + junit_args + coverage_args
 
   def _do_run_tests_with_args(self, pex, workunit, args):
     try:
@@ -440,9 +440,10 @@ class PytestRun(PythonTask):
       self.context.log.info(traceback.format_exc())
       return PythonTestResult.exception()
 
-  # Pattern for lines such as:
+  # Pattern for lines such as ones below.  The second one is from a test inside a class.
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
-  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+)::(.+)')
+  # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
+  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+?)::(.+)')
 
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):

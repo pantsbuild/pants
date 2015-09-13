@@ -12,11 +12,13 @@ from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
+from pants.base.build_manual import manual
 from pants.util.memo import memoized_property
 
 
 def globs_matches(path, patterns):
   return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
+
 
 def matches_filespec(path, spec):
   if spec is None:
@@ -27,6 +29,7 @@ def matches_filespec(path, spec):
     if matches_filespec(path, spec):
       return False
   return True
+
 
 class FilesetWithSpec(object):
   """A set of files that keeps track of how we got it.
@@ -51,16 +54,33 @@ class FilesetWithSpec(object):
 
 
 class FilesetRelPathWrapper(object):
+  KNOWN_PARAMETERS = frozenset(['exclude', 'follow_links'])
 
-  def __init__(self, parse_context):
-    self.rel_path = parse_context.rel_path
+  @classmethod
+  @manual.builddict(factory=True)
+  def factory(cls, parse_context):
+    """A factory for using a `FilesetRelPathWrapper` as a context aware object factory."""
+    return cls(parse_context.rel_path)
+
+  def __init__(self, rel_path):
+    """
+    :param string rel_path: The path this file set will be relative to.
+    """
+    self._rel_path = rel_path
 
   def __call__(self, *args, **kwargs):
-    root = os.path.join(get_buildroot(), self.rel_path)
+    root = os.path.normpath(os.path.join(get_buildroot(), self._rel_path))
 
     excludes = kwargs.pop('exclude', [])
+
     if isinstance(excludes, string_types):
-        raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+
+    # making sure there is no unknown argument(s)
+    unknown_args = set(kwargs.keys()) - self.KNOWN_PARAMETERS
+
+    if unknown_args:
+      raise ValueError('Unexpected arguments while parsing globs: {}'.format(', '.join(unknown_args)))
 
     for i, exclude in enumerate(excludes):
       if isinstance(exclude, string_types):
@@ -81,6 +101,8 @@ class FilesetRelPathWrapper(object):
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
+    if rel_root == '.':
+      rel_root = ''
     filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
     return FilesetWithSpec(rel_root, filespec, files_calculator)
 
@@ -147,6 +169,7 @@ class RGlobs(FilesetRelPathWrapper):
   those in ``config/foo``.  Please use exclude instead, since pants is moving to
   make BUILD files easier to parse, and the new grammar will not support arithmetic.
   """
+
   @staticmethod
   def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
     if 'follow_links' not in kw:
@@ -212,6 +235,7 @@ class ZGlobs(FilesetRelPathWrapper):
 
   Uses ``BUILD`` file's directory as the "working directory".
   """
+
   @staticmethod
   def zglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
     if 'follow_links' not in kw:

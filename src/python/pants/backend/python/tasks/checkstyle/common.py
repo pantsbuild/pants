@@ -24,6 +24,7 @@ __all__ = (
 
 
 class OffByOneList(Sequence):
+
   def __init__(self, iterator):
     # Make sure we properly handle unicode chars in code files.
     self._list = list(iterator)
@@ -235,7 +236,6 @@ class Nit(object):
     self._message = message
     self._line_number = line_number
 
-
   def __str__(self):
     """convert ascii for safe terminal output"""
     flat = list(self.flatten_lines([self.message], self.lines))
@@ -252,7 +252,7 @@ class Nit(object):
 
   @property
   def message(self):
-    return '{code}:{severity:<7}bobs your uncle {filename}:{linenum} {message}'.format(
+    return '{code}:{severity:<7} {filename}:{linenum} {message}'.format(
         code=self.code,
         severity=self.SEVERITY[self.severity],
         filename=self.python_file.filename,

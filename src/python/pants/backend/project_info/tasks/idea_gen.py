@@ -80,6 +80,14 @@ class IdeaGen(IdeGen):
                '.pants.d/resources',
                ],
              help='Adds folders to be excluded from the project configuration.')
+    register('--annotation-processing-enabled', action='store_true',
+             help='Tell IntelliJ IDEA to run annotation processors.')
+    register('--annotation-generated-sources-dir', default='generated', advanced=True,
+             help='Directory relative to --project-dir to write annotation processor sources.')
+    register('--annotation-generated-test-sources-dir', default='generated_tests', advanced=True,
+             help='Directory relative to --project-dir to write annotation processor sources.')
+    register('--annotation-processor', action='append', advanced=True,
+             help='Add a Class name of a specific annotation processor to run.')
 
   def __init__(self, *args, **kwargs):
     super(IdeaGen, self).__init__(*args, **kwargs)
@@ -99,11 +107,15 @@ class IdeaGen(IdeGen):
     self.java_maximum_heap_size = self.get_options().java_maximum_heap_size_mb
 
     idea_version = _VERSIONS[self.get_options().version]
-    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-{}.mustache'.format(idea_version))
-    self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-{}.mustache'.format(idea_version))
+    self.project_template = os.path.join(_TEMPLATE_BASEDIR,
+                                         'project-{}.mustache'.format(idea_version))
+    self.module_template = os.path.join(_TEMPLATE_BASEDIR,
+                                        'module-{}.mustache'.format(idea_version))
 
-    self.project_filename = os.path.join(self.cwd, '{}.ipr'.format(self.project_name))
-    self.module_filename = os.path.join(self.gen_project_workdir, '{}.iml'.format(self.project_name))
+    self.project_filename = os.path.join(self.cwd,
+                                         '{}.ipr'.format(self.project_name))
+    self.module_filename = os.path.join(self.gen_project_workdir,
+                                        '{}.iml'.format(self.project_name))
 
   @staticmethod
   def _maven_targets_excludes(repo_root):
@@ -142,6 +154,24 @@ class IdeaGen(IdeGen):
       if has_test_type(SourceRoot.types(sibling_path)):
         return True
     return False
+
+  @property
+  def annotation_processing_template(self):
+    return TemplateData(
+      enabled=self.get_options().annotation_processing_enabled,
+      rel_source_output_dir=os.path.join('..','..','..',
+                                         self.get_options().annotation_generated_sources_dir),
+      source_output_dir=
+      os.path.join(self.gen_project_workdir,
+                   self.get_options().annotation_generated_sources_dir),
+      rel_test_source_output_dir=os.path.join('..','..','..',
+                                              self.get_options().annotation_generated_test_sources_dir),
+      test_source_output_dir=
+      os.path.join(self.gen_project_workdir,
+                   self.get_options().annotation_generated_test_sources_dir),
+      processors=[{'class_name' : processor}
+                  for processor in self.get_options().annotation_processor],
+    )
 
   def generate_project(self, project):
     def create_content_root(source_set):
@@ -208,6 +238,7 @@ class IdeaGen(IdeGen):
                              if cp_entry.javadoc_jar],
       external_source_jars=[cp_entry.source_jar for cp_entry in project.external_jars
                             if cp_entry.source_jar],
+      annotation_processing=self.annotation_processing_template,
       extra_components=[],
       exclude_folders=exclude_folders,
     )
@@ -231,6 +262,7 @@ class IdeaGen(IdeGen):
       scala=scala,
       checkstyle_classpath=';'.join(project.checkstyle_classpath),
       debug_port=project.debug_port,
+      annotation_processing=self.annotation_processing_template,
       extra_components=[],
     )
 

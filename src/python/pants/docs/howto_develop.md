@@ -17,9 +17,6 @@ As pants is implemented in python it can be run directly from sources.
     $ ./pants goals
     <remainder of output omitted for brevity>
 
-Notice this invocation specifies the `PANTS_DEV` environment variable.
-By defining `PANTS_DEV` pants will be run from sources.
-
 Building a Pants PEX for Production
 -----------------------------------
 
@@ -118,19 +115,6 @@ origin on `github.com/pantsbuild/pants`.
 Most test are runnable as regular Pants test targets. To find tests that work with a particular
 feature, you might explore `tests/python/pants_tests/.../BUILD`.
 
-Typically, you're not sure precisely which tests you need to run, so you run all of them.
-
-To run all tests,
-
-    :::bash
-    $ ./pants test tests::
-
-To run just Pants' *unit* tests (skipping the can-be-slow integration tests), use the
-`tests/python/pants_test:all` target:
-
-    :::bash
-    $ ./pants test tests/python/pants_test:all
-
 Before [[contributing a change to Pants|pants('src/python/pants/docs:howto_contribute')]],
 make sure it passes **all** of our continuous integration (CI) tests: everything builds,
 all tests pass. To try all the CI tests in a few configurations, you can run the same script
@@ -139,6 +123,18 @@ contribute a change or merge it to master:
 
     :::bash
     $ ./build-support/bin/ci.sh
+
+To run just Pants' *unit* tests (skipping the can-be-slow integration tests), use the
+`tests/python/pants_test:all` target:
+
+    :::bash
+    $ ./pants test tests/python/pants_test:all
+
+If you only want to run tests for changed targets, then you can use the
+`test-changed` goal:
+
+    :::bash
+    $ ./pants test-changed
 
 You can run your code through the Travis-CI before you submit a change. Travis-CI is integrated
 with the pull requests for the `pantsbuild/pants` repo. Travis-CI will test it soon after the pull

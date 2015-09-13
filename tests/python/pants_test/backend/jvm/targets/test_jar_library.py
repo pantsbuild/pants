@@ -9,7 +9,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.target import Target
@@ -19,22 +19,23 @@ from pants_test.base_test import BaseTest
 jar1 = JarDependency(org='testOrg1', name='testName1', rev='123')
 jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
 
+
 class JarLibraryTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'jar_library': JarLibrary},
-                                   objects={'jar': JarDependency})
+    return BuildFileAliases(targets={'jar_library': JarLibrary},
+                            objects={'jar': JarDependency})
 
   def test_validation(self):
-    target = Target(name='mybird', address=SyntheticAddress.parse('//:mybird'),
+    target = Target(name='mybird', address=Address.parse('//:mybird'),
                     build_graph=self.build_graph)
     # jars attribute must contain only JarLibrary instances
     with self.assertRaises(TargetDefinitionException):
       JarLibrary(name="test", jars=[target])
 
   def test_jar_dependencies(self):
-    lib = JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
+    lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
                      build_graph=self.build_graph,
                      jars=[jar1, jar2])
     self.assertEquals((jar1, jar2), lib.jar_dependencies)
@@ -46,7 +47,7 @@ class JarLibraryTest(BaseTest):
 
   def test_excludes(self):
     # TODO(Eric Ayers) There doesn't seem to be any way to set this field at the moment.
-    lib = JarLibrary(name='foo', address=SyntheticAddress.parse('//:foo'),
+    lib = JarLibrary(name='foo', address=Address.parse('//:foo'),
                      build_graph=self.build_graph, jars=[jar1])
     self.assertEquals([], lib.excludes)
 

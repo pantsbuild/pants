@@ -18,6 +18,7 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.project_info.tasks.projectutils import get_jar_infos
+from pants.base.address import BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
@@ -34,7 +35,6 @@ logger = logging.getLogger(__name__)
 # 2.) the target may be under development in which case it may not have sources yet - its pretty
 #     common to write a BUILD and ./pants idea the target inside to start development at which
 #     point there are no source files yet - and the developer intents to add them using the ide.
-
 def is_scala(target):
   return target.has_sources('.scala') or target.is_scala
 
@@ -575,8 +575,8 @@ class Project(object):
         # this target globs children as well.  Gather all these candidate BUILD files to test for
         # sources they own that live in the directories this targets sources live in.
         target_dirset = find_source_basedirs(target)
-        if target.address.is_synthetic:
-          return []  # Siblings don't make sense for synthetic addresses.
+        if not isinstance(target.address, BuildFileAddress):
+          return []  # Siblings only make sense for BUILD files.
         candidates = self.target_util.get_all_addresses(target.address.build_file)
         for ancestor in target.address.build_file.ancestors():
           candidates.update(self.target_util.get_all_addresses(ancestor))

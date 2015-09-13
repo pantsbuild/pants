@@ -81,7 +81,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-distdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'dist'),
              help='Write end-product artifacts to this dir.')
-    register('--config-override', advanced=True,
+    register('--config-override', advanced=True, action='append', metavar='<path>',
              help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, action='store_true', default=True,
              help='Use pantsrc files.')
@@ -141,7 +141,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
-             help='Used to limit the number of arguments passed to some subprocesses by breaking'
+             help='Used to limit the number of arguments passed to some subprocesses by breaking '
              'the command up into multiple invocations')
     register('--print-exception-stacktrace', advanced=True, action='store_true',
              help='Print to console the full exception stack trace if encountered.')

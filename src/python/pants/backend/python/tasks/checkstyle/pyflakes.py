@@ -13,6 +13,7 @@ from pants.subsystem.subsystem import Subsystem
 
 class FlakeCheckSubsystem(Subsystem):
   options_scope = 'pycheck-pyflakes'
+
   @classmethod
   def register_options(cls, register):
     super(FlakeCheckSubsystem, cls).register_options(register)

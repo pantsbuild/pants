@@ -10,7 +10,7 @@ import os
 import shutil
 from collections import defaultdict
 
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
 from pants.util.contextutil import temporary_dir
@@ -134,7 +134,7 @@ class GoFetch(GoTask):
           package_path = GoRemoteLibrary.remote_package_path(remote_root, remote_import_path)
           target_name = package_path or os.path.basename(remote_root)
 
-          address = SyntheticAddress(spec_path, target_name)
+          address = Address(spec_path, target_name)
           if address not in all_known_addresses:
             try:
               # If we've already resolved a package from this remote root, its ok to define an

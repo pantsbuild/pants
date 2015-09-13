@@ -416,6 +416,70 @@ After building our `hello` example, if we check the binary jar's contents, there
     org/pantsbuild/example/hello/world.txt
     $
 
+Shading
+-------
+
+Sometimes you have dependencies that have conflicting package or class names. This typically occurs
+in the following scenario: Your jvm_binary depends on a 3rdparty library A (rev 1.0), and a 3rdparty
+library B (rev 1.3). It turns out that A happens to also depend on B, but it depends on B (rev 2.0),
+which is backwards-incompatible with rev 1.3. Now B (1.3) and B (2.0) define different versions of
+the same classes, with the same fully-qualified class names, and you're pulling them all onto the
+classpath for your project.
+
+This is where shading comes in: you can rename the fully-qualified names of the classes that
+conflict, typically by applying a prefix (eg, `__shaded_by_pants__.org.foobar.example`).
+
+Pants uses jarjar for shading, and allows shading rules to be specified on `jvm_binary` targets with
+the `shading_rules` argument. The `shading_rules` argument is a list of rules. Available rules
+include: <a pantsref='bdict_shading_relocate'>`shading_relocate`</a>,
+<a pantsref='bdict_shading_exclude'>`shading_exclude`</a>,
+<a pantsref='bdict_shading_relocate_package'>`shading_relocate_package`</a>, and
+<a pantsref='bdict_shading_exclude_package'>`shading_exclude_package`</a>.
+
+The order of rules in the list matters, as typical of shading
+logic in general.
+
+These rules are powerful enough to take advantage of jarjar's more
+advanced syntax, like using wildcards in the middle of package
+names. E.g., this syntax works:
+
+    :::python
+    # Destination pattern will be inferred to be
+    # __shaded_by_pants__.com.@1.foo.bar.@2
+    shading_relocate('com.*.foo.bar.**')
+
+Which can also be done by:
+
+   :::python
+   shading_relocate_package('com.*.foo.bar')
+
+The default shading prefix is `__shaded_by_pants__`, but you can change it:
+
+    :::python
+    shading_relocate_package('com.foo.bar', shade_prefix='__my_prefix__.')
+
+You can rename a specific class:
+
+    :::python
+    shading_relocate('com.example.foo.Main', 'org.example.bar.NotMain')
+
+If you want to shade everything in a package except a particular file (or subpackage), you can use
+the <a pantsref='bdict_shading_exclude'>`shading_exclude`</a> rule.
+
+    :::python
+    shading_exclude('com.example.foobar.Main') # Omit the Main class.
+    shading_exclude_package('com.example.foobar.api') # Omit the api subpackage.
+    shading_relocate_package('com.example.foobar')
+
+Again, order matters here: excludes have to appear __first__.
+
+To see an example, take a look at `testprojects/src/java/org/pantsbuild/testproject/shading/BUILD`,
+and try running
+
+    :::bash
+    ./pants binary testprojects/src/java/org/pantsbuild/testproject/shading
+    jar -tf dist/shading.jar
+
 Further Reading
 ---------------
 

@@ -13,6 +13,11 @@ python_library(
 )
 
 python_library(
+  name='jar_dependency_utils',
+  sources=['jar_dependency_utils.py'],
+)
+
+python_library(
   name='plugin',
   sources=['__init__.py', 'register.py'],
   dependencies=[
@@ -20,6 +25,7 @@ python_library(
     ':ossrh_publication_metadata',
     ':repository',
     'src/python/pants/backend/core/tasks:group_task',
+    'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/jvm/tasks:all',
     'src/python/pants/base:build_file_aliases',
@@ -33,6 +39,7 @@ python_library(
   sources=['ivy_utils.py'],
   resources=globs('tasks/templates/ivy_resolve/*.mustache'),
   dependencies=[
+    ':jar_dependency_utils',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',

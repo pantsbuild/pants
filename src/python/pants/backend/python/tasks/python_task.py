@@ -123,14 +123,16 @@ class PythonTask(Task):
                         builder=builder,
                         targets=targets,
                         platforms=platforms,
-                        extra_requirements=extra_requirements)
+                        extra_requirements=extra_requirements,
+                        log=self.context.log)
 
-  @contextmanager
-  def cached_chroot(self, interpreter, pex_info, targets, platforms,
+  def cached_chroot(self, interpreter, pex_info, targets, platforms=None,
                     extra_requirements=None, executable_file_content=None):
     """Returns a cached PythonChroot created with the specified args.
 
     The returned chroot will be cached for future use.
+
+    :rtype: pants.backend.python.python_chroot.PythonChroot
 
     TODO: Garbage-collect old chroots, so they don't pile up?
     TODO: Ideally chroots would just be products produced by some other task. But that's
@@ -154,16 +156,11 @@ class PythonTask(Task):
     pex_info = PexInfo.from_pex(path)
     # Now create a PythonChroot wrapper without dumping it.
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
-    chroot = self.create_chroot(
-      interpreter=interpreter,
-      builder=builder,
-      targets=targets,
-      platforms=platforms,
-      extra_requirements=extra_requirements)
-    # TODO: Doesn't really need to be a contextmanager, but it's convenient to make it so
-    # while transitioning calls to temporary_chroot to calls to cached_chroot.
-    # We can revisit after that transition is complete.
-    yield chroot
+    return self.create_chroot(interpreter=interpreter,
+                              builder=builder,
+                              targets=targets,
+                              platforms=platforms,
+                              extra_requirements=extra_requirements)
 
   @contextmanager
   def temporary_chroot(self, interpreter, pex_info, targets, platforms,

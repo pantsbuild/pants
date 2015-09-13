@@ -10,7 +10,6 @@ import os
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
 from pants.util.contextutil import temporary_dir
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -24,20 +23,20 @@ class PrepareServicesTest(TaskTestBase):
   def test_find_all_relevant_resources_targets(self):
     jvm_target = self.make_target('jvm:target', target_type=JvmTarget)
     java_library = self.make_target('java:target', target_type=JavaLibrary)
-    scala_library = self.make_target('scala:target',
-                                     target_type=ScalaLibrary,
+    java_library2 = self.make_target('java:target2',
+                                     target_type=JavaLibrary,
                                      services={'com.foo.bars.Baz': ['com.spam.bars.BaxImpl']})
     non_services_target = self.make_target('other:target')
 
     task = self.create_task(self.context(target_roots=[jvm_target,
                                                        java_library,
                                                        non_services_target,
-                                                       scala_library]))
+                                                       java_library2]))
     relevant_resources_targets = task.find_all_relevant_resources_targets()
 
     # Just the JvmTargets are relevant, and they're relevant whether they have defined services or
     # not.
-    self.assertEqual(sorted([jvm_target, java_library, scala_library]),
+    self.assertEqual(sorted([jvm_target, java_library, java_library2]),
                      sorted(relevant_resources_targets))
 
   def test_create_invalidation_strategy(self):
@@ -85,8 +84,8 @@ class PrepareServicesTest(TaskTestBase):
         self.assertEqual([], os.listdir(chroot))
 
     assert_no_resources_prepared(self.make_target('java:target', target_type=JavaLibrary))
-    assert_no_resources_prepared(self.make_target('scala:target',
-                                                  target_type=ScalaLibrary,
+    assert_no_resources_prepared(self.make_target('java:target2',
+                                                  target_type=JavaLibrary,
                                                   services={}))
     assert_no_resources_prepared(self.make_target('jvm:target',
                                                   target_type=JvmTarget,

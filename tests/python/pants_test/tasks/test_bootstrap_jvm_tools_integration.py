@@ -20,7 +20,8 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
       ]
 
       # Scala compilation should bootstrap and shade zinc.
-      pants_run = self.run_pants(bootstrap_args + ['compile', 'examples/src/scala/org/pantsbuild/example/hello'])
+      args = bootstrap_args + ['compile', 'examples/src/scala/org/pantsbuild/example/hello']
+      pants_run = self.run_pants(args)
       self.assert_success(pants_run)
       self.assertTrue('[shade-zinc]' in pants_run.stdout_data)
 

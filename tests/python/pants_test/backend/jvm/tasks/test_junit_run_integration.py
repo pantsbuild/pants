@@ -7,16 +7,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from unittest import skipIf
 
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 def missing_jvm(version):
-  try:
-    Distribution.locate(minimum_version=version, maximum_version='{}.9999'.format(version))
-    return False
-  except Distribution.Error:
-    return True
+  with subsystem_instance(DistributionLocator):
+    try:
+      DistributionLocator.locate(minimum_version=version, maximum_version='{}.9999'.format(version))
+      return False
+    except DistributionLocator.Error:
+      return True
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
@@ -40,3 +42,11 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   @skipIf(missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_with_test_platform(self):
     self._testjvms('eight-test-platform')
+
+  def test_junit_run_against_class_succeeds(self):
+    self.assert_success(self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest', 'testprojects/tests/java/org/pantsbuild/testproject/matcher']))
+
+  def test_junit_run_against_invalid_class_fails(self):
+    pants_run = self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest_BAD_CLASS', 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])
+    self.assert_failure(pants_run)
+    self.assertIn("No target found for test specifier", pants_run.stdout_data)

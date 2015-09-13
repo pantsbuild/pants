@@ -9,7 +9,7 @@ import logging
 
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -52,7 +52,6 @@ class JvmPlatform(Subsystem):
   options_scope = 'jvm-platform'
 
   # Mapping to keep version numbering consistent for ease of comparison.
-
   @classmethod
   def register_options(cls, register):
     super(JvmPlatform, cls).register_options(register)
@@ -60,6 +59,10 @@ class JvmPlatform(Subsystem):
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JvmPlatform, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def _parse_platform(self, name, platform):
     return JvmPlatformSettings(platform.get('source', platform.get('target')),
@@ -75,9 +78,9 @@ class JvmPlatform(Subsystem):
   @property
   def _fallback_platform(self):
     logger.warn('No default jvm platform is defined.')
-    source_level = JvmPlatform.parse_java_version(Distribution.cached().version)
+    source_level = JvmPlatform.parse_java_version(DistributionLocator.cached().version)
     target_level = source_level
-    platform_name = '(Distribution.cached().version {})'.format(source_level)
+    platform_name = '(DistributionLocator.cached().version {})'.format(source_level)
     return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
 
   @memoized_property
@@ -92,7 +95,7 @@ class JvmPlatform(Subsystem):
           "defined. Typically, this should be defined under [{1}] in pants.ini."
           .format(name, self.options_scope)
       )
-    return JvmPlatformSettings(*platforms_by_name[name], name='{} (by default)'.format(name))
+    return JvmPlatformSettings(*platforms_by_name[name], name=name, by_default=True)
 
   @memoized_method
   def get_platform_by_name(self, name, for_target=None):
@@ -113,6 +116,12 @@ class JvmPlatform(Subsystem):
     return self.platforms_by_name[name]
 
   def get_platform_for_target(self, target):
+    """Find the platform associated with this target.
+
+    :param JvmTarget target: target to query.
+    :return: The jvm platform object.
+    :rtype: JvmPlatformSettings
+    """
     if not target.payload.platform and target.is_synthetic:
       derived_from = target.derived_from
       platform = derived_from and getattr(derived_from, 'platform', None)
@@ -150,27 +159,37 @@ class JvmPlatformSettings(object):
   class IllegalSourceTargetCombination(TaskError):
     """Illegal pair of -source and -target flags to compile java."""
 
-  def __init__(self, source_level, target_level, args, name=None):
+  def __init__(self, source_level, target_level, args, name=None, by_default=False):
     """
     :param source_level: Revision object or string for the java source level.
     :param target_level: Revision object or string for the java target level.
     :param list args: Additional arguments to pass to the java compiler.
-    :param str name: optional name to identify this platform; not used for anything but logging.
+    :param str name: name to identify this platform.
+    :param by_default: True if this value was inferred by omission of a specific platform setting.
     """
     self.source_level = JvmPlatform.parse_java_version(source_level)
     self.target_level = JvmPlatform.parse_java_version(target_level)
     self.args = tuple(args or ())
     self.name = name
+    self._by_default = by_default
     self._validate_source_target()
 
   def _validate_source_target(self):
     if self.source_level > self.target_level:
+      if self.by_default:
+        name = "{} (by default)".format(self.name)
+      else:
+        name = self.name
       raise self.IllegalSourceTargetCombination(
         'Platform {platform} has java source level {source_level} but target level {target_level}.'
-        .format(platform=self.name,
+        .format(platform=name,
                 source_level=self.source_level,
                 target_level=self.target_level)
       )
+
+  @property
+  def by_default(self):
+    return self._by_default
 
   def __iter__(self):
     yield self.source_level

@@ -24,7 +24,7 @@ class SpindleGenTest(JvmToolTaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'spindle_thrift_library': SpindleThriftLibrary,
         'jar_library': JarLibrary,

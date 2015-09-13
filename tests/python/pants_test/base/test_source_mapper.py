@@ -21,7 +21,7 @@ class SourceMapperTest(object):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
       },
@@ -93,6 +93,7 @@ class SourceMapperTest(object):
     self.set_mapper(fast=True)
     self.owner(['a/b:b'], 'a/b/bar.py')
     self.owner([':top'], 'foo.py')
+
 
 class LazySourceMapperTest(SourceMapperTest, BaseTest):
   def set_mapper(self, fast=False):

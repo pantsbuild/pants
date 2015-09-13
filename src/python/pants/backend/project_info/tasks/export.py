@@ -9,23 +9,30 @@ import json
 import os
 from collections import defaultdict
 
+from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.ivy_utils import IvyModuleRef
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.project_info.tasks.projectutils import get_jar_infos
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.java.distribution.distribution import DistributionLocator
+from pants.util.memo import memoized_property
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
 # Please add fkorotkov, tdesai to reviews for this file
-class Export(ConsoleTask):
+class Export(PythonTask, ConsoleTask):
   """Generates a JSON description of the targets as configured in pants.
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
@@ -42,7 +49,11 @@ class Export(ConsoleTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION='1.0.2'
+  DEFAULT_EXPORT_VERSION='1.0.4'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(Export, cls).subsystem_dependencies() + (DistributionLocator, JvmPlatform)
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -76,13 +87,6 @@ class Export(ConsoleTask):
     """
     return '{0}:{1}'.format(jar.org, jar.name) if jar.name else jar.org
 
-  @staticmethod
-  def _address(address):
-    """
-    :type address: pants.base.address.SyntheticAddress
-    """
-    return '{0}:{1}'.format(address.spec_path, address.target_name)
-
   @classmethod
   def register_options(cls, register):
     super(Export, cls).register_options(register)
@@ -112,7 +116,6 @@ class Export(ConsoleTask):
   def __init__(self, *args, **kwargs):
     super(Export, self).__init__(*args, **kwargs)
     self.format = self.get_options().formatted
-    self.target_aliases_map = None
 
   def console_output(self, targets):
     targets_map = {}
@@ -131,6 +134,7 @@ class Export(ConsoleTask):
         ivy_info = ivy_info_list[0]
 
     ivy_jar_memo = {}
+    python_interpreter_targets_mapping = defaultdict(list)
 
     def process_target(current_target):
       """
@@ -168,6 +172,7 @@ class Export(ConsoleTask):
         'target_type': get_target_type(current_target),
         'is_code_gen': current_target.is_codegen,
         'pants_target_type': self._get_pants_target_alias(type(current_target))
+
       }
 
       if not current_target.is_synthetic:
@@ -175,11 +180,23 @@ class Export(ConsoleTask):
         if self.get_options().sources:
           info['sources'] = list(current_target.sources_relative_to_buildroot())
 
-      target_libraries = set()
+      if isinstance(current_target, PythonRequirementLibrary):
+        reqs = current_target.payload.get_field_value('requirements', set())
+        """:type : set[pants.backend.python.python_requirement.PythonRequirement]"""
+        info['requirements'] = [req.key for req in reqs]
+
+      if isinstance(current_target, PythonTarget):
+        interpreter_for_target = self.select_interpreter_for_targets([current_target])
+        if interpreter_for_target is None:
+          raise TaskError('Unable to find suitable interpreter for {}'.format(current_target.address))
+        python_interpreter_targets_mapping[interpreter_for_target].append(current_target)
+        info['python_interpreter'] = str(interpreter_for_target.identity)
+
+      target_libraries = OrderedSet()
       if isinstance(current_target, JarLibrary):
         target_libraries = get_transitive_jars(current_target)
       for dep in current_target.dependencies:
-        info['targets'].append(self._address(dep.address))
+        info['targets'].append(dep.address.spec)
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
             target_libraries.add(IvyModuleRef(jar.org, jar.name, jar.rev))
@@ -190,11 +207,12 @@ class Export(ConsoleTask):
 
       if isinstance(current_target, ScalaLibrary):
         for dep in current_target.java_sources:
-          info['targets'].append(self._address(dep.address))
+          info['targets'].append(dep.address.spec)
           process_target(dep)
 
       if isinstance(current_target, JvmTarget):
         info['excludes'] = [self._exclude_id(exclude) for exclude in current_target.excludes]
+        info['platform'] = current_target.platform.name
 
       info['roots'] = map(lambda (source_root, package_prefix): {
         'source_root': source_root,
@@ -203,18 +221,53 @@ class Export(ConsoleTask):
 
       if self.get_options().libraries:
         info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
-      targets_map[self._address(current_target.address)] = info
+      targets_map[current_target.address.spec] = info
 
     for target in targets:
       process_target(target)
 
-    graph_info = {
-      'targets': targets_map,
+    jvm_platforms_map = {
+      'default_platform' : JvmPlatform.global_instance().default_platform.name,
+      'platforms': {
+        str(platform_name): {
+          'target_level' : str(platform.target_level),
+          'source_level' : str(platform.source_level),
+          'args' : platform.args,
+        } for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items() }
     }
+
+    graph_info = {
+      'version': self.DEFAULT_EXPORT_VERSION,
+      'targets': targets_map,
+      'jvm_platforms': jvm_platforms_map,
+    }
+    jvm_distributions = DistributionLocator.global_instance().all_jdk_paths()
+    if jvm_distributions:
+      graph_info['jvm_distributions'] = jvm_distributions
+
     if self.get_options().libraries:
       graph_info['libraries'] = self._resolve_jars_info()
 
-    graph_info['version'] = self.DEFAULT_EXPORT_VERSION
+    if python_interpreter_targets_mapping:
+      default_interpreter = self.interpreter_cache.select_interpreter(python_interpreter_targets_mapping.keys())[0]
+
+      interpreters_info = {}
+      for interpreter, targets in python_interpreter_targets_mapping.iteritems():
+        chroot = self.cached_chroot(
+          interpreter=interpreter,
+          pex_info=PexInfo.default(),
+          targets=targets
+        )
+        interpreters_info[str(interpreter.identity)] = {
+          'binary': interpreter.binary,
+          'chroot': chroot.path()
+        }
+
+      graph_info['python_setup'] = {
+        'default_interpreter': str(default_interpreter.identity),
+        'interpreters': interpreters_info
+      }
+
 
     if self.format:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
@@ -237,16 +290,23 @@ class Export(ConsoleTask):
       mapping[self._jar_id(ivy_module_ref)].update(conf_to_jarfile_map)
     return mapping
 
+  @memoized_property
+  def target_aliases_map(self):
+    registered_aliases = self.context.build_file_parser.registered_aliases()
+    map = {}
+    for alias, target_types in registered_aliases.target_types_by_alias.items():
+      # If a target class is registered under multiple aliases returns the last one.
+      for target_type in target_types:
+        map[target_type] = alias
+    return map
+
   def _get_pants_target_alias(self, pants_target_type):
     """Returns the pants target alias for the given target"""
-    if not self.target_aliases_map:
-      target_aliases = self.context.build_file_parser.registered_aliases().targets
-      # If a target class is registered under multiple aliases returns the last one.
-      self.target_aliases_map = {classname: alias for alias, classname in target_aliases.items()}
     if pants_target_type in self.target_aliases_map:
       return self.target_aliases_map.get(pants_target_type)
     else:
-      raise TaskError('Unregistered target type {target_type}'.format(target_type=pants_target_type))
+      raise TaskError('Unregistered target type {target_type}'
+                      .format(target_type=pants_target_type))
 
   @staticmethod
   def _source_roots_for_target(target):

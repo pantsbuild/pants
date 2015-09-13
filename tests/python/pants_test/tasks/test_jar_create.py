@@ -30,7 +30,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
   @property
   def alias_groups(self):
-    return super(JarCreateTestBase, self).alias_groups.merge(BuildFileAliases.create(
+    return super(JarCreateTestBase, self).alias_groups.merge(BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
         'java_thrift_library': JavaThriftLibrary,
@@ -43,6 +43,7 @@ class JarCreateTestBase(JarTaskTestBase):
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
     self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+
 
 class JarCreateMiscTest(JarCreateTestBase):
 

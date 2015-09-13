@@ -11,6 +11,8 @@ from contextlib import closing
 from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
+from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
@@ -19,8 +21,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.java.distribution.distribution import Distribution
-from pants.java.jar.shader import Shader
+from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import relativize_paths, safe_open
@@ -53,8 +54,8 @@ class ZincCompile(JvmCompile):
     return root, plugin_info_file
 
   @classmethod
-  def global_subsystems(cls):
-    return super(ZincCompile, cls).global_subsystems() + (ScalaPlatform, )
+  def subsystem_dependencies(cls):
+    return super(ZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -80,6 +81,9 @@ class ZincCompile(JvmCompile):
 
     cls.register_jvm_tool(register,
                           'zinc',
+                          classpath=[
+                            JarDependency('org.pantsbuild', 'zinc', '1.0.8')
+                          ],
                           main=cls._ZINC_MAIN,
                           custom_rules=[
                             # The compiler-interface and sbt-interface tool jars carry xsbt and
@@ -90,10 +94,31 @@ class ZincCompile(JvmCompile):
                             Shader.exclude_package('xsbt', recursive=True),
                             Shader.exclude_package('xsbti', recursive=True),
                           ])
-    cls.register_jvm_tool(register, 'compiler-interface')
-    cls.register_jvm_tool(register, 'sbt-interface')
 
-    cls.register_jvm_tool(register, 'plugin-jars', default=[])
+    def sbt_jar(name, **kwargs):
+      return JarDependency(org='com.typesafe.sbt', name=name, rev='0.13.9', **kwargs)
+
+    cls.register_jvm_tool(register,
+                          'compiler-interface',
+                          classpath=[
+                            sbt_jar(name='compiler-interface',
+                                    classifier='sources',
+                                    # We just want the single compiler-interface jar and not its
+                                    # dep on scala-lang
+                                    intransitive=True)
+                          ])
+    cls.register_jvm_tool(register,
+                          'sbt-interface',
+                          classpath=[
+                            sbt_jar(name='sbt-interface',
+                                    # We just want the single sbt-interface jar and not its dep
+                                    # on scala-lang
+                                    intransitive=True)
+                          ])
+
+    # By default we expect no plugin-jars classpath_spec is filled in by the user, so we accept an
+    # empty classpath.
+    cls.register_jvm_tool(register, 'plugin-jars', classpath=[])
 
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')
@@ -110,15 +135,15 @@ class ZincCompile(JvmCompile):
     self._lazy_plugin_args = None
 
   def create_analysis_tools(self):
-    return AnalysisTools(self.context.java_home, ZincAnalysisParser(), ZincAnalysis)
+    return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis)
 
   def zinc_classpath(self):
     # Zinc takes advantage of tools.jar if it's presented in classpath.
     # For example com.sun.tools.javac.Main is used for in process java compilation.
     def locate_tools_jar():
       try:
-        return Distribution.cached(jdk=True).find_libs(['tools.jar'])
-      except Distribution.Error:
+        return DistributionLocator.cached(jdk=True).find_libs(['tools.jar'])
+      except DistributionLocator.Error:
         self.context.log.info('Failed to locate tools.jar. '
                               'Install a JDK to increase performance of Zinc.')
         return []

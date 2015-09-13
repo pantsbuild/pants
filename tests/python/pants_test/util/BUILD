@@ -6,9 +6,11 @@ target(
   dependencies = [
     ':contextutil',
     ':dirutil',
+    ':eval',
     ':fileutil',
     ':memo',
     ':meta',
+    ':osutil',
     ':strutil',
     ':xml_parser',
   ]
@@ -34,6 +36,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'eval',
+  sources = ['test_eval.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    'src/python/pants/util:eval',
+  ]
+)
+
+python_tests(
   name = 'fileutil',
   sources = ['test_fileutil.py'],
   dependencies = [
@@ -47,6 +58,14 @@ python_tests(
   sources = ['test_filtering.py'],
   dependencies = [
     'src/python/pants/util:filtering',
+  ]
+)
+
+python_tests(
+  name = 'osutil',
+  sources = ['test_osutil.py'],
+  dependencies = [
+    'src/python/pants/util:osutil',
   ]
 )
 

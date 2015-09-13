@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.tasks.task import Task, TaskBase
-from pants.backend.jvm.subsystems.jvm import JVM
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.java import util
-from pants.java.distribution.distribution import Distribution
+from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
 
@@ -23,20 +23,23 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
-    cls.register_jvm_tool(register, 'nailgun-server')
     register('--use-nailgun', action='store_true', default=True,
              help='Use nailgun to make repeated invocations of this task quicker.')
     register('--nailgun-timeout-seconds', advanced=True, default=10,
              help='Timeout (secs) for nailgun startup.')
     register('--nailgun-connect-attempts', advanced=True, default=5,
              help='Max attempts for nailgun connects.')
+    cls.register_jvm_tool(register,
+                          'nailgun-server',
+                          classpath=[
+                            JarDependency(org='com.martiansoftware',
+                                          name='nailgun-server',
+                                          rev='0.9.1'),
+                          ])
 
   @classmethod
   def global_subsystems(cls):
-    # TODO(gmalmquist): JVM subsystem dependency is required because Distribution queries it for
-    # jdk_paths when locating a jvm. Distribution should be refactored to be its own subsystem
-    # which depends on JVM, then NailgunTaskBase can depend on Distribution.
-    return super(NailgunTaskBase, cls).global_subsystems() + (JVM,)
+    return super(NailgunTaskBase, cls).global_subsystems() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
     super(NailgunTaskBase, self).__init__(*args, **kwargs)
@@ -51,9 +54,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
   def set_distribution(self, minimum_version=None, maximum_version=None, jdk=False):
     try:
-      self._dist = Distribution.cached(minimum_version=minimum_version,
-                                       maximum_version=maximum_version, jdk=jdk)
-    except Distribution.Error as e:
+      self._dist = DistributionLocator.cached(minimum_version=minimum_version,
+                                              maximum_version=maximum_version, jdk=jdk)
+    except DistributionLocator.Error as e:
       raise TaskError(e)
 
   def create_java_executor(self):
@@ -101,6 +104,7 @@ class NailgunTask(NailgunTaskBase, Task): pass
 
 class NailgunKillall(Task):
   """A task to manually kill nailguns."""
+
   @classmethod
   def register_options(cls, register):
     super(NailgunKillall, cls).register_options(register)

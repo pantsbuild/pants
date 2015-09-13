@@ -77,8 +77,10 @@ def is_builtin_name(name):
 def is_constant(name):
   return UPPER_SNAKE_RE.match(name) is not None
 
+
 class VariableNamesSubsystem(Subsystem):
   options_scope = 'pycheck-variable-names'
+
   @classmethod
   def register_options(cls, register):
     super(VariableNamesSubsystem, cls).register_options(register)

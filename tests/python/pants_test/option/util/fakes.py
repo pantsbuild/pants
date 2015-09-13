@@ -36,6 +36,9 @@ class _FakeOptionValues(object):
   def is_flagged(self, key):
     return self.get_rank(key) == RankedValue.FLAG
 
+  def is_default(self, key):
+    return self.get_rank(key) in (RankedValue.NONE, RankedValue.HARDCODED)
+
 
 def create_option_values(option_values):
   """Create a fake OptionValueContainer object for testing.

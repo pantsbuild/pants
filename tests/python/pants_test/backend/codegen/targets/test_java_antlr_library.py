@@ -16,7 +16,7 @@ class JavaAntlrLibraryTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_antlr_library': JavaAntlrLibrary})
+    return BuildFileAliases(targets={'java_antlr_library': JavaAntlrLibrary})
 
   def test_empty(self):
     with self.assertRaisesRegexp(ValueError, "Missing required 'sources' parameter"):

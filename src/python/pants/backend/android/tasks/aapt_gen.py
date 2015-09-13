@@ -15,7 +15,7 @@ from pants.backend.android.tasks.aapt_task import AaptTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -23,6 +23,7 @@ from pants.util.dirutil import safe_mkdir
 
 
 logger = logging.getLogger(__name__)
+
 
 class AaptGen(AaptTask):
   """
@@ -70,7 +71,7 @@ class AaptGen(AaptTask):
       if sdk not in self._jar_library_by_sdk:
         jar_url = 'file://{0}'.format(self.android_jar(binary))
         jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
-        address = SyntheticAddress(self.workdir, 'android-{0}.jar'.format(sdk))
+        address = Address(self.workdir, 'android-{0}.jar'.format(sdk))
         self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
 
   def _render_args(self, binary, manifest, resource_dirs):
@@ -112,6 +113,7 @@ class AaptGen(AaptTask):
       # framework can't differentiate between one library that has to be compiled by multiple sdks.
 
       gentargets = [binary]
+
       def gather_gentargets(tgt):
         """Gather all AndroidLibrary targets that have a manifest."""
         if isinstance(tgt, AndroidLibrary) and tgt.manifest:
@@ -150,13 +152,13 @@ class AaptGen(AaptTask):
     :rtype::class:`pants.backend.jvm.targets.java_library.JavaLibrary`
     """
     spec_path = os.path.join(os.path.relpath(self.aapt_out(binary), get_buildroot()))
-    address = SyntheticAddress(spec_path=spec_path, target_name=gentarget.id)
+    address = Address(spec_path=spec_path, target_name=gentarget.id)
     deps = [self._jar_library_by_sdk[binary.target_sdk]]
     new_target = self.context.add_new_target(address,
-                                      JavaLibrary,
-                                      derived_from=gentarget,
-                                      sources=[self._relative_genfile(gentarget)],
-                                      dependencies=deps)
+                                             JavaLibrary,
+                                             derived_from=gentarget,
+                                             sources=[self._relative_genfile(gentarget)],
+                                             dependencies=deps)
     return new_target
 
   def aapt_out(self, binary):

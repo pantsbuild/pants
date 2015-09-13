@@ -7,7 +7,6 @@ python_library(
   dependencies = [
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:exceptions',
-    'src/python/pants/option',
   ],
 )
 
@@ -16,6 +15,7 @@ python_library(
   sources = ['jar_tool.py'],
   dependencies = [
     ':jvm_tool_mixin',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:workunit',
     'src/python/pants/option',
     'src/python/pants/subsystem',
@@ -29,7 +29,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:strutil',
-    'src/python/pants/util:osutil',
   ],
 )
 
@@ -53,4 +52,17 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
+)
+
+python_library(
+  name = 'shader',
+  sources = ['shader.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
+  ]
 )

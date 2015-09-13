@@ -90,6 +90,13 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
                 return library_type.getElementsByTagName('root')
     return None
 
+  def _get_compiler_configuration(self, dom):
+    project = dom.getElementsByTagName('project')[0]
+    for component in project.getElementsByTagName('component'):
+      if component.getAttribute('name') == 'CompilerConfiguration':
+        return component
+    return None
+
   # Testing IDEA integration on lots of different targets which require different functionalities to
   # make sure that everything that needs to happen for idea gen does happen.
   # TODO(Garrett Malmquist): Actually validate the contents of the project files, rather than just
@@ -534,4 +541,48 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
     self._idea_test([
       'testprojects/tests/java/org/pantsbuild/testproject/ideatestsandlib::'
+    ], check_func=do_check)
+
+  def test_annotation_processor(self):
+    """Turn on annotation processor support for AutoValue in IntellliJ"""
+
+    def do_check(path):
+      iml_file = os.path.join(path, 'project.iml')
+      iml_dom = minidom.parse(iml_file)
+      found_paths = set()
+      for sourceFolder in self._get_sourceFolders(iml_dom):
+        url = sourceFolder.getAttribute('url')
+        source_path = re.sub(r'^.*/generated', 'generated', url)
+        found_paths.add(source_path)
+      self.assertIn("generated", found_paths)
+      self.assertIn("generated_tests", found_paths)
+
+      ipr_file = os.path.join(path, 'project.ipr')
+      ipr_dom = minidom.parse(ipr_file)
+      annotation_processing = self._get_compiler_configuration(ipr_dom).getElementsByTagName(
+        'annotationProcessing')[0]
+      profile = annotation_processing.getElementsByTagName('profile')[0]
+      self.assertEquals('True', profile.getAttribute('enabled'))
+      self.assertEquals('true', profile.getAttribute('default'))
+      self.assertEquals('Default', profile.getAttribute('name'))
+      processor_path = profile.getElementsByTagName('processorPath')[0]
+      self.assertEquals('true', processor_path.getAttribute('useClasspath'))
+      source_output_dir = profile.getElementsByTagName('sourceOutputDir')[0]
+      self.assertEquals('../../../generated', source_output_dir.getAttribute('name'))
+      source_test_output_dir = profile.getElementsByTagName('sourceTestOutputDir')[0]
+      self.assertEquals('../../../generated_tests', source_test_output_dir.getAttribute('name'))
+      found_processors = set()
+      for processor in profile.getElementsByTagName('processor'):
+        found_processors.add(processor.getAttribute('name'))
+      self.assertEquals({'com.google.auto.value.processor.AutoAnnotationProcessor',
+                         'com.google.auto.value.processor.AutoValueBuilderProcessor',
+                         'com.google.auto.value.processor.AutoValueProcessor'},
+                        found_processors)
+
+    self._idea_test([
+      'examples/src/java/org/pantsbuild/example/autovalue::',
+      '--idea-annotation-processing-enabled',
+      '--idea-annotation-processor=com.google.auto.value.processor.AutoAnnotationProcessor',
+      '--idea-annotation-processor=com.google.auto.value.processor.AutoValueBuilderProcessor',
+      '--idea-annotation-processor=com.google.auto.value.processor.AutoValueProcessor',
     ], check_func=do_check)

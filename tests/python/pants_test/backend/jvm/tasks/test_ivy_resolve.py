@@ -16,7 +16,6 @@ from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.base.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
@@ -46,12 +45,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
   #
   # Test section
   #
-
   def test_resolve_specific(self):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
     jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
-    scala_lib = self.make_target('//:b', ScalaLibrary)
+    scala_lib = self.make_target('//:b', JavaLibrary)
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
@@ -146,12 +144,15 @@ class IvyResolveTest(JvmToolTaskTestBase):
                                                  artifacts=[IvyArtifact('junit')])
 
     no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
-    classifier_and_no_classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier_and_no_classifier])
+    classifier_and_no_classifier_lib = self.make_target('//:b',
+                                                        JarLibrary,
+                                                        jars=[classifier_and_no_classifier])
 
     compile_classpath = self.resolve([no_classifier_lib, classifier_and_no_classifier_lib])
 
     no_classifier_cp = compile_classpath.get_for_target(no_classifier_lib)
-    classifier_and_no_classifier_cp = compile_classpath.get_for_target(classifier_and_no_classifier_lib)
+    classifier_and_no_classifier_cp = compile_classpath.get_for_target(
+        classifier_and_no_classifier_lib)
 
     sources_jar = 'junit-4.12-sources.jar'
     regular_jar = 'junit-4.12.jar'
@@ -172,7 +173,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
     regular_jar = 'avro-1.7.7.jar'
     self.assertIn(tests_jar, list((os.path.basename(j[-1]) for j in cp)))
     self.assertIn(regular_jar, list((os.path.basename(j[-1]) for j in cp)))
-
     # TODO(Eric Ayers):  I can't replicate the test in test_resolve_multiple_artifacts1
     # probably because the previous example creates a unique key for the jar_dependency for //:b
     # with a classifier.
@@ -210,7 +210,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
-    target = self.make_target('//:a', ScalaLibrary)
+    target = self.make_target('//:a', JavaLibrary)
     self.assertTrue(self.resolve([target]))
 
   def test_resolve_symlinked_cache(self):

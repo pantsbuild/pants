@@ -245,7 +245,10 @@ class GoBuildgenTest(TaskTestBase):
 
   def test_stitch_deps_remote_existing_rev_respected(self):
     self.set_options(remote=True, materialize=True)
-    self.make_target('3rdparty/go/pantsbuild.org/fake:prod', GoRemoteLibrary, rev='v1.2.3')
+    self.make_target('3rdparty/go/pantsbuild.org/fake:prod',
+                     GoRemoteLibrary,
+                     pkg='prod',
+                     rev='v1.2.3')
     pre_execute_files = self.stitch_deps_remote()
     self.build_graph.reset()  # Force targets to be loaded off disk
     self.assertEqual('v1.2.3', self.target('3rdparty/go/pantsbuild.org/fake:prod').rev)

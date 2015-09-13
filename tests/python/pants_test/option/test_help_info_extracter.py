@@ -9,8 +9,8 @@ import unittest
 
 from mock import mock
 
+from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.custom_types import dict_option, list_option
-from pants.option.help_info_extracter import HelpInfoExtracter
 
 
 class HelpInfoExtracterTest(unittest.TestCase):
@@ -33,7 +33,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'metavar': 'xx'}, ['--foo=xx'], ['--foo'])
     do_test(['--foo'], {'type': int}, ['--foo=<int>'], ['--foo'])
     do_test(['--foo'], {'type': list_option}, ['--foo="[\'str1\',\'str2\',...]"'], ['--foo'])
-    do_test(['--foo'], {'type': dict_option}, ['--foo="{ \'key1\': val1,\'key2\': val2,...}"'],
+    do_test(['--foo'], {'type': dict_option}, ['--foo="{\'key1\':val1,\'key2\':val2,...}"'],
                                             ['--foo'])
     do_test(['--foo'], {'action': 'append'},
             ['--foo="[\'str1\',\'str2\',...]" (--foo="[\'str1\',\'str2\',...]") ...'], ['--foo'])
@@ -78,6 +78,18 @@ class HelpInfoExtracterTest(unittest.TestCase):
     self.assertEquals('999.99.9', ohi.deprecated_version)
     self.assertEquals('do not use this', ohi.deprecated_hint)
     self.assertIsNotNone(ohi.deprecated_message)
+
+  def test_fromfile(self):
+    ohi = HelpInfoExtracter('').get_option_help_info([], {})
+    self.assertFalse(ohi.fromfile)
+
+    kwargs = {'fromfile': False}
+    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
+    self.assertFalse(ohi.fromfile)
+
+    kwargs = {'fromfile': True}
+    ohi = HelpInfoExtracter('').get_option_help_info([], kwargs)
+    self.assertTrue(ohi.fromfile)
 
   def test_grouping(self):
     def do_test(kwargs, expected_basic=False, expected_recursive=False, expected_advanced=False):

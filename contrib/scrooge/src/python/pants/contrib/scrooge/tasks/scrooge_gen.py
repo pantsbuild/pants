@@ -16,7 +16,7 @@ from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.address import SyntheticAddress
+from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -234,7 +234,7 @@ class ScroogeGen(NailgunTask):
 
     def create_target(files, deps, target_type):
       spec = '{spec_path}:{name}'.format(spec_path=outdir, name=gentarget.id)
-      address = SyntheticAddress.parse(spec=spec)
+      address = Address.parse(spec=spec)
       return self.context.add_new_target(address,
                                          target_type,
                                          sources=files,

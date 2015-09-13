@@ -46,7 +46,7 @@ class JarPublishTest(TaskTestBase):
     self.push_db_basedir = os.path.join(self.build_root, "pushdb")
     safe_mkdir(self.push_db_basedir)
 
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,

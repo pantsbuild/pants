@@ -69,5 +69,5 @@ git config --local user.name "${GH_USER}" && \
 git commit -am "Sync of https://github.com/pantsbuild/pants/commit/$(git rev-parse HEAD)" && \
 git config --local credential.helper "store --file=.git/credentials" && \
 echo "https://${GH_TOKEN}:@github.com" > .git/credentials && \
-git push -f https://github.com/pantsbuild/pants-for-travis-osx-ci.git HEAD:master
+git push -f https://github.com/pantsbuild-osx/pants.git HEAD:master
 
