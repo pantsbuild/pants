@@ -6,19 +6,30 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
+import shutil
 import os
 import sys
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
+from hashlib import sha1
 
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
+from pants.base.exceptions import TaskError
 from pants.option.custom_types import list_option
+from pants.base.worker_pool import Work, WorkerPool
+from pants.base.build_environment import get_buildroot
+from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
+from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
+                                                                 Job)
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.fileutil import atomic_copy, create_size_estimators
+from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):
@@ -45,11 +56,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   @classmethod
   def register_options(cls, register):
     super(JvmCompile, cls).register_options(register)
-    register('--partition-size-hint', advanced=True, type=int, default=sys.maxint,
-             metavar='<# source files>',
-             help='Roughly how many source files to attempt to compile together. Set to a large '
-                  'number to compile all sources together. Set to 0 to compile target-by-target.')
-
     register('--jvm-options', advanced=True, type=list_option, default=[],
              help='Run the compiler with these JVM options.')
 
@@ -83,9 +89,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--worker-count', advanced=True, type=int, default=1,
              help='The number of concurrent workers to use when '
                   'compiling with {task}.'.format(task=cls._name))
+
     register('--size-estimator', advanced=True,
              choices=list(cls.size_estimators.keys()), default='filesize',
              help='The method of target size estimation.')
+
     register('--capture-log', advanced=True, action='store_true', default=False,
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
@@ -254,6 +262,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     self._worker_pool = None
 
+    self._analysis_tools = self.create_analysis_tools()
+
+
+  @property
+  def _analysis_parser(self):
+    return self._analysis_tools.parser
+
   def _fingerprint_strategy(self):
     return TaskIdentityFingerprintStrategy(self)
 
@@ -267,7 +282,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     :return: path of temporary analysis directory
     """
     analysis_tmpdir = os.path.join(self._workdir, 'analysis_tmpdir')
-    if self.delete_scratch:
+    if self._delete_scratch:
       self.context.background_worker_pool().add_shutdown_hook(
         lambda: safe_rmtree(analysis_tmpdir))
     safe_mkdir(analysis_tmpdir)
@@ -289,7 +304,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     self._create_empty_products()
 
   def prepare_execute(self, chunks):
-    targets_in_chunks = list(itertools.chain(*chunks))
+    relevant_targets = list(itertools.chain(*chunks))
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
                                               fingerprint_strategy=self._fingerprint_strategy())
 
@@ -323,11 +338,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Generate a short unique path for the jar to allow for shorter classpaths.
     #   TODO: likely unnecessary after https://github.com/pantsbuild/pants/issues/1988
     jar_file = os.path.join(self._jars_dir, '{}.jar'.format(sha1(target.id).hexdigest()[:12]))
-    return IsolatedCompileContext(target,
-                                  analysis_file,
-                                  classes_dir,
-                                  jar_file,
-                                  self._sources_for_target(target))
+    return CompileContext(target,
+                          analysis_file,
+                          classes_dir,
+                          jar_file,
+                          self._sources_for_target(target))
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
@@ -645,7 +660,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # on success.
         tmpdir = os.path.join(self.analysis_tmpdir, compile_context.target.id)
         safe_mkdir(tmpdir)
-        tmp_analysis_file = JvmCompileStrategy._analysis_for_target(
+        tmp_analysis_file = self._analysis_for_target(
             tmpdir, compile_context.target)
         if os.path.exists(compile_context.analysis_file):
            shutil.copy(compile_context.analysis_file, tmp_analysis_file)
@@ -722,7 +737,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     vt = vts.versioned_targets[0]
 
     # Set up args to relativize analysis in the background.
-    portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(
+    portable_analysis_file = self._portable_analysis_for_target(
         self._analysis_dir, compile_context.target)
     relativize_args_tuple = (compile_context.analysis_file, portable_analysis_file)
 
