@@ -264,7 +264,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     self._analysis_tools = self.create_analysis_tools()
 
-
   @property
   def _analysis_parser(self):
     return self._analysis_tools.parser
