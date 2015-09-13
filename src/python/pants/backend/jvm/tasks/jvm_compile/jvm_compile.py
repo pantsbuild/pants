@@ -82,7 +82,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     register('--worker-count', advanced=True, type=int, default=1,
              help='The number of concurrent workers to use when '
-                  'compiling with {task}.'.format(task=compile_task_name))
+                  'compiling with {task}.'.format(task=cls._name))
     register('--size-estimator', advanced=True,
              choices=list(cls.size_estimators.keys()), default='filesize',
              help='The method of target size estimation.')
@@ -300,7 +300,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Update the classpath by adding relevant target's classes directories to its classpath.
     compile_classpaths = self.context.products.get_data('compile_classpath')
 
-    with self.context.new_workunit('validate-{}-analysis'.format(self._compile_task_name)):
+    with self.context.new_workunit('validate-{}-analysis'.format(self._name)):
       for target in relevant_targets:
         cc = self.compile_context(target)
         safe_mkdir(cc.classes_dir)
@@ -308,7 +308,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         self.validate_analysis(cc.analysis_file)
 
     # This ensures the workunit for the worker pool is set
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._compile_task_name)) \
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
             as workunit:
       # This uses workunit.parent as the WorkerPool's parent so that child workunits
       # of different pools will show up in order in the html output. This way the current running
