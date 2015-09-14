@@ -48,7 +48,7 @@ fi
 
 function prepare_osx_yaml() {
   # NB: we can freely `pip install` in our Travis CI ephemeral build environment.
-  pip install --quiet PyYAML && python << EOF
+  pip install PyYAML && python << EOF
 import yaml
 with open('.travis.yml') as fp:
   config_linux = yaml.safe_load(fp)
