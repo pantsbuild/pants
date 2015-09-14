@@ -89,7 +89,8 @@ class IvyInfo(object):
 
   def add_module(self, module):
     if module.ref in self.modules_by_ref:
-      raise IvyResolveMappingError("Already defined module {}, would be overwritten!".format(module.ref))
+      raise IvyResolveMappingError('Already defined module {}, would be overwritten!'
+                                   .format(module.ref))
     self.modules_by_ref[module.ref] = module
     if not module.artifact:
       # Module was evicted, so do not record information about it
@@ -103,8 +104,8 @@ class IvyInfo(object):
     created by the collector function.
 
     :param ref an IvyModuleRef to start traversing the ivy dependency graph
-    :param collector a function that takes a ref and returns a new set of values to collect for that ref,
-           which will also be updated with all the dependencies accumulated values
+    :param collector a function that takes a ref and returns a new set of values to collect for
+           that ref, which will also be updated with all the dependencies accumulated values
     :param memo is a dict of ref -> set that memoizes the results of each node in the graph.
            If provided, allows for retaining cache across calls.
     :returns the accumulated set for ref
@@ -145,12 +146,12 @@ class IvyInfo(object):
     :returns: all the artifacts for all of the jars in this library, including transitive deps
     :rtype: list of str
     """
-    def to_resolved_jar(jar_module_ref, artifact_path):
-      return ResolvedJar(coordinate=M2Coordinate(org=jar_module_ref.org, name=jar_module_ref.name,
-                                                 rev=jar_module_ref.rev,
-                                                 classifier=jar_module_ref.classifier),
-                         cache_path=artifact_path
-      )
+    def to_resolved_jar(jar_ref, jar_path):
+      return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
+                                                 name=jar_ref.name,
+                                                 rev=jar_ref.rev,
+                                                 classifier=jar_ref.classifier),
+                         cache_path=jar_path)
     resolved_jars = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
@@ -159,7 +160,11 @@ class IvyInfo(object):
         jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
         for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
           for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
-            resolved_jars.add(to_resolved_jar(jar_module_ref, artifact_path))
+            classified_module_ref = IvyModuleRef(module_ref.org,
+                                                 module_ref.name,
+                                                 module_ref.rev,
+                                                 classifier)
+            resolved_jars.add(to_resolved_jar(classified_module_ref, artifact_path))
     return resolved_jars
 
   def get_jars_for_ivy_module(self, jar, memo=None):
@@ -307,10 +312,10 @@ class IvyUtils(object):
     return cls._parse_xml_report(path)
 
   @classmethod
-  def _parse_xml_report(cls, path):
-    logger.debug("Parsing ivy report {}".format(path))
+  def _parse_xml_report(cls, source):
+    logger.debug("Parsing ivy report {}".format(source))
     ret = IvyInfo()
-    etree = ET.parse(path)
+    etree = ET.parse(source)
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')

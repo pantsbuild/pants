@@ -13,8 +13,11 @@ from mock import Mock
 
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyResolveMappingError, IvyUtils
+from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.base_test import BaseTest
@@ -181,8 +184,25 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v1, v1_force))
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v1))
 
+  def test_get_resolved_jars_for_jar_library(self):
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
+    lib = self.make_target(spec=':org1-name1',
+                           target_type=JarLibrary,
+                           jars=[JarDependency(org='org1', name='name1', rev='0.0.1')])
+
+    resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
+
+    def coord(org, name):
+      return M2Coordinate(org=org, name=name, rev='0.0.1')
+
+    expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1'),
+                'ivy2cache_path/org2/name2.jar': coord(org='org2', name='name2'),
+                'ivy2cache_path/org3/name3.jar': coord(org='org3', name='name3')}
+    coordinate_by_path = {rj.cache_path: rj.coordinate for rj in resolved_jars}
+    self.assertEqual(expected, coordinate_by_path)
+
   def test_does_not_visit_diamond_dep_twice(self):
-    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
 
     ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
     seen = set()
@@ -190,7 +210,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     def collector(r):
       self.assertNotIn(r, seen)
       seen.add(r)
-      return set([r])
+      return {r}
 
     result = ivy_info.traverse_dependency_graph(ref, collector)
 
@@ -204,7 +224,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           result)
 
   def test_does_not_follow_cycle(self):
-    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_cycle.xml')
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_cycle.xml')
 
     ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
     seen = set()
@@ -212,7 +232,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     def collector(r):
       self.assertNotIn(r, seen)
       seen.add(r)
-      return set([r])
+      return {r}
 
     result = ivy_info.traverse_dependency_graph(ref, collector)
 
@@ -226,12 +246,12 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           result)
 
   def test_memo_reused_across_calls(self):
-    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
 
     ref = IvyModuleRef(org='org1', name='name1', rev='0.0.1')
 
     def collector(r):
-      return set([r])
+      return {r}
 
     memo = dict()
     result1 = ivy_info.traverse_dependency_graph(ref, collector, memo=memo)
@@ -248,7 +268,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def test_parse_fails_when_same_classifier_different_type(self):
     with self.assertRaises(IvyResolveMappingError):
-      self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_same_classifier_different_type.xml')
+      self.parse_ivy_report('ivy_utils_resources/report_with_same_classifier_different_type.xml')
 
   def find_single(self, elem, xpath):
     results = list(elem.findall(xpath))
@@ -325,7 +345,9 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             self.assertEquals(symlink_bar_path + os.pathsep + symlink_foo_path, outpath.readline())
 
   def test_missing_ivy_report(self):
-    self.set_options_for_scope(IvySubsystem.options_scope, cache_dir='DOES_NOT_EXIST', use_nailgun=False)
+    self.set_options_for_scope(IvySubsystem.options_scope,
+                               cache_dir='DOES_NOT_EXIST',
+                               use_nailgun=False)
 
     # Hack to initialize Ivy subsystem
     self.context()
@@ -333,7 +355,8 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     with self.assertRaises(IvyUtils.IvyResolveReportError):
       IvyUtils.parse_xml_report('INVALID_REPORT_UNIQUE_NAME', 'default')
 
-  def parse_ivy_report(self, path):
+  def parse_ivy_report(self, rel_path):
+    path = os.path.join('tests/python/pants_test/backend/jvm/tasks', rel_path)
     ivy_info = IvyUtils._parse_xml_report(path)
     self.assertIsNotNone(ivy_info)
     return ivy_info
