@@ -74,7 +74,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
     symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
                    artifact_path('bogus1'): artifact_path('bogus1'),
                    artifact_path('unused'): artifact_path('unused')}
-    context.products.safe_create_data('ivy_resolve_symlink_map', lambda: symlink_map)
     task = self.create_task(context, 'unused')
 
     def mock_ivy_resolve(targets, *args, **kw):
@@ -84,7 +83,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
         cache_key = vts.cache_key.hash
       else:
         cache_key = None
-      return ([], cache_key)
+      return [], symlink_map, cache_key
 
     task.ivy_resolve = mock_ivy_resolve
 

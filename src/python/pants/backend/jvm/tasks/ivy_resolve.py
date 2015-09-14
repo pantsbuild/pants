@@ -21,7 +21,6 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
-from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
@@ -33,10 +32,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
   class UnresolvedJarError(Error):
     """A jar dependency couldn't be found in the symlink map"""
-
-  @classmethod
-  def global_subsystems(cls):
-    return super(IvyResolve, cls).global_subsystems() + (IvySubsystem, )
 
   @classmethod
   def register_options(cls, register):
@@ -74,9 +69,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
   def product_types(cls):
     return [
         'compile_classpath',
-        'ivy_cache_dir',
         'ivy_jar_products',
-        'ivy_resolve_symlink_map',
         'jar_dependencies',
         'jar_map_default',
         'jar_map_sources',
@@ -91,7 +84,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
   def __init__(self, *args, **kwargs):
     super(IvyResolve, self).__init__(*args, **kwargs)
 
-    self._cachedir = IvySubsystem.global_instance().get_options().cache_dir
     self._classpath_dir = os.path.join(self.workdir, 'mapped')
     self._outdir = self.get_options().outdir or os.path.join(self.workdir, 'reports')
     self._open = self.get_options().open
@@ -118,13 +110,12 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
     executor = self.create_java_executor()
     targets = self.context.targets()
-    self.context.products.safe_create_data('ivy_cache_dir', lambda: self._cachedir)
     compile_classpath = self.context.products.get_data('compile_classpath',
                                                        lambda: ClasspathProducts())
     compile_classpath.add_excludes_for_targets(targets)
     # After running ivy, we parse the resulting report, and record the dependencies for
     # all relevant targets (ie: those that have direct dependencies).
-    _, resolve_hash_name = self.ivy_resolve(
+    _, symlink_map, resolve_hash_name = self.ivy_resolve(
       targets,
       executor=executor,
       workunit_name='ivy-resolve',
@@ -135,7 +126,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     # Record the ordered subset of jars that each jar_library/leaf depends on using
     # stable symlinks within the working copy.
     ivy_jar_products = self._generate_ivy_jar_products(resolve_hash_name)
-    symlink_map = self.context.products.get_data('ivy_resolve_symlink_map')
+
     def new_resolved_jar_with_symlink_path(resolved_jar_without_symlink):
       if resolved_jar_without_symlink.cache_path in symlink_map:
         key = resolved_jar_without_symlink.cache_path
@@ -143,9 +134,11 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         key = os.path.realpath(resolved_jar_without_symlink.cache_path)
 
       if key not in symlink_map:
-        raise self.UnresolvedJarError(
-          'Jar {resolved_jar} in {spec} not resolved to the ivy symlink map in conf {conf}.'.format(
-          spec=target.address.spec, resolved_jar=resolved_jar_without_symlink.cache_path, conf=conf))
+        raise self.UnresolvedJarError('Jar {resolved_jar} in {spec} not resolved to the ivy '
+                                      'symlink map in conf {conf}.'
+                                      .format(spec=target.address.spec,
+                                              resolved_jar=resolved_jar_without_symlink.cache_path,
+                                              conf=conf))
 
       return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
                          pants_path=symlink_map[key],
@@ -166,9 +159,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
       jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
       for target in jar_library_targets:
         # Add the artifacts from each dependency module.
-        resolved_jars = [new_resolved_jar_with_symlink_path(resolved_jar)
-                         for resolved_jar in ivy_info.get_resolved_jars_for_jar_library(target,
-                                                                                        memo=ivy_jar_memo)]
+        jars = ivy_info.get_resolved_jars_for_jar_library(target, memo=ivy_jar_memo)
+        resolved_jars = [new_resolved_jar_with_symlink_path(resolved_jar) for resolved_jar in jars]
         compile_classpath.add_jars_for_targets([target], conf, resolved_jars)
 
     if self._report:
@@ -192,7 +184,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     """Based on the ivy report, compute a map of conf to lists of IvyInfo objects."""
     ivy_products = defaultdict(list)
     for conf in self.confs:
-      ivyinfo = IvyUtils.parse_xml_report(resolve_hash_name, conf)
+      ivyinfo = IvyUtils.parse_xml_report(self.ivy_cache_dir, resolve_hash_name, conf)
       if ivyinfo:
         # TODO(stuhood): Value is a list, previously to accommodate multiple exclusives groups.
         ivy_products[conf].append(ivyinfo)
@@ -231,14 +223,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     report = None
     org = IvyUtils.INTERNAL_ORG_NAME
     name = resolve_hash_name
-    xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
+    xsl = os.path.join(self.ivy_cache_dir, 'ivy-report.xsl')
 
     # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
     # points.
     safe_mkdir(self._outdir, clean=False)
 
     for conf in self.confs:
-      xml_path = IvyUtils.xml_report_path(resolve_hash_name, conf)
+      xml_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
       if not os.path.exists(xml_path):
         # Make it clear that this is not the original report from Ivy by changing its name.
         xml_path = xml_path[:-4] + "-empty.xml"

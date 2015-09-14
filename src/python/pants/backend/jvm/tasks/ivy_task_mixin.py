@@ -24,6 +24,7 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir
+from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -57,12 +58,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
 
 class IvyTaskMixin(object):
-  """A mixin for Tasks that execute resolves via Ivy.
-
-  The creation of the 'ivy_resolve_symlink_map' product is a side effect of
-  running `def ivy_resolve`. The product is a map of paths in Ivy's resolve cache to
-  stable locations within the working copy.
-  """
+  """A mixin for Tasks that execute resolves via Ivy."""
 
   @classmethod
   def global_subsystems(cls):
@@ -79,6 +75,15 @@ class IvyTaskMixin(object):
 
   # Protect writes to the global map of jar path -> symlinks to that jar.
   symlink_map_lock = threading.Lock()
+
+  @memoized_property
+  def ivy_cache_dir(self):
+    """The path of the ivy cache dir used for resolves.
+
+    :rtype: string
+    """
+    # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
+    return IvySubsystem.global_instance().get_options().cache_dir
 
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
@@ -97,7 +102,7 @@ class IvyTaskMixin(object):
     from the resolve."""
 
     if not targets:
-      return ([], None)
+      return [], {}, None
 
     ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
 
@@ -110,7 +115,7 @@ class IvyTaskMixin(object):
                           silent=silent,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
       if not invalidation_check.all_vts:
-        return ([], None)
+        return [], {}, None
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
       # If a report file is not present, we need to exec ivy, even if all the individual
@@ -120,7 +125,7 @@ class IvyTaskMixin(object):
       report_paths = []
       resolve_hash_name = global_vts.cache_key.hash
       for conf in report_confs:
-        report_path = IvyUtils.xml_report_path(resolve_hash_name, conf)
+        report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
         if not os.path.exists(report_path):
           report_missing = True
           break
@@ -138,7 +143,9 @@ class IvyTaskMixin(object):
 
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
-      if report_missing or invalidation_check.invalid_vts or not os.path.exists(raw_target_classpath_file):
+      if (report_missing or
+          invalidation_check.invalid_vts or
+          not os.path.exists(raw_target_classpath_file)):
         args = ['-cachepath', raw_target_classpath_file_tmp] + (custom_args if custom_args else [])
 
         self.exec_ivy(
@@ -167,19 +174,14 @@ class IvyTaskMixin(object):
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
     with IvyTaskMixin.symlink_map_lock:
-      products = self.context.products
-      existing_symlinks_map = products.get_data('ivy_resolve_symlink_map', lambda: dict())
-      symlink_map = IvyUtils.symlink_cachepath(
-        IvySubsystem.global_instance().get_options().cache_dir,
-        raw_target_classpath_file,
-        symlink_dir,
-        target_classpath_file,
-        existing_symlinks_map)
-      existing_symlinks_map.update(symlink_map)
+      symlink_map = IvyUtils.symlink_cachepath(self.ivy_cache_dir,
+                                               raw_target_classpath_file,
+                                               symlink_dir,
+                                               target_classpath_file)
 
-    with IvyUtils.cachepath(target_classpath_file) as classpath:
-      stripped_classpath = [path.strip() for path in classpath]
-      return (stripped_classpath, resolve_hash_name)
+      with IvyUtils.cachepath(target_classpath_file) as classpath:
+        stripped_classpath = [path.strip() for path in classpath]
+        return stripped_classpath, symlink_map, resolve_hash_name
 
   def mapjar_workdir(self, target):
     return os.path.join(self.workdir, 'mapped-jars', target.id)
@@ -214,7 +216,8 @@ class IvyTaskMixin(object):
           .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
         [u'com.example-bar-0.0.1.jar']
       # (org, name, conf)
-      (u'com.example', u'bar', u'default') => .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
+      (u'com.example', u'bar', u'default') =>
+          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
         [u'com.example-bar-0.0.1.jar']
     """
     mapdir = self.mapjar_workdir(target)
