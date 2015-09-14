@@ -259,7 +259,7 @@ class JarPublishTest(TaskTestBase):
     self.assertEquals(r, c)
 
 
-class FailNTimes:
+class FailNTimes(object):
 
   def __init__(self, tries, exc_type, success=None):
     self.tries = tries

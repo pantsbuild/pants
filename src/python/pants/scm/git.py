@@ -363,19 +363,19 @@ class GitRepositoryReader(object):
       return path.endswith('/')
     return False
 
-  class Symlink:
+  class Symlink(object):
 
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
-  class Dir:
+  class Dir(object):
 
     def __init__(self, name, sha):
       self.name = name
       self.sha = sha
 
-  class File:
+  class File(object):
 
     def __init__(self, name, sha):
       self.name = name
