@@ -41,36 +41,47 @@ class IvyResolveMappingError(Exception):
 
 class IvyModuleRef(object):
 
+  # latest.integration is ivy magic meaning "just get the latest version"
+  _ANY_REV = 'latest.integration'
+
   def __init__(self, org, name, rev, classifier=None):
     self.org = org
     self.name = name
     self.rev = rev
     self.classifier = classifier
 
+    self._id = (org, name, rev, classifier)
+
   def __eq__(self, other):
-    return self.org == other.org and \
-           self.name == other.name and \
-           self.rev == other.rev and \
-           self.classifier == other.classifier
+    return isinstance(other, IvyModuleRef) and self._id == other._id
+
+  def __ne__(self, other):
+    return not self == other
 
   def __hash__(self):
-    return hash((self.org, self.name, self.rev, self.classifier))
+    return hash(self._id)
 
   def __str__(self):
-    return 'IvyModuleRef({})'.format(':'.join([self.org, self.name, self.rev, self.classifier or '']))
+    return 'IvyModuleRef({})'.format(':'.join((x or '') for x in self._id))
+
+  @property
+  def caller_key(self):
+    """This returns an identifier for an IvyModuleRef that only retains the caller org and name.
+
+    Ivy represents dependees as `<caller/>`'s with just org and name and rev information.
+    This method returns a `<caller/>` representation of the current ref.
+    """
+    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV)
 
   @property
   def unversioned(self):
     """This returns an identifier for an IvyModuleRef without version information.
 
-       It's useful because ivy might return information about a
-       different version of a dependency than the one we request, and we
-       want to ensure that all requesters of any version of that
-       dependency are able to learn about it.
+    It's useful because ivy might return information about a different version of a dependency than
+    the one we request, and we want to ensure that all requesters of any version of that dependency
+    are able to learn about it.
     """
-
-    # latest.integration is ivy magic meaning "just get the latest version"
-    return IvyModuleRef(name=self.name, org=self.org, rev='latest.integration', classifier=self.classifier)
+    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV, classifier=self.classifier)
 
   @property
   def unclassified(self):
@@ -96,7 +107,7 @@ class IvyInfo(object):
       # Module was evicted, so do not record information about it
       return
     for caller in module.callers:
-      self._deps_by_caller[caller.unversioned].add(module.ref)
+      self._deps_by_caller[caller.caller_key].add(module.ref)
     self._artifacts_by_ref[module.ref.unversioned].add(module.artifact)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
@@ -127,7 +138,7 @@ class IvyInfo(object):
     visited.add(ref)
 
     acc = collector(ref)
-    for dep in self._deps_by_caller.get(ref.unversioned, ()):
+    for dep in self._deps_by_caller.get(ref.caller_key, ()):
       acc.update(self.traverse_dependency_graph(dep, collector, memo, visited))
     memo[ref] = acc
     return acc
@@ -160,11 +171,7 @@ class IvyInfo(object):
         jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
         for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
           for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
-            classified_module_ref = IvyModuleRef(module_ref.org,
-                                                 module_ref.name,
-                                                 module_ref.rev,
-                                                 classifier)
-            resolved_jars.add(to_resolved_jar(classified_module_ref, artifact_path))
+            resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
     return resolved_jars
 
   def get_jars_for_ivy_module(self, jar, memo=None):

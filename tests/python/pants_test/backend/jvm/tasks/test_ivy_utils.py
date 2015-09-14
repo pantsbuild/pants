@@ -188,16 +188,19 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
     lib = self.make_target(spec=':org1-name1',
                            target_type=JarLibrary,
-                           jars=[JarDependency(org='org1', name='name1', rev='0.0.1')])
+                           jars=[JarDependency(org='org1', name='name1', rev='0.0.1',
+                                               classifier='tests')])
 
     resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
 
-    def coord(org, name):
-      return M2Coordinate(org=org, name=name, rev='0.0.1')
+    def coord(org, name, classifier=None):
+      return M2Coordinate(org=org, name=name, rev='0.0.1', classifier=classifier)
 
-    expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1'),
+    expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1',
+                                                       classifier='tests'),
                 'ivy2cache_path/org2/name2.jar': coord(org='org2', name='name2'),
                 'ivy2cache_path/org3/name3.jar': coord(org='org3', name='name3')}
+    self.maxDiff = None
     coordinate_by_path = {rj.cache_path: rj.coordinate for rj in resolved_jars}
     self.assertEqual(expected, coordinate_by_path)
 
@@ -214,13 +217,10 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
     result = ivy_info.traverse_dependency_graph(ref, collector)
 
-    self.assertEqual(
-          {
-            IvyModuleRef("toplevel", "toplevelmodule", "latest"),
-            IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
-            IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
-            IvyModuleRef(org='org3', name='name3', rev='0.0.1')
-          },
+    self.assertEqual({IvyModuleRef("toplevel", "toplevelmodule", "latest"),
+                      IvyModuleRef(org='org1', name='name1', rev='0.0.1', classifier='tests'),
+                      IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
+                      IvyModuleRef(org='org3', name='name3', rev='0.0.1')},
           result)
 
   def test_does_not_follow_cycle(self):
