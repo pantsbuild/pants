@@ -186,57 +186,59 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
       # invalid_targets.extend(vt.targets)
       outdir = self.codegen_workdir(vt)
 
-    import_paths, changed_srcs = calculate_compile_sources(invalid_targets, self.is_gentarget)
+      import_paths, dummy_changed_srcs = calculate_compile_sources(invalid_targets, self.is_gentarget)
 
-    if changed_srcs:
-      args = []
+      changed_srcs = vt.sources_relative_to_buildroot()
 
-      for import_path in import_paths:
-        args.extend(['--import-path', import_path])
+      if changed_srcs:
+        args = []
 
-      args.extend(['--language', partial_cmd.language])
+        for import_path in import_paths:
+          args.extend(['--import-path', import_path])
 
-      for lhs, rhs in partial_cmd.namespace_map:
-        args.extend(['--namespace-map', '%s=%s' % (lhs, rhs)])
+        args.extend(['--language', partial_cmd.language])
 
-      if partial_cmd.rpc_style == 'ostrich':
-        args.append('--finagle')
-        args.append('--ostrich')
-      elif partial_cmd.rpc_style == 'finagle':
-        args.append('--finagle')
+        for lhs, rhs in partial_cmd.namespace_map:
+          args.extend(['--namespace-map', '%s=%s' % (lhs, rhs)])
 
-      args.extend(['--dest', outdir])
-      safe_mkdir(outdir)
+        if partial_cmd.rpc_style == 'ostrich':
+          args.append('--finagle')
+          args.append('--ostrich')
+        elif partial_cmd.rpc_style == 'finagle':
+          args.append('--finagle')
 
-      if not self.get_options().strict:
-        args.append('--disable-strict')
+        args.extend(['--dest', outdir])
+        safe_mkdir(outdir)
 
-      if self.get_options().verbose:
-        args.append('--verbose')
+        if not self.get_options().strict:
+          args.append('--disable-strict')
 
-      gen_file_map_path = os.path.relpath(self._tempname())
-      args.extend(['--gen-file-map', gen_file_map_path])
+        if self.get_options().verbose:
+          args.append('--verbose')
 
-      args.extend(changed_srcs)
+        gen_file_map_path = os.path.relpath(self._tempname())
+        args.extend(['--gen-file-map', gen_file_map_path])
 
-      classpath = self.tool_classpath('scrooge-gen')
-      jvm_options = list(self.get_options().jvm_options)
-      jvm_options.append('-Dfile.encoding=UTF-8')
-      returncode = self.runjava(classpath=classpath,
-                                main='com.twitter.scrooge.Main',
-                                jvm_options=jvm_options,
-                                args=args,
-                                workunit_name='scrooge-gen')
-      try:
-        if 0 == returncode:
-          gen_files_for_source = self.parse_gen_file_map(gen_file_map_path, outdir)
-        else:
-          gen_files_for_source = None
-      finally:
-        os.remove(gen_file_map_path)
+        args.extend(changed_srcs)
 
-      if 0 != returncode:
-        raise TaskError('Scrooge compiler exited non-zero ({0})'.format(returncode))
+        classpath = self.tool_classpath('scrooge-gen')
+        jvm_options = list(self.get_options().jvm_options)
+        jvm_options.append('-Dfile.encoding=UTF-8')
+        returncode = self.runjava(classpath=classpath,
+                                  main='com.twitter.scrooge.Main',
+                                  jvm_options=jvm_options,
+                                  args=args,
+                                  workunit_name='scrooge-gen')
+        try:
+          if 0 == returncode:
+            gen_files_for_source = self.parse_gen_file_map(gen_file_map_path, outdir)
+          else:
+            gen_files_for_source = None
+        finally:
+          os.remove(gen_file_map_path)
+
+        if 0 != returncode:
+          raise TaskError('Scrooge compiler exited non-zero ({0})'.format(returncode))
 
         # self.write_gen_file_map(gen_files_for_source, invalid_targets, outdir)
 
