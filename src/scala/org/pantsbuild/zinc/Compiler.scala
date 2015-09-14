@@ -7,9 +7,27 @@ package org.pantsbuild.zinc
 import java.io.File
 import java.net.URLClassLoader
 import sbt.compiler.javac
-import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, Logger, LoggerReporter, ScalaInstance }
-import sbt.compiler.{ AnalyzingCompiler, CompilerCache, CompileOutput, MixedAnalyzingCompiler, IC }
-import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore, ZincPrivateAnalysis }
+import sbt.{
+  ClasspathOptions,
+  CompileOptions,
+  CompileSetup,
+  Logger,
+  LoggerReporter,
+  ScalaInstance
+}
+import sbt.compiler.{
+  AnalyzingCompiler,
+  CompileOutput,
+  CompilerCache,
+  IC,
+  MixedAnalyzingCompiler
+}
+import sbt.inc.{
+  Analysis,
+  AnalysisStore,
+  FileBasedStore,
+  ZincPrivateAnalysis
+}
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 
@@ -71,10 +89,18 @@ object Compiler {
    */
   def newJavaCompiler(instance: ScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler = {
     val compiler =
-      if (fork || javaHome.isDefined)
+      if (fork || javaHome.isDefined) {
         javac.JavaCompiler.fork(javaHome)
-      else
-        javac.JavaCompiler.local.getOrElse(javac.JavaCompiler.fork(None))
+      } else {
+        Option(javax.tools.ToolProvider.getSystemJavaCompiler).map { jc =>
+          // NB: using backported 0.13.10+ JavaCompiler input
+          new javac.ZincLocalJavaCompiler(jc)
+        }.getOrElse {
+          throw new RuntimeException(
+            "Unable to locate javac directly. Please ensure that a JDK is on zinc's classpath."
+          )
+        }
+      }
 
     val options = ClasspathOptions.javac(compiler = false)
     new javac.JavaCompilerAdapter(compiler, instance, options)
