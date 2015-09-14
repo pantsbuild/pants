@@ -256,7 +256,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     css = os.path.join(self._outdir, 'ivy-report.css')
     if os.path.exists(css):
       os.unlink(css)
-    shutil.copy(os.path.join(self._cachedir, 'ivy-report.css'), self._outdir)
+    shutil.copy(os.path.join(self.ivy_cache_dir, 'ivy-report.css'), self._outdir)
 
     if self._open and report:
       binary_util.ui_open(report)
