@@ -41,7 +41,9 @@ python_library(
 python_library(
   name = 'eclipse_gen',
   sources = ['eclipse_gen.py'],
-  resources = globs('templates/eclipse/*.mustache', 'templates/eclipse/*.prefs'),
+  resource_targets = [
+    ':eclipse_gen_resources',
+  ],
   dependencies = [
     ':ide_gen',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -51,10 +53,17 @@ python_library(
   ],
 )
 
+resources(
+  name = 'eclipse_gen_resources',
+  sources = globs('templates/eclipse/*.mustache', 'templates/eclipse/*.prefs'),
+)
+
 python_library(
   name = 'ensime_gen',
   sources = ['ensime_gen.py'],
-  resources = globs('templates/ensime/*.mustache'),
+  resource_targets = [
+    ':ensime_gen_resources',
+  ],
   dependencies = [
     ':ide_gen',
     '3rdparty/python/twitter/commons:twitter.common.collections',
@@ -62,6 +71,11 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/util:dirutil',
   ],
+)
+
+resources(
+  name = 'ensime_gen_resources',
+  sources = globs('templates/ensime/*.mustache'),
 )
 
 python_library(
@@ -121,7 +135,9 @@ python_library(
 python_library(
   name = 'idea_gen',
   sources = ['idea_gen.py'],
-  resources = globs('templates/idea/*.mustache'),
+  resource_targets = [
+    ':idea_gen_resources',
+  ],
   dependencies = [
     ':ide_gen',
     'src/python/pants/base:build_environment',
@@ -132,6 +148,11 @@ python_library(
     'src/python/pants/scm:git',
     'src/python/pants/util:dirutil',
   ],
+)
+
+resources(
+  name = 'idea_gen_resources',
+  sources = globs('templates/idea/*.mustache'),
 )
 
 python_library(

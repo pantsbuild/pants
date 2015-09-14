@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'reporting',
-  sources = globs('*.py', exclude=[['report.py']]),
-  resources = rglobs('assets/*', 'templates/*.mustache'),
-  dependencies = [
+  name='reporting',
+  sources=globs('*.py', exclude=[['report.py']]),
+  resource_targets=[
+    ':reporting_resources',
+  ],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.threading',
     '3rdparty/python:ansicolors',
     '3rdparty/python:pystache',
@@ -19,16 +21,21 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/option',
     'src/python/pants/pantsd:process_manager',
+    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/subsystem',
   ]
 )
 
+resources(
+  name='reporting_resources',
+  sources=rglobs('assets/*', 'templates/*.mustache')
+)
+
 python_library(
-  name = 'report',
-  sources = ['report.py'],
-  dependencies = [
+  name='report',
+  sources=['report.py'],
+  dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.threading',
   ],
 )
