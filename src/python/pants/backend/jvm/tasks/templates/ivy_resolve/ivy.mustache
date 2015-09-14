@@ -76,14 +76,14 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       />
       {{/artifacts}}
       {{#excludes}}
-      {{#name}}<exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>{{/name}}
-      {{^name}}<exclude matcher="exactOrRegexp" org="{{org}}"/>{{/name}}
+      {{#name}}<exclude matcher="exact" org="{{org}}" module="{{name}}"/>{{/name}}
+      {{^name}}<exclude matcher="exact" org="{{org}}"/>{{/name}}
       {{/excludes}}
     </dependency>
     {{/lib.dependencies}}
     {{#lib.excludes}}
-    {{#name}}<exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>{{/name}}
-    {{^name}}<exclude matcher="exactOrRegexp" org="{{org}}"/>{{/name}}
+    {{#name}}<exclude matcher="exact" org="{{org}}" module="{{name}}"/>{{/name}}
+    {{^name}}<exclude matcher="exact" org="{{org}}"/>{{/name}}
     {{/lib.excludes}}
     {{#lib.overrides?}}
       {{#lib.overrides}}
