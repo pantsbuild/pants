@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.target import Target
 from pants.util.dirutil import safe_open
 
@@ -19,17 +19,18 @@ This places them on the classpath of any dependees downstream that may use them.
 forcing a separate member type we could get a java chunk containing a mix of apt processors and
 code that relied on the un-compiled apt processor in the same javac invocation. If so, javac
 would not be smart enough to compile the apt processors 1st and activate them.
+
+NB: Having a separate task for this is unnecessary with the isolated compile strategy.
 """
 
 
-class AptCompile(JmakeCompile):
+class AptCompile(ZincCompile):
   """Compile Java annotation processors."""
     # Well known metadata file to auto-register annotation processors with a java 1.6+ compiler
   _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
-  @classmethod
-  def name(cls):
-    return 'apt'
+  _file_suffix = '.java'
+  _name = 'apt'
 
   def __init__(self, *args, **kwargs):
     super(AptCompile, self).__init__(*args, **kwargs)
@@ -39,6 +40,9 @@ class AptCompile(JmakeCompile):
   def select(self, target):
     return target.has_sources(self._file_suffix) and isinstance(target, AnnotationProcessor)
 
+  def select_source(self, source_file_path):
+    return source_file_path.endswith(self._file_suffix)
+
   def extra_products(self, target):
     """Override extra_products to produce an annotation processor information file."""
     ret = []
@@ -47,7 +51,7 @@ class AptCompile(JmakeCompile):
       processor_info_file = os.path.join(root, self._PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
       ret.append((root, [processor_info_file]))
-    return ret
+    return super(AptCompile, self).extra_products(target) + ret
 
   def _write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:
