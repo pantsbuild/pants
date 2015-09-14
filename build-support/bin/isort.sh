@@ -65,7 +65,7 @@ function activate_isort() {
    activate_venv || die "Failed to activate venv."
    for req in ${REQUIREMENTS[@]}
    do
-     pip install ${req} || die "Failed to install requirements from ${req}."
+     pip install --quiet ${req} || die "Failed to install requirements from ${req}."
    done
    touch "${bootsrapped_file}"
  else
