@@ -15,11 +15,15 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 
 class CacheCompileIntegrationTest(BaseCompileIT):
-  def run_compile(self, target_spec, config, strategy, workdir):
+  def run_compile(self, target_spec, config, strategy, workdir, tool_name):
+    args = ['compile',
+            'compile.{}'.format(tool_name), '--strategy={}'.format(strategy),
+              '--partition-size-hint=1', target_spec]
+    if tool_name == 'zinc':
+      args.append('--no-compile-java-use-jmake')
+
     pants_run = self.run_pants_with_workdir(
-      ['compile', 'compile.java', '--strategy={}'.format(strategy), '--partition-size-hint=1',
-       target_spec,
-       ],
+      args,
       workdir, config)
     self.assert_success(pants_run)
 
@@ -27,11 +31,20 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     with safe_open(path, 'w') as f:
       f.write(value)
 
-  def test_stale_artifacts_rmd_when_cache_used(self):
+  def test_stale_artifacts_rmd_when_cache_used_with_zinc(self):
+    self._do_test_stale_artifacts_rmd_when_cache_used(tool_name='zinc')
+
+  def test_stale_artifacts_rmd_when_cache_used_with_jmake(self):
+    self._do_test_stale_artifacts_rmd_when_cache_used(tool_name='java')
+
+  def _do_test_stale_artifacts_rmd_when_cache_used(self, tool_name):
     with temporary_dir() as cache_dir, \
         temporary_dir(root_dir=self.workdir_root()) as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir:
-      config = {'cache.compile.java': {'write_to': [cache_dir], 'read_from': [cache_dir]}}
+
+      config = {
+        'cache.compile.{}'.format(tool_name): {'write_to': [cache_dir], 'read_from': [cache_dir]},
+      }
 
       self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
                        dedent("""package org.pantsbuild.cachetest;
@@ -46,14 +59,14 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                                     'cachetest:cachetest')
 
       # Caches values A.class, Main.class
-      self.run_compile(cachetest_spec, config, 'isolated', workdir)
+      self.run_compile(cachetest_spec, config, 'isolated', workdir, tool_name)
 
       self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
                        dedent("""package org.pantsbuild.cachetest;
                             class A {}
                             class NotMain {}"""))
       # Caches values A.class, NotMain.class and leaves them on the filesystem
-      self.run_compile(cachetest_spec, config, 'isolated', workdir)
+      self.run_compile(cachetest_spec, config, 'isolated', workdir, tool_name)
 
       self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
                        dedent("""package org.pantsbuild.cachetest;
@@ -61,14 +74,14 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                           class Main {}"""))
 
       # Should cause NotMain.class to be removed
-      self.run_compile(cachetest_spec, config, 'isolated', workdir)
+      self.run_compile(cachetest_spec, config, 'isolated', workdir, tool_name)
 
       cachetest_id = cachetest_spec.replace(':', '.').replace(os.sep, '.')
 
       bad_artifact_dir = os.path.join(workdir,
                                       'compile',
                                       'jvm',
-                                      'java',
+                                      tool_name,
                                       'isolated-classes',
                                       cachetest_id,
                                       'org',

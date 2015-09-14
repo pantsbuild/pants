@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import zipfile
 from collections import OrderedDict, defaultdict
 from hashlib import sha1
 
@@ -20,7 +19,6 @@ from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
-from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy, create_size_estimators
 
