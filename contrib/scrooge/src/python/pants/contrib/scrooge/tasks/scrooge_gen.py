@@ -201,11 +201,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
         if 0 != returncode:
           raise TaskError('Scrooge compiler exited non-zero ({0})'.format(returncode))
 
-        # self.write_gen_file_map(gen_files_for_source, invalid_targets, outdir)
-
-    # return self.gen_file_map(targets, outdir)
-    # return None
-
   def createtarget(self, gentarget, dependees, outdir, gen_files_for_source):
     assert self.is_gentarget(gentarget)
 
