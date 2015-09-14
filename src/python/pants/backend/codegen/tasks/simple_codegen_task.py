@@ -79,6 +79,21 @@ class SimpleCodegenTask(Task):
     """
     return []
 
+
+  def synthetic_target_type_facade(self, target):
+    try:
+      return self.synthetic_target_type_by_target(target)
+    except NotImplementedError:
+      return self.synthetic_target_type
+
+  def synthetic_target_type_by_target(self, target):
+    """The type of target this codegen task generates.
+
+    For example, the target type for JaxbGen would simply be JavaLibrary.
+    :return: a type (class) that inherits from Target.
+    """
+    raise NotImplementedError
+
   @property
   def synthetic_target_type(self):
     """The type of target this codegen task generates.
@@ -233,8 +248,8 @@ class SimpleCodegenTask(Task):
                                       for src in generated_sources]
 
         self.target = self.context.add_new_target(
-          address=synthetic_address,
-          target_type=self.synthetic_target_type,
+          address= synthetic_address,
+          target_type= self.synthetic_target_type_facade(target),
           dependencies=self.synthetic_target_extra_dependencies(target),
           sources=relative_generated_sources,
           derived_from=target,
