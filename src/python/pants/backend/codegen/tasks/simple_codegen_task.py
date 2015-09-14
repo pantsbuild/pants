@@ -79,7 +79,6 @@ class SimpleCodegenTask(Task):
     """
     return []
 
-
   def synthetic_target_type_facade(self, target):
     try:
       return self.synthetic_target_type_by_target(target)
@@ -248,8 +247,8 @@ class SimpleCodegenTask(Task):
                                       for src in generated_sources]
 
         self.target = self.context.add_new_target(
-          address= synthetic_address,
-          target_type= self.synthetic_target_type_facade(target),
+          address=synthetic_address,
+          target_type=self.synthetic_target_type_facade(target),
           dependencies=self.synthetic_target_extra_dependencies(target),
           sources=relative_generated_sources,
           derived_from=target,
