@@ -103,25 +103,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     # return os.path.join(self.workdir, partial_cmd.relative_outdir)
     return os.path.join(self.workdir, self.codegen_strategy.codegen_workdir_suffix(target))
 
-  def _resolve_deps(self, depmap):
-    """Given a map of gen-key=>target specs, resolves the target specs into references."""
-    deps = defaultdict(lambda: OrderedSet())
-    for category, depspecs in depmap.items():
-      dependencies = deps[category]
-      for depspec in depspecs:
-        try:
-          dependencies.update(self.context.resolve(depspec))
-        except AddressLookupError as e:
-          raise self.DepLookupError("{message}\n  referenced from [{section}] key: "
-                                    "gen->deps->{category} in pants.ini".format(
-                                      message=e,
-                                      section=_CONFIG_SECTION,
-                                      category=category
-                                    ))
-    return deps
-
-  # def execute(self):
-  #   invalid_targets = self.context.targets()
   def execute_codegen(self, invalid_targets):
     self._validate_compiler_configs(invalid_targets)
     self._must_have_sources(invalid_targets)
@@ -140,9 +121,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     if not gentargets:
       return
 
-    self._depinfo = ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_deps),
-                                       self._resolve_deps(self.get_options().structs_deps))
-
     for target in gentargets:
       language = self._thrift_defaults.language(target)
       rpc_style = self._thrift_defaults.rpc_style(target)
@@ -154,23 +132,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
     for partial_cmd, tgts in partial_cmds.items():
       self.gen(partial_cmd, tgts)
-
-      # for path in os.listdir(gen_dir):
-      #   shutil.move(os.path.join(gen_dir, path), work_dir)
-      #
-      # relative_outdir = os.path.relpath(self._outdir(partial_cmd), get_buildroot())
-      # langtarget_by_gentarget = {}
-      # for target in tgts:
-      #   dependees = dependees_by_gentarget.get(target, [])
-      #   langtarget_by_gentarget[target] = self.createtarget(target, dependees, relative_outdir,
-      #                                                       gen_files_for_source)
-      #
-      # genmap = self.context.products.get(partial_cmd.language)
-      # for gentarget, langtarget in langtarget_by_gentarget.items():
-      #   genmap.add(gentarget, get_buildroot(), [langtarget])
-      #   for dep in gentarget.dependencies:
-      #     if self.is_gentarget(dep):
-      #       langtarget.inject_dependency(langtarget_by_gentarget[dep].address)
 
   def gen(self, partial_cmd, invalid_targets):
     # fp_strategy = JavaThriftLibraryFingerprintStrategy(self._thrift_defaults)
@@ -375,10 +336,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
       if isinstance(target, JavaThriftLibrary) and not target.payload.sources.source_paths:
         raise TargetDefinitionException(target, 'no thrift files found')
 
-  @property
-  def synthetic_target_type(self):
-    # language = kwargs['name'].split('-')[-1]
-    # target_type = _TARGET_TYPE_FOR_LANG[language]
-    # # target_type['address'] =  kwargs['address']
-    # return target_type
-    return JavaLibrary
+  def synthetic_target_type_by_target(self, target):
+    language = self._thrift_defaults.language(target)
+    return _TARGET_TYPE_FOR_LANG[language]
+    # raise NotImplementedError

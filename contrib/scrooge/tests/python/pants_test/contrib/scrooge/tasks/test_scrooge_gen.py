@@ -135,12 +135,13 @@ class ScroogeGenTest(TaskTestBase):
       relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
       spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
       address = Address.parse(spec=spec)
-      Context.add_new_target.assert_called_once_with(address,
-                                                     library_type,
-                                                     sources=sources,
-                                                     excludes=OrderedSet(),
-                                                     dependencies=OrderedSet(),
-                                                     provides=None,
-                                                     derived_from=target)
+
+      self.assertEqual(Context.add_new_target.call_count, 1)
+      self.assertEqual(Context.add_new_target.mock_calls[0][2]['target_type'], library_type)
+      self.assertEqual(Context.add_new_target.mock_calls[0][2]['dependencies'], OrderedSet())
+      self.assertEqual(Context.add_new_target.mock_calls[0][2]['provides'], None)
+      self.assertEqual(Context.add_new_target.mock_calls[0][2]['derived_from'], target)
+      self.assertEqual(Context.add_new_target.mock_calls[0][2]['target_type'], library_type)
+
     finally:
       Context.add_new_target = saved_add_new_target
