@@ -12,6 +12,7 @@ scala_library(
     '3rdparty:jsr305',
     'src/scala/org/pantsbuild/zinc/logging',
     'src/scala/sbt/inc',
+    'src/scala/sbt/compiler/javac',
   ],
   sources=globs('*.scala'),
 )

@@ -15,8 +15,8 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis_parser import ZincAnalysisParser
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
