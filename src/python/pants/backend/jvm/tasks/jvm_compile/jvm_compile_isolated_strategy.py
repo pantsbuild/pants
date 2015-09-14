@@ -195,7 +195,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
   def exec_graph_key_for_target(self, compile_target):
     return "compile({})".format(compile_target.address.spec)
 
-
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
                            invalid_targets, invalid_vts_partitioned, check_vts, compile_vts,
                            register_vts, update_artifact_cache_vts_work):
