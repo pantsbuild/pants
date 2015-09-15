@@ -22,7 +22,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy, create_size_estimators
 
 
@@ -155,7 +155,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
                                                                   compile_context.classes_dir)
         for src, classes in products.items():
-          relsrc = os.path.relpath(src, buildroot)
+          relsrc = fast_relpath(src, buildroot)
           classes_by_src[relsrc] = classes
           unclaimed_classes.difference_update(classes)
 
