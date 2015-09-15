@@ -55,6 +55,7 @@ target(
     ':jvm_bundle_integration',
     ':jvm_run_integration',
     ':protobuf_integration',
+    ':scalastyle_integration',
   ],
 )
 
