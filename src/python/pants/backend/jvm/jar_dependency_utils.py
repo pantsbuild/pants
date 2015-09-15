@@ -19,16 +19,19 @@ class ResolvedJar(object):
     self.cache_path = cache_path
     self.pants_path = pants_path
 
+    self._id = (coordinate, cache_path, pants_path)
+
   def __eq__(self, other):
-    return self.coordinate == other.coordinate and \
-           self.cache_path == other.cache_path and \
-           self.pants_path == other.pants_path
+    return isinstance(other, ResolvedJar) and self._id == other._id
 
   def __ne__(self, other):
     return not self == other
 
   def __hash__(self):
-    return hash((self.coordinate, self.cache_path, self.pants_path))
+    return hash(self._id)
+
+  def __repr__(self):
+    return 'ResolvedJar(coordinate={!r}, cache_path={!r}, pants_path={!r})'.format(*self._id)
 
 
 class M2Coordinate(object):
@@ -51,10 +54,10 @@ class M2Coordinate(object):
     self._id = (org, name, rev, classifier, type_)
 
   def __eq__(self, other):
-    return self._id == other._id
+    return isinstance(other, M2Coordinate) and self._id == other._id
 
   def __ne__(self, other):
-    return self._id != other._id
+    return not self == other
 
   def __hash__(self):
     return hash(self._id)
@@ -66,3 +69,7 @@ class M2Coordinate(object):
     # if any of the fields are None, it uses ''
     # for example org=a, name=b, type_=jar -> a:b:::jar
     return ':'.join(x or '' for x in self._id)
+
+  def __repr__(self):
+    return ('M2Coordinate(org={!r}, name={!r}, rev={!r}, classifier={!r}, type_={!r})'
+            .format(*self._id))
