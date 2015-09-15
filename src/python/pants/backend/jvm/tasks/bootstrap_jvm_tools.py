@@ -197,7 +197,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
   def _bootstrap_classpath(self, jvm_tool, targets):
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
-    classpath, _ = self.ivy_resolve(targets, silent=True, workunit_name=workunit_name)
+    classpath, _, _ = self.ivy_resolve(targets, silent=True, workunit_name=workunit_name)
     return classpath
 
   @memoized_property

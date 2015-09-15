@@ -39,15 +39,15 @@ python_library(
   sources=['ivy_utils.py'],
   resources=globs('tasks/templates/ivy_resolve/*.mustache'),
   dependencies=[
-    ':jar_dependency_utils',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    ':jar_dependency_utils',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:revision',
     'src/python/pants/base:target',
-    'src/python/pants/ivy',
     'src/python/pants/util:dirutil',
   ],
 )

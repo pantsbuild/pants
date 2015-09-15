@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import os
 import sys
 from collections import defaultdict
 
@@ -87,7 +86,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     super(JvmCompile, cls).prepare(options, round_manager)
 
     round_manager.require_data('compile_classpath')
-    round_manager.require_data('ivy_resolve_symlink_map')
 
     # Require codegen we care about
     # TODO(John Sirois): roll this up in Task - if the list of labels we care about for a target

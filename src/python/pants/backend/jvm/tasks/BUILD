@@ -172,11 +172,10 @@ python_library(
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:cache_manager',
+    'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
-    'src/python/pants/goal:products',
-    'src/python/pants/ivy',
-    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:strutil',
   ],
 )
 
@@ -185,14 +184,15 @@ python_library(
   sources = ['ivy_task_mixin.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/ivy',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

@@ -15,6 +15,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 from contextlib import contextmanager
 from copy import deepcopy
 
+import six
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
@@ -25,7 +26,6 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.base.target import Target
-from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
@@ -221,21 +221,7 @@ class IvyUtils(object):
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   @classmethod
-  def _find_new_symlinks(cls, existing_symlink_path, updated_symlink_path):
-    """Find the difference between the existing and updated symlink path.
-
-    :param existing_symlink_path: map from path : symlink
-    :param updated_symlink_path: map from path : symlink after new resolve
-    :return: the portion of updated_symlink_path that is not found in existing_symlink_path.
-    """
-    diff_map = OrderedDict()
-    for key, value in updated_symlink_path.iteritems():
-      if key not in existing_symlink_path:
-        diff_map[key] = value
-    return diff_map
-
-  @classmethod
-  def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
+  def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
     """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
     If there is an existing symlink for a file under inpath, it is used rather than creating
@@ -247,22 +233,20 @@ class IvyUtils(object):
     # reference the realpath of the .jar file after it is resolved in the cache dir. To handle
     # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
     real_ivy_cache_dir = os.path.realpath(ivy_cache_dir)
-    updated_symlink_map = OrderedDict()
+    symlink_map = OrderedDict()
     with safe_open(inpath, 'r') as infile:
       inpaths = filter(None, infile.read().strip().split(os.pathsep))
       paths = OrderedSet([os.path.realpath(path) for path in inpaths])
 
     for path in paths:
       if path.startswith(real_ivy_cache_dir):
-        updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
+        symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
       else:
         # This path is outside the cache. We won't symlink it.
-        updated_symlink_map[path] = path
+        symlink_map[path] = path
 
-    # Create symlinks for paths in the ivy cache dir that we haven't seen before.
-    new_symlinks = cls._find_new_symlinks(existing_symlink_map, updated_symlink_map)
-
-    for path, symlink in new_symlinks.iteritems():
+    # Create symlinks for paths in the ivy cache dir.
+    for path, symlink in six.iteritems(symlink_map):
       if path == symlink:
         # Skip paths that aren't going to be symlinked.
         continue
@@ -276,9 +260,9 @@ class IvyUtils(object):
 
     # (re)create the classpath with all of the paths
     with safe_open(outpath, 'w') as outfile:
-      outfile.write(':'.join(OrderedSet(updated_symlink_map.values())))
+      outfile.write(':'.join(OrderedSet(symlink_map.values())))
 
-    return dict(updated_symlink_map)
+    return dict(symlink_map)
 
   @staticmethod
   def identify(targets):
@@ -289,30 +273,36 @@ class IvyUtils(object):
       return IvyUtils.INTERNAL_ORG_NAME, Target.maybe_readable_identify(targets)
 
   @classmethod
-  def xml_report_path(cls, resolve_hash_name, conf):
+  def xml_report_path(cls, cache_dir, resolve_hash_name, conf):
     """The path to the xml report ivy creates after a retrieve.
-    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet
-    used for resolution.
-    :param string conf: the ivy conf name (e.g. "default")
+
+    :param string cache_dir: The path of the ivy cache dir used for resolves.
+    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
+                                     resolution.
+    :param string conf: The ivy conf name (e.g. "default").
+    :returns: The report path.
+    :rtype: string
     """
-    cachedir = IvySubsystem.global_instance().get_options().cache_dir
-    return os.path.join(cachedir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
-                                                        resolve_hash_name, conf))
+    return os.path.join(cache_dir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
+                                                         resolve_hash_name, conf))
 
   @classmethod
-  def parse_xml_report(cls, resolve_hash_name, conf):
+  def parse_xml_report(cls, cache_dir, resolve_hash_name, conf):
     """Parse the ivy xml report corresponding to the name passed to ivy.
 
-    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet
-    used for resolution.
+    :param string cache_dir: The path of the ivy cache dir used for resolves.
+    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
+                                     resolution; if `None` returns `None` instead of attempting to
+                                     parse any report.
     :param string conf: the ivy conf name (e.g. "default")
-    :return: The info in the xml report or None if target is empty.
-    :rtype: IvyInfo
-    :raises: IvyResolveReportError if no report exists.
+    :returns: The info in the xml report or None if target is empty.
+    :rtype: :class:`IvyInfo`
+    :raises: :class:`IvyResolveMappingError` if no report exists.
     """
+    # TODO(John Sirois): Cleanup acceptance of None, this is IvyResolve's concern, not ours.
     if not resolve_hash_name:
       return None
-    path = cls.xml_report_path(resolve_hash_name, conf)
+    path = cls.xml_report_path(cache_dir, resolve_hash_name, conf)
     if not os.path.exists(path):
       raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
 
