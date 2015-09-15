@@ -226,7 +226,7 @@ class NailgunExecutor(Executor, ProcessManager):
         sock.close()
 
       attempt_count += 1
-      time.sleep(self.WAIT_INTERVAL)
+      time.sleep(self.WAIT_INTERVAL_SEC)
 
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Synchronously spawn a new nailgun server."""
