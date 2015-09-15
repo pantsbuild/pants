@@ -39,7 +39,6 @@ class IvyResolveMappingError(Exception):
   """Raised when there is a failure mapping the ivy resolve results to pants objects."""
 
 
-# TODO(John Sirois): An IvyModuleRef is an M2Coordinate - merge.
 class IvyModuleRef(object):
 
   # latest.integration is ivy magic meaning "just get the latest version"

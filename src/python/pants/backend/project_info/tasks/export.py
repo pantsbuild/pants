@@ -187,7 +187,8 @@ class Export(PythonTask, ConsoleTask):
           for _, cp_entry in jar_products:
             if isinstance(cp_entry, ArtifactClasspathEntry):
               coordinate = cp_entry.coordinate
-              # We drop classifier and type_ since these are mapped in the global libraries dict.
+              # We drop classifier and type_ since those fields are represented in the global
+              # libraries dict and here we just want the key into that dict (see `_jar_id`).
               yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
 
       target_libraries = OrderedSet()

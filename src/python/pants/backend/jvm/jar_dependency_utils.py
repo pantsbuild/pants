@@ -34,7 +34,6 @@ class ResolvedJar(object):
     return 'ResolvedJar(coordinate={!r}, cache_path={!r}, pants_path={!r})'.format(*self._id)
 
 
-# TODO(John Sirois): An M2Coordinate is an IvyModuleRef - merge.
 class M2Coordinate(object):
   """Represents a fully qualified name of an artifact."""
 
@@ -52,7 +51,7 @@ class M2Coordinate(object):
     self.classifier = classifier
     self.type_ = type_ or 'jar'
 
-    self._id = (org, name, rev, classifier, self.type_)
+    self._id = (self.org, self.name, self.rev, self.classifier, self.type_)
 
   def __eq__(self, other):
     return isinstance(other, M2Coordinate) and self._id == other._id

@@ -15,10 +15,28 @@ from pants.goal.products import UnionProducts
 
 
 class ClasspathEntry(object):
+  """Represents a java classpath entry."""
+
   def __init__(self, path):
-    self.path = path
+    self._path = path
+
+  @property
+  def path(self):
+    """Returns the pants internal path of this classpath entry.
+
+    Suitable for use in constructing classpaths for pants executions and pants generated artifacts.
+
+    :rtype: string
+    """
+    return self._path
 
   def is_excluded_by(self, excludes):
+    """Returns `True` if this classpath entry should be excluded given the `excludes` in play.
+
+    :param excludes: The excludes to check this classpath entry against.
+    :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
+    :rtype: bool
+    """
     return False
 
   def __hash__(self):
@@ -30,13 +48,39 @@ class ClasspathEntry(object):
   def __ne__(self, other):
     return not self == other
 
+  def __repr__(self):
+    return 'ClasspathEntry(path={!r})'.format(self.path)
 
-# TODO(John Sirois): An ArtifactClasspathEntry is a Resolved jar - merge.
+
 class ArtifactClasspathEntry(ClasspathEntry):
-  def __init__(self, resolved_jar):
-    super(ArtifactClasspathEntry, self).__init__(resolved_jar.pants_path)
-    self.coordinate = resolved_jar.coordinate
-    self.cache_path = resolved_jar.cache_path
+  """Represents a resolved third party classpath entry."""
+
+  def __init__(self, path, coordinate, cache_path):
+    super(ArtifactClasspathEntry, self).__init__(path)
+    self._coordinate = coordinate
+    self._cache_path = cache_path
+
+  @property
+  def coordinate(self):
+    """Returns the maven coordinate that used to resolve this classpath entry's artifact.
+
+    :rtype: :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
+    """
+    return self._coordinate
+
+  @property
+  def cache_path(self):
+    """Returns the external cache path of this classpath entry.
+
+    For example, the `~/.m2/repository` or `~/.ivy2/cache` location of the resolved artifact for
+    maven and ivy resolvers respectively.
+
+    Suitable for use in constructing classpaths for external tools that should not be subject to
+    potential volatility in pants own internal caches.
+
+    :rtype: string
+    """
+    return self._cache_path
 
   def is_excluded_by(self, excludes):
     return any(_matches_exclude(self.coordinate, exclude) for exclude in excludes)
@@ -53,9 +97,20 @@ class ArtifactClasspathEntry(ClasspathEntry):
   def __ne__(self, other):
     return not self == other
 
+  def __repr__(self):
+    return ('ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r})'
+            .format(self.path, self.coordinate, self.cache_path))
+
 
 def _matches_exclude(coordinate, exclude):
-  return exclude.org == coordinate.org and (exclude.name or coordinate.name) == coordinate.name
+  if not coordinate.org == exclude.org:
+    return False
+
+  if not exclude.name:
+    return True
+  if coordinate.name == exclude.name:
+    return True
+  return False
 
 
 def _not_excluded_filter(excludes):
@@ -89,7 +144,8 @@ class ClasspathProducts(object):
     for jar in resolved_jars:
       if not jar.pants_path:
         raise TaskError('Jar: {!s} has no specified path.'.format(jar.coordinate))
-      classpath_entries.append((conf, ArtifactClasspathEntry(jar)))
+      cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path)
+      classpath_entries.append((conf, cp_entry))
 
     for target in targets:
       self._add_elements_for_target(target, classpath_entries)
