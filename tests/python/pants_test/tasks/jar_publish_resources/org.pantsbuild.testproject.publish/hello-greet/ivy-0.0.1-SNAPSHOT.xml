@@ -8,15 +8,14 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
   <info organisation="org.pantsbuild.testproject.publish" module="hello-greet" revision="0.0.1-SNAPSHOT" status="release" />
 
-    <configurations>
-      <conf name="default"/>
-      <conf name="sources"/>
-    </configurations>
+  <configurations>
+    <conf name="default"/>
+  </configurations>
 
   <publications>
-    <artifact conf="default" type="jar" ext="jar"/>
-    <artifact conf="default" type="pom" ext="pom"/>
-    <artifact conf="sources" type="source" m:classifier="sources" ext="jar"/>
+    <artifact/>
+    <artifact type="pom"/>
+    <artifact m:classifier="sources"/>
   </publications>
 
 </ivy-module>

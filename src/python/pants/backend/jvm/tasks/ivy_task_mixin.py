@@ -279,7 +279,7 @@ class IvyTaskMixin(object):
 
     ivy_args = ['-ivy', ivyxml]
 
-    confs_to_resolve = confs or ['default']
+    confs_to_resolve = confs or ('default',)
     ivy_args.append('-confs')
     ivy_args.extend(confs_to_resolve)
     ivy_args.extend(args)
