@@ -210,7 +210,9 @@ python_library(
 python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
-  resources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
+  resource_targets = [
+    ':jar_publish_resources',
+  ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.config',
@@ -235,6 +237,11 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
+)
+
+resources(
+  name = 'jar_publish_resources',
+  sources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
 )
 
 python_library(

@@ -96,19 +96,17 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name = 'python_target',
   sources = ['test_python_target.py'],
   dependencies = [
-    ':base',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
-    'src/python/pants/base:target',
+    'tests/python/pants_test:base_test'
   ]
 )
 

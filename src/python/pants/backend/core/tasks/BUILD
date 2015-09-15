@@ -47,7 +47,9 @@ target(
 python_library(
   name = 'bash_completion',
   sources = ['bash_completion.py'],
-  resources = globs('templates/bash_completion/*.mustache'),
+  resource_targets = [
+    ':bash_completion_resources',
+  ],
   dependencies = [
     ':console_task',
     ':task',
@@ -56,13 +58,20 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/help',
     'src/python/pants/option',
-    ],
-  )
+  ],
+)
+
+resources(
+  name = 'bash_completion_resources',
+  sources = globs('templates/bash_completion/*.mustache'),
+)
 
 python_library(
   name = 'builddictionary',
   sources = ['builddictionary.py'],
-  resources = globs('templates/builddictionary/*.mustache'),
+  resource_targets = [
+    ':builddictionary_resources',
+  ],
   dependencies = [
     ':common',
     ':reflect',
@@ -82,6 +91,12 @@ python_library(
     'src/python/pants/util:dirutil',
   ],
 )
+
+resources(
+  name = 'builddictionary_resources',
+  sources = globs('templates/builddictionary/*.mustache'),
+)
+
 
 python_library(
   name = 'clean',
@@ -193,7 +208,9 @@ python_library(
 python_library(
   name = 'markdown_to_html',
   sources = ['markdown_to_html.py'],
-  resources = globs('templates/markdown/*.mustache'),
+  resource_targets = [
+    ':markdown_to_html_resources',
+  ],
   dependencies = [
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',
@@ -209,6 +226,11 @@ python_library(
     'src/python/pants/binaries:binary_util',
     'src/python/pants/util:dirutil',
   ],
+)
+
+resources(
+  name = 'markdown_to_html_resources',
+  sources = globs('templates/markdown/*.mustache'),
 )
 
 python_library(
@@ -343,13 +365,20 @@ python_library(
 python_library(
   name = 'targets_help',
   sources = ['targets_help.py'],
-  resources = globs('templates/targets_help/*.mustache'),
+  resource_targets = [
+    ':targets_help_resources',
+  ],
   dependencies = [
     ':builddictionary',
     ':common',
     ':console_task',
     ':reflect',
   ],
+)
+
+resources(
+  name = 'targets_help_resources',
+  sources = globs('templates/targets_help/*.mustache'),
 )
 
 python_library(
