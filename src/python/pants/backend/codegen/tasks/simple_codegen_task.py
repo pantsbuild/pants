@@ -234,9 +234,6 @@ class SimpleCodegenTask(Task):
 
       for target in targets:
         target_workdir = self.codegen_workdir(target)
-        # synthetic_name = target.id
-        # sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
-        # synthetic_address = Address(sources_rel_path, synthetic_name)
         raw_generated_sources = list(self.codegen_strategy.find_sources(target))
         # Make the sources robust regardless of whether subclasses return relative paths, or
         # absolute paths that are subclasses of the workdir.
