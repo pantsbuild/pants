@@ -20,6 +20,7 @@ from pants.backend.core.tasks.clean import Cleaner, Invalidator
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
 from pants.backend.core.tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.backend.core.tasks.dependees import ReverseDepmap
+from pants.backend.core.tasks.explain_options_task import ExplainOptionsTask
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.core.tasks.filter import Filter
 from pants.backend.core.tasks.list_goals import ListGoals
@@ -172,3 +173,6 @@ def register_goals():
 
   task(name='bash-completion', action=BashCompletionTask).install().with_description(
     'Dump bash shell script for autocompletion of pants command lines.')
+
+  task(name='options', action=ExplainOptionsTask).install().with_description(
+    'List what options pants has set.')

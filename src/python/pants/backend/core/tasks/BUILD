@@ -13,6 +13,7 @@ target(
     ':console_task',
     ':deferred_sources_mapper',
     ':dependees',
+    ':explain_options',
     ':filemap',
     ':filter',
     ':group_task',
@@ -149,6 +150,16 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
+  ],
+)
+
+python_library(
+  name = 'explain_options',
+  sources = ['explain_options_task.py'],
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    ':console_task',
+    'src/python/pants/option',
   ],
 )
 
