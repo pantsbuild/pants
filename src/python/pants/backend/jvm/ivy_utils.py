@@ -41,36 +41,47 @@ class IvyResolveMappingError(Exception):
 
 class IvyModuleRef(object):
 
+  # latest.integration is ivy magic meaning "just get the latest version"
+  _ANY_REV = 'latest.integration'
+
   def __init__(self, org, name, rev, classifier=None):
     self.org = org
     self.name = name
     self.rev = rev
     self.classifier = classifier
 
+    self._id = (org, name, rev, classifier)
+
   def __eq__(self, other):
-    return self.org == other.org and \
-           self.name == other.name and \
-           self.rev == other.rev and \
-           self.classifier == other.classifier
+    return isinstance(other, IvyModuleRef) and self._id == other._id
+
+  def __ne__(self, other):
+    return not self == other
 
   def __hash__(self):
-    return hash((self.org, self.name, self.rev, self.classifier))
+    return hash(self._id)
 
   def __str__(self):
-    return 'IvyModuleRef({})'.format(':'.join([self.org, self.name, self.rev, self.classifier or '']))
+    return 'IvyModuleRef({})'.format(':'.join((x or '') for x in self._id))
+
+  @property
+  def caller_key(self):
+    """This returns an identifier for an IvyModuleRef that only retains the caller org and name.
+
+    Ivy represents dependees as `<caller/>`'s with just org and name and rev information.
+    This method returns a `<caller/>` representation of the current ref.
+    """
+    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV)
 
   @property
   def unversioned(self):
     """This returns an identifier for an IvyModuleRef without version information.
 
-       It's useful because ivy might return information about a
-       different version of a dependency than the one we request, and we
-       want to ensure that all requesters of any version of that
-       dependency are able to learn about it.
+    It's useful because ivy might return information about a different version of a dependency than
+    the one we request, and we want to ensure that all requesters of any version of that dependency
+    are able to learn about it.
     """
-
-    # latest.integration is ivy magic meaning "just get the latest version"
-    return IvyModuleRef(name=self.name, org=self.org, rev='latest.integration', classifier=self.classifier)
+    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV, classifier=self.classifier)
 
   @property
   def unclassified(self):
@@ -89,13 +100,14 @@ class IvyInfo(object):
 
   def add_module(self, module):
     if module.ref in self.modules_by_ref:
-      raise IvyResolveMappingError("Already defined module {}, would be overwritten!".format(module.ref))
+      raise IvyResolveMappingError('Already defined module {}, would be overwritten!'
+                                   .format(module.ref))
     self.modules_by_ref[module.ref] = module
     if not module.artifact:
       # Module was evicted, so do not record information about it
       return
     for caller in module.callers:
-      self._deps_by_caller[caller.unversioned].add(module.ref)
+      self._deps_by_caller[caller.caller_key].add(module.ref)
     self._artifacts_by_ref[module.ref.unversioned].add(module.artifact)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
@@ -103,8 +115,8 @@ class IvyInfo(object):
     created by the collector function.
 
     :param ref an IvyModuleRef to start traversing the ivy dependency graph
-    :param collector a function that takes a ref and returns a new set of values to collect for that ref,
-           which will also be updated with all the dependencies accumulated values
+    :param collector a function that takes a ref and returns a new set of values to collect for
+           that ref, which will also be updated with all the dependencies accumulated values
     :param memo is a dict of ref -> set that memoizes the results of each node in the graph.
            If provided, allows for retaining cache across calls.
     :returns the accumulated set for ref
@@ -126,7 +138,7 @@ class IvyInfo(object):
     visited.add(ref)
 
     acc = collector(ref)
-    for dep in self._deps_by_caller.get(ref.unversioned, ()):
+    for dep in self._deps_by_caller.get(ref.caller_key, ()):
       acc.update(self.traverse_dependency_graph(dep, collector, memo, visited))
     memo[ref] = acc
     return acc
@@ -145,12 +157,12 @@ class IvyInfo(object):
     :returns: all the artifacts for all of the jars in this library, including transitive deps
     :rtype: list of str
     """
-    def to_resolved_jar(jar_module_ref, artifact_path):
-      return ResolvedJar(coordinate=M2Coordinate(org=jar_module_ref.org, name=jar_module_ref.name,
-                                                 rev=jar_module_ref.rev,
-                                                 classifier=jar_module_ref.classifier),
-                         cache_path=artifact_path
-      )
+    def to_resolved_jar(jar_ref, jar_path):
+      return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
+                                                 name=jar_ref.name,
+                                                 rev=jar_ref.rev,
+                                                 classifier=jar_ref.classifier),
+                         cache_path=jar_path)
     resolved_jars = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
@@ -159,7 +171,7 @@ class IvyInfo(object):
         jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
         for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
           for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
-            resolved_jars.add(to_resolved_jar(jar_module_ref, artifact_path))
+            resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
     return resolved_jars
 
   def get_jars_for_ivy_module(self, jar, memo=None):
@@ -307,10 +319,10 @@ class IvyUtils(object):
     return cls._parse_xml_report(path)
 
   @classmethod
-  def _parse_xml_report(cls, path):
-    logger.debug("Parsing ivy report {}".format(path))
+  def _parse_xml_report(cls, source):
+    logger.debug("Parsing ivy report {}".format(source))
     ret = IvyInfo()
-    etree = ET.parse(path)
+    etree = ET.parse(source)
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')

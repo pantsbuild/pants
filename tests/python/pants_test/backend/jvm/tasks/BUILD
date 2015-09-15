@@ -164,12 +164,13 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/base:context_utils',
   ]
 )
 
