@@ -49,7 +49,6 @@ target(
   dependencies = [
     ':antlr_integration',
     ':bootstrap_jvm_tools_integration',
-    ':dep_usage_integration',
     ':ivy_resolve_integration',
     ':jar_publish_integration',
     ':junit_tests_integration',
@@ -62,15 +61,6 @@ target(
 python_tests(
   name = 'scalastyle_integration',
   sources = ['test_scalastyle_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-    'src/python/pants/util:contextutil',
-  ]
-)
-
-python_tests(
-  name = 'dep_usage_integration',
-  sources = ['test_dep_usage_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
     'src/python/pants/util:contextutil',
