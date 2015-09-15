@@ -158,6 +158,17 @@ class ConsoleTaskTestBase(TaskTestBase):
     options = options or {}
     self.set_options(**options)
     context = self.context(target_roots=targets, workspace=workspace)
+    return self.execute_console_task_given_context(context, extra_targets=extra_targets)
+
+  def execute_console_task_given_context(self, context, extra_targets=None):
+    """Creates a new task and executes it with the context and extra targets.
+
+    :param context: The pants run context to use.
+    :param extra_targets: An optional list of extra targets in the context in addition to those
+                          passed on the command line.
+    :returns: The list of items returned from invoking the console task's console_output method.
+    :rtype: list of strings
+    """
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()) + list(extra_targets or ())))
 

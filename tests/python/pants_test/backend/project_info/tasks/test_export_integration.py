@@ -11,8 +11,10 @@ import os
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
+from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 class ExportIntegrationTest(PantsRunIntegrationTest):
@@ -23,7 +25,8 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
 
   def run_export(self, test_target, workdir, load_libs=False, extra_args=None):
     export_out_file = os.path.join(workdir, 'export_out.txt')
-    args = ['export', '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
+    args = ['export',
+            '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
     pants_run = self.run_pants_with_workdir(args + libs_args + (extra_args or []), workdir)
     self.assert_success(pants_run)
@@ -86,26 +89,24 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      # NB(Eric Ayers) The setting the cache dir from the IvySubsystem instance can be difficult
-      # to get in a test that isn't a subclass of TaskTestBase.
-      # ivy_cache_dir = IvySubsystem.global_instance().get_options().cache_dir
-      ivy_cache_dir = os.path.expanduser('~/.ivy2/pants')
-      common_lang_lib_info = json_data.get('libraries').get('commons-lang:commons-lang:2.5')
-      self.assertIsNotNone(common_lang_lib_info)
-      self.assertEquals(
-        common_lang_lib_info.get('default'),
-        os.path.join(ivy_cache_dir, 'commons-lang/commons-lang/jars/commons-lang-2.5.jar')
-      )
-      self.assertEquals(
-        common_lang_lib_info.get('javadoc'),
-        os.path.join(ivy_cache_dir,
-                     'commons-lang/commons-lang/javadocs/commons-lang-2.5-javadoc.jar')
-      )
-      self.assertEquals(
-        common_lang_lib_info.get('sources'),
-        os.path.join(ivy_cache_dir,
-                     'commons-lang/commons-lang/sources/commons-lang-2.5-sources.jar')
-      )
+      with subsystem_instance(IvySubsystem) as ivy_subsystem:
+        ivy_cache_dir = ivy_subsystem.get_options().cache_dir
+        common_lang_lib_info = json_data.get('libraries').get('commons-lang:commons-lang:2.5')
+        self.assertIsNotNone(common_lang_lib_info)
+        self.assertEquals(
+          common_lang_lib_info.get('default'),
+          os.path.join(ivy_cache_dir, 'commons-lang/commons-lang/jars/commons-lang-2.5.jar')
+        )
+        self.assertEquals(
+          common_lang_lib_info.get('javadoc'),
+          os.path.join(ivy_cache_dir,
+                       'commons-lang/commons-lang/javadocs/commons-lang-2.5-javadoc.jar')
+        )
+        self.assertEquals(
+          common_lang_lib_info.get('sources'),
+          os.path.join(ivy_cache_dir,
+                       'commons-lang/commons-lang/sources/commons-lang-2.5-sources.jar')
+        )
 
   def test_dep_map_for_java_sources(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
@@ -128,29 +129,26 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      # NB(Eric Ayers) The setting the cache dir from the IvySubsystem instance can be difficult
-      # to get in a test that isn't a subclass of TaskTestBase.
-      # ivy_cache_dir = IvySubsystem.global_instance().get_options().cache_dir
-      ivy_cache_dir = os.path.expanduser('~/.ivy2/pants')
-      avro_lib_info = json_data.get('libraries').get('org.apache.avro:avro:1.7.7')
-      self.assertIsNotNone(avro_lib_info)
-      self.assertEquals(
-        avro_lib_info.get('default'),
-        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
-      )
-      self.assertEquals(
-        avro_lib_info.get('tests'),
-        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
-      )
-      # TODO(Eric Ayers): Pants does not properly download javadoc and test jars
-      #self.assertEquals(
-      #  common_lang_lib_info.get('javadoc'),
-      #  os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-javadoc.jar')
-      #)
-      #self.assertEquals(
-      #  common_lang_lib_info.get('sources'),
-      #  os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-sources.jar')
-      #)
+      with subsystem_instance(IvySubsystem) as ivy_subsystem:
+        ivy_cache_dir = ivy_subsystem.get_options().cache_dir
+        avro_lib_info = json_data.get('libraries').get('org.apache.avro:avro:1.7.7')
+        self.assertIsNotNone(avro_lib_info)
+        self.assertEquals(
+          avro_lib_info.get('default'),
+          os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
+        )
+        self.assertEquals(
+          avro_lib_info.get('tests'),
+          os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
+        )
+        self.assertEquals(
+          avro_lib_info.get('javadoc'),
+          os.path.join(ivy_cache_dir, 'org.apache.avro/avro/javadocs/avro-1.7.7-javadoc.jar')
+        )
+        self.assertEquals(
+          avro_lib_info.get('sources'),
+          os.path.join(ivy_cache_dir, 'org.apache.avro/avro/sources/avro-1.7.7-sources.jar')
+        )
 
   def test_distributions_and_platforms(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:

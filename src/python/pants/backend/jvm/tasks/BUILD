@@ -175,6 +175,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
 )

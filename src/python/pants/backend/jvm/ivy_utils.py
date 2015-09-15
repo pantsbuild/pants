@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 
 import six
-from twitter.common.collections import OrderedSet, maybe_list
+from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.targets.exclude import Exclude
@@ -39,6 +39,7 @@ class IvyResolveMappingError(Exception):
   """Raised when there is a failure mapping the ivy resolve results to pants objects."""
 
 
+# TODO(John Sirois): An IvyModuleRef is an M2Coordinate - merge.
 class IvyModuleRef(object):
 
   # latest.integration is ivy magic meaning "just get the latest version"
@@ -83,15 +84,11 @@ class IvyModuleRef(object):
     """
     return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV, classifier=self.classifier)
 
-  @property
-  def unclassified(self):
-    """This returns an identifier for an IvyModuleRef without classifier information."""
-    return IvyModuleRef(name=self.name, org=self.org, rev=self.rev, classifier=None)
-
 
 class IvyInfo(object):
 
-  def __init__(self):
+  def __init__(self, conf):
+    self._conf = conf
     self.modules_by_ref = {}  # Map from ref to referenced module.
     # Map from ref of caller to refs of modules required by that caller.
     self._deps_by_caller = defaultdict(OrderedSet)
@@ -167,7 +164,8 @@ class IvyInfo(object):
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
-      for classifier in jar.artifact_classifiers:
+      classifiers = jar.artifact_classifiers if self._conf == 'default' else (self._conf,)
+      for classifier in classifiers:
         jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
         for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
           for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
@@ -306,13 +304,13 @@ class IvyUtils(object):
     if not os.path.exists(path):
       raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
 
-    return cls._parse_xml_report(path)
+    return cls._parse_xml_report(conf, path)
 
   @classmethod
-  def _parse_xml_report(cls, source):
-    logger.debug("Parsing ivy report {}".format(source))
-    ret = IvyInfo()
-    etree = ET.parse(source)
+  def _parse_xml_report(cls, conf, path):
+    logger.debug("Parsing ivy report {}".format(path))
+    ret = IvyInfo(conf)
+    etree = ET.parse(path)
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
       org = module.get('organisation')
@@ -367,6 +365,8 @@ class IvyUtils(object):
     else:
       org, name = cls.identify(targets)
 
+    extra_configurations = [conf for conf in confs if conf and conf != 'default']
+
     # As it turns out force is not transitive - it only works for dependencies pants knows about
     # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
     # don't make this clear [1], but the source code docs do (see isForce docs) [2]. I was able to
@@ -377,7 +377,7 @@ class IvyUtils(object):
     # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
     #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
     # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    dependencies = [cls._generate_jar_template(jar, confs) for jar in jars]
+    dependencies = [cls._generate_jar_template(jar) for jar in jars]
     overrides = [cls._generate_override_template(dep) for dep in dependencies if dep.force]
 
     excludes = [cls._generate_exclude_template(exclude) for exclude in excludes]
@@ -387,7 +387,7 @@ class IvyUtils(object):
         module=name,
         version='latest.integration',
         publications=None,
-        configurations=maybe_list(confs),  # Mustache doesn't like sets.
+        extra_configurations=extra_configurations,
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)
@@ -500,7 +500,22 @@ class IvyUtils(object):
     return False
 
   @classmethod
-  def _generate_jar_template(cls, jar, confs):
+  def _generate_jar_template(cls, jar):
+    def create_artifact(name=None, ext=None, url=None, type_=None, classifier=None):
+      return TemplateData(name=name or jar.name,
+                          ext=ext,
+                          url=url,
+                          type_=type_,
+                          classifier=classifier)
+
+    artifacts_by_classifier = OrderedDict()
+    for artifact in jar.artifacts:
+      key = artifact.classifier or 'default'
+      artifacts_by_classifier[key] = create_artifact(name=artifact.name,
+                                                     ext=artifact.ext,
+                                                     url=artifact.url,
+                                                     type_=artifact.type_,
+                                                     classifier=artifact.classifier)
     template = TemplateData(
         org=jar.org,
         module=jar.name,
@@ -509,6 +524,5 @@ class IvyUtils(object):
         force=jar.force,
         excludes=[cls._generate_exclude_template(exclude) for exclude in jar.excludes],
         transitive=jar.transitive,
-        artifacts=jar.artifacts,
-        configurations=maybe_list(confs))
+        artifacts=artifacts_by_classifier.values())
     return template

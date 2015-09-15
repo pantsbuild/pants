@@ -34,10 +34,11 @@ class ResolvedJar(object):
     return 'ResolvedJar(coordinate={!r}, cache_path={!r}, pants_path={!r})'.format(*self._id)
 
 
+# TODO(John Sirois): An M2Coordinate is an IvyModuleRef - merge.
 class M2Coordinate(object):
   """Represents a fully qualified name of an artifact."""
 
-  def __init__(self, org, name, rev=None, classifier=None, type_='jar'):
+  def __init__(self, org, name, rev=None, classifier=None, type_=None):
     """
     :param org: Maven equivalent of orgId
     :param name: Maven equivalent of groupId
@@ -47,11 +48,11 @@ class M2Coordinate(object):
     """
     self.org = org
     self.name = name
-    self.type_ = type_
     self.rev = rev
     self.classifier = classifier
+    self.type_ = type_ or 'jar'
 
-    self._id = (org, name, rev, classifier, type_)
+    self._id = (org, name, rev, classifier, self.type_)
 
   def __eq__(self, other):
     return isinstance(other, M2Coordinate) and self._id == other._id
@@ -68,7 +69,7 @@ class M2Coordinate(object):
     # org:name:rev:classifier:type_
     # if any of the fields are None, it uses ''
     # for example org=a, name=b, type_=jar -> a:b:::jar
-    return ':'.join(x or '' for x in self._id)
+    return ':'.join((x or '') for x in self._id)
 
   def __repr__(self):
     return ('M2Coordinate(org={!r}, name={!r}, rev={!r}, classifier={!r}, type_={!r})'
