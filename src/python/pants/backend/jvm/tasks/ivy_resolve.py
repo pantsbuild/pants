@@ -143,7 +143,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
                          pants_path=symlink_map[key],
                          cache_path=resolved_jar_without_symlink.cache_path)
 
-      # Build the 3rdparty classpath product.
+    # Build the 3rdparty classpath product.
     for conf in self.confs:
       ivy_info = self._parse_report(resolve_hash_name, conf)
       if not ivy_info:
