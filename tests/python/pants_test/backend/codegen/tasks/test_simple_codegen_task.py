@@ -332,8 +332,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
                             'strategy=isolated.')
       return super(SimpleCodegenTaskTest.DummyGen, self)._find_sources_generated_by_target(target)
 
-    @property
-    def synthetic_target_type(self):
+  def synthetic_target_type(self, target):
       return JavaLibrary
 
     class DummyGlobalStrategy(SimpleCodegenTask.GlobalCodegenStrategy):

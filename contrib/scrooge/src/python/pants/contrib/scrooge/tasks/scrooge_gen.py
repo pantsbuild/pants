@@ -319,7 +319,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
       if isinstance(target, JavaThriftLibrary) and not target.payload.sources.source_paths:
         raise TargetDefinitionException(target, 'no thrift files found')
 
-  def synthetic_target_type_by_target(self, target):
+  def synthetic_target_type(self, target):
     language = self._thrift_defaults.language(target)
     return _TARGET_TYPE_FOR_LANG[language]
     # raise NotImplementedError
