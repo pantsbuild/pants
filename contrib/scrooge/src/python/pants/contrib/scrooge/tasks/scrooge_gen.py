@@ -100,7 +100,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     return path
 
   def _outdir(self, target):
-    # return os.path.join(self.workdir, partial_cmd.relative_outdir)
     return os.path.join(self.workdir, self.codegen_strategy.codegen_workdir_suffix(target))
 
   def execute_codegen(self, invalid_targets):
@@ -134,21 +133,10 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
       self.gen(partial_cmd, tgts)
 
   def gen(self, partial_cmd, invalid_targets):
-    # fp_strategy = JavaThriftLibraryFingerprintStrategy(self._thrift_defaults)
-    # with self.invalidated(targets,
-    #                       fingerprint_strategy=fp_strategy,
-    #                       invalidate_dependents=True) as invalidation_check:
-    #   invalid_targets = []
-    #   for vt in invalidation_check.invalid_vts:
-    #     invalid_targets.extend(vt.targets)
-    #     outdir = self.codegen_workdir(vt)
 
     for vt in invalid_targets:
-      # invalid_targets.extend(vt.targets)
       outdir = self.codegen_workdir(vt)
-
       import_paths, dummy_changed_srcs = calculate_compile_sources(invalid_targets, self.is_gentarget)
-
       changed_srcs = vt.sources_relative_to_buildroot()
 
       if changed_srcs:
