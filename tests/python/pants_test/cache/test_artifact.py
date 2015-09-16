@@ -7,20 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import SimpleHTTPServer
-import SocketServer
 import unittest
-from contextlib import contextmanager
-from threading import Thread
 
-from pants.base.build_invalidator import CacheKey
-from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
-from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.artifact import DirectoryArtifact, TarballArtifact
-from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
-from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants_test.base.context_utils import create_context
 from pants.util.contextutil import temporary_dir
 
 
