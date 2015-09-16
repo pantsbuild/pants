@@ -10,8 +10,8 @@ import os
 import unittest
 
 from pants.cache.artifact import DirectoryArtifact, TarballArtifact
-from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_open
 
 
 class TarballArtifactTest(unittest.TestCase):
