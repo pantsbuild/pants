@@ -11,7 +11,7 @@ import os
 import sys
 
 from pants.backend.jvm.tasks.jvm_compile.anonymizer import TranslationCapturer
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis_parser import ZincAnalysisParser
 from pants.util.dirutil import safe_mkdir
 
 

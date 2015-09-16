@@ -95,13 +95,15 @@ python_library(
   name = 'python_chroot',
   sources = ['python_chroot.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:pex',
     ':antlr_builder',
     ':python_requirement',
     ':thrift_builder',
-    '3rdparty/python:pex',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/base:target',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:build_invalidator',
     'src/python/pants/util:dirutil'
   ],

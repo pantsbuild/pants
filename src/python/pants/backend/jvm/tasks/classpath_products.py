@@ -15,32 +15,91 @@ from pants.goal.products import UnionProducts
 
 
 class ClasspathEntry(object):
+  """Represents a java classpath entry."""
+
   def __init__(self, path):
-    self.path = path
+    self._path = path
+
+  @property
+  def path(self):
+    """Returns the pants internal path of this classpath entry.
+
+    Suitable for use in constructing classpaths for pants executions and pants generated artifacts.
+
+    :rtype: string
+    """
+    return self._path
 
   def is_excluded_by(self, excludes):
+    """Returns `True` if this classpath entry should be excluded given the `excludes` in play.
+
+    :param excludes: The excludes to check this classpath entry against.
+    :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
+    :rtype: bool
+    """
     return False
 
   def __hash__(self):
     return hash(self.path)
 
   def __eq__(self, other):
-    return self.path == other.path
+    return isinstance(other, ClasspathEntry) and self.path == other.path
 
   def __ne__(self, other):
-    return self.path != other.path
+    return not self == other
+
+  def __repr__(self):
+    return 'ClasspathEntry(path={!r})'.format(self.path)
 
 
 class ArtifactClasspathEntry(ClasspathEntry):
-  def __init__(self, coordinate, path):
+  """Represents a resolved third party classpath entry."""
+
+  def __init__(self, path, coordinate, cache_path):
     super(ArtifactClasspathEntry, self).__init__(path)
-    self.coordinate = coordinate
+    self._coordinate = coordinate
+    self._cache_path = cache_path
+
+  @property
+  def coordinate(self):
+    """Returns the maven coordinate that used to resolve this classpath entry's artifact.
+
+    :rtype: :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
+    """
+    return self._coordinate
+
+  @property
+  def cache_path(self):
+    """Returns the external cache path of this classpath entry.
+
+    For example, the `~/.m2/repository` or `~/.ivy2/cache` location of the resolved artifact for
+    maven and ivy resolvers respectively.
+
+    Suitable for use in constructing classpaths for external tools that should not be subject to
+    potential volatility in pants own internal caches.
+
+    :rtype: string
+    """
+    return self._cache_path
 
   def is_excluded_by(self, excludes):
     return any(_matches_exclude(self.coordinate, exclude) for exclude in excludes)
 
   def __hash__(self):
-    return hash((self.path, self.coordinate))
+    return hash((self.path, self.coordinate, self.cache_path))
+
+  def __eq__(self, other):
+    return (isinstance(other, ArtifactClasspathEntry) and
+            self.path == other.path and
+            self.coordinate == other.coordinate and
+            self.cache_path == other.cache_path)
+
+  def __ne__(self, other):
+    return not self == other
+
+  def __repr__(self):
+    return ('ArtifactClasspathEntry(path={!r}, coordinate={!r}, cache_path={!r})'
+            .format(self.path, self.coordinate, self.cache_path))
 
 
 def _matches_exclude(coordinate, exclude):
@@ -77,38 +136,81 @@ class ClasspathProducts(object):
     self._add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
 
   def add_jars_for_targets(self, targets, conf, resolved_jars):
-    """Adds jar classpath elements to the products of the provided targets in a way that works with
-    excludes.
+    """Adds jar classpath elements to the products of the provided targets.
+
+    The resolved jars are added in a way that works with excludes.
     """
     classpath_entries = []
     for jar in resolved_jars:
       if not jar.pants_path:
-        raise TaskError("Jar: {!s} has no specified path.".format(jar.coordinate))
-      classpath_entries.append((conf, ArtifactClasspathEntry(jar.coordinate, jar.pants_path)))
+        raise TaskError('Jar: {!s} has no specified path.'.format(jar.coordinate))
+      cp_entry = ArtifactClasspathEntry(jar.pants_path, jar.coordinate, jar.cache_path)
+      classpath_entries.append((conf, cp_entry))
 
     for target in targets:
       self._add_elements_for_target(target, classpath_entries)
 
   def add_excludes_for_targets(self, targets):
-    """Add excludes from the provided targets. Does not look up transitive excludes."""
+    """Add excludes from the provided targets.
+
+    Does not look up transitive excludes.
+    """
     for target in targets:
       self._add_excludes_for_target(target)
 
   def remove_for_target(self, target, classpath_elements):
-    """Removes the given entries for the target"""
+    """Removes the given entries for the target."""
     self._classpaths.remove_for_target(target, self._wrap_path_elements(classpath_elements))
 
   def get_for_target(self, target, transitive=True):
-    """Gets the transitive classpath products for the given target, in order, respecting target
-       excludes."""
+    """Gets the transitive classpath products for the given target.
+
+    Products are returned in order, respecting target excludes.
+
+    :param target: The target to lookup classpath products for.
+    :param bool transitive: `True` to include the transitive classpath for the target, `False` to
+                            just include the classpath formed by the direct dependencies of the
+                            target.
+    :returns: The ordered (conf, path) tuples, with paths being either classfile directories or
+              jars.
+    :rtype: list of (string, string)
+    """
     return self.get_for_targets([target], transitive=transitive)
 
   def get_for_targets(self, targets, transitive=True):
-    """Gets the transitive classpath products for the given targets, in order, respecting target
-       excludes."""
+    """Gets the transitive classpath products for the given targets.
+
+    Products are returned in order, respecting target excludes.
+
+    :param targets: The targets to lookup classpath products for.
+    :param bool transitive: `True` to include the transitive classpath for all targets, `False` to
+                            just include the classpath formed by the direct dependencies of the
+                            targets.
+    :returns: The ordered (conf, path) tuples, with paths being either classfile directories or
+              jars.
+    :rtype: list of (string, string)
+    """
+    cp_entries = self.get_classpath_entries_for_targets(targets, transitive=transitive)
+    return [(conf, cp_entry.path) for conf, cp_entry in cp_entries]
+
+  def get_classpath_entries_for_targets(self, targets, transitive=True, respect_excludes=True):
+    """Gets the transitive classpath products for the given targets.
+
+    Products are returned in order, optionally respecting target excludes.
+
+    :param targets: The targets to lookup classpath products for.
+    :param bool transitive: `True` to include the transitive classpath for all targets, `False` to
+                            just include the classpath formed by the direct dependencies of the
+                            targets.
+    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+    :returns: The ordered (conf, classpath entry) tuples.
+    :rtype: list of (string, :class:`ClasspathEntry`)
+    """
     classpath_tuples = self._classpaths.get_for_targets(targets, transitive)
-    filtered_classpath_tuples = self._filter_by_excludes(classpath_tuples, targets, transitive)
-    return [(classpath_tuple[0], classpath_tuple[1].path) for classpath_tuple in filtered_classpath_tuples]
+    if respect_excludes:
+      return self._filter_by_excludes(classpath_tuples, targets, transitive)
+    else:
+      return classpath_tuples
 
   def _filter_by_excludes(self, classpath_tuples, root_targets, transitive):
     excludes = self._excludes.get_for_targets(root_targets, transitive=transitive)

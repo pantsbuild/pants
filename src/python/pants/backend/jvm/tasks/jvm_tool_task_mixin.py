@@ -5,11 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.core.tasks.task import TaskBase
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 
 
-class JvmToolTaskMixin(JvmToolMixin):
+class JvmToolTaskMixin(JvmToolMixin, TaskBase):
   """A JvmToolMixin specialized for mixing in to Tasks."""
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JvmToolTaskMixin, cls).prepare(options, round_manager)
+    cls.prepare_tools(round_manager)
 
   def tool_jar(self, key, scope=None):
     """Get the jar for the tool previously registered under key in the given scope.

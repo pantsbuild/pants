@@ -15,38 +15,34 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     {{#lib.version}}
     revision="{{.}}"
     {{/lib.version}}
-   />
+  />
 
-  {{#lib.configurations?}}
-    <configurations>
-      {{#lib.configurations}}
-      <conf name="{{.}}"/>
-      {{/lib.configurations}}
-    </configurations>
-  {{/lib.configurations?}}
+  <configurations>
+    <conf name="default"/>
+    {{#lib.extra_configurations}}
+    <conf name="{{.}}"/>
+    {{/lib.extra_configurations}}
+  </configurations>
 
   {{#lib.publications?}}
   <publications>
-    <artifact conf="default" type="jar" ext="jar"/>
-    <artifact conf="default" type="pom" ext="pom"/>
+    <artifact/>
+    <artifact type="pom"/>
     {{#lib.publications.sources}}
-    <artifact conf="sources" type="source" m:classifier="sources" ext="jar"/>
+    <artifact m:classifier="sources"/>
     {{/lib.publications.sources}}
     {{#lib.publications.javadoc}}
-    <artifact conf="javadoc" type="javadoc" m:classifier="javadoc" ext="jar"/>
+    <artifact m:classifier="javadoc"/>
     {{/lib.publications.javadoc}}
     {{#lib.publications.changelog}}
-    <artifact conf="changelog" type="CHANGELOG" m:classifier="CHANGELOG" ext="txt"/>
+    <artifact m:classifier="CHANGELOG" ext="txt"/>
     {{/lib.publications.changelog}}
     {{#lib.extra_publications}}
     <artifact
-      {{#name}}name="{{name}}"
-               conf="{{conf}}"
-      {{/name}}
-      {{^name}}conf="{{classifier}}"{{/name}}
-      type="{{type}}"
+      {{#name}}name="{{name}}"{{/name}}
       m:classifier="{{classifier}}"
-      ext="{{ext}}"/>
+      ext="{{ext}}"
+    />
     {{/lib.extra_publications}}
   </publications>
   {{/lib.publications?}}
@@ -57,14 +53,14 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <dependency org="{{org}}"
                 name="{{module}}"
                 rev="{{version}}"
-                {{#classifier}}conf="{{classifier}}"{{/classifier}}
                 {{#force}}force="true"{{/force}}
                 {{^transitive}}transitive="false"{{/transitive}}
                 {{#mutable}}changing="true"{{/mutable}}
     >
-      {{#configurations}}
+      <conf name="default" mapped="default"/>
+      {{#lib.extra_configurations}}
       <conf name="{{.}}" mapped="{{.}}"/>
-      {{/configurations}}
+      {{/lib.extra_configurations}}
       {{#artifacts}}
       <artifact
         {{#name}}name="{{.}}"{{/name}}
@@ -72,18 +68,20 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
         {{#url}}url="{{.}}"{{/url}}
         {{#type_}}type="{{.}}"{{/type_}}
         {{#classifier}}m:classifier="{{.}}"{{/classifier}}
-        {{#conf}}conf="{{.}}"{{/conf}}
       />
       {{/artifacts}}
+      {{#lib.extra_configurations}}
+      <include name="{{module}}" conf="{{.}}"/>
+      {{/lib.extra_configurations}}
       {{#excludes}}
-      {{#name}}<exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>{{/name}}
-      {{^name}}<exclude matcher="exactOrRegexp" org="{{org}}"/>{{/name}}
+      {{#name}}<exclude matcher="exact" org="{{org}}" module="{{name}}"/>{{/name}}
+      {{^name}}<exclude matcher="exact" org="{{org}}"/>{{/name}}
       {{/excludes}}
     </dependency>
     {{/lib.dependencies}}
     {{#lib.excludes}}
-    {{#name}}<exclude matcher="exactOrRegexp" org="{{org}}" module="{{name}}"/>{{/name}}
-    {{^name}}<exclude matcher="exactOrRegexp" org="{{org}}"/>{{/name}}
+    {{#name}}<exclude matcher="exact" org="{{org}}" module="{{name}}"/>{{/name}}
+    {{^name}}<exclude matcher="exact" org="{{org}}"/>{{/name}}
     {{/lib.excludes}}
     {{#lib.overrides?}}
       {{#lib.overrides}}

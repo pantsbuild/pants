@@ -28,6 +28,7 @@ python_tests(
   dependencies = [
     'src/python/pants/java/distribution:distribution',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
 

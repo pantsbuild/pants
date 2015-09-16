@@ -117,6 +117,11 @@ class JvmToolMixin(object):
     jvm_tool = cls.JvmTool(register.scope, key, classpath, main, custom_rules)
     JvmToolMixin._jvm_tools.append(jvm_tool)
 
+  @classmethod
+  def prepare_tools(cls, round_manager):
+    """Subclasses must call this method to ensure jvm tool products are available."""
+    round_manager.require_data('jvm_build_tools_classpath_callbacks')
+
   @staticmethod
   def get_registered_tools():
     """Returns all registered jvm tools.

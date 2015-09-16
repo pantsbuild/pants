@@ -55,11 +55,6 @@ class SpindleGen(NailgunTask):
                                           rev='3.0.0-M7'),
                           ])
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(SpindleGen, cls).prepare(options, round_manager)
-    round_manager.require_data('jvm_build_tools_classpath_callbacks')
-
   @property
   def spindle_classpath(self):
     return self.tool_classpath('spindle-codegen')

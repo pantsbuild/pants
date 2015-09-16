@@ -19,9 +19,11 @@ from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
 from pants.option.errors import ParseError
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.parser import Parser
+from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
@@ -130,7 +132,8 @@ class OptionsTest(unittest.TestCase):
                              config=self._create_config(config or {}),
                              known_scope_infos=OptionsTest._known_scope_infos,
                              args=args,
-                             bootstrap_option_values=bootstrap_option_values)
+                             bootstrap_option_values=bootstrap_option_values,
+                             option_tracker=OptionTracker())
     self._register(options)
     return options
 
@@ -141,7 +144,8 @@ class OptionsTest(unittest.TestCase):
                              config=self._create_config(config or {}),
                              known_scope_infos=OptionsTest._known_scope_infos,
                              args=args,
-                             bootstrap_option_values=bootstrap_option_values)
+                             bootstrap_option_values=bootstrap_option_values,
+                             option_tracker=OptionTracker())
     options.register(GLOBAL_SCOPE, '--config-override', action=action, type=int)
     return options
 
@@ -487,7 +491,8 @@ class OptionsTest(unittest.TestCase):
       options = Options.create(env={},
                                config=self._create_config({}),
                                known_scope_infos=OptionsTest._known_scope_infos,
-                               args="./pants")
+                               args="./pants",
+                               option_tracker=OptionTracker())
       options.register(GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
                        deprecated_hint='The semver for this option has already passed.')
 
@@ -751,3 +756,17 @@ class OptionsTest(unittest.TestCase):
   def test_fromfile_escape(self):
     options = self._parse(r'./pants fromfile --string=@@/does/not/exist')
     self.assertEqual('@/does/not/exist', options.for_scope('fromfile').string)
+
+  def test_ranked_value_equality(self):
+    none = RankedValue(RankedValue.NONE, None)
+    some = RankedValue(RankedValue.HARDCODED, 'some')
+    self.assertEquals('(NONE, None)', str(none))
+    self.assertEquals('(HARDCODED, some)', str(some))
+    self.assertNotEqual(some, none)
+    self.assertEqual(some, RankedValue(RankedValue.HARDCODED, 'some'))
+    self.assertNotEqual(some, RankedValue(RankedValue.HARDCODED, 'few'))
+    self.assertNotEqual(some, RankedValue(RankedValue.CONFIG, 'some'))
+
+  def test_option_tracker_required(self):
+    with self.assertRaises(Options.OptionTrackerRequiredError):
+      Options.create(None, None, [])

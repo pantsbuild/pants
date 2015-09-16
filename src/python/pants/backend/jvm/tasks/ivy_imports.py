@@ -32,11 +32,6 @@ class IvyImports(IvyTaskMixin, NailgunTask):
     return ['ivy_imports']  # Guaranteed to populate target => { builddir: [jar_filenames]}
   # TODO https://github.com/pantsbuild/pants/issues/604 product_types finish
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(IvyImports, cls).prepare(options, round_manager)
-    round_manager.require_data('jvm_build_tools_classpath_callbacks')
-
   def _str_jar(self, jar):
     return 'jar' + str((jar.org, jar.name, jar.rev))
 

@@ -10,7 +10,7 @@ target(
     ':anonymizer',
     ':java',
     ':jvm_compile',
-    ':scala',
+    ':zinc',
   ],
 )
 
@@ -72,11 +72,12 @@ python_library(
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:workunit',
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/base:fingerprint_strategy',
   ],
 )
 
@@ -148,8 +149,8 @@ python_library(
 )
 
 python_library(
-  name = 'scala',
-  sources = globs('scala/*.py'),
+  name = 'zinc',
+  sources = globs('zinc/*.py'),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
@@ -173,10 +174,10 @@ python_library(
 
 python_binary(
   name = 'anonymize_zinc_analysis',
-  source = 'scala/bin/anonymize_analysis.py',
+  source = 'zinc/bin/anonymize_analysis.py',
   dependencies = [
     ':anonymizer',
-    ':scala',
+    ':zinc',
     'src/python/pants/util:dirutil',
   ],
 )

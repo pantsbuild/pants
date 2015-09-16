@@ -9,7 +9,7 @@ from zincutils.zinc_analysis_parser import ZincAnalysisParser as UnderlyingParse
 
 from pants.backend.jvm.tasks.jvm_compile.analysis_parser import (AnalysisParser, ParseError,
                                                                  raise_on_eof)
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
 
 
 class ZincAnalysisParser(AnalysisParser):

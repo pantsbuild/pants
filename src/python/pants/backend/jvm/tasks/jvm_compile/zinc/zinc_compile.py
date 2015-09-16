@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 import textwrap
 from contextlib import closing
 from xml.etree import ElementTree
@@ -15,8 +16,8 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis import ZincAnalysis
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_analysis_parser import ZincAnalysisParser
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis_parser import ZincAnalysisParser
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
@@ -53,6 +54,23 @@ class ZincCompile(JvmCompile):
       """.format(target.plugin, target.classname)).strip())
     return root, plugin_info_file
 
+  @staticmethod
+  def validate_arguments(log, whitelisted_args, args):
+    """Validate that all arguments match whitelisted regexes."""
+    valid_patterns = {re.compile(p): v for p, v in whitelisted_args.items()}
+
+    def validate(arg_index):
+      arg = args[arg_index]
+      for pattern, has_argument in valid_patterns.items():
+        if pattern.match(arg):
+          return 2 if has_argument else 1
+      log.warn("Zinc argument '{}' is not supported, and is subject to change/removal!".format(arg))
+      return 1
+
+    arg_index = 0
+    while arg_index < len(args):
+      arg_index += validate(arg_index)
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(ZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
@@ -78,11 +96,21 @@ class ZincCompile(JvmCompile):
              help='Map from plugin name to list of arguments for that plugin.')
     register('--name-hashing', advanced=True, action='store_true', default=False, fingerprint=True,
              help='Use zinc name hashing.')
+    register('--whitelisted-args', advanced=True, type=dict_option,
+             default={
+               '-S.*': False,
+               '-C.*': False,
+               '-log-filter': True,
+               '-msg-filter': True,
+               },
+             help='A dict of option regexes that make up pants\' supported API for zinc. '
+                  'Options not listed here are subject to change/removal. The value of the dict '
+                  'indicates that an option accepts an argument.')
 
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc', '1.0.8')
+                            JarDependency('org.pantsbuild', 'zinc', '1.0.10')
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=[
@@ -120,6 +148,11 @@ class ZincCompile(JvmCompile):
     # empty classpath.
     cls.register_jvm_tool(register, 'plugin-jars', classpath=[])
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ZincCompile, cls).prepare(options, round_manager)
+    ScalaPlatform.prepare_tools(round_manager)
+
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')
 
@@ -133,6 +166,9 @@ class ZincCompile(JvmCompile):
     # plugin resource files.
     self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
     self._lazy_plugin_args = None
+
+    # Validate zinc options
+    ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
 
   def create_analysis_tools(self):
     return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis)

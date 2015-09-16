@@ -91,10 +91,11 @@ class JvmCompileStrategy(object):
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
+                    check_vts,
                     compile_vts,
                     register_vts,
                     update_artifact_cache_vts_work):
-    """Executes compilations for that invalid targets contained in a single language chunk."""
+    """Executes compilations for the invalid targets contained in a single language chunk."""
 
   @abstractmethod
   def post_process_cached_vts(self, cached_vts):

@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
@@ -74,7 +73,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
     symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
                    artifact_path('bogus1'): artifact_path('bogus1'),
                    artifact_path('unused'): artifact_path('unused')}
-    context.products.safe_create_data('ivy_resolve_symlink_map', lambda: symlink_map)
     task = self.create_task(context, 'unused')
 
     def mock_ivy_resolve(targets, *args, **kw):
@@ -84,13 +82,12 @@ class IvyResolveTest(JvmToolTaskTestBase):
         cache_key = vts.cache_key.hash
       else:
         cache_key = None
-      return ([], cache_key)
+      return [], symlink_map, cache_key
 
     task.ivy_resolve = mock_ivy_resolve
 
-    def mock_generate_ivy_jar_products(cache_key_ignored):
-      ivy_products = defaultdict(list)
-      ivy_info = IvyInfo()
+    def mock_parse_report(resolve_hash_name_ignored, conf):
+      ivy_info = IvyInfo(conf)
 
       # Guava 16.0 would be evicted by Guava 16.0.1.  But in a real
       # resolve, it's possible that before it was evicted, it would
@@ -125,10 +122,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
                             unused_artifact, [unrelated_parent])
       ivy_info.add_module(unrelated)
 
-      ivy_products['default'] = [ivy_info]
-      return ivy_products
+      return ivy_info
 
-    task._generate_ivy_jar_products = mock_generate_ivy_jar_products
+    task._parse_report = mock_parse_report
     task.execute()
     compile_classpath = context.products.get_data('compile_classpath', None)
     losing_cp = compile_classpath.get_for_target(losing_lib)
@@ -195,8 +191,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     junit_jar_lib = self.make_target('//:junit_lib', JarLibrary, jars=[junit_dep])
     excluding_target = self.make_target('//:excluding_bin', JvmBinary, dependencies=[junit_jar_lib],
-                                        excludes=[Exclude('junit', 'junit')],
-                                        configurations=['default'])
+                                        excludes=[Exclude('junit', 'junit')])
 
     self.set_options(soft_excludes=True)
     context = self.context(target_roots=[junit_jar_lib, excluding_target])

@@ -21,6 +21,7 @@ from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.core.targets.resources import Resources
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -288,6 +289,10 @@ class SetupPy(PythonTask):
   def is_python_target(target):
     return isinstance(target, PythonTarget)
 
+  @staticmethod
+  def is_resources_target(target):
+    return isinstance(target, Resources)
+
   @classmethod
   def has_provides(cls, target):
     return cls.is_python_target(target) and target.provides
@@ -456,7 +461,8 @@ class SetupPy(PythonTask):
   def write_contents(self, root_target, reduced_dependencies, chroot):
     """Write contents of the target."""
     def write_target_source(target, src):
-      chroot.link(os.path.join(target.target_base, src), os.path.join(self.SOURCE_ROOT, src))
+      chroot.link(os.path.join(get_buildroot(), target.target_base, src),
+                  os.path.join(self.SOURCE_ROOT, src))
       # check parent __init__.pys to see if they also need to be linked.  this is to allow
       # us to determine if they belong to regular packages or namespace packages.
       while True:
@@ -476,9 +482,7 @@ class SetupPy(PythonTask):
         for relpath, abspath in self.iter_generated_sources(target):
           write_codegen_source(relpath, abspath)
       else:
-        sources_and_resources = (list(target.payload.sources.relative_to_buildroot()) +
-                                 list(target.payload.resources.relative_to_buildroot()))
-        for rel_source in sources_and_resources:
+        for rel_source in target.sources_relative_to_buildroot():
           abs_source_path = os.path.join(get_buildroot(), rel_source)
           abs_source_root_path = os.path.join(get_buildroot(), target.target_base)
           source_root_relative_path = os.path.relpath(abs_source_path, abs_source_root_path)
@@ -487,6 +491,8 @@ class SetupPy(PythonTask):
     write_target(root_target)
     for dependency in reduced_dependencies:
       if self.is_python_target(dependency) and not dependency.provides:
+        write_target(dependency)
+      elif self.is_resources_target(dependency):
         write_target(dependency)
 
   def write_setup(self, root_target, reduced_dependencies, chroot):

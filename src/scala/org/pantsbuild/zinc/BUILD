@@ -8,10 +8,10 @@ scala_library(
   ),
   dependencies=[
     '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
-    '3rdparty:guava',
-    '3rdparty:jsr305',
+    'src/scala/org/pantsbuild/zinc/cache',
     'src/scala/org/pantsbuild/zinc/logging',
     'src/scala/sbt/inc',
+    'src/scala/sbt/compiler/javac',
   ],
   sources=globs('*.scala'),
 )

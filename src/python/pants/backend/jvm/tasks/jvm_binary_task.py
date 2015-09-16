@@ -13,7 +13,7 @@ from twitter.common.collections.orderedset import OrderedSet
 
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.backend.jvm.tasks.jar_task import JarBuilderTask
 from pants.base.exceptions import TaskError
 from pants.java.util import execute_runner
 from pants.util.contextutil import temporary_dir
@@ -21,7 +21,7 @@ from pants.util.fileutil import atomic_copy
 from pants.util.memo import memoized_property
 
 
-class JvmBinaryTask(JarTask):
+class JvmBinaryTask(JarBuilderTask):
 
   @staticmethod
   def is_binary(target):
@@ -41,7 +41,7 @@ class JvmBinaryTask(JarTask):
   def prepare(cls, options, round_manager):
     super(JvmBinaryTask, cls).prepare(options, round_manager)
     round_manager.require('jar_dependencies', predicate=cls.is_binary)
-    cls.JarBuilder.prepare(round_manager)
+    Shader.Factory.prepare_tools(round_manager)
 
   @classmethod
   def subsystem_dependencies(cls):

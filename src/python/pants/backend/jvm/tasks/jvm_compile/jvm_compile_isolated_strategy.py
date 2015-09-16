@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
 import shutil
 from collections import OrderedDict, defaultdict
@@ -19,7 +20,7 @@ from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
-from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy, create_size_estimators
 
 
@@ -164,7 +165,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         products = self._analysis_parser.parse_products_from_path(compile_context.analysis_file,
                                                                   compile_context.classes_dir)
         for src, classes in products.items():
-          relsrc = os.path.relpath(src, buildroot)
+          relsrc = fast_relpath(src, buildroot)
           classes_by_src[relsrc] = classes
           unclaimed_classes.difference_update(classes)
 
@@ -205,21 +206,39 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, compile_classpaths, compile_contexts, extra_compile_time_classpath,
-                           invalid_targets, invalid_vts_partitioned, compile_vts, register_vts,
-                           update_artifact_cache_vts_work):
-    def create_work_for_vts(vts, compile_context, target_closure):
-      def work():
-        progress_message = compile_context.target.address.spec
-        cp_entries = self._compute_classpath_entries(compile_classpaths,
-                                                     target_closure,
-                                                     compile_context,
-                                                     extra_compile_time_classpath)
+                           invalid_targets, invalid_vts_partitioned, check_vts, compile_vts,
+                           register_vts, update_artifact_cache_vts_work):
+    def check_cache(vts):
+      """Manually checks the artifact cache (usually immediately before compilation.)
 
-        upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
+      Returns true if the cache was hit successfully, indicating that no compilation is necessary.
+      """
+      if not check_vts:
+        return False
+      cached_vts, uncached_vts = check_vts([vts])
+      if not cached_vts:
+        self.context.log.debug('Missed cache during double check for {}'.format(vts.target.address.spec))
+        return False
+      assert cached_vts == [vts], (
+          'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
+      )
+      self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
+      return True
 
-        # Capture a compilation log if requested.
-        log_file = self._capture_log_file(compile_context.target)
+    def work_for_vts(vts, compile_context, target_closure):
+      progress_message = compile_context.target.address.spec
+      cp_entries = self._compute_classpath_entries(compile_classpaths,
+                                                   target_closure,
+                                                   compile_context,
+                                                   extra_compile_time_classpath)
 
+      upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
+
+      # Capture a compilation log if requested.
+      log_file = self._capture_log_file(compile_context.target)
+
+      # Double check the cache before beginning compilation
+      if not check_cache(vts):
         # Mutate analysis within a temporary directory, and move it to the final location
         # on success.
         tmpdir = os.path.join(self.analysis_tmpdir, compile_context.target.id)
@@ -227,7 +246,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         tmp_analysis_file = JvmCompileStrategy._analysis_for_target(
             tmpdir, compile_context.target)
         if os.path.exists(compile_context.analysis_file):
-           shutil.copy(compile_context.analysis_file, tmp_analysis_file)
+          shutil.copy(compile_context.analysis_file, tmp_analysis_file)
         target, = vts.targets
         compile_vts(vts,
                     compile_context.sources,
@@ -243,14 +262,12 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         # Jar the compiled output.
         self._create_context_jar(compile_context)
 
-        # Update the products with the latest classes.
-        register_vts([compile_context])
+      # Update the products with the latest classes.
+      register_vts([compile_context])
 
-        # Kick off the background artifact cache write.
-        if update_artifact_cache_vts_work:
-          self._write_to_artifact_cache(vts, compile_context, update_artifact_cache_vts_work)
-
-      return work
+      # Kick off the background artifact cache write.
+      if update_artifact_cache_vts_work:
+        self._write_to_artifact_cache(vts, compile_context, update_artifact_cache_vts_work)
 
     jobs = []
     invalid_target_set = set(invalid_targets)
@@ -266,7 +283,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
       invalid_dependencies = (compile_target_closure & invalid_target_set) - [compile_target]
 
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
-                      create_work_for_vts(vts, compile_context, compile_target_closure),
+                      functools.partial(work_for_vts, vts, compile_context, compile_target_closure),
                       [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
                       self._size_estimator(compile_context.sources),
                       # If compilation and analysis work succeeds, validate the vts.
@@ -281,6 +298,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                     relevant_targets,
                     invalid_targets,
                     extra_compile_time_classpath_elements,
+                    check_vts,
                     compile_vts,
                     register_vts,
                     update_artifact_cache_vts_work):
@@ -300,6 +318,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
                                      extra_compile_time_classpath,
                                      invalid_targets,
                                      invalidation_check.invalid_vts_partitioned,
+                                     check_vts,
                                      compile_vts,
                                      register_vts,
                                      update_artifact_cache_vts_work)

@@ -172,11 +172,11 @@ python_library(
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:cache_manager',
+    'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
-    'src/python/pants/goal:products',
-    'src/python/pants/ivy',
-    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:strutil',
   ],
 )
 
@@ -185,14 +185,15 @@ python_library(
   sources = ['ivy_task_mixin.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/ivy',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 
@@ -210,7 +211,9 @@ python_library(
 python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
-  resources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
+  resource_targets = [
+    ':jar_publish_resources',
+  ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.config',
@@ -235,6 +238,11 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
+)
+
+resources(
+  name = 'jar_publish_resources',
+  sources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
 )
 
 python_library(
@@ -390,6 +398,7 @@ python_library(
   name = 'jvm_tool_task_mixin',
   sources = ['jvm_tool_task_mixin.py'],
   dependencies = [
+    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/base:exceptions',
   ],

@@ -15,7 +15,8 @@ from collections import OrderedDict, defaultdict, namedtuple
 from contextlib import contextmanager
 from copy import deepcopy
 
-from twitter.common.collections import OrderedSet, maybe_list
+import six
+from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.targets.exclude import Exclude
@@ -25,7 +26,6 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.base.target import Target
-from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
@@ -41,46 +41,53 @@ class IvyResolveMappingError(Exception):
 
 class IvyModuleRef(object):
 
+  # latest.integration is ivy magic meaning "just get the latest version"
+  _ANY_REV = 'latest.integration'
+
   def __init__(self, org, name, rev, classifier=None):
     self.org = org
     self.name = name
     self.rev = rev
     self.classifier = classifier
 
+    self._id = (org, name, rev, classifier)
+
   def __eq__(self, other):
-    return self.org == other.org and \
-           self.name == other.name and \
-           self.rev == other.rev and \
-           self.classifier == other.classifier
+    return isinstance(other, IvyModuleRef) and self._id == other._id
+
+  def __ne__(self, other):
+    return not self == other
 
   def __hash__(self):
-    return hash((self.org, self.name, self.rev, self.classifier))
+    return hash(self._id)
 
   def __str__(self):
-    return 'IvyModuleRef({})'.format(':'.join([self.org, self.name, self.rev, self.classifier or '']))
+    return 'IvyModuleRef({})'.format(':'.join((x or '') for x in self._id))
+
+  @property
+  def caller_key(self):
+    """This returns an identifier for an IvyModuleRef that only retains the caller org and name.
+
+    Ivy represents dependees as `<caller/>`'s with just org and name and rev information.
+    This method returns a `<caller/>` representation of the current ref.
+    """
+    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV)
 
   @property
   def unversioned(self):
     """This returns an identifier for an IvyModuleRef without version information.
 
-       It's useful because ivy might return information about a
-       different version of a dependency than the one we request, and we
-       want to ensure that all requesters of any version of that
-       dependency are able to learn about it.
+    It's useful because ivy might return information about a different version of a dependency than
+    the one we request, and we want to ensure that all requesters of any version of that dependency
+    are able to learn about it.
     """
-
-    # latest.integration is ivy magic meaning "just get the latest version"
-    return IvyModuleRef(name=self.name, org=self.org, rev='latest.integration', classifier=self.classifier)
-
-  @property
-  def unclassified(self):
-    """This returns an identifier for an IvyModuleRef without classifier information."""
-    return IvyModuleRef(name=self.name, org=self.org, rev=self.rev, classifier=None)
+    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV, classifier=self.classifier)
 
 
 class IvyInfo(object):
 
-  def __init__(self):
+  def __init__(self, conf):
+    self._conf = conf
     self.modules_by_ref = {}  # Map from ref to referenced module.
     # Map from ref of caller to refs of modules required by that caller.
     self._deps_by_caller = defaultdict(OrderedSet)
@@ -89,13 +96,14 @@ class IvyInfo(object):
 
   def add_module(self, module):
     if module.ref in self.modules_by_ref:
-      raise IvyResolveMappingError("Already defined module {}, would be overwritten!".format(module.ref))
+      raise IvyResolveMappingError('Already defined module {}, would be overwritten!'
+                                   .format(module.ref))
     self.modules_by_ref[module.ref] = module
     if not module.artifact:
       # Module was evicted, so do not record information about it
       return
     for caller in module.callers:
-      self._deps_by_caller[caller.unversioned].add(module.ref)
+      self._deps_by_caller[caller.caller_key].add(module.ref)
     self._artifacts_by_ref[module.ref.unversioned].add(module.artifact)
 
   def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
@@ -103,8 +111,8 @@ class IvyInfo(object):
     created by the collector function.
 
     :param ref an IvyModuleRef to start traversing the ivy dependency graph
-    :param collector a function that takes a ref and returns a new set of values to collect for that ref,
-           which will also be updated with all the dependencies accumulated values
+    :param collector a function that takes a ref and returns a new set of values to collect for
+           that ref, which will also be updated with all the dependencies accumulated values
     :param memo is a dict of ref -> set that memoizes the results of each node in the graph.
            If provided, allows for retaining cache across calls.
     :returns the accumulated set for ref
@@ -126,7 +134,7 @@ class IvyInfo(object):
     visited.add(ref)
 
     acc = collector(ref)
-    for dep in self._deps_by_caller.get(ref.unversioned, ()):
+    for dep in self._deps_by_caller.get(ref.caller_key, ()):
       acc.update(self.traverse_dependency_graph(dep, collector, memo, visited))
     memo[ref] = acc
     return acc
@@ -145,21 +153,22 @@ class IvyInfo(object):
     :returns: all the artifacts for all of the jars in this library, including transitive deps
     :rtype: list of str
     """
-    def to_resolved_jar(jar_module_ref, artifact_path):
-      return ResolvedJar(coordinate=M2Coordinate(org=jar_module_ref.org, name=jar_module_ref.name,
-                                                 rev=jar_module_ref.rev,
-                                                 classifier=jar_module_ref.classifier),
-                         cache_path=artifact_path
-      )
+    def to_resolved_jar(jar_ref, jar_path):
+      return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
+                                                 name=jar_ref.name,
+                                                 rev=jar_ref.rev,
+                                                 classifier=jar_ref.classifier),
+                         cache_path=jar_path)
     resolved_jars = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
-      for classifier in jar.artifact_classifiers:
+      classifiers = jar.artifact_classifiers if self._conf == 'default' else (self._conf,)
+      for classifier in classifiers:
         jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
         for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
           for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
-            resolved_jars.add(to_resolved_jar(jar_module_ref, artifact_path))
+            resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
     return resolved_jars
 
   def get_jars_for_ivy_module(self, jar, memo=None):
@@ -209,21 +218,7 @@ class IvyUtils(object):
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   @classmethod
-  def _find_new_symlinks(cls, existing_symlink_path, updated_symlink_path):
-    """Find the difference between the existing and updated symlink path.
-
-    :param existing_symlink_path: map from path : symlink
-    :param updated_symlink_path: map from path : symlink after new resolve
-    :return: the portion of updated_symlink_path that is not found in existing_symlink_path.
-    """
-    diff_map = OrderedDict()
-    for key, value in updated_symlink_path.iteritems():
-      if key not in existing_symlink_path:
-        diff_map[key] = value
-    return diff_map
-
-  @classmethod
-  def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath, existing_symlink_map):
+  def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
     """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
     If there is an existing symlink for a file under inpath, it is used rather than creating
@@ -235,22 +230,20 @@ class IvyUtils(object):
     # reference the realpath of the .jar file after it is resolved in the cache dir. To handle
     # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
     real_ivy_cache_dir = os.path.realpath(ivy_cache_dir)
-    updated_symlink_map = OrderedDict()
+    symlink_map = OrderedDict()
     with safe_open(inpath, 'r') as infile:
       inpaths = filter(None, infile.read().strip().split(os.pathsep))
       paths = OrderedSet([os.path.realpath(path) for path in inpaths])
 
     for path in paths:
       if path.startswith(real_ivy_cache_dir):
-        updated_symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
+        symlink_map[path] = os.path.join(symlink_dir, os.path.relpath(path, real_ivy_cache_dir))
       else:
         # This path is outside the cache. We won't symlink it.
-        updated_symlink_map[path] = path
+        symlink_map[path] = path
 
-    # Create symlinks for paths in the ivy cache dir that we haven't seen before.
-    new_symlinks = cls._find_new_symlinks(existing_symlink_map, updated_symlink_map)
-
-    for path, symlink in new_symlinks.iteritems():
+    # Create symlinks for paths in the ivy cache dir.
+    for path, symlink in six.iteritems(symlink_map):
       if path == symlink:
         # Skip paths that aren't going to be symlinked.
         continue
@@ -264,9 +257,9 @@ class IvyUtils(object):
 
     # (re)create the classpath with all of the paths
     with safe_open(outpath, 'w') as outfile:
-      outfile.write(':'.join(OrderedSet(updated_symlink_map.values())))
+      outfile.write(':'.join(OrderedSet(symlink_map.values())))
 
-    return dict(updated_symlink_map)
+    return dict(symlink_map)
 
   @staticmethod
   def identify(targets):
@@ -277,39 +270,45 @@ class IvyUtils(object):
       return IvyUtils.INTERNAL_ORG_NAME, Target.maybe_readable_identify(targets)
 
   @classmethod
-  def xml_report_path(cls, resolve_hash_name, conf):
+  def xml_report_path(cls, cache_dir, resolve_hash_name, conf):
     """The path to the xml report ivy creates after a retrieve.
-    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet
-    used for resolution.
-    :param string conf: the ivy conf name (e.g. "default")
+
+    :param string cache_dir: The path of the ivy cache dir used for resolves.
+    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
+                                     resolution.
+    :param string conf: The ivy conf name (e.g. "default").
+    :returns: The report path.
+    :rtype: string
     """
-    cachedir = IvySubsystem.global_instance().get_options().cache_dir
-    return os.path.join(cachedir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
-                                                        resolve_hash_name, conf))
+    return os.path.join(cache_dir, '{}-{}-{}.xml'.format(IvyUtils.INTERNAL_ORG_NAME,
+                                                         resolve_hash_name, conf))
 
   @classmethod
-  def parse_xml_report(cls, resolve_hash_name, conf):
+  def parse_xml_report(cls, cache_dir, resolve_hash_name, conf):
     """Parse the ivy xml report corresponding to the name passed to ivy.
 
-    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet
-    used for resolution.
+    :param string cache_dir: The path of the ivy cache dir used for resolves.
+    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
+                                     resolution; if `None` returns `None` instead of attempting to
+                                     parse any report.
     :param string conf: the ivy conf name (e.g. "default")
-    :return: The info in the xml report or None if target is empty.
-    :rtype: IvyInfo
-    :raises: IvyResolveReportError if no report exists.
+    :returns: The info in the xml report or None if target is empty.
+    :rtype: :class:`IvyInfo`
+    :raises: :class:`IvyResolveMappingError` if no report exists.
     """
+    # TODO(John Sirois): Cleanup acceptance of None, this is IvyResolve's concern, not ours.
     if not resolve_hash_name:
       return None
-    path = cls.xml_report_path(resolve_hash_name, conf)
+    path = cls.xml_report_path(cache_dir, resolve_hash_name, conf)
     if not os.path.exists(path):
       raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
 
-    return cls._parse_xml_report(path)
+    return cls._parse_xml_report(conf, path)
 
   @classmethod
-  def _parse_xml_report(cls, path):
+  def _parse_xml_report(cls, conf, path):
     logger.debug("Parsing ivy report {}".format(path))
-    ret = IvyInfo()
+    ret = IvyInfo(conf)
     etree = ET.parse(path)
     doc = etree.getroot()
     for module in doc.findall('dependencies/module'):
@@ -365,6 +364,8 @@ class IvyUtils(object):
     else:
       org, name = cls.identify(targets)
 
+    extra_configurations = [conf for conf in confs if conf and conf != 'default']
+
     # As it turns out force is not transitive - it only works for dependencies pants knows about
     # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
     # don't make this clear [1], but the source code docs do (see isForce docs) [2]. I was able to
@@ -375,7 +376,7 @@ class IvyUtils(object):
     # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
     #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
     # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    dependencies = [cls._generate_jar_template(jar, confs) for jar in jars]
+    dependencies = [cls._generate_jar_template(jar) for jar in jars]
     overrides = [cls._generate_override_template(dep) for dep in dependencies if dep.force]
 
     excludes = [cls._generate_exclude_template(exclude) for exclude in excludes]
@@ -385,7 +386,7 @@ class IvyUtils(object):
         module=name,
         version='latest.integration',
         publications=None,
-        configurations=maybe_list(confs),  # Mustache doesn't like sets.
+        extra_configurations=extra_configurations,
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)
@@ -498,7 +499,22 @@ class IvyUtils(object):
     return False
 
   @classmethod
-  def _generate_jar_template(cls, jar, confs):
+  def _generate_jar_template(cls, jar):
+    def create_artifact(name=None, ext=None, url=None, type_=None, classifier=None):
+      return TemplateData(name=name or jar.name,
+                          ext=ext,
+                          url=url,
+                          type_=type_,
+                          classifier=classifier)
+
+    artifacts_by_classifier = OrderedDict()
+    for artifact in jar.artifacts:
+      key = artifact.classifier or 'default'
+      artifacts_by_classifier[key] = create_artifact(name=artifact.name,
+                                                     ext=artifact.ext,
+                                                     url=artifact.url,
+                                                     type_=artifact.type_,
+                                                     classifier=artifact.classifier)
     template = TemplateData(
         org=jar.org,
         module=jar.name,
@@ -507,6 +523,5 @@ class IvyUtils(object):
         force=jar.force,
         excludes=[cls._generate_exclude_template(exclude) for exclude in jar.excludes],
         transitive=jar.transitive,
-        artifacts=jar.artifacts,
-        configurations=maybe_list(confs))
+        artifacts=artifacts_by_classifier.values())
     return template

@@ -6,39 +6,25 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from textwrap import dedent
 
-import pytest
-
+from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.python.python_artifact import PythonArtifact
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.source_root import SourceRoot
 from pants_test.base_test import BaseTest
 
 
 class PythonTargetTest(BaseTest):
 
-  def setUp(self):
-    super(PythonTargetTest, self).setUp()
-    SourceRoot.register(os.path.realpath(os.path.join(self.build_root, 'test_python_target')),
-                        PythonTarget)
-
-    self.add_to_build_file('test_thrift_replacement', dedent('''
-      python_thrift_library(name='one',
-        sources=['thrift/keyword.thrift'],
-      )
-    '''))
-
   def test_validation(self):
-
     internal_repo = Repository(url=None, push_db_basedir=None)
     # Adding a JVM Artifact as a provides on a PythonTarget doesn't make a lot of sense.
     # This test sets up that very scenario, and verifies that pants throws a
     # TargetDefinitionException.
-    with pytest.raises(TargetDefinitionException):
+    with self.assertRaises(TargetDefinitionException):
       self.make_target(target_type=PythonTarget,
                        spec=":one",
                        provides=Artifact(org='com.twitter', name='one-jar', repo=internal_repo))
@@ -58,3 +44,36 @@ class PythonTargetTest(BaseTest):
                                       target_type=PythonTarget,
                                       provides=None)
     self.assertEquals(pt_no_artifact.address.spec, spec)
+
+  def assert_single_resource_dep(self, target, expected_resource_path, expected_resource_contents):
+    self.assertEqual(1, len(target.dependencies))
+    resources_dep = target.dependencies[0]
+    self.assertIsInstance(resources_dep, Resources)
+
+    self.assertEqual(1, len(target.resources))
+    resources_tgt = target.resources[0]
+    self.assertIs(resources_dep, resources_tgt)
+
+    self.assertEqual([expected_resource_path], resources_tgt.sources_relative_to_buildroot())
+    resource_rel_path = resources_tgt.sources_relative_to_buildroot()[0]
+    with open(os.path.join(self.build_root, resource_rel_path)) as fp:
+      self.assertEqual(expected_resource_contents, fp.read())
+    return resources_tgt
+
+  def test_resources(self):
+    self.create_file('test/data.txt', contents='42')
+    lib = self.make_target(spec='test:lib', target_type=PythonLibrary, resources=['data.txt'])
+    self.assert_single_resource_dep(lib,
+                                    expected_resource_path='test/data.txt',
+                                    expected_resource_contents='42')
+
+  def test_resource_targets(self):
+    self.create_file('res/data.txt', contents='1/137')
+    res = self.make_target(spec='res:resources', target_type=Resources, sources=['data.txt'])
+    lib = self.make_target(spec='test:lib',
+                           target_type=PythonLibrary,
+                           resource_targets=[res.address.spec])
+    resource_dep = self.assert_single_resource_dep(lib,
+                                                   expected_resource_path='res/data.txt',
+                                                   expected_resource_contents='1/137')
+    self.assertIs(res, resource_dep)

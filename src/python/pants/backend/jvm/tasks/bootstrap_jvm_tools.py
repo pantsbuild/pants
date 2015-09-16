@@ -87,6 +87,11 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   def global_subsystems(cls):
     return super(BootstrapJvmTools, cls).global_subsystems() + (IvySubsystem, )
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(BootstrapJvmTools, cls).prepare(options, round_manager)
+    Shader.Factory.prepare_tools(round_manager)
+
   class ToolResolveError(TaskError):
     """Indicates an error resolving a required JVM tool classpath."""
 
@@ -197,7 +202,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
   def _bootstrap_classpath(self, jvm_tool, targets):
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
-    classpath, _ = self.ivy_resolve(targets, silent=True, workunit_name=workunit_name)
+    classpath, _, _ = self.ivy_resolve(targets, silent=True, workunit_name=workunit_name)
     return classpath
 
   @memoized_property

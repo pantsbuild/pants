@@ -759,8 +759,6 @@ class JarPublish(ScmPublishMixin, JarTask):
             # Supply extra data about this jar into the Ivy template, so that Ivy will publish it
             # to the final destination.
             extra_confs.append({'name': override_name,
-                                'type': ivy_type,
-                                'conf': ivy_tmpl_key,
                                 'classifier': classifier,
                                 'ext': extension})
 

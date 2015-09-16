@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import os
 import sys
 from collections import defaultdict
 
@@ -16,6 +15,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmC
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
+from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
@@ -87,7 +87,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     super(JvmCompile, cls).prepare(options, round_manager)
 
     round_manager.require_data('compile_classpath')
-    round_manager.require_data('ivy_resolve_symlink_map')
 
     # Require codegen we care about
     # TODO(John Sirois): roll this up in Task - if the list of labels we care about for a target
@@ -273,6 +272,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         self._register_vts(valid_compile_contexts)
 
         # Invoke the strategy to execute compilations for invalid targets.
+        check_vts = (self.check_artifact_cache
+            if self.artifact_cache_reads_enabled() else None)
         update_artifact_cache_vts_work = (self.get_update_artifact_cache_work
             if self.artifact_cache_writes_enabled() else None)
         self._strategy.compile_chunk(invalidation_check,
@@ -280,6 +281,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                      relevant_targets,
                                      invalid_targets,
                                      self.extra_compile_time_classpath_elements(),
+                                     check_vts,
                                      self._compile_vts,
                                      self._register_vts,
                                      update_artifact_cache_vts_work)

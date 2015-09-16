@@ -8,19 +8,19 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
   <info organisation="org.pantsbuild.testproject.publish" module="jvm-example-lib" revision="0.0.1-SNAPSHOT" status="release" />
 
-    <configurations>
-      <conf name="default"/>
-      <conf name="sources"/>
-    </configurations>
+  <configurations>
+    <conf name="default"/>
+  </configurations>
 
   <publications>
-    <artifact conf="default" type="jar" ext="jar"/>
-    <artifact conf="default" type="pom" ext="pom"/>
-    <artifact conf="sources" type="source" m:classifier="sources" ext="jar"/>
+    <artifact/>
+    <artifact type="pom"/>
+    <artifact m:classifier="sources"/>
   </publications>
 
   <dependencies>
     <dependency org="org.pantsbuild.testproject.publish.hello" name="welcome" rev="0.0.1-SNAPSHOT">
+      <conf name="default" mapped="default"/>
     </dependency>
     <dependency org="org.scala-lang" name="scala-library" rev="2.10.4">
       <conf name="default" mapped="default"/>

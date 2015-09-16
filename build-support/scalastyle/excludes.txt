@@ -2,3 +2,5 @@
 # to share patches with upstream. Should eventually consider choosing and conforming
 # to a particular style.
 src/scala/org/pantsbuild/zinc/.*
+# TODO: Temporarily backported between 0.13.9 and 0.13.10: remove afterward.
+src/scala/sbt/compiler/javac/.*
