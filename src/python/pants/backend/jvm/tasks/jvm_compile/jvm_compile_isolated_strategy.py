@@ -24,6 +24,8 @@ from pants.util.dirutil import fast_relpath, safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy, create_size_estimators
 
 
+# This class holds onto class directories rather than CompileContexts because
+# CompileContext aren't picklable.
 class IsolationCacheHitCallback(object):
   """A serializable cache hit callback that cleans the class directory prior to cache extraction."""
 
