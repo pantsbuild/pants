@@ -82,7 +82,7 @@ def create_option_values_for_optionable(optionable_type, **options):
   return create_option_values(option_values)
 
 
-def create_options(options):
+def create_options(options, passthru_args=None):
   """Create a fake Options object for testing.
 
   Note that the returned object only provides access to the provided options values. There is
@@ -107,7 +107,7 @@ def create_options(options):
       return self.for_scope('')
 
     def passthru_args_for_scope(self, scope):
-      return []
+      return passthru_args or []
 
     def items(self):
       return options.items()

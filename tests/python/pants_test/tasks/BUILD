@@ -34,6 +34,7 @@ target(
     ':jvm_task',
     ':jvmdoc_gen',
     ':list_goals',
+    ':list_owners',
     ':listtargets',
     ':minimal_cover',
     ':reflect',
@@ -375,6 +376,18 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:source_root',
     'src/python/pants/base:target',
+  ],
+)
+
+python_tests(
+  name = 'list_owners',
+  sources = ['test_list_owners.py'],
+  dependencies = [
+    ':console_task',
+    'src/python/pants/backend/core/tasks:list_owners',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/base:exceptions',
   ],
 )
 
