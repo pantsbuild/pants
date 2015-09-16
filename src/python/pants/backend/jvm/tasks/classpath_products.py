@@ -121,10 +121,22 @@ def _not_excluded_filter(excludes):
 
 
 class ClasspathProducts(object):
-  def __init__(self):
-    self._classpaths = UnionProducts()
-    self._excludes = UnionProducts()
+  def __init__(self, classpaths=None, excludes=None):
+    self._classpaths = classpaths or UnionProducts()
+    self._excludes = excludes or UnionProducts()
     self._buildroot = get_buildroot()
+
+  def copy(self):
+    """Returns a copy of this ClasspathProducts.
+
+    Edits to the copy's classpaths or exclude associations will not affect the classpaths or
+    excludes in the original. The copy is shallow though, so edits to the the copy's product values
+    will mutate the original's product values.  See `UnionProducts.copy`.
+
+    :rtype: :class:`ClasspathProducts`
+    """
+    return ClasspathProducts(classpaths=self._classpaths.copy(),
+                             excludes=self._excludes.copy())
 
   def add_for_targets(self, targets, classpath_elements):
     """Adds classpath path elements to the products of all the provided targets."""
@@ -150,10 +162,23 @@ class ClasspathProducts(object):
     for target in targets:
       self._add_elements_for_target(target, classpath_entries)
 
+  def add_excludes_for_target(self, target, excludes):
+    """Add excludes for the given target.
+
+    :param target: The target to add excludes for.
+    :type target: :class:`pants.base.target.Target`
+    :param excludes: The excludes to add for the target.
+    :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
+    """
+    self._excludes.add_for_target(target, excludes)
+
   def add_excludes_for_targets(self, targets):
     """Add excludes from the provided targets.
 
     Does not look up transitive excludes.
+
+    :param targets: The targets to add excludes for.
+    :type targets: list of :class:`pants.base.target.Target`
     """
     for target in targets:
       self._add_excludes_for_target(target)
@@ -212,6 +237,27 @@ class ClasspathProducts(object):
     else:
       return classpath_tuples
 
+  def get_artifact_classpath_entries_for_targets(self, targets, transitive=True,
+                                                 respect_excludes=True):
+    """Gets the transitive artifact classpath products for the given targets.
+
+    Products are returned in order, optionally respecting target excludes, and the products only
+    include external artifact classpath elements (ie: resolved jars).
+
+    :param targets: The targets to lookup classpath products for.
+    :param bool transitive: `True` to include the transitive classpath for all targets, `False` to
+                            just include the classpath formed by the direct dependencies of the
+                            targets.
+    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+    :returns: The ordered (conf, classpath entry) tuples.
+    :rtype: list of (string, :class:`ArtifactClasspathEntry`)
+    """
+    classpath_tuples = self.get_classpath_entries_for_targets(targets,
+                                                              transitive=transitive,
+                                                              respect_excludes=respect_excludes)
+    return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
+            if isinstance(cp_entry, ArtifactClasspathEntry)]
+
   def _filter_by_excludes(self, classpath_tuples, root_targets, transitive):
     excludes = self._excludes.get_for_targets(root_targets, transitive=transitive)
     return filter(_not_excluded_filter(excludes),
@@ -234,8 +280,9 @@ class ClasspathProducts(object):
   def _validate_classpath_tuples(self, classpath, target):
     """Validates that all files are located within the working copy, to simplify relativization.
 
-    :param classpath: The list of classpath tuples. Each tuple is a 2-tuple of ivy_conf and ClasspathEntry
-    :param target: The target that the classpath tuple is being registered for
+    :param classpath: The list of classpath tuples. Each tuple is a 2-tuple of ivy_conf and
+                      ClasspathEntry.
+    :param target: The target that the classpath tuple is being registered for.
     :raises: `TaskError` when the path is outside the build root
     """
     for classpath_tuple in classpath:
