@@ -421,6 +421,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     satisfied/unsatisfied from the cache.
 
     :param cache_hit_callback: A serializable function that expects a CacheKey as an argument.
+      Called after a cache hit, but before the cached artifact is extracted.
     """
     if not vts:
       return [], []

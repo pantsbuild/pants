@@ -151,7 +151,7 @@ def call_use_cached_files(tup):
   To call a bound method, instead call a helper like this and pass tuple of the instance and args.
   The helper can then call the original method on the deserialized instance.
 
-  :param tup: A tuple of an ArtifactCache and arg (eg CacheKey) for ArtifactCache.use_cached_files.
+  :param tup: A tuple of an ArtifactCache and args (eg CacheKey) for ArtifactCache.use_cached_files.
   """
 
   try:
