@@ -3,8 +3,8 @@
 
 
 python_tests(
-  name='scala_compile_integration',
-  sources=['test_scala_compile_integration.py'],
+  name='zinc_compile_integration',
+  sources=['test_zinc_compile_integration.py'],
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ]
