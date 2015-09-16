@@ -19,23 +19,9 @@ class ProductError(Exception): pass
 class UnionProducts(object):
   """Here, products for a target are the ordered union of the products for its transitive deps."""
 
-  def __init__(self, products_by_target=None):
+  def __init__(self):
     # A map of target to OrderedSet of product members.
-    self._products_by_target = products_by_target or defaultdict(OrderedSet)
-
-  def copy(self):
-    """Returns a copy of this UnionProducts.
-
-    Edits to the copy's mappings will not affect the product mappings in the original.
-    The copy is shallow though, so edits to the the copy's product values will mutate the original's
-    product values.
-
-    :rtype: :class:`UnionProducts`
-    """
-    products_by_target = defaultdict(OrderedSet)
-    for key, value in self._products_by_target.items():
-      products_by_target[key] = OrderedSet(value)
-    return UnionProducts(products_by_target=products_by_target)
+    self._products_by_target = defaultdict(OrderedSet)
 
   def add_for_target(self, target, products):
     """Updates the products for a particular target, adding to existing entries."""

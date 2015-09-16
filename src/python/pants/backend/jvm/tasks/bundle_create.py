@@ -81,6 +81,9 @@ class BundleCreate(JvmBinaryTask):
           )
           self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
+  class MissingJarError(TaskError):
+    """Indicates an unexpected problem finding a jar that a bundle depends on."""
+
   def bundle(self, app):
     """Create a self-contained application bundle.
 
@@ -89,10 +92,16 @@ class BundleCreate(JvmBinaryTask):
     assert(isinstance(app, BundleCreate.App))
 
     def verbose_symlink(src, dst):
+      if not os.path.exists(src):
+        raise self.MissingJarError('Could not find {src} when attempting to link it into the '
+                                   'bundle for {app_spec} at {dst}'
+                                   .format(src=src,
+                                           app_spec=app.address.reference(),
+                                           dst=os.path.relpath(dst, get_buildroot())))
       try:
         os.symlink(src, dst)
       except OSError as e:
-        self.context.log.error("Unable to create symlink: {0} -> {1}".format(src, dst))
+        self.context.log.error('Unable to create symlink: {0} -> {1}'.format(src, dst))
         raise e
 
     bundle_dir = os.path.join(self._outdir, '{}-bundle'.format(app.basename))
@@ -124,13 +133,12 @@ class BundleCreate(JvmBinaryTask):
       # Add external dependencies to the bundle.
       for path, coordinate in self.list_external_jar_dependencies(app.binary):
         # Create a name guaranteed to be unique for the jar in the flat `libs/` dir.
-        _, ext = os.path.splitext(path)
         classifier = '-{}'.format(coordinate.classifier) if coordinate.classifier else ''
-        external_jar = '{org}-{name}{classifier}-{rev}{ext}'.format(org=coordinate.org,
-                                                                    name=coordinate.name,
-                                                                    rev=coordinate.rev,
-                                                                    classifier=classifier,
-                                                                    ext=ext)
+        external_jar = '{org}-{name}-{rev}{classifier}.{ext}'.format(org=coordinate.org,
+                                                                     name=coordinate.name,
+                                                                     rev=coordinate.rev,
+                                                                     classifier=classifier,
+                                                                     ext=coordinate.ext)
         destination = os.path.join(lib_dir, external_jar)
         verbose_symlink(path, destination)
         if app.binary.shading_rules:

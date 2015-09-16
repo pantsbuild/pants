@@ -37,6 +37,16 @@ class JvmBinaryTask(JarBuilderTask):
       jar.main(main)
 
   @classmethod
+  def register_options(cls, register):
+    super(JvmBinaryTask, cls).register_options(register)
+
+    # TODO(John Sirois): deprecate this legacy deploy_excludes support or else elevate it to a
+    # choice per JvmBinary: https://github.com/pantsbuild/pants/issues/2208
+    register('--shallow-deploy-excludes', action='store_true', advanced=True,
+             help='When excluding jars from binaries, only exclude matching jars and not their '
+                  'transitive dependencies that are otherwise unused by the binary.')
+
+  @classmethod
   def prepare(cls, options, round_manager):
     super(JvmBinaryTask, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
@@ -46,23 +56,18 @@ class JvmBinaryTask(JarBuilderTask):
   def subsystem_dependencies(cls):
     return super(JvmBinaryTask, cls).subsystem_dependencies() + (Shader.Factory,)
 
-  def list_external_jar_dependencies(self, binary, confs=None):
+  def list_external_jar_dependencies(self, binary, confs=None, shallow_excludes=False):
     """Returns the external jar dependencies of the given binary.
 
     :returns: An list of (jar path, coordinate) tuples.
     :rtype: list of (string, :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`)
     """
     classpath_products = self.context.products.get_data('compile_classpath')
-    if binary.deploy_excludes:
-      # We need deploy_excludes respected but do not want to meddle with the product for
-      # downstream consumers that do not care about deploy_excludes, so we work with a copy.
-      classpath_products = classpath_products.copy()
-      classpath_products.add_excludes_for_target(binary, binary.deploy_excludes)
-
     classpath_entries = classpath_products.get_artifact_classpath_entries_for_targets([binary])
     confs = confs or ('default',)
     external_jars = OrderedSet(jar_entry for conf, jar_entry in classpath_entries if conf in confs)
-    return [(entry.path, entry.coordinate) for entry in external_jars]
+    return [(entry.path, entry.coordinate) for entry in external_jars
+            if not entry.is_excluded_by(binary.deploy_excludes)]
 
   @contextmanager
   def monolithic_jar(self, binary, path, with_external_deps):
@@ -91,7 +96,10 @@ class JvmBinaryTask(JarBuilderTask):
           # but is not currently possible with how things are set up. It may not be possible to do
           # in general, at least efficiently.
           with self.context.new_workunit(name='add-dependency-jars'):
-            for jar, coordinate in self.list_external_jar_dependencies(binary):
+            shallow_excludes = self.get_options().shallow_deploy_excludes
+            dependencies = self.list_external_jar_dependencies(binary,
+                                                               shallow_excludes=shallow_excludes)
+            for jar, coordinate in dependencies:
               self.context.log.debug('  dumping {} from {}'.format(coordinate, jar))
               monolithic_jar.writejar(jar)
 
