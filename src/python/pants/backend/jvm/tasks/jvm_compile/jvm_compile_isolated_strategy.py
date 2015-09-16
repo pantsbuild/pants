@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import os
 import shutil
-import zipfile
 from collections import OrderedDict, defaultdict
 from hashlib import sha1
 
@@ -21,9 +20,22 @@ from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
-from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy, create_size_estimators
+
+
+# This class holds onto class directories rather than CompileContexts because
+# CompileContext aren't picklable.
+class IsolationCacheHitCallback(object):
+  """A serializable cache hit callback that cleans the class directory prior to cache extraction."""
+
+  def __init__(self, cache_key_to_class_dir):
+    self._key_to_target = cache_key_to_class_dir
+
+  def __call__(self, cache_key):
+    class_dir = self.key_to_target.get(cache_key)
+    if class_dir:
+      safe_mkdir(class_dir, clean=True)
 
 
 class JvmCompileIsolatedStrategy(JvmCompileStrategy):
@@ -117,7 +129,7 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._compile_task_name)) \
-            as workunit:
+        as workunit:
       # This uses workunit.parent as the WorkerPool's parent so that child workunits
       # of different pools will show up in order in the html output. This way the current running
       # workunit is on the bottom of the page rather than possibly in the middle.
@@ -321,6 +333,11 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
 
   def compute_resource_mapping(self, compile_contexts):
     return ResourceMapping(self._classes_dir)
+
+  def create_cache_hit_callback(self, vts):
+    cache_key_to_classes_dir = {v.cache_key: self.compile_context(v.target).classes_dir
+                                for v in vts}
+    return IsolationCacheHitCallback(cache_key_to_classes_dir)
 
   def post_process_cached_vts(self, cached_vts):
     """Localizes the fetched analysis for targets we found in the cache.

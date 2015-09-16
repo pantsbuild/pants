@@ -101,6 +101,13 @@ class JvmCompileStrategy(object):
   def post_process_cached_vts(self, cached_vts):
     """Post processes VTS that have been fetched from the cache."""
 
+  def create_cache_hit_callback(self, vts):
+    """Factory method for artifact cache hit callback functions.
+
+    Return value must be serializable.
+    """
+    return None
+
   @abstractmethod
   def compute_resource_mapping(self, compile_contexts):
     """Computes a merged ResourceMapping for the given compile contexts.

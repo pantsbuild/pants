@@ -28,6 +28,10 @@ class Artifact(object):
     # The files known to be in this artifact, relative to artifact_root.
     self._relpaths = set()
 
+  def exists(self):
+    """:returns True if the artifact is available for extraction."""
+    raise NotImplementedError()
+
   def get_paths(self):
     for relpath in self._relpaths:
       yield os.path.join(self._artifact_root, relpath)
@@ -50,6 +54,9 @@ class DirectoryArtifact(Artifact):
   def __init__(self, artifact_root, directory):
     Artifact.__init__(self, artifact_root)
     self._directory = directory
+
+  def exists(self):
+    return os.path.exists(self._directory)
 
   def collect(self, paths):
     for path in paths or ():
@@ -80,6 +87,9 @@ class TarballArtifact(Artifact):
     Artifact.__init__(self, artifact_root)
     self._tarfile = tarfile
     self._compression = compression
+
+  def exists(self):
+    return os.path.isfile(self._tarfile)
 
   def collect(self, paths):
     # In our tests, gzip is slightly less compressive than bzip2 on .class files,
