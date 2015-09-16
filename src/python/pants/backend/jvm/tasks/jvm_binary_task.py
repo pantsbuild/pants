@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import OrderedDict
 from contextlib import contextmanager
 
 from twitter.common.collections.orderedset import OrderedSet
@@ -40,7 +39,7 @@ class JvmBinaryTask(JarBuilderTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmBinaryTask, cls).prepare(options, round_manager)
-    round_manager.require('jar_dependencies', predicate=cls.is_binary)
+    round_manager.require_data('compile_classpath')
     Shader.Factory.prepare_tools(round_manager)
 
   @classmethod
@@ -50,14 +49,20 @@ class JvmBinaryTask(JarBuilderTask):
   def list_external_jar_dependencies(self, binary, confs=None):
     """Returns the external jar dependencies of the given binary.
 
-    :returns: An iterable of (basedir, jarfile) tuples where the jarfile names are
-              guaranteed to be unique.
+    :returns: An list of (jar path, coordinate) tuples.
+    :rtype: list of (string, :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`)
     """
-    jardepmap = self.context.products.get('jar_dependencies') or {}
-    if confs:
-      return self._mapped_dependencies(jardepmap, binary, confs)
-    else:
-      return self._unexcluded_dependencies(jardepmap, binary)
+    classpath_products = self.context.products.get_data('compile_classpath')
+    if binary.deploy_excludes:
+      # We need deploy_excludes respected but do not want to meddle with the product for
+      # downstream consumers that do not care about deploy_excludes, so we work with a copy.
+      classpath_products = classpath_products.copy()
+      classpath_products.add_excludes_for_target(binary, binary.deploy_excludes)
+
+    classpath_entries = classpath_products.get_artifact_classpath_entries_for_targets([binary])
+    confs = confs or ('default',)
+    external_jars = OrderedSet(jar_entry for conf, jar_entry in classpath_entries if conf in confs)
+    return [(entry.path, entry.coordinate) for entry in external_jars]
 
   @contextmanager
   def monolithic_jar(self, binary, path, with_external_deps):
@@ -86,10 +91,9 @@ class JvmBinaryTask(JarBuilderTask):
           # but is not currently possible with how things are set up. It may not be possible to do
           # in general, at least efficiently.
           with self.context.new_workunit(name='add-dependency-jars'):
-            for basedir, external_jar in self.list_external_jar_dependencies(binary):
-              jar_path = os.path.join(basedir, external_jar)
-              self.context.log.debug('  dumping {}'.format(jar_path))
-              monolithic_jar.writejar(jar_path)
+            for jar, coordinate in self.list_external_jar_dependencies(binary):
+              self.context.log.debug('  dumping {} from {}'.format(coordinate, jar))
+              monolithic_jar.writejar(jar)
 
         yield monolithic_jar
 
@@ -125,54 +129,3 @@ class JvmBinaryTask(JarBuilderTask):
                           'the output jar was not found at {1}'.format(jar_path, output_jar))
         atomic_copy(output_jar, jar_path)
         return jar_path
-
-  def _mapped_dependencies(self, jardepmap, binary, confs):
-    # TODO(John Sirois): rework product mapping towards well known types
-
-    # Generate a map of jars for each unique artifact (org, name)
-    externaljars = OrderedDict()
-    visited = set()
-    for conf in confs:
-      mapped = jardepmap.get((binary, conf))
-      if mapped:
-        for basedir, jars in mapped.items():
-          for externaljar in jars:
-            if (basedir, externaljar) not in visited:
-              visited.add((basedir, externaljar))
-              keys = jardepmap.keys_for(basedir, externaljar)
-              for key in keys:
-                if isinstance(key, tuple) and len(key) == 3:
-                  org, name, configuration = key
-                  classpath_entry = externaljars.get((org, name))
-                  if not classpath_entry:
-                    classpath_entry = {}
-                    externaljars[(org, name)] = classpath_entry
-                  classpath_entry[conf] = os.path.join(basedir, externaljar)
-    return externaljars.values()
-
-  def _unexcluded_dependencies(self, jardepmap, binary):
-    # TODO(John Sirois): Kill this and move jar exclusion to use confs
-    excludes = set()
-    for exclude_key in ((e.org, e.name) if e.name else e.org for e in binary.deploy_excludes):
-      exclude = jardepmap.get(exclude_key)
-      if exclude:
-        for basedir, jars in exclude.items():
-          for jar in jars:
-            excludes.add((basedir, jar))
-    if excludes:
-      self.context.log.debug('Calculated excludes:\n\t{}'.format('\n\t'.join(str(e) for e in excludes)))
-
-    externaljars = OrderedSet()
-
-    def add_jars(target):
-      mapped = jardepmap.get(target)
-      if mapped:
-        for basedir, jars in mapped.items():
-          for externaljar in jars:
-            if (basedir, externaljar) not in excludes:
-              externaljars.add((basedir, externaljar))
-            else:
-              self.context.log.debug('Excluding {} from binary'.format(externaljar))
-
-    binary.walk(add_jars)
-    return externaljars

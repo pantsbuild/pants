@@ -6,11 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from textwrap import dedent
 
-from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -20,19 +19,12 @@ class TestBinaryCreate(JvmToolTaskTestBase):
   def task_type(cls):
     return BinaryCreate
 
-  @property
-  def alias_groups(self):
-    return register_core().merge(register_jvm())
-
   def test_jvm_binaries_products(self):
-    self.add_to_build_file('foo', dedent("""
-      jvm_binary(
-        name='foo-binary',
-        source='Foo.java',
-      )
-    """))
-    binary_target = self.target('//foo:foo-binary')
+    binary_target = self.make_target(spec='//foo:foo-binary',
+                                     target_type=JvmBinary,
+                                     source='Foo.java')
     context = self.context(target_roots=[binary_target])
+    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
     with self.add_data(context.products, 'classes_by_target', binary_target, 'Foo.class'):
       with self.add_data(context.products, 'resources_by_target', binary_target, 'foo.txt'):
         self.execute(context)

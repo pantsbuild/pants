@@ -298,11 +298,10 @@ class IdeGen(JvmToolTaskMixin, Task):
 
     classpath_products = self.context.products.get_data('compile_classpath')
     cp_entry_by_classifier_by_orgname = defaultdict(lambda: defaultdict(dict))
-    for conf, cp_entry in classpath_products.get_classpath_entries_for_targets(targets):
-      if isinstance(cp_entry, ArtifactClasspathEntry):
-        coord = (cp_entry.coordinate.org, cp_entry.coordinate.name)
-        classifier = cp_entry.coordinate.classifier
-        cp_entry_by_classifier_by_orgname[coord][classifier] = cp_entry
+    for conf, jar_entry in classpath_products.get_artifact_classpath_entries_for_targets(targets):
+      coord = (jar_entry.coordinate.org, jar_entry.coordinate.name)
+      classifier = jar_entry.coordinate.classifier
+      cp_entry_by_classifier_by_orgname[coord][classifier] = jar_entry
 
     def copy_jar(cp_entry, dest_dir):
       if not cp_entry:
@@ -325,8 +324,8 @@ class IdeGen(JvmToolTaskMixin, Task):
 
       # Treat all other jars as opaque with no source or javadoc attachments of their own.  An
       # example are jars with the 'tests' classifier.
-      for cp_entry in cp_entry_by_classifier.values():
-        extra_jar = copy_jar(cp_entry, external_jar_dir)
+      for jar_entry in cp_entry_by_classifier.values():
+        extra_jar = copy_jar(jar_entry, external_jar_dir)
         self._project.external_jars.add(ClasspathEntry(extra_jar))
 
   def execute(self):

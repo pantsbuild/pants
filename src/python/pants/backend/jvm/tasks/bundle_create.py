@@ -115,14 +115,22 @@ class BundleCreate(JvmBinaryTask):
         if generated:
           for base_dir, internal_jars in generated.items():
             for internal_jar in internal_jars:
-              verbose_symlink(os.path.join(base_dir, internal_jar), os.path.join(lib_dir, internal_jar))
+              verbose_symlink(os.path.join(base_dir, internal_jar),
+                              os.path.join(lib_dir, internal_jar))
               classpath.add(internal_jar)
 
       app.binary.walk(add_jars, lambda t: t != app.binary)
 
       # Add external dependencies to the bundle.
-      for basedir, external_jar in self.list_external_jar_dependencies(app.binary):
-        path = os.path.join(basedir, external_jar)
+      for path, coordinate in self.list_external_jar_dependencies(app.binary):
+        # Create a name guaranteed to be unique for the jar in the flat `libs/` dir.
+        _, ext = os.path.splitext(path)
+        classifier = '-{}'.format(coordinate.classifier) if coordinate.classifier else ''
+        external_jar = '{org}-{name}{classifier}-{rev}{ext}'.format(org=coordinate.org,
+                                                                    name=coordinate.name,
+                                                                    rev=coordinate.rev,
+                                                                    classifier=classifier,
+                                                                    ext=ext)
         destination = os.path.join(lib_dir, external_jar)
         verbose_symlink(path, destination)
         if app.binary.shading_rules:

@@ -31,9 +31,9 @@ python_tests(
   name = 'binary_create',
   sources = ['test_binary_create.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:binary_create',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
@@ -77,9 +77,9 @@ python_tests(
   name = 'bundle_create',
   sources = ['test_bundle_create.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/backend/jvm/tasks:binary_create',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:bundle_create',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
