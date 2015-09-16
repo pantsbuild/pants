@@ -414,11 +414,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return self.do_check_artifact_cache(vts)
 
-  def do_check_artifact_cache(self, vts, post_process_cached_vts=None):
+  def do_check_artifact_cache(self, vts, post_process_cached_vts=None, cache_hit_callback=None):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
     Returns a pair (cached, uncached) of VersionedTargets that were
     satisfied/unsatisfied from the cache.
+
+    :param cache_hit_callback: A serializable function that expects a CacheKey as an argument.
     """
     if not vts:
       return [], []
@@ -427,7 +429,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     uncached_vts = OrderedSet(vts)
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key) for vt in vts]
+    items = [(read_cache, vt.cache_key, cache_hit_callback) for vt in vts]
 
     res = self.context.subproc_map(call_use_cached_files, items)
 

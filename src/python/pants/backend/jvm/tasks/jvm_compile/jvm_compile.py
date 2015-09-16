@@ -268,7 +268,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
         # Register products for all the valid targets.
         # We register as we go, so dependency checking code can use this data.
-        valid_targets = list(set(relevant_targets) - set(invalid_targets))
+        #valid_targets = list(set(relevant_targets) - set(invalid_targets))
+        valid_vts = [vt for vt in invalidation_check.all_vts if vt.valid]
+        valid_targets_2 = [vt.target for vt in valid_vts]
+        valid_targets = [vt.target for vt in valid_vts]
+        #assert valid_targets == valid_targets_2
+
         valid_compile_contexts = [self._strategy.compile_context(t) for t in valid_targets]
         self._register_vts(valid_compile_contexts)
 
@@ -329,7 +334,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def check_artifact_cache(self, vts):
     post_process_cached_vts = lambda cvts: self._strategy.post_process_cached_vts(cvts)
-    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
+    cachehitcallback=None#self._strategy.make_cache_hit_callback(vts)
+    cachehitcallback=self._strategy.create_cache_hit_callback(vts)
+    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts,
+                                        cache_hit_callback=cachehitcallback)
 
   def _create_empty_products(self):
     make_products = lambda: defaultdict(MultipleRootedProducts)

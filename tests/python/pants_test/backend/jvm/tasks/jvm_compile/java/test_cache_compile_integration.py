@@ -78,7 +78,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       cachetest_id = cachetest_spec.replace(':', '.').replace(os.sep, '.')
 
-      bad_artifact_dir = os.path.join(workdir,
+      class_file_dir = os.path.join(workdir,
                                       'compile',
                                       'jvm',
                                       tool_name,
@@ -88,4 +88,4 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                                       'pantsbuild',
                                       'cachetest',
                                       )
-      self.assertEqual(os.listdir(bad_artifact_dir), ['A.class', 'Main.class'])
+      self.assertEqual(os.listdir(class_file_dir), ['A.class', 'Main.class'])
