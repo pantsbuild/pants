@@ -398,6 +398,7 @@ python_library(
   name = 'jvm_tool_task_mixin',
   sources = ['jvm_tool_task_mixin.py'],
   dependencies = [
+    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/base:exceptions',
   ],

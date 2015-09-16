@@ -15,6 +15,7 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmC
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
+from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts

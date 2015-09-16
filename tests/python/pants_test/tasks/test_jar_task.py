@@ -16,7 +16,7 @@ from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.backend.jvm.tasks.jar_task import JarBuilderTask, JarTask
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
@@ -25,15 +25,6 @@ from pants_test.jvm.jar_task_test_base import JarTaskTestBase
 
 
 class BaseJarTaskTest(JarTaskTestBase):
-
-  class TestJarTask(JarTask):
-
-    def execute(self):
-      pass
-
-  @classmethod
-  def task_type(cls):
-    return cls.TestJarTask
 
   @property
   def alias_groups(self):
@@ -62,21 +53,27 @@ class BaseJarTaskTest(JarTaskTestBase):
       fd.close()
       yield fd.name
 
-  def prepare_jar_task(self, context):
-    return self.prepare_execute(context)
-
   def assert_listing(self, jar, *expected_items):
-    self.assertEquals(set(['META-INF/', 'META-INF/MANIFEST.MF']) | set(expected_items),
+    self.assertEquals({'META-INF/', 'META-INF/MANIFEST.MF'} | set(expected_items),
                       set(jar.namelist()))
 
 
 class JarTaskTest(BaseJarTaskTest):
   MAX_SUBPROC_ARGS = 50
 
+  class TestJarTask(JarTask):
+
+    def execute(self):
+      pass
+
+  @classmethod
+  def task_type(cls):
+    return cls.TestJarTask
+
   def setUp(self):
     super(JarTaskTest, self).setUp()
     self.set_options(max_subprocess_args=self.MAX_SUBPROC_ARGS)
-    self.jar_task = self.prepare_jar_task(self.context())
+    self.jar_task = self.prepare_execute(self.context())
 
   def test_update_write(self):
     with temporary_dir() as chroot:
@@ -213,6 +210,15 @@ class JarTaskTest(BaseJarTaskTest):
 
 class JarBuilderTest(BaseJarTaskTest):
 
+  class TestJarBuilderTask(JarBuilderTask):
+
+    def execute(self):
+      pass
+
+  @classmethod
+  def task_type(cls):
+    return cls.TestJarBuilderTask
+
   def setUp(self):
     super(JarBuilderTest, self).setUp()
     self.set_options(max_subprocess_args=100)
@@ -239,7 +245,7 @@ class JarBuilderTest(BaseJarTaskTest):
     java_agent = self.target('src/java/pants/agents:fake_agent')
 
     context = self.context(target_roots=[java_agent])
-    jar_task = self.prepare_jar_task(context)
+    jar_builder_task = self.prepare_execute(context)
 
     classfile = '.pants.d/javac/classes/FakeAgent.class'
     self.create_file(classfile, '0xCAFEBABE')
@@ -248,8 +254,8 @@ class JarBuilderTest(BaseJarTaskTest):
 
                                   lambda: defaultdict(MultipleRootedProducts))
     with self.jarfile() as existing_jarfile:
-      with jar_task.open_jar(existing_jarfile) as jar:
-        with jar_task.create_jar_builder(jar) as jar_builder:
+      with jar_builder_task.open_jar(existing_jarfile) as jar:
+        with jar_builder_task.create_jar_builder(jar) as jar_builder:
           jar_builder.add_target(java_agent)
 
       with open_zip(existing_jarfile) as jar:
@@ -287,11 +293,11 @@ class JarBuilderTest(BaseJarTaskTest):
     context.products.safe_create_data('resources_by_target',
                                       lambda: defaultdict(MultipleRootedProducts))
 
-    jar_task = self.prepare_jar_task(context)
+    jar_builder_task = self.prepare_execute(context)
 
     with self.jarfile() as existing_jarfile:
-      with jar_task.open_jar(existing_jarfile) as jar:
-        with jar_task.create_jar_builder(jar) as jar_builder:
+      with jar_builder_task.open_jar(existing_jarfile) as jar:
+        with jar_builder_task.create_jar_builder(jar) as jar_builder:
           jar_builder.add_target(binary_target)
 
       with open_zip(existing_jarfile) as jar:
