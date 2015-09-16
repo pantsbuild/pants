@@ -44,8 +44,8 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
       hasher.update(target.payload.fingerprint())
       return hasher.hexdigest()
     if isinstance(target, JvmTarget):
-      if target.payload.excludes or target.payload.configurations:
-        hasher.update(target.payload.fingerprint(field_keys=('excludes', 'configurations')))
+      if target.payload.excludes:
+        hasher.update(target.payload.fingerprint(field_keys=('excludes',)))
         return hasher.hexdigest()
 
     return None

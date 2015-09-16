@@ -191,8 +191,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     junit_jar_lib = self.make_target('//:junit_lib', JarLibrary, jars=[junit_dep])
     excluding_target = self.make_target('//:excluding_bin', JvmBinary, dependencies=[junit_jar_lib],
-                                        excludes=[Exclude('junit', 'junit')],
-                                        configurations=['default'])
+                                        excludes=[Exclude('junit', 'junit')])
 
     self.set_options(soft_excludes=True)
     context = self.context(target_roots=[junit_jar_lib, excluding_target])
