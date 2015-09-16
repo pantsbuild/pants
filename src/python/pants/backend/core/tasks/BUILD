@@ -18,6 +18,7 @@ target(
     ':filter',
     ':group_task',
     ':list_goals',
+    ':list_owners',
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
@@ -25,8 +26,8 @@ target(
     ':noop',
     ':pathdeps',
     ':paths',
-    ':reporting_server',
     ':repl_task_mixin',
+    ':reporting_server',
     ':roots',
     ':run_prep_command',
     ':scm_publish',
@@ -409,6 +410,15 @@ python_library(
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
     'src/python/pants/util:meta',
+  ],
+)
+
+python_library(
+  name = 'list_owners',
+  sources = ['list_owners.py'],
+  dependencies = [
+    ':console_task',
+    'src/python/pants/base:source_mapper',
   ],
 )
 
