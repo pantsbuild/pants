@@ -37,16 +37,6 @@ class JvmBinaryTask(JarBuilderTask):
       jar.main(main)
 
   @classmethod
-  def register_options(cls, register):
-    super(JvmBinaryTask, cls).register_options(register)
-
-    # TODO(John Sirois): deprecate this legacy deploy_excludes support or else elevate it to a
-    # choice per JvmBinary: https://github.com/pantsbuild/pants/issues/2208
-    register('--shallow-deploy-excludes', action='store_true', advanced=True,
-             help='When excluding jars from binaries, only exclude matching jars and not their '
-                  'transitive dependencies that are otherwise unused by the binary.')
-
-  @classmethod
   def prepare(cls, options, round_manager):
     super(JvmBinaryTask, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
@@ -56,10 +46,15 @@ class JvmBinaryTask(JarBuilderTask):
   def subsystem_dependencies(cls):
     return super(JvmBinaryTask, cls).subsystem_dependencies() + (Shader.Factory,)
 
-  def list_external_jar_dependencies(self, binary, confs=None, shallow_excludes=False):
+  def list_external_jar_dependencies(self, binary, confs=None):
     """Returns the external jar dependencies of the given binary.
 
-    :returns: An list of (jar path, coordinate) tuples.
+    :param binary: The jvm binary target to list transitive external dependencies for.
+    :type binary: :class:`pants.backend.jvm.targets.jvm_binary.JvmBinary`
+    :param confs: The ivy configurations to include in the dependencies list, ('default',) by
+                  default.
+    :type confs: :class:`collections.Iterable` of string
+    :returns: A list of (jar path, coordinate) tuples.
     :rtype: list of (string, :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`)
     """
     classpath_products = self.context.products.get_data('compile_classpath')
@@ -96,9 +91,7 @@ class JvmBinaryTask(JarBuilderTask):
           # but is not currently possible with how things are set up. It may not be possible to do
           # in general, at least efficiently.
           with self.context.new_workunit(name='add-dependency-jars'):
-            shallow_excludes = self.get_options().shallow_deploy_excludes
-            dependencies = self.list_external_jar_dependencies(binary,
-                                                               shallow_excludes=shallow_excludes)
+            dependencies = self.list_external_jar_dependencies(binary)
             for jar, coordinate in dependencies:
               self.context.log.debug('  dumping {} from {}'.format(coordinate, jar))
               monolithic_jar.writejar(jar)
