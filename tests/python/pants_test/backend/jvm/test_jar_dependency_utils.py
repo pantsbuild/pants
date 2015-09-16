@@ -27,8 +27,7 @@ class JarDependencyUtilsTest(unittest.TestCase):
     self.assertEquals('org.example:lib::classify:zip', str(org_name_type_classifier))
 
     org_name_type_jar_classifier = M2Coordinate(org='org.example', name='lib',
-                                                classifier='classify', ext='jar',
-                                            )
+                                                classifier='classify', ext='jar')
     self.assertEquals('org.example:lib::classify:jar', str(org_name_type_jar_classifier))
 
   def test_m2_coordinates_with_same_properties(self):
