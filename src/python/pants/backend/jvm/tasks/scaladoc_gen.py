@@ -26,6 +26,11 @@ class ScaladocGen(JvmdocGen):
   def subsystem_dependencies(cls):
     return super(JvmdocGen, cls).subsystem_dependencies() + (DistributionLocator,)
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ScaladocGen, cls).prepare(options, round_manager)
+    ScalaPlatform.prepare_tools(round_manager)
+
   def execute(self):
     def is_scala(target):
       return target.has_sources('.scala')

@@ -120,6 +120,11 @@ class ZincCompile(JvmCompile):
     # empty classpath.
     cls.register_jvm_tool(register, 'plugin-jars', classpath=[])
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ZincCompile, cls).prepare(options, round_manager)
+    ScalaPlatform.prepare_tools(round_manager)
+
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')
 
