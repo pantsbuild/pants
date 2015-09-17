@@ -6,13 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import sys
+import thread
 import threading
-
-
-try:
-    import thread
-except ImportError:
-    import _thread as thread
 
 
 class Timeout:
@@ -26,5 +21,5 @@ class Timeout:
     def __enter__(self):
         self.timer.start()
 
-    def __exit__(self):
+    def __exit__(self, type, value, traceback):
         self.timer.cancel()
