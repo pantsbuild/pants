@@ -88,4 +88,4 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                                       'pantsbuild',
                                       'cachetest',
                                       )
-      self.assertEqual(os.listdir(class_file_dir), ['A.class', 'Main.class'])
+      self.assertEqual(sorted(os.listdir(class_file_dir)), sorted(['A.class', 'Main.class']))

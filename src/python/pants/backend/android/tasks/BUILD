@@ -94,8 +94,10 @@ python_library(
   sources = ['unpack_libraries.py'],
   dependencies = [
     'src/python/pants/backend/android/targets:android',
-    'src/python/pants/backend/core/tasks:common',
-    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jar_import_products',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:fingerprint_strategy',

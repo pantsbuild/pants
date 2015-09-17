@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.util.memo import memoized_property
+
 
 class ResolvedJar(object):
   """Represents an artifact resolved from the dependency resolution process."""
@@ -56,6 +58,21 @@ class M2Coordinate(object):
     self.ext = ext or 'jar'
 
     self._id = (self.org, self.name, self.rev, self.classifier, self.ext)
+
+  @memoized_property
+  def artifact_filename(self):
+    """Returns the canonical maven-style filename for an artifact pointed at by this coordinate.
+
+    :rtype: string
+    """
+    def maybe_compenent(component):
+      return '-{}'.format(component) if component else ''
+
+    return '{org}-{name}{rev}{classifier}.{ext}'.format(org=self.org,
+                                                        name=self.name,
+                                                        rev=maybe_compenent(self.rev),
+                                                        classifier=maybe_compenent(self.classifier),
+                                                        ext=self.ext)
 
   def __eq__(self, other):
     return isinstance(other, M2Coordinate) and self._id == other._id

@@ -131,7 +131,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def test_module_ref_str_minus_classifier(self):
     module_ref = IvyModuleRef(org='org', name='name', rev='rev')
-    self.assertEquals("IvyModuleRef(org:name:rev:)", str(module_ref))
+    self.assertEquals("IvyModuleRef(org:name:rev::jar)", str(module_ref))
 
   def test_force_override(self):
     jars = list(self.a.payload.jars)
