@@ -100,7 +100,7 @@ class ZincCompile(JvmCompile):
              default={
                '-S.*': False,
                '-C.*': False,
-               '-log-filter': True,
+               '-file-filter': True,
                '-msg-filter': True,
                },
              help='A dict of option regexes that make up pants\' supported API for zinc. '
