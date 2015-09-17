@@ -26,10 +26,7 @@ from pants.util.strutil import safe_shlex_split
 class IvyResolve(IvyTaskMixin, NailgunTask):
 
   class Error(TaskError):
-    """Error in IvyResolve."""
-
-  class UnresolvedJarError(Error):
-    """A jar dependency couldn't be found in the symlink map"""
+    """Indicates an error performing an ivy resolve."""
 
   @classmethod
   def register_options(cls, register):
@@ -173,7 +170,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
       if 0 != self.runjava(classpath=tool_classpath, main='org.apache.xalan.xslt.Process',
                            args=args, workunit_name='report'):
-        raise IvyResolve.Error('Failed to create html report from xml ivy report.')
+        raise self.Error('Failed to create html report from xml ivy report.')
 
       # The ivy-report.xsl is already smart enough to generate an html page with tab links to all
       # confs for a given report coordinate (org, name).  We need only display 1 of the generated

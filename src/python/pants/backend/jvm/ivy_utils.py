@@ -157,7 +157,7 @@ class IvyInfo(object):
     :param jar_library A JarLibrary to collect the transitive artifacts for.
     :param memo see `traverse_dependency_graph`
     :returns: all the artifacts for all of the jars in this library, including transitive deps
-    :rtype: list of str
+    :rtype: list of :class:`pants.backend.jvm.jar_dependency_utils.ResolvedJar`
     """
     def to_resolved_jar(jar_ref, jar_path):
       return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,

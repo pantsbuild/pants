@@ -58,6 +58,9 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 class IvyTaskMixin(object):
   """A mixin for Tasks that execute resolves via Ivy."""
 
+  class UnresolvedJarError(TaskError):
+    """Indicates a jar dependency couldn't be mapped."""
+
   @classmethod
   def global_subsystems(cls):
     return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, )
@@ -125,22 +128,23 @@ class IvyTaskMixin(object):
     # Record the ordered subset of jars that each jar_library/leaf depends on using
     # stable symlinks within the working copy.
 
-    def new_resolved_jar_with_symlink_path(resolved_jar_without_symlink):
-      if resolved_jar_without_symlink.cache_path in symlink_map:
-        key = resolved_jar_without_symlink.cache_path
-      else:
-        key = os.path.realpath(resolved_jar_without_symlink.cache_path)
+    def new_resolved_jar_with_symlink_path(tgt, cnf, resolved_jar_without_symlink):
+      # There is a focus on being lazy here to avoid `os.path.realpath` when we can.
+      def candidate_cache_paths():
+        yield resolved_jar_without_symlink.cache_path
+        yield os.path.realpath(resolved_jar_without_symlink.cache_path)
 
-      if key not in symlink_map:
+      try:
+        return next(ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
+                                pants_path=symlink_map[cache_path],
+                                cache_path=resolved_jar_without_symlink.cache_path)
+                    for cache_path in candidate_cache_paths() if cache_path in symlink_map)
+      except StopIteration:
         raise self.UnresolvedJarError('Jar {resolved_jar} in {spec} not resolved to the ivy '
                                       'symlink map in conf {conf}.'
-                                      .format(spec=target.address.spec,
+                                      .format(spec=tgt.address.spec,
                                               resolved_jar=resolved_jar_without_symlink.cache_path,
-                                              conf=conf))
-
-      return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
-                         pants_path=symlink_map[key],
-                         cache_path=resolved_jar_without_symlink.cache_path)
+                                              conf=cnf))
 
     # Build the 3rdparty classpath product.
     for conf in confs:
@@ -152,7 +156,7 @@ class IvyTaskMixin(object):
       for target in jar_library_targets:
         # Add the artifacts from each dependency module.
         raw_resolved_jars = ivy_info.get_resolved_jars_for_jar_library(target, memo=ivy_jar_memo)
-        resolved_jars = [new_resolved_jar_with_symlink_path(raw_resolved_jar)
+        resolved_jars = [new_resolved_jar_with_symlink_path(target, conf, raw_resolved_jar)
                          for raw_resolved_jar in raw_resolved_jars]
         classpath_products.add_jars_for_targets([target], conf, resolved_jars)
 
@@ -252,8 +256,8 @@ class IvyTaskMixin(object):
             resolve_hash_name=resolve_hash_name)
 
         if not os.path.exists(raw_target_classpath_file_tmp):
-          raise TaskError('Ivy failed to create classpath file at {}'
-                          .format(raw_target_classpath_file_tmp))
+          raise self.Error('Ivy failed to create classpath file at {}'
+                           .format(raw_target_classpath_file_tmp))
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
         logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
@@ -312,6 +316,6 @@ class IvyTaskMixin(object):
         result = execute_runner(runner, workunit_factory=self.context.new_workunit,
                                 workunit_name=workunit_name)
         if result != 0:
-          raise TaskError('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
+          raise self.Error('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
       except runner.executor.Error as e:
-        raise TaskError(e)
+        raise self.Error(e)

@@ -16,7 +16,7 @@ class JarImportProducts(object):
   Jar imports are jars containing source code to be unpacked and used locally.
   """
 
-  JarImport = namedtuple('IvyImport', ['coordinate', 'jar'])
+  JarImport = namedtuple('JarImport', ['coordinate', 'jar'])
   """Represents a jar containing source imports.
 
   Each jar import has a `coordinate` :class:`pants.backend.jvm.jar_dependency_utls.M2Coordinate`

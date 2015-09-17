@@ -14,6 +14,9 @@ python_library(
 python_library(
   name='jar_dependency_utils',
   sources=['jar_dependency_utils.py'],
+  dependencies=[
+    'src/python/pants/util:memo',
+  ]
 )
 
 python_library(

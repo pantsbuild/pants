@@ -93,9 +93,9 @@ class UnpackLibraries(Task):
     """
     # TODO(mateor) add another JarDependency for every jar under 'libs'.
     jar_url = 'file://{0}'.format(jar_file)
-    jar_dep = JarDependency(org=target.id, name=self._as_path(coordinate), rev=coordinate.rev,
+    jar_dep = JarDependency(org=target.id, name=coordinate.artifact_filename, rev=coordinate.rev,
                             url=jar_url)
-    address = Address(self.workdir, '{}-classes.jar'.format(self._as_path(coordinate)))
+    address = Address(self.workdir, '{}-classes.jar'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, JarLibrary, jars=[jar_dep],
                                              derived_from=target)
     return new_target
@@ -113,7 +113,7 @@ class UnpackLibraries(Task):
     :rtype::class:`pants.backend.android.targets.AndroidResources`
     """
 
-    address = Address(self.workdir, '{}-resources'.format(self._as_path(coordinate)))
+    address = Address(self.workdir, '{}-resources'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidResources,
                                              manifest=manifest, resource_dir=resource_dir,
                                              derived_from=target)
@@ -150,7 +150,7 @@ class UnpackLibraries(Task):
     if os.path.isfile(jar_file):
       deps.append(self.create_classes_jar_target(target, coordinate, jar_file))
 
-    address = Address(self.workdir, '{}-android_library'.format(self._as_path(coordinate)))
+    address = Address(self.workdir, '{}-android_library'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidLibrary,
                                              manifest=manifest,
                                              include_patterns=target.include_patterns,
@@ -230,16 +230,8 @@ class UnpackLibraries(Task):
 
   def unpacked_jar_location(self, coordinate):
     """Location for unpacked jar files, whether imported as-is or found inside an aar file."""
-    return os.path.join(self.workdir, 'explode-jars', self._as_path(coordinate))
+    return os.path.join(self.workdir, 'explode-jars', coordinate.artifact_filename)
 
   def unpacked_aar_location(self, coordinate):
     """Output location for unpacking .aar archives."""
-    return os.path.join(self.workdir, self._as_path(coordinate))
-
-  def _as_path(self, coordinate):
-    classifier = '-{}'.format(coordinate.classifier) if coordinate.classifier else ''
-    return '{org}-{name}-{rev}{classifier}.{ext}'.format(org=coordinate.org,
-                                                         name=coordinate.name,
-                                                         rev=coordinate.rev,
-                                                         classifier=classifier,
-                                                         ext=coordinate.ext)
+    return os.path.join(self.workdir, coordinate.artifact_filename)

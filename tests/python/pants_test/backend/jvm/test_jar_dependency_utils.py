@@ -49,6 +49,26 @@ class JarDependencyUtilsTest(unittest.TestCase):
 
     self.assertNotEqual(hash(coordinate1), hash(coordinate2))
 
+  def test_m2_coordinate_artifact_path_no_rev(self):
+    coordinate = M2Coordinate('org.example', 'lib')
+
+    self.assertEqual('org.example-lib.jar', coordinate.artifact_filename)
+
+  def test_m2_coordinate_artifact_path_no_classifier(self):
+    coordinate = M2Coordinate('org.example', 'lib', '1.0.0')
+
+    self.assertEqual('org.example-lib-1.0.0.jar', coordinate.artifact_filename)
+
+  def test_m2_coordinate_artifact_path_classifier(self):
+    coordinate = M2Coordinate('org.example', 'lib', '1.0.0', 'sources')
+
+    self.assertEqual('org.example-lib-1.0.0-sources.jar', coordinate.artifact_filename)
+
+  def test_m2_coordinate_artifact_path_explicit_ext(self):
+    coordinate = M2Coordinate('org.example', 'lib', '1.0.0', ext='tar.gz')
+
+    self.assertEqual('org.example-lib-1.0.0.tar.gz', coordinate.artifact_filename)
+
   def test_resolved_jars_with_same_properties(self):
     jar1 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'path')
     jar2 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'path')

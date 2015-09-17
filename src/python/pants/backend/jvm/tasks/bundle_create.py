@@ -132,18 +132,11 @@ class BundleCreate(JvmBinaryTask):
 
       # Add external dependencies to the bundle.
       for path, coordinate in self.list_external_jar_dependencies(app.binary):
-        # Create a name guaranteed to be unique for the jar in the flat `libs/` dir.
-        classifier = '-{}'.format(coordinate.classifier) if coordinate.classifier else ''
-        external_jar = '{org}-{name}-{rev}{classifier}.{ext}'.format(org=coordinate.org,
-                                                                     name=coordinate.name,
-                                                                     rev=coordinate.rev,
-                                                                     classifier=classifier,
-                                                                     ext=coordinate.ext)
+        external_jar = coordinate.artifact_filename
         destination = os.path.join(lib_dir, external_jar)
         verbose_symlink(path, destination)
         if app.binary.shading_rules:
-          self.shade_jar(binary=app.binary, jar_id=os.path.basename(external_jar),
-                         jar_path=destination)
+          self.shade_jar(binary=app.binary, jar_id=coordinate, jar_path=destination)
         classpath.add(external_jar)
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
