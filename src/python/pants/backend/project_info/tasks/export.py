@@ -183,13 +183,12 @@ class Export(PythonTask, ConsoleTask):
                 :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
         """
         if classpath_products:
-          jar_products = classpath_products.get_classpath_entries_for_targets((jar_lib,))
-          for _, cp_entry in jar_products:
-            if isinstance(cp_entry, ArtifactClasspathEntry):
-              coordinate = cp_entry.coordinate
-              # We drop classifier and type_ since those fields are represented in the global
-              # libraries dict and here we just want the key into that dict (see `_jar_id`).
-              yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
+          jar_products = classpath_products.get_artifact_classpath_entries_for_targets((jar_lib,))
+          for _, jar_entry in jar_products:
+            coordinate = jar_entry.coordinate
+            # We drop classifier and type_ since those fields are represented in the global
+            # libraries dict and here we just want the key into that dict (see `_jar_id`).
+            yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
 
       target_libraries = OrderedSet()
       if isinstance(current_target, JarLibrary):
@@ -284,12 +283,11 @@ class Export(PythonTask, ConsoleTask):
                                   }
     """
     mapping = defaultdict(dict)
-    cp_products = classpath_products.get_classpath_entries_for_targets(targets,
-                                                                       respect_excludes=False)
-    for conf, cp_entry in cp_products:
-      if isinstance(cp_entry, ArtifactClasspathEntry):
-        conf = cp_entry.coordinate.classifier or 'default'
-        mapping[self._jar_id(cp_entry.coordinate)][conf] = cp_entry.cache_path
+    jar_products = classpath_products.get_artifact_classpath_entries_for_targets(
+      targets, respect_excludes=False)
+    for conf, jar_entry in jar_products:
+      conf = jar_entry.coordinate.classifier or 'default'
+      mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
   @memoized_property

@@ -193,13 +193,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
     resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
 
-    def coord(org, name, classifier=None):
-      return M2Coordinate(org=org, name=name, rev='0.0.1', classifier=classifier)
+    def coord(org, name, classifier=None, ext=None):
+      return M2Coordinate(org=org, name=name, rev='0.0.1', classifier=classifier, ext=ext)
 
     expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1',
                                                        classifier='tests'),
                 'ivy2cache_path/org2/name2.jar': coord(org='org2', name='name2'),
-                'ivy2cache_path/org3/name3.jar': coord(org='org3', name='name3')}
+                'ivy2cache_path/org3/name3.tar.gz': coord(org='org3', name='name3', ext='tar.gz')}
     self.maxDiff = None
     coordinate_by_path = {rj.cache_path: rj.coordinate for rj in resolved_jars}
     self.assertEqual(expected, coordinate_by_path)
@@ -220,7 +220,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.assertEqual({IvyModuleRef("toplevel", "toplevelmodule", "latest"),
                       IvyModuleRef(org='org1', name='name1', rev='0.0.1', classifier='tests'),
                       IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
-                      IvyModuleRef(org='org3', name='name3', rev='0.0.1')},
+                      IvyModuleRef(org='org3', name='name3', rev='0.0.1', ext='tar.gz')},
           result)
 
   def test_does_not_follow_cycle(self):
@@ -262,7 +262,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           {
             IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
             IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
-            IvyModuleRef(org='org3', name='name3', rev='0.0.1')
+            IvyModuleRef(org='org3', name='name3', rev='0.0.1', ext='tar.gz')
           },
           result1)
 

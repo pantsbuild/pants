@@ -337,6 +337,25 @@ class ClasspathProductsTest(BaseTest):
                       ('default', ClasspathEntry(self.path('an/internally/generated.jar')))],
                      classpath)
 
+  def test_get_artifact_classpath_entries_for_targets(self):
+    b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+    a = self.make_target('a', JvmTarget, dependencies=[b])
+
+    classpath_product = ClasspathProducts()
+    example_jar_path = self._example_jar_path()
+    resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
+
+    # These non-artifact classpath entries should be ignored.
+    classpath_product.add_for_target(b, [('default', self.path('b/loose/classes/dir'))])
+    classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
+                                         ('default', self.path('an/internally/generated.jar'))])
+
+    classpath = classpath_product.get_artifact_classpath_entries_for_targets([a])
+    self.assertEqual([('default', ArtifactClasspathEntry(example_jar_path,
+                                                         resolved_jar.coordinate,
+                                                         resolved_jar.cache_path))],
+                     classpath)
+
   def _example_jar_path(self):
     return self.path('ivy/jars/com.example/lib/jars/123.4.jar')
 

@@ -31,9 +31,10 @@ python_tests(
   name = 'binary_create',
   sources = ['test_binary_create.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
+    ':jvm_binary_task_test_base',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:binary_create',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
@@ -74,13 +75,23 @@ python_tests(
 )
 
 python_tests(
+  name = 'binary_create_integration',
+  sources = ['test_binary_create_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
   name = 'bundle_create',
   sources = ['test_bundle_create.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/jvm:plugin',
-    'src/python/pants/backend/jvm/tasks:binary_create',
-    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    ':jvm_binary_task_test_base',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:bundle_create',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/util:contextutil',
   ]
 )
 
@@ -183,6 +194,16 @@ python_tests(
   ]
 )
 
+python_library(
+  name = 'jvm_binary_task_test_base',
+  sources = ['jvm_binary_task_test_base.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+  ]
+)
+
 python_tests(
   name = 'jvm_dependency_usage',
   sources = ['test_jvm_dependency_usage.py'],
@@ -255,15 +276,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]
-)
-
-python_tests(
-  name = 'jvm_binary_integration',
-  sources = ['test_jvm_binary_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'tests/python/pants_test:int-test',
-  ],
 )
 
 python_tests(

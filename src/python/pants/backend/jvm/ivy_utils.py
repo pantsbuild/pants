@@ -44,11 +44,12 @@ class IvyModuleRef(object):
   # latest.integration is ivy magic meaning "just get the latest version"
   _ANY_REV = 'latest.integration'
 
-  def __init__(self, org, name, rev, classifier=None):
+  def __init__(self, org, name, rev, classifier=None, ext=None):
     self.org = org
     self.name = name
     self.rev = rev
     self.classifier = classifier
+    self.ext = ext
 
     self._id = (org, name, rev, classifier)
 
@@ -157,7 +158,8 @@ class IvyInfo(object):
       return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
                                                  name=jar_ref.name,
                                                  rev=jar_ref.rev,
-                                                 classifier=jar_ref.classifier),
+                                                 classifier=jar_ref.classifier,
+                                                 ext=jar_ref.ext),
                          cache_path=jar_path)
     resolved_jars = OrderedSet()
     def create_collection(dep):
@@ -323,8 +325,15 @@ class IvyUtils(object):
                                       caller.get('callerrev')))
 
         for artifact in revision.findall('artifacts/artifact'):
-          ivy_module_ref = IvyModuleRef(org, name, rev, artifact.get('extra-classifier'))
-          ret.add_module(IvyModule(ivy_module_ref, artifact.get('location'), callers))
+          classifier = artifact.get('extra-classifier')
+          ext = artifact.get('ext')
+          ivy_module_ref = IvyModuleRef(org=org, name=name, rev=rev,
+                                        classifier=classifier, ext=ext)
+
+          artifact_cache_path = artifact.get('location')
+          ivy_module = IvyModule(ivy_module_ref, artifact_cache_path, callers)
+
+          ret.add_module(ivy_module)
     return ret
 
   @classmethod
