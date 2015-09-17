@@ -120,7 +120,11 @@ class FilesetRelPathWrapperTest(BaseTest):
       java_library(name="y", sources=globs("*.java", exclude=list_of_files))
       java_library(name="z", sources=list_of_files)
       """))
-    self.context().scan(self.build_root)
+
+    graph = self.context().scan(self.build_root)
+
+    self.assertEqual(['fleem.java'],
+                     list(graph.get_target_from_spec('y:z').sources_relative_to_source_root()))
 
   def test_glob_invalid_keyword(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*.java", invalid_keyword=["fleem.java"]))')
