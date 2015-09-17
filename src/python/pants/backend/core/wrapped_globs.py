@@ -71,21 +71,24 @@ class FilesetRelPathWrapper(object):
   def __call__(self, *args, **kwargs):
     root = os.path.normpath(os.path.join(get_buildroot(), self._rel_path))
 
-    excludes = kwargs.pop('exclude', [])
-
-    if isinstance(excludes, string_types):
+    raw_excludes = kwargs.pop('exclude', [])
+    if isinstance(raw_excludes, string_types):
       raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+
+    # You can't subtract raw strings from globs
+    def ensure_string_wrapped_in_list(element):
+      if isinstance(element, string_types):
+        return [element]
+      else:
+        return element
+
+    excludes = [ensure_string_wrapped_in_list(exclude) for exclude in raw_excludes]
 
     # making sure there is no unknown argument(s)
     unknown_args = set(kwargs.keys()) - self.KNOWN_PARAMETERS
 
     if unknown_args:
       raise ValueError('Unexpected arguments while parsing globs: {}'.format(', '.join(unknown_args)))
-
-    for i, exclude in enumerate(excludes):
-      if isinstance(exclude, string_types):
-        # You can't subtract raw strings from globs
-        excludes[i] = [exclude]
 
     for glob in args:
       if self._is_glob_dir_outside_root(glob, root):
