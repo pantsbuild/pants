@@ -145,10 +145,10 @@ python_tests(
   name = 'ivy_imports',
   sources = ['test_ivy_imports.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:ivy_imports',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/backend/jvm/tasks:jar_import_products',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ]
@@ -347,10 +347,12 @@ python_tests(
   name = 'unpack_jars',
   sources = ['test_unpack_jars.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jar_import_products',
     'src/python/pants/backend/jvm/tasks:unpack_jars',
-    'src/python/pants/base:target',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )

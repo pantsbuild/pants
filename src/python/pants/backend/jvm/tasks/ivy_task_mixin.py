@@ -12,9 +12,8 @@ import shutil
 import threading
 from hashlib import sha1
 
-from twitter.common.collections import maybe_list
-
 from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.jar_dependency_utils import ResolvedJar
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.cache_manager import VersionedTargetSet
@@ -23,7 +22,6 @@ from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.util import execute_runner
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
 
@@ -85,6 +83,85 @@ class IvyTaskMixin(object):
     # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
     return IvySubsystem.global_instance().get_options().cache_dir
 
+  def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
+              invalidate_dependents=False):
+    """Resolves external classpath products (typically jars) for the given targets.
+
+    :param executor: A java executor to run ivy with.
+    :type executor: :class:`pants.java.executor.Executor`
+    :param targets: The targets to resolve jvm dependencies for.
+    :type targets: :class:`collections.Iterable` of :class:`pants.base.target.Target`
+    :param classpath_products: The classpath products to populate with the results of the resolve.
+    :type classpath_products: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
+    :param confs: The ivy configurations to resolve; ('default',) by default.
+    :type confs: :class:`collections.Iterable` of string
+    :param extra_args: Any extra command line arguments to pass to ivy.
+    :type extra_args: list of string
+    :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
+                                        resolved.
+    :returns: The id of the reports associated with this resolve.
+    :rtype: string
+    """
+
+    classpath_products.add_excludes_for_targets(targets)
+
+    confs = confs or ('default',)
+
+    # After running ivy, we parse the resulting report, and record the dependencies for
+    # all relevant targets (ie: those that have direct dependencies).
+    _, symlink_map, resolve_hash_name = self.ivy_resolve(
+      targets,
+      executor=executor,
+      workunit_name='ivy-resolve',
+      confs=confs,
+      custom_args=extra_args,
+      invalidate_dependents=invalidate_dependents,
+    )
+
+    if not resolve_hash_name:
+      # There was no resolve to do, so no 3rdparty deps to process below
+      return
+
+    # Record the ordered subset of jars that each jar_library/leaf depends on using
+    # stable symlinks within the working copy.
+
+    def new_resolved_jar_with_symlink_path(resolved_jar_without_symlink):
+      if resolved_jar_without_symlink.cache_path in symlink_map:
+        key = resolved_jar_without_symlink.cache_path
+      else:
+        key = os.path.realpath(resolved_jar_without_symlink.cache_path)
+
+      if key not in symlink_map:
+        raise self.UnresolvedJarError('Jar {resolved_jar} in {spec} not resolved to the ivy '
+                                      'symlink map in conf {conf}.'
+                                      .format(spec=target.address.spec,
+                                              resolved_jar=resolved_jar_without_symlink.cache_path,
+                                              conf=conf))
+
+      return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
+                         pants_path=symlink_map[key],
+                         cache_path=resolved_jar_without_symlink.cache_path)
+
+    # Build the 3rdparty classpath product.
+    for conf in confs:
+      ivy_info = self._parse_report(resolve_hash_name, conf)
+      if not ivy_info:
+        continue
+      ivy_jar_memo = {}
+      jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
+      for target in jar_library_targets:
+        # Add the artifacts from each dependency module.
+        raw_resolved_jars = ivy_info.get_resolved_jars_for_jar_library(target, memo=ivy_jar_memo)
+        resolved_jars = [new_resolved_jar_with_symlink_path(raw_resolved_jar)
+                         for raw_resolved_jar in raw_resolved_jars]
+        classpath_products.add_jars_for_targets([target], conf, resolved_jars)
+
+    return resolve_hash_name
+
+  # Extracted for testing.
+  def _parse_report(self, resolve_hash_name, conf):
+    return IvyUtils.parse_xml_report(self.ivy_cache_dir, resolve_hash_name, conf)
+
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
   # ivy cache dir.
@@ -94,13 +171,28 @@ class IvyTaskMixin(object):
                   silent=False,
                   workunit_name=None,
                   confs=None,
-                  custom_args=None):
-    """Executes an ivy resolve for the relevant subset of the given targets.
+                  custom_args=None,
+                  invalidate_dependents=False):
+    """Resolves external dependencies for the given targets.
 
-    :returns: the resulting classpath, and the unique part of the name used for the resolution
-    report (a hash). Also populates the 'ivy_resolve_symlink_map' product for jars resulting
-    from the resolve."""
+    If there are no targets suitable for jvm transitive dependency resolution, an empty result is
+    returned, ie: ([], {}, None).
 
+    :param targets: The targets to resolve jvm dependencies for.
+    :type targets: :class:`collections.Iterable` of :class:`pants.base.target.Target`
+    :param executor: A java executor to run ivy with.
+    :type executor: :class:`pants.java.executor.Executor`
+
+    :param confs: The ivy configurations to resolve; ('default',) by default.
+    :type confs: :class:`collections.Iterable` of string
+    :param custom_args: Any extra command line arguments to pass to ivy.
+    :type custom_args: list of string
+    :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
+                                        resolved.
+    :returns: A tuple of the classpath, a mapping from ivy cache jars to their linked location
+              under .pants.d, and the id of the reports associated with the resolve.
+    :rtype: tuple of (list, dict, string)
+    """
     if not targets:
       return [], {}, None
 
@@ -111,7 +203,7 @@ class IvyTaskMixin(object):
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
     with self.invalidated(targets,
-                          invalidate_dependents=False,
+                          invalidate_dependents=invalidate_dependents,
                           silent=silent,
                           fingerprint_strategy=fingerprint_strategy) as invalidation_check:
       if not invalidation_check.all_vts:
@@ -148,7 +240,7 @@ class IvyTaskMixin(object):
           not os.path.exists(raw_target_classpath_file)):
         args = ['-cachepath', raw_target_classpath_file_tmp] + (custom_args if custom_args else [])
 
-        self.exec_ivy(
+        self._exec_ivy(
             target_workdir=target_workdir,
             targets=global_vts.targets,
             args=args,
@@ -183,77 +275,7 @@ class IvyTaskMixin(object):
         stripped_classpath = [path.strip() for path in classpath]
         return stripped_classpath, symlink_map, resolve_hash_name
 
-  def mapjar_workdir(self, target):
-    return os.path.join(self.workdir, 'mapped-jars', target.id)
-
-  def mapjars(self, genmap, target, executor, jars=None):
-    """Resolves jars for the target and stores their locations in genmap.
-
-    :param genmap: The jar_dependencies ProductMapping entry for the required products.
-    :param target: The target whose jar dependencies are being retrieved.
-    :param jars: If specified, resolves the given jars rather than
-    :type jars: List of :class:`pants.backend.jvm.targets.jar_dependency.JarDependency` (jar())
-      objects.
-
-
-     Here is an example of what the resulting genmap looks like after sucessfully mapping
-     a JarLibrary target with a single JarDependency:
-
-     ProductMapping(ivy_imports) {
-      # target
-      UnpackedJars(BuildFileAddress(.../unpack/BUILD, foo)) =>
-          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
-        [u'com.example-bar-0.0.1.jar']
-      # (org, name)
-      (u'com.example', u'bar') =>
-          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
-        [u'com.example-bar-0.0.1.jar']
-      # (org)
-      com.example => .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
-        [u'com.example-bar-0.0.1.jar']
-      # (target)
-      (UnpackedJars(BuildFileAddress(.../unpack/BUILD, foo)), u'default') =>
-          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
-        [u'com.example-bar-0.0.1.jar']
-      # (org, name, conf)
-      (u'com.example', u'bar', u'default') =>
-          .../.pants.d/test/IvyImports/mapped-jars/unpack.foo/com.example/bar/default
-        [u'com.example-bar-0.0.1.jar']
-    """
-    mapdir = self.mapjar_workdir(target)
-    safe_mkdir(mapdir, clean=True)
-    ivyargs = self._get_ivy_args(mapdir)
-
-    confs = maybe_list(target.payload.get_field_value('configurations') or [])
-    self.exec_ivy(mapdir,
-                  [target],
-                  executor=executor,
-                  args=ivyargs,
-                  confs=confs,
-                  ivy=Bootstrapper.default_ivy(),
-                  workunit_name='map-jars',
-                  jars=jars,
-                  use_soft_excludes=False)
-
-    for org in os.listdir(mapdir):
-      orgdir = os.path.join(mapdir, org)
-      if os.path.isdir(orgdir):
-        for name in os.listdir(orgdir):
-          artifactdir = os.path.join(orgdir, name)
-          if os.path.isdir(artifactdir):
-            for conf in os.listdir(artifactdir):
-              confdir = os.path.join(artifactdir, conf)
-              for f in os.listdir(confdir):
-                # TODO(John Sirois): kill the org and (org, name) exclude mappings in favor of a
-                # conf whitelist
-                genmap.add(org, confdir).append(f)
-                genmap.add((org, name), confdir).append(f)
-
-                genmap.add(target, confdir).append(f)
-                genmap.add((target, conf), confdir).append(f)
-                genmap.add((org, name, conf), confdir).append(f)
-
-  def exec_ivy(self,
+  def _exec_ivy(self,
                target_workdir,
                targets,
                args,
@@ -272,8 +294,7 @@ class IvyTaskMixin(object):
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
 
     if not jars:
-      jars, excludes = IvyUtils.calculate_classpath(targets,
-                                                    gather_excludes=not use_soft_excludes)
+      jars, excludes = IvyUtils.calculate_classpath(targets, gather_excludes=not use_soft_excludes)
     else:
       excludes = set()
 
@@ -294,15 +315,3 @@ class IvyTaskMixin(object):
           raise TaskError('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
       except runner.executor.Error as e:
         raise TaskError(e)
-
-  @staticmethod
-  def _get_ivy_args(mapdir):
-    # At least one task(android.unpack_libraries) relies on mapped jars filenames being unique and
-    # including the version number. This method is being used to create a regression test to
-    # protect that interest.
-    ivy_args = [
-      '-retrieve', '{}/[organisation]/[artifact]/[conf]/'
-                   '[organisation]-[artifact]-[revision](-[classifier]).[ext]'.format(mapdir),
-      '-symlink',
-      ]
-    return ivy_args

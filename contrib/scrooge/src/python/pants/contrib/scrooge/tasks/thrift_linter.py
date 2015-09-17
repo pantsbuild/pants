@@ -49,12 +49,6 @@ class ThriftLinter(NailgunTask):
     # Declare the product of this goal. Gen depends on thrift-linter.
     return ['thrift-linter']
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(ThriftLinter, cls).prepare(options, round_manager)
-    # Linter depends on ivy running before it.
-    round_manager.require_data('ivy_imports')
-
   @property
   def config_section(self):
     return self._CONFIG_SECTION

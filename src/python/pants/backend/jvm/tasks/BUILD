@@ -15,6 +15,7 @@ python_library(
     ':ivy_resolve',
     ':ivy_task_mixin',
     ':jar_create',
+    ':jar_import_products',
     ':jar_publish',
     ':javadoc_gen',
     ':junit_run',
@@ -156,8 +157,11 @@ python_library(
   name = 'ivy_imports',
   sources = ['ivy_imports.py'],
   dependencies = [
+    ':classpath_products',
     ':ivy_task_mixin',
+    ':jar_import_products',
     ':nailgun_task',
+    'src/python/pants/backend/jvm/targets:jvm'
   ],
 )
 
@@ -170,7 +174,6 @@ python_library(
     ':nailgun_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
@@ -184,15 +187,14 @@ python_library(
   name = 'ivy_task_mixin',
   sources = ['ivy_task_mixin.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/ivy',
     'src/python/pants/java:util',
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
 )
@@ -206,6 +208,14 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/backend/jvm/targets:jvm',
   ],
+)
+
+python_library(
+  name='jar_import_products',
+  sources=['jar_import_products.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/targets:jvm',
+  ]
 )
 
 python_library(
@@ -300,10 +310,10 @@ python_library(
   sources = ['jvm_binary_task.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':classpath_products',
     ':jar_task',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/base:exceptions',
     'src/python/pants/java:util',
     'src/python/pants/util:contextutil',
@@ -512,5 +522,9 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jar_import_products',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/fs',
   ]
 )

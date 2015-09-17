@@ -254,51 +254,38 @@ class Products(object):
     __nonzero__ = __bool__
 
   def __init__(self):
+    # TODO(John Sirois): Kill products and simply have users register ProductMapping subtypes
+    # as data products.  Will require a class factory, like `ProductMapping.named(typename)`.
     self.products = {}  # type -> ProductMapping instance.
-    self.predicates_for_type = defaultdict(list)
+    self.required_products = set()
 
     self.data_products = {}  # type -> arbitrary object.
     self.required_data_products = set()
 
-  def require(self, typename, predicate=None):
+  def require(self, typename):
     """Registers a requirement that file products of the given type by mapped.
 
-    If target predicates are supplied, only targets matching at least one of the predicates are
-    mapped.
+    :param typename: the type or other key of a product mapping that should be generated.
     """
-    # TODO(John Sirois): This is a broken API.  If one client does a require with no predicate and
-    # another requires with a predicate, the producer will only produce for the latter.  The former
-    # presumably intended to have all products of this type mapped.  Kill the predicate portion of
-    # the api by moving to the new tuple-based engine where all tasks require data for a specific
-    # set of targets.
-    self.predicates_for_type[typename].append(predicate or (lambda target: False))
+    self.required_products.add(typename)
 
   def isrequired(self, typename):
-    """Returns a predicate selecting targets required for the given type if mappings are required.
-
-    Otherwise returns None.
-    """
-    predicates = self.predicates_for_type[typename]
-    if not predicates:
-      return None
-
-    def combine(first, second):
-      return lambda target: first(target) or second(target)
-    return reduce(combine, predicates, lambda target: False)
+    """Checks if a particular product is required by any tasks."""
+    return typename in self.required_products
 
   def get(self, typename):
     """Returns a ProductMapping for the given type name."""
     return self.products.setdefault(typename, Products.ProductMapping(typename))
 
   def require_data(self, typename):
-    """ Registers a requirement that data produced by tasks is required.
+    """Registers a requirement that data produced by tasks is required.
 
-    typename: the name of a data product that should be generated.
+    :param typename: the type or other key of a data product that should be generated.
     """
     self.required_data_products.add(typename)
 
   def is_required_data(self, typename):
-    """ Checks if a particular data product is required by any tasks."""
+    """Checks if a particular data product is required by any tasks."""
     return typename in self.required_data_products
 
   def safe_create_data(self, typename, init_func):

@@ -49,9 +49,9 @@ class IvyModuleRef(object):
     self.name = name
     self.rev = rev
     self.classifier = classifier
-    self.ext = ext
+    self.ext = ext or 'jar'
 
-    self._id = (org, name, rev, classifier)
+    self._id = (self.org, self.name, self.rev, self.classifier, self.ext)
 
   def __eq__(self, other):
     return isinstance(other, IvyModuleRef) and self._id == other._id
@@ -64,6 +64,10 @@ class IvyModuleRef(object):
 
   def __str__(self):
     return 'IvyModuleRef({})'.format(':'.join((x or '') for x in self._id))
+
+  def __repr__(self):
+    return ('IvyModuleRef(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
+            .format(*self._id))
 
   @property
   def caller_key(self):
@@ -82,7 +86,8 @@ class IvyModuleRef(object):
     the one we request, and we want to ensure that all requesters of any version of that dependency
     are able to learn about it.
     """
-    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV, classifier=self.classifier)
+    return IvyModuleRef(name=self.name, org=self.org, rev=self._ANY_REV, classifier=self.classifier,
+                        ext=self.ext)
 
 
 class IvyInfo(object):
@@ -172,20 +177,6 @@ class IvyInfo(object):
           for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
             resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
     return resolved_jars
-
-  def get_jars_for_ivy_module(self, jar, memo=None):
-    """Collects dependency references of the passed jar
-    :param jar an JarDependency for a third party dependency.
-    :param memo see `traverse_dependency_graph`
-    """
-
-    ref = IvyModuleRef(jar.org, jar.name, jar.rev, jar.classifier).unversioned
-    def create_collection(dep):
-      s = OrderedSet()
-      if ref != dep.unversioned:
-        s.add(dep)
-      return s
-    return self.traverse_dependency_graph(ref, create_collection, memo)
 
 
 class IvyUtils(object):
