@@ -61,8 +61,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     """Generates Java files from .proto files using the Wire protobuf compiler."""
     super(WireGen, self).__init__(*args, **kwargs)
 
-  @property
-  def synthetic_target_type(self):
+  def synthetic_target_type(self, target):
     return JavaLibrary
 
   def is_gentarget(self, target):
