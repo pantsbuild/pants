@@ -191,12 +191,12 @@ class JarDependency(object):
 
   @property
   def artifact_classifiers(self):
-      if self.artifacts:
-        return {a.classifier for a in self.artifacts}
-      else:
-        # If there are no artifacts, there's one implicit artifact with the
-        # classifier None.
-        return {None}
+    if self.artifacts:
+      return {a.classifier for a in self.artifacts}
+    else:
+      # If there are no artifacts, there's one implicit artifact with the
+      # classifier None.
+      return {None}
 
   def cache_key(self):
     key = ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)
