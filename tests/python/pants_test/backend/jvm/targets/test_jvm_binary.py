@@ -104,6 +104,11 @@ class JvmBinaryTest(BaseTest):
                                  r'jvm_binary only supports a single "source" argument'):
       self.make_target('foo:foo', target_type=JvmBinary, main='com.example.Foo', sources=['foo.py'])
 
+  def test_non_existant_source(self):
+    with self.assertRaisesRegexp(TargetDefinitionException, 
+                                  r'source does not exist: zoo.py'):
+      self.make_target(':zoo', target_type=JvmBinary, main='com.example.Foo', source='zoo.py')
+
   def test_bad_main_declaration(self):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'Invalid target JvmBinary.*bar.*main must be a fully'):

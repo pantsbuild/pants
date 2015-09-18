@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import re
 from hashlib import sha1
 
@@ -12,6 +13,7 @@ from six import string_types
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
@@ -322,8 +324,12 @@ class JvmBinary(JvmTarget):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if main and not isinstance(main, string_types):
       raise TargetDefinitionException(self, 'main must be a fully qualified classname')
-    if source and not isinstance(source, string_types):
-      raise TargetDefinitionException(self, 'source must be a single relative file path')
+    if source:
+      if not isinstance(source, string_types):
+        raise TargetDefinitionException(self, 'source must be a single relative file path')
+      source_path = os.path.join(get_buildroot(), address.spec_path, source)
+      if not os.path.isfile(source_path):
+        raise TargetDefinitionException(self, 'source does not exist: {}'.format(source))
     if deploy_jar_rules and not isinstance(deploy_jar_rules, JarRules):
       raise TargetDefinitionException(self,
                                       'deploy_jar_rules must be a JarRules specification. got {}'
