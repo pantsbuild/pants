@@ -106,8 +106,12 @@ class JvmBinaryTest(BaseTest):
 
   def test_non_existant_source(self):
     with self.assertRaisesRegexp(TargetDefinitionException, 
-                                  r'source does not exist: zoo.py'):
-      self.make_target(':zoo', target_type=JvmBinary, main='com.example.Foo', source='zoo.py')
+                                  r'source does not exist: foo.py'):
+      self.make_target(':foo', target_type=JvmBinary, main='com.example.Foo', source='foo.py')
+
+  def test_existant_source(self):
+    self.create_file('foo.py')
+    self.make_target('//:foo', target_type=JvmBinary, source='foo.py')
 
   def test_bad_main_declaration(self):
     with self.assertRaisesRegexp(TargetDefinitionException,
