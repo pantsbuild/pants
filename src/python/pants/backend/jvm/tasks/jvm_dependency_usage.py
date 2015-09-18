@@ -130,19 +130,19 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
 
 class Node(object):
 
-    def __init__(self, target, total_products):
-      self.target = target
-      self.total_products = total_products
-      self.usage_by_dep = defaultdict(int)
+  def __init__(self, target, total_products):
+    self.target = target
+    self.total_products = total_products
+    self.usage_by_dep = defaultdict(int)
 
-    def __eq__(self, other):
-      return self.target.address == other.target.address
+  def __eq__(self, other):
+    return self.target.address == other.target.address
 
-    def __ne__(self, other):
-      return not self.__eq__(other)
+  def __ne__(self, other):
+    return not self.__eq__(other)
 
-    def __hash_(self):
-      return hash(self.target.address)
+  def __hash_(self):
+    return hash(self.target.address)
 
 
 class DependencyUsageGraph(dict):

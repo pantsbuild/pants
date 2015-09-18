@@ -159,11 +159,12 @@ class UnpackLibrariesTest(TestAndroidBase):
   def test_no_manifest(self):
     with self.android_library(include_patterns=['**/*.class']) as android_library:
       with temporary_dir() as temp:
-          contents = self.unpacked_aar_library(temp, manifest=False)
-          task = self.create_task(self.context())
-          coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
-          with self.assertRaises(UnpackLibraries.MissingElementException):
-            task.create_android_library_target(android_library, coordinate, contents)
+        contents = self.unpacked_aar_library(temp, manifest=False)
+        task = self.create_task(self.context())
+        archive = 'org.pantsbuild.example-1.0'
+
+        with self.assertRaises(UnpackLibraries.MissingElementException):
+          task.create_android_library_target(android_library, archive, contents)
 
   # Test unpacking process.
   def create_android_library(self, rev, library_file):
