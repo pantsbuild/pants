@@ -21,3 +21,11 @@ class TestTimeout(unittest.TestCase):
         with self.assertRaises(KeyboardInterrupt):
             with Timeout(5):
                 time.sleep(10)
+
+    def test_timeout_none(self):
+        with Timeout(None):
+            time.sleep(1)
+
+    def test_timeout_zero(self):
+        with Timeout(0):
+            time.sleep(1)

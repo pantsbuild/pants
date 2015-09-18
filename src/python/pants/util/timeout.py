@@ -11,15 +11,31 @@ import threading
 
 
 class Timeout:
+    """Timeout generator
+
+        with Timeout(seconds):
+          try:
+            <do stuff>
+          except KeyboardInterrupt:
+            <handle timeout>
+
+        If seconds is None or 0, then the there is no timeout
+    """
+
     def __init__(self, seconds):
-        self.timer = threading.Timer(seconds, self._handle_timeout)
+        if seconds:
+            self._timer = threading.Timer(seconds, self._handle_timeout)
+        else:
+            self._timer = None
 
     def _handle_timeout(self):
         sys.stderr.flush() # Python 3 stderr is likely buffered.
         thread.interrupt_main() # raises KeyboardInterrupt
 
     def __enter__(self):
-        self.timer.start()
+        if self._timer is not None:
+            self._timer.start()
 
     def __exit__(self, type, value, traceback):
-        self.timer.cancel()
+        if self._timer is not None:
+            self._timer.cancel()
