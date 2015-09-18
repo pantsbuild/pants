@@ -189,7 +189,7 @@ class Shader(object):
       cls.register_jvm_tool(register,
                             'jarjar',
                             classpath=[
-                              JarDependency(org='org.pantsbuild.jarjar', name='jarjar', rev='1.5')
+                              JarDependency(org='org.pantsbuild', name='jarjar', rev='1.5.2')
                             ])
 
     @classmethod
@@ -202,11 +202,7 @@ class Shader(object):
         executor = SubprocessExecutor(DistributionLocator.cached())
       classpath = cls.global_instance().tool_classpath_from_products(context.products, 'jarjar',
                                                                      cls.options_scope)
-      if len(classpath) != 1:
-        raise cls.Error('JarJar classpath is expected to have exactly one jar!\nclasspath = {}'
-                        .format(':'.join(classpath)))
-      jarjar = classpath[0]
-      return Shader(jarjar, executor)
+      return Shader(classpath, executor)
 
   @classmethod
   def exclude_package(cls, package_name=None, recursive=False):
@@ -284,13 +280,14 @@ class Shader(object):
           paths.add(os.path.dirname(pathname))
       return cls._iter_packages(paths)
 
-  def __init__(self, jarjar, executor):
+  def __init__(self, jarjar_classpath, executor):
     """Creates a `Shader` the will use the given `jarjar` jar to create shaded jars.
 
-    :param unicode jarjar: The path to the jarjar jar.
+    :param jarjar_classpath: The jarjar classpath.
+    :type jarjar_classpath: list of string.
     :param executor: A java `Executor` to use to create shaded jar files.
     """
-    self._jarjar = jarjar
+    self._jarjar_classpath = jarjar_classpath
     self._executor = executor
     self._system_packages = None
 
@@ -385,7 +382,7 @@ class Shader(object):
         fp.write(rule.render())
       fp.close()
 
-      yield self._executor.runner(classpath=[self._jarjar],
+      yield self._executor.runner(classpath=self._jarjar_classpath,
                                   main='org.pantsbuild.jarjar.Main',
                                   jvm_options=jvm_options,
                                   args=['process', fp.name, jar, output_jar])
