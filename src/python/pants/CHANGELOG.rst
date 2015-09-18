@@ -14,7 +14,7 @@ into a task to see which sub-steps are most expensive.  Try it out!
 We also have a few new metadata goals to help figure out what's going on with file ownership and
 options.
 
-If you want to find out where options are comping from, the `options` goal can help you out::
+If you want to find out where options are coming from, the `options` goal can help you out::
 
     $ ./pants -q options --only-overridden --scope=compile
     compile.apt.jvm_options = ['-Xmx1g', '-XX:MaxPermSize=256m'] (from CONFIG in pants.ini)
