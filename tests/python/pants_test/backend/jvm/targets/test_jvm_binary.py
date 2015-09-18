@@ -105,7 +105,7 @@ class JvmBinaryTest(BaseTest):
       self.make_target('foo:foo', target_type=JvmBinary, main='com.example.Foo', sources=['foo.py'])
 
   def test_non_existant_source(self):
-    with self.assertRaisesRegexp(TargetDefinitionException, 
+    with self.assertRaisesRegexp(TargetDefinitionException,
                                   r'source does not exist: foo.py'):
       self.make_target(':foo', target_type=JvmBinary, main='com.example.Foo', source='foo.py')
 
