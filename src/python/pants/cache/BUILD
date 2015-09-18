@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     '3rdparty/python:requests',
     '3rdparty/python:six',
+    'src/python/pants/base:validation',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
