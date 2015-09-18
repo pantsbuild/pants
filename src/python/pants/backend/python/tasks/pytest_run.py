@@ -495,7 +495,7 @@ class PytestRun(PythonTask, TestTaskMixin):
     if not sources:
       return PythonTestResult.rc(0)
 
-    timeout = sum([target.timeout for target in targets])
+    timeout = sum([target.timeout for target in targets if target.timeout is not None])
     with self._test_runner(targets, workunit) as (pex, test_args):
 
       def run_and_analyze(resultlog_path):
