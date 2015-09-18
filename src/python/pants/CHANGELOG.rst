@@ -1,6 +1,147 @@
 RELEASE HISTORY
 ===============
 
+0.0.48 (9/18/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+There is a new UI in the `./pants server` web interface that shows 'Timing Stats' graphs.  These
+graphs show where time is spent on a daily-aggregation basis in various tasks.  You can drill down
+into a task to see which sub-steps are most expensive.  Try it out!
+
+We also have a few new metadata goals to help figure out what's going on with file ownership and
+options.
+
+If you want to find out where options are coming from, the `options` goal can help you out::
+
+    $ ./pants -q options --only-overridden --scope=compile
+    compile.apt.jvm_options = ['-Xmx1g', '-XX:MaxPermSize=256m'] (from CONFIG in pants.ini)
+    compile.java.jvm_options = ['-Xmx2G'] (from CONFIG in pants.ini)
+    compile.java.partition_size_hint = 1000000000 (from CONFIG in pants.ini)
+    compile.zinc.jvm_options = ['-Xmx2g', '-XX:MaxPermSize=256m', '-Dzinc.analysis.cache.limit=0'] (from CONFIG in pants.ini)
+
+If you're not sure which target(s) own a given file::
+
+    $ ./pants -q list-owners -- src/python/pants/base/target.py
+    src/python/pants/base:target
+
+The latter comes from new contributor Tansy Arron-Walker.
+
+API Changes
+~~~~~~~~~~~
+
+* Kill 'ivy_jar_products'.
+  `RB #2823 <https://rbcommons.com/s/twitter/r/2823>`_
+
+* Kill 'ivy_resolve_symlink_map' and 'ivy_cache_dir' products.
+  `RB #2819 <https://rbcommons.com/s/twitter/r/2819>`_
+
+Bugfixes
+~~~~~~~~
+
+* Upgrade to jarjar 1.5.2.
+  `RB #2847 <https://rbcommons.com/s/twitter/r/2847>`_
+
+* Don't modify globs excludes argument value.
+  `RB #2841 <https://rbcommons.com/s/twitter/r/2841>`_
+
+* Whitelist the appropriate filter option name for zinc
+  `RB #2839 <https://rbcommons.com/s/twitter/r/2839>`_
+
+* Ensure stale classes are removed during isolated compile by cleaning classes directory prior to handling invalid targets
+  `RB #2805 <https://rbcommons.com/s/twitter/r/2805>`_
+
+* Fix `linecount` estimator for `dep-usage` goal
+  `RB #2828 <https://rbcommons.com/s/twitter/r/2828>`_
+
+* Fix resource handling for the python backend.
+  `RB #2817 <https://rbcommons.com/s/twitter/r/2817>`_
+
+* Fix coordinates of resolved jars in IvyInfo.
+  `RB #2818 <https://rbcommons.com/s/twitter/r/2818>`_
+
+* Fix `NailgunExecutor` to support more than one connect attempt
+  `RB #2822 <https://rbcommons.com/s/twitter/r/2822>`_
+
+* Fixup AndroidIntegrationTest broken by Distribution refactor.
+  `RB #2811 <https://rbcommons.com/s/twitter/r/2811>`_
+
+* Backport sbt java output fixes into zinc
+  `RB #2810 <https://rbcommons.com/s/twitter/r/2810>`_
+
+* Align ivy excludes and ClasspathProducts excludes.
+  `RB #2807 <https://rbcommons.com/s/twitter/r/2807>`_
+
+New Features
+~~~~~~~~~~~~
+
+* A nice timing stats report.
+  `RB #2825 <https://rbcommons.com/s/twitter/r/2825>`_
+
+* Add new console task ListOwners to determine the targets that own a source
+  `RB #2755 <https://rbcommons.com/s/twitter/r/2755>`_
+
+* Adding a console task to explain where options came from.
+  `RB #2816 <https://rbcommons.com/s/twitter/r/2816>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Deprecate 'Repository' alias in favor of 'repo'.
+  `RB #2845 <https://rbcommons.com/s/twitter/r/2845>`_
+
+* Fix indents (checkstyle)
+  `RB #2844 <https://rbcommons.com/s/twitter/r/2844>`_
+
+* Use list comprehension in jvm_compile to calculate valid targets
+  `RB #2843 <https://rbcommons.com/s/twitter/r/2843>`_
+
+* Transition `IvyImports` to 'compile_classpath'.
+  `RB #2840 <https://rbcommons.com/s/twitter/r/2840>`_
+
+* Migrate `JvmBinaryTask` to 'compile_classpath'.
+  `RB #2832 <https://rbcommons.com/s/twitter/r/2832>`_
+
+* Add support for snapshotting `ClasspathProducts`.
+  `RB #2837 <https://rbcommons.com/s/twitter/r/2837>`_
+
+* Bump to zinc 1.0.11
+  `RB #2827 <https://rbcommons.com/s/twitter/r/2827>`_
+  `RB #2836 <https://rbcommons.com/s/twitter/r/2836>`_
+  `RB #2812 <https://rbcommons.com/s/twitter/r/2812>`_
+
+* Lazily load zinc analysis
+  `RB #2827 <https://rbcommons.com/s/twitter/r/2827>`_
+
+* Add support for whitelisting of zinc options
+  `RB #2835 <https://rbcommons.com/s/twitter/r/2835>`_
+
+* Kill the unused `JvmTarget.configurations` field.
+  `RB #2834 <https://rbcommons.com/s/twitter/r/2834>`_
+
+* Kill 'jvm_build_tools_classpath_callbacks' deps.
+  `RB #2831 <https://rbcommons.com/s/twitter/r/2831>`_
+
+* Add `:scalastyle_integration` test to `:integration` test target
+  `RB #2830 <https://rbcommons.com/s/twitter/r/2830>`_
+
+* Use fast_relpath in JvmCompileIsolatedStrategy.compute_classes_by_source
+  `RB #2826 <https://rbcommons.com/s/twitter/r/2826>`_
+
+* Enable New Style class check
+  `RB #2820 <https://rbcommons.com/s/twitter/r/2820>`_
+
+* Remove `--quiet` flag from `pip`
+  `RB #2809 <https://rbcommons.com/s/twitter/r/2809>`_
+
+* Move AptCompile to zinc
+  `RB #2806 <https://rbcommons.com/s/twitter/r/2806>`_
+
+* Add a just-in-time check of the artifact cache to the isolated compile strategy
+  `RB #2690 <https://rbcommons.com/s/twitter/r/2690>`_
+
 0.0.47 (9/11/2015)
 ------------------
 
