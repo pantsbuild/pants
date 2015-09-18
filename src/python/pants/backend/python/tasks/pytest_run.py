@@ -20,17 +20,19 @@ from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
+from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.exceptions import TaskError, TestFailedTaskError
+from pants.base.exceptions import TaskError, TestFailedTaskError, TestFailedTimeoutError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.strutil import safe_shlex_split
+from pants.util.timeout import Timeout
 
 
 # Initialize logging, since tests do not run via pants_exe (where it is usually done)
@@ -38,6 +40,10 @@ logging.basicConfig()
 
 
 class PythonTestResult(object):
+  @staticmethod
+  def timeout():
+    return PythonTestResult("TIMEOUT")
+
   @staticmethod
   def exception():
     return PythonTestResult('EXCEPTION')
@@ -66,7 +72,7 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
-class PytestRun(PythonTask):
+class PytestRun(PythonTask, TestTaskMixin):
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
     # to avoid confusion when debugging pants tests.
@@ -78,6 +84,9 @@ class PytestRun(PythonTask):
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
   ]
 
+  def __init__(self, *args, **kwargs):
+    super(PytestRun, self).__init__(*args, **kwargs)
+
   @classmethod
   def global_subsystems(cls):
     return super(PytestRun, cls).global_subsystems() + (PythonSetup, PythonRepos)
@@ -85,6 +94,8 @@ class PytestRun(PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
+    TestTaskMixin.register_options(register)
+
     register('--fast', action='store_true', default=True,
              help='Run all tests in a single chroot. If turned off, each test target will '
                   'create a new chroot, which will be much slower, but more correct, as the'
@@ -419,7 +430,7 @@ class PytestRun(PythonTask):
                                             workunit) as coverage_args:
           yield pex, shard_args + junit_args + coverage_args
 
-  def _do_run_tests_with_args(self, pex, workunit, args):
+  def _do_run_tests_with_args(self, pex, workunit, args, timeout=None):
     try:
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
@@ -433,8 +444,8 @@ class PytestRun(PythonTask):
       if profile:
         env['PEX_PROFILE'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
       with environment_as(**env):
-        rc = self._pex_run(pex, workunit, args=args, setsid=True)
-        return PythonTestResult.rc(rc)
+        rv = self._pex_run(pex, workunit, args=args, setsid=True, timeout=timeout)
+        return rv
     except Exception:
       self.context.log.error('Failed to run test!')
       self.context.log.info(traceback.format_exc())
@@ -484,10 +495,11 @@ class PytestRun(PythonTask):
     if not sources:
       return PythonTestResult.rc(0)
 
+    timeout = sum([target.timeout for target in targets])
     with self._test_runner(targets, workunit) as (pex, test_args):
 
       def run_and_analyze(resultlog_path):
-        result = self._do_run_tests_with_args(pex, workunit, args)
+        result = self._do_run_tests_with_args(pex, workunit, args, timeout)
         failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
         return result.with_failed_targets(failed_targets)
 
@@ -511,7 +523,7 @@ class PytestRun(PythonTask):
           args.insert(0, '--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
-  def _pex_run(self, pex, workunit, args, setsid=False):
+  def _pex_run(self, pex, workunit, args, setsid=False, timeout=None):
     # NB: We don't use pex.run(...) here since it makes a point of running in a clean environment,
     # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
     # task.
@@ -519,4 +531,14 @@ class PytestRun(PythonTask):
                                preexec_fn=os.setsid if setsid else None,
                                stdout=workunit.output('stdout'),
                                stderr=workunit.output('stderr'))
-    return process.wait()
+    with Timeout(self.timeout(timeout)):
+      try:
+        while process.poll() is None:
+          pass
+        rc = process.returncode
+        rv = PythonTestResult.rc(rc)
+      except KeyboardInterrupt:
+        process.terminate()
+        rv = PythonTestResult.timeout()
+
+    return rv

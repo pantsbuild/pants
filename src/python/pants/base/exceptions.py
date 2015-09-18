@@ -34,6 +34,12 @@ class TestFailedTaskError(TaskError):
   """
 
 
+class TestFailedTimeoutError(TaskError):
+  """Raise when an actual test run has timed out
+
+  """
+
+
 class TargetDefinitionException(Exception):
   """Indicates an invalid target definition."""
 

@@ -35,6 +35,7 @@ target(
     ':targets_help',
     ':task',
     ':what_changed',
+    ':test_task_mixin',
   ]
 )
 
@@ -441,4 +442,12 @@ python_library(
     ':noop',
     ':what_changed',
   ],
+)
+
+python_library(
+  name='test_task_mixin',
+  sources=['test_task_mixin.py'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:task',
+  ]
 )
