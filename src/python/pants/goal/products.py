@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+import six
 from twitter.common.collections import OrderedSet
 
 from pants.util.dirutil import fast_relpath
@@ -230,7 +231,7 @@ class Products(object):
         Returns an iterable over all pairs (target, product) in this mapping.
         Each product is itself a map of <basedir> -> <products list>.
       """
-      return self.by_target.iteritems()
+      return six.iteritems(self.by_target)
 
     def keys_for(self, basedir, product):
       """Returns the set of keys the given mapped product is registered under."""
