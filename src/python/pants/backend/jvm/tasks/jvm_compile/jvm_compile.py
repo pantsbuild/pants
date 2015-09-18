@@ -267,7 +267,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
         # Register products for all the valid targets.
         # We register as we go, so dependency checking code can use this data.
-        valid_targets = list(set(relevant_targets) - set(invalid_targets))
+        valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
         valid_compile_contexts = [self._strategy.compile_context(t) for t in valid_targets]
         self._register_vts(valid_compile_contexts)
 
