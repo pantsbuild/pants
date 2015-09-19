@@ -10,6 +10,7 @@ import os
 from collections import defaultdict, namedtuple
 
 from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import create_size_estimators
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -40,6 +41,9 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyUsage, cls).register_options(register)
+    register('--internal-only', default=True, action='store_true',
+             help='Specifies that only internal dependencies should be included in the graph '
+                  'output (no external jars).')
     register('--size-estimator',
              choices=list(cls.size_estimators.keys()), default='filesize',
              help='The method of target size estimation.')
@@ -75,6 +79,14 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     """Returns true if the given dep target should be considered a declared dep of target."""
     return dep in self._resolve_aliases(target)
 
+  def _select(self, target):
+    if self.get_options().internal_only and isinstance(target, JarLibrary):
+      return False
+    elif isinstance(target, Resources):
+      return False
+    else:
+      return True
+
   def create_dep_usage_graph(self, targets, buildroot):
     """Creates a graph of concrete targets, with their sum of products and dependencies.
 
@@ -86,6 +98,8 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
     nodes = dict()
     for target in targets:
+      if not self._select(target):
+        continue
       # Create or extend a Node for the concrete version of this target.
       concrete_target = target.concrete_derived_from
       products_total = sum(1 for _, paths in classes_by_target[target].rel_paths() for p in paths)
@@ -97,18 +111,20 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
 
       # Record declared Edges.
       for dep_tgt in self._resolve_aliases(target):
-        node.add_edge(Edge(True, set()), dep_tgt.concrete_derived_from)
+        derived_from = dep_tgt.concrete_derived_from
+        if self._select(derived_from):
+          node.add_edge(Edge(True, set()), derived_from)
 
       # Record the used products and undeclared Edges for this target.
       target_product_deps_by_src = product_deps_by_src.get(target, dict())
       for src in target.sources_relative_to_buildroot():
         for product_dep in target_product_deps_by_src.get(os.path.join(buildroot, src), []):
           for dep_tgt in self.targets_by_file.get(product_dep, []):
-            edge_tgt = dep_tgt.concrete_derived_from
-            if edge_tgt == concrete_target:
+            derived_from = dep_tgt.concrete_derived_from
+            if derived_from == concrete_target or not self._select(derived_from):
               continue
             is_declared = self._is_declared_dep(target, dep_tgt)
-            node.add_edge(Edge(is_declared, set([product_dep])), edge_tgt)
+            node.add_edge(Edge(is_declared, set([product_dep])), derived_from)
 
     # Prune any Nodes with 0 products.
     for concrete_target, node in nodes.copy().items():
@@ -132,15 +148,6 @@ class Node(object):
 
   def add_edge(self, edge, dest):
     self.dep_edges[dest] += edge
-
-  def __eq__(self, other):
-    return self.concrete_target.address == other.concrete_target.address
-
-  def __ne__(self, other):
-    return not self.__eq__(other)
-
-  def __hash_(self):
-    return hash(self.concrete_target.address)
 
 
 class Edge(object):
