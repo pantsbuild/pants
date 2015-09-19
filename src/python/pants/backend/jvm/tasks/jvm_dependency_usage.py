@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
+import sys
 from collections import defaultdict, namedtuple
 
 from pants.backend.core.targets.dependencies import Dependencies
@@ -33,8 +34,8 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   job size of each target, which indicates the impact a poorly factored target has on
   the build times. (see DependencyUsageGraph->to_json)
 
-  The graph is outputted into a JSON file, with the intent of consuming and analyzing
-  the graph via some external tool.
+  The graph is either summarized for local analysis or outputted as a JSON file for
+  aggregation and analysis on a larger scale.
   """
 
   size_estimators = create_size_estimators()
@@ -45,13 +46,16 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     register('--internal-only', default=True, action='store_true',
              help='Specifies that only internal dependencies should be included in the graph '
                   'output (no external jars).')
+    register('--summary', default=True, action='store_true',
+             help='When set, outputs a summary of the "worst" dependencies; otherwise, '
+                  'outputs a JSON report.')
     register('--size-estimator',
              choices=list(cls.size_estimators.keys()), default='filesize',
              help='The method of target size estimation.')
     register('--transitive', default=True, action='store_true',
              help='Score all targets in the build graph transitively.')
     register('--output-file', type=str,
-             help='Output dependency usage graph as JSON to the specified file.')
+             help='Output destination. When unset, outputs to <stdout>.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -69,9 +73,16 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     if output_file:
       self.context.log.info('Writing dependency usage graph to {}'.format(output_file))
       with open(output_file, 'w') as fh:
-        fh.write(graph.to_json())
+        self._render(graph, fh)
     else:
-      self.context.log.error('No output file specified')
+      sys.stdout.write('\n')
+      self._render(graph, sys.stdout)
+
+  def _render(self, graph, fh):
+    chunks = graph.to_summary() if self.get_options().summary else graph.to_json()
+    for chunk in chunks:
+      fh.write(chunk)
+    fh.flush()
 
   def _resolve_aliases(self, target):
     """Recursively resolve `target` aliases."""
@@ -217,15 +228,43 @@ class DependencyUsageGraph(object):
     else:
       return 'undeclared'
 
+  def _used_ratio(self, dep_tgt, edge):
+    dep_tgt_products_total = max(self._nodes[dep_tgt].products_total if dep_tgt in self._nodes else 1, 1)
+    return len(edge.products_used) / dep_tgt_products_total
+
+  def to_summary(self):
+    """Outputs targets ordered by a combination of max usage and cost."""
+
+    # Aggregate inbound edges by their maximum product usage ratio.
+    max_target_usage = defaultdict(lambda: 0.0)
+    for target, node in self._nodes.items():
+      for dep_target, edge in node.dep_edges.items():
+        used_ratio = self._used_ratio(dep_target, edge)
+        max_target_usage[dep_target] = max(max_target_usage[dep_target], used_ratio)
+
+    # Score targets.
+    keys = ('score', 'max_usage', 'job_size_transitive', 'target')
+    Score = namedtuple('Score', keys)
+    scores = []
+    for target, max_usage in max_target_usage.items():
+      job_size_transitive = self._trans_job_size(target)
+      score = job_size_transitive / max_usage
+      scores.append(Score(score, max_usage, job_size_transitive, target.address.spec))
+
+    # Output in reverse order by score.
+    yield '{}\n'.format('\t'.join(keys))
+    for score in sorted(scores, key=lambda s: -s.score):
+      yield "{:.3f}\t{:.3f}\t{:.3f}\t{}\n".format(*score)
+
   def to_json(self):
+    """Outputs the entire graph."""
     res_dict = {}
     def gen_dep_edge(node, edge, dep_tgt):
-      dep_tgt_products_total = max(self._nodes[dep_tgt].products_total if dep_tgt in self._nodes else 1, 1)
       return {
         'target': dep_tgt.address.spec,
         'dependency_type': self._edge_type(node.concrete_target, edge, dep_tgt),
         'products_used': len(edge.products_used),
-        'products_used_ratio': len(edge.products_used) / dep_tgt_products_total,
+        'products_used_ratio': self._used_ratio(dep_tgt, edge),
       }
     for node in self._nodes.values():
       res_dict[node.concrete_target.address.spec] = {
@@ -234,4 +273,4 @@ class DependencyUsageGraph(object):
           'products_total': node.products_total,
           'dependencies': [gen_dep_edge(node, edge, dep_tgt) for dep_tgt, edge in node.dep_edges.items()]
         }
-    return json.dumps(res_dict, indent=2, sort_keys=True)
+    yield json.dumps(res_dict, indent=2, sort_keys=True)
