@@ -110,7 +110,6 @@ class Node(object):
     self.derivations.add(derived_target)
     self.products_total += derived_products
     for dep, edge in outbound_edges.items():
-      print(">>> recording edge from {} to {} with {}".format(self.concrete_target, dep, edge.products_used))
       self.dep_edges[dep] += edge
 
   def __eq__(self, other):
@@ -153,15 +152,18 @@ class DependencyUsageGraph(object):
 
   def to_json(self):
     res_dict = {}
+    def gen_dep_edge(node, edge, dep_tgt):
+      dep_tgt_products_total = max(self._nodes[dep_tgt].products_total if dep_tgt in self._nodes else 1, 1)
+      return {
+        'target': dep_tgt.address.spec,
+        'products_used': len(edge.products_used),
+        'products_used_ratio': 1.0 * len(edge.products_used) / dep_tgt_products_total
+      }
     for node in self._nodes.values():
       res_dict[node.concrete_target.address.spec] = {
           'job_size': self._job_size(node.concrete_target),
           'job_size_transitive': self._trans_job_size(node.concrete_target),
           'products_total': node.products_total,
-          'dependencies': [{
-              'target': dep_tgt.address.spec,
-              'products_used': len(edge.products_used),
-              'products_used_ratio': 1.0 * len(edge.products_used) / max(self._nodes[dep_tgt].products_total, 1),
-            } for dep_tgt, edge in node.dep_edges.items()]
+          'dependencies': [gen_dep_edge(node, edge, dep_tgt) for dep_tgt, edge in node.dep_edges.items()]
         }
     return json.dumps(res_dict, indent=2, sort_keys=True)
