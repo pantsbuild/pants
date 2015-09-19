@@ -172,7 +172,7 @@ def create_options_for_optionables(optionables, extra_scopes=None, options=None)
   # and therefore only have to inherit from our immediately enclosing scope.
   for s in sorted(all_scopes):
     if s != GLOBAL_SCOPE:
-      enclosing_scope = s.rpartition('.')[0]
+      enclosing_scope = s.split('.')[0] if '.' in s else GLOBAL_SCOPE
       opts = all_options[s]
       for key, val in all_options.get(enclosing_scope, {}).items():
         if key not in opts:  # Inner scope values override the inherited ones.

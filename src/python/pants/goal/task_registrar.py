@@ -59,6 +59,7 @@ class TaskRegistrar(object):
     :param replace: Replaces any existing tasks in the goal with this goal.
     :param before: Places this task before the named task in the goal's execution list.
     :param after: Places this task after the named task in the goal's execution list.
+    :returns: The installed goal.
     """
     goal = Goal.by_name(goal or self.name)
     goal.install(self, first, replace, before, after)

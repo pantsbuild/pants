@@ -77,7 +77,8 @@ class MutexTaskMixinTest(BaseTest):
 
   @contextmanager
   def mutex_group(self, targets=None):
-    context = self.context(target_roots=targets)
+    context = self.context(target_roots=targets,
+                           for_task_types=[RedLogViewer, BlueLogViewer, GreenLogViewer])
 
     def prepare_task(task_type):
       task_type.prepare(self.options, round_manager=None)

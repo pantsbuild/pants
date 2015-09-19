@@ -63,14 +63,14 @@ class TestPyStyleTask(PythonTaskTestBase):
     """Required method"""
     return PythonCheckStyleTask
 
-  def _create_context(self, target_roots=None):
+  def _create_context(self, target_roots=None, for_task_types=None):
     return self.context(
       options={
         'py.check': {
           'interpreter': 'python'  # Interpreter required by PythonTaskTestBase
         }
       },
-      target_roots=target_roots)
+      target_roots=target_roots, for_task_types=for_task_types)
 
   def setUp(self):
     """Setup PythonCheckStyleTask with Rage Checker"""
@@ -79,7 +79,8 @@ class TestPyStyleTask(PythonTaskTestBase):
     PythonCheckStyleTask.register_plugin(name='angry_test', checker=Rage)
     PythonCheckStyleTask.options_scope = 'py.check'
 
-    self.style_check = PythonCheckStyleTask(self._create_context(), ".")
+    self.style_check = PythonCheckStyleTask(self._create_context(
+                                            for_task_types=[PythonCheckStyleTask]), ".")
     self.style_check.options.suppress = None
 
   def test_noqa_line_filter_length(self):
