@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 import sys
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
@@ -71,7 +71,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     graph = self.create_dep_usage_graph(targets, get_buildroot())
     output_file = self.get_options().output_file
     if output_file:
-      self.context.log.info('Writing dependency usage graph to {}'.format(output_file))
+      self.context.log.info('Writing dependency usage to {}'.format(output_file))
       with open(output_file, 'w') as fh:
         self._render(graph, fh)
     else:
@@ -233,7 +233,7 @@ class DependencyUsageGraph(object):
     return len(edge.products_used) / dep_tgt_products_total
 
   def to_summary(self):
-    """Outputs targets ordered by a combination of max usage and cost."""
+    """Outputs summarized dependencies ordered by a combination of max usage and cost."""
 
     # Aggregate inbound edges by their maximum product usage ratio.
     max_target_usage = defaultdict(lambda: 0.0)
@@ -242,7 +242,7 @@ class DependencyUsageGraph(object):
         used_ratio = self._used_ratio(dep_target, edge)
         max_target_usage[dep_target] = max(max_target_usage[dep_target], used_ratio)
 
-    # Score targets.
+    # Calculate a score for each.
     keys = ('score', 'max_usage', 'job_size_transitive', 'target')
     Score = namedtuple('Score', keys)
     scores = []
@@ -252,9 +252,12 @@ class DependencyUsageGraph(object):
       scores.append(Score(score, max_usage, job_size_transitive, target.address.spec))
 
     # Output in reverse order by score.
-    yield '{}\n'.format('\t'.join(keys))
-    for score in sorted(scores, key=lambda s: -s.score):
-      yield "{:.3f}\t{:.3f}\t{:.3f}\t{}\n".format(*score)
+    yield '[\n'
+    first = True
+    for score in sorted(scores, key=lambda s: s.score, reverse=True):
+      yield '{}  {}'.format('' if first else ',\n', json.dumps(OrderedDict(zip(keys, score))))
+      first = False
+    yield '\n]\n'
 
   def to_json(self):
     """Outputs the entire graph."""
