@@ -40,7 +40,8 @@ class GroupIteratorTestBase(BaseTest):
     self.blue = self.group_member('blue', lambda tgt: 'blue' in tgt.name)
 
   def iterate(self, *targets):
-    context = self.context(target_roots=targets, for_task_types=[self.red, self.green, self.blue])
+    context = self.context(target_roots=targets,
+                           for_task_types=[self.red, self.green, self.blue])
 
     def workdir():
       return None
@@ -127,7 +128,8 @@ class BaseGroupTaskTest(BaseTest):
     scalac = self.group_member(name='scalac', selector=lambda t: isinstance(t, self.ScalaLibrary))
     self.group_task.add_member(scalac)
 
-    self._context = self.context(target_roots=self.create_targets(), for_task_types=[self.group_task])
+    self._context = self.context(target_roots=self.create_targets(),
+                                 for_task_types=[self.group_task])
     self.populate_compile_classpath(self._context)
     self.group_task._prepare(self.options, round_manager=RoundManager(self._context))
 

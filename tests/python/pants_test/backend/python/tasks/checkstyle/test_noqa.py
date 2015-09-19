@@ -79,8 +79,8 @@ class TestPyStyleTask(PythonTaskTestBase):
     PythonCheckStyleTask.register_plugin(name='angry_test', checker=Rage)
     PythonCheckStyleTask.options_scope = 'py.check'
 
-    self.style_check = PythonCheckStyleTask(self._create_context(
-                                            for_task_types=[PythonCheckStyleTask]), ".")
+    self.style_check = PythonCheckStyleTask(self._create_context(".",
+                                            for_task_types=[PythonCheckStyleTask]))
     self.style_check.options.suppress = None
 
   def test_noqa_line_filter_length(self):

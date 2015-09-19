@@ -74,7 +74,10 @@ class RoundEngineTest(EngineTestBase, BaseTest):
   @contextmanager
   def install_task(self, name, product_types=None, goal=None, required_data=None,
                    alternate_target_roots=None):
-    """Install a task to goal and return all installed tasks of the goal."""
+    """Install a task to goal and return all installed tasks of the goal.
+
+    This is needed to initialize tasks' context.
+    """
     task_type = self.record(name, product_types, required_data, alternate_target_roots)
     yield super(RoundEngineTest,
                 self).install_task(name=name, action=task_type, goal=goal).task_types()
