@@ -9,6 +9,7 @@ import json
 import os
 from collections import defaultdict, namedtuple
 
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import create_size_estimators
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
@@ -61,6 +62,19 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     else:
       self.context.log.error('No output file specified')
 
+  def _resolve_aliases(self, target):
+    """Recursively resolve `target` aliases."""
+    for declared in target.dependencies:
+      if isinstance(declared, Dependencies):
+        for r in self._resolve_aliases(declared):
+          yield r
+      else:
+        yield declared
+
+  def _is_declared_dep(self, target, dep):
+    """Returns true if the given dep target should be considered a declared dep of target."""
+    return dep in self._resolve_aliases(target)
+
   def create_dep_usage_graph(self, targets, buildroot):
     """Creates a graph of concrete targets, with their sum of products and dependencies.
 
@@ -72,23 +86,29 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
     nodes = dict()
     for target in targets:
-      # Record the product count and used products for this target.
-      products_total = sum(1 for _, paths in classes_by_target[target].rel_paths() for p in paths)
-      outbound_edges = defaultdict(Edge)
-      target_product_deps_by_src = product_deps_by_src.get(target, dict())
-      for src in target.sources_relative_to_buildroot():
-        for product_dep in target_product_deps_by_src.get(os.path.join(buildroot, src), []):
-          for dep_tgt in self.targets_by_file.get(product_dep, []):
-            if dep_tgt != target:
-              outbound_edges[dep_tgt.concrete_derived_from].products_used.add(product_dep)
-
       # Create or extend a Node for the concrete version of this target.
       concrete_target = target.concrete_derived_from
+      products_total = sum(1 for _, paths in classes_by_target[target].rel_paths() for p in paths)
       if concrete_target in nodes:
         node = nodes[concrete_target]
       else:
         node = nodes[concrete_target] = Node(concrete_target)
-      node.add_derivation(target, products_total, outbound_edges)
+      node.add_derivation(target, products_total)
+
+      # Record declared Edges.
+      for dep_tgt in self._resolve_aliases(target):
+        node.add_edge(Edge(True, set()), dep_tgt.concrete_derived_from)
+
+      # Record the used products and undeclared Edges for this target.
+      target_product_deps_by_src = product_deps_by_src.get(target, dict())
+      for src in target.sources_relative_to_buildroot():
+        for product_dep in target_product_deps_by_src.get(os.path.join(buildroot, src), []):
+          for dep_tgt in self.targets_by_file.get(product_dep, []):
+            edge_tgt = dep_tgt.concrete_derived_from
+            if edge_tgt == concrete_target:
+              continue
+            is_declared = self._is_declared_dep(target, dep_tgt)
+            node.add_edge(Edge(is_declared, set([product_dep])), edge_tgt)
 
     # Prune any Nodes with 0 products.
     for concrete_target, node in nodes.copy().items():
@@ -106,11 +126,12 @@ class Node(object):
     # Dict mapping concrete dependency targets to an Edge object.
     self.dep_edges = defaultdict(Edge)
 
-  def add_derivation(self, derived_target, derived_products, outbound_edges):
+  def add_derivation(self, derived_target, derived_products):
     self.derivations.add(derived_target)
     self.products_total += derived_products
-    for dep, edge in outbound_edges.items():
-      self.dep_edges[dep] += edge
+
+  def add_edge(self, edge, dest):
+    self.dep_edges[dest] += edge
 
   def __eq__(self, other):
     return self.concrete_target.address == other.concrete_target.address
@@ -123,11 +144,14 @@ class Node(object):
 
 
 class Edge(object):
-  def __init__(self):
-    self.products_used = set()
+  """Record a set of used products, and a boolean indicating that a depedency edge was declared."""
+  def __init__(self, is_declared=False, products_used=None):
+    self.products_used = products_used or set()
+    self.is_declared = is_declared
 
   def __iadd__(self, that):
     self.products_used |= that.products_used
+    self.is_declared |= that.is_declared
     return self
 
 
@@ -156,6 +180,7 @@ class DependencyUsageGraph(object):
       dep_tgt_products_total = max(self._nodes[dep_tgt].products_total if dep_tgt in self._nodes else 1, 1)
       return {
         'target': dep_tgt.address.spec,
+        'is_declared': edge.is_declared,
         'products_used': len(edge.products_used),
         'products_used_ratio': 1.0 * len(edge.products_used) / dep_tgt_products_total
       }
