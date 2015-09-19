@@ -32,6 +32,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                                    classifier='tests'),
                                      JarDependency(org='org.gnu', name='gary', rev='4.0.0',
                                                    ext='tar.gz')])
+    self.create_file('//:foo:foo-binary')
     binary_target = self.make_target(spec='//foo:foo-binary',
                                      target_type=JvmBinary,
                                      source='Foo.java',
@@ -79,6 +80,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                            sorted(jar.namelist()))
 
   def test_jvm_bundle_missing_product(self):
+    self.create_file('//foo:foo-binary')
     binary_target = self.make_target(spec='//foo:foo-binary',
                                      target_type=JvmBinary,
                                      source='Foo.java')

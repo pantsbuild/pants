@@ -23,6 +23,7 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
     return BinaryCreate
 
   def test_jvm_binaries_products(self):
+    self.create_file('//bar:bar-binary')
     binary_target = self.make_target(spec='//bar:bar-binary',
                                      target_type=JvmBinary,
                                      source='Bar.java')
@@ -58,6 +59,7 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
     foo_jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
                                    target_type=JarLibrary,
                                    jars=[JarDependency(org='org.example', name='foo', rev='1.0.0')])
+    self.create_file('//bar:bar-binary')
     binary_target = self.make_target(spec='//bar:bar-binary',
                                      target_type=JvmBinary,
                                      source='Bar.java',
