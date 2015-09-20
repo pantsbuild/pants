@@ -253,10 +253,10 @@ class DependencyUsageGraph(object):
       score = int(cost_transitive / (max_usage if max_usage > 0.0 else 1.0))
       scores.append(Score(score, max_usage, cost_transitive, target.address.spec))
 
-    # Output in reverse order by score.
+    # Output in order by score.
     yield '[\n'
     first = True
-    for score in sorted(scores, key=lambda s: s.badness, reverse=True):
+    for score in sorted(scores, key=lambda s: s.badness):
       yield '{}  {}'.format('' if first else ',\n', json.dumps(OrderedDict(zip(keys, score))))
       first = False
     yield '\n]\n'
