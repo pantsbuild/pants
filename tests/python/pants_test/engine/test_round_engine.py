@@ -123,11 +123,12 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
     self.assert_actions('task1', 'task2')
 
-  def test_inter_goal_dep_self_cycle(self):
+  def test_inter_goal_dep_self_cycle_ok(self):
     self.install_task('task1', goal='goal1', product_types=['1'], required_data=['1'])
 
-    with self.assertRaises(self.engine.TaskOrderError):
-      self.engine.attempt(self._context, self.as_goals('goal1'))
+    self.engine.attempt(self._context, self.as_goals('goal1'))
+
+    self.assert_actions('task1')
 
   def test_inter_goal_dep_downstream(self):
     self.install_task('task1', goal='goal1', required_data=['1'])

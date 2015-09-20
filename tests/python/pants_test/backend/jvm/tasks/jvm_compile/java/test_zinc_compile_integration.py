@@ -10,7 +10,7 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 from pants_test.testutils.compile_strategy_utils import provide_compile_strategies
 
 
-class JvmExamplesCompileIntegrationTest(BaseCompileIT):
+class ZincCompileIntegrationTest(BaseCompileIT):
 
   def test_java_src_zinc_compile(self):
     # TODO(stuhood): doesn't succeed stably with global+zinc
@@ -44,8 +44,8 @@ class JvmExamplesCompileIntegrationTest(BaseCompileIT):
           workdir, cachedir, target, strategy,
           extra_args=['--no-compile-java-use-jmake', '--no-color'], clean_all=True
         )
-        self.assertIn('[warn] sun.security.x509.X500Name', pants_run.stdout_data)
-        self.assertIn('[error] System2.out', pants_run.stdout_data)
+        self.assertIn('[warn] import sun.security.x509.X500Name;', pants_run.stdout_data)
+        self.assertIn('[error]     System2.out.println("Hello World!");', pants_run.stdout_data)
 
   def test_unicode_source_symbol(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:

@@ -9,7 +9,7 @@ from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
-from pants.backend.jvm.repository import Repository
+from pants.backend.jvm.repository import Repository as repo
 from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
@@ -37,8 +37,8 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
-from pants.backend.jvm.tasks.jvm_compile.java.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
@@ -51,8 +51,14 @@ from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.build_file_aliases import BuildFileAliases
+from pants.base.deprecated import deprecated
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
+
+
+@deprecated(removal_version='0.0.52', hint_message="Replace 'Repository' with 'repository'.")
+def Repository(*args, **kwargs):
+  return repo(*args, **kwargs)
 
 
 def build_file_aliases():
@@ -86,6 +92,7 @@ def build_file_aliases():
       'jar': JarDependency,
       'jar_rules': JarRules,
       'Repository': Repository,
+      'repository': repo,
       'Skip': Skip,
       'shading_relocate': Shading.Relocate.new,
       'shading_exclude': Shading.Exclude.new,

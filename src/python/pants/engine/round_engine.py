@@ -152,7 +152,11 @@ class RoundEngine(Engine):
         for producer_info in dependencies:
           producer_goal = producer_info.goal
           if producer_goal == goal:
-            if producer_info.task_type in visited_task_types:
+            if producer_info.task_type == task_type:
+              # We allow a task to produce products it itself needs.  We trust the Task writer
+              # to arrange for proper sequencing.
+              pass
+            elif producer_info.task_type in visited_task_types:
               ordering = '\n\t'.join("[{0}] '{1}' {2}".format(i, tn,
                                                               goal.task_type_by_name(tn).__name__)
                                      for i, tn in enumerate(goal.ordered_task_names()))

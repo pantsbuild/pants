@@ -22,6 +22,7 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -31,7 +32,7 @@ from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
-class ProjectInfoTest(ConsoleTaskTestBase):
+class ExportTest(ConsoleTaskTestBase):
 
   @classmethod
   def task_type(cls):
@@ -42,11 +43,11 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     return register_core().merge(register_jvm()).merge(register_python())
 
   def setUp(self):
-    super(ProjectInfoTest, self).setUp()
+    super(ExportTest, self).setUp()
 
     self.set_options_for_scope('jvm-platform',
                                default_platform='java6',
-                               platforms= {
+                               platforms={
                                  'java6': {'source': '1.6', 'target': '1.6'}
                                })
 
@@ -166,11 +167,17 @@ class ProjectInfoTest(ConsoleTaskTestBase):
         python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
       '''.strip())
 
+  def execute_export(self, *specs):
+    context = self.context(target_roots=[self.target(spec) for spec in specs])
+    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
+    return self.execute_console_task_given_context(context=context)
+
+  def execute_export_json(self, *specs):
+    return json.loads(''.join(self.execute_export(*specs)))
+
   def test_source_globs_py(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/x')]
-    ))
+    self.set_options(globs=True)
+    result = self.execute_export_json('src/x')
 
     self.assertEqual(
       {'globs': ['src/x/*.py']},
@@ -178,10 +185,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
   def test_source_globs_java(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('project_info:globular')]
-    ))
+    self.set_options(globs=True)
+    result = self.execute_export_json('project_info:globular')
 
     self.assertEqual(
       {'globs' : ['project_info/com/foo/*.scala']},
@@ -189,22 +194,16 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
   def test_without_dependencies(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:first')]
-    ))
+    result = self.execute_export_json('project_info:first')
     self.assertEqual({}, result['libraries'])
 
   def test_version(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:first')]
-    ))
+    result = self.execute_export_json('project_info:first')
     self.assertEqual('1.0.4', result['version'])
 
   def test_sources(self):
-    result = get_json(self.execute_console_task(
-      options=dict(sources=True),
-      targets=[self.target('project_info:third')]
-    ))
+    self.set_options(sources=True)
+    result = self.execute_export_json('project_info:third')
 
     self.assertEqual(
       ['project_info/com/foo/Bar.scala',
@@ -214,9 +213,7 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
   def test_with_dependencies(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:third')]
-    ))
+    result = self.execute_export_json('project_info:third')
 
     self.assertEqual(
       sorted([
@@ -239,17 +236,13 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
   def test_jvm_app(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:jvm_app')]
-    ))
+    result = self.execute_export_json('project_info:jvm_app')
     self.assertEqual(['org.apache:apache-jar:12.12.2012'],
                      result['targets']['project_info:jvm_app']['libraries'])
 
   def test_jvm_target(self):
     self.maxDiff = None
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:jvm_target')],
-    ))
+    result = self.execute_export_json('project_info:jvm_target')
     jvm_target = result['targets']['project_info:jvm_target']
     expected_jvm_target = {
       'excludes': [],
@@ -271,17 +264,13 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     self.assertEqual(jvm_target, expected_jvm_target)
 
   def test_no_libraries(self):
-    result = get_json(self.execute_console_task(
-      options=dict(libraries=False),
-      targets=[self.target('project_info:java_test')]
-    ))
+    self.set_options(libraries=False)
+    result = self.execute_export_json('project_info:java_test')
     self.assertEqual([],
                      result['targets']['project_info:java_test']['libraries'])
 
   def test_java_test(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:java_test')]
-    ))
+    result = self.execute_export_json('project_info:java_test')
     self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
     self.assertEqual(['org.apache:apache-jar:12.12.2012'],
                      result['targets']['project_info:java_test']['libraries'])
@@ -289,63 +278,51 @@ class ProjectInfoTest(ConsoleTaskTestBase):
                      result['targets']['project_info:test_resource']['target_type'])
 
   def test_jvm_binary(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:jvm_binary')]
-    ))
+    result = self.execute_export_json('project_info:jvm_binary')
     self.assertEqual(['org.apache:apache-jar:12.12.2012'],
                      result['targets']['project_info:jvm_binary']['libraries'])
 
   def test_top_dependency(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:top_dependency')]
-    ))
+    result = self.execute_export_json('project_info:top_dependency')
     self.assertEqual([], result['targets']['project_info:top_dependency']['libraries'])
     self.assertEqual(['project_info:jvm_binary'],
                      result['targets']['project_info:top_dependency']['targets'])
 
   def test_format_flag(self):
-    result = self.execute_console_task(
-      targets=[self.target('project_info:third')],
-      options={'formatted': False},
-    )
+    self.set_options(formatted=False)
+    result = self.execute_export('project_info:third')
     # confirms only one line of output, which is what -format should produce
     self.assertEqual(1, len(result))
 
   def test_target_types(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:target_type')]
-    ))
+    result = self.execute_export_json('project_info:target_type')
     self.assertEqual('SOURCE',
                      result['targets']['project_info:target_type']['target_type'])
     self.assertEqual('RESOURCE', result['targets']['project_info:resource']['target_type'])
 
   def test_target_platform(self):
-    result = get_json(self.execute_console_task(
-      targets=[self.target('project_info:target_type')],
-    ))
+    result = self.execute_export_json('project_info:target_type')
     self.assertEqual('java6',
                      result['targets']['project_info:target_type']['platform'])
 
   def test_output_file(self):
     outfile = os.path.join(self.build_root, '.pants.d', 'test')
-    self.execute_console_task(targets=[self.target('project_info:target_type')],
-                              options={'output_file': outfile})
+    self.set_options(output_file=outfile)
+    self.execute_export('project_info:target_type')
     self.assertTrue(os.path.exists(outfile))
 
   def test_output_file_error(self):
+    self.set_options(output_file=self.build_root)
     with self.assertRaises(TaskError):
-      self.execute_console_task(targets=[self.target('project_info:target_type')],
-                                options={'output_file': self.build_root})
+      self.execute_export('project_info:target_type')
 
   def test_unrecognized_target_type(self):
     with self.assertRaises(TaskError):
-      self.execute_console_task(targets=[self.target('project_info:unrecognized_target_type')])
+      self.execute_export('project_info:unrecognized_target_type')
 
   def test_source_exclude(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/exclude')]
-    ))
+    self.set_options(globs=True)
+    result = self.execute_export_json('src/exclude')
 
     self.assertEqual(
       {'globs': ['src/exclude/*.py'],
@@ -357,10 +334,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
   def test_source_rglobs(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/y')]
-    ))
+    self.set_options(globs=True)
+    result = self.execute_export_json('src/y')
 
     self.assertEqual(
       {'globs': ['src/y/**/*.py', 'src/y/*.py']},
@@ -368,10 +343,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
   def test_source_rglobs_subdir(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/y:y2')]
-    ))
+    self.set_options(globs=True)
+    result = self.execute_export_json('src/y:y2')
 
     self.assertEqual(
       {'globs': ['src/y/subdir/**/*.py', 'src/y/subdir/*.py']},
@@ -379,10 +352,8 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
   def test_source_rglobs_noninitial(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/y:y3')]
-    ))
+    self.set_options(globs=True)
+    result = self.execute_export_json('src/y:y3')
 
     self.assertEqual(
       {'globs': ['src/y/Test*.py']},
@@ -390,16 +361,10 @@ class ProjectInfoTest(ConsoleTaskTestBase):
     )
 
   def test_source_zglobs(self):
-    result = get_json(self.execute_console_task(
-      options=dict(globs=True),
-      targets=[self.target('src/z')]
-    ))
+    self.set_options(globs=True)
+    result = self.execute_export_json('src/z')
 
     self.assertEqual(
       {'globs': ['src/z/**/*.py']},
       result['targets']['src/z:z']['globs']
     )
-
-
-def get_json(lines):
-  return json.loads(''.join(lines))

@@ -9,8 +9,6 @@ import os
 import re
 import xml.dom.minidom as minidom
 
-import pytest
-
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -364,41 +362,26 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
   def test_ivy_classifiers(self):
     def do_check(path):
       """Check to see that the project contains the expected jar files."""
-      def check_jars(dom, jars, expected_jars):
+      def check_jars(jars, expected_jars):
         # Make sure the .jar files are present on disk
         for jar in expected_jars:
           self.assertTrue(os.path.exists(jar))
-        to_find = set(['jar://{}!/'.format(jar) for jar in expected_jars])
+        to_find = set('jar://{}!/'.format(jar) for jar in expected_jars)
         for external_library in jars:
           to_find.discard(external_library.getAttribute('url'))
-        self.assertEqual(set([]), to_find)
+        self.assertEqual(set(), to_find)
 
       iml_file = os.path.join(path, 'project.iml')
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
-      check_jars(dom, self._get_external_libraries(dom, type='CLASSES'), [
-         os.path.join(get_buildroot(), path, 'external-libs', jar_path)
-        for jar_path in [
-          'avro-1.7.7.jar',
-          'avro-1.7.7-tests.jar'
-        ]
-      ])
-
-      # TODO(Eric Ayers) we'd pull down sources and javadoc, but this fails when you
-      # use <artifact> elements in ivy to pull artifacts with classifiers.
-
-      #check_jars(dom, self._get_external_libraries(dom, type='SOURCES'), [
-      #  "jar://" + os.path.join(get_buildroot(), path, 'external-libsources', jar_path )
-      #  for jar_path in [
-      #    'avro-1.7.7-sources.jar',
-      #  ]
-      #])
-      #check_jars(dom, self._get_external_libraries(dom, type='JAVADOC'), [
-      #  "jar://" + os.path.join(get_buildroot(), path, 'external-libjavadoc', jar_path )
-      #  for jar_path in [
-      #    'avro-1.7.7-javadoc.jar',
-      #    ]
-      #])
+      base = os.path.join(get_buildroot(), path)
+      check_jars(self._get_external_libraries(dom, type='CLASSES'),
+                 [os.path.join(base, 'external-libs', jar_path)
+                  for jar_path in ['avro-1.7.7.jar', 'avro-1.7.7-tests.jar']])
+      check_jars(self._get_external_libraries(dom, type='SOURCES'),
+                 [os.path.join(base, 'external-libsources', 'avro-1.7.7-sources.jar')])
+      check_jars(self._get_external_libraries(dom, type='JAVADOC'),
+                 [os.path.join(base, 'external-libjavadoc', 'avro-1.7.7-javadoc.jar')])
 
     self._idea_test(['testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier::'],
                     check_func=do_check)

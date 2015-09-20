@@ -15,6 +15,7 @@ from twitter.common.dirutil.fileset import fnmatch_translate_extended
 
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.fs.archive import ZIP
@@ -26,8 +27,8 @@ logger = logging.getLogger(__name__)
 class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, target):
-    """UnpackedJars targets need to be re-unpacked if any of its configuration changes or
-       any of the jars they import have changed.
+    """UnpackedJars targets need to be re-unpacked if any of its configuration changes or any of
+    the jars they import have changed.
     """
     if isinstance(target, UnpackedJars):
       hasher = sha1()
@@ -41,7 +42,7 @@ class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintS
 class UnpackJars(Task):
   """Looks for UnpackedJars targets and unpacks them.
 
-     Adds an entry to SourceRoot for the contents.
+  Adds an entry to SourceRoot for the contents.
   """
 
   class InvalidPatternError(Exception):
@@ -57,14 +58,14 @@ class UnpackJars(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     super(UnpackJars, cls).prepare(options, round_manager)
-    round_manager.require_data('ivy_imports')
+    round_manager.require_data(JarImportProducts)
 
   def _unpack_dir(self, unpacked_jars):
     return os.path.normpath(os.path.join(self._workdir, unpacked_jars.id))
 
   @classmethod
   def _file_filter(cls, filename, include_patterns, exclude_patterns):
-    """:return: True if the file should be allowed through the filter"""
+    """:returns: `True` if the file should be allowed through the filter."""
     for exclude_pattern in exclude_patterns:
       if exclude_pattern.match(filename):
         return False
@@ -91,17 +92,16 @@ class UnpackJars(Task):
     return compiled_patterns
 
   @classmethod
-  def calculate_unpack_filter(cls, includes=[], excludes=[], spec=None):
+  def calculate_unpack_filter(cls, includes=None, excludes=None, spec=None):
     """Take regex patterns and return a filter function.
 
     :param list includes: List of include patterns to pass to _file_filter.
     :param list excludes: List of exclude patterns to pass to _file_filter.
-
     """
-    include_patterns = cls._compile_patterns(includes,
+    include_patterns = cls._compile_patterns(includes or [],
                                              field_name='include_patterns',
                                              spec=spec)
-    exclude_patterns = cls._compile_patterns(excludes,
+    exclude_patterns = cls._compile_patterns(excludes or [],
                                              field_name='exclude_patterns',
                                              spec=spec)
     return lambda f: cls._file_filter(f, include_patterns, exclude_patterns)
@@ -129,19 +129,18 @@ class UnpackJars(Task):
       os.makedirs(unpack_dir)
 
     unpack_filter = self.get_unpack_filter(unpacked_jars)
-    products = self.context.products.get('ivy_imports')
-    jarmap = products[unpacked_jars]
-
-    for path, names in jarmap.items():
-      for name in names:
-        jar_path = os.path.join(path, name)
-        ZIP.extract(jar_path, unpack_dir,
-                    filter_func=unpack_filter)
+    jar_import_products = self.context.products.get_data(JarImportProducts)
+    for coordinate, jar_path in jar_import_products.imports(unpacked_jars):
+      self.context.log.debug('Unpacking jar {coordinate} from {jar_path} to {unpack_dir}.'
+                             .format(coordinate=coordinate,
+                                     jar_path=jar_path,
+                                     unpack_dir=unpack_dir))
+      ZIP.extract(jar_path, unpack_dir, filter_func=unpack_filter)
 
   def execute(self):
     addresses = [target.address for target in self.context.targets()]
-    unpacked_jars_list = [t for t in self.context.build_graph.transitive_subgraph_of_addresses(addresses)
-                          if isinstance(t, UnpackedJars)]
+    closure = self.context.build_graph.transitive_subgraph_of_addresses(addresses)
+    unpacked_jars_list = [t for t in closure if isinstance(t, UnpackedJars)]
 
     unpacked_targets = []
     with self.invalidated(unpacked_jars_list,

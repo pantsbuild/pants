@@ -11,8 +11,10 @@ from hashlib import sha1
 from pants.backend.android.targets.android_library import AndroidLibrary
 from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -60,7 +62,7 @@ class UnpackLibraries(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     super(UnpackLibraries, cls).prepare(options, round_manager)
-    round_manager.require_data('ivy_imports')
+    round_manager.require_data(JarImportProducts)
 
   @classmethod
   def product_types(cls):
@@ -78,50 +80,54 @@ class UnpackLibraries(Task):
     self._created_targets = {}
     self._unpacked_archives = set()
 
-  def create_classes_jar_target(self, target, archive, jar_file):
+  def create_classes_jar_target(self, target, coordinate, jar_file):
     """Create a JarLibrary target containing the jar_file as a JarDependency.
 
-    :param AndroidLibrary target: The new JarLibrary will be derived from this AndroidLibrary .
-    :param string archive: Archive name as fetched by ivy, e.g. 'org.pantsbuild.example-1.0.aar'.
+    :param target: The new JarLibrary will be derived from this AndroidLibrary.
+    :type target: :class:`pants.backend.android.targets.android_library.AndroidLibrary`
+    :param coordinate: Archive coordinate fetched by ivy, e.g. 'org.pantsbuild:example::1.0:aar'.
+    :type coordinate: :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
     :param string jar_file: Full path of the classes.jar contained within unpacked aar files.
-    :return: new_target.
-    :rtype::class:`pants.backend.jvm.targets.java_library.JarLibrary`
+    :returns: A new jar library target.
+    :rtype: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
     """
     # TODO(mateor) add another JarDependency for every jar under 'libs'.
-
-    # Try to parse revision number. This is just to satisfy the spec, the rev is part of 'archive'.
-    archive_version = os.path.splitext(archive)[0].rpartition('-')[-1]
     jar_url = 'file://{0}'.format(jar_file)
-    jar_dep = JarDependency(org=target.id, name=archive, rev=archive_version, url=jar_url)
-    address = Address(self.workdir, '{}-classes.jar'.format(archive))
+    jar_dep = JarDependency(org=target.id, name=coordinate.artifact_filename, rev=coordinate.rev,
+                            url=jar_url)
+    address = Address(self.workdir, '{}-classes.jar'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, JarLibrary, jars=[jar_dep],
                                              derived_from=target)
     return new_target
 
-  def create_resource_target(self, target, archive, manifest, resource_dir):
+  def create_resource_target(self, target, coordinate, manifest, resource_dir):
     """Create an AndroidResources target.
 
-    :param AndroidLibrary target: AndroidLibrary that the new AndroidResources target derives from.
-    :param string archive: Archive name as fetched by ivy, e.g. 'org.pantsbuild.example-1.0.aar'.
+    :param target: AndroidLibrary that the new AndroidResources target derives from.
+    :type target: :class:`pants.backend.android.targets.android_library.AndroidLibrary`
+    :param coordinate: Archive coordinate fetched by ivy, e.g. 'org.pantsbuild:example::1.0:aar'.
+    :type coordinate: :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
+    :param string manifest: The path of 'AndroidManifest.xml'
     :param string resource_dir: Full path of the res directory contained within aar files.
-    :return: new_target.
+    :return: A new android resources target.
     :rtype::class:`pants.backend.android.targets.AndroidResources`
     """
 
-    address = Address(self.workdir, '{}-resources'.format(archive))
+    address = Address(self.workdir, '{}-resources'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidResources,
                                              manifest=manifest, resource_dir=resource_dir,
                                              derived_from=target)
     return new_target
 
-  def create_android_library_target(self, target, archive, unpacked_aar_location):
+  def create_android_library_target(self, target, coordinate, unpacked_aar_location):
     """Create an AndroidLibrary target.
 
     The aar files are unpacked and the contents used to create a new AndroidLibrary target.
     :param AndroidLibrary target: AndroidLibrary that the new AndroidLibrary target derives from.
-    :param string archive: An archive name as fetched by ivy, e.g. 'org.pantsbuild.example-1.0.aar'.
+    :param coordinate: Archive coordinate fetched by ivy, e.g. 'org.pantsbuild:example::1.0:aar'.
+    :type coordinate: :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
     :param string unpacked_aar_location: Full path of dir holding contents of an unpacked aar file.
-    :return: new_target
+    :return: A new android library target.
     :rtype::class:`pants.backend.android.targets.AndroidLibrary`
     """
     # The following three elements of an aar file have names mandated by the aar spec:
@@ -135,16 +141,16 @@ class UnpackLibraries(Task):
     if not os.path.isfile(manifest):
       raise self.MissingElementException("An AndroidManifest.xml is expected in every unpacked "
                                          ".aar file but none was found in the {} archive "
-                                         "for the {} target".format(archive, target))
+                                         "for the {} target".format(coordinate, target))
 
     # Depending on the contents of the unpacked aar file, create the dependencies.
     deps = []
     if os.path.isdir(resource_dir):
-      deps.append(self.create_resource_target(target, archive, manifest, resource_dir))
+      deps.append(self.create_resource_target(target, coordinate, manifest, resource_dir))
     if os.path.isfile(jar_file):
-      deps.append(self.create_classes_jar_target(target, archive, jar_file))
+      deps.append(self.create_classes_jar_target(target, coordinate, jar_file))
 
-    address = Address(self.workdir, '{}-android_library'.format(archive))
+    address = Address(self.workdir, '{}-android_library'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidLibrary,
                                              manifest=manifest,
                                              include_patterns=target.include_patterns,
@@ -153,79 +159,79 @@ class UnpackLibraries(Task):
                                              derived_from=target)
     return new_target
 
-  def _unpack_artifacts(self, imports):
+  def _unpack_artifacts(self, jar_imports):
     # Unpack the aar and jar library artifacts. If the aar files have a jar in the contents,
     # unpack that jar as well.
-    for archive_path in imports:
-      for archive in imports[archive_path]:
-        jar_outdir = self.unpacked_jar_location(archive)
-        if archive.endswith('.jar'):
-          jar_file = os.path.join(archive_path, archive)
-        elif archive.endswith('.aar'):
-          unpacked_aar_destination = self.unpacked_aar_location(archive)
-          jar_file = os.path.join(unpacked_aar_destination, 'classes.jar')
+    for coordinate, aar_or_jar in jar_imports:
+      jar_outdir = self.unpacked_jar_location(coordinate)
+      if 'jar' == coordinate.ext:
+        jar_file = aar_or_jar
+      elif 'aar' == coordinate.ext:
+        unpacked_aar_destination = self.unpacked_aar_location(coordinate)
+        jar_file = os.path.join(unpacked_aar_destination, 'classes.jar')
 
-          # Unpack .aar files.
-          if archive not in self._unpacked_archives:
-            ZIP.extract(os.path.join(archive_path, archive), unpacked_aar_destination)
-            self._unpacked_archives.update([archive])
+        # Unpack .aar files.
+        if coordinate not in self._unpacked_archives:
+          ZIP.extract(aar_or_jar, unpacked_aar_destination)
+          self._unpacked_archives.add(aar_or_jar)
 
-            # Create an .aar/classes.jar signature for self._unpacked_archives.
-            archive = os.path.join(archive, 'classes.jar')
-        else:
-          raise self.UnexpectedArchiveType('Android dependencies can be .aar or .jar '
-                                           'archives (was: {})'.format(archive))
-        # Unpack the jar files.
-        if archive not in self._unpacked_archives and os.path.isfile(jar_file):
-          ZIP.extract(jar_file, jar_outdir)
-          self._unpacked_archives.update([archive])
+          # Create an .aar/classes.jar signature for self._unpacked_archives.
+          coordinate = M2Coordinate(org=coordinate.org,
+                                    name=coordinate.name,
+                                    rev=coordinate.rev,
+                                    classifier=coordinate.classifier,
+                                    ext='classes.jar')
+      else:
+        raise self.UnexpectedArchiveType('Android dependencies can be .aar or .jar archives '
+                                         '(was: {} at {})'.format(coordinate, aar_or_jar))
+      # Unpack the jar files.
+      if coordinate not in self._unpacked_archives and os.path.isfile(jar_file):
+        ZIP.extract(jar_file, jar_outdir)
+        self._unpacked_archives.add(aar_or_jar)
 
-  def _create_target(self, target, imports):
+  def _create_target(self, target, coordinates):
     # Create a target for the components of an unpacked .aar file.
-    for archives in imports.values():
-      for archive in archives:
+    for coordinate in coordinates:
+      # The contents of the unpacked aar file must be made into an AndroidLibrary target.
+      if 'aar' == coordinate.ext:
+        if coordinate not in self._created_targets:
+          unpacked_location = self.unpacked_aar_location(coordinate)
+          if not os.path.isdir(unpacked_location):
+            raise self.MissingElementException('{}: Expected to unpack {} at {} but did not!'
+                                               .format(target, coordinate, unpacked_location))
+          new_target = self.create_android_library_target(target,
+                                                          coordinate,
+                                                          unpacked_location)
+          self._created_targets[coordinate] = new_target
+        target.inject_dependency(self._created_targets[coordinate].address)
 
-        # The contents of the unpacked aar file must be made into an AndroidLibrary target.
-        if archive.endswith('.aar'):
-          if archive not in self._created_targets:
-            unpacked_location = self.unpacked_aar_location(archive)
-            if not os.path.isdir(unpacked_location):
-              raise self.MissingElementException('{}: Expected to unpack {} at {} but did not!'
-                                                 .format(target, archive, unpacked_location))
-            new_target = self.create_android_library_target(target, archive, unpacked_location)
-            self._created_targets[archive] = new_target
-          target.inject_dependency(self._created_targets[archive].address)
-
-        # The unpacked_libraries product is a dir containing the full unpacked source. The files
-        # that match the include/exclude patterns are calculated during DxCompile.
-        unpacked_products = self.context.products.get('unpacked_libraries')
-        unpacked_products.add(target, get_buildroot()).append(self.unpacked_jar_location(archive))
+      # The unpacked_libraries product is a dir containing the full unpacked source. The files
+      # that match the include/exclude patterns are calculated during DxCompile.
+      unpacked_products = self.context.products.get('unpacked_libraries')
+      unpacked_products.add(target, get_buildroot()).append(self.unpacked_jar_location(coordinate))
 
   def execute(self):
-    ivy_imports = self.context.products.get('ivy_imports')
+    jar_import_products = self.context.products.get_data(JarImportProducts)
     library_targets = self.context.targets(predicate=self.is_library)
 
-    targets_to_unpack = []
     with self.invalidated(library_targets,
                           fingerprint_strategy=AndroidLibraryFingerprintStrategy(),
                           invalidate_dependents=True) as invalidation_check:
-      if invalidation_check.invalid_vts:
-        targets_to_unpack.extend([vt.target for vt in invalidation_check.invalid_vts])
-        for target in targets_to_unpack:
-          imports = ivy_imports.get(target)
-          if imports:
-            self._unpack_artifacts(imports)
+      for vt in invalidation_check.invalid_vts:
+        jar_imports = jar_import_products.imports(vt.target)
+        if jar_imports:
+          self._unpack_artifacts(jar_imports)
 
     # Create the new targets from the contents of unpacked aar files.
     for target in library_targets:
-      imports = ivy_imports.get(target)
-      if imports:
-        self._create_target(target, imports)
+      jar_imports = jar_import_products.imports(target)
+      if jar_imports:
+        self._create_target(target, (jar_import.coordinate for jar_import in jar_imports))
 
-  def unpacked_jar_location(self, archive):
+  def unpacked_jar_location(self, coordinate):
     """Location for unpacked jar files, whether imported as-is or found inside an aar file."""
-    return os.path.join(self.workdir, 'explode-jars', archive)
+    return os.path.join(self.workdir, 'explode-jars', coordinate.artifact_filename)
 
-  def unpacked_aar_location(self, archive):
+  def unpacked_aar_location(self, coordinate):
     """Output location for unpacking .aar archives."""
-    return os.path.join(self.workdir, archive)
+    return os.path.join(self.workdir, coordinate.artifact_filename)

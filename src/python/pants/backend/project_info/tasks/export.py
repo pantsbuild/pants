@@ -15,12 +15,13 @@ from twitter.common.collections import OrderedSet
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.ivy_utils import IvyModuleRef
+from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.project_info.tasks.projectutils import get_jar_infos
+from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
@@ -49,7 +50,7 @@ class Export(PythonTask, ConsoleTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION='1.0.4'
+  DEFAULT_EXPORT_VERSION = '1.0.4'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -105,8 +106,14 @@ class Export(PythonTask, ConsoleTask):
   def prepare(cls, options, round_manager):
     super(Export, cls).prepare(options, round_manager)
     if options.libraries or options.libraries_sources or options.libraries_javadocs:
-      round_manager.require_data('ivy_jar_products')
-      round_manager.require('jar_dependencies')
+      # TODO(John Sirois): Clean this up by using IvyUtils in here, passing it the confs we need
+      # as a parameter.
+      # See: https://github.com/pantsbuild/pants/issues/2177
+      round_manager.require_data('compile_classpath')
+
+      # NB: These are fake products that only serve as signals to the upstream producer of
+      # 'compile_classpath' to resolve extra classifiers (ivy confs).  A hack that can go away with
+      # execution of the TODO above.
       round_manager.require('jar_map_default')
       if options.libraries_sources:
         round_manager.require('jar_map_sources')
@@ -120,20 +127,9 @@ class Export(PythonTask, ConsoleTask):
   def console_output(self, targets):
     targets_map = {}
     resource_target_map = {}
-    ivy_info = None
-    if self.get_options().libraries:
-      ivy_jar_products = self.context.products.get_data('ivy_jar_products') or {}
-      # This product is a list for historical reasons (exclusives groups) but in practice should
-      # have either 0 or 1 entries.
-      ivy_info_list = ivy_jar_products.get('default')
-      if ivy_info_list:
-        assert len(ivy_info_list) == 1, (
-          'The values in ivy_jar_products should always be length 1,'
-          ' since we no longer have exclusives groups.'
-        )
-        ivy_info = ivy_info_list[0]
+    classpath_products = (self.context.products.get_data('compile_classpath')
+                          if self.get_options().libraries else None)
 
-    ivy_jar_memo = {}
     python_interpreter_targets_mapping = defaultdict(list)
 
     def process_target(current_target):
@@ -153,18 +149,6 @@ class Export(PythonTask, ConsoleTask):
           else:
             return Export.SourceRootTypes.SOURCE
 
-      def get_transitive_jars(jar_lib):
-        """
-        :type jar_lib: pants.backend.jvm.targets.jar_library.JarLibrary
-        :rtype: twitter.common.collections.orderedset.OrderedSet
-        """
-        if not ivy_info or not self.get_options().libraries:
-          return OrderedSet()
-        transitive_jars = OrderedSet()
-        for jar in jar_lib.jar_dependencies:
-          transitive_jars.update(ivy_info.get_jars_for_ivy_module(jar, memo=ivy_jar_memo))
-        return transitive_jars
-
       info = {
         'targets': [],
         'libraries': [],
@@ -172,7 +156,6 @@ class Export(PythonTask, ConsoleTask):
         'target_type': get_target_type(current_target),
         'is_code_gen': current_target.is_codegen,
         'pants_target_type': self._get_pants_target_alias(type(current_target))
-
       }
 
       if not current_target.is_synthetic:
@@ -188,20 +171,35 @@ class Export(PythonTask, ConsoleTask):
       if isinstance(current_target, PythonTarget):
         interpreter_for_target = self.select_interpreter_for_targets([current_target])
         if interpreter_for_target is None:
-          raise TaskError('Unable to find suitable interpreter for {}'.format(current_target.address))
+          raise TaskError('Unable to find suitable interpreter for {}'
+                          .format(current_target.address))
         python_interpreter_targets_mapping[interpreter_for_target].append(current_target)
         info['python_interpreter'] = str(interpreter_for_target.identity)
 
+      def iter_transitive_jars(jar_lib):
+        """
+        :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
+        :rtype: :class:`collections.Iterator` of
+                :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
+        """
+        if classpath_products:
+          jar_products = classpath_products.get_artifact_classpath_entries_for_targets((jar_lib,))
+          for _, jar_entry in jar_products:
+            coordinate = jar_entry.coordinate
+            # We drop classifier and type_ since those fields are represented in the global
+            # libraries dict and here we just want the key into that dict (see `_jar_id`).
+            yield M2Coordinate(org=coordinate.org, name=coordinate.name, rev=coordinate.rev)
+
       target_libraries = OrderedSet()
       if isinstance(current_target, JarLibrary):
-        target_libraries = get_transitive_jars(current_target)
+        target_libraries = OrderedSet(iter_transitive_jars(current_target))
       for dep in current_target.dependencies:
         info['targets'].append(dep.address.spec)
         if isinstance(dep, JarLibrary):
           for jar in dep.jar_dependencies:
-            target_libraries.add(IvyModuleRef(jar.org, jar.name, jar.rev))
+            target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
           # Add all the jars pulled in by this jar_library
-          target_libraries.update(get_transitive_jars(dep))
+          target_libraries.update(iter_transitive_jars(dep))
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
 
@@ -219,7 +217,7 @@ class Export(PythonTask, ConsoleTask):
         'package_prefix': package_prefix
       }, self._source_roots_for_target(current_target))
 
-      if self.get_options().libraries:
+      if classpath_products:
         info['libraries'] = [self._jar_id(lib) for lib in target_libraries]
       targets_map[current_target.address.spec] = info
 
@@ -245,11 +243,13 @@ class Export(PythonTask, ConsoleTask):
     if jvm_distributions:
       graph_info['jvm_distributions'] = jvm_distributions
 
-    if self.get_options().libraries:
-      graph_info['libraries'] = self._resolve_jars_info()
+    if classpath_products:
+      graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
 
     if python_interpreter_targets_mapping:
-      default_interpreter = self.interpreter_cache.select_interpreter(python_interpreter_targets_mapping.keys())[0]
+      interpreters = self.interpreter_cache.select_interpreter(
+        python_interpreter_targets_mapping.keys())
+      default_interpreter = interpreters[0]
 
       interpreters_info = {}
       for interpreter, targets in python_interpreter_targets_mapping.iteritems():
@@ -268,13 +268,12 @@ class Export(PythonTask, ConsoleTask):
         'interpreters': interpreters_info
       }
 
-
     if self.format:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:
       return [json.dumps(graph_info)]
 
-  def _resolve_jars_info(self):
+  def _resolve_jars_info(self, targets, classpath_products):
     """Consults ivy_jar_products to export the external libraries.
 
     :return: mapping of jar_id -> { 'default'     : <jar_file>,
@@ -284,10 +283,11 @@ class Export(PythonTask, ConsoleTask):
                                   }
     """
     mapping = defaultdict(dict)
-    jar_data = self.context.products.get_data('ivy_jar_products')
-    jar_infos = get_jar_infos(ivy_products=jar_data)
-    for ivy_module_ref, conf_to_jarfile_map in jar_infos.iteritems():
-      mapping[self._jar_id(ivy_module_ref)].update(conf_to_jarfile_map)
+    jar_products = classpath_products.get_artifact_classpath_entries_for_targets(
+      targets, respect_excludes=False)
+    for conf, jar_entry in jar_products:
+      conf = jar_entry.coordinate.classifier or 'default'
+      mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
     return mapping
 
   @memoized_property

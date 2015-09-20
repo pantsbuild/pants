@@ -102,9 +102,8 @@ class DuplicateDetector(JvmBinaryTask):
 
   def _get_external_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
-    for basedir, externaljar in self.list_external_jar_dependencies(binary_target):
-      external_dep = os.path.join(basedir, externaljar)
-      self.context.log.debug('  scanning {}'.format(external_dep))
+    for external_dep, coordinate in self.list_external_jar_dependencies(binary_target):
+      self.context.log.debug('  scanning {} from {}'.format(coordinate, external_dep))
       with open_zip(external_dep) as dep_zip:
         for qualified_file_name in dep_zip.namelist():
           # Zip entry names can come in any encoding and in practice we find some jars that have

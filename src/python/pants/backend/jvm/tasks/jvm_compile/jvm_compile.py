@@ -17,6 +17,7 @@ from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
+from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
@@ -108,7 +109,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     super(JvmCompile, cls).prepare(options, round_manager)
 
     round_manager.require_data('compile_classpath')
-    round_manager.require_data('ivy_resolve_symlink_map')
 
     # Require codegen we care about
     # TODO(John Sirois): roll this up in Task - if the list of labels we care about for a target
@@ -361,11 +361,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
         # Register products for all the valid targets.
         # We register as we go, so dependency checking code can use this data.
-        valid_targets = list(set(relevant_targets) - set(invalid_targets))
+        valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
         valid_compile_contexts = [self.compile_context(t) for t in valid_targets]
         self._register_vts(valid_compile_contexts)
 
         # Invoke the strategy to execute compilations for invalid targets.
+        check_vts = (self.check_artifact_cache
+            if self.artifact_cache_reads_enabled() else None)
         update_artifact_cache_vts_work = (self.get_update_artifact_cache_work
             if self.artifact_cache_writes_enabled() else None)
         self.compile_chunk(invalidation_check,
@@ -373,6 +375,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                            relevant_targets,
                            invalid_targets,
                            self.extra_compile_time_classpath_elements(),
+                           check_vts,
                            self._compile_vts,
                            self._register_vts,
                            update_artifact_cache_vts_work)
@@ -463,7 +466,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def check_artifact_cache(self, vts):
     post_process_cached_vts = lambda cvts: self.post_process_cached_vts(cvts)
-    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process_cached_vts)
+    cache_hit_callback = self.create_cache_hit_callback(vts)
+    return self.do_check_artifact_cache(vts,
+                                        post_process_cached_vts=post_process_cached_vts,
+                                        cache_hit_callback=cache_hit_callback)
 
   def post_process_cached_vts(self, cached_vts):
     """Localizes the fetched analysis for targets we found in the cache.

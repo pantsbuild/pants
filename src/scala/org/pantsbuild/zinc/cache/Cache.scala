@@ -1,10 +1,11 @@
 /**
- * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
+ * Copyright (C) 2015 Pants project contributors (see CONTRIBUTORS.md).
+ * Licensed under the Apache License, Version 2.0 (see LICENSE).
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.cache
 
-import com.google.common.cache
+import com.google.common.{cache => gcache}
 
 import java.util.concurrent.Callable
 
@@ -16,8 +17,8 @@ import scala.collection.JavaConverters._
 object Cache {
   final val DefaultInitialSize = 8
 
-  def apply[K<:AnyRef, V<:AnyRef](maxSize: Int): cache.Cache[K, V] =
-    cache.CacheBuilder.newBuilder()
+  def apply[K<:AnyRef, V<:AnyRef](maxSize: Int): gcache.Cache[K, V] =
+    gcache.CacheBuilder.newBuilder()
       .softValues()
       .initialCapacity(maxSize min DefaultInitialSize)
       .maximumSize(maxSize)
@@ -28,7 +29,7 @@ object Cache {
    *
    * NB: This should become a value class after we're on scala 2.11.x: see SI-8011.
    */
-  implicit class Implicits[K, V](val c: cache.Cache[K, V]) {
+  implicit class Implicits[K, V](val c: gcache.Cache[K, V]) {
     def getOrElseUpdate(key: K)(value: => V): V =
       c.get(key, new Callable[V] { def call = value })
 

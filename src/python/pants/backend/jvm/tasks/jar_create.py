@@ -9,7 +9,7 @@ import os
 from contextlib import contextmanager
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.backend.jvm.tasks.jar_task import JarBuilderTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 
@@ -32,7 +32,7 @@ def is_jvm_library(target):
           or (is_jvm_binary(target) and target.has_resources))
 
 
-class JarCreate(JarTask):
+class JarCreate(JarBuilderTask):
   """Jars jvm libraries and optionally their sources and their docs."""
 
   @classmethod
