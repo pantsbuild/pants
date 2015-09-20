@@ -10,7 +10,6 @@ use_jmake: False
 
 
 [compile.zinc]
-name_hashing: False
 strategy: isolated
 worker_count: 4
 jvm_options: [
