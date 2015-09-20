@@ -239,22 +239,24 @@ class DependencyUsageGraph(object):
     max_target_usage = defaultdict(lambda: 0.0)
     for target, node in self._nodes.items():
       for dep_target, edge in node.dep_edges.items():
+        if target == dep_target:
+          continue
         used_ratio = self._used_ratio(dep_target, edge)
         max_target_usage[dep_target] = max(max_target_usage[dep_target], used_ratio)
 
     # Calculate a score for each.
-    keys = ('score', 'max_usage', 'job_size_transitive', 'target')
+    keys = ('badness', 'max_usage', 'job_size_transitive', 'target')
     Score = namedtuple('Score', keys)
     scores = []
     for target, max_usage in max_target_usage.items():
       job_size_transitive = self._trans_job_size(target)
-      score = job_size_transitive / max_usage
+      score = int(job_size_transitive / (max_usage if max_usage > 0.0 else 1.0))
       scores.append(Score(score, max_usage, job_size_transitive, target.address.spec))
 
     # Output in reverse order by score.
     yield '[\n'
     first = True
-    for score in sorted(scores, key=lambda s: s.score, reverse=True):
+    for score in sorted(scores, key=lambda s: s.badness, reverse=True):
       yield '{}  {}'.format('' if first else ',\n', json.dumps(OrderedDict(zip(keys, score))))
       first = False
     yield '\n]\n'

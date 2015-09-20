@@ -480,6 +480,50 @@ and try running
     ./pants binary testprojects/src/java/org/pantsbuild/testproject/shading
     jar -tf dist/shading.jar
 
+Dependency Hygiene
+------------------
+
+As the set of targets in a repository grows larger, it becomes increasingly important that they
+observe good dependency hygiene. In particular, following
+[[the 1:1:1 rule|pants('src/docs:build_files')]] helps keep useful code self-contained. But even
+while observing 1:1:1, it's possible to declare and use dependencies that add little or no benefit
+for a target.
+
+For example: a particularly large target may expose many different APIs. In cases where other
+targets depend on the large target, they might need only a fraction of those APIs. But because
+they can't declare a dependency on a smaller subset of the large target, they are forced to
+build the entire dependency. Even in the presence of distributed builds and caching, this slows
+down your build!
+
+To help users address these problems for JVM targets, pants has a `dep-usage.jvm` task which
+supports scoring and summarizing the fractions of each dependency that a target uses.
+
+### For local analysis
+
+In the default output mode ("summary" mode) the `dep-usage.jvm` task outputs targets ordered by
+a simple 'badness' score. The "badness" score is intended to indicate both how easy the dependency
+would be to remove (based on the maximum fraction used by each dependee) and how valuable it would
+be remove (based on a estimate of the transitive cost to build the dep).
+
+    :::shell
+    $ ./pants dep-usage.jvm examples/src/scala/org/pantsbuild/example::
+    ...
+    [
+      {"badness": 4890, "max_usage": 0.3, "job_size_transitive": 1630, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome"},
+      {"badness": 1098, "max_usage": 1.0, "job_size_transitive": 1098, "target": "examples/src/java/org/pantsbuild/example/hello/greet"}
+    ]
+
+The above example indicates that within the scope of the scala examples, the
+`examples/src/scala/org/pantsbuild/example/hello/welcome` target is the worst dependency. This is
+because it has a high transitive "cost" to build, and sees a maximum of 30% usage by its dependees.
+
+### For global analysis
+
+The summary mode is great when users want to inspect their own targets. But for more in-depth
+analysis, disabling summary mode (by passing the `--no-summary` flag) will output raw usage data
+for each dependency edge. This mode does no aggregation, so using it effectively usually means
+doing analytics or graph analysis with an external tool.
+
 Further Reading
 ---------------
 
