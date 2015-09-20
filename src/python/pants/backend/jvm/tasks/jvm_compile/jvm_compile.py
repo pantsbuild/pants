@@ -33,10 +33,13 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.fileutil import atomic_copy, create_size_estimators
 from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
-# This class holds onto class directories rather than CompileContexts because
-# CompileContext aren't picklable.
+
 class CacheHitCallback(object):
-  """A serializable cache hit callback that cleans the class directory prior to cache extraction."""
+  """A serializable cache hit callback that cleans the class directory prior to cache extraction.
+
+  This class holds onto class directories rather than CompileContexts because CompileContexts
+  aren't picklable.
+  """
 
   def __init__(self, cache_key_to_class_dir):
     self._key_to_target = cache_key_to_class_dir
