@@ -12,7 +12,7 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 class ZincCompileIntegrationTest(BaseCompileIT):
 
   def test_java_src_zinc_compile(self):
-    with self.do_test_compile('examples/src/java/::', 'isolated', extra_args=['--no-compile-java-use-jmake']):
+    with self.do_test_compile('examples/src/java/::', extra_args=['--no-compile-java-use-jmake']):
       # run succeeded as expected
       pass
 
@@ -47,10 +47,9 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
         target = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/unicodedep/consumer'
         pants_run = self.run_test_compile(
-          workdir, cachedir, target, 'isolated',
+          workdir, cachedir, target,
           extra_args=[
             '--compile-zinc-name-hashing',
-            '--config-override=pants.ini.isolated',
             '--cache-compile-zinc-write-to=["{}/dummy_artifact_cache_dir"]'.format(cachedir),
           ],
           clean_all=True,

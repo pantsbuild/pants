@@ -11,26 +11,17 @@ from pants.util.contextutil import open_tar, open_zip, temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
-SHAPELESS_CLSNAME = 'ShapelessExample.class'
 SHAPELESS_CLSFILE = 'org/pantsbuild/testproject/unicode/shapeless/ShapelessExample.class'
 SHAPELESS_TARGET = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless'
 
 
 class ZincCompileIntegrationTest(BaseCompileIT):
 
-  def test_scala_global_compile(self):
-    with self.do_test_compile(SHAPELESS_TARGET,
-                              'global',
-                              expected_files=[SHAPELESS_CLSNAME]) as found:
-
-      self.assertTrue(self.get_only(found, SHAPELESS_CLSNAME).endswith(SHAPELESS_CLSFILE))
-
-  def test_scala_isolated_compile_jar(self):
+  def test_scala_compile_jar(self):
     # NB: generated with:
     #   hashlib.sha1('testprojects.src.scala.org.pantsbuild.testproject.unicode.shapeless.shapeless').hexdigest()[:12]
     jar_suffix = 'fd9f49e1153b.jar'
     with self.do_test_compile(SHAPELESS_TARGET,
-                              'isolated',
                               expected_files=[jar_suffix]) as found:
       with open_zip(self.get_only(found, jar_suffix), 'r') as jar:
         self.assertTrue(jar.getinfo(SHAPELESS_CLSFILE),
@@ -53,12 +44,11 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         self.assertTrue(cls.endswith(
           'org/pantsbuild/testproject/sharedsources/SharedSources.class'))
 
-  def test_scala_isolated_failure(self):
+  def test_scala_failure(self):
     """With no initial analysis, a failed compilation shouldn't leave anything behind."""
     analysis_file = 'testprojects.src.scala.' \
         'org.pantsbuild.testproject.compilation_failure.compilation_failure.analysis'
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testprojects/compilation_failure',
-                              'isolated',
                               expected_files=[analysis_file],
                               expect_failure=True) as found:
       self.assertEqual(0, len(found[analysis_file]))
@@ -99,7 +89,6 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             workdir,
             cachedir,
             'testprojects/src/scala/org/pantsbuild/testproject/emptyscala',
-            'isolated',
             extra_args=[
               '--compile-zinc-args=-recompile-all-fraction',
               '--compile-zinc-args=0.5',
