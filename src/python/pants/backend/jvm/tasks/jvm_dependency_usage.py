@@ -100,7 +100,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   def _select(self, target):
     if self.get_options().internal_only and isinstance(target, JarLibrary):
       return False
-    elif isinstance(target, Resources):
+    elif isinstance(target, (Dependencies, Resources)):
       return False
     else:
       return True
