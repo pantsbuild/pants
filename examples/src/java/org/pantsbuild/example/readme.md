@@ -509,8 +509,8 @@ be remove (based on a estimate of the transitive cost to build the dep).
     $ ./pants dep-usage.jvm examples/src/scala/org/pantsbuild/example::
     ...
     [
-      {"badness": 4890, "max_usage": 0.3, "job_size_transitive": 1630, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome"},
-      {"badness": 1098, "max_usage": 1.0, "job_size_transitive": 1098, "target": "examples/src/java/org/pantsbuild/example/hello/greet"}
+      {"badness": 4890, "max_usage": 0.3, "cost_transitive": 1630, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome"},
+      {"badness": 1098, "max_usage": 1.0, "cost_transitive": 1098, "target": "examples/src/java/org/pantsbuild/example/hello/greet"}
     ]
 
 The above example indicates that within the scope of the scala examples, the

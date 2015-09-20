@@ -206,19 +206,19 @@ class DependencyUsageGraph(object):
   def __init__(self, nodes, size_estimator):
     self._nodes = nodes
     self._size_estimator = size_estimator
-    self._job_size_cache = {}
-    self._trans_job_size_cache = {}
+    self._cost_cache = {}
+    self._trans_cost_cache = {}
 
-  def _job_size(self, target):
-    if target not in self._job_size_cache:
-      self._job_size_cache[target] = self._size_estimator(target.sources_relative_to_buildroot())
-    return self._job_size_cache[target]
+  def _cost(self, target):
+    if target not in self._cost_cache:
+      self._cost_cache[target] = self._size_estimator(target.sources_relative_to_buildroot())
+    return self._cost_cache[target]
 
-  def _trans_job_size(self, target):
-    if target not in self._trans_job_size_cache:
-      dep_sum = sum(self._trans_job_size(dep) for dep in target.dependencies)
-      self._trans_job_size_cache[target] = self._job_size(target) + dep_sum
-    return self._trans_job_size_cache[target]
+  def _trans_cost(self, target):
+    if target not in self._trans_cost_cache:
+      dep_sum = sum(self._trans_cost(dep) for dep in target.dependencies)
+      self._trans_cost_cache[target] = self._cost(target) + dep_sum
+    return self._trans_cost_cache[target]
 
   def _edge_type(self, target, edge, dep):
     if target == dep:
@@ -245,13 +245,13 @@ class DependencyUsageGraph(object):
         max_target_usage[dep_target] = max(max_target_usage[dep_target], used_ratio)
 
     # Calculate a score for each.
-    keys = ('badness', 'max_usage', 'job_size_transitive', 'target')
+    keys = ('badness', 'max_usage', 'cost_transitive', 'target')
     Score = namedtuple('Score', keys)
     scores = []
     for target, max_usage in max_target_usage.items():
-      job_size_transitive = self._trans_job_size(target)
-      score = int(job_size_transitive / (max_usage if max_usage > 0.0 else 1.0))
-      scores.append(Score(score, max_usage, job_size_transitive, target.address.spec))
+      cost_transitive = self._trans_cost(target)
+      score = int(cost_transitive / (max_usage if max_usage > 0.0 else 1.0))
+      scores.append(Score(score, max_usage, cost_transitive, target.address.spec))
 
     # Output in reverse order by score.
     yield '[\n'
@@ -273,8 +273,8 @@ class DependencyUsageGraph(object):
       }
     for node in self._nodes.values():
       res_dict[node.concrete_target.address.spec] = {
-          'job_size': self._job_size(node.concrete_target),
-          'job_size_transitive': self._trans_job_size(node.concrete_target),
+          'cost': self._cost(node.concrete_target),
+          'cost_transitive': self._trans_cost(node.concrete_target),
           'products_total': node.products_total,
           'dependencies': [gen_dep_edge(node, edge, dep_tgt) for dep_tgt, edge in node.dep_edges.items()]
         }

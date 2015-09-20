@@ -55,9 +55,9 @@ class TestJvmDependencyUsage(TaskTestBase):
     self.assertEqual(len(graph._nodes[t2].dep_edges[t1].products_used), 1)
     self.assertEqual(len(graph._nodes[t3].dep_edges[t1].products_used), 2)
 
-    self.assertEqual(graph._trans_job_size(t1), 2)
-    self.assertEqual(graph._trans_job_size(t2), 3)
-    self.assertEqual(graph._trans_job_size(t3), 4)
+    self.assertEqual(graph._trans_cost(t1), 2)
+    self.assertEqual(graph._trans_cost(t2), 3)
+    self.assertEqual(graph._trans_cost(t3), 4)
 
   def test_dep_usage_graph_with_synthetic_targets(self):
     t1 = self.make_java_target(spec=':t1', sources=['t1.thrift'])
