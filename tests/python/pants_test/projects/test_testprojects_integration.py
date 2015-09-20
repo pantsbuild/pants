@@ -6,13 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
-from pants_test.testutils.compile_strategy_utils import provide_compile_strategies
 
 
 class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
-  @provide_compile_strategies
-  def tests_testprojects(self, strategy):
+  def tests_testprojects(self):
     # TODO(Eric Ayers) find a better way to deal with tests that are known to fail.
     # right now, just split them into two categories and ignore them.
 
@@ -41,5 +39,5 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
     targets_to_exclude = known_failing_targets + negative_test_targets
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target), targets_to_exclude)
-    pants_run = self.pants_test(strategy, ['testprojects::'] + exclude_opts)
+    pants_run = self.pants_test(['testprojects::'] + exclude_opts)
     self.assert_success(pants_run)

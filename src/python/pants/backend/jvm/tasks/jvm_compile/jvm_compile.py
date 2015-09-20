@@ -33,6 +33,19 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.fileutil import atomic_copy, create_size_estimators
 from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
 
+# This class holds onto class directories rather than CompileContexts because
+# CompileContext aren't picklable.
+class CacheHitCallback(object):
+  """A serializable cache hit callback that cleans the class directory prior to cache extraction."""
+
+  def __init__(self, cache_key_to_class_dir):
+    self._key_to_target = cache_key_to_class_dir
+
+  def __call__(self, cache_key):
+    class_dir = self.key_to_target.get(cache_key)
+    if class_dir:
+      safe_mkdir(class_dir, clean=True)
+
 
 class JvmCompile(NailgunTaskBase, GroupMember):
   """A common framework for JVM compilation.
@@ -469,8 +482,15 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def check_artifact_cache(self, vts):
     post_process_cached_vts = lambda cvts: self.post_process_cached_vts(cvts)
+    cache_hit_callback = self.create_cache_hit_callback(vts)
     return self.do_check_artifact_cache(vts,
-                                        post_process_cached_vts=post_process_cached_vts)
+                                        post_process_cached_vts=post_process_cached_vts,
+                                        cache_hit_callback=cache_hit_callback)
+
+  def create_cache_hit_callback(self, vts):
+    cache_key_to_classes_dir = {v.cache_key: self.compile_context(v.target).classes_dir
+                                for v in vts}
+    return CacheHitCallback(cache_key_to_classes_dir)
 
   def post_process_cached_vts(self, cached_vts):
     """Localizes the fetched analysis for targets we found in the cache.
