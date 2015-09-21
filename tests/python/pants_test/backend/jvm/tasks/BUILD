@@ -218,14 +218,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'jvm_dependency_usage_integration',
-  sources = ['test_jvm_dependency_usage_integration.py'],
-  dependencies = [
-    'tests/python/pants_test:int-test',
-  ]
-)
-
-python_tests(
   name = 'jvm_platform_analysis',
   sources = ['test_jvm_platform_analysis.py'],
   dependencies = [

@@ -16,6 +16,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import create_size_estimators
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
+from pants.base.target import Target
 from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
 
@@ -62,6 +63,8 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
     super(JvmDependencyUsage, cls).prepare(options, round_manager)
     if not options.skip:
       round_manager.require_data('classes_by_source')
+      round_manager.require_data('classes_by_target')
+      round_manager.require_data('product_deps_by_src')
 
   def execute(self):
     if self.get_options().skip:
@@ -87,7 +90,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   def _resolve_aliases(self, target):
     """Recursively resolve `target` aliases."""
     for declared in target.dependencies:
-      if isinstance(declared, Dependencies):
+      if isinstance(declared, Dependencies) or type(declared) == Target:
         for r in self._resolve_aliases(declared):
           yield r
       else:
@@ -138,18 +141,17 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
         continue
       # Create or extend a Node for the concrete version of this target.
       concrete_target = target.concrete_derived_from
-      products_total = sum(1 for _, paths in classes_by_target[target].rel_paths() for p in paths)
-      if concrete_target in nodes:
-        node = nodes[concrete_target]
-      else:
-        node = nodes[concrete_target] = Node(concrete_target)
+      products_total = sum(len(paths) for _, paths in classes_by_target[target].rel_paths())
+      node = nodes.get(concrete_target)
+      if not node:
+        node = nodes.setdefault(concrete_target, Node(concrete_target))
       node.add_derivation(target, products_total)
 
       # Record declared Edges.
       for dep_tgt in self._resolve_aliases(target):
         derived_from = dep_tgt.concrete_derived_from
         if self._select(derived_from):
-          node.add_edge(Edge(True, set()), derived_from)
+          node.add_edge(Edge(is_declared=True, products_used=set()), derived_from)
 
       # Record the used products and undeclared Edges for this target. Note that some of
       # these may be self edges, which are considered later.
@@ -162,10 +164,10 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
               continue
             is_declared = self._is_declared_dep(target, dep_tgt)
             normalized_deps = self._normalize_product_dep(buildroot, classes_by_source, product_dep)
-            node.add_edge(Edge(is_declared, normalized_deps), derived_from)
+            node.add_edge(Edge(is_declared=is_declared, products_used=normalized_deps), derived_from)
 
     # Prune any Nodes with 0 products.
-    for concrete_target, node in nodes.copy().items():
+    for concrete_target, node in nodes.items()[:]:
       if node.products_total == 0:
         nodes.pop(concrete_target)
 
@@ -245,8 +247,7 @@ class DependencyUsageGraph(object):
         max_target_usage[dep_target] = max(max_target_usage[dep_target], used_ratio)
 
     # Calculate a score for each.
-    keys = ('badness', 'max_usage', 'cost_transitive', 'target')
-    Score = namedtuple('Score', keys)
+    Score = namedtuple('Score', ('badness', 'max_usage', 'cost_transitive', 'target'))
     scores = []
     for target, max_usage in max_target_usage.items():
       cost_transitive = self._trans_cost(target)
@@ -257,7 +258,7 @@ class DependencyUsageGraph(object):
     yield '[\n'
     first = True
     for score in sorted(scores, key=lambda s: s.badness):
-      yield '{}  {}'.format('' if first else ',\n', json.dumps(OrderedDict(zip(keys, score))))
+      yield '{}  {}'.format('' if first else ',\n', json.dumps(score._asdict()))
       first = False
     yield '\n]\n'
 

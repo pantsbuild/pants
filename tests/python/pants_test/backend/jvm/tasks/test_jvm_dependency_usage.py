@@ -30,6 +30,11 @@ class TestJvmDependencyUsage(TaskTestBase):
     assert 'target_type' not in kwargs
     return self.make_target(target_type=JavaLibrary, *args, **kwargs)
 
+  def _cover_output(self, graph):
+    # coverage of the output code
+    self.assertNotEqual(graph.to_json(), "")
+    self.assertNotEqual(graph.to_summary(), "")
+
   def test_simple_dep_usage_graph(self):
     t1 = self.make_java_target(spec=':t1', sources=['a.java', 'b.java'])
     t2 = self.make_java_target(spec=':t2', sources=['c.java'], dependencies=[t1])
@@ -59,6 +64,8 @@ class TestJvmDependencyUsage(TaskTestBase):
     self.assertEqual(graph._trans_cost(t2), 3)
     self.assertEqual(graph._trans_cost(t3), 4)
 
+    self._cover_output(graph)
+
   def test_dep_usage_graph_with_synthetic_targets(self):
     t1 = self.make_java_target(spec=':t1', sources=['t1.thrift'])
     t1_x = self.make_java_target(spec=':t1.x', derived_from=t1)
@@ -84,3 +91,5 @@ class TestJvmDependencyUsage(TaskTestBase):
 
     self.assertEqual(graph._nodes[t1].products_total, 5)
     self.assertEqual(len(graph._nodes[t2].dep_edges[t1].products_used), 3)
+
+    self._cover_output(graph)
