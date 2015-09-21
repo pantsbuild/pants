@@ -185,7 +185,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
   def test_junit_test_annotation_processor(self):
     pants_run = self.run_pants([
       'test',
-      '--compile-java-strategy=isolated',
       'testprojects/tests/java/org/pantsbuild/testproject/annotation',
     ])
     self.assert_success(pants_run)

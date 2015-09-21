@@ -49,8 +49,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   DEBUG_LEVEL_COMPILE_MSG='compile(examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
 
   def test_ouput_level_warn(self):
-    command = ['compile', '--compile-java-strategy=isolated',
+    command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-use-jmake',
                '--compile-java-level=warn']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
@@ -58,8 +59,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assertFalse(self.DEBUG_LEVEL_COMPILE_MSG in pants_run.stdout_data)
 
   def test_output_level_info(self):
-    command = ['compile', '--compile-java-strategy=isolated',
+    command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-use-jmake',
                '--compile-java-level=info']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
@@ -67,8 +69,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assertFalse(self.DEBUG_LEVEL_COMPILE_MSG in pants_run.stdout_data)
 
   def test_output_level_debug(self):
-    command = ['compile', '--compile-java-strategy=isolated',
+    command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-use-jmake',
                '--compile-java-level=debug']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
@@ -76,8 +79,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assertTrue(self.DEBUG_LEVEL_COMPILE_MSG in pants_run.stdout_data)
 
   def test_output_color_enabled(self):
-    command = ['compile', '--compile-java-strategy=isolated',
+    command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-use-jmake',
                '--compile-java-colors']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
@@ -85,8 +89,9 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
   def test_output_level_group_compile(self):
     """Set level with the scope 'compile' and see that it propagates to the task level."""
-    command = ['compile', '--compile-java-strategy=isolated',
+    command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
+               '--compile-java-use-jmake',
                '--compile-level=debug']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
@@ -96,7 +101,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_default_console(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello::',
-               '--compile-java-strategy=isolated']
+               '--compile-java-use-jmake']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertIn('Compiling 1 java source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
@@ -110,7 +115,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                'examples/src/java/org/pantsbuild/example/hello::',
                '--reporting-console-label-format={ "COMPILER" : "SUPPRESS" }',
                '--reporting-console-tool-output-format={ "COMPILER" : "CHILD_SUPPRESS"}',
-               '--compile-java-strategy=isolated']
+               '--compile-java-use-jmake']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertIn('Compiling 1 java source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
@@ -125,7 +130,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                'examples/src/java/org/pantsbuild/example/hello::',
                '--reporting-console-label-format={ "FOO" : "BAR" }',
                '--reporting-console-tool-output-format={ "BAZ" : "QUX"}',
-               '--compile-java-strategy=isolated']
+               '--compile-java-use-jmake']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertIn('*** Got invalid key FOO for --reporting-console-label-format. Expected one of [', pants_run.stdout_data)
