@@ -16,6 +16,7 @@ target(
     ':ivy_utils',
     ':jar_publish_unit_test',
     ':junit_run',
+    ':jvm_dependency_usage',
     ':jvm_platform_analysis',
     ':jvm_run',
     ':resources_task',
