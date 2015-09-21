@@ -113,7 +113,7 @@ class JarDependency(object):
     self.apidocs = apidocs
     self.mutable = mutable
 
-    @deprecated(removal_version='0.0.49',
+    @deprecated(removal_version='0.0.50',
                 hint_message='JarDependency now only specifies a single artifact, so the '
                              'artifacts argument will be removed.')
     def make_artifacts():
@@ -151,7 +151,7 @@ class JarDependency(object):
   def append_artifact(self, name, type_=None, ext=None, conf=None, url=None, classifier=None):
     """Append a new IvyArtifact to the list of artifacts for this jar."""
 
-    @deprecated(removal_version='0.0.49',
+    @deprecated(removal_version='0.0.50',
                 hint_message='JarDependency now only specifies a single artifact, {} defines more '
                              'than one.'.format(name))
     def add_more_artifacts():
