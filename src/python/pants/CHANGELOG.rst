@@ -13,6 +13,9 @@ that use relative imports.
 Bugfixes
 ~~~~~~~~
 
+* Include resolved jar versions in compile fingerprints; ensure coordinates match artifacts.
+  `RB #2853 <https://rbcommons.com/s/twitter/r/2853>`_
+
 * Fixup GoFetch to handle relative imports.
   `RB #2854 <https://rbcommons.com/s/twitter/r/2854>`_
 
