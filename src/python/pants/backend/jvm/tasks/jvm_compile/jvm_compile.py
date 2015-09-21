@@ -7,31 +7,30 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 import itertools
-import shutil
 import os
+import shutil
 import sys
 from collections import OrderedDict, defaultdict
 from hashlib import sha1
 
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
-from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
-from pants.base.workunit import WorkUnitLabel
-from pants.goal.products import MultipleRootedProducts
-from pants.base.exceptions import TaskError
-from pants.option.custom_types import list_option
-from pants.base.worker_pool import Work, WorkerPool
-from pants.base.build_environment import get_buildroot
-from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
+from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
+from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
+from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
+from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
+from pants.base.worker_pool import Work, WorkerPool
+from pants.base.workunit import WorkUnitLabel
+from pants.goal.products import MultipleRootedProducts
+from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.fileutil import atomic_copy, create_size_estimators
 from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
+from pants.util.fileutil import atomic_copy, create_size_estimators
 
 
 class CacheHitCallback(object):
