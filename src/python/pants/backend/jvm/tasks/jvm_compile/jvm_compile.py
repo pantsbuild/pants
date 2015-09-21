@@ -182,7 +182,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     return target.has_sources(self._file_suffix)
 
   def select_source(self, source_file_path):
-    """Source predicate for the strategy."""
+    """Source predicate for this task."""
     return source_file_path.endswith(self._file_suffix)
 
   def create_analysis_tools(self):
@@ -381,7 +381,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         valid_compile_contexts = [self.compile_context(t) for t in valid_targets]
         self._register_vts(valid_compile_contexts)
 
-        # Invoke the strategy to execute compilations for invalid targets.
+        # Execute compilations for invalid targets.
         check_vts = (self.check_artifact_cache
             if self.artifact_cache_reads_enabled() else None)
         update_artifact_cache_vts_work = (self.get_update_artifact_cache_work
@@ -530,10 +530,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     It's possible (although unfortunate) for multiple targets to own the same sources, hence
     the top level division. Srcs are relative to buildroot. Classes are absolute paths.
 
-    Strategies may also return classes with 'None' as their src, to indicate that compiler
-    analysis indicated that they were un-owned. This case is triggered when annotation
-    processors generate classes (or due to bugs in classfile tracking in zinc/jmake.)
-
+    Returning classes with 'None' as their src indicates that the compiler analysis indicated
+    that they were un-owned. This case is triggered when annotation processors generate
+    classes (or due to bugs in classfile tracking in zinc/jmake.)
     """
     buildroot = get_buildroot()
     # Build a mapping of srcs to classes for each context.
