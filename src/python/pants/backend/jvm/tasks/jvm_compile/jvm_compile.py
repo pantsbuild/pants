@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import sys
 from collections import defaultdict
+import hashlib
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -15,12 +16,39 @@ from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmC
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
+
+
+class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
+  """Fingerprint strategy which includes the current task fingerprint when fingerprinting target."""
+
+  def __init__(self, task, compile_classpath):
+    super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
+    self._compile_classpath = compile_classpath
+
+  def compute_fingerprint(self, target):
+    hasher = hashlib.sha1()
+    hasher.update(target.payload.fingerprint() or '')
+    hasher.update(self._task.fingerprint or '')
+    if isinstance(target, JarLibrary):
+      classpath_entries = self._compile_classpath.get_artifact_classpath_entries_for_targets(
+         [target], transitive=False)
+      for _, entry in classpath_entries:
+        hasher.update(str(entry.coordinate))
+    return hasher.hexdigest()
+
+  def __hash__(self):
+    return hash(self._task.fingerprint)
+
+  def __eq__(self, other):
+    return isinstance(other, ResolvedJarAwareTaskIdentityFingerprintStrategy) and \
+           super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__eq__(other)
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):
@@ -227,8 +255,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Maps CompileContext --> dict of upstream class to paths.
     self._upstream_class_to_paths = {}
 
-  def _fingerprint_strategy(self):
-    return TaskIdentityFingerprintStrategy(self)
+  def _fingerprint_strategy(self, classpath_products):
+    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
 
   def pre_execute(self):
     # Only create these working dirs during execution phase, otherwise, they
@@ -244,14 +272,18 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def prepare_execute(self, chunks):
     targets_in_chunks = list(itertools.chain(*chunks))
 
+    classpath_product = self.context.products.get_data('compile_classpath')
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
-                                              fingerprint_strategy=self._fingerprint_strategy())
+                                              fingerprint_strategy=self._fingerprint_strategy(classpath_product))
     self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks)
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
       return
+
+    classpath_product = self.context.products.get_data('compile_classpath')
+    fingerprint_strategy = self._fingerprint_strategy(classpath_product)
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
     partition_size_hint, locally_changed_targets = self._strategy.invalidation_hints(relevant_targets)
@@ -259,7 +291,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           invalidate_dependents=True,
                           partition_size_hint=partition_size_hint,
                           locally_changed_targets=locally_changed_targets,
-                          fingerprint_strategy=self._fingerprint_strategy(),
+                          fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid targets for this chunk.

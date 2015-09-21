@@ -41,7 +41,6 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     # Run the test above twice to ensure it works both times.
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       self._java_compile_produces_valid_analysis_file(workdir)
-      self._java_compile_produces_valid_analysis_file(workdir)
 
   @provide_compile_strategies
   def test_resources_by_target_and_partitions(self, strategy):
@@ -225,3 +224,37 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # Use zinc.
       args=['--no-compile-java-use-jmake']
     )
+
+  @provide_compile_strategies
+  def test_java_compile_with_different_resolved_jars_produce_different_artifacts(self, strategy):
+    # Since unforced dependencies resolve to the highest version including transitive jars,
+    # We want to ensure that running java compile with binary incompatible libraries will
+    # produces two different artifacts.
+
+    with temporary_dir(root_dir=self.workdir_root()) as workdir,  temporary_dir() as cache_dir:
+      path_prefix = 'testprojects/src/java/org/pantsbuild/testproject/jarversionincompatibility'
+      dotted_path = path_prefix.replace(os.path.sep, '.')
+      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
+                                  '{}.jarversionincompatibility'.format(dotted_path))
+      config = {'cache.compile.java': {'write_to': [cache_dir], 'read_from': [cache_dir]}}
+
+      pants_run = self.run_pants_with_workdir(['compile.java',
+                                               '--strategy={}'.format(strategy),
+                                               ('{}:only-15-directly'.format(path_prefix))],
+                                              workdir,
+                                              config)
+      self.assert_success(pants_run)
+
+      # One artifact for guava 15
+      self.assertEqual(len(os.listdir(artifact_dir)), 1)
+
+      # Rerun for guava 16
+      pants_run = self.run_pants_with_workdir(['compile.java',
+                                               '--strategy={}'.format(strategy),
+                                               (u'{}:alongside-16'.format(path_prefix)), '-ldebug'],
+                                              workdir,
+                                              config)
+      self.assert_success(pants_run)
+
+      # One artifact for guava 15 and one for guava 16
+      self.assertEqual(len(os.listdir(artifact_dir)), 2)

@@ -95,24 +95,48 @@ class IvyInfo(object):
   def __init__(self, conf):
     self._conf = conf
     self.modules_by_ref = {}  # Map from ref to referenced module.
+    self.refs_by_unversioned_refs = {} # Map from unversioned ref to the resolved versioned ref
     # Map from ref of caller to refs of modules required by that caller.
     self._deps_by_caller = defaultdict(OrderedSet)
     # Map from _unversioned_ ref to OrderedSet of IvyArtifact instances.
     self._artifacts_by_ref = defaultdict(OrderedSet)
 
   def add_module(self, module):
+    ref_unversioned = module.ref.unversioned
+    if ref_unversioned in self.refs_by_unversioned_refs:
+      raise IvyResolveMappingError('Already defined module {}, as rev {}!'
+                                   .format(ref_unversioned, module.ref.rev))
     if module.ref in self.modules_by_ref:
       raise IvyResolveMappingError('Already defined module {}, would be overwritten!'
                                    .format(module.ref))
+    self.refs_by_unversioned_refs[ref_unversioned] = module.ref
     self.modules_by_ref[module.ref] = module
-    if not module.artifact:
+    if not module.artifact: #TODO maybe move above symbol table entry
       # Module was evicted, so do not record information about it
       return
     for caller in module.callers:
       self._deps_by_caller[caller.caller_key].add(module.ref)
-    self._artifacts_by_ref[module.ref.unversioned].add(module.artifact)
+    self._artifacts_by_ref[ref_unversioned].add(module.artifact)
 
-  def traverse_dependency_graph(self, ref, collector, memo=None, visited=None):
+  def _do_traverse_dependency_graph(self, ref, collector, memo, visited):
+    memoized_value = memo.get(ref)
+    if memoized_value:
+      return memoized_value
+
+    if ref in visited:
+      # Ivy allows for circular dependencies
+      # If we're here, that means we're resolving something that
+      # transitively depends on itself
+      return set()
+
+    visited.add(ref)
+    acc = collector(ref)
+    for dep in self._deps_by_caller.get(ref.caller_key, ()):
+      acc.update(self._do_traverse_dependency_graph(dep, collector, memo, visited))
+    memo[ref] = acc
+    return acc
+
+  def traverse_dependency_graph(self, ref, collector, memo=None):
     """Traverses module graph, starting with ref, collecting values for each ref into the sets
     created by the collector function.
 
@@ -124,26 +148,13 @@ class IvyInfo(object):
     :returns the accumulated set for ref
     """
 
+    resolved_ref = self.refs_by_unversioned_refs.get(ref.unversioned)
+    if resolved_ref:
+      ref = resolved_ref
     if memo is None:
       memo = dict()
-
-    memoized_value = memo.get(ref)
-    if memoized_value:
-      return memoized_value
-
-    visited = visited or set()
-    if ref in visited:
-      # Ivy allows for circular dependencies
-      # If we're here, that means we're resolving something that
-      # transitively depends on itself
-      return set()
-    visited.add(ref)
-
-    acc = collector(ref)
-    for dep in self._deps_by_caller.get(ref.caller_key, ()):
-      acc.update(self.traverse_dependency_graph(dep, collector, memo, visited))
-    memo[ref] = acc
-    return acc
+    visited = set()
+    return self._do_traverse_dependency_graph(ref, collector, memo, visited)
 
   def get_resolved_jars_for_jar_library(self, jar_library, memo=None):
     """Collects jars for the passed jar_library.

@@ -23,6 +23,11 @@ from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.base_test import BaseTest
 
 
+def coord(org, name, classifier=None, rev=None, ext=None):
+  rev = rev or '0.0.1'
+  return M2Coordinate(org=org, name=name, rev=rev, classifier=classifier, ext=ext)
+
+
 class IvyUtilsTestBase(BaseTest):
 
   @property
@@ -193,13 +198,27 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
     resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
 
-    def coord(org, name, classifier=None, ext=None):
-      return M2Coordinate(org=org, name=name, rev='0.0.1', classifier=classifier, ext=ext)
-
     expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1',
                                                        classifier='tests'),
                 'ivy2cache_path/org2/name2.jar': coord(org='org2', name='name2'),
                 'ivy2cache_path/org3/name3.tar.gz': coord(org='org3', name='name3', ext='tar.gz')}
+    self.maxDiff = None
+    coordinate_by_path = {rj.cache_path: rj.coordinate for rj in resolved_jars}
+    self.assertEqual(expected, coordinate_by_path)
+
+  def test_resolved_jars_with_different_version(self):
+    lib = self.make_target(spec=':org1-name1',
+                           target_type=JarLibrary,
+                           jars=[JarDependency(org='org1', name='name1', rev='0.0.1',
+                                               classifier='tests')])
+
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_resolve_to_other_version.xml')
+
+    resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
+
+    expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1',
+                                                       classifier='tests',
+                                                       rev='0.0.2')}
     self.maxDiff = None
     coordinate_by_path = {rj.cache_path: rj.coordinate for rj in resolved_jars}
     self.assertEqual(expected, coordinate_by_path)
