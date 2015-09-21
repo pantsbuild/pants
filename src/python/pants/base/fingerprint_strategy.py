@@ -63,10 +63,14 @@ class TaskIdentityFingerprintStrategy(FingerprintStrategy):
   def __init__(self, task):
     self._task = task
 
-  def compute_fingerprint(self, target):
+  def _build_hasher(self, target):
     hasher = hashlib.sha1()
     hasher.update(target.payload.fingerprint() or '')
     hasher.update(self._task.fingerprint or '')
+    return hasher
+
+  def compute_fingerprint(self, target):
+    hasher = self._build_hasher(target)
     return hasher.hexdigest()
 
   def __hash__(self):

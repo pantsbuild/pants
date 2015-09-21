@@ -5,18 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import itertools
 import sys
 from collections import defaultdict
-import hashlib
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmCompileGlobalStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
@@ -32,16 +32,14 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
     super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
     self._compile_classpath = compile_classpath
 
-  def compute_fingerprint(self, target):
-    hasher = hashlib.sha1()
-    hasher.update(target.payload.fingerprint() or '')
-    hasher.update(self._task.fingerprint or '')
+  def _build_hasher(self, target):
+    hasher = super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self)._build_hasher(target)
     if isinstance(target, JarLibrary):
       classpath_entries = self._compile_classpath.get_artifact_classpath_entries_for_targets(
-         [target], transitive=False)
+        [target], transitive=False)
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
-    return hasher.hexdigest()
+    return hasher
 
   def __hash__(self):
     return hash(self._task.fingerprint)

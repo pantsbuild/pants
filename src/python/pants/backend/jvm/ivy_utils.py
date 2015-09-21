@@ -102,6 +102,10 @@ class IvyInfo(object):
     self._artifacts_by_ref = defaultdict(OrderedSet)
 
   def add_module(self, module):
+    if not module.artifact:
+      # Module was evicted, so do not record information about it
+      return
+
     ref_unversioned = module.ref.unversioned
     if ref_unversioned in self.refs_by_unversioned_refs:
       raise IvyResolveMappingError('Already defined module {}, as rev {}!'
@@ -111,9 +115,7 @@ class IvyInfo(object):
                                    .format(module.ref))
     self.refs_by_unversioned_refs[ref_unversioned] = module.ref
     self.modules_by_ref[module.ref] = module
-    if not module.artifact: #TODO maybe move above symbol table entry
-      # Module was evicted, so do not record information about it
-      return
+
     for caller in module.callers:
       self._deps_by_caller[caller.caller_key].add(module.ref)
     self._artifacts_by_ref[ref_unversioned].add(module.artifact)
