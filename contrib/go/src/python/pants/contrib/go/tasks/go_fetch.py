@@ -197,6 +197,10 @@ class GoFetch(GoTask):
     out = self.go_dist.create_go_cmd('list', args=['std']).check_output()
     return frozenset(out.strip().split())
 
+  @staticmethod
+  def _is_relative(import_path):
+    return import_path.startswith('.')
+
   def _get_remote_import_paths(self, pkg, gopath=None):
     """Returns the remote import paths declared by the given Go `pkg`."""
     out = self.go_dist.create_go_cmd('list', args=['-json', pkg], gopath=gopath).check_output()
@@ -204,7 +208,12 @@ class GoFetch(GoTask):
       data = json.loads(out)
       imports = data.get('Imports', [])
       imports.extend(data.get('TestImports', []))
-      return [imp for imp in imports if imp not in self.go_stdlib]
+
+      return [imp for imp in imports
+              if (imp not in self.go_stdlib and
+                  # We assume relative imports are local to the package and skip attempts to
+                  # recursively resolve them.
+                  not self._is_relative(imp))]
     except ValueError as e:
       save_file = os.path.join(gopath, '.errors', pkg, 'list.json')
       with safe_open(save_file, 'w') as fp:
