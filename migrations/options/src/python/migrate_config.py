@@ -325,7 +325,21 @@ migrations = {
   ('test.junit', 'junit'): None,
   ('thrift-linter', 'nailgun-server'): None,
   ('thrift-linter', 'scrooge-linter'): None,
+
+  # Global strategy removal.
+  ('compile.apt', 'changed-targets-heuristic-limit'): None,
+  ('compile.apt', 'partition-size-hint'): None,
+  ('compile.apt', 'strategy'): None,
+  ('compile.java', 'changed-targets-heuristic-limit'): None,
+  ('compile.java', 'partition-size-hint'): None,
+  ('compile.java', 'strategy'): None,
+  ('compile.zinc', 'changed-targets-heuristic-limit'): None,
+  ('compile.zinc', 'partition-size-hint'): None,
+  ('compile.zinc', 'strategy'): None,
 }
+
+jvm_global_strategy_removal = ('The JVM global compile strategy was removed in favor of the '
+                               'isolated strategy, which uses a different set of options.')
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
                    'local to each task that can use a nailgun.  A default can no longer be '
@@ -499,6 +513,17 @@ notes = {
   ('test.junit', 'junit'): jvm_tool_spec_override,
   ('thrift-linter', 'nailgun-server'): jvm_tool_spec_override,
   ('thrift-linter', 'scrooge-linter'): jvm_tool_spec_override,
+
+  # Global strategy removal.
+  ('compile.apt', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.apt', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.apt', 'strategy'): jvm_global_strategy_removal,
+  ('compile.java', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.java', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.java', 'strategy'): jvm_global_strategy_removal,
+  ('compile.zinc', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.zinc', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.zinc', 'strategy'): jvm_global_strategy_removal,
 }
 
 
