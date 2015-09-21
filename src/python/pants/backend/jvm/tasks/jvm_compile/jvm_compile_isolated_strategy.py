@@ -20,6 +20,7 @@ from pants.backend.jvm.tasks.jvm_compile.resource_mapping import ResourceMapping
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
+from pants.fs.archive import ZipArchiver
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_walk
 from pants.util.fileutil import atomic_copy, create_size_estimators
 
@@ -33,7 +34,7 @@ class IsolationCacheHitCallback(object):
     self._key_to_target = cache_key_to_class_dir
 
   def __call__(self, cache_key):
-    class_dir = self.key_to_target.get(cache_key)
+    class_dir = self._key_to_target.get(cache_key)
     if class_dir:
       safe_mkdir(class_dir, clean=True)
 
@@ -350,6 +351,11 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
         compile_contexts.append(self.compile_context(target))
 
     for compile_context in compile_contexts:
+      # Extract the context jar to rehydrate loose classfiles.
+      safe_mkdir(compile_context.classes_dir, clean=True)
+      ZipArchiver.extract(compile_context.jar_file, compile_context.classes_dir)
+
+      # Localize the analysis.
       portable_analysis_file = JvmCompileStrategy._portable_analysis_for_target(
           self._analysis_dir, compile_context.target)
       if os.path.exists(portable_analysis_file):
@@ -395,9 +401,6 @@ class JvmCompileIsolatedStrategy(JvmCompileStrategy):
     # Resources.
     resources_by_target = self.context.products.get_data('resources_by_target')
     add_abs_products(resources_by_target.get(compile_context.target))
-    # Classes.
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    add_abs_products(classes_by_target.get(compile_context.target))
     # Log file.
     log_file = self._capture_log_file(compile_context.target)
     if log_file and os.path.exists(log_file):
