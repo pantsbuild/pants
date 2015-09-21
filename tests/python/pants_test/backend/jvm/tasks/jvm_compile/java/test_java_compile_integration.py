@@ -7,8 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
-from pants.backend.jvm.tasks.jvm_compile.java.jmake_analysis_parser import JMakeAnalysisParser
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
@@ -17,58 +16,15 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class JavaCompileIntegrationTest(BaseCompileIT):
 
-  def _java_compile_produces_valid_analysis_file(self, workdir):
-    # A bug was introduced where if a java compile was run twice, the second
-    # time the global_analysis.valid file would incorrectly be empty.
-
-    pants_run = self.run_pants_with_workdir([
-        'compile',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
-        workdir)
-    self.assert_success(pants_run)
-
-    # Parse the analysis file from the compilation.
-    analysis_file = os.path.join(workdir, 'compile', 'jvm', 'java', 'analysis',
-                                 'global_analysis.valid')
-    parser = JMakeAnalysisParser()
-    analysis = parser.parse_from_path(analysis_file)
-
-    # Ensure we have entries in the analysis file.
-    self.assertEquals(len(analysis.pcd_entries), 2)
-
-  def test_java_compile_produces_valid_analysis_file_second_time(self):
-    # Run the test above twice to ensure it works both times.
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      self._java_compile_produces_valid_analysis_file(workdir)
-      self._java_compile_produces_valid_analysis_file(workdir)
-
-  def test_resources_by_target_and_partitions(self):
-    """
-    This tests that resources_by_target interacts correctly with
-    partitions; we want to make sure that even targets that are outside
-    the current partition don't cause crashes when they are looked up in
-    resources_by_targets (see jvm_compile.py).
-    """
-    with temporary_dir() as cache_dir:
-      config = {'cache.compile.java': {'write_to': [cache_dir]}}
-
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
-        pants_run = self.run_pants_with_workdir(
-          ['compile', 'compile.java', '--partition-size-hint=1',
-           'testprojects/src/java/org/pantsbuild/testproject/publish/hello/main:',
-         ],
-          workdir, config)
-        self.assert_success(pants_run)
-
   def test_nocache(self):
     with temporary_dir() as cache_dir:
       bad_artifact_dir = os.path.join(cache_dir,
-          JmakeCompile.stable_name(),
+          ZincCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.nocache.nocache')
       good_artifact_dir = os.path.join(cache_dir,
-          JmakeCompile.stable_name(),
+          ZincCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.nocache.cache_me')
-      config = {'cache.compile.java': {'write_to': [cache_dir]}}
+      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
       pants_run = self.run_pants(['compile.java',
                                   'testprojects/src/java/org/pantsbuild/testproject/nocache::'],
@@ -93,9 +49,9 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     # produces two different artifacts.
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
-      config = {'cache.compile.java': {'write_to': [cache_dir]}}
+      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
       pants_run = self.run_pants(self.create_platform_args(6) +
                                  ['compile.java',
@@ -121,10 +77,9 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     # the artifact contains that resource mapping.
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir,
-          JmakeCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.annotation.main.main')
-      config = {'cache.compile.java': {'write_to': [cache_dir]}}
+      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
       pants_run = self.run_pants(['compile',
                                   'testprojects/src/java/org/pantsbuild/testproject/annotation/main'],
@@ -179,16 +134,16 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      '--compile-jvm-dep-check-missing-direct-deps=fatal'
+      '--compile-jvm-dep-check-missing-direct-deps=fatal',
+      # Use jmake.
+      args=['--compile-java-use-jmake']
     )
 
   def test_java_compile_missing_direct_dep_analysis_whitelist_zinc(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      '--compile-jvm-dep-check-missing-direct-deps=fatal',
-      # Use zinc.
-      args=['--no-compile-java-use-jmake']
+      '--compile-jvm-dep-check-missing-direct-deps=fatal'
     )
 
   def test_java_compile_missing_jar_dep_analysis_whitelist_zinc(self):
