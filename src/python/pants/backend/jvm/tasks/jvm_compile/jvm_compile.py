@@ -26,7 +26,7 @@ from pants.reporting.reporting_utils import items_to_report_element
 
 
 class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
-  """Fingerprint strategy which includes the current task fingerprint when fingerprinting target."""
+  """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
 
   def __init__(self, task, compile_classpath):
     super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
