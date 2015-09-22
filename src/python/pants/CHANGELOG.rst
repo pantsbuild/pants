@@ -1,6 +1,30 @@
 RELEASE HISTORY
 ===============
 
+0.0.49 (9/21/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release that includes a fix for resolving remote go libraries
+that use relative imports.
+
+Bugfixes
+~~~~~~~~
+
+* Include resolved jar versions in compile fingerprints; ensure coordinates match artifacts.
+  `RB #2853 <https://rbcommons.com/s/twitter/r/2853>`_
+
+* Fixup GoFetch to handle relative imports.
+  `RB #2854 <https://rbcommons.com/s/twitter/r/2854>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Enhancements to the dep-usage goal
+  `RB #2851 <https://rbcommons.com/s/twitter/r/2851>`_
+
 0.0.48 (9/18/2015)
 ------------------
 
