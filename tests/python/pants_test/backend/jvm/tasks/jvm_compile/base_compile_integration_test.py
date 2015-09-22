@@ -9,6 +9,8 @@ import os
 from collections import defaultdict
 from contextlib import contextmanager
 
+import six
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -24,7 +26,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
     """
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
-        for i in xrange(0, iterations):
+        for i in six.moves.xrange(0, iterations):
           pants_run = self.run_test_compile(workdir, cachedir, target,
                                             clean_all=(i == 0),
                                             extra_args=extra_args)

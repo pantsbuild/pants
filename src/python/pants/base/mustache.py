@@ -45,7 +45,7 @@ class MustacheRenderer(object):
     if six.PY2:
       # pystache does a typecheck for unicode in python 2.x but rewrites its sources to deal
       # unicode via str in python 3.x.
-      template_text = unicode(template_text)
+      template_text = unicode(template_text)  # noqa
     template = pystache.parse(template_text)
     return template
 

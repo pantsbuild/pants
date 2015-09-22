@@ -11,6 +11,7 @@ import tempfile
 import unittest
 
 import mox
+import six
 
 from pants.util import dirutil
 from pants.util.contextutil import temporary_dir
@@ -79,12 +80,16 @@ class DirutilTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def test_safe_walk(self):
-    with temporary_dir() as tmpdir:
-      safe_mkdir(os.path.join(tmpdir, '中文'))
-      if isinstance(tmpdir, unicode):
-        tmpdir = tmpdir.encode('utf-8')
-      for _, dirs, _ in dirutil.safe_walk(tmpdir):
-        self.assertTrue(all(isinstance(dirname, unicode) for dirname in dirs))
+    """Test that directory names are correctly represented as unicode strings"""
+    # This test is unnecessary in python 3 since all strings are unicode there is no
+    # unicode constructor.
+    if six.PY2:
+      with temporary_dir() as tmpdir:
+        safe_mkdir(os.path.join(tmpdir, '中文'))
+        if isinstance(tmpdir, unicode):  # noqa
+          tmpdir = tmpdir.encode('utf-8')
+        for _, dirs, _ in dirutil.safe_walk(tmpdir):
+          self.assertTrue(all(isinstance(dirname, unicode) for dirname in dirs))  # noqa
 
   def test_relativize_paths(self):
     build_root = '/build-root'
