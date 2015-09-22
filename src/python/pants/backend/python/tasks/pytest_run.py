@@ -25,7 +25,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.exceptions import TaskError, TestFailedTaskError, TestFailedTimeoutError
+from pants.base.exceptions import TaskError, TestFailedTaskError, TestTimeoutTaskError
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
@@ -147,6 +147,8 @@ class PytestRun(PythonTask, TestTaskMixin):
   def run_tests(self, targets, workunit):
     if self.get_options().fast:
       result = self._do_run_tests(targets, workunit)
+      if result.is_timeout:
+        raise TestTimeoutTaskError(timedout_targets=result.failed_targets)
       if not result.success:
         raise TestFailedTaskError(failed_targets=result.failed_targets)
     else:
@@ -163,9 +165,10 @@ class PytestRun(PythonTask, TestTaskMixin):
       for target in sorted(results):
         self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
 
-      failed_targets = [target for target, rv in results.items() if not rv.success]
-      if failed_targets:
-        raise TestFailedTaskError(failed_targets=failed_targets)
+      failed_targets = [target for target, rv in results.items() if not rv.success and not rv.is_timeout]
+      timedout_targets = [target for target, rv in results.items() if rv.is_timeout]
+      if failed_targets or timedout_targets:
+        raise TestFailedTaskError(failed_targets=failed_targets, timedout_targets=timedout_targets)
 
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--shard` option."""
