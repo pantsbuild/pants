@@ -13,19 +13,19 @@ from pants.util.timeout import Timeout
 
 
 class TestTimeout(unittest.TestCase):
-    def test_timeout_success(self):
-        with Timeout(5):
-            time.sleep(1)
+  def test_timeout_success(self):
+    with Timeout(5):
+      time.sleep(1)
 
-    def test_timeout_failure(self):
-        with self.assertRaises(KeyboardInterrupt):
-            with Timeout(5):
-                time.sleep(10)
+  def test_timeout_failure(self):
+    with self.assertRaises(KeyboardInterrupt):
+      with Timeout(5):
+        time.sleep(10)
 
-    def test_timeout_none(self):
-        with Timeout(None):
-            time.sleep(1)
+  def test_timeout_none(self):
+    with Timeout(None):
+      time.sleep(1)
 
-    def test_timeout_zero(self):
-        with Timeout(0):
-            time.sleep(1)
+  def test_timeout_zero(self):
+    with Timeout(0):
+      time.sleep(1)
