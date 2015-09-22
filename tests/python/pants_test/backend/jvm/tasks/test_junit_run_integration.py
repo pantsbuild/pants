@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os.path
 from unittest import skipIf
 
 from pants.java.distribution.distribution import DistributionLocator
@@ -45,6 +46,12 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
   def test_junit_run_against_class_succeeds(self):
     self.assert_success(self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest', 'testprojects/tests/java/org/pantsbuild/testproject/matcher']))
+
+  def test_junit_run_with_cobertura_coverage_succeeds(self):
+    self.assert_success(self.run_pants(['clean-all', 'test.junit', '--test-junit-coverage-processor=cobertura --test-junit-coverage', 'testprojects/tests/java/org/pantsbuild/testproject/unicode::']))
+    coverage_xml = '.pants.d/test/junit/coverage/xml/coverage.xml'
+    self.assertTrue(os.path.isfile(coverage_xml))
+    self.assertIn('line-rate="1.0"', open(coverage_xml).read())
 
   def test_junit_run_against_invalid_class_fails(self):
     pants_run = self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest_BAD_CLASS', 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])

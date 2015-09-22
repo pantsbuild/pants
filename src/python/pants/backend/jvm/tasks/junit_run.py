@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
-import fnmatch
 import os
 import sys
 from abc import abstractmethod
@@ -27,6 +26,7 @@ from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
+from pants.option.custom_types import list_option
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
@@ -583,6 +583,16 @@ class Cobertura(_Coverage):
   def register_options(cls, register, register_jvm_tool):
     slf4j_jar = JarDependency(org='org.slf4j', name='slf4j-simple', rev='1.7.5')
 
+    register('--coverage-cobertura-include-classes', advanced=True, action='append',
+             help='Regex patterns passed to cobertura specifying which classes should be '
+                  'instrumented. (see the "includeclasses" element description here: '
+                  'https://github.com/cobertura/cobertura/wiki/Ant-Task-Reference)')
+
+    register('--coverage-cobertura-exclude-classes', advanced=True, action='append',
+             help='Regex patterns passed to cobertura specifying which classes should NOT be '
+                  'instrumented. (see the "excludeclasses" element description here: '
+                  'https://github.com/cobertura/cobertura/wiki/Ant-Task-Reference')
+
     def cobertura_jar(**kwargs):
       return JarDependency(org='net.sourceforge.cobertura', name='cobertura', rev='2.1.1', **kwargs)
 
@@ -607,16 +617,12 @@ class Cobertura(_Coverage):
 
   def __init__(self, task_exports, context):
     super(Cobertura, self).__init__(task_exports, context)
+    options = task_exports.task_options
     self._coverage_datafile = os.path.join(self._coverage_dir, 'cobertura.ser')
     touch(self._coverage_datafile)
     self._rootdirs = defaultdict(OrderedSet)
-    self._include_filters = []
-    self._exclude_filters = []
-    for filt in self._coverage_filters:
-      if filt[0] == '-':
-        self._exclude_filters.append(filt[1:])
-      else:
-        self._include_filters.append(filt)
+    self._include_classes = options.coverage_cobertura_include_classes
+    self._exclude_classes = options.coverage_cobertura_exclude_classes
     self._nothing_to_instrument = True
 
   def instrument(self, targets, tests, compute_junit_classpath):
@@ -631,24 +637,6 @@ class Cobertura(_Coverage):
         if classes_by_rootdir:
           for root, products in classes_by_rootdir.rel_paths():
             self._rootdirs[root].update(products)
-    # Cobertura uses regular expressions for filters, and even then there are still problems
-    # with filtering. It turned out to be easier to just select which classes to instrument
-    # by filtering them here.
-    # TODO(ji): Investigate again how we can use cobertura's own filtering mechanisms.
-    if self._coverage_filters:
-      for basedir, classes in self._rootdirs.items():
-        updated_classes = []
-        for cls in classes:
-          does_match = False
-          for positive_filter in self._include_filters:
-            if fnmatch.fnmatchcase(_classfile_to_classname(cls), positive_filter):
-              does_match = True
-          for negative_filter in self._exclude_filters:
-            if fnmatch.fnmatchcase(_classfile_to_classname(cls), negative_filter):
-              does_match = False
-          if does_match:
-            updated_classes.append(cls)
-        self._rootdirs[basedir] = updated_classes
     for basedir, classes in self._rootdirs.items():
       if not classes:
         continue  # No point in running instrumentation if there is nothing to instrument!
@@ -661,6 +649,15 @@ class Cobertura(_Coverage):
         '--auxClasspath',
         aux_classpath,
         ]
+      # apply class incl/excl filters
+      if len(self._include_classes) > 0:
+        for pattern in self._include_classes:
+          args += ["--includeClasses", pattern]
+      else:
+        args += ["--includeClasses", '.*']  # default to instrumenting all classes
+      for pattern in self._exclude_classes:
+        args += ["--excludeClasses", pattern]
+
       with temporary_file_path(cleanup=False) as instrumented_classes_file:
         with file(instrumented_classes_file, 'wb') as icf:
           icf.write(('\n'.join(classes) + '\n').encode('utf-8'))
@@ -668,6 +665,7 @@ class Cobertura(_Coverage):
         args.append('--listOfFilesToInstrument')
         args.append(instrumented_classes_file)
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
+        self._context.log.debug("executing cobertura with the following args: {}".format(args))
         execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
         result = execute_java(classpath=cobertura_cp,
                               main=main,
