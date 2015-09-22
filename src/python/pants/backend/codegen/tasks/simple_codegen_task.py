@@ -284,7 +284,7 @@ class SimpleCodegenTask(Task):
       try:
         deps.update(self.context.resolve(dep))
       except AddressLookupError as e:
-        raise self.DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
+        raise Exception('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
     return deps
 
   class CodegenStrategy(AbstractClass):

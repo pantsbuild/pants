@@ -18,7 +18,7 @@ class ProjectIntegrationTest(PantsRunIntegrationTest):
 
   def pants_test(self, strategy, command):
     return self.run_pants([
-      'test'
+      'test',
       '--compile-apt-strategy={}'.format(strategy),
       '--compile-java-strategy={}'.format(strategy),
       '--compile-zinc-strategy={}'.format(strategy),

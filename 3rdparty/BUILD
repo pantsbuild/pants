@@ -110,7 +110,17 @@ target(name='thrift-0.9.2',
          ':slf4j-api',
        ])
 
-target(name='thrift', dependencies = [ ':thrift-0.9.2' ])
+jar_library(name='libthrift-0.6.1',
+            jars = [
+              jar(org='org.apache.thrift', name='libthrift', rev='0.6.1')
+            ])
+
+target(name='thrift-0.6.1',
+       dependencies = [
+         ':commons-lang',
+         ':libthrift-0.6.1',
+         ':slf4j-api',
+       ])
 
 
 ###############
