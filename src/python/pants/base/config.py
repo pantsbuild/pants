@@ -12,7 +12,7 @@ import os
 import six
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
-from pants.util.eval import parse_literal
+from pants.util.eval import parse_expression
 from pants.util.strutil import is_text_or_binary
 
 
@@ -163,8 +163,8 @@ class Config(object):
       return raw_value
 
     key = '{}.{}'.format(section, option)
-    return parse_literal(name=key, val=raw_value, acceptable_types=type_,
-                         raise_type=self.ConfigError)
+    return parse_expression(name=key, val=raw_value, acceptable_types=type_,
+                            raise_type=self.ConfigError)
 
   # Subclasses must implement.
   def sources(self):
