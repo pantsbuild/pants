@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -24,7 +24,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
     """Ensure that max-old of 1 removes all but one files"""
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
       touch(os.path.join(artifact_dir, 'old_cache_test1'))
@@ -64,7 +64,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
     """
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
       touch(os.path.join(artifact_dir, 'old_cache_test1'))

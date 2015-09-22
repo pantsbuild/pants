@@ -16,30 +16,6 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class JavaCompileIntegrationTest(BaseCompileIT):
 
-  def _java_compile_produces_valid_analysis_file(self, workdir):
-    # A bug was introduced where if a java compile was run twice, the second
-    # time the global_analysis.valid file would incorrectly be empty.
-
-    pants_run = self.run_pants_with_workdir([
-        'compile',
-        'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
-        workdir)
-    self.assert_success(pants_run)
-
-    # Parse the analysis file from the compilation.
-    analysis_file = os.path.join(workdir, 'compile', 'jvm', 'java', 'analysis',
-                                 'global_analysis.valid')
-    parser = JMakeAnalysisParser()
-    analysis = parser.parse_from_path(analysis_file)
-
-    # Ensure we have entries in the analysis file.
-    self.assertEquals(len(analysis.pcd_entries), 2)
-
-  def test_java_compile_produces_valid_analysis_file_second_time(self):
-    # Run the test above twice to ensure it works both times.
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      self._java_compile_produces_valid_analysis_file(workdir)
-
   def test_resources_by_target_and_partitions(self):
     """
     This tests that resources_by_target interacts correctly with
@@ -205,9 +181,9 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     with temporary_dir(root_dir=self.workdir_root()) as workdir,  temporary_dir() as cache_dir:
       path_prefix = 'testprojects/src/java/org/pantsbuild/testproject/jarversionincompatibility'
       dotted_path = path_prefix.replace(os.path.sep, '.')
-      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
+      artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
                                   '{}.jarversionincompatibility'.format(dotted_path))
-      config = {'cache.compile.java': {'write_to': [cache_dir], 'read_from': [cache_dir]}}
+      config = {'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]}}
 
       pants_run = self.run_pants_with_workdir(['compile.java',
                                                ('{}:only-15-directly'.format(path_prefix))],
