@@ -410,6 +410,8 @@ class GopkgInFetcher(Fetcher, Subsystem):
   """
   options_scope = 'gopkg.in'
 
+  logger = logging.getLogger(__name__)
+
   @classmethod
   def subsystem_dependencies(cls):
     return (ArchiveFetcher,)
@@ -449,6 +451,7 @@ class GopkgInFetcher(Fetcher, Subsystem):
     user = user or 'go-{}'.format(package)
     rev = rev or self._find_highest_compatible(user, package, raw_rev)
     root = 'github.com/{user}/{pkg}'.format(user=user, pkg=package)
+    self.logger.debug('Resolved {} to {} at rev {}'.format(import_path, root, rev))
     return root, rev
 
   class ApiError(Fetcher.FetchError):
@@ -461,10 +464,6 @@ class GopkgInFetcher(Fetcher, Subsystem):
     """Indicates no versions were found even there there were no github API errors - unexpected."""
 
   def _find_highest_compatible(self, user, repo, raw_rev):
-    # http://labix.org/gopkg.in defines v0 as master.
-    if raw_rev == 'v0':
-      return 'master'
-
     candidates = set()
     errors = []
 
@@ -483,6 +482,10 @@ class GopkgInFetcher(Fetcher, Subsystem):
     highest_compatible = self._select_highest_compatible(candidates, raw_rev)
     if highest_compatible:
       return highest_compatible
+
+    # http://labix.org/gopkg.in defines the v0 fallback as master.
+    if raw_rev == 'v0':
+      return 'master'
 
     if len(errors) == 2:
       raise self.ApiError('Failed to fetch both tags and branches:\n\t{}\n\t{}'
