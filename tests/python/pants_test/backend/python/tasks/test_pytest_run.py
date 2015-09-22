@@ -13,7 +13,7 @@ from textwrap import dedent
 import coverage
 
 from pants.backend.python.tasks.pytest_run import PytestRun
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.exceptions import TestFailedTaskError, TestTaskError, TestTimeoutTaskError
 from pants.util.contextutil import pushd
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
@@ -38,6 +38,12 @@ class PythonTestBuilderTestBase(PythonTaskTestBase):
   def run_failing_tests(self, targets, failed_targets, **options):
     with self.assertRaises(TestFailedTaskError) as cm:
       self.run_tests(targets=targets, **options)
+    self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
+
+  def run_timedout_tests(self, targets, timedout_targets, failed_targets, **options):
+    with self.assertRaises(TestTaskError) as cm:
+      self.run_tests(targets=targets, **options)
+    self.assertEqual(set(timedout_targets), set(cm.exception.timedout_targets))
     self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
 
 
@@ -224,8 +230,31 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
     self.run_failing_tests(targets=[self.red_in_class], failed_targets=[self.red_in_class])
 
+  def test_timeout_fast(self):
+    """When running 'fast' all the targets run together so there's just one timeout covering the whole
+    thing. They fail or succeed together
+    """
+
+    self.run_timedout_tests(targets=[self.two_seconds_no_timeout, self.two_seconds_timeout],
+                            timedout_targets=[self.two_seconds_timeout, self.two_seconds_no_timeout],
+                            failed_targets=[], fast=True)
+
   def test_timeout(self):
-    self.run_failing_tests(targets=[self.two_seconds_no_timeout, self.two_seconds_timeout], failed_targets=[self.two_seconds_timeout])
+    """When fast is false, each test is run individually so we can see which ones time out
+    and which ones don't
+    """
+
+    self.run_timedout_tests(targets=[self.two_seconds_no_timeout, self.two_seconds_timeout],
+                            timedout_targets=[self.two_seconds_timeout],
+                            failed_targets=[],
+                            fast=False)
+
+  def test_timeout_mixed(self):
+    self.run_timedout_tests(targets=[self.two_seconds_timeout, self.red],
+                            timedout_targets=[self.two_seconds_timeout],
+                            failed_targets=[self.red],
+                            fast=False,
+                            fail_slow=True)
 
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])

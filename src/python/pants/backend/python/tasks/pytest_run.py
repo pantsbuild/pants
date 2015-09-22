@@ -25,7 +25,8 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
-from pants.base.exceptions import TaskError, TestFailedTaskError, TestTimeoutTaskError
+from pants.base.exceptions import (TaskError, TestFailedTaskError, TestTaskError,
+                                   TestTimeoutTaskError)
 from pants.base.target import Target
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
@@ -168,7 +169,7 @@ class PytestRun(PythonTask, TestTaskMixin):
       failed_targets = [target for target, rv in results.items() if not rv.success and not rv.is_timeout]
       timedout_targets = [target for target, rv in results.items() if rv.is_timeout]
       if failed_targets or timedout_targets:
-        raise TestFailedTaskError(failed_targets=failed_targets, timedout_targets=timedout_targets)
+        raise TestTaskError(failed_targets=failed_targets, timedout_targets=timedout_targets)
 
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--shard` option."""
