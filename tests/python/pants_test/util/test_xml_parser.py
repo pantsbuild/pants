@@ -58,8 +58,6 @@ class TestXmlParser(TestXmlBase):
   """Test the XmlParser class."""
 
   def test_from_file(self):
-    import time
-    time.sleep(10)
     with self.xml_file() as xml:
       parser = XmlParser.from_file(xml)
       self.assertEqual(isinstance(parser, XmlParser), True)
