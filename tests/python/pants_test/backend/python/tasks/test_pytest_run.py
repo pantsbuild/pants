@@ -100,6 +100,15 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
             def test_one_in_class(self):
               self.assertEqual(1, core.two())
         """))
+    self.create_file(
+      'tests/test_core_two_seconds.py',
+      dedent("""
+          import core, time
+
+          def test_three():
+            time.sleep(2)
+            assert 1 == core.one()
+        """))
     self.add_to_build_file(
         'tests',
         dedent("""
@@ -143,10 +152,38 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           )
 
           python_tests(
+            name='two_seconds_no_timeout',
+            sources=[
+              'test_core_two_seconds.py',
+            ],
+            timeout = 0,
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='two_seconds_timeout',
+            sources=[
+              'test_core_two_seconds.py',
+            ],
+            timeout = 1,
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
             name='all',
             sources=[
               'test_core_green.py',
-              'test_core_red.py'
+              'test_core_red.py',
             ],
             dependencies=[
               'lib:core'
@@ -171,6 +208,8 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     self.red = self.target('tests:red')
     self.red_in_class = self.target('tests:red_in_class')
+    self.two_seconds_no_timeout = self.target('tests:two_seconds_no_timeout')
+    self.two_seconds_timeout = self.target('tests:two_seconds_timeout')
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
 
@@ -184,6 +223,9 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     # for test in a class, the failure line is in the following format
     # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
     self.run_failing_tests(targets=[self.red_in_class], failed_targets=[self.red_in_class])
+
+  def test_timeout(self):
+    self.run_failing_tests(targets=[self.two_seconds_no_timeout, self.two_seconds_timeout], failed_targets=[self.two_seconds_timeout])
 
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])

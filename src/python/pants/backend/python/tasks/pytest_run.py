@@ -71,6 +71,10 @@ class PythonTestResult(object):
   def failed_targets(self):
     return self._failed_targets
 
+  @property
+  def is_timeout(self):
+    return self._msg == "TIMEOUT"
+
 
 class PytestRun(PythonTask, TestTaskMixin):
   _TESTING_TARGETS = [
@@ -500,7 +504,10 @@ class PytestRun(PythonTask, TestTaskMixin):
 
       def run_and_analyze(resultlog_path):
         result = self._do_run_tests_with_args(pex, workunit, args, timeout)
-        failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
+        if result.is_timeout:
+          failed_targets = targets
+        else:
+          failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
         return result.with_failed_targets(failed_targets)
 
       args = []
