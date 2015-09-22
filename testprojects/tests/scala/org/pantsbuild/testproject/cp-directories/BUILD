@@ -4,8 +4,6 @@
 junit_tests(
   name = 'cp-directories',
   dependencies = [
-    '3rdparty/jvm/org/reflections',
-    '3rdparty:guava',
     '3rdparty:junit',
     '3rdparty:scalatest',
   ],
