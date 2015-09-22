@@ -11,15 +11,14 @@ import unittest
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   IsolationCacheHitCallback
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import touch
 
 
 class IsolationCacheHitCallbackTest(unittest.TestCase):
   def test_when_key_has_associated_directory_cleans_dir(self):
     with temporary_dir() as tmpdir:
       filename = os.path.join(tmpdir, 'deleted')
-      with safe_open(filename, 'w') as f:
-        f.write('')
+      touch(filename)
 
       key = 'some-key'
       cache_key_to_class_dir = {key: tmpdir}
