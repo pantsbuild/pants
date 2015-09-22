@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import IsolationCacheHitCallback
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
+  IsolationCacheHitCallback
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 
