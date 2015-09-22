@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.option.errors import ParseError
-from pants.util.eval import parse_literal
+from pants.util.eval import parse_expression
 
 
 def dict_option(s):
@@ -49,4 +49,4 @@ def _convert(val, acceptable_types):
   :raises :class:`pants.options.errors.ParseError`: if there was a problem parsing the val as an
                                                     acceptable type.
   """
-  return parse_literal(val, acceptable_types, raise_type=ParseError)
+  return parse_expression(val, acceptable_types, raise_type=ParseError)

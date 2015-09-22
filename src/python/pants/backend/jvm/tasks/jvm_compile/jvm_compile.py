@@ -42,10 +42,10 @@ class CacheHitCallback(object):
   """
 
   def __init__(self, cache_key_to_class_dir):
-    self._key_to_target = cache_key_to_class_dir
+    self._key_to_classes_dir = cache_key_to_class_dir
 
   def __call__(self, cache_key):
-    class_dir = self._key_to_target.get(cache_key)
+    class_dir = self._key_to_classes_dir.get(cache_key)
     if class_dir:
       safe_mkdir(class_dir, clean=True)
 
