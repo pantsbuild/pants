@@ -3,26 +3,24 @@
 
 package org.pantsbuild.testproject.cp_directories
 
-import collection.JavaConverters._
-
-import com.google.common.reflect.ClassPath
-
 import org.junit.runner.RunWith
 import org.scalatest.WordSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.MustMatchers
 
-/** A test that confirms it can list the classes in its own package to find itself. */
+/**
+ * A test that confirms it can fetch the directory entry for its own package. This confirms
+ * that the classpath provided to the test contains directories, which may not always be true
+ * for jars.
+ */
 @RunWith(classOf[JUnitRunner])
 class ClasspathDirectories extends WordSpec with MustMatchers {
+  val thisPackage = this.getClass.getCanonicalName.split('.').dropRight(1).mkString(".")
+
   "ClasspathDirectories" should {
-    "be able to find itself" in {
-      val thisClass = this.getClass.getCanonicalName
-      val thisPackage = thisClass.split('.').dropRight(1).mkString(".")
-      val classes =
-        ClassPath.from(this.getClass.getClassLoader)
-          .getTopLevelClasses(thisPackage)
-      classes.asScala.map(_.toString) must contain(thisClass)
+    "see its own package as a directory on the classpath" in {
+      val packageResource = "/" + thisPackage.replace('.', '/')
+      Option(this.getClass.getResource(packageResource)) mustBe defined
     }
   }
 }
