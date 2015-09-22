@@ -144,3 +144,29 @@ class GopkgInFetcherTest(unittest.TestCase):
                   github_api_responses=([{'ref': 'refs/tags/v2'}],  # non-matching tag
                                         [{'ref': 'refs/heads/v1.2.3'}]),
                   expected_fetch=('github.com/go-check/check', 'v1.2.3'))
+
+  def test_v0_tag_match(self):
+    # This emulates a real case discovered here: https://github.com/pantsbuild/pants/issues/2233
+    self.do_fetch('gopkg.in/fsnotify.v0',
+                  github_api_responses=([{'ref': 'refs/tags/v0.8.06'},
+                                         {'ref': 'refs/tags/v0.8.07'},
+                                         {'ref': 'refs/tags/v0.8.08'},
+                                         {'ref': 'refs/tags/v0.8.09'},
+                                         {'ref': 'refs/tags/v0.8.10'},
+                                         {'ref': 'refs/tags/v0.8.11'},
+                                         {'ref': 'refs/tags/v0.8.12'},
+                                         {'ref': 'refs/tags/v0.8.13'},
+                                         {'ref': 'refs/tags/v0.9.0'},
+                                         {'ref': 'refs/tags/v0.9.1'},
+                                         {'ref': 'refs/tags/v0.9.2'},
+                                         {'ref': 'refs/tags/v0.9.3'},
+                                         {'ref': 'refs/tags/v1.0.0'}],
+                                        [{'ref': 'refs/heads/master'},
+                                         {'ref': 'refs/heads/v0'}]),
+                  expected_fetch=('github.com/go-fsnotify/fsnotify', 'v0.9.3'))
+
+  def test_v0_no_matches(self):
+    self.do_fetch('gopkg.in/fsnotify.v0',
+                  github_api_responses=([{'ref': 'refs/tags/v1.0.0'}],
+                                        []),
+                  expected_fetch=('github.com/go-fsnotify/fsnotify', 'master'))
