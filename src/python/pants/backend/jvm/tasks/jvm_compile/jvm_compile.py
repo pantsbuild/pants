@@ -11,11 +11,12 @@ import os
 import shutil
 import sys
 from collections import OrderedDict, defaultdict
+from hashlib import sha1
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
