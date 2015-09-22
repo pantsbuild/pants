@@ -4,46 +4,70 @@ set -o pipefail
 
 PANTS_SERVER_PORT=${PANTS_SERVER_PORT:-22222}
 
-DOCKERFILE="${HOME}/.cache/pantsbuild/docker/dev/local/Dockerfile"
+CACHE="${XDG_CACHE_HOME:-${HOME}/.cache}"
+DOCKERFILE="${CACHE}/pantsbuild/docker/dev/local/Dockerfile"
 
+user=$(id -run)
 if [[ ! -f "${DOCKERFILE}" ]]
 then
-  echo "=== Building a customized image for $(id -run):$(id -rgn) ($(id -ru):$(id -rg)) ==="
+  group=$(id -rgn)
+  gid=$(id -rg)
+  uid=$(id -ru)
+  echo "=== Building a customized image for ${user}:${group} (${uid}:${gid}) ==="
 
   mkdir -p $(dirname ${DOCKERFILE})
-  dockerdir="$(mktemp -d /tmp/pantsbuild.docker.XXXXXX)"
+  dockerdir="$(mktemp -d -t pantsbuild.docker.XXXXXX)"
   trap "rm -rf "${dockerdir}"" EXIT
 
   cat << EOF > "${dockerdir}/Dockerfile"
 FROM pantsbuild/pants:latest
 
-LABEL org.pantsbuild.pants-dev-local="latest"
+# NB: An alternative to creating a new image with a customized user is to just:
+#  ./docker run --user=${uid}:${gid}
+#
+# That though has the disadvantage of a wonky presentation:
+#  $ docker run -u 1002:1002 -it -v ${PWD}:/home/${user}/pants pants-dev-local:latest
+#  groups: cannot find name for group ID 1002
+#  I have no name!@454547f0e703:~/pants$ id
+#  uid=1002 gid=1002 groups=1002
+#  I have no name!@454547f0e703:~/pants$
+#
+# As such, we build a shim image to setup a user with uid/gid matching the host user so that the
+# /home/${user}/pants volume mount of the pants clone has matching perms and can be used
+# transparently.
 
-RUN groupadd --gid $(id -rg) -r pantsbuild && \\
-    useradd --uid $(id -ru)  -r -m -g pantsbuild pantsbuild
+RUN groupadd --gid ${gid} -r ${group} && \\
+    useradd --uid ${uid}  -r -m -g ${group} ${user} 
 
-VOLUME /home/pantsbuild/pants
+VOLUME /home/${user}/.cache/pants
+VOLUME /home/${user}/.ivy2/pants
+VOLUME /home/${user}/pants
 
-USER pantsbuild
-ENV HOME /home/pantsbuild
+RUN mkdir -p /home/${user}/.cache && chown ${user}:${group} /home/${user}/.cache
+
+USER ${user}
+ENV HOME /home/${user}
 
 # We have files with unicode path segments that require a unicode-supporting locale to read from
 # python.
 ENV LANG=en_US.UTF-8
 
-WORKDIR /home/pantsbuild/pants
+WORKDIR /home/${user}/pants
 CMD ["bash"]
 EOF
 
   docker build --rm -t pants-dev-local:latest "${dockerdir}" && \
     mv "${dockerdir}/Dockerfile" "${DOCKERFILE}"
+
+  echo "=== Image built and tagged as pants-dev-local:latest ==="
 fi
 
-docker run --rm -it \
+exec docker run --rm -it \
   --name=pants-dev \
-  -p ${PANTS_SERVER_PORT}:${PANTS_SERVER_PORT} \
-  -e PANTS_SERVER_PORT=${PANTS_SERVER_PORT} \
   --net=host \
-  -v $PWD:/home/pantsbuild/pants \
-  $(docker images -q -f label=org.pantsbuild.pants-dev-local=latest)
-
+  --pid=host \
+  --privileged=true \
+  -v ${PWD}:/home/${user}/pants \
+  -v ${HOME}/.ivy2/pants:/home/${user}/.ivy2/pants \
+  -v ${CACHE}/pants:/home/${user}/.cache/pants \
+  pants-dev-local:latest
