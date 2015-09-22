@@ -37,6 +37,7 @@ class TestTaskError(TaskError):
 
   """
 
+
 class TestFailedTaskError(TestTaskError):
   """Raised when an actual test run failed.
 
@@ -48,6 +49,7 @@ class TestTimeoutTaskError(TestTaskError):
   """Raise when an actual test run has timed out
 
   """
+
   def __str__(self):
     return "Tests timed out"
 
