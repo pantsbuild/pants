@@ -32,7 +32,7 @@ class CheckPublishedDeps(ConsoleTask):
       return tgt.is_exported
 
     for target in self.context.scan().targets(predicate=is_published):
-      provided_jar, _, _ = target.get_artifact_info()
+      provided_jar, _ = target.get_artifact_info()
       artifact = (provided_jar.org, provided_jar.name)
       if not artifact in self._artifacts_to_targets:
         self._artifacts_to_targets[artifact] = target

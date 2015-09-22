@@ -122,7 +122,7 @@ class PushDb(object):
     db_set('revision.fingerprint', pe.fingerprint)
 
   def _accessors_for_target(self, target):
-    jar_dep, _, exported = target.get_artifact_info()
+    jar_dep, exported = target.get_artifact_info()
     if not exported:
       raise ValueError
 
@@ -159,28 +159,21 @@ class DependencyWriter(object):
     self.template_relpath = template_relpath
 
   def write(self, target, path, confs=None, extra_confs=None, classifier=None):
-    # TODO(John Sirois): a dict is used here to de-dup codegen targets which have both the original
-    # codegen target - say java_thrift_library - and the synthetic generated target (java_library)
-    # Consider reworking codegen tasks to add removal of the original codegen targets when rewriting
-    # the graph
     dependencies = OrderedDict()
-    internal_codegen = {}
-    configurations = set(confs or [])
     for internal_dep in target_internal_dependencies(target):
       jar = self._as_versioned_jar(internal_dep)
-      dependencies[(jar.org, jar.name)] = self.internaldep(jar, internal_dep, classifier=classifier)
-      if internal_dep.is_codegen:
-        internal_codegen[jar.name] = jar.name
-    for jar in target.jar_dependencies:
-      if jar.rev:
-        dependencies[(jar.org, jar.name, classifier)] = self.jardep(jar, classifier=classifier)
-        configurations |= set(jar._configurations)
+      key = (jar.org, jar.name)
+      dependencies[key] = self.internaldep(jar, internal_dep, classifier=classifier)
 
-    target_jar = self.internaldep(self._as_versioned_jar(target),
-                                  target,
-                                  classifier=classifier,
-                                  configurations=list(configurations))
-    target_jar = target_jar.extend(dependencies=dependencies.values())
+    for jar in target.jar_dependencies:
+      jardep = self.jardep(jar, classifier=classifier)
+      if jardep:
+        key = (jar.org, jar.name, classifier or jar.classifier)
+        dependencies[key] = jardep
+
+    target_jar = self.internaldep(self._as_versioned_jar(target), target, classifier=classifier)
+    if target_jar:
+      target_jar = target_jar.extend(dependencies=dependencies.values())
 
     template_kwargs = self.templateargs(target_jar, confs, extra_confs, classifier)
     with safe_open(path, 'w') as output:
@@ -194,7 +187,7 @@ class DependencyWriter(object):
     """
     raise NotImplementedError()
 
-  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
+  def internaldep(self, jar_dependency, target, classifier=None):
     """
       Subclasses must return a template data for the given internal target (provided in jar
       dependency form).
@@ -203,7 +196,7 @@ class DependencyWriter(object):
 
   def _as_versioned_jar(self, internal_target):
     """Fetches the jar representation of the given target, and applies the latest pushdb version."""
-    jar, _, _ = internal_target.get_artifact_info()
+    jar, _ = internal_target.get_artifact_info()
     pushdb_entry = self.get_db(internal_target).get_entry(internal_target)
     jar.rev = pushdb_entry.version().version()
     return jar
@@ -226,7 +219,7 @@ class PomWriter(DependencyWriter):
 
   def jardep(self, jar, classifier=None):
     return TemplateData(
-      classifiers=self.classifiers(classifier, jar.artifacts),
+      classifiers=self.classifiers(classifier, jar),
       artifact_id=jar.name,
       group_id=jar.org,
       version=jar.rev,
@@ -234,23 +227,23 @@ class PomWriter(DependencyWriter):
       excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
 
   @staticmethod
-  def classifiers(classifier, artifacts):
+  def classifiers(classifier, jar):
     """Find a list of plausible classifiers.
 
-    :param classifier: the starting classifier
-    :param artifacts: a sequence of IvyArtifact's
+    :param classifier: The starting classifier.
+    :param jar: The dependency jar.
     :return: list like [TemplateData(classifier='sources'), TemplateData(classifier='javadoc')]
     """
     s = set()
     if classifier:
       s.add(classifier)
-    s.update([i.classifier for i in artifacts if i.classifier])
+    if jar.classifier:
+      s.add(jar.classifier)
 
     # We sort this for testing: having a test fail because the order changed isn't helpful.
-
     return map(lambda x: TemplateData(classifier=x), sorted(s))
 
-  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
+  def internaldep(self, jar_dependency, target, classifier=None):
     template_data = self.jardep(jar_dependency, classifier=classifier)
     if isinstance(target.provides.publication_metadata, OSSRHPublicationMetadata):
       pom = target.provides.publication_metadata
@@ -281,32 +274,20 @@ class IvyWriter(DependencyWriter):
         template_package_name=IvyUtils.IVY_TEMPLATE_PACKAGE_NAME)
 
   def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
-    return dict(lib=target_jar.extend(
-        publications=set(confs or []),
-        extra_publications=extra_confs if extra_confs else {},
-        overrides=None))
-
-  def _jardep(self, jar, transitive=True, configurations='default', classifier=None):
-    return TemplateData(
-        org=jar.org,
-        module=jar.name,
-        version=jar.rev,
-        mutable=False,
-        force=jar.force,
-        excludes=[self.create_exclude(exclude) for exclude in jar.excludes],
-        transitive=transitive,
-        artifacts=jar.artifacts,
-        classifier=classifier,
-        configurations=configurations)
+    return dict(lib=target_jar.extend(publications=set(confs or []),
+                                      extra_publications=extra_confs if extra_confs else {},
+                                      overrides=None))
 
   def jardep(self, jar, classifier=None):
-    return self._jardep(jar,
-                        transitive=jar.transitive,
-                        configurations=jar._configurations,
-                        classifier=classifier)
+    # The ivy.xml used for publication does not need external jar dependencies listed.
+    return None
 
-  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
-    return self._jardep(jar_dependency, configurations=configurations, classifier=classifier)
+  def internaldep(self, jar_dependency, target, classifier=None):
+    # The ivy.xml used for publication only needs minimal coordinate info for internal deps.
+    return TemplateData(org=jar_dependency.org,
+                        module=jar_dependency.name,
+                        version=jar_dependency.rev,
+                        transitive=True)
 
 
 def coordinate(org, name, rev=None):
@@ -617,7 +598,6 @@ class JarPublish(ScmPublishMixin, JarTask):
     args = [
       '-settings', ivysettings,
       '-ivy', ivyxml_path,
-      '-deliverto', '{}/[organisation]/[module]/ivy-[revision].xml'.format(self.workdir),
       '-publish', resolver,
       '-publishpattern', '{}/[organisation]/[module]/'
                          '[artifact]-[revision](-[classifier]).[ext]'.format(self.workdir),
@@ -779,7 +759,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       product_config = {
         'jars': {
           'classifier': '',
-          },
+        },
       }
       product_config.update(self.get_options().publish_extras or {})
       for product, config in product_config.items():
@@ -793,7 +773,7 @@ class JarPublish(ScmPublishMixin, JarTask):
             self.create_source_jar(tgt, jar, version)
             doc_jar = self.create_doc_jar(tgt, jar, version)
             confs.add(IvyWriter.SOURCES_CONFIG)
-            if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
+            if doc_jar:
               confs.add(IvyWriter.JAVADOC_CONFIG)
           else:
             confs = [classifier, DEFAULT_CONF]
@@ -803,7 +783,7 @@ class JarPublish(ScmPublishMixin, JarTask):
                            'conf': confs,
                            'ext': DEFAULT_EXT}
           return stage_artifact(tgt, jar, version, tag_name, changelog, confs,
-                              extra_confs=extra_confs, classifier=classifier)
+                                extra_confs=extra_confs, classifier=classifier)
       raise ValueError('No product mapping in {0} for {1}. '
                        'You may need to run some other task first'.format(product_config.keys(),
                                                                           tgt))
@@ -823,7 +803,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       oldentry = pushdb.get_entry(target)
 
       # the jar version is ignored here, since it is overridden below with the new entry
-      jar, _, _ = target.get_artifact_info()
+      jar, _ = target.get_artifact_info()
       published.append(jar)
 
       if skip and (jar.org, jar.name) == self.restart_at:

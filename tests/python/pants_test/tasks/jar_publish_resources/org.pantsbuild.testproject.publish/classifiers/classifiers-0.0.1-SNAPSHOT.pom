@@ -40,14 +40,14 @@
       <artifactId>compiler-interface</artifactId>
       <version>0.13.7</version>
       <scope>compile</scope>
-      <classifier>javadoc</classifier>
+      <classifier>sources</classifier>
     </dependency>
     <dependency>
       <groupId>com.typesafe.sbt</groupId>
       <artifactId>compiler-interface</artifactId>
       <version>0.13.7</version>
       <scope>compile</scope>
-      <classifier>sources</classifier>
+      <classifier>javadoc</classifier>
     </dependency>
     <dependency>
       <groupId>com.typesafe.sbt</groupId>

@@ -11,7 +11,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
@@ -37,8 +37,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
     context = self.context(target_roots=targets)
-    self.create_task(context, 'unused').execute()
-    return context.products.get_data('compile_classpath', None)
+    self.create_task(context).execute()
+    return context.products.get_data('compile_classpath')
 
   #
   # Test section
@@ -57,10 +57,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Create jar_libraries with different versions of the same dep: this will cause
     # a pre-ivy "eviction" in IvyUtils.generate_ivy, but the same case can be triggered
     # due to an ivy eviction where the declared version loses to a transitive version.
-    losing_dep = JarDependency('com.google.guava', 'guava', '16.0',
-                               artifacts=[IvyArtifact('guava16.0')])
-    winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1',
-                               artifacts=[IvyArtifact('guava16.0.1')])
+    losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
+    winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1')
     losing_lib = self.make_target('//:a', JarLibrary, jars=[losing_dep])
     winning_lib = self.make_target('//:b', JarLibrary, jars=[winning_dep])
     # Confirm that the same artifact was added to each target.
@@ -135,42 +133,37 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   def test_resolve_multiple_artifacts1(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
-    classifier_and_no_classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources',
-                                                 artifacts=[IvyArtifact('junit')])
+    classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
 
     no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
-    classifier_and_no_classifier_lib = self.make_target('//:b',
-                                                        JarLibrary,
-                                                        jars=[classifier_and_no_classifier])
+    classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier])
+    classifier_and_no_classifier_lib = self.make_target('//:c', JarLibrary,
+                                                        jars=[classifier, no_classifier])
 
-    compile_classpath = self.resolve([no_classifier_lib, classifier_and_no_classifier_lib])
+    compile_classpath = self.resolve([no_classifier_lib,
+                                      classifier_lib,
+                                      classifier_and_no_classifier_lib])
+    no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
+    classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
+    classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
+      [classifier_and_no_classifier_lib])
 
-    no_classifier_cp = compile_classpath.get_for_target(no_classifier_lib)
-    classifier_and_no_classifier_cp = compile_classpath.get_for_target(
-        classifier_and_no_classifier_lib)
+    self.assertIn(no_classifier.coordinate,
+                  {resolved_jar.coordinate
+                   for conf, resolved_jar in classifier_and_no_classifier_cp})
+    self.assertIn(classifier.coordinate,
+                  {resolved_jar.coordinate
+                   for conf, resolved_jar in classifier_and_no_classifier_cp})
 
-    sources_jar = 'junit-4.12-sources.jar'
-    regular_jar = 'junit-4.12.jar'
-    self.assertIn(sources_jar, (os.path.basename(j[-1]) for j in classifier_and_no_classifier_cp))
-    self.assertIn(regular_jar, (os.path.basename(j[-1]) for j in classifier_and_no_classifier_cp))
+    self.assertNotIn(classifier.coordinate, {resolved_jar.coordinate
+                                             for conf, resolved_jar in no_classifier_cp})
+    self.assertIn(no_classifier.coordinate, {resolved_jar.coordinate
+                                             for conf, resolved_jar in no_classifier_cp})
 
-    self.assertNotIn(sources_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
-    self.assertIn(regular_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
-
-  def test_resolve_multiple_artifacts2(self):
-    no_classifier2 = JarDependency('org.apache.avro', 'avro', rev='1.7.7')
-    classifier = JarDependency('org.apache.avro', 'avro', rev='1.7.7', classifier='tests')
-
-    lib = self.make_target('//:c', JarLibrary, jars=[no_classifier2, classifier])
-    compile_classpath = self.resolve([lib])
-    cp = compile_classpath.get_for_target(lib)
-    tests_jar = 'avro-1.7.7-tests.jar'
-    regular_jar = 'avro-1.7.7.jar'
-    self.assertIn(tests_jar, list((os.path.basename(j[-1]) for j in cp)))
-    self.assertIn(regular_jar, list((os.path.basename(j[-1]) for j in cp)))
-    # TODO(Eric Ayers):  I can't replicate the test in test_resolve_multiple_artifacts1
-    # probably because the previous example creates a unique key for the jar_dependency for //:b
-    # with a classifier.
+    self.assertNotIn(no_classifier.coordinate, {resolved_jar.coordinate
+                                                for conf, resolved_jar in classifier_cp})
+    self.assertIn(classifier.coordinate, {resolved_jar.coordinate
+                                          for conf, resolved_jar in classifier_cp})
 
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')

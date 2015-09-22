@@ -22,8 +22,5 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <dependency org="org.pantsbuild.testproject.publish.hello" name="welcome" rev="0.0.1-SNAPSHOT">
       <conf name="default" mapped="default"/>
     </dependency>
-    <dependency org="org.scala-lang" name="scala-library" rev="2.10.4">
-      <conf name="default" mapped="default"/>
-    </dependency>
   </dependencies>
 </ivy-module>

@@ -13,7 +13,6 @@ import threading
 import xml.etree.ElementTree as ET
 from collections import OrderedDict, defaultdict, namedtuple
 from contextlib import contextmanager
-from copy import deepcopy
 
 import six
 from twitter.common.collections import OrderedSet
@@ -22,7 +21,6 @@ from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.base.target import Target
@@ -183,12 +181,11 @@ class IvyInfo(object):
     def create_collection(dep):
       return OrderedSet([dep])
     for jar in jar_library.jar_dependencies:
-      classifiers = jar.artifact_classifiers if self._conf == 'default' else (self._conf,)
-      for classifier in classifiers:
-        jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
-        for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-          for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
-            resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
+      classifier = jar.classifier if self._conf == 'default' else self._conf
+      jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
+      for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
+        for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
+          resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
     return resolved_jars
 
 
@@ -202,9 +199,17 @@ class IvyUtils(object):
 
   INTERNAL_ORG_NAME = 'internal'
 
-  class IvyResolveReportError(Exception):
-    """Raised when the ivy report cannot be found."""
-    pass
+  class IvyError(Exception):
+    """Indicates an error preparing an ivy operation."""
+
+  class IvyResolveReportError(IvyError):
+    """Indicates that an ivy report cannot be found."""
+
+  class IvyResolveConflictingDepsError(IvyError):
+    """Indicates two or more locally declared dependencies conflict."""
+
+  class BadRevisionError(IvyError):
+    """Indicates an unparseable version number."""
 
   @staticmethod
   def _generate_exclude_template(exclude):
@@ -341,35 +346,6 @@ class IvyUtils(object):
     return ret
 
   @classmethod
-  def _combine_jars(cls, jars):
-    """Combine jars with the same org/name/version so they can be represented together in ivy.xml.
-
-    If you have multiple instances of a dependency with org/name/version with different
-    classifiers, they need to be represented with one <dependency> tag and multiple <artifact> tags.
-    :param jars: list of JarDependency definitions
-    :return: list of JarDependency definitions.  These are cloned from the input jars so we
-      don't mutate the inputs.
-    """
-    jar_map = OrderedDict()
-    for jar in jars:
-      key = (jar.org, jar.name, jar.rev)
-      if key not in jar_map:
-        jar_map[key] = deepcopy(jar)
-      else:
-        # Add an artifact
-        existing_jar = jar_map[key]
-        if not existing_jar.artifacts or not jar.artifacts:
-          # Add an artifact to represent the main artifact
-          existing_jar.append_artifact(jar.name,
-                                       type_=None,
-                                       ext=None,
-                                       url=None,
-                                       classifier=None)
-
-        existing_jar.artifacts += jar.artifacts
-    return jar_map.values()
-
-  @classmethod
   def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None):
     if resolve_hash_name:
       org = IvyUtils.INTERNAL_ORG_NAME
@@ -378,6 +354,13 @@ class IvyUtils(object):
       org, name = cls.identify(targets)
 
     extra_configurations = [conf for conf in confs if conf and conf != 'default']
+
+    jars_by_key = OrderedDict()
+    for jar in jars:
+      jars = jars_by_key.setdefault((jar.org, jar.name), [])
+      jars.append(jar)
+
+    dependencies = [cls._generate_jar_template(jars) for jars in jars_by_key.values()]
 
     # As it turns out force is not transitive - it only works for dependencies pants knows about
     # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
@@ -389,7 +372,6 @@ class IvyUtils(object):
     # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
     #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
     # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    dependencies = [cls._generate_jar_template(jar) for jar in jars]
     overrides = [cls._generate_override_template(dep) for dep in dependencies if dep.force]
 
     excludes = [cls._generate_exclude_template(exclude) for exclude in excludes]
@@ -422,22 +404,16 @@ class IvyUtils(object):
     # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
     # strategy generally.
     def add_jar(jar):
-      coordinate = jar.coordinate_without_rev
+      # TODO(John Sirois): XXX
+      coordinate = (jar.org, jar.name, jar.classifier)
       existing = jars.get(coordinate)
       jars[coordinate] = jar if not existing else (
         cls._resolve_conflict(existing=existing, proposed=jar)
       )
 
     def collect_jars(target):
-      if not isinstance(target, JarLibrary):
-        return
-      # Combine together requests for jars with different classifiers from the same jar_library
-      # TODO(Eric Ayers) This is a short-term fix for dealing with the same ivy module that
-      # wants to download multiple jar files with different classifiers as binary dependencies.
-      # I am trying to work out a better long-term solution in this design doc:
-      # https://docs.google.com/document/d/1sEMXUmj7v-YCBZ_wHLpCFjkHOeWjsc1NR1hRIJ9uCZ8
-      for jar in cls._combine_jars(target.jar_dependencies):
-        if jar.rev:
+      if isinstance(target, JarLibrary):
+        for jar in target.jar_dependencies:
           add_jar(jar)
 
     def collect_excludes(target):
@@ -473,14 +449,14 @@ class IvyUtils(object):
 
     return jars.values(), global_excludes
 
-  @staticmethod
-  def _resolve_conflict(existing, proposed):
+  @classmethod
+  def _resolve_conflict(cls, existing, proposed):
     if proposed == existing:
       if proposed.force:
         return proposed
       return existing
     elif existing.force and proposed.force:
-      raise TaskError('Cannot force {}#{};{} to both rev {} and {}'.format(
+      raise cls.IvyResolveConflictingDepsError('Cannot force {}#{};{} to both rev {} and {}'.format(
         proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
       ))
     elif existing.force:
@@ -503,38 +479,58 @@ class IvyUtils(object):
         else:
           return existing
       except Revision.BadRevision as e:
-        raise TaskError('Failed to parse jar revision', e)
-
-  @staticmethod
-  def _is_mutable(jar):
-    if jar.mutable is not None:
-      return jar.mutable
-    return False
+        raise cls.BadRevisionError('Failed to parse jar revision', e)
 
   @classmethod
-  def _generate_jar_template(cls, jar):
-    def create_artifact(name=None, ext=None, url=None, type_=None, classifier=None):
-      return TemplateData(name=name or jar.name,
+  def _generate_jar_template(cls, jars):
+    Dependency = namedtuple('DependencyAttributes', ['org', 'name', 'rev', 'mutable', 'force',
+                                                     'transitive'])
+    global_dep_attributes = set(Dependency(org=jar.org,
+                                           name=jar.name,
+                                           rev=jar.rev,
+                                           mutable=jar.mutable,
+                                           force=jar.force,
+                                           transitive=jar.transitive)
+                                for jar in jars)
+    if len(global_dep_attributes) != 1:
+      # TODO(John Sirois): Need to provide information about where these came from - could be
+      # far-flung JarLibrary targets.  The jars here were collected from targets via
+      # `calculate_classpath` above and so merging of the 2 could provide the context needed.
+      conflicting_dependencies = sorted(str(g) for g in global_dep_attributes)
+      raise cls.IvyResolveConflictingDepsError('Found conflicting dependencies:\n\t{}'
+                                               .format('\n\t'.join(conflicting_dependencies)))
+    jar_attributes = global_dep_attributes.pop()
+
+    excludes = set()
+    for jar in jars:
+      excludes.update(jar.excludes)
+
+    Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])
+    artifacts = OrderedDict()
+    for jar in jars:
+      ext = jar.ext
+      url = jar.url
+      classifier = jar.classifier
+      artifact = Artifact(name=jar.name,
+                          type_=ext or 'jar',
                           ext=ext,
                           url=url,
-                          type_=type_,
                           classifier=classifier)
+      artifacts[(ext, url, classifier)] = artifact
 
-    artifacts_by_classifier = OrderedDict()
-    for artifact in jar.artifacts:
-      key = artifact.classifier or 'default'
-      artifacts_by_classifier[key] = create_artifact(name=artifact.name,
-                                                     ext=artifact.ext,
-                                                     url=artifact.url,
-                                                     type_=artifact.type_,
-                                                     classifier=artifact.classifier)
+    if len(artifacts) == 1:
+      # If the only artifact has no attributes that we need a nested <artifact/> for, just emit
+      # a <dependency/>.
+      artifacts.pop((None, None, None), None)
+
     template = TemplateData(
-        org=jar.org,
-        module=jar.name,
-        version=jar.rev,
-        mutable=cls._is_mutable(jar),
-        force=jar.force,
-        excludes=[cls._generate_exclude_template(exclude) for exclude in jar.excludes],
-        transitive=jar.transitive,
-        artifacts=artifacts_by_classifier.values())
+        org=jar_attributes.org,
+        module=jar_attributes.name,
+        version=jar_attributes.rev,
+        mutable=jar_attributes.mutable,
+        force=jar_attributes.force,
+        transitive=jar_attributes.transitive,
+        artifacts=artifacts.values(),
+        excludes=[cls._generate_exclude_template(exclude) for exclude in excludes])
+
     return template

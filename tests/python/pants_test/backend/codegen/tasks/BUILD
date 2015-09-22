@@ -103,6 +103,7 @@ python_tests(
   sources = ['test_wire_gen.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/tasks:wire_gen',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
