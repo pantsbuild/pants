@@ -11,11 +11,11 @@ import os
 import shutil
 import sys
 from collections import OrderedDict, defaultdict
-from hashlib import sha1
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
@@ -47,6 +47,35 @@ class CacheHitCallback(object):
     class_dir = self.key_to_target.get(cache_key)
     if class_dir:
       safe_mkdir(class_dir, clean=True)
+
+
+class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
+  """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
+
+  def __init__(self, task, compile_classpath):
+    super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
+    self._compile_classpath = compile_classpath
+
+  def _build_hasher(self, target):
+    hasher = super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self)._build_hasher(target)
+    if isinstance(target, JarLibrary):
+      # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
+      # the resolved coordinates, and the requested coordinates are used. This ensures that if a
+      # source file depends on a library with source compatible but binary incompatible signature
+      # changes between versions, that you won't get runtime errors due to using an artifact built
+      # against a binary incompatible version resolved for a previous compile.
+      classpath_entries = self._compile_classpath.get_artifact_classpath_entries_for_targets(
+        [target], transitive=False)
+      for _, entry in classpath_entries:
+        hasher.update(str(entry.coordinate))
+    return hasher
+
+  def __hash__(self):
+    return hash((type(self), self._task.fingerprint))
+
+  def __eq__(self, other):
+    return (isinstance(other, ResolvedJarAwareTaskIdentityFingerprintStrategy) and
+            super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__eq__(other))
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):
@@ -284,8 +313,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def _analysis_parser(self):
     return self._analysis_tools.parser
 
-  def _fingerprint_strategy(self):
-    return TaskIdentityFingerprintStrategy(self)
+  def _fingerprint_strategy(self, classpath_products):
+    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
 
   def ensure_analysis_tmpdir(self):
     """Work in a tmpdir so we don't stomp the main analysis files on error.
@@ -320,8 +349,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def prepare_execute(self, chunks):
     relevant_targets = list(itertools.chain(*chunks))
-    cache_manager = self.create_cache_manager(invalidate_dependents=True,
-                                              fingerprint_strategy=self._fingerprint_strategy())
 
     # Target -> sources (relative to buildroot).
     # TODO(benjy): Should sources_by_target be available in all Tasks?
@@ -362,6 +389,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
       return
+
+    classpath_product = self.context.products.get_data('compile_classpath')
+    fingerprint_strategy = self._fingerprint_strategy(classpath_product)
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
     partition_size_hint, locally_changed_targets = (0, None)
@@ -369,7 +399,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           invalidate_dependents=True,
                           partition_size_hint=partition_size_hint,
                           locally_changed_targets=locally_changed_targets,
-                          fingerprint_strategy=self._fingerprint_strategy(),
+                          fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid targets for this chunk.

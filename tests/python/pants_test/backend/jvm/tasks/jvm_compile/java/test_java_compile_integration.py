@@ -16,6 +16,48 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class JavaCompileIntegrationTest(BaseCompileIT):
 
+  def _java_compile_produces_valid_analysis_file(self, workdir):
+    # A bug was introduced where if a java compile was run twice, the second
+    # time the global_analysis.valid file would incorrectly be empty.
+
+    pants_run = self.run_pants_with_workdir([
+        'compile',
+        'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
+        workdir)
+    self.assert_success(pants_run)
+
+    # Parse the analysis file from the compilation.
+    analysis_file = os.path.join(workdir, 'compile', 'jvm', 'java', 'analysis',
+                                 'global_analysis.valid')
+    parser = JMakeAnalysisParser()
+    analysis = parser.parse_from_path(analysis_file)
+
+    # Ensure we have entries in the analysis file.
+    self.assertEquals(len(analysis.pcd_entries), 2)
+
+  def test_java_compile_produces_valid_analysis_file_second_time(self):
+    # Run the test above twice to ensure it works both times.
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      self._java_compile_produces_valid_analysis_file(workdir)
+
+  def test_resources_by_target_and_partitions(self):
+    """
+    This tests that resources_by_target interacts correctly with
+    partitions; we want to make sure that even targets that are outside
+    the current partition don't cause crashes when they are looked up in
+    resources_by_targets (see jvm_compile.py).
+    """
+    with temporary_dir() as cache_dir:
+      config = {'cache.compile.java': {'write_to': [cache_dir]}}
+
+      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+        pants_run = self.run_pants_with_workdir(
+          ['compile', 'compile.java',
+           'testprojects/src/java/org/pantsbuild/testproject/publish/hello/main:',
+         ],
+          workdir, config)
+        self.assert_success(pants_run)
+
   def test_nocache(self):
     with temporary_dir() as cache_dir:
       bad_artifact_dir = os.path.join(cache_dir,
@@ -154,3 +196,34 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # Use zinc.
       args=['--no-compile-java-use-jmake']
     )
+
+  def test_java_compile_with_different_resolved_jars_produce_different_artifacts(self):
+    # Since unforced dependencies resolve to the highest version including transitive jars,
+    # We want to ensure that running java compile with binary incompatible libraries will
+    # produces two different artifacts.
+
+    with temporary_dir(root_dir=self.workdir_root()) as workdir,  temporary_dir() as cache_dir:
+      path_prefix = 'testprojects/src/java/org/pantsbuild/testproject/jarversionincompatibility'
+      dotted_path = path_prefix.replace(os.path.sep, '.')
+      artifact_dir = os.path.join(cache_dir, JmakeCompile.stable_name(),
+                                  '{}.jarversionincompatibility'.format(dotted_path))
+      config = {'cache.compile.java': {'write_to': [cache_dir], 'read_from': [cache_dir]}}
+
+      pants_run = self.run_pants_with_workdir(['compile.java',
+                                               ('{}:only-15-directly'.format(path_prefix))],
+                                              workdir,
+                                              config)
+      self.assert_success(pants_run)
+
+      # One artifact for guava 15
+      self.assertEqual(len(os.listdir(artifact_dir)), 1)
+
+      # Rerun for guava 16
+      pants_run = self.run_pants_with_workdir(['compile.java',
+                                               (u'{}:alongside-16'.format(path_prefix)), '-ldebug'],
+                                              workdir,
+                                              config)
+      self.assert_success(pants_run)
+
+      # One artifact for guava 15 and one for guava 16
+      self.assertEqual(len(os.listdir(artifact_dir)), 2)
