@@ -37,7 +37,7 @@ FROM pantsbuild/pants:latest
 # transparently.
 
 RUN groupadd --gid ${gid} -r ${group} && \\
-    useradd --uid ${uid}  -r -m -g ${group} ${user} 
+    useradd --uid ${uid}  -r -m -g ${group} ${user}
 
 VOLUME /home/${user}/.cache/pants
 VOLUME /home/${user}/.ivy2/pants
