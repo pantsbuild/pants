@@ -90,6 +90,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Sergey Serebryakov
 + Simeon Franklin
 + Stu Hood
++ Tansy Arron-Walker
 + Ted Dziuba
 + Tejal Desai
 + Tianshuo Deng

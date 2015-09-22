@@ -8,7 +8,7 @@ java_thrift_library(
   provides=artifact(
     org='org.archimedes',
     name='android_generator',
-    repo=Repository(name='test',
+    repo=repository(name='test',
       url='https://dl.bintray.com/somerandom/url',
       push_db_basedir='/tmp')
   )
