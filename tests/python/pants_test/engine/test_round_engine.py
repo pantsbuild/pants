@@ -22,14 +22,12 @@ class RoundEngineTest(EngineTestBase, BaseTest):
       for inner in ['task1', 'task2', 'task3', 'task4', 'task5']:
         self.set_options_for_scope('{}.{}'.format(outer, inner),
                                    level='info', colors=False)
-    self._context = self.context()
-    self.assertTrue(self._context.is_unlocked())
 
     self.engine = RoundEngine()
     self.actions = []
 
   def tearDown(self):
-    self.assertTrue(self._context.is_unlocked())
+    self.assertTrue(not self._context or self._context.is_unlocked())
     super(RoundEngineTest, self).tearDown()
 
   def alternate_target_roots_action(self, tag):
@@ -75,8 +73,17 @@ class RoundEngineTest(EngineTestBase, BaseTest):
 
   def install_task(self, name, product_types=None, goal=None, required_data=None,
                    alternate_target_roots=None):
+    """Install a task to goal and return all installed tasks of the goal.
+
+    This is needed to initialize tasks' context.
+    """
     task_type = self.record(name, product_types, required_data, alternate_target_roots)
-    return super(RoundEngineTest, self).install_task(name=name, action=task_type, goal=goal)
+    return super(RoundEngineTest,
+                 self).install_task(name=name, action=task_type, goal=goal).task_types()
+
+  def create_context(self, for_task_types=None):
+    self._context = self.context(for_task_types=for_task_types)
+    self.assertTrue(self._context.is_unlocked())
 
   def assert_actions(self, *expected_execute_ordering):
     expected_pre_execute_actions = set()
@@ -93,78 +100,75 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.assertEqual(expected_execute_actions, self.actions[-expeceted_execute_actions_length:])
 
   def test_lifecycle_ordering(self):
-    self.install_task('task1', goal='goal1', product_types=['1'])
-    self.install_task('task2', goal='goal1', product_types=['2'], required_data=['1'])
-    self.install_task('task3', goal='goal3', product_types=['3'], required_data=['2'])
-    self.install_task('task4', goal='goal4', required_data=['1', '2', '3'])
-
+    task1 = self.install_task('task1', goal='goal1', product_types=['1'])
+    task2 = self.install_task('task2', goal='goal1', product_types=['2'], required_data=['1'])
+    task3 = self.install_task('task3', goal='goal3', product_types=['3'], required_data=['2'])
+    task4 = self.install_task('task4', goal='goal4', required_data=['1', '2', '3'])
+    self.create_context(for_task_types=task1+task2+task3+task4)
     self.engine.attempt(self._context, self.as_goals('goal4'))
-
     self.assert_actions('task1', 'task2', 'task3', 'task4')
 
   def test_lifecycle_ordering_install_order_invariant(self):
     # Here we swap the order of goal3 and goal4 task installation from the order in
     # `test_lifecycle_ordering` above.  We can't swap task1 and task2 since they purposefully
     # do have an implicit order dependence with a dep inside the same goal.
-    self.install_task('task1', goal='goal1', product_types=['1'])
-    self.install_task('task2', goal='goal1', product_types=['2'], required_data=['1'])
-    self.install_task('task4', goal='goal4', required_data=['1', '2', '3'])
-    self.install_task('task3', goal='goal3', product_types=['3'], required_data=['2'])
-
+    task1 = self.install_task('task1', goal='goal1', product_types=['1'])
+    task2 = self.install_task('task2', goal='goal1', product_types=['2'], required_data=['1'])
+    task3 = self.install_task('task4', goal='goal4', required_data=['1', '2', '3'])
+    task4 = self.install_task('task3', goal='goal3', product_types=['3'], required_data=['2'])
+    self.create_context(for_task_types=task1+task2+task3+task4)
     self.engine.attempt(self._context, self.as_goals('goal4'))
-
     self.assert_actions('task1', 'task2', 'task3', 'task4')
 
   def test_inter_goal_dep(self):
-    self.install_task('task1', goal='goal1', product_types=['1'])
-    self.install_task('task2', goal='goal1', required_data=['1'])
-
+    task1 = self.install_task('task1', goal='goal1', product_types=['1'])
+    task2 = self.install_task('task2', goal='goal1', required_data=['1'])
+    self.create_context(for_task_types=task1+task2)
     self.engine.attempt(self._context, self.as_goals('goal1'))
-
     self.assert_actions('task1', 'task2')
 
   def test_inter_goal_dep_self_cycle_ok(self):
-    self.install_task('task1', goal='goal1', product_types=['1'], required_data=['1'])
-
+    task = self.install_task('task1', goal='goal1', product_types=['1'],
+                             required_data=['1'])
+    self.create_context(for_task_types=task)
     self.engine.attempt(self._context, self.as_goals('goal1'))
-
     self.assert_actions('task1')
 
   def test_inter_goal_dep_downstream(self):
-    self.install_task('task1', goal='goal1', required_data=['1'])
-    self.install_task('task2', goal='goal1', product_types=['1'])
-
+    task1 = self.install_task('task1', goal='goal1', required_data=['1'])
+    task2 = self.install_task('task2', goal='goal1', product_types=['1'])
+    self.create_context(for_task_types=task1+task2)
     with self.assertRaises(self.engine.TaskOrderError):
       self.engine.attempt(self._context, self.as_goals('goal1'))
 
   def test_missing_product(self):
-    self.install_task('task1', goal='goal1', required_data=['1'])
-
+    task =  self.install_task('task1', goal='goal1', required_data=['1'])
+    self.create_context(for_task_types=task)
     with self.assertRaises(self.engine.MissingProductError):
       self.engine.attempt(self._context, self.as_goals('goal1'))
 
   def test_goal_cycle_direct(self):
-    self.install_task('task1', goal='goal1', required_data=['2'], product_types=['1'])
-    self.install_task('task2', goal='goal2', required_data=['1'], product_types=['2'])
-
+    task1 = self.install_task('task1', goal='goal1', required_data=['2'], product_types=['1'])
+    task2 = self.install_task('task2', goal='goal2', required_data=['1'], product_types=['2'])
+    self.create_context(for_task_types=task1+task2)
     for goal in ('goal1', 'goal2'):
       with self.assertRaises(self.engine.GoalCycleError):
         self.engine.attempt(self._context, self.as_goals(goal))
 
   def test_goal_cycle_indirect(self):
-    self.install_task('task1', goal='goal1', required_data=['2'], product_types=['1'])
-    self.install_task('task2', goal='goal2', required_data=['3'], product_types=['2'])
-    self.install_task('task3', goal='goal3', required_data=['1'], product_types=['3'])
-
+    task1 = self.install_task('task1', goal='goal1', required_data=['2'], product_types=['1'])
+    task2 = self.install_task('task2', goal='goal2', required_data=['3'], product_types=['2'])
+    task3 = self.install_task('task3', goal='goal3', required_data=['1'], product_types=['3'])
+    self.create_context(for_task_types=task1+task2+task3)
     for goal in ('goal1', 'goal2', 'goal3'):
       with self.assertRaises(self.engine.GoalCycleError):
         self.engine.attempt(self._context, self.as_goals(goal))
 
   def test_goal_ordering_unconstrained_respects_cli_order(self):
-    self.install_task('task1', goal='goal1')
-    self.install_task('task2', goal='goal2')
-    self.install_task('task3', goal='goal3')
-
+    task1 = self.install_task('task1', goal='goal1')
+    task2 = self.install_task('task2', goal='goal2')
+    task3 = self.install_task('task3', goal='goal3')
+    self.create_context(for_task_types=task1+task2+task3)
     for permutation in itertools.permutations([('task1', 'goal1'),
                                                ('task2', 'goal2'),
                                                ('task3', 'goal3')]):
@@ -175,46 +179,43 @@ class RoundEngineTest(EngineTestBase, BaseTest):
       self.assert_actions(*expected_execute_actions)
 
   def test_goal_ordering_constrained_conflicts_cli_order(self):
-    self.install_task('task1', goal='goal1', required_data=['2'])
-    self.install_task('task2', goal='goal2', product_types=['2'])
-
+    task1 = self.install_task('task1', goal='goal1', required_data=['2'])
+    task2 = self.install_task('task2', goal='goal2', product_types=['2'])
+    self.create_context(for_task_types=task1+task2)
     self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
-
     self.assert_actions('task2', 'task1')
 
   def test_goal_ordering_mixed_constraints_and_cli_order(self):
-    self.install_task('task1', goal='goal1')
-    self.install_task('task2', goal='goal2')
-    self.install_task('task3', goal='goal3')
-    self.install_task('task4', goal='goal4', required_data=['5'])
-    self.install_task('task5', goal='goal5', product_types=['5'])
-
+    task1 = self.install_task('task1', goal='goal1')
+    task2 = self.install_task('task2', goal='goal2')
+    task3 = self.install_task('task3', goal='goal3')
+    task4 = self.install_task('task4', goal='goal4', required_data=['5'])
+    task5 = self.install_task('task5', goal='goal5', product_types=['5'])
+    self.create_context(for_task_types=task1+task2+task3+task4+task5)
     self.engine.attempt(self._context,
                         self.as_goals('goal1', 'goal2', 'goal4', 'goal5', 'goal3'))
-
     self.assert_actions('task1', 'task2', 'task5', 'task4', 'task3')
 
   def test_cli_goals_deduped(self):
-    self.install_task('task1', goal='goal1')
-    self.install_task('task2', goal='goal2')
-    self.install_task('task3', goal='goal3')
-
+    task1 = self.install_task('task1', goal='goal1')
+    task2 = self.install_task('task2', goal='goal2')
+    task3 = self.install_task('task3', goal='goal3')
+    self.create_context(for_task_types=task1+task2+task3)
     self.engine.attempt(self._context,
                         self.as_goals('goal1', 'goal2', 'goal1', 'goal3', 'goal2'))
-
     self.assert_actions('task1', 'task2', 'task3')
 
   def test_replace_target_roots(self):
-    self.install_task('task1', goal='goal1')
-    self.install_task('task2', goal='goal2', alternate_target_roots=[42])
-
+    task1 = self.install_task('task1', goal='goal1')
+    task2 = self.install_task('task2', goal='goal2', alternate_target_roots=[42])
+    self.create_context(for_task_types=task1+task2)
     self.assertEquals([], self._context.target_roots)
     self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
     self.assertEquals([42], self._context.target_roots)
 
   def test_replace_target_roots_conflict(self):
-    self.install_task('task1', goal='goal1', alternate_target_roots=[42])
-    self.install_task('task2', goal='goal2', alternate_target_roots=[1, 2])
-
+    task1 = self.install_task('task1', goal='goal1', alternate_target_roots=[42])
+    task2 = self.install_task('task2', goal='goal2', alternate_target_roots=[1, 2])
+    self.create_context(for_task_types=task1+task2)
     with self.assertRaises(self.engine.TargetRootsReplacement.ConflictingProposalsError):
       self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
