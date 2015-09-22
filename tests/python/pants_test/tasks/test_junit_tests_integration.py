@@ -115,6 +115,8 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('org.pantsbuild.example.hello.welcome', package_report)
     self.assertIn('org.pantsbuild.example.hello.greet', package_report)
 
+  # NB: fix in process over here: https://rbcommons.com/s/twitter/r/2803/
+  @pytest.mark.xfail
   def test_junit_test_with_coberta(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir([

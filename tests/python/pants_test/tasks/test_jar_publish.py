@@ -120,7 +120,6 @@ class JarPublishTest(TaskTestBase):
           assert "Repository internal has no" in str(e)
           raise e
 
-  @set_compile_strategies
   def test_publish_local_dryrun(self):
     targets = self._prepare_for_publishing()
 
