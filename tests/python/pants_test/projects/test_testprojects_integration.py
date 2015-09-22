@@ -28,16 +28,25 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files',
       'testprojects/src/java/org/pantsbuild/testproject/cycle1',
       'testprojects/src/java/org/pantsbuild/testproject/cycle2',
+      'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*',
       'testprojects/src/python/antlr:test_antlr_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure',
       'testprojects/src/thrift/org/pantsbuild/thrift_linter:',
-      'testprojects/tests/java/org/pantsbuild/testproject/empty:',
       'testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target',
+      'testprojects/tests/java/org/pantsbuild/testproject/empty:',
       'testprojects/tests/python/pants/dummies:failing_target',
     ]
 
-    targets_to_exclude = known_failing_targets + negative_test_targets
+    # May not succeed without java8 installed
+    need_java_8 = [
+      'testprojects/src/java/org/pantsbuild/testproject/targetlevels/java8',
+      'testprojects/tests/java/org/pantsbuild/testproject/testjvms',
+      'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight',
+      'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform',
+    ]
+
+    targets_to_exclude = known_failing_targets + negative_test_targets + need_java_8
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target), targets_to_exclude)
     pants_run = self.pants_test(['testprojects::'] + exclude_opts)
     self.assert_success(pants_run)

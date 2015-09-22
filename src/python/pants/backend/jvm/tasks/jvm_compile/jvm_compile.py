@@ -30,7 +30,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.fileutil import atomic_copy, create_size_estimators
 
 
@@ -573,7 +573,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       unclaimed_classes = set()
       with compile_context.open_jar(mode='r') as jar:
         for name in jar.namelist():
-          unclaimed_classes.add(os.path.join(compile_context.classes_dir, name))
+          if not name.endswith('/'):
+            unclaimed_classes.add(os.path.join(compile_context.classes_dir, name))
 
       # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
@@ -795,10 +796,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     root = compile_context.classes_dir
     with compile_context.open_jar(mode='w') as jar:
-      for abs_sub_dir, _, filenames in safe_walk(root):
-        for name in filenames:
+      for abs_sub_dir, dirnames, filenames in safe_walk(root):
+        for name in dirnames + filenames:
           abs_filename = os.path.join(abs_sub_dir, name)
-          arcname = os.path.relpath(abs_filename, root)
+          arcname = fast_relpath(abs_filename, root)
           jar.write(abs_filename, arcname)
 
   def _write_to_artifact_cache(self, vts, compile_context, get_update_artifact_cache_work):

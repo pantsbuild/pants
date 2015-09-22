@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 from textwrap import dedent
 
-from pants.base.address_lookup_error import AddressLookupError
+from pants.base.dep_lookup_error import DepLookupError
 from pants.base.exceptions import TaskError
 
 
@@ -17,10 +17,6 @@ class JvmToolMixin(object):
 
   Must be mixed in to something that can register and use options, e.g., a Task or a Subsystem.
   """
-  class DepLookupError(AddressLookupError):
-    """Thrown when a dependency can't be found."""
-    pass
-
   class InvalidToolClasspath(TaskError):
     """Indicates an invalid jvm tool classpath."""
 
