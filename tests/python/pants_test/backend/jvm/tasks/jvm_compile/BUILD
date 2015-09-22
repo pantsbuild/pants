@@ -10,6 +10,16 @@ target(
 )
 
 python_tests(
+  name='isolation_cache_hit_callback',
+  sources=['test_isolation_cache_hit_callback.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/tasks/jvm_compile',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_tests(
   name='resource_mapping',
   sources=['test_resource_mapping.py'],
   dependencies=[

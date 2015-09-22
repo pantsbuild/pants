@@ -110,7 +110,7 @@ that.""",
 
   def test_getdefault_not_found(self):
     with self.assertRaises(Config.ConfigError):
-      self.config.getdefault('name', type=int)
+      self.config.getdefault('scale', type=int)
 
   def test_default_section_fallback(self):
     self.assertEquals('foo', self.config.get('defined_section', 'name'))
