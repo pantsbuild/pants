@@ -4,7 +4,7 @@ java_thrift_library(
   compiler='scrooge',
   language='android',
   rpc_style='finagle',
-  dependencies=['3rdparty:thrift-0.9.2'],
+  dependencies=['3rdparty:thrift-0.6.1'],
   provides=artifact(
     org='org.archimedes',
     name='android_generator',

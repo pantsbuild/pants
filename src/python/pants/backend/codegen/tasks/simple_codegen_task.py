@@ -16,6 +16,7 @@ from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_graph import sort_targets
+from pants.base.dep_lookup_error import DepLookupError
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_rmtree, safe_walk
@@ -284,7 +285,7 @@ class SimpleCodegenTask(Task):
       try:
         deps.update(self.context.resolve(dep))
       except AddressLookupError as e:
-        raise Exception('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
+        raise DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
     return deps
 
   class CodegenStrategy(AbstractClass):
