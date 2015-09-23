@@ -113,7 +113,7 @@ class ZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc', '1.0.11')
+                            JarDependency('org.pantsbuild', 'zinc', '1.0.12')
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=[
