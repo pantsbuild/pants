@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import os
 from abc import abstractmethod
 from collections import defaultdict
@@ -40,7 +41,8 @@ class ResourcesTask(Task):
   def compute_target_dir(self, target):
     # Sources are all relative to their roots: relativize directories as well to avoid
     # breaking filesystem path length limits.
-    return relativize_path(os.path.join(self.workdir, target.id), get_buildroot())
+    target_id_hash = hashlib.sha1(target.id).hexdigest()
+    return relativize_path(os.path.join(self.workdir, target_id_hash), get_buildroot())
 
   def execute(self):
     # Tracked and returned for use in tests.
