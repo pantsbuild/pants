@@ -65,6 +65,10 @@ class GlobalOptionsRegistrar(Optionable):
              help="Prints pants' version number and exits.")
 
     register('--plugins', advanced=True, type=list_option, help='Load these plugins.')
+    register('--plugin-cache-dir', advanced=True,
+             default=os.path.join(get_pants_cachedir(), 'plugins'),
+             help='Cache resolved plugin requirements here.')
+
     register('--backend-packages', advanced=True, type=list_option,
              help='Load backends from these packages that are already on the path.')
 
