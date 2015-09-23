@@ -12,6 +12,7 @@ import re
 import select
 import threading
 import time
+from contextlib import closing
 
 from six import string_types
 from twitter.common.collections import maybe_list
@@ -213,17 +214,16 @@ class NailgunExecutor(Executor, ProcessManager):
     attempt_count = 0
     while 1:
       try:
-        nailgun.try_connect()
+        with closing(nailgun.try_connect()) as sock:
+          logger.debug('Verified new ng server is connectable at {}'.format(sock.getpeername()))
+          return
       except nailgun.NailgunConnectionError:
         if attempt_count >= self._connect_attempts:
           logger.debug('Failed to connect to ng after {} attempts'.format(self._connect_attempts))
           raise     # Re-raise the NailgunConnectionError which provides more context to the user.
 
-        attempt_count += 1
-        time.sleep(self.WAIT_INTERVAL_SEC)
-      else:
-        logger.debug('Connected to ng server {!r}'.format(self))
-        return
+      attempt_count += 1
+      time.sleep(self.WAIT_INTERVAL_SEC)
 
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Synchronously spawn a new nailgun server."""
