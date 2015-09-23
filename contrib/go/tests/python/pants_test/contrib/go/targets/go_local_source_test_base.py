@@ -71,6 +71,13 @@ class GoLocalSourceTestBase(AbstractClass):
   def test_globs_cgo(self):
     # .c, .s, or .S .cc, .cpp, or .cxx .h, .hh, .hpp, or .hxx
     SourceRoot.register('src/go', self.target_type)
+
+    # We shouldn't grab theses - no BUILDs, no dirents, no subdir files.
+    self.create_file('src/go/src/foo/BUILD')
+    self.create_file('src/go/src/foo/subpackage/jane.go')
+    self.create_file('src/go/src/foo/subpackage/jane.c')
+
+    # We should grab all of these though.
     self.create_file('src/go/src/foo/jake.go')
     self.create_file('src/go/src/foo/jake.c')
     self.create_file('src/go/src/foo/jake.s')
@@ -99,6 +106,13 @@ class GoLocalSourceTestBase(AbstractClass):
 
   def test_globs_resources(self):
     SourceRoot.register('src/go', self.target_type)
+
+    # We shouldn't grab theses - no BUILDs, no dirents, no subdir files.
+    self.create_file('src/go/src/foo/BUILD')
+    self.create_file('src/go/src/foo/subpackage/jane.go')
+    self.create_file('src/go/src/foo/subpackage/jane.png')
+
+    # We should grab all of these though.
     self.create_file('src/go/src/foo/jake.go')
     self.create_file('src/go/src/foo/jake.png')
     target = self.make_target(spec='src/go/src/foo', target_type=self.target_type)
