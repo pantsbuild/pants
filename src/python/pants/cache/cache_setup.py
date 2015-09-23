@@ -157,25 +157,26 @@ class CacheFactory(object):
     if not spec:
       raise EmptyCacheSpecError()
 
-    if len(spec) == 1:
-      if self.is_local(spec[0]):
-        return CacheSpec(local=spec[0], remote=None)
-      elif self.is_remote(spec[0]):
-        return CacheSpec(local=None, remote=spec[0])
-      else:
-        raise CacheSpecFormatError('Invalid cache spec: {0}, must be either local or remote'
-                                   .format(spec[0]))
+    if len(spec) > 2:
+      raise TooManyCacheSpecsError('Too many artifact cache specs: ({0})'.format(spec))
+
+    local_specs = [s for s in spec if self.is_local(s)]
+    remote_specs = [s for s in spec if self.is_remote(s)]
+
+    if not local_specs and not remote_specs:
+      raise CacheSpecFormatError('Invalid cache spec: {0}, must be either local or remote'
+                                 .format(spec))
 
     if len(spec) == 2:
-      if not self.is_local(spec[0]):
-        raise LocalCacheSpecRequiredError(
-          'First of two cache specs must be a local cache path. Found: {0}'.format(spec[0]))
-      if not self.is_remote(spec[1]):
-        raise RemoteCacheSpecRequiredError(
-          'Second of two cache specs must be a remote spec. Found: {0}'.format(spec[1]))
-      return CacheSpec(local=spec[0], remote=spec[1])
+      if not local_specs:
+        raise LocalCacheSpecRequiredError('One of two cache specs must be a local cache path.')
+      if not remote_specs:
+        raise RemoteCacheSpecRequiredError('One of two cache specs must be a remote spec.')
 
-    raise TooManyCacheSpecsError('Too many artifact cache specs: ({0})'.format(spec))
+    local_spec = local_specs[0] if len(local_specs) > 0 else None
+    remote_spec = remote_specs[0] if len(remote_specs) > 0 else None
+
+    return CacheSpec(local=local_spec, remote=remote_spec)
 
   # VisibleForTesting
   def _resolve(self, spec):

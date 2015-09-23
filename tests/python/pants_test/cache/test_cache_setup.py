@@ -79,8 +79,11 @@ class TestCacheSetup(BaseTest):
     self.assertEquals(self.CACHE_SPEC_REMOTE_ONLY,
                       self.cache_factory._sanitize_cache_spec([self.REMOTE_URI_1]))
 
+    # (local, remote) and (remote, local) are equivalent as long as they are valid
     self.assertEquals(self.CACHE_SPEC_LOCAL_REMOTE,
                       self.cache_factory._sanitize_cache_spec([self.LOCAL_URI, self.REMOTE_URI_1]))
+    self.assertEquals(self.CACHE_SPEC_LOCAL_REMOTE,
+                      self.cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.LOCAL_URI]))
 
     with self.assertRaises(InvalidCacheSpecError):
       self.cache_factory._sanitize_cache_spec('not a list')
@@ -96,7 +99,7 @@ class TestCacheSetup(BaseTest):
     with self.assertRaises(LocalCacheSpecRequiredError):
       self.cache_factory._sanitize_cache_spec([self.INVALID_LOCAL_URI, self.REMOTE_URI_1])
     with self.assertRaises(LocalCacheSpecRequiredError):
-      self.cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.LOCAL_URI])
+      self.cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.REMOTE_URI_2])
     with self.assertRaises(RemoteCacheSpecRequiredError):
       self.cache_factory._sanitize_cache_spec([self.LOCAL_URI, self.INVALID_LOCAL_URI])
 
