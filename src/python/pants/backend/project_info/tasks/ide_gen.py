@@ -16,8 +16,8 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.project_info.tasks.projectutils import get_jar_infos
 from pants.base.address import BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -110,10 +110,15 @@ class IdeGen(JvmToolTaskMixin, Task):
       round_manager.require('java')
     if options.scala:
       round_manager.require('scala')
+
     # TODO(Garrett Malmquist): Clean this up by using IvyUtils in the caller, passing it confs as
-    # the parameter. See John's comments on RB 716.
-    round_manager.require_data('ivy_jar_products')
-    round_manager.require('jar_dependencies')
+    # the parameter.
+    # See: https://github.com/pantsbuild/pants/issues/2177
+    round_manager.require_data('compile_classpath')
+
+    # NB: These are fake products that only serve as signals to the upstream producer of
+    # 'compile_classpath' to resolve extra classifiers (ivy confs).  A hack that can go away with
+    # execution of the TODO above.
     round_manager.require('jar_map_default')
     if options.source_jars:
       round_manager.require('jar_map_sources')
@@ -281,16 +286,7 @@ class IdeGen(JvmToolTaskMixin, Task):
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
-  @staticmethod
-  def copy_jar(jar, dest_dir):
-    if jar:
-      cp_jar = os.path.join(dest_dir, os.path.basename(jar))
-      shutil.copy(jar, cp_jar)
-      return cp_jar
-    else:
-      return None
-
-  def map_external_jars(self):
+  def map_external_jars(self, targets):
     external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
     safe_mkdir(external_jar_dir, clean=True)
 
@@ -299,24 +295,44 @@ class IdeGen(JvmToolTaskMixin, Task):
 
     external_javadoc_jar_dir = os.path.join(self.gen_project_workdir, 'external-libjavadoc')
     safe_mkdir(external_javadoc_jar_dir, clean=True)
-    jar_products = self.context.products.get_data('ivy_jar_products')
-    jar_paths = get_jar_infos(jar_products)
-    for entry in jar_paths.values():
-      binary_jar  = self.copy_jar(entry.get('default'), external_jar_dir)
-      sources_jar = self.copy_jar(entry.get('sources'), external_source_jar_dir)
-      javadoc_jar = self.copy_jar(entry.get('javadoc'), external_javadoc_jar_dir)
-      if binary_jar:
-        self._project.external_jars.add(ClasspathEntry(jar=binary_jar,
+
+    classpath_products = self.context.products.get_data('compile_classpath')
+    cp_entry_by_classifier_by_orgname = defaultdict(lambda: defaultdict(dict))
+    for conf, jar_entry in classpath_products.get_artifact_classpath_entries_for_targets(targets):
+      coord = (jar_entry.coordinate.org, jar_entry.coordinate.name)
+      classifier = jar_entry.coordinate.classifier
+      cp_entry_by_classifier_by_orgname[coord][classifier] = jar_entry
+
+    def copy_jar(cp_entry, dest_dir):
+      if not cp_entry:
+        return None
+      cp_jar = os.path.join(dest_dir, os.path.basename(cp_entry.path))
+      shutil.copy(cp_entry.path, cp_jar)
+      return cp_jar
+
+    # Per org.name (aka maven "project"), collect the primary artifact and any extra classified
+    # artifacts, taking special note of 'sources' and 'javadoc' artifacts that IDEs handle specially
+    # to provide source browsing and javadocs for 3rdparty libs.
+    for cp_entry_by_classifier in cp_entry_by_classifier_by_orgname.values():
+      primary_jar = copy_jar(cp_entry_by_classifier.pop(None, None), external_jar_dir)
+      sources_jar = copy_jar(cp_entry_by_classifier.pop('sources', None), external_source_jar_dir)
+      javadoc_jar = copy_jar(cp_entry_by_classifier.pop('javadoc', None), external_javadoc_jar_dir)
+      if primary_jar:
+        self._project.external_jars.add(ClasspathEntry(jar=primary_jar,
                                                        source_jar=sources_jar,
                                                        javadoc_jar=javadoc_jar))
-      # treat all other jars as binaries
-      for classifier, jar in entry.iteritems():
-        if classifier not in {'default', 'sources', 'javadoc'}:
-          binary_jar  = self.copy_jar(jar, external_jar_dir)
-          self._project.external_jars.add(ClasspathEntry(binary_jar))
+
+      # Treat all other jars as opaque with no source or javadoc attachments of their own.  An
+      # example are jars with the 'tests' classifier.
+      for jar_entry in cp_entry_by_classifier.values():
+        extra_jar = copy_jar(jar_entry, external_jar_dir)
+        self._project.external_jars.add(ClasspathEntry(extra_jar))
 
   def execute(self):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
+    # Grab the targets in-play before the context is replaced by `self._prepare_project()` below.
+    targets = self.context.targets()
+
     self._prepare_project()
 
     if self.context.options.is_known_scope('compile.checkstyle'):
@@ -330,9 +346,8 @@ class IdeGen(JvmToolTaskMixin, Task):
       scalac_classpath = self.tool_classpath('scalac', scope='scala-platform')
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
-    targets = self.context.targets()
     self.map_internal_jars(targets)
-    self.map_external_jars()
+    self.map_external_jars(targets)
 
     idefile = self.generate_project(self._project)
     if idefile:

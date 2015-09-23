@@ -161,7 +161,7 @@ class Address(AbstractClass):
     return ':{target_name}'.format(target_name=self._target_name)
 
   @property
-  @deprecated(removal_version='0.0.49',
+  @deprecated(removal_version='0.0.50',
               hint_message='Use `not isinstance(address, BuildFileAddress)` instead.')
   def is_synthetic(self):
     return False
@@ -226,7 +226,7 @@ class BuildFileAddress(Address):
 
 
 class SyntheticAddress(Address):
-  deprecate_me = functools.partial(deprecated, removal_version='0.0.49')
+  deprecate_me = functools.partial(deprecated, removal_version='0.0.50')
 
   @classmethod
   @deprecate_me(hint_message='Use `Address.parse(...)` instead.')

@@ -113,8 +113,9 @@ class JarDependency(object):
     self.apidocs = apidocs
     self.mutable = mutable
 
-    @deprecated('0.0.48',
-                hint_message='JarDependency now only specifies a single artifact, so the artifacts argument will be removed.')
+    @deprecated(removal_version='0.0.50',
+                hint_message='JarDependency now only specifies a single artifact, so the '
+                             'artifacts argument will be removed.')
     def make_artifacts():
       return tuple(assert_list(artifacts, expected_type=IvyArtifact, key_arg='artifacts'))
 
@@ -150,8 +151,9 @@ class JarDependency(object):
   def append_artifact(self, name, type_=None, ext=None, conf=None, url=None, classifier=None):
     """Append a new IvyArtifact to the list of artifacts for this jar."""
 
-    @deprecated('0.0.48',
-                hint_message='JarDependency now only specifies a single artifact, {} defines more than one.'.format(name))
+    @deprecated(removal_version='0.0.50',
+                hint_message='JarDependency now only specifies a single artifact, {} defines more '
+                             'than one.'.format(name))
     def add_more_artifacts():
       return self.artifacts + (IvyArtifact(name, type_=type_, ext=ext, conf=conf, url=url, classifier=classifier), )
     if self.artifacts:
@@ -191,12 +193,12 @@ class JarDependency(object):
 
   @property
   def artifact_classifiers(self):
-      if self.artifacts:
-        return {a.classifier for a in self.artifacts}
-      else:
-        # If there are no artifacts, there's one implicit artifact with the
-        # classifier None.
-        return {None}
+    if self.artifacts:
+      return {a.classifier for a in self.artifacts}
+    else:
+      # If there are no artifacts, there's one implicit artifact with the
+      # classifier None.
+      return {None}
 
   def cache_key(self):
     key = ''.join(str(getattr(self, key)) for key in self._HASH_KEYS)

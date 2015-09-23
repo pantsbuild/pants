@@ -10,13 +10,22 @@ target(
 )
 
 python_tests(
-  name = 'resource_mapping',
-  sources = ['test_resource_mapping.py'],
-  dependencies = [
+  name='cache_hit_callback',
+  sources=['test_cache_hit_callback.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/tasks/jvm_compile',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ],
+)
+
+python_tests(
+  name='resource_mapping',
+  sources=['test_resource_mapping.py'],
+  dependencies=[
     'src/python/pants/backend/jvm/tasks/jvm_compile:resource_mapping',
     'tests/python/pants_test:base_test',
   ],
-  resources=rglobs('test-data/*'),
 )
 
 python_library(

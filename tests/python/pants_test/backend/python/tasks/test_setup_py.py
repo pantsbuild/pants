@@ -18,9 +18,12 @@ from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrar
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 # TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
 # in pants java since non-jvm backends depend on it to run things.
+from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.python.python_artifact import PythonArtifact
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.setup_py import SetupPy
+from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.fs.archive import TGZ
@@ -41,6 +44,11 @@ class TestSetupPy(PythonTaskTestBase):
     self.set_options(pants_distdir=distdir)
 
     self.dependency_calculator = SetupPy.DependencyCalculator(self.build_graph)
+
+  @property
+  def alias_groups(self):
+    resources = BuildFileAliases(targets={'resources': Resources})
+    return super(TestSetupPy, self).alias_groups.merge(resources)
 
   def create_dependencies(self, depmap):
     target_map = {}
@@ -330,6 +338,78 @@ class TestSetupPy(PythonTaskTestBase):
     with self.assertRaises(self.dependency_calculator.AmbiguousOwnerError):
       self.dependency_calculator.reduced_dependencies(self.target('foo:foo2'))
 
+  @contextmanager
+  def extracted_sdist(src, sdist, expected_prefix, collect_suffixes=None):
+    collect_suffixes = collect_suffixes or ('.py',)
+
+    def collect(path):
+      for suffix in collect_suffixes:
+        if path.endswith(suffix):
+          return True
+      return False
+
+    with temporary_dir() as chroot:
+      TGZ.extract(sdist, chroot)
+
+      all_py_files = set()
+      for root, _, files in os.walk(chroot):
+        all_py_files.update(os.path.join(root, f) for f in files if collect(f))
+
+      def as_full_path(p):
+        return os.path.join(chroot, expected_prefix, p)
+
+      yield all_py_files, as_full_path
+
+  def test_resources(self):
+    SourceRoot.register('src/python', PythonLibrary, Resources)
+    self.create_file(relpath='src/python/monster/j-function.res', contents='196884')
+    self.create_file(relpath='src/python/monster/group.res', contents='196883')
+    self.create_file(relpath='src/python/monster/__init__.py', contents='')
+    self.create_file(relpath='src/python/monster/research_programme.py',
+                     contents='# Look for more off-by-one "errors"!')
+
+    # NB: We have to resort to BUILD files on disk here due to the target ownership algorithm in
+    # SetupPy needing to walk ancestors in this case which currently requires BUILD files on disk.
+    self.add_to_build_file('src/python/monster', dedent("""
+      python_library(
+        name='conway',
+        sources=['__init__.py', 'research_programme.py'],
+        resources=['group.res'],
+        resource_targets=[
+          ':j-function',
+        ],
+        provides=setup_py(
+          name='monstrous.moonshine',
+          version='0.0.0',
+        )
+      )
+
+      resources(
+        name='j-function',
+        sources=['j-function.res']
+      )
+      """))
+    conway = self.target('src/python/monster:conway')
+
+    with self.run_execute(conway) as created:
+      self.assertEqual([conway], created.keys())
+
+      with self.extracted_sdist(sdist=created[conway],
+                                expected_prefix='monstrous.moonshine-0.0.0',
+                                collect_suffixes=('.py', '.res')) as (py_files, path):
+        self.assertEqual({path('setup.py'),
+                          path('src/monster/__init__.py'),
+                          path('src/monster/research_programme.py'),
+                          path('src/monster/group.res'),
+                          path('src/monster/j-function.res')},
+                         py_files)
+
+        with open(path('src/monster/group.res')) as fp:
+          self.assertEqual('196883', fp.read())
+
+        with open(path('src/monster/j-function.res')) as fp:
+          self.assertEqual('196884', fp.read())
+
   def test_exported_antlr(self):
     SourceRoot.register('src/antlr', PythonThriftLibrary)
     self.create_file(relpath='src/antlr/exported/exported.g', contents=dedent("""
@@ -407,22 +487,8 @@ class TestSetupPy(PythonTaskTestBase):
     with self.run_execute(target2, recursive=True) as created:
       self.assertEqual({target2, target1}, set(created.keys()))
 
-      @contextmanager
-      def extracted_sdist(target, expected_prefix):
-        sdist = created[target]
-        with temporary_dir() as chroot:
-          TGZ.extract(sdist, chroot)
-
-          all_py_files = set()
-          for root, _, files in os.walk(chroot):
-            all_py_files.update(os.path.join(root, f) for f in files if f.endswith('.py'))
-
-          def as_full_path(p):
-            return os.path.join(chroot, expected_prefix, p)
-
-          yield all_py_files, as_full_path
-
-      with extracted_sdist(target1, 'test.exported-0.0.0') as (py_files, path):
+      with self.extracted_sdist(sdist=created[target1],
+                                expected_prefix='test.exported-0.0.0') as (py_files, path):
         self.assertEqual({path('setup.py'),
                           path('src/__init__.py'),
                           path('src/exported/__init__.py'),
@@ -432,7 +498,8 @@ class TestSetupPy(PythonTaskTestBase):
 
         self.assertFalse(os.path.exists(path('src/test.exported.egg-info/requires.txt')))
 
-      with extracted_sdist(target2, 'test.exported_dependee-0.0.0') as (py_files, path):
+      with self.extracted_sdist(sdist=created[target2],
+                                expected_prefix='test.exported_dependee-0.0.0') as (py_files, path):
         self.assertEqual({path('setup.py'),
                           path('src/__init__.py'),
                           path('src/exported_dependee/__init__.py'),

@@ -22,6 +22,7 @@ from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrar
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.prep_command import PrepCommand
+from pants.backend.core.targets.resources import Resources
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -45,7 +46,8 @@ class PythonChroot(object):
     PythonBinary: 'binaries',
     PythonThriftLibrary: 'thrifts',
     PythonAntlrLibrary: 'antlrs',
-    PythonTests: 'tests'
+    PythonTests: 'tests',
+    Resources: 'resources'
   }
 
   class InvalidDependencyException(Exception):

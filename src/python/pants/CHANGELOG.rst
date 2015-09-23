@@ -1,6 +1,266 @@
 RELEASE HISTORY
 ===============
 
+0.0.49 (9/21/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release that includes a fix for resolving remote go libraries
+that use relative imports.
+
+Bugfixes
+~~~~~~~~
+
+* Include resolved jar versions in compile fingerprints; ensure coordinates match artifacts.
+  `RB #2853 <https://rbcommons.com/s/twitter/r/2853>`_
+
+* Fixup GoFetch to handle relative imports.
+  `RB #2854 <https://rbcommons.com/s/twitter/r/2854>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Enhancements to the dep-usage goal
+  `RB #2851 <https://rbcommons.com/s/twitter/r/2851>`_
+
+0.0.48 (9/18/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+There is a new UI in the `./pants server` web interface that shows 'Timing Stats' graphs.  These
+graphs show where time is spent on a daily-aggregation basis in various tasks.  You can drill down
+into a task to see which sub-steps are most expensive.  Try it out!
+
+We also have a few new metadata goals to help figure out what's going on with file ownership and
+options.
+
+If you want to find out where options are coming from, the `options` goal can help you out::
+
+    $ ./pants -q options --only-overridden --scope=compile
+    compile.apt.jvm_options = ['-Xmx1g', '-XX:MaxPermSize=256m'] (from CONFIG in pants.ini)
+    compile.java.jvm_options = ['-Xmx2G'] (from CONFIG in pants.ini)
+    compile.java.partition_size_hint = 1000000000 (from CONFIG in pants.ini)
+    compile.zinc.jvm_options = ['-Xmx2g', '-XX:MaxPermSize=256m', '-Dzinc.analysis.cache.limit=0'] (from CONFIG in pants.ini)
+
+If you're not sure which target(s) own a given file::
+
+    $ ./pants -q list-owners -- src/python/pants/base/target.py
+    src/python/pants/base:target
+
+The latter comes from new contributor Tansy Arron-Walker.
+
+API Changes
+~~~~~~~~~~~
+
+* Kill 'ivy_jar_products'.
+  `RB #2823 <https://rbcommons.com/s/twitter/r/2823>`_
+
+* Kill 'ivy_resolve_symlink_map' and 'ivy_cache_dir' products.
+  `RB #2819 <https://rbcommons.com/s/twitter/r/2819>`_
+
+Bugfixes
+~~~~~~~~
+
+* Upgrade to jarjar 1.5.2.
+  `RB #2847 <https://rbcommons.com/s/twitter/r/2847>`_
+
+* Don't modify globs excludes argument value.
+  `RB #2841 <https://rbcommons.com/s/twitter/r/2841>`_
+
+* Whitelist the appropriate filter option name for zinc
+  `RB #2839 <https://rbcommons.com/s/twitter/r/2839>`_
+
+* Ensure stale classes are removed during isolated compile by cleaning classes directory prior to handling invalid targets
+  `RB #2805 <https://rbcommons.com/s/twitter/r/2805>`_
+
+* Fix `linecount` estimator for `dep-usage` goal
+  `RB #2828 <https://rbcommons.com/s/twitter/r/2828>`_
+
+* Fix resource handling for the python backend.
+  `RB #2817 <https://rbcommons.com/s/twitter/r/2817>`_
+
+* Fix coordinates of resolved jars in IvyInfo.
+  `RB #2818 <https://rbcommons.com/s/twitter/r/2818>`_
+
+* Fix `NailgunExecutor` to support more than one connect attempt
+  `RB #2822 <https://rbcommons.com/s/twitter/r/2822>`_
+
+* Fixup AndroidIntegrationTest broken by Distribution refactor.
+  `RB #2811 <https://rbcommons.com/s/twitter/r/2811>`_
+
+* Backport sbt java output fixes into zinc
+  `RB #2810 <https://rbcommons.com/s/twitter/r/2810>`_
+
+* Align ivy excludes and ClasspathProducts excludes.
+  `RB #2807 <https://rbcommons.com/s/twitter/r/2807>`_
+
+New Features
+~~~~~~~~~~~~
+
+* A nice timing stats report.
+  `RB #2825 <https://rbcommons.com/s/twitter/r/2825>`_
+
+* Add new console task ListOwners to determine the targets that own a source
+  `RB #2755 <https://rbcommons.com/s/twitter/r/2755>`_
+
+* Adding a console task to explain where options came from.
+  `RB #2816 <https://rbcommons.com/s/twitter/r/2816>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Deprecate 'Repository' alias in favor of 'repo'.
+  `RB #2845 <https://rbcommons.com/s/twitter/r/2845>`_
+
+* Fix indents (checkstyle)
+  `RB #2844 <https://rbcommons.com/s/twitter/r/2844>`_
+
+* Use list comprehension in jvm_compile to calculate valid targets
+  `RB #2843 <https://rbcommons.com/s/twitter/r/2843>`_
+
+* Transition `IvyImports` to 'compile_classpath'.
+  `RB #2840 <https://rbcommons.com/s/twitter/r/2840>`_
+
+* Migrate `JvmBinaryTask` to 'compile_classpath'.
+  `RB #2832 <https://rbcommons.com/s/twitter/r/2832>`_
+
+* Add support for snapshotting `ClasspathProducts`.
+  `RB #2837 <https://rbcommons.com/s/twitter/r/2837>`_
+
+* Bump to zinc 1.0.11
+  `RB #2827 <https://rbcommons.com/s/twitter/r/2827>`_
+  `RB #2836 <https://rbcommons.com/s/twitter/r/2836>`_
+  `RB #2812 <https://rbcommons.com/s/twitter/r/2812>`_
+
+* Lazily load zinc analysis
+  `RB #2827 <https://rbcommons.com/s/twitter/r/2827>`_
+
+* Add support for whitelisting of zinc options
+  `RB #2835 <https://rbcommons.com/s/twitter/r/2835>`_
+
+* Kill the unused `JvmTarget.configurations` field.
+  `RB #2834 <https://rbcommons.com/s/twitter/r/2834>`_
+
+* Kill 'jvm_build_tools_classpath_callbacks' deps.
+  `RB #2831 <https://rbcommons.com/s/twitter/r/2831>`_
+
+* Add `:scalastyle_integration` test to `:integration` test target
+  `RB #2830 <https://rbcommons.com/s/twitter/r/2830>`_
+
+* Use fast_relpath in JvmCompileIsolatedStrategy.compute_classes_by_source
+  `RB #2826 <https://rbcommons.com/s/twitter/r/2826>`_
+
+* Enable New Style class check
+  `RB #2820 <https://rbcommons.com/s/twitter/r/2820>`_
+
+* Remove `--quiet` flag from `pip`
+  `RB #2809 <https://rbcommons.com/s/twitter/r/2809>`_
+
+* Move AptCompile to zinc
+  `RB #2806 <https://rbcommons.com/s/twitter/r/2806>`_
+
+* Add a just-in-time check of the artifact cache to the isolated compile strategy
+  `RB #2690 <https://rbcommons.com/s/twitter/r/2690>`_
+
+0.0.47 (9/11/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+By defaulting the versions of most built-in tools, this release makes pants significantly easier to configure! Tools like antlr, jmake, nailgun, etc, will use default classpaths unless override targets are provided.
+
+Additionally, this release adds native support for shading JVM binaries, which helps to isolate them from their deployment environment.
+
+Thanks to all contributors!
+
+API Changes
+~~~~~~~~~~~
+
+* Add JVM distributions and platforms to the export format.
+  `RB #2784 <https://rbcommons.com/s/twitter/r/2784>`_
+
+* Added Python setup to export goal to consume in the Pants Plugin for IntelliJ.
+  `RB #2785 <https://rbcommons.com/s/twitter/r/2785>`_
+  `RB #2786 <https://rbcommons.com/s/twitter/r/2786>`_
+
+* Introduce anonymous targets built by macros.
+  `RB #2759 <https://rbcommons.com/s/twitter/r/2759>`_
+
+* Upgrade to the re-merged Node.js/io.js as the default.
+  `RB #2800 <https://rbcommons.com/s/twitter/r/2800>`_
+
+Bugfixes
+~~~~~~~~
+
+* Don't create directory entries in the isolated compile context jar
+  `RB #2775 <https://rbcommons.com/s/twitter/r/2775>`_
+
+* Bump jar-tool release version to 0.0.7 to pick up double-slashed directory fixes
+  `RB #2763 <https://rbcommons.com/s/twitter/r/2763>`_
+  `RB #2779 <https://rbcommons.com/s/twitter/r/2779>`_
+
+* junit_run now parses errors (in addition to failures) to correctly set failing target
+  `RB #2782 <https://rbcommons.com/s/twitter/r/2782>`_
+
+* Fix the zinc name-hashing flag for unicode symbols
+  `RB #2776 <https://rbcommons.com/s/twitter/r/2776>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support for shading rules for jvm_binary.
+  `RB #2754 <https://rbcommons.com/s/twitter/r/2754>`_
+
+* Add support for @fromfile option values.
+  `RB #2783 <https://rbcommons.com/s/twitter/r/2783>`_
+  `RB #2794 <https://rbcommons.com/s/twitter/r/2794>`_
+
+* --config-override made appendable, to support multiple pants.ini files.
+  `RB #2774 <https://rbcommons.com/s/twitter/r/2774>`_
+
+* JVM tools can now carry their own classpath, meaning that most don't need to be configured
+  `RB #2778 <https://rbcommons.com/s/twitter/r/2778>`_
+  `RB #2795 <https://rbcommons.com/s/twitter/r/2795>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Added migration of --jvm-jdk-paths to --jvm-distributions-paths
+  `RB #2677 <https://rbcommons.com/s/twitter/r/2677>`_
+  `RB #2781 <https://rbcommons.com/s/twitter/r/2781>`_
+
+* Example of problem with annotation processors that reference external dependencies.
+  `RB #2777 <https://rbcommons.com/s/twitter/r/2777>`_
+
+* Replace eval use with a parse_literal util.
+  `RB #2787 <https://rbcommons.com/s/twitter/r/2787>`_
+
+* Move Shader from pants.java to the jvm backend.
+  `RB #2788 <https://rbcommons.com/s/twitter/r/2788>`_
+
+* Move BuildFileAliases validation to BuildFileAliases.
+  `RB #2790 <https://rbcommons.com/s/twitter/r/2790>`_
+
+* Centralize finding target types for an alias.
+  `RB #2796 <https://rbcommons.com/s/twitter/r/2796>`_
+
+* Store timing stats in a structured way, instead of as json.
+  `RB #2797 <https://rbcommons.com/s/twitter/r/2797>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Added a step to publish RELEASE HISTORY back to the public website [DOC]
+  `RB #2780 <https://rbcommons.com/s/twitter/r/2780>`_
+
+* Fix buildcache doc typos, use err param rather than ignoring it in UnreadableArtifact
+  `RB #2801 <https://rbcommons.com/s/twitter/r/2801>`_
+
 0.0.46 (9/4/2015)
 -----------------
 

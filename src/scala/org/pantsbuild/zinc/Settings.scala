@@ -172,8 +172,7 @@ case class IncOptions(
  */
 case class AnalysisOptions(
   cache: Option[File]           = None,
-  cacheMap: Map[File, File]     = Map.empty,
-  forceClean: Boolean           = false
+  cacheMap: Map[File, File]     = Map.empty
 )
 
 object Settings {
@@ -245,7 +244,6 @@ object Settings {
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
-    boolean(   "-force-clean",                 "Force clean classes on empty analysis",      (s: Settings) => s.copy(analysis = s.analysis.copy(forceClean = true))),
 
     header("JVM options:"),
     prefix(    "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),

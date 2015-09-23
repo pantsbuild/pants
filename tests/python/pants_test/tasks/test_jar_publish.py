@@ -25,7 +25,6 @@ from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants_test.tasks.task_test_base import TaskTestBase
-from pants_test.testutils.compile_strategy_utils import set_compile_strategies
 
 
 class JarPublishTest(TaskTestBase):
@@ -121,7 +120,6 @@ class JarPublishTest(TaskTestBase):
           assert "Repository internal has no" in str(e)
           raise e
 
-  @set_compile_strategies
   def test_publish_local_dryrun(self):
     targets = self._prepare_for_publishing()
 
@@ -259,7 +257,7 @@ class JarPublishTest(TaskTestBase):
     self.assertEquals(r, c)
 
 
-class FailNTimes:
+class FailNTimes(object):
 
   def __init__(self, tries, exc_type, success=None):
     self.tries = tries

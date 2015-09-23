@@ -27,6 +27,9 @@ from six.moves.urllib.parse import urlparse
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 
 
+logger = logging.getLogger(__name__)
+
+
 class Fetcher(AbstractClass):
   """Knows how to interpret some remote import paths and fetch code to satisfy them."""
 
@@ -270,8 +273,6 @@ class Fetchers(Subsystem):
 class ArchiveFetcher(Fetcher, Subsystem):
   """A fetcher that knows how find archives for remote import paths and unpack them."""
 
-  logger = logging.getLogger(__name__)
-
   class UrlInfo(namedtuple('UrlInfo', ['url_format', 'default_rev', 'strip_level'])):
     def rev(self, rev):
       return rev or self.default_rev
@@ -383,7 +384,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
   @contextmanager
   def _download(self, url):
     # TODO(jsirois): Wrap with workunits, progress meters, checksums.
-    self.logger.info('Downloading {}...'.format(url))
+    logger.info('Downloading {}...'.format(url))
     with closing(self.session().get(url, stream=True)) as res:
       if res.status_code != requests.codes.ok:
         raise self.FetchError('Failed to download {} ({} error)'.format(url, res.status_code))
@@ -449,6 +450,7 @@ class GopkgInFetcher(Fetcher, Subsystem):
     user = user or 'go-{}'.format(package)
     rev = rev or self._find_highest_compatible(user, package, raw_rev)
     root = 'github.com/{user}/{pkg}'.format(user=user, pkg=package)
+    logger.debug('Resolved {} to {} at rev {}'.format(import_path, root, rev))
     return root, rev
 
   class ApiError(Fetcher.FetchError):
@@ -461,10 +463,6 @@ class GopkgInFetcher(Fetcher, Subsystem):
     """Indicates no versions were found even there there were no github API errors - unexpected."""
 
   def _find_highest_compatible(self, user, repo, raw_rev):
-    # http://labix.org/gopkg.in defines v0 as master.
-    if raw_rev == 'v0':
-      return 'master'
-
     candidates = set()
     errors = []
 
@@ -483,6 +481,10 @@ class GopkgInFetcher(Fetcher, Subsystem):
     highest_compatible = self._select_highest_compatible(candidates, raw_rev)
     if highest_compatible:
       return highest_compatible
+
+    # http://labix.org/gopkg.in defines the v0 fallback as master.
+    if raw_rev == 'v0':
+      return 'master'
 
     if len(errors) == 2:
       raise self.ApiError('Failed to fetch both tags and branches:\n\t{}\n\t{}'

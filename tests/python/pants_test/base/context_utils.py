@@ -74,7 +74,7 @@ class TestContext(Context):
 
 
 # TODO: Make Console and Workspace into subsystems, and simplify this signature.
-def create_context(options=None, target_roots=None, build_graph=None,
+def create_context(options=None, passthru_args=None, target_roots=None, build_graph=None,
                    build_file_parser=None, address_mapper=None,
                    console_outstream=None, workspace=None):
   """Creates a ``Context`` with no options or targets by default.
@@ -83,7 +83,7 @@ def create_context(options=None, target_roots=None, build_graph=None,
 
   Other params are as for ``Context``.
   """
-  options = create_options(options or {})
+  options = create_options(options or {}, passthru_args=passthru_args)
   run_tracker = TestContext.DummyRunTracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
   return TestContext(options=options, run_tracker=run_tracker, target_roots=target_roots,

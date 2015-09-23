@@ -60,6 +60,9 @@ class Options(object):
     - None.
   """
 
+  class OptionTrackerRequiredError(Exception):
+    """Options requires an OptionTracker instance."""
+
   @classmethod
   def complete_scopes(cls, scope_infos):
     """Expand a set of scopes to include all enclosing scopes.
@@ -80,7 +83,8 @@ class Options(object):
     return ret
 
   @classmethod
-  def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None):
+  def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None,
+             option_tracker=None,):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
@@ -89,6 +93,8 @@ class Options(object):
     :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
            options. We can use these values when registering other options.
+    :param :class:`pants.option.option_tracker.OptionTracker` option_tracker: option tracker
+           instance to record how option values were assigned.
     """
     # We need parsers for all the intermediate scopes, so inherited option values
     # can propagate through them.
@@ -96,6 +102,9 @@ class Options(object):
     splitter = ArgSplitter(complete_known_scope_infos)
     args = sys.argv if args is None else args
     goals, scope_to_flags, target_specs, passthru, passthru_owner = splitter.split_args(args)
+
+    if not option_tracker:
+      raise cls.OptionTrackerRequiredError()
 
     if bootstrap_option_values:
       target_spec_files = bootstrap_option_values.target_spec_files
@@ -106,15 +115,17 @@ class Options(object):
 
     help_request = splitter.help_request
 
-    parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
+    parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos, option_tracker)
     values_by_scope = {}  # Arg values, parsed per-scope on demand.
     bootstrap_option_values = bootstrap_option_values
     known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
     return cls(goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
-               parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info)
+               parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info,
+               option_tracker)
 
   def __init__(self, goals, scope_to_flags, target_specs, passthru, passthru_owner, help_request,
-               parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info):
+               parser_hierarchy, values_by_scope, bootstrap_option_values, known_scope_to_info,
+               option_tracker):
     """The low-level constructor for an Options instance.
 
     Dependees should use `Options.create` instead.
@@ -129,6 +140,11 @@ class Options(object):
     self._values_by_scope = values_by_scope
     self._bootstrap_option_values = bootstrap_option_values
     self._known_scope_to_info = known_scope_to_info
+    self._option_tracker = option_tracker
+
+  @property
+  def tracker(self):
+    return self._option_tracker
 
   @property
   def help_request(self):
@@ -171,7 +187,8 @@ class Options(object):
                    self._parser_hierarchy,
                    no_values,
                    self._bootstrap_option_values,
-                   self._known_scope_to_info)
+                   self._known_scope_to_info,
+                   self._option_tracker)
 
   def is_known_scope(self, scope):
     """Whether the given scope is known by this instance."""
@@ -242,6 +259,9 @@ class Options(object):
     flags_in_scope = self._scope_to_flags.get(scope, [])
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
     self._values_by_scope[scope] = values
+    for option in values:
+      self._option_tracker.record_option(scope=scope, option=option, value=values[option],
+                                         rank=values.get_rank(option))
     return values
 
   def registration_args_iter_for_scope(self, scope):

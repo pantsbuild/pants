@@ -9,8 +9,8 @@ import sys
 
 from colors import cyan, green, red, yellow
 
-from pants.base.config import Config
 from pants.option import custom_types
+from pants.option.config import Config
 from pants.option.errors import ParseError
 
 
@@ -325,7 +325,21 @@ migrations = {
   ('test.junit', 'junit'): None,
   ('thrift-linter', 'nailgun-server'): None,
   ('thrift-linter', 'scrooge-linter'): None,
+
+  # Global strategy removal.
+  ('compile.apt', 'changed-targets-heuristic-limit'): None,
+  ('compile.apt', 'partition-size-hint'): None,
+  ('compile.apt', 'strategy'): None,
+  ('compile.java', 'changed-targets-heuristic-limit'): None,
+  ('compile.java', 'partition-size-hint'): None,
+  ('compile.java', 'strategy'): None,
+  ('compile.zinc', 'changed-targets-heuristic-limit'): None,
+  ('compile.zinc', 'partition-size-hint'): None,
+  ('compile.zinc', 'strategy'): None,
 }
+
+jvm_global_strategy_removal = ('The JVM global compile strategy was removed in favor of the '
+                               'isolated strategy, which uses a different set of options.')
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
                    'local to each task that can use a nailgun.  A default can no longer be '
@@ -499,6 +513,17 @@ notes = {
   ('test.junit', 'junit'): jvm_tool_spec_override,
   ('thrift-linter', 'nailgun-server'): jvm_tool_spec_override,
   ('thrift-linter', 'scrooge-linter'): jvm_tool_spec_override,
+
+  # Global strategy removal.
+  ('compile.apt', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.apt', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.apt', 'strategy'): jvm_global_strategy_removal,
+  ('compile.java', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.java', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.java', 'strategy'): jvm_global_strategy_removal,
+  ('compile.zinc', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.zinc', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.zinc', 'strategy'): jvm_global_strategy_removal,
 }
 
 
@@ -507,18 +532,15 @@ def check_option(cp, src, dst):
     # David tried to avoid poking into cp's guts in https://rbcommons.com/s/twitter/r/1451/ but
     # that approach fails for the important case of boolean options.  Since this is a ~short term
     # tool and its highly likely its lifetime will be shorter than the time the private
-    # ConfigParser_sections API we use here changes, its worth the risk.
+    # ConfigParser_sections API we use here changes, it's worth the risk.
     if section == 'DEFAULT':
       # NB: The 'DEFAULT' section is not tracked via `has_section` or `_sections`, so we use a
-      # different API to check for an explicit default.  The defaults are a combination of both
-      # 'DEFAULT' section values and defaults passed to the ConfigParser constructor, but we
-      # create the `cp` config parser below explicitly with no constructor defaults so this check
-      # works.
+      # different API to check for an explicit default.
       return key in cp.defaults()
     else:
       return cp.has_section(section) and (key in cp._sections[section])
 
-  def section(s):
+  def sect(s):
     return cyan('[{}]'.format(s))
 
   src_section, src_key = src
@@ -526,8 +548,8 @@ def check_option(cp, src, dst):
     if dst is not None:
       dst_section, dst_key = dst
       print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
-            '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
-                                    dst_key=green(dst_key), dst_section=section(dst_section)),
+            '{dst_section}.'.format(src_key=green(src_key), src_section=sect(src_section),
+                                    dst_key=green(dst_key), dst_section=sect(dst_section)),
             file=sys.stderr)
     elif src not in notes:
       print('Found {src_key} in section {src_section} and there is no automated migration path'
@@ -537,12 +559,12 @@ def check_option(cp, src, dst):
     if (src_section, src_key) in notes:
       print('  Note for {src_key} in section {src_section}: {note}'
             .format(src_key=green(src_key),
-                    src_section=section(src_section),
+                    src_section=sect(src_section),
                     note=yellow(notes[(src_section, src_key)])))
 
 
 def check_config_file(path):
-  cp = Config.create_parser()
+  cp = Config._create_parser()
   with open(path, 'r') as ini:
     cp.readfp(ini)
 

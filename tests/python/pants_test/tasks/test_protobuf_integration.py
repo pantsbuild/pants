@@ -56,10 +56,9 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                                                   pants_run.stderr_data,
                                                   pants_run.stdout_data))
     out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-unpacked-jars-example-bundle')
-    java_run = subprocess.Popen(['java', '-cp', 'protobuf-unpacked-jars-example.jar',
-                                 'org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive'],
-                                stdout=subprocess.PIPE,
-                                cwd=out_path)
+    args = ['java', '-cp', 'protobuf-unpacked-jars-example.jar',
+            'org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive']
+    java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
     java_retcode = java_run.wait()
     java_out = java_run.stdout.read()
     self.assertEquals(java_retcode, 0)

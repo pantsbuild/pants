@@ -18,6 +18,7 @@ from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -71,7 +72,7 @@ class ProtobufGen(SimpleCodegenTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(ProtobufGen, cls).prepare(options, round_manager)
-    round_manager.require_data('ivy_imports')
+    round_manager.require_data(JarImportProducts)
     round_manager.require_data('deferred_sources')
   # TODO https://github.com/pantsbuild/pants/issues/604 prep finish
 
@@ -213,21 +214,23 @@ class ProtobufGen(SimpleCodegenTask):
     :returns: a set of filepaths to directories containing the contents of jar.
     """
     files = set()
-    jarmap = self.context.products.get('ivy_imports')
-    for folder, names in jarmap.by_target[target].items():
-      for name in names:
-        files.add(self._extract_jar(os.path.join(folder, name)))
+    jar_import_products = self.context.products.get_data(JarImportProducts)
+    imports = jar_import_products.imports(target)
+    for coordinate, jar in imports:
+      files.add(self._extract_jar(coordinate, jar))
     return files
 
-  def _extract_jar(self, jar_path):
+  def _extract_jar(self, coordinate, jar_path):
     """Extracts the jar to a subfolder of workdir/extracted and returns the path to it."""
     with open(jar_path, 'rb') as f:
       outdir = os.path.join(self.workdir, 'extracted', sha1(f.read()).hexdigest())
     if not os.path.exists(outdir):
       ZIP.extract(jar_path, outdir)
-      self.context.log.debug('Extracting jar at {jar_path}.'.format(jar_path=jar_path))
+      self.context.log.debug('Extracting jar {jar} at {jar_path}.'
+                             .format(jar=coordinate, jar_path=jar_path))
     else:
-      self.context.log.debug('Jar already extracted at {jar_path}.'.format(jar_path=jar_path))
+      self.context.log.debug('Jar {jar} already extracted at {jar_path}.'
+                             .format(jar=coordinate, jar_path=jar_path))
     return outdir
 
   def _proto_path_imports(self, proto_targets):
@@ -243,7 +246,7 @@ class ProtobufGen(SimpleCodegenTask):
   def calculate_java_genfiles(self, protobuf_parse):
     basepath = protobuf_parse.package.replace('.', os.path.sep)
 
-    classnames = set([protobuf_parse.outer_class_name])
+    classnames = {protobuf_parse.outer_class_name}
     if protobuf_parse.multiple_files:
       classnames |= protobuf_parse.enums | protobuf_parse.messages | protobuf_parse.services | \
         set(['{name}OrBuilder'.format(name=m) for m in protobuf_parse.messages])
@@ -259,11 +262,8 @@ class ProtobufGen(SimpleCodegenTask):
 
 def _same_contents(a, b):
   """Perform a comparison of the two files"""
-  with open(a, 'r') as f:
-    a_data = f.read()
-  with open(b, 'r') as f:
-    b_data = f.read()
-  return a_data == b_data
+  with open(a, 'rb') as fp_a, open(b, 'rb') as fp_b:
+    return fp_a.read() == fp_b.read()
 
 
 def check_duplicate_conflicting_protos(task, sources_by_base, sources, log):

@@ -105,12 +105,13 @@ class TaskTestBase(BaseTest):
   def set_options(self, **kwargs):
     self.set_options_for_scope(self.options_scope, **kwargs)
 
-  def context(self, for_task_types=None, options=None, target_roots=None,
+  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
               console_outstream=None, workspace=None):
     # Add in our task type.
     for_task_types = [self._testing_task_type] + (for_task_types or [])
     return super(TaskTestBase, self).context(for_task_types=for_task_types,
                                              options=options,
+                                             passthru_args=passthru_args,
                                              target_roots=target_roots,
                                              console_outstream=console_outstream,
                                              workspace=workspace)
@@ -144,20 +145,32 @@ class ConsoleTaskTestBase(TaskTestBase):
       task.execute()
       return output.getvalue()
 
-  def execute_console_task(self, targets=None, extra_targets=None, options=None, workspace=None):
+  def execute_console_task(self, targets=None, extra_targets=None, options=None, passthru_args=None, workspace=None):
     """Creates a new task and executes it with the given config, command line args and targets.
 
     :param options: option values.
     :param targets: optional list of Target objects passed on the command line.
     :param extra_targets: optional list of extra targets in the context in addition to those
                           passed on the command line.
+    :param passthru_args: optional list of passthru_args
     :param workspace: optional Workspace to pass into the context.
 
     Returns the list of items returned from invoking the console task's console_output method.
     """
     options = options or {}
     self.set_options(**options)
-    context = self.context(target_roots=targets, workspace=workspace)
+    context = self.context(target_roots=targets, passthru_args=passthru_args, workspace=workspace)
+    return self.execute_console_task_given_context(context, extra_targets=extra_targets)
+
+  def execute_console_task_given_context(self, context, extra_targets=None):
+    """Creates a new task and executes it with the context and extra targets.
+
+    :param context: The pants run context to use.
+    :param extra_targets: An optional list of extra targets in the context in addition to those
+                          passed on the command line.
+    :returns: The list of items returned from invoking the console task's console_output method.
+    :rtype: list of strings
+    """
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()) + list(extra_targets or ())))
 

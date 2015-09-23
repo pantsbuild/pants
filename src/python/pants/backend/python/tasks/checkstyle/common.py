@@ -104,7 +104,7 @@ class PythonFile(object):
   @classmethod
   def parse(cls, filename):
     with codecs.open(filename) as fp:
-       blob = fp.read()
+      blob = fp.read()
     return cls(blob, filename)
 
   @classmethod

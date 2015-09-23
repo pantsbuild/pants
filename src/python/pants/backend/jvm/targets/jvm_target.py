@@ -13,7 +13,7 @@ from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.payload import Payload
-from pants.base.payload_field import ConfigurationsField, ExcludesField, PrimitiveField
+from pants.base.payload_field import ExcludesField, PrimitiveField
 from pants.base.target import Target
 from pants.util.memo import memoized_property
 
@@ -32,15 +32,11 @@ class JvmTarget(Target, Jarable):
                provides=None,
                excludes=None,
                resources=None,
-               configurations=None,
                no_cache=False,
                services=None,
                platform=None,
                **kwargs):
     """
-    :param configurations: One or more ivy configurations to resolve for this target.
-      This parameter is not intended for general use.
-    :type configurations: tuple of strings
     :param excludes: List of `exclude <#exclude>`_\s to filter this target's
       transitive dependencies against.
     :param sources: Source code files to build. Paths are relative to the BUILD
@@ -62,12 +58,10 @@ class JvmTarget(Target, Jarable):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
-    configurations = ConfigurationsField(self.assert_list(configurations, key_arg='configurations'))
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
       'excludes': excludes,
-      'configurations': configurations,
       'platform': PrimitiveField(platform),
     })
     self._resource_specs = self.assert_list(resources, key_arg='resources')

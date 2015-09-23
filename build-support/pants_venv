@@ -46,7 +46,7 @@ function activate_pants_venv() {
     create_venv || die "Failed to create venv."
     activate_venv || die "Failed to activate venv."
     for req in ${REQUIREMENTS[@]}; do
-      pip install --quiet ${pip_extra} -r "${req}" || \
+      pip install ${pip_extra} -r "${req}" || \
         die "Failed to install requirements from ${req}."
     done
     touch "${BOOTSTRAPPED_FILE}"
