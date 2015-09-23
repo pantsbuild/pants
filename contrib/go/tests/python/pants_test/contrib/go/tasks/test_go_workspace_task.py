@@ -60,7 +60,7 @@ class GoWorkspaceTaskTest(TaskTestBase):
       SourceRoot.register('src/main/go')
       spec = 'src/main/go/foo/bar/mylib'
 
-      sources = ['x.go', 'y.go', 'z.go']
+      sources = ['x.go', 'y.go', 'z.go', 'z.c', 'z.h', 'w.png']
       for src in sources:
         self.create_file(os.path.join(spec, src))
 
@@ -101,7 +101,9 @@ class GoWorkspaceTaskTest(TaskTestBase):
         spec = '3rdparty/github.com/user/lib'
 
         remote_lib_src_dir = os.path.join(d, spec)
-        self.create_file(os.path.join(remote_lib_src_dir, 'file.go'))
+        remote_files = ['file.go', 'file.cc', 'file.hh']
+        for remote_file in remote_files:
+          self.create_file(os.path.join(remote_lib_src_dir, remote_file))
 
         go_remote_lib = self.make_target(spec=spec, target_type=GoRemoteLibrary)
 
@@ -117,5 +119,6 @@ class GoWorkspaceTaskTest(TaskTestBase):
         workspace_dir = os.path.join(gopath, 'src/github.com/user/lib')
         self.assertTrue(os.path.isdir(workspace_dir))
 
-        link = os.path.join(workspace_dir, 'file.go')
-        self.assertEqual(os.readlink(link), os.path.join(remote_lib_src_dir, 'file.go'))
+        for remote_file in remote_files:
+          link = os.path.join(workspace_dir, remote_file)
+          self.assertEqual(os.readlink(link), os.path.join(remote_lib_src_dir, remote_file))

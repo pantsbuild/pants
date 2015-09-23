@@ -108,7 +108,6 @@ python_library(
   name='go_workspace_task',
   sources=['go_workspace_task.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
