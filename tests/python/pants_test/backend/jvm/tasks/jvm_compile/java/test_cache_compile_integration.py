@@ -15,10 +15,8 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 
 class CacheCompileIntegrationTest(BaseCompileIT):
-  def run_compile(self, target_spec, config, strategy, workdir, tool_name):
-    args = ['compile',
-            'compile.{}'.format(tool_name), '--strategy={}'.format(strategy),
-              '--partition-size-hint=1', target_spec]
+  def run_compile(self, target_spec, config, workdir, tool_name):
+    args = ['compile', target_spec]
     if tool_name == 'zinc':
       args.append('--no-compile-java-use-jmake')
 
@@ -44,6 +42,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       config = {
         'cache.compile.{}'.format(tool_name): {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.java': {'use_jmake': tool_name == 'java' },
       }
 
       self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
@@ -59,14 +58,14 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                                     'cachetest:cachetest')
 
       # Caches values A.class, Main.class
-      self.run_compile(cachetest_spec, config, 'isolated', workdir, tool_name)
+      self.run_compile(cachetest_spec, config, workdir, tool_name)
 
       self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
                        dedent("""package org.pantsbuild.cachetest;
                             class A {}
                             class NotMain {}"""))
       # Caches values A.class, NotMain.class and leaves them on the filesystem
-      self.run_compile(cachetest_spec, config, 'isolated', workdir, tool_name)
+      self.run_compile(cachetest_spec, config, workdir, tool_name)
 
       self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
                        dedent("""package org.pantsbuild.cachetest;
@@ -74,7 +73,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                           class Main {}"""))
 
       # Should cause NotMain.class to be removed
-      self.run_compile(cachetest_spec, config, 'isolated', workdir, tool_name)
+      self.run_compile(cachetest_spec, config, workdir, tool_name)
 
       cachetest_id = cachetest_spec.replace(':', '.').replace(os.sep, '.')
 

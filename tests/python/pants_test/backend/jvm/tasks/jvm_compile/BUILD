@@ -10,8 +10,8 @@ target(
 )
 
 python_tests(
-  name='isolation_cache_hit_callback',
-  sources=['test_isolation_cache_hit_callback.py'],
+  name='cache_hit_callback',
+  sources=['test_cache_hit_callback.py'],
   dependencies=[
     'src/python/pants/backend/jvm/tasks/jvm_compile',
     'src/python/pants/util:contextutil',
