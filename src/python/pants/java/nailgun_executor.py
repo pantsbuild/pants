@@ -221,7 +221,7 @@ class NailgunExecutor(Executor, ProcessManager):
       if sock:
         logger.debug('Connected to ng server {server!r}'.format(server=self))
         sock.close()
-        return()
+        return
 
       attempt_count += 1
       time.sleep(self.WAIT_INTERVAL_SEC)
