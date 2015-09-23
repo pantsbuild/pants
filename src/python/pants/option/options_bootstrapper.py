@@ -9,8 +9,8 @@ import itertools
 import os
 import sys
 
-from pants.base.config import Config
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.config import Config
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_boolean_flag
