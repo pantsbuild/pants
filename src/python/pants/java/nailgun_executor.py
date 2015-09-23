@@ -217,14 +217,11 @@ class NailgunExecutor(Executor, ProcessManager):
                      .format(count=self._connect_attempts))
         raise NailgunClient.NailgunError('Failed to connect to ng server.')
 
-      try:
-        sock = nailgun.try_connect()
-        if sock:
-          logger.debug('Connected to ng server {server!r}'.format(server=self))
-          return
-      finally:
-        if sock:
-          sock.close()
+      sock = nailgun.try_connect()
+      if sock:
+        logger.debug('Connected to ng server {server!r}'.format(server=self))
+        sock.close()
+        return()
 
       attempt_count += 1
       time.sleep(self.WAIT_INTERVAL_SEC)

@@ -188,8 +188,7 @@ class NailgunClient(object):
 
   def try_connect(self):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # The sock.close() call returns None.
-    return sock if sock.connect_ex((self._host, self._port)) == 0 else sock.close()
+    return sock if sock.connect_ex((self._host, self._port)) == 0 else None
 
   def __call__(self, main_class, cwd=None, *args, **environment):
     """Executes the given main_class with any supplied args in the given environment.
