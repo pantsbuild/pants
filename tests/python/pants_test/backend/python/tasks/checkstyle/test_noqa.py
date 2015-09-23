@@ -60,6 +60,9 @@ def no_qa_file(request):
 class TestPyStyleTask(PythonTaskTestBase):
   @classmethod
   def setUpClass(cls):
+    super(TestPyStyleTask, cls).setUpClass()
+    # Overriding options_scope needs to happen before `setUp` because it is used
+    # in `TaskTestBase.setUp` to construct the testing task_type
     PythonCheckStyleTask.options_scope = 'py.check'
 
   @classmethod
