@@ -211,7 +211,7 @@ class NailgunExecutor(Executor, ProcessManager):
 
   def ensure_connectable(self, nailgun):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
-    attempt_count = 0
+    attempt_count = 1
     while 1:
       try:
         with closing(nailgun.try_connect()) as sock:

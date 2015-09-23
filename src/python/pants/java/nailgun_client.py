@@ -194,6 +194,11 @@ class NailgunClient(object):
     self.execute = self.__call__
 
   def try_connect(self):
+    """Creates a socket, connects it to the nailgun and returns the connected socket.
+
+    :returns: a connected `socket.socket`.
+    :raises: `NailgunClient.NailgunConnectionError` on failure to connect.
+    """
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
       sock.connect((self._host, self._port))
