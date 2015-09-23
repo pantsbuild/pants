@@ -212,21 +212,18 @@ class NailgunExecutor(Executor, ProcessManager):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
     attempt_count = 0
     while 1:
-      if attempt_count > self._connect_attempts:
-        logger.debug('Failed to connect to ng after {count} attempts'
-                     .format(count=self._connect_attempts))
-        raise NailgunClient.NailgunError('Failed to connect to ng server.')
-
       try:
-        sock = nailgun.try_connect()
-        if sock:
-          logger.debug('Connected to ng server {server!r}'.format(server=self))
-          return
-      finally:
-        sock.close()
+        nailgun.try_connect()
+      except nailgun.NailgunConnectionError:
+        if attempt_count >= self._connect_attempts:
+          logger.debug('Failed to connect to ng after {} attempts'.format(self._connect_attempts))
+          raise     # Re-raise the NailgunConnectionError which provides more context to the user.
 
-      attempt_count += 1
-      time.sleep(self.WAIT_INTERVAL_SEC)
+        attempt_count += 1
+        time.sleep(self.WAIT_INTERVAL_SEC)
+      else:
+        logger.debug('Connected to ng server {!r}'.format(self))
+        return
 
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Synchronously spawn a new nailgun server."""
