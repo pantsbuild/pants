@@ -65,7 +65,6 @@ class TaskTestBase(BaseTest):
   @classmethod
   def setUpClass(cls):
     super(TaskTestBase, cls).setUpClass()
-    # use test_scope for tests and not real scope
     TaskTestBase.options_scope = 'test_scope'
 
   @classmethod
