@@ -7,12 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.config import Config, SingleFileConfig
+from pants.option.config import Config
 
 
 class KeystoreResolver(object):
-  """
-  Read a keystore config.ini file and instantiate Keystore objects with the info.
+  """Reads a keystore config.ini file and instantiate Keystore objects with the info.
 
   A Keystore config is an .ini file with valid syntax as parsed by Python's ConfigParser.
   Each definition requires an arbitrary [name] section followed by the following five fields:
@@ -25,32 +24,34 @@ class KeystoreResolver(object):
     """Indicates an invalid android distribution."""
 
   @classmethod
-  def resolve(cls, config_file):
+  def resolve(cls, keystore_config_file):
     """Parse a keystore config file and return a list of Keystore objects."""
-
-    config_file = os.path.expanduser(config_file)
-    config = Config.create_parser()
+    keystore_config_file = os.path.expanduser(keystore_config_file)
     try:
-      with open(config_file, 'rb') as keystore_config:
-        config.readfp(keystore_config)
+      keystore_config = Config.load([keystore_config_file])
     except IOError as e:
-      raise KeystoreResolver.Error('Problem parsing config at {}: {}'.format(config_file, e))
-
-    parser = SingleFileConfig(config_file, config)
-    key_names = config.sections()
-    keys = {}
+      raise KeystoreResolver.Error('Problem parsing keystore config file at {}: '
+                                   '{}'.format(keystore_config_file, e))
 
     def create_key(key_name):
       """Instantiate Keystore objects."""
+      def get_config_value(section, option):
+        val = keystore_config.get(section, option)
+        if val is None or val == '':
+          raise KeystoreResolver.Error('Required keystore config value {}.{} is '
+                                       'not defined.'.format(section, option))
+        return val
+
       keystore = Keystore(keystore_name=key_name,
-                          build_type=parser.get_required(key_name, 'build_type'),
-                          keystore_location=parser.get_required(key_name, 'keystore_location'),
-                          keystore_alias=parser.get_required(key_name, 'keystore_alias'),
-                          keystore_password=parser.get_required(key_name, 'keystore_password'),
-                          key_password=parser.get_required(key_name, 'key_password'))
+                          build_type=get_config_value(key_name, 'build_type'),
+                          keystore_location=get_config_value(key_name, 'keystore_location'),
+                          keystore_alias=get_config_value(key_name, 'keystore_alias'),
+                          keystore_password=get_config_value(key_name, 'keystore_password'),
+                          key_password=get_config_value(key_name, 'key_password'))
       return keystore
 
-    for name in key_names:
+    keys = {}
+    for name in keystore_config.sections():
       try:
         keys[name] = create_key(name)
       except Config.ConfigError as e:
@@ -69,7 +70,7 @@ class Keystore(object):
                keystore_password=None,
                key_password=None):
     """
-    :param string name: Arbitrary name of keystore. This is the [section] of the .ini config file.
+    :param string keystore_name: Arbitrary name of keystore. I.e., the [section] in the config file.
     :param string build_type: The build type of the keystore. One of (debug, release).
     :param string keystore_location: path/to/keystore.
     :param string keystore_alias: The alias of this keystore.
