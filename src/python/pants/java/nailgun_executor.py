@@ -219,8 +219,8 @@ class NailgunExecutor(Executor, ProcessManager):
 
       sock = nailgun.try_connect()
       if sock:
-        logger.debug('Connected to ng server {server!r}'.format(server=self))
         sock.close()
+        logger.debug('Connected to ng server {server!r}'.format(server=self))
         return
 
       attempt_count += 1
