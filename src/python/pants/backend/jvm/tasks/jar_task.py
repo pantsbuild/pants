@@ -234,6 +234,7 @@ class JarTask(NailgunTask):
       Duplicate.SKIP: 'SKIP',
       Duplicate.REPLACE: 'REPLACE',
       Duplicate.CONCAT: 'CONCAT',
+      Duplicate.CONCAT_TEXT: 'CONCAT_TEXT',
       Duplicate.FAIL: 'THROW',
   }
 
