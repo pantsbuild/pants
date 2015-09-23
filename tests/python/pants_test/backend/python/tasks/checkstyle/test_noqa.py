@@ -59,11 +59,6 @@ def no_qa_file(request):
 @pytest.mark.usefixtures('no_qa_file', 'no_qa_line')
 class TestPyStyleTask(PythonTaskTestBase):
   @classmethod
-  def setUpClass(cls):
-    super(TestPyStyleTask, cls).setUpClass()
-    PythonCheckStyleTask.options_scope = 'py.check'
-
-  @classmethod
   def task_type(cls):
     """Required method"""
     return PythonCheckStyleTask
@@ -71,7 +66,7 @@ class TestPyStyleTask(PythonTaskTestBase):
   def _create_context(self, target_roots=None):
     return self.context(
       options={
-        'py.check': {
+        self.options_scope : {
           'interpreter': 'python'  # Interpreter required by PythonTaskTestBase
         }
       },
@@ -82,6 +77,8 @@ class TestPyStyleTask(PythonTaskTestBase):
     super(TestPyStyleTask, self).setUp()
     PythonCheckStyleTask.clear_plugins()
     PythonCheckStyleTask.register_plugin(name='angry_test', checker=Rage)
+    # use default test_scope
+    PythonCheckStyleTask.options_scope = self.options_scope
 
     self.style_check = PythonCheckStyleTask(self._create_context(), ".")
     self.style_check.options.suppress = None

@@ -62,7 +62,11 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
 class TaskTestBase(BaseTest):
   """A baseclass useful for testing a single Task type."""
 
-  TEST_SCOPE = 'test_scope'
+  @classmethod
+  def setUpClass(cls):
+    super(TaskTestBase, cls).setUpClass()
+    # use test_scope for tests and not real scope
+    TaskTestBase.options_scope = 'test_scope'
 
   @classmethod
   def task_type(cls):
@@ -71,9 +75,6 @@ class TaskTestBase(BaseTest):
 
   def setUp(self):
     super(TaskTestBase, self).setUp()
-    # Note: if to override `options_scope`, different from the provided `TEST_SCOPE`,
-    # it needs to happen before `setUp`, `setUpClass` is one possible place
-    self.options_scope = self.task_type().options_scope or self.TEST_SCOPE
     self._testing_task_type = self.synthesize_task_subtype(self.task_type(), self.options_scope)
     # We locate the workdir below the pants_workdir, which BaseTest locates within the BuildRoot.
     # BaseTest cleans this up, so we don't need to.  We give it a stable name, so that we can
