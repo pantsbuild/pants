@@ -59,6 +59,10 @@ def no_qa_file(request):
 @pytest.mark.usefixtures('no_qa_file', 'no_qa_line')
 class TestPyStyleTask(PythonTaskTestBase):
   @classmethod
+  def setUpClass(cls):
+    PythonCheckStyleTask.options_scope = 'py.check'
+
+  @classmethod
   def task_type(cls):
     """Required method"""
     return PythonCheckStyleTask
@@ -77,7 +81,6 @@ class TestPyStyleTask(PythonTaskTestBase):
     super(TestPyStyleTask, self).setUp()
     PythonCheckStyleTask.clear_plugins()
     PythonCheckStyleTask.register_plugin(name='angry_test', checker=Rage)
-    PythonCheckStyleTask.options_scope = 'py.check'
 
     self.style_check = PythonCheckStyleTask(self._create_context(), ".")
     self.style_check.options.suppress = None
