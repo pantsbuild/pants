@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import itertools
 import os
 import sys
@@ -12,6 +13,7 @@ from collections import defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_global_strategy import JvmCompileGlobalStrategy
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
   JvmCompileIsolatedStrategy
@@ -21,6 +23,35 @@ from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
+
+
+class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
+  """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
+
+  def __init__(self, task, compile_classpath):
+    super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
+    self._compile_classpath = compile_classpath
+
+  def _build_hasher(self, target):
+    hasher = super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self)._build_hasher(target)
+    if isinstance(target, JarLibrary):
+      # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
+      # the resolved coordinates, and the requested coordinates are used. This ensures that if a
+      # source file depends on a library with source compatible but binary incompatible signature
+      # changes between versions, that you won't get runtime errors due to using an artifact built
+      # against a binary incompatible version resolved for a previous compile.
+      classpath_entries = self._compile_classpath.get_artifact_classpath_entries_for_targets(
+        [target], transitive=False)
+      for _, entry in classpath_entries:
+        hasher.update(str(entry.coordinate))
+    return hasher
+
+  def __hash__(self):
+    return hash((type(self), self._task.fingerprint))
+
+  def __eq__(self, other):
+    return (isinstance(other, ResolvedJarAwareTaskIdentityFingerprintStrategy) and
+            super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__eq__(other))
 
 
 class JvmCompile(NailgunTaskBase, GroupMember):
@@ -228,8 +259,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Maps CompileContext --> dict of upstream class to paths.
     self._upstream_class_to_paths = {}
 
-  def _fingerprint_strategy(self):
-    return TaskIdentityFingerprintStrategy(self)
+  def _fingerprint_strategy(self, classpath_products):
+    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
 
   def pre_execute(self):
     # Only create these working dirs during execution phase, otherwise, they
@@ -245,14 +276,18 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def prepare_execute(self, chunks):
     targets_in_chunks = list(itertools.chain(*chunks))
 
+    classpath_product = self.context.products.get_data('compile_classpath')
     # Invoke the strategy's prepare_compile to prune analysis.
     cache_manager = self.create_cache_manager(invalidate_dependents=True,
-                                              fingerprint_strategy=self._fingerprint_strategy())
+                                              fingerprint_strategy=self._fingerprint_strategy(classpath_product))
     self._strategy.prepare_compile(cache_manager, self.context.targets(), targets_in_chunks)
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
       return
+
+    classpath_product = self.context.products.get_data('compile_classpath')
+    fingerprint_strategy = self._fingerprint_strategy(classpath_product)
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
     partition_size_hint, locally_changed_targets = self._strategy.invalidation_hints(relevant_targets)
@@ -260,7 +295,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           invalidate_dependents=True,
                           partition_size_hint=partition_size_hint,
                           locally_changed_targets=locally_changed_targets,
-                          fingerprint_strategy=self._fingerprint_strategy(),
+                          fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
       if invalidation_check.invalid_vts:
         # Find the invalid targets for this chunk.
