@@ -5,6 +5,7 @@ python_library(
   name='bin',
   sources=globs('*.py'),
   dependencies=[
+    '3rdparty/python:ansicolors',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     'src/python/pants/backend/core/tasks:task',
