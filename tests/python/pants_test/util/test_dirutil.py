@@ -83,13 +83,12 @@ class DirutilTest(unittest.TestCase):
     """Test that directory names are correctly represented as unicode strings"""
     # This test is unnecessary in python 3 since all strings are unicode there is no
     # unicode constructor.
-    if six.PY2:
-      with temporary_dir() as tmpdir:
-        safe_mkdir(os.path.join(tmpdir, '中文'))
-        if isinstance(tmpdir, six.text_type):
-          tmpdir = tmpdir.encode('utf-8')
-        for _, dirs, _ in dirutil.safe_walk(tmpdir):
-          self.assertTrue(all(isinstance(dirname, six.text_type) for dirname in dirs))
+    with temporary_dir() as tmpdir:
+      safe_mkdir(os.path.join(tmpdir, '中文'))
+      if isinstance(tmpdir, six.text_type):
+        tmpdir = tmpdir.encode('utf-8')
+      for _, dirs, _ in dirutil.safe_walk(tmpdir):
+        self.assertTrue(all(isinstance(dirname, six.text_type) for dirname in dirs))
 
   def test_relativize_paths(self):
     build_root = '/build-root'
