@@ -86,10 +86,10 @@ class DirutilTest(unittest.TestCase):
     if six.PY2:
       with temporary_dir() as tmpdir:
         safe_mkdir(os.path.join(tmpdir, '中文'))
-        if isinstance(tmpdir, unicode):  # noqa
+        if isinstance(tmpdir, six.text_type):
           tmpdir = tmpdir.encode('utf-8')
         for _, dirs, _ in dirutil.safe_walk(tmpdir):
-          self.assertTrue(all(isinstance(dirname, unicode) for dirname in dirs))  # noqa
+          self.assertTrue(all(isinstance(dirname, six.text_type) for dirname in dirs))
 
   def test_relativize_paths(self):
     build_root = '/build-root'
