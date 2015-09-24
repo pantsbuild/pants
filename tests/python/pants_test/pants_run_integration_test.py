@@ -20,7 +20,9 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
-PantsResult = namedtuple('PantsResult', ['command', 'returncode', 'stdout_data', 'stderr_data'])
+PantsResult = namedtuple(
+  'PantsResult',
+  ['command', 'returncode', 'stdout_data', 'stderr_data'])
 
 
 def ensure_cached(expected_num_artifacts=None):
@@ -80,7 +82,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return root
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
-                             **kwargs):
+                             workdir_validation=None, **kwargs):
 
     args = ['--no-pantsrc',
             '--pants-workdir=' + workdir,
@@ -108,20 +110,26 @@ class PantsRunIntegrationTest(unittest.TestCase):
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     (stdout_data, stderr_data) = proc.communicate(stdin_data)
+    if (workdir_validation):
+      workdir_validation(workdir)
     return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"),
                        stderr_data.decode("utf-8"))
 
-  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
+  def run_pants(self, command, config=None, stdin_data=None, extra_env=None,
+                workdir_validation=None, **kwargs):
     """Runs pants in a subprocess.
 
     :param list command: A list of command line arguments coming after `./pants`.
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
+    :param workdir_validation: A function that can be used to validate output in the workdir, before
+    it gets torn down. Receives workdir as the sole parameter.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,
+                                         workdir_validation, **kwargs)
 
   def bundle_and_run(self, target, bundle_name, args=None):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
