@@ -42,13 +42,17 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
         {{#ext}}ext="{{.}}"{{/ext}}
         {{#url}}url="{{.}}"{{/url}}
         {{#classifier}}m:classifier="{{.}}"{{/classifier}}
+        {{#url?}}
+          conf="default{{#lib.required_extra_configurations}},{{.}}{{/lib.required_extra_configurations}}"
+        {{/url?}}
+
       />
         {{/artifacts}}
         {{! When specifying explicit artifacts, extra optional conf resolution is turned off.
             These <include/>s turn the optional resolutions back on. }}
-        {{#lib.extra_configurations}}
+        {{#lib.required_extra_configurations}}
       <include name="{{module}}" conf="{{.}}"/>
-        {{/lib.extra_configurations}}
+        {{/lib.required_extra_configurations}}
       {{/artifacts?}}
       {{#excludes}}
       {{#name}}
