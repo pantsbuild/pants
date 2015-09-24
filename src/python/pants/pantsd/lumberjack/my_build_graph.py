@@ -86,6 +86,10 @@ def is_empty_file(filepath):
   return os.path.getsize(filepath) == 0
 
 
+def infer_address_prefix_from_build_file_location(relative_build_file_path):
+  pass
+
+
 class MyBuildGraphServer(object):
 
   def __init__(self):
@@ -93,7 +97,6 @@ class MyBuildGraphServer(object):
     build_file_parser = BuildFileParser(BuildConfiguration(), root_dir)
     build_file_type = FilesystemBuildFile
     self.build_graph = MyBuildGraph(BuildFileAddressMapper(build_file_parser, build_file_type))
-
 
   # Here go all possible file events
   def file_created(self, filepath):
@@ -115,7 +118,7 @@ class MyBuildGraphServer(object):
 
       # All targets from there should be now deleted.
       # Get all addresses that were in this file. Infer them from filename?
-      addresses = get_addresses_from_build_file(filepath)
+      addresses = infer_addresses_from_build_file_location(filepath)
 
       for address in addresses:
           self.build_graph.delete(address)

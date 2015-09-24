@@ -14,6 +14,9 @@ from pants.util.dirutil import safe_mkdir, touch
 
 
 class BuildFileTestBase(unittest.TestCase):
+
+  base_dir = tempfile.mkdtemp()
+
   def fullpath(self, path):
     return os.path.join(self.root_dir, path)
 
@@ -24,7 +27,9 @@ class BuildFileTestBase(unittest.TestCase):
     touch(self.fullpath(path))
 
   def setUp(self):
-    self.base_dir = tempfile.mkdtemp()
+    with open('/Users/sserebryakov/workspace/pants/pants_output', 'a') as f:
+      f.write('New test!')
+      f.write('\n')
 
     # Seed a BUILD outside the build root that should not be detected
     touch(os.path.join(self.base_dir, 'BUILD'))

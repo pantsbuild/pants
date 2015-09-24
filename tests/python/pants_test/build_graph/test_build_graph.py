@@ -270,3 +270,37 @@ class BuildGraphTest(BaseTest):
         '^Addresses in dependencies must be unique. \'other:b\' is referenced more than once.'
         '\s+referenced from :a$'):
       self.inject_address_closure('//:a')
+
+  def test_remove_targets_by_spec_path(self):
+    a1 = self.make_target('dir1:a1')
+    a2 = self.make_target('dir1:a2', dependencies=[a1])
+    b1 = self.make_target('dir2:b1', dependencies=[a2])
+
+    result = self.build_graph.get_target_from_spec('dir1:a1')
+    self.assertEquals(a1, result)
+    result = self.build_graph.get_target_from_spec('dir1:a2')
+    self.assertEquals(a2, result)
+
+    self.build_graph.remove_targets_by_spec_path('dir1')
+
+    result = self.build_graph.get_target_from_spec('dir1:a1')
+    self.assertIsNone(result)
+    result = self.build_graph.get_target_from_spec('dir1:a2')
+    self.assertIsNone(result)
+    result = self.build_graph.get_target_from_spec('dir2:b1')
+    self.assertEquals(b1, result)
+
+  def test_remove_and_reinsert_target(self):
+    a1 = self.make_target('dir1:a1')
+    dependent_a2 = self.make_target('dir1:a2', dependencies=[a1])
+    b1 = self.make_target('dir2:b1', dependencies=[dependent_a2])
+
+    self.build_graph.remove_targets_by_spec_path('dir1')
+    independent_a2 = self.make_target('dir1:a2')
+
+    result = self.build_graph.get_target_from_spec('dir1:a1')
+    self.assertIsNone(result)
+    result = self.build_graph.get_target_from_spec('dir1:a2')
+    self.assertEquals(independent_a2, result)
+    result = self.build_graph.get_target_from_spec('dir2:b1')
+    self.assertEquals(b1, result)

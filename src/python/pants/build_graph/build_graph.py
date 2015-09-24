@@ -42,6 +42,7 @@ class BuildGraph(object):
     self._target_dependencies_by_address = defaultdict(OrderedSet)
     self._target_dependees_by_address = defaultdict(set)
     self._derived_from_by_derivative_address = {}
+    self._addresses_by_spec_path = defaultdict(set)
 
   def contains_address(self, address):
     return address in self._target_by_address
@@ -128,6 +129,7 @@ class BuildGraph(object):
       self._derived_from_by_derivative_address[target.address] = derived_from.address
 
     self._target_by_address[address] = target
+    self._addresses_by_spec_path[address.spec_path].add(address)
 
     for dependency_address in dependencies:
       self.inject_dependency(dependent=address, dependency=dependency_address)
@@ -168,6 +170,26 @@ class BuildGraph(object):
     else:
       self._target_dependencies_by_address[dependent].add(dependency)
       self._target_dependees_by_address[dependency].add(dependent)
+
+  def remove_targets_by_spec_path(self, spec_path):
+    addresses_to_remove = self._addresses_by_spec_path[spec_path].copy()
+    for address in addresses_to_remove:
+      self.remove_target(address)
+
+  def remove_target(self, address):
+    if address in self._target_by_address:
+      self._target_by_address.pop(address, None)
+      dependencies = self._target_dependencies_by_address[address]
+      for dependency in dependencies:
+        self._target_dependees_by_address[dependency].remove(address)
+      self._target_dependencies_by_address.pop(address, None)
+      if address in self._addresses_already_closed:
+        self._addresses_already_closed.remove(address)
+      self._addresses_by_spec_path[address.spec_path].remove(address)
+      self._derived_from_by_derivative_address.pop(address, None)
+    else:
+      # Whoa, trying to delete non-existing target. That's bad.
+      raise AddressLookupError
 
   def targets(self, predicate=None):
     """Returns all the targets in the graph in no particular order.
@@ -243,7 +265,7 @@ class BuildGraph(object):
     :param function predicate: The predicate passed through to `walk_transitive_dependee_graph`.
     """
     ret = OrderedSet()
-    self.walk_transitive_dependee_graph(addresses, ret.add, predicate=predicate, postorder=False)
+    self.walk_transitive_dependee_graph(addresses, ret.add, predicate=predicate, postorder=postorder)
     return ret
 
   def transitive_subgraph_of_addresses(self, addresses, predicate=None, postorder=False):

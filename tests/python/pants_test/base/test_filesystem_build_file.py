@@ -203,3 +203,11 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     with self.assertRaises(SyntaxError) as e:
       build_file.code()
     self.assertEqual(build_file.full_path, e.exception.filename)
+
+  def test_dropping_from_buildfile_cache(self):
+    key = (self.root_dir, 'grandparent/parent/BUILD', True)
+    self.assertTrue(FilesystemBuildFile.has_cache_entry(*key))
+    FilesystemBuildFile.invalidate_cache_entry(*key)
+    self.assertFalse(FilesystemBuildFile.has_cache_entry(*key))
+    FilesystemBuildFile.from_cache(*key)
+    self.assertTrue(FilesystemBuildFile.has_cache_entry(*key))
