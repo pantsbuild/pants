@@ -81,7 +81,7 @@ class NodeDistribution(object):
         os.rename(tmp_dist, outdir)
     return os.path.join(outdir, 'node')
 
-  class Command(AbstractClass, namedtuple('Command', ['executable', 'args'])):
+  class Command(AbstractClass, namedtuple('Command', ['bin_dir_path', 'executable', 'args'])):
     """Describes a command to be run using a Node distribution."""
 
     @property
@@ -91,15 +91,17 @@ class NodeDistribution(object):
       :returns: The full command line used to spawn this command as a list of strings.
       :rtype: list
       """
-      return [self._executable_path(self.executable)] + self.args
+      return [os.path.join(self.bin_dir_path, self.executable)] + self.args
 
-    @abstractmethod
-    def _executable_path(self, executable):
-      """Resolves the full path of the given Node executable.
+    def _add_bin_to_env_path(self, kwargs):
+      """Takes a kwargs dict, and adds the Node distribution's bin directory to the PATH in the env entry.
 
-      :returns: The full path of the executable.
-      :rtype: string
+      :param kwargs: The original kwargs to be modified.
+      :returns: The modified kwargs.
+      :rtype: dict
       """
+      env = kwargs.setdefault('env', os.environ.copy())
+      env['PATH'] = env['PATH'] + os.path.pathsep + self.bin_dir_path if 'PATH' in env else self.bin_dir_path
 
     def run(self, **kwargs):
       """Runs this command.
@@ -108,6 +110,7 @@ class NodeDistribution(object):
       :returns: A handle to the running command.
       :rtype: :class:`subprocess.Popen`
       """
+      self._add_bin_to_env_path(kwargs)
       return subprocess.Popen(self.cmd, **kwargs)
 
     def check_output(self, **kwargs):
@@ -118,6 +121,7 @@ class NodeDistribution(object):
       :rtype: string
       :raises: :class:`subprocess.CalledProcessError` if the command fails.
       """
+      self._add_bin_to_env_path(kwargs)
       return subprocess.check_output(self.cmd, **kwargs)
 
     def __str__(self):
@@ -145,6 +149,5 @@ class NodeDistribution(object):
 
   def _create_command(self, executable, args=None):
     class NodeDistributionCommand(self.Command):
-      def _executable_path(_, executable):
-        return os.path.join(self.path, 'bin', executable)
-    return NodeDistributionCommand(executable, args or [])
+      pass
+    return NodeDistributionCommand(os.path.join(self.path, 'bin'), executable, args or [])
