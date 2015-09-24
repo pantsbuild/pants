@@ -20,7 +20,6 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.build_graph.target import Target
@@ -504,11 +503,15 @@ class IvyUtils(object):
     for jar in jars:
       excludes.update(jar.excludes)
 
+    any_have_url = False
+
     Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])
     artifacts = OrderedDict()
     for jar in jars:
       ext = jar.ext
       url = jar.url
+      if url:
+        any_have_url = True
       classifier = jar.classifier
       artifact = Artifact(name=jar.name,
                           type_=ext or 'jar',
@@ -530,6 +533,7 @@ class IvyUtils(object):
         force=jar_attributes.force,
         transitive=jar_attributes.transitive,
         artifacts=artifacts.values(),
+        any_have_url=any_have_url,
         excludes=[cls._generate_exclude_template(exclude) for exclude in excludes])
 
     return template

@@ -22,18 +22,21 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import SubprocessExecutor
 from pants.util.memo import memoized_property
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add fkorotkov, tdesai to reviews for this file.
-class Export(PythonTask, ConsoleTask):
+class Export(IvyTaskMixin, PythonTask, ConsoleTask):
   """Generates a JSON description of the targets as configured in pants.
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
@@ -106,31 +109,54 @@ class Export(PythonTask, ConsoleTask):
   def prepare(cls, options, round_manager):
     super(Export, cls).prepare(options, round_manager)
     if options.libraries or options.libraries_sources or options.libraries_javadocs:
-      # TODO(John Sirois): Clean this up by using IvyUtils in here, passing it the confs we need
-      # as a parameter.
-      # See: https://github.com/pantsbuild/pants/issues/2177
-      round_manager.require_data('compile_classpath')
-
-      # NB: These are fake products that only serve as signals to the upstream producer of
-      # 'compile_classpath' to resolve extra classifiers (ivy confs).  A hack that can go away with
-      # execution of the TODO above.
-      round_manager.require('jar_map_default')
-      if options.libraries_sources:
-        round_manager.require('jar_map_sources')
-      if options.libraries_javadocs:
-        round_manager.require('jar_map_javadoc')
+      round_manager.require_data('java')
+      round_manager.require_data('scala')
 
   def __init__(self, *args, **kwargs):
     super(Export, self).__init__(*args, **kwargs)
     self.format = self.get_options().formatted
 
-  def console_output(self, targets):
+  def resolve_jars(self, targets):
+    executor = SubprocessExecutor(DistributionLocator.cached())
+    confs = []
+    if self.get_options().libraries:
+      confs.append('default')
+    if self.get_options().libraries_sources:
+      confs.append('sources')
+    if self.get_options().libraries_javadocs:
+      confs.append('javadoc')
+
+    # TODO(gmalmquist): This is a terrible hack for backwards-compatibility with the pants-plugin.
+    # Kill it ASAP, and update test_export_integration#test_export_jar_path_with_excludes_soft to
+    # use the flag actually scoped for this task.
+    export_options = self.get_options()
+    ivy_options = self.context.options.for_scope('resolve.ivy')
+    for name in set.intersection(set(export_options), set(ivy_options)):
+      if not ivy_options.is_default(name):
+        setattr(export_options, name, ivy_options[name])
+    confs = confs or export_options.confs
+
+    compile_classpath = None
+    if confs:
+      compile_classpath = ClasspathProducts()
+      self.resolve(executor=executor,
+                   targets=targets,
+                   classpath_products=compile_classpath,
+                   confs=confs,
+                   extra_args=())
+    return compile_classpath
+
+  def console_output(self, targets, classpath_products=None):
     targets_map = {}
     resource_target_map = {}
-    classpath_products = (self.context.products.get_data('compile_classpath')
-                          if self.get_options().libraries else None)
-
     python_interpreter_targets_mapping = defaultdict(list)
+
+    if self.get_options().libraries:
+      # NB(gmalmquist): This supports mocking the classpath_products in tests.
+      if classpath_products is None:
+        classpath_products = self.resolve_jars(targets)
+    else:
+      classpath_products = None
 
     def process_target(current_target):
       """
