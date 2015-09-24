@@ -91,11 +91,13 @@ public class JarBuilderTest {
       @Test
       public void test() {
         DuplicatePolicy anyA = DuplicatePolicy.pathMatches("a", DuplicateAction.CONCAT);
+        DuplicatePolicy anyTextA = DuplicatePolicy.pathMatches("a", DuplicateAction.CONCAT_TEXT);
         DuplicatePolicy startA = DuplicatePolicy.pathMatches("^a", DuplicateAction.SKIP);
         DuplicatePolicy endA = DuplicatePolicy.pathMatches("a$", DuplicateAction.REPLACE);
         DuplicatePolicy exactlyA = DuplicatePolicy.pathMatches("^a$", DuplicateAction.THROW);
 
         assertEquals(DuplicateAction.CONCAT, anyA.getAction());
+        assertEquals(DuplicateAction.CONCAT_TEXT, anyTextA.getAction());
         assertEquals(DuplicateAction.SKIP, startA.getAction());
         assertEquals(DuplicateAction.REPLACE, endA.getAction());
         assertEquals(DuplicateAction.THROW, exactlyA.getAction());
@@ -104,6 +106,11 @@ public class JarBuilderTest {
         assertTrue(anyA.apply("ab"));
         assertTrue(anyA.apply("ba"));
         assertFalse(anyA.apply("bbb"));
+
+        assertTrue(anyTextA.apply("bab"));
+        assertTrue(anyTextA.apply("ab"));
+        assertTrue(anyTextA.apply("ba"));
+        assertFalse(anyTextA.apply("bbb"));
 
         assertTrue(startA.apply("ab"));
         assertTrue(startA.apply("aa"));
@@ -547,6 +554,39 @@ public class JarBuilderTest {
     }
 
     @Test
+    public void testPolicyConcatText() throws IOException {
+      DuplicateHandler alwaysConcat = DuplicateHandler.always(DuplicateAction.CONCAT_TEXT);
+
+      File destinationJar = jarBuilder().add(content("1/137"), "meaning/of/life").write();
+
+      jarBuilder(destinationJar)
+          .add(content("42"), "meaning/of/life")
+          .add(content(""), "meaning/of/life")
+          .add(content("jake\n"), "meaning/of/life")
+          .write(true /* compress */, alwaysConcat);
+
+      File jar = jarBuilder().add(content("more\n"), "meaning/of/life").write();
+
+      File dir = newFolder("life/of");
+      write(new File(dir, "life"), "jane");
+
+      jarBuilder(destinationJar)
+          .addJar(jar)
+          .addDirectory(dir, Optional.of("meaning/of"))
+          .write(true /* compress */, alwaysConcat);
+
+      doWithJar(destinationJar, new ExceptionalClosure<JarFile, IOException>() {
+        @Override public void execute(JarFile jar) throws IOException {
+          assertListing(jar,
+              "meaning/",
+              "meaning/of/",
+              "meaning/of/life");
+          assertCompressedContents(jar, "meaning/of/life", "1/137\n42\njake\nmore\njane\n");
+        }
+      });
+    }
+
+    @Test
     public void testPolicySkip() throws IOException {
       DuplicateHandler alwaysSkip = DuplicateHandler.always(DuplicateAction.SKIP);
 
@@ -727,6 +767,28 @@ public class JarBuilderTest {
           .addFile(two, "concatenated/write")
           .addFile(three, "concatenated/write")
           .write(false /* compress */, DuplicateHandler.always(DuplicateAction.CONCAT));
+
+      assertEquals(ImmutableList.of("one", "two", "three"),
+          FluentIterable.from(concatenated.getValue()).transform(GET_NAME).toList());
+    }
+
+
+    @Test
+    public void testOnDuplicateConcatText() throws IOException {
+      Listener listener = createMock(Listener.class);
+      Capture<Iterable<? extends Entry>> concatenated = newCapture();
+      listener.onConcat(eq("concatenated/write"), capture(concatenated));
+      replay(listener);
+
+      File one = newFile("one");
+      File two = newFile("two");
+      File three = newFile("three");
+
+      jarBuilder(newFile(), listener)
+          .addFile(one, "concatenated/write")
+          .addFile(two, "concatenated/write")
+          .addFile(three, "concatenated/write")
+          .write(false /* compress */, DuplicateHandler.always(DuplicateAction.CONCAT_TEXT));
 
       assertEquals(ImmutableList.of("one", "two", "three"),
           FluentIterable.from(concatenated.getValue()).transform(GET_NAME).toList());
