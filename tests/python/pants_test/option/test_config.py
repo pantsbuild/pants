@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import textwrap
 import unittest
 
-from pants.base.config import Config
+from pants.option.config import Config
 from pants.util.contextutil import temporary_file
 
 
@@ -57,7 +57,6 @@ class ConfigTest(unittest.TestCase):
         self.config = Config.load(configpaths=[ini1.name, ini2.name])
 
   def test_getstring(self):
-    self.assertEquals('foo', self.config.getdefault('name'))
     self.assertEquals('/a/b/42', self.config.get('a', 'path'))
     self.assertEquals('/a/b/42::foo', self.config.get('a', 'embed'))
     self.assertEquals(
@@ -69,52 +68,12 @@ that.""",
     self._check_defaults(self.config.get, '')
     self._check_defaults(self.config.get, '42')
 
-  def test_getint(self):
-    self.assertEquals(42, self.config.getint('a', 'answer'))
-    self._check_defaults(self.config.get, 42)
-
-  def test_getfloat(self):
-    self.assertEquals(1.2, self.config.getfloat('b', 'scale'))
-    self._check_defaults(self.config.get, 42.0)
-
-  def test_getbool(self):
-    self.assertTrue(self.config.getbool('a', 'fast'))
-    self.assertFalse(self.config.getbool('b', 'preempt'))
-    self._check_defaults(self.config.get, True)
-
-  def test_getlist(self):
-    self.assertEquals([1, 2, 3, 42], self.config.getlist('a', 'list'))
-    self._check_defaults(self.config.get, [])
-    self._check_defaults(self.config.get, [42])
-
-  def test_getdict(self):
-    self.assertEquals(dict(a=1, b=42, c=['42', 42]), self.config.getdict('b', 'dict'))
-    self._check_defaults(self.config.get, {})
-    self._check_defaults(self.config.get, dict(a=42))
-
-  def test_get_required(self):
-    self.assertEquals('foo', self.config.get_required('a', 'name'))
-    self.assertEquals(42, self.config.get_required('a', 'answer', type=int))
-    with self.assertRaises(Config.ConfigError):
-      self.config.get_required('a', 'answer', type=dict)
-    with self.assertRaises(Config.ConfigError):
-      self.config.get_required('a', 'no_section')
-    with self.assertRaises(Config.ConfigError):
-      self.config.get_required('a', 'blank_section')
-
-  def test_getdefault(self):
-    self.assertEquals('foo', self.config.getdefault('name'))
-
-  def test_getdefault_explicit(self):
-    self.assertEquals('foo', self.config.getdefault('name', type=str))
-
-  def test_getdefault_not_found(self):
-    with self.assertRaises(Config.ConfigError):
-      self.config.getdefault('scale', type=int)
-
   def test_default_section_fallback(self):
     self.assertEquals('foo', self.config.get('defined_section', 'name'))
     self.assertEquals('foo', self.config.get('not_a_defined_section', 'name'))
+
+  def test_sections(self):
+    self.assertEquals(['a', 'b', 'defined_section'], self.config.sections())
 
   def _check_defaults(self, accessor, default):
     self.assertEquals(None, accessor('c', 'fast'))

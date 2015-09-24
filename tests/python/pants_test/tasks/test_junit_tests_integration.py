@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from xml.etree import ElementTree
 
+import pytest
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -115,6 +117,8 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('org.pantsbuild.example.hello.welcome', package_report)
     self.assertIn('org.pantsbuild.example.hello.greet', package_report)
 
+  # NB: fix in process over here: https://rbcommons.com/s/twitter/r/2803/
+  @pytest.mark.xfail
   def test_junit_test_with_coberta(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       pants_run = self.run_pants_with_workdir([
@@ -185,7 +189,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
   def test_junit_test_annotation_processor(self):
     pants_run = self.run_pants([
       'test',
-      '--compile-java-strategy=isolated',
       'testprojects/tests/java/org/pantsbuild/testproject/annotation',
     ])
     self.assert_success(pants_run)

@@ -36,7 +36,7 @@ python_library(
   name='keystore_resolver',
   sources=['keystore/keystore_resolver.py'],
   dependencies=[
-    'src/python/pants/base:config',
+    'src/python/pants/option',
   ]
 )
 

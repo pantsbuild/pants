@@ -5,10 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
+from pants.base.address_lookup_error import AddressLookupError
 
 
-class ExamplesIntegrationTest(ProjectIntegrationTest):
-  def tests_examples(self):
-    pants_run = self.pants_test(['examples::'])
-    self.assert_success(pants_run)
+class DepLookupError(AddressLookupError):
+  """Thrown when a dependency can't be found."""

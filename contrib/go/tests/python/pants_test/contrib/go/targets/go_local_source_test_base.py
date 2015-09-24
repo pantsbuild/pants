@@ -67,3 +67,57 @@ class GoLocalSourceTestBase(AbstractClass):
 
     with self.assertRaises(AddressLookupError):
       self.target('src/go/src/foo')
+
+  def test_globs_cgo(self):
+    # Any of these extensions are handled by `go build`:
+    # .c, .s or .S, .cc, .cpp, or .cxx, .h, .hh, .hpp, or .hxx
+    # We do not test .S since .s and .S are the same on OSX HFS+
+    # case insensitive filesystems - which are common.
+    SourceRoot.register('src/go', self.target_type)
+
+    # We shouldn't grab these - no BUILDs, no dirents, no subdir files.
+    self.create_file('src/go/src/foo/BUILD')
+    self.create_file('src/go/src/foo/subpackage/jane.go')
+    self.create_file('src/go/src/foo/subpackage/jane.c')
+
+    # We should grab all of these though.
+    self.create_file('src/go/src/foo/jake.go')
+    self.create_file('src/go/src/foo/jake.c')
+    self.create_file('src/go/src/foo/jake.s')
+    self.create_file('src/go/src/foo/jake.cc')
+    self.create_file('src/go/src/foo/jake.cpp')
+    self.create_file('src/go/src/foo/jake.cxx')
+    self.create_file('src/go/src/foo/jake.h')
+    self.create_file('src/go/src/foo/jake.hh')
+    self.create_file('src/go/src/foo/jake.hpp')
+    self.create_file('src/go/src/foo/jake.hxx')
+    target = self.make_target(spec='src/go/src/foo', target_type=self.target_type)
+
+    self.assertEqual(sorted(['src/foo/jake.go',
+                             'src/foo/jake.c',
+                             'src/foo/jake.s',
+                             'src/foo/jake.cc',
+                             'src/foo/jake.cpp',
+                             'src/foo/jake.cxx',
+                             'src/foo/jake.h',
+                             'src/foo/jake.hh',
+                             'src/foo/jake.hpp',
+                             'src/foo/jake.hxx']),
+                     sorted(target.sources_relative_to_source_root()))
+
+  def test_globs_resources(self):
+    SourceRoot.register('src/go', self.target_type)
+
+    # We shouldn't grab these - no BUILDs, no dirents, no subdir files.
+    self.create_file('src/go/src/foo/BUILD')
+    self.create_file('src/go/src/foo/subpackage/jane.go')
+    self.create_file('src/go/src/foo/subpackage/jane.png')
+
+    # We should grab all of these though.
+    self.create_file('src/go/src/foo/jake.go')
+    self.create_file('src/go/src/foo/jake.png')
+    target = self.make_target(spec='src/go/src/foo', target_type=self.target_type)
+
+    self.assertEqual(sorted(['src/foo/jake.go',
+                             'src/foo/jake.png']),
+                     sorted(target.sources_relative_to_source_root()))

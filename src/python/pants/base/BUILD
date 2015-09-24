@@ -151,14 +151,11 @@ python_library(
 )
 
 python_library(
-  name = 'config',
-  sources = ['config.py'],
+  name = 'dep_lookup_error',
   dependencies = [
-    '3rdparty/python:six',
-    ':build_environment',
-    'src/python/pants/util:eval',
-    'src/python/pants/util:strutil',
-  ]
+    ':address_lookup_error',
+  ],
+  sources = ['dep_lookup_error.py'],
 )
 
 python_library(

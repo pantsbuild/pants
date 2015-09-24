@@ -4,9 +4,6 @@
 
 # This bootstrap script runs pants from the live sources in this repo.
 #
-# If PANTS_PROFILE=results.pstats is exported, then this script will run pants with python profiling
-# enabled. It will create a pstats file named with the value of PANTS_PROFILE that you can analyze.
-#
 # Further support is added for projects wrapping pants with custom external extensions.  In the
 # future this will work differently (see: https://github.com/pantsbuild/pants/issues/5), but
 # currently pants extenders can invoke this script exporting a few environment variables to include
@@ -41,16 +38,6 @@ HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 source ${HERE}/build-support/pants_venv
 
 PANTS_EXE="${HERE}/src/python/pants/bin/pants_exe.py"
-
-if [ ! -z "${PANTS_PROFILE}" ]; then
-  PANTS_EXE=" -m cProfile -o ${PANTS_PROFILE} ${PANTS_EXE}"
-
-  # PEX_PROFILE requires a path that is directory-ish, otherwise it blows up with a strange error
-  if [[ $PANTS_PROFILE != *"/"* ]]; then
-    PANTS_PROFILE="./${PANTS_PROFILE}"
-  fi
-  export PEX_PROFILE=${PANTS_PROFILE}
-fi
 
 PY=${PY:-$(which python2.7)}
 
