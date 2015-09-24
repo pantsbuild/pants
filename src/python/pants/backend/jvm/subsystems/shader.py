@@ -189,7 +189,7 @@ class Shader(object):
       cls.register_jvm_tool(register,
                             'jarjar',
                             classpath=[
-                              JarDependency(org='org.pantsbuild', name='jarjar', rev='1.5.2')
+                              JarDependency(org='org.pantsbuild', name='jarjar', rev='1.6.0')
                             ])
 
     @classmethod

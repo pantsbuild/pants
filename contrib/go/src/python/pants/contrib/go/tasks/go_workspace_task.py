@@ -11,7 +11,6 @@ from itertools import chain
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir
 
-from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.tasks.go_task import GoTask
 
 
@@ -88,7 +87,9 @@ class GoWorkspaceTask(GoTask):
       remote_lib_source_dir = self.context.products.get_data('go_remote_lib_src')[go_remote_lib]
       for path in os.listdir(remote_lib_source_dir):
         remote_src = os.path.join(remote_lib_source_dir, path)
-        if GoLocalSource.is_go_source(remote_src):
+        # We grab any file since a go package might have .go, .c, .cc, etc files - all needed for
+        # installation.
+        if os.path.isfile(remote_src):
           yield remote_src
     return self._symlink_lib(gopath, go_remote_lib, source_iter(), required_links)
 
