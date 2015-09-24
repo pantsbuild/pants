@@ -104,11 +104,61 @@ class ClasspathProducts(object):
     return self.get_for_targets([target], transitive=transitive)
 
   def get_for_targets(self, targets, transitive=True):
-    """Gets the transitive classpath products for the given targets, in order, respecting target
-       excludes."""
+    """Gets the transitive classpath products for the given targets.
+
+    Products are returned in order, respecting target excludes.
+
+    :param targets: The targets to lookup classpath products for.
+    :param bool transitive: `True` to include the transitive classpath for all targets, `False` to
+                            just include the classpath formed by the direct dependencies of the
+                            targets.
+    :returns: The ordered (conf, path) tuples, with paths being either classfile directories or
+              jars.
+    :rtype: list of (string, string)
+    """
+    cp_entries = self.get_classpath_entries_for_targets(targets, transitive=transitive)
+    return [(conf, cp_entry.path) for conf, cp_entry in cp_entries]
+
+  def get_classpath_entries_for_targets(self, targets, transitive=True, respect_excludes=True):
+    """Gets the transitive classpath products for the given targets.
+
+    Products are returned in order, optionally respecting target excludes.
+
+    :param targets: The targets to lookup classpath products for.
+    :param bool transitive: `True` to include the transitive classpath for all targets, `False` to
+                            just include the classpath formed by the direct dependencies of the
+                            targets.
+    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+    :returns: The ordered (conf, classpath entry) tuples.
+    :rtype: list of (string, :class:`ClasspathEntry`)
+    """
     classpath_tuples = self._classpaths.get_for_targets(targets, transitive)
-    filtered_classpath_tuples = self._filter_by_excludes(classpath_tuples, targets, transitive)
-    return [(classpath_tuple[0], classpath_tuple[1].path) for classpath_tuple in filtered_classpath_tuples]
+    if respect_excludes:
+      return self._filter_by_excludes(classpath_tuples, targets, transitive)
+    else:
+      return classpath_tuples
+
+  def get_artifact_classpath_entries_for_targets(self, targets, transitive=True,
+                                                 respect_excludes=True):
+    """Gets the transitive artifact classpath products for the given targets.
+
+    Products are returned in order, optionally respecting target excludes, and the products only
+    include external artifact classpath elements (ie: resolved jars).
+
+    :param targets: The targets to lookup classpath products for.
+    :param bool transitive: `True` to include the transitive classpath for all targets, `False` to
+                            just include the classpath formed by the direct dependencies of the
+                            targets.
+    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+    :returns: The ordered (conf, classpath entry) tuples.
+    :rtype: list of (string, :class:`ArtifactClasspathEntry`)
+    """
+    classpath_tuples = self.get_classpath_entries_for_targets(targets,
+                                                              transitive=transitive,
+                                                              respect_excludes=respect_excludes)
+    return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
+            if isinstance(cp_entry, ArtifactClasspathEntry)]
+
 
   def _filter_by_excludes(self, classpath_tuples, root_targets, transitive):
     excludes = self._excludes.get_for_targets(root_targets, transitive=transitive)
