@@ -70,7 +70,7 @@ class GoLocalSourceTestBase(AbstractClass):
 
   def test_globs_cgo(self):
     # Any of these extensions are handled by `go build`:
-    # .c, .s or .S, .cc, .cpp, or .cxx .h, .hh, .hpp, or .hxx
+    # .c, .s or .S, .cc, .cpp, or .cxx, .h, .hh, .hpp, or .hxx
     # We do not test .S since .s and .S are the same on OSX HFS+
     # case insensitive filesystems - which are common.
     SourceRoot.register('src/go', self.target_type)
@@ -96,6 +96,7 @@ class GoLocalSourceTestBase(AbstractClass):
     self.assertEqual(sorted(['src/foo/jake.go',
                              'src/foo/jake.c',
                              'src/foo/jake.s',
+                             'src/foo/jake.cc',
                              'src/foo/jake.cpp',
                              'src/foo/jake.cxx',
                              'src/foo/jake.h',
