@@ -109,6 +109,16 @@ python_tests(
 )
 
 python_tests(
+  name='paths',
+  sources=['test_paths.py'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:paths',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
   name='scm_publish',
   sources=['test_scm_publish.py'],
   coverage=['pants.backend.core.tasks.scm_publish'],
