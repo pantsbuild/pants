@@ -36,7 +36,7 @@ class BuildRoot(Singleton):
           buildroot = os.path.dirname(buildroot)
         else:
           raise self.NotFoundError('Could not find pants.ini!')
-      self._root_dir = buildroot
+      self._root_dir = os.path.realpath(buildroot)
     return self._root_dir
 
   @path.setter

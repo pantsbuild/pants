@@ -32,3 +32,14 @@ python_tests(
     'src/python/pants/util:dirutil',
   ]
 )
+
+
+python_tests(
+  name='repro',
+  sources=['test_repro.py'],
+  dependencies=[
+    'src/python/pants/bin',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ]
+)

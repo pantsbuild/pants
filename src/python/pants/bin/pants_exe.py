@@ -14,6 +14,7 @@ from colors import green
 
 from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer
+from pants.bin.repro import Reproducer
 
 
 class _Exiter(object):
@@ -73,9 +74,15 @@ def _run(exiter):
   # Determine the build root dir.
   root_dir = get_buildroot()
 
+  # Capture a repro of the 'before' state for this build, if needed.
+  repro = Reproducer.global_instance().create_repro()
+  if repro:
+    repro.capture(run_tracker.run_info.get_as_dict())
+
   # Set up and run GoalRunner.
   def run():
-    goal_runner = GoalRunner.Factory(root_dir, options, build_config, run_tracker, reporting).setup()
+    goal_runner = GoalRunner.Factory(root_dir, options, build_config,
+                                     run_tracker, reporting).setup()
     return goal_runner.run()
 
   # Run with profiling, if requested.
@@ -93,6 +100,10 @@ def _run(exiter):
       print('Use, e.g., {} to render and view.'.format(view_cmd))
   else:
     result = run()
+
+  if repro:
+    # TODO: Have Repro capture the 'after' state (as a diff) as well?
+    repro.log_location_of_repro_file()
 
   exiter.do_exit(result)
 
