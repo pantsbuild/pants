@@ -555,7 +555,6 @@ class Emma(_Coverage):
 
   def run(self, tests_and_targets):
     self._run_tests(tests_and_targets,
-                    JUnitRun._MAIN,
                     classpath_prepend=[self._coverage_instrument_dir],
                     classpath_append=self._emma_classpath,
                     extra_jvm_options=['-Demma.coverage.out.file={0}'.format(self._coverage_file)])
