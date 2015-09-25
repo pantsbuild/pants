@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import copy
 import os
+import shutil
 import sys
 from abc import abstractmethod
 from collections import defaultdict, namedtuple
@@ -26,8 +27,6 @@ from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
-from pants.option.custom_types import list_option
-from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
 from pants.util.strutil import safe_shlex_split
@@ -190,7 +189,7 @@ class _JUnitRunner(object):
       mapped to their targets extracted from the testing targets.
     """
 
-    self._run_tests(tests_and_targets, JUnitRun._MAIN)
+    self._run_tests(tests_and_targets)
 
   def report(self, targets, tests, tests_failed_exception):
     """Post-processing of any test output.
@@ -285,13 +284,16 @@ class _JUnitRunner(object):
 
     return failed_targets
 
-  def _run_tests(self, tests_to_targets, main, extra_jvm_options=None, classpath_prepend=(),
-                 classpath_append=()):
+  def _run_tests(self, tests_to_targets, extra_jvm_options=None,
+                 classpath_prepend=(), classpath_append=()):
     extra_jvm_options = extra_jvm_options or []
 
     tests_by_properties = self._tests_by_properties(tests_to_targets,
                                                     self._infer_workdir,
                                                     lambda target: target.test_platform)
+
+    # the below will be None if not set, and we'll default back to compile_classpath
+    classpath_product = self._context.products.get_data('instrument_classpath')
 
     result = 0
     for (workdir, platform), tests in tests_by_properties.items():
@@ -299,7 +301,8 @@ class _JUnitRunner(object):
         # Batches of test classes will likely exist within the same targets: dedupe them.
         relevant_targets = set(map(tests_to_targets.get, batch))
         classpath = self._task_exports.classpath(relevant_targets,
-                                                 cp=self._task_exports.tool_classpath('junit'))
+                                                 cp=self._task_exports.tool_classpath('junit'),
+                                                 classpath_product=classpath_product)
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
         complete_classpath.update(classpath)
@@ -310,7 +313,7 @@ class _JUnitRunner(object):
           self._context.log.debug('platform = {}'.format(platform))
           result += abs(distribution.execute_java(
             classpath=complete_classpath,
-            main=main,
+            main=JUnitRun._MAIN,
             jvm_options=self._task_exports.jvm_options + extra_jvm_options,
             args=self._args + batch_tests + [u'-xmlreport'],
             workunit_factory=self._context.new_workunit,
@@ -481,6 +484,36 @@ class _Coverage(_JUnitRunner):
         target.walk(add_sources_under_test)
       return classes_under_test
 
+  def setup_instrumentation_targets(self, targets):
+    """Clones the existing compile_classpath and corresponding binaries to instrumentation specific
+    paths.
+    
+    :param targets: the targets which should be mutated.
+    """
+    safe_mkdir(self._coverage_instrument_dir, clean=True)
+
+    compile_classpath = self._context.products.get_data('compile_classpath')
+    self._context.products.safe_create_data('instrument_classpath', compile_classpath.copy)
+    instrumentation_classpath = self._context.products.get_data('instrument_classpath')
+
+    for target in targets:
+      if (self.is_coverage_target(target)):
+        paths = instrumentation_classpath.get_for_target(target, False)
+        for (config, path) in paths:
+          if (os.path.isfile(path)):
+            shutil.copy2(path, self._coverage_instrument_dir)
+            new_path = os.path.join(self._coverage_instrument_dir, os.path.basename(path))
+          else:
+            files = os.listdir(path)
+            for file in files:
+              shutil.copy2(file, self._coverage_instrument_dir)
+            new_path = self._coverage_instrument_dir
+
+          instrumentation_classpath.remove_for_target(target, [(config, path)])
+          instrumentation_classpath.add_for_target(target, [(config, new_path)])
+          self._context.log.debug(
+            "compile_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+
 
 class Emma(_Coverage):
   """Class to run coverage tests with Emma."""
@@ -626,46 +659,41 @@ class Cobertura(_Coverage):
     self._nothing_to_instrument = True
 
   def instrument(self, targets, tests, compute_junit_classpath):
+    self.setup_instrumentation_targets(targets)
     junit_classpath = compute_junit_classpath()
     cobertura_cp = self._task_exports.tool_classpath('cobertura-instrument')
     aux_classpath = os.pathsep.join(relativize_paths(junit_classpath, get_buildroot()))
     safe_delete(self._coverage_datafile)
-    classes_by_target = self._context.products.get_data('classes_by_target')
+    instrumentation_classpath = self._context.products.get_data('instrument_classpath')
+    files_to_instrument = []
     for target in targets:
       if self.is_coverage_target(target):
-        classes_by_rootdir = classes_by_target.get(target)
-        if classes_by_rootdir:
-          for root, products in classes_by_rootdir.rel_paths():
-            self._rootdirs[root].update(products)
-    for basedir, classes in self._rootdirs.items():
-      if not classes:
-        continue  # No point in running instrumentation if there is nothing to instrument!
-      self._nothing_to_instrument = False
-      args = [
-        '--basedir',
-        basedir,
-        '--datafile',
-        self._coverage_datafile,
-        '--auxClasspath',
-        aux_classpath,
-        ]
-      # apply class incl/excl filters
-      if len(self._include_classes) > 0:
-        for pattern in self._include_classes:
-          args += ["--includeClasses", pattern]
-      else:
-        args += ["--includeClasses", '.*']  # default to instrumenting all classes
-      for pattern in self._exclude_classes:
-        args += ["--excludeClasses", pattern]
+        paths = instrumentation_classpath.get_for_target(target, False)
+        for (name, path) in paths:
+          files_to_instrument.append(path)
 
-      with temporary_file_path(cleanup=False) as instrumented_classes_file:
-        with file(instrumented_classes_file, 'wb') as icf:
-          icf.write(('\n'.join(classes) + '\n').encode('utf-8'))
-        self._context.log.debug('instrumented classes in {0}'.format(instrumented_classes_file))
-        args.append('--listOfFilesToInstrument')
-        args.append(instrumented_classes_file)
+      if len(files_to_instrument) > 0:
+        self._nothing_to_instrument = False
+        args = [
+          '--datafile',
+          self._coverage_datafile,
+          '--auxClasspath',
+          aux_classpath,
+        ]
+        # apply class incl/excl filters
+        if len(self._include_classes) > 0:
+          for pattern in self._include_classes:
+            args += ["--includeClasses", pattern]
+        else:
+          args += ["--includeClasses", '.*']  # default to instrumenting all classes
+        for pattern in self._exclude_classes:
+          args += ["--excludeClasses", pattern]
+
+        args += files_to_instrument
+
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
-        self._context.log.debug("executing cobertura with the following args: {}".format(args))
+        self._context.log.debug(
+          "executing cobertura instrumentation with the following args: {}".format(args))
         execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
         result = execute_java(classpath=cobertura_cp,
                               main=main,
@@ -673,18 +701,17 @@ class Cobertura(_Coverage):
                               args=args,
                               workunit_factory=self._context.new_workunit,
                               workunit_name='cobertura-instrument')
-      if result != 0:
-        raise TaskError("java {0} ... exited non-zero ({1})"
-                        " 'failed to instrument'".format(main, result))
+        if result != 0:
+          raise TaskError("java {0} ... exited non-zero ({1})"
+                          " 'failed to instrument'".format(main, result))
 
   def run(self, tests_and_targets):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping tests...')
       return
-    cobertura_cp = self._task_exports.tool_classpath('cobertura-run')
+
     self._run_tests(tests_and_targets,
-                    JUnitRun._MAIN,
-                    classpath_prepend=cobertura_cp,
+                    classpath_prepend=self._task_exports.tool_classpath('cobertura-run'),
                     extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
 
   def _build_sources_by_class(self):

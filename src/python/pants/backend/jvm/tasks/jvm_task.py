@@ -33,10 +33,12 @@ class JvmTask(Task):
     self.args = self.jvm.get_program_args()
     self.confs = self.get_options().confs
 
-  def classpath(self, targets, cp=None):
+  def classpath(self, targets, cp=None, classpath_product=None):
     classpath = list(cp) if cp else []
 
+    classpath_product = classpath_product or self.context.products.get_data('compile_classpath')
+
     classpath_for_targets = ClasspathUtil.classpath_entries(
-      targets, self.context.products.get_data('compile_classpath'), self.confs)
+      targets, classpath_product, self.confs)
     classpath.extend(classpath_for_targets)
     return classpath
