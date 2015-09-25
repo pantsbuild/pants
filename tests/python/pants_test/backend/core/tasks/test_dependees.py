@@ -14,6 +14,7 @@ from pants.backend.core.tasks.dependees import ReverseDepmap
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_file_aliases import BuildFileAliases
@@ -59,6 +60,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       },
       objects={
         'jar': JarDependency,
+        'scala_jar': ScalaJarDependency,
       }
     )
 

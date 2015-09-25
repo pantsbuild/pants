@@ -17,6 +17,7 @@ from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_file_aliases import BuildFileAliases
@@ -48,6 +49,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       },
       objects={
         'jar': JarDependency,
+        'scala_jar': ScalaJarDependency,
       }
     )
 
