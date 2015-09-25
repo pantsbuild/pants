@@ -39,7 +39,7 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
     def wrapper(self, *args, **kwargs):
       with temporary_dir() as artifact_cache:
         self.set_options_for_scope('cache.{}'.format(self.options_scope),
-                                   write_to=artifact_cache)
+                                   write_to=[artifact_cache])
         task_cache = os.path.join(artifact_cache, task_cls.stable_name())
         os.mkdir(task_cache)
 
