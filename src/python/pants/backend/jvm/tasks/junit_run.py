@@ -612,6 +612,7 @@ class Cobertura(_Coverage):
     self._rootdirs = defaultdict(OrderedSet)
     self._include_filters = []
     self._exclude_filters = []
+    self._instrumented_dirs = set()
     for filt in self._coverage_filters:
       if filt[0] == '-':
         self._exclude_filters.append(filt[1:])
@@ -675,6 +676,7 @@ class Cobertura(_Coverage):
                               args=args,
                               workunit_factory=self._context.new_workunit,
                               workunit_name='cobertura-instrument')
+        self._instrumented_dirs.add(basedir)
       if result != 0:
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to instrument'".format(main, result))
@@ -684,9 +686,11 @@ class Cobertura(_Coverage):
       self._context.log.warn('Nothing found to instrument, skipping tests...')
       return
     cobertura_cp = self._task_exports.tool_classpath('cobertura-run')
+    # prepend instrumented class dirs to the classpath for instrumented runs
+    prepend_cp = list(self._instrumented_dirs) + cobertura_cp
     self._run_tests(tests_and_targets,
                     JUnitRun._MAIN,
-                    classpath_prepend=cobertura_cp,
+                    classpath_prepend= prepend_cp,
                     extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
 
   def _build_sources_by_class(self):
