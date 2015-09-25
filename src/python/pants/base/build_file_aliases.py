@@ -13,7 +13,6 @@ from collections import defaultdict
 import six
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
-from pants.base.deprecated import deprecated
 from pants.base.target import Target
 from pants.util.memo import memoized_property
 
@@ -107,18 +106,6 @@ class BuildFileAliases(object):
     BUILD file path or functions that need to be able to create targets or objects from within the
     BUILD file parse.
   """
-
-  @classmethod
-  @deprecated(removal_version='0.0.50',
-              hint_message='Use the BuildFileAliases constructor instead.')
-  def create(cls,
-             targets=None,
-             objects=None,
-             context_aware_object_factories=None):
-    """A convenience constructor that can accept zero to all alias types."""
-    return cls(targets=targets,
-               objects=objects,
-               context_aware_object_factories=context_aware_object_factories)
 
   @classmethod
   def curry_context(cls, wrappee):

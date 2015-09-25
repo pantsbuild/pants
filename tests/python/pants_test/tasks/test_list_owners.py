@@ -22,7 +22,7 @@ class ListOwnersTest(ConsoleTaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'python_library': PythonLibrary})
+    return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):
     super(ListOwnersTest, self).setUp()
