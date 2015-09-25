@@ -57,28 +57,6 @@ class PathFinder(ConsoleTask):
     self.log = self.context.log
     self.target_roots = self.context.target_roots
 
-  @classmethod
-  def _find_paths(cls, from_target, to_target, log):
-    log.debug('Looking for all paths from {} to {}'.format(from_target.address.reference(),
-                                                           to_target.address.reference()))
-
-  @classmethod
-  def _find_paths_rec(cls, from_target, to_target):
-    if from_target == to_target:
-      return [[from_target]]
-
-    if from_target not in cls.all_paths or to_target not in cls.all_paths[from_target]:
-      paths = []
-      for dep in from_target.dependencies:
-        for path in cls._find_paths_rec(dep, to_target):
-          new_path = copy.copy(path)
-          new_path.insert(0, from_target)
-          paths.append(new_path)
-
-      cls.all_paths[from_target][to_target] = paths
-
-    return cls.all_paths[from_target][to_target]
-
   def validate_target_roots(self):
     if len(self.target_roots) != 2:
       raise TaskError('Specify two targets please (found {})'.format(len(self.target_roots)))
