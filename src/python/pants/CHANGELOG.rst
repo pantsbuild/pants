@@ -100,7 +100,6 @@ Small improvements, Refactoring and Tooling
 
 * Fix scoped options initialization in test
   `RB #2815 <https://rbcommons.com/s/twitter/r/2815>`_
-  `RB #2815 <https://rbcommons.com/s/twitter/r/2815>`_
   `RB #2850 <https://rbcommons.com/s/twitter/r/2850>`_
 
 0.0.49 (9/21/2015)
