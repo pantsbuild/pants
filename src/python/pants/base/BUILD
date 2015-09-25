@@ -83,7 +83,6 @@ python_library(
   sources = ['build_file_aliases.py'],
   dependencies = [
     ':build_file_target_factory',
-    ':deprecated',
     ':target',
     'src/python/pants/util:memo',
   ]
