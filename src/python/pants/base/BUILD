@@ -6,7 +6,6 @@ python_library(
   sources = ['address.py'],
   dependencies = [
     ':build_file',
-    'src/python/pants/base:deprecated',
     'src/python/pants/util:meta',
   ]
 )
