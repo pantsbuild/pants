@@ -27,7 +27,7 @@ class ScalaPlatform(JvmToolMixin, Subsystem):
              help='Target specs pointing to the scala runtime libraries.')
     # TODO: The choice of a platform version should likely drive automatic selection of the
     # appropriate scala-library and scala-compiler dependencies.
-    register('--version', advanced=True, default='2.11',
+    register('--version', advanced=True, default='2.10',
              help='The scala "platform version", which is suffixed onto all published '
                   'libraries. This should match the declared compiler/library versions.')
     cls.register_jvm_tool(register, 'scalac', classpath_spec='//:scala-compiler')
