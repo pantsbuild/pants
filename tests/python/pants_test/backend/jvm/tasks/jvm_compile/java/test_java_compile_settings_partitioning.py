@@ -44,11 +44,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
     context = self.context(target_roots=targets)
     return self.create_task(context)
 
-  def _settings_and_targets(self, targets, ordered=False, **options):
-    if ordered:
-      # Only works in global! Isolated doesn't need this ordering.
-      task = self._task_setup(targets, strategy='global', **options)
-      return task._strategy.ordered_compile_settings_and_targets(targets)
+  def _settings_and_targets(self, targets, **options):
     self._task_setup(targets, **options)
     settings_and_targets = defaultdict(set)
     for target in targets:
@@ -162,52 +158,3 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
 
     self.assertNotEqual(JvmPlatformSettings('1.4', '1.6', ['-Xfoo:bar']),
                         JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']))
-
-  def test_chunks_respect_dependencies(self):
-    # Create the dependency tree:
-    # a <- b <-|
-    #      c <-|<- e <- f <- g <- | <- i <- j <- k
-    #      d <-|             h <- |
-    a = self._java('a', platform='1.6')
-    b = self._java('b', platform='1.6', deps=[a])
-    c = self._java('c', platform='1.6')
-    d = self._java('d', platform='1.7')
-    e = self._java('e', platform='1.7', deps=[b, c, d])
-    f = self._java('f', platform='1.7', deps=[e])
-    g = self._java('g', platform='1.8', deps=[f])
-    h = self._java('h', platform='1.6')
-    i = self._java('i', platform='1.8', deps=[g])
-    j = self._java('j', platform='1.8-bar', deps=[i])
-    k = self._java('k', platform='1.8', deps=[j])
-
-    platforms = {
-      '1.6': {'source': '1.6'},
-      '1.7': {'source': '1.7'},
-      '1.8': {'source': '1.8'},
-      '1.8-bar': {'source': '1.8', 'args': ['-Xfoo:bar']}
-    }
-
-    def _settings(target_level, args=None):
-      return JvmPlatformSettings(target_level, target_level, args)
-
-    def _format_chunk(chunk):
-      settings, targets = chunk
-      return '{}: ({})'.format(str(settings), ', '.join(sorted(t.address.spec for t in targets)))
-
-    expected = [
-      (_settings('1.6'), {a, b, c, h}),
-      (_settings('1.7'), {d, e, f}),
-      (_settings('1.8'), {g, i}),
-      (_settings('1.8', ['-Xfoo:bar']), {j}),
-      (_settings('1.8'), {k})
-    ]
-
-    settings_and_targets = self._settings_and_targets([a, b, c, d, e, f, g, h, i, j, k],
-                                                      ordered=True,
-                                                      platforms=platforms)
-    received = [(settings, set(targets)) for settings, targets in settings_and_targets]
-
-    self.assertEqual(expected, received, 'Expected: {}\n\nReceived: {}'.format(
-      ''.join('\n  {}'.format(_format_chunk(s)) for s in expected),
-      ''.join('\n  {}'.format(_format_chunk(s)) for s in received),
-    ))

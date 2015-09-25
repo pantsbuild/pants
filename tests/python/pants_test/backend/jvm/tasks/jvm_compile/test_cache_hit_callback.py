@@ -8,13 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import \
-  IsolationCacheHitCallback
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile import CacheHitCallback
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 
 
-class IsolationCacheHitCallbackTest(unittest.TestCase):
+class CacheHitCallbackTest(unittest.TestCase):
   def test_when_key_has_associated_directory_cleans_dir(self):
     with temporary_dir() as tmpdir:
       filename = os.path.join(tmpdir, 'deleted')
@@ -22,5 +21,5 @@ class IsolationCacheHitCallbackTest(unittest.TestCase):
 
       key = 'some-key'
       cache_key_to_class_dir = {key: tmpdir}
-      IsolationCacheHitCallback(cache_key_to_class_dir)(key)
+      CacheHitCallback(cache_key_to_class_dir)(key)
       self.assertFalse(os.path.exists(filename))

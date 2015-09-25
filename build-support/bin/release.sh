@@ -32,8 +32,10 @@ PKG_PANTS=(
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) || die "pip install of pantsbuild.pants failed!"
-  execute_packaged_pants_with_internal_backends list src:: || die "'pants list src::' failed in venv!"
+  pip install ${PIP_ARGS} "${ROOT}/dist/pantsbuild.pants-$(local_version).tar.gz" || \
+    die "pip install of pantsbuild.pants failed!"
+  execute_packaged_pants_with_internal_backends list src:: || \
+    die "'pants list src::' failed in venv!"
   [[ "$(execute_packaged_pants_with_internal_backends --pants-version 2>/dev/null)" \
      == "$(local_version)" ]] || die "Installed version of pants does match local version!"
 }
@@ -45,7 +47,7 @@ PKG_PANTS_TESTINFRA=(
 )
 function pkg_pants_testinfra_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.testinfra==$(local_version) && \
+  pip install ${PIP_ARGS} "${ROOT}/dist/pantsbuild.pants.testinfra-$(local_version).tar.gz" && \
   python -c "import pants_test"
 }
 
@@ -189,6 +191,10 @@ function install_and_test_packages() {
   )
 
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-$(local_version)!"
+
+  # Make sure we install fresh plugins since pants uses a fixed version number between releases.
+  export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
+  trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do

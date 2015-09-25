@@ -125,11 +125,11 @@ class BootstrapOptionsTest(unittest.TestCase):
 
   def test_create_bootstrapped_multiple_config_override(self):
     # check with multiple config files, the latest values always get taken
-    # in this case strategy will be overwritten, while fruit stays the same
+    # in this case worker_count will be overwritten, while fruit stays the same
     with temporary_file() as fp:
       fp.write(dedent("""
       [compile.apt]
-      strategy: global
+      worker_count: 1
 
       [fruit]
       apple: red
@@ -145,16 +145,16 @@ class BootstrapOptionsTest(unittest.TestCase):
           ScopeInfo('fruit', ScopeInfo.TASK),
       ])
       opts_single_config.register('', '--config-override')  # So we don't choke on it on the cmd line.
-      opts_single_config.register('compile.apt', '--strategy')
+      opts_single_config.register('compile.apt', '--worker-count')
       opts_single_config.register('fruit', '--apple')
 
-      self.assertEquals('global', opts_single_config.for_scope('compile.apt').strategy)
+      self.assertEquals('1', opts_single_config.for_scope('compile.apt').worker_count)
       self.assertEquals('red', opts_single_config.for_scope('fruit').apple)
 
       with temporary_file() as fp2:
         fp2.write(dedent("""
         [compile.apt]
-        strategy: isolated
+        worker_count: 2
         """))
         fp2.close()
 
@@ -169,10 +169,10 @@ class BootstrapOptionsTest(unittest.TestCase):
           ScopeInfo('fruit', ScopeInfo.TASK),
         ])
         opts_double_config.register('', '--config-override')  # So we don't choke on it on the cmd line.
-        opts_double_config.register('compile.apt', '--strategy')
+        opts_double_config.register('compile.apt', '--worker-count')
         opts_double_config.register('fruit', '--apple')
 
-        self.assertEquals('isolated', opts_double_config.for_scope('compile.apt').strategy)
+        self.assertEquals('2', opts_double_config.for_scope('compile.apt').worker_count)
         self.assertEquals('red', opts_double_config.for_scope('fruit').apple)
 
   def test_full_options_caching(self):

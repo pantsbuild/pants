@@ -10,6 +10,8 @@ import sys
 import traceback
 import warnings
 
+from colors import green
+
 from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer
 
@@ -71,9 +73,27 @@ def _run(exiter):
   # Determine the build root dir.
   root_dir = get_buildroot()
 
-  # Setup and run GoalRunner.
-  goal_runner = GoalRunner.Factory(root_dir, options, build_config, run_tracker, reporting).setup()
-  result = goal_runner.run()
+  # Set up and run GoalRunner.
+  def run():
+    goal_runner = GoalRunner.Factory(root_dir, options, build_config, run_tracker, reporting).setup()
+    return goal_runner.run()
+
+  # Run with profiling, if requested.
+  profile_path = os.environ.get('PANTS_PROFILE')
+  if profile_path:
+    import cProfile
+    profiler = cProfile.Profile()
+    try:
+      result = profiler.runcall(run)
+    finally:
+      profiler.dump_stats(profile_path)
+      print('Dumped profile data to {}'.format(profile_path))
+      view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && '
+                       'open {path}.png'.format(path=profile_path))
+      print('Use, e.g., {} to render and view.'.format(view_cmd))
+  else:
+    result = run()
+
   exiter.do_exit(result)
 
 

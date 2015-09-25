@@ -16,10 +16,5 @@ class ProjectIntegrationTest(PantsRunIntegrationTest):
     exclude_android = os.environ.get('SKIP_ANDROID') == "true" or not os.environ.get('ANDROID_HOME')
     return ['--exclude-target-regexp=.*android.*'] if exclude_android else []
 
-  def pants_test(self, strategy, command):
-    return self.run_pants([
-      'test'
-      '--compile-apt-strategy={}'.format(strategy),
-      '--compile-java-strategy={}'.format(strategy),
-      '--compile-zinc-strategy={}'.format(strategy),
-    ] + command + self._android_flags())
+  def pants_test(self, command):
+    return self.run_pants(['test'] + command + self._android_flags())

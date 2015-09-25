@@ -6,8 +6,6 @@ jvm_binary(name='shading',
   basename='shading',
   dependencies=[
     ':lib',
-    'testprojects/src/java/org/pantsbuild/testproject/shadingdep',
-    'testprojects/src/java/org/pantsbuild/testproject/shadingdep:other',
   ],
   shading_rules=[
     shading_exclude('org.pantsbuild.testproject.shadingdep.PleaseDoNotShadeMe'),
@@ -20,6 +18,10 @@ jvm_binary(name='shading',
 )
 
 java_library(name='lib',
+  dependencies=[
+    'testprojects/src/java/org/pantsbuild/testproject/shadingdep',
+    'testprojects/src/java/org/pantsbuild/testproject/shadingdep:other',
+  ],
   sources=[
     'Main.java',
     'ShadeSelf.java',
