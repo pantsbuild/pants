@@ -329,7 +329,7 @@ class _JUnitRunner(object):
       failed_targets = self._get_failed_targets(tests_to_targets)
       raise TestFailedTaskError(
         'java {0} ... exited non-zero ({1}); {2} failed targets.'
-        .format(main, result, len(failed_targets)),
+        .format(JUnitRun._MAIN, result, len(failed_targets)),
         failed_targets=failed_targets
       )
 
