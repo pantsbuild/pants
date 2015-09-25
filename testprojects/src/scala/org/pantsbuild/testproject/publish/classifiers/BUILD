@@ -1,5 +1,5 @@
 scala_library(name='classifiers',
-  provides=artifact(
+  provides=scala_artifact(
     org='org.pantsbuild.testproject.publish',
     name='classifiers',
     repo=testing,

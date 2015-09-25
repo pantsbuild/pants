@@ -1,6 +1,6 @@
 scala_library(
   name='javac',
-  provides=artifact(
+  provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc-sbt-compiler-javac',
     repo=public,

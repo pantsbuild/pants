@@ -66,6 +66,16 @@ python_library(
 )
 
 python_library(
+  name='scala_artifact',
+  sources=['scala_artifact.py'],
+  dependencies=[
+    ':artifact',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/util:memo',
+  ],
+)
+
+python_library(
   name='ossrh_publication_metadata',
   sources=['ossrh_publication_metadata.py'],
   dependencies=[
