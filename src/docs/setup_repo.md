@@ -252,13 +252,11 @@ defined in your plugin:
       'public': {  # must match the name of the `Repository` object that you defined in your plugin.
         'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
                                          # in your custom ivysettings.xml.
-        'confs': ['default', 'sources', 'docs', 'changelog'],
         'auth': 'build-support:netrc',   # Pants spec to a 'credentials()' object.
         'help': 'Configure your ~/.netrc for maven.example.com access.'
       },
       'testing': {
         'resolver': 'artifactory.example.com',
-        'confs': ['default', 'sources', 'docs', 'changelog'],
         'auth': 'build-support:netrc',
         'help': 'Configure your ~/.netrc for artifactory.example.com access.'
       },

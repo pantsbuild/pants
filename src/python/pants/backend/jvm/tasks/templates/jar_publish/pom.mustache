@@ -86,43 +86,25 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   {{#dependencies?}}
   <dependencies>
     {{#dependencies}}
-    {{^classifiers}}
     <dependency>
       <groupId>{{group_id}}</groupId>
       <artifactId>{{artifact_id}}</artifactId>
       <version>{{version}}</version>
       <scope>{{scope}}</scope>
-      {{#excludes?}}
-      <exclusions>
-        {{#excludes}}
-        <exclusion>
-          <groupId>{{org}}</groupId>
-          <artifactId>{{name}}</artifactId>
-        </exclusion>
-        {{/excludes}}
-      </exclusions>
-      {{/excludes?}}
-    </dependency>
-    {{/classifiers}}
-    {{#classifiers}}
-    <dependency>
-      <groupId>{{group_id}}</groupId>
-      <artifactId>{{artifact_id}}</artifactId>
-      <version>{{version}}</version>
-      <scope>{{scope}}</scope>
-      <classifier>{{classifier}}</classifier>
+      {{#classifier}}
+      <classifier>{{.}}</classifier>
+      {{/classifier}}
       {{#excludes?}}
         <exclusions>
           {{#excludes}}
-            <exclusion>
-              <groupId>{{org}}</groupId>
-              <artifactId>{{name}}</artifactId>
-            </exclusion>
+          <exclusion>
+            <groupId>{{org}}</groupId>
+            <artifactId>{{name}}</artifactId>
+          </exclusion>
           {{/excludes}}
         </exclusions>
       {{/excludes?}}
     </dependency>
-    {{/classifiers}}
     {{/dependencies}}
   </dependencies>
   {{/dependencies?}}

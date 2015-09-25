@@ -174,7 +174,6 @@ python_tests(
   name = 'ivy_utils',
   sources = ['test_ivy_utils.py'],
   dependencies = [
-    '3rdparty/python:mock',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',

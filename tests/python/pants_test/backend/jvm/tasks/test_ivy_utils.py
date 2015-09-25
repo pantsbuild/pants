@@ -9,8 +9,6 @@ import os
 import xml.etree.ElementTree as ET
 from textwrap import dedent
 
-from mock import Mock
-
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyResolveMappingError, IvyUtils
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
@@ -164,30 +162,35 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
       override = self.find_single(doc, 'dependencies/override')
       self.assert_attributes(override, org='org2', module='name2', rev='rev2')
 
-  def test_resove_conflict(self):
-    v1 = Mock()
-    v1.force = False
-    v1.rev = "1"
+  def test_resove_conflict_no_conflicts(self):
+    v1 = JarDependency('org.example', 'foo', '1', force=False)
+    v1_force = JarDependency('org.example', 'foo', '1', force=True)
+    v2 = JarDependency('org.example', 'foo', '2', force=False)
 
-    v1_force = Mock()
-    v1_force.force = True
-    v1_force.rev = "1"
-
-    v2 = Mock()
-    v2.force = False
-    v2.rev = "2"
-
-    # If neither version is forced, use the latest version
+    # If neither version is forced, use the latest version.
     self.assertIs(v2, IvyUtils._resolve_conflict(v1, v2))
     self.assertIs(v2, IvyUtils._resolve_conflict(v2, v1))
 
-    # If an earlier version is forced, use the forced version
+    # If an earlier version is forced, use the forced version.
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v2))
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v2, v1_force))
 
-    # If the same version is forced, use the forced version
+    # If the same version is forced, use the forced version.
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v1, v1_force))
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v1))
+
+    # If the same force is in play in multiple locations, allow it.
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v1_force))
+
+  def test_resolve_conflict_conflict(self):
+    v1_force = JarDependency('org.example', 'foo', '1', force=True)
+    v2_force = JarDependency('org.example', 'foo', '2', force=True)
+
+    with self.assertRaises(IvyUtils.IvyResolveConflictingDepsError):
+      IvyUtils._resolve_conflict(v1_force, v2_force)
+
+    with self.assertRaises(IvyUtils.IvyResolveConflictingDepsError):
+      IvyUtils._resolve_conflict(v2_force, v1_force)
 
   def test_get_resolved_jars_for_jar_library(self):
     ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
