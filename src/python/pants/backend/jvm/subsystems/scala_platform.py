@@ -41,7 +41,7 @@ class ScalaPlatform(JvmToolMixin, Subsystem):
 
   def suffix_version(self, name):
     """Appends the platform version to the given artifact name.
-    
+
     Also validates that the name doesn't already end with the version.
     """
     if name.endswith(self.version):
