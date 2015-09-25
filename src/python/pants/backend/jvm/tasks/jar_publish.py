@@ -38,6 +38,9 @@ from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
 
+_TEMPLATES_RELPATH = os.path.join('templates', 'jar_publish')
+
+
 class PushDb(object):
 
   @staticmethod
@@ -163,7 +166,7 @@ class PomWriter(object):
     if target_jar:
       target_jar = target_jar.extend(dependencies=dependencies.values())
 
-    template_relpath = os.path.join('templates', 'jar_publish', 'pom.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
     generator = Generator(template_text, project=target_jar)
     with safe_open(path, 'w') as output:
@@ -284,8 +287,6 @@ class JarPublish(ScmPublishMixin, JarTask):
        },
      }
   """
-
-  _TEMPLATES_RELPATH = os.path.join('templates', 'jar_publish')
 
   class Publication(namedtuple('Publication', ['name', 'classifier', 'ext'])):
     """Represents an artifact publication.
@@ -597,8 +598,11 @@ class JarPublish(ScmPublishMixin, JarTask):
       # TODO Remove this once we fix https://github.com/pantsbuild/pants/issues/1229
       if (not self.context.products.get('jars').has(tgt) and
           not self.get_options().individual_plugins):
-        raise TaskError()
+        raise TaskError('Expected to find a primary artifact for {} but there was no jar for it.'
+                        .format(tgt.address.reference()))
 
+      # TODO Remove this guard once we fix https://github.com/pantsbuild/pants/issues/1229, there
+      # should always be a primary artifact.
       if self.context.products.get('jars').has(tgt):
         self._copy_artifact(tgt, jar, version, typename='jars')
         publications.add(self.Publication(name=jar.name, classifier=None, ext='jar'))
@@ -880,7 +884,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       return ivy.ivy_settings
 
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
-    template_relpath = os.path.join(self._TEMPLATES_RELPATH, 'ivysettings.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
 
     published = [TemplateData(org=jar.org, name=jar.name) for jar in publishedjars]
@@ -897,7 +901,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       return wrapper.name
 
   def generate_ivy(self, jar, version, publications):
-    template_relpath = os.path.join(self._TEMPLATES_RELPATH, 'ivy.mustache')
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
 
     pubs = [TemplateData(name=None if p.name == jar.name else p.name,

@@ -400,7 +400,7 @@ class IvyUtils(object):
     def add_jar(jar):
       # TODO(John Sirois): Maven allows for depending on an artifact at one rev and one of its
       # attachments (classified artifacts) at another.  Ivy does not, allow this, the dependency
-      # can carry only 1 rev and that hosts multiple artifacts fro that rev.  This conflict
+      # can carry only 1 rev and that hosts multiple artifacts for that rev.  This conflict
       # resolution happens at the classifier level, allowing skew in a
       # multi-artifact/multi-classifier dependency.  We only find out about the skew later in
       # `_generate_jar_template` below which will blow up with a conflict.  Move this logic closer

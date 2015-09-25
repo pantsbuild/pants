@@ -128,12 +128,11 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       extra_options=['--override={}'.format(override)])
 
   # Collect all the common factors for running a publish_extras test, and execute the test.
-  def publish_extras_runner(self, extra_config=None, artifact_name=None, extra_options=None,
-                            success_expected=True):
+  def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT', artifact_name),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--doc-javadoc-skip'] + (extra_options or []),
+                      extra_options=['--doc-javadoc-skip'],
                       extra_config=extra_config,
                       success_expected=success_expected)
   #
@@ -197,6 +196,29 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                         ]}),
                       [],
                       assert_publish_config_contents=True)
+
+  def test_override_via_coord(self):
+    self.publish_test(
+      target='testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers',
+      artifacts=dict({'org/pantsbuild/testproject/publish/classifiers/1.2.3-SNAPSHOT': [
+                        'classifiers-1.2.3-SNAPSHOT.pom',
+                        'ivy-1.2.3-SNAPSHOT.xml',
+                      ]}),
+      pushdb_files=[],
+      extra_options=['--override=org.pantsbuild.testproject.publish#classifiers=1.2.3'],
+      assert_publish_config_contents=True)
+
+  def test_override_via_address(self):
+    target = 'testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers'
+    self.publish_test(
+      target=target,
+      artifacts=dict({'org/pantsbuild/testproject/publish/classifiers/1.2.3-SNAPSHOT': [
+        'classifiers-1.2.3-SNAPSHOT.pom',
+        'ivy-1.2.3-SNAPSHOT.xml',
+      ]}),
+      pushdb_files=[],
+      extra_options=['--override={}=1.2.3'.format(target)],
+      assert_publish_config_contents=True)
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True,
