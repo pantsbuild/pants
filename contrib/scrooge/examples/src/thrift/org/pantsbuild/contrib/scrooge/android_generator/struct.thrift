@@ -1,4 +1,7 @@
 #@namespace android thrift.android.test
+
+include "contrib/scrooge/examples/src/thrift/org/pantsbuild/contrib/scrooge/dummy_generator/dummy.thrift"
+
 typedef i32 MyInteger
 
 enum Day {
@@ -23,4 +26,5 @@ struct Work {
   11: list<string> test_list,
   12: required list<i64> user_ids,
   13: list<Other> other_list,
+  14: required dummy.Krow krow,
 }

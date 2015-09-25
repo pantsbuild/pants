@@ -50,8 +50,7 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   def is_gentarget(self, target):
     return isinstance(target, JavaAntlrLibrary)
 
-  @property
-  def synthetic_target_type(self):
+  def synthetic_target_type(self, target):
     return JavaLibrary
 
   @classmethod

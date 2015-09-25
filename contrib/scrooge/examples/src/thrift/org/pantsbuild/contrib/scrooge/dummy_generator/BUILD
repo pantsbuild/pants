@@ -1,0 +1,15 @@
+java_thrift_library(
+  name='dummy_generator',
+  sources=['dummy.thrift'],
+  compiler='scrooge',
+  language='android',
+  rpc_style='finagle',
+  dependencies=['3rdparty:thrift-0.9.2'],
+  provides=artifact(
+    org='org.archimedes',
+    name='dummy_generator',
+    repo=Repository(name='test',
+      url='https://dl.bintray.com/somerandom/url',
+      push_db_basedir='/tmp')
+  )
+)
