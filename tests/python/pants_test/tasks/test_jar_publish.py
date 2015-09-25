@@ -16,10 +16,9 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jar_publish import JarPublish, PomWriter
+from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
-from pants.base.generator import TemplateData
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
@@ -83,7 +82,6 @@ class JarPublishTest(TaskTestBase):
     return {
       'internal': {
         'resolver': 'example.com',
-        'confs': ['default', 'sources', 'docs', 'changelog'],
       }
     }
 
@@ -103,7 +101,6 @@ class JarPublishTest(TaskTestBase):
     repos = {
       'another-repo': {
         'resolver': 'example.org',
-        'confs': ['default', 'sources', 'docs', 'changelog'],
       }
     }
 

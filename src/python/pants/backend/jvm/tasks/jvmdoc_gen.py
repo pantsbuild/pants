@@ -107,8 +107,11 @@ class JvmdocGen(JvmTask):
     def docable(tgt):
       return language_predicate(tgt) and (self._include_codegen or not tgt.is_codegen)
 
-    targets = self.context.targets()
-    with self.invalidated(filter(docable, targets)) as invalidation_check:
+    targets = self.context.targets(predicate=docable)
+    if not targets:
+      return
+
+    with self.invalidated(targets) as invalidation_check:
       safe_mkdir(self.workdir)
       classpath = self.classpath(targets)
 
@@ -122,7 +125,7 @@ class JvmdocGen(JvmTask):
         else:
           return set(invalid_targets).intersection(set(self.context.target_roots))
 
-      jvmdoc_targets = list(filter(docable, find_jvmdoc_targets()))
+      jvmdoc_targets = list(find_jvmdoc_targets())
       if self.combined:
         self._generate_combined(classpath, jvmdoc_targets, create_jvmdoc_command)
       else:

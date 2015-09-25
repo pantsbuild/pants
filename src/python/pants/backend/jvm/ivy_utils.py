@@ -194,9 +194,6 @@ class IvyUtils(object):
 
   ivy_lock = threading.RLock()
 
-  IVY_TEMPLATE_PACKAGE_NAME = __name__
-  IVY_TEMPLATE_PATH = os.path.join('tasks', 'templates', 'ivy_resolve', 'ivy.mustache')
-
   INTERNAL_ORG_NAME = 'internal'
 
   class IvyError(Exception):
@@ -379,18 +376,15 @@ class IvyUtils(object):
     template_data = TemplateData(
         org=org,
         module=name,
-        version='latest.integration',
-        publications=None,
         extra_configurations=extra_configurations,
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)
 
-    safe_mkdir(os.path.dirname(ivyxml))
-    with open(ivyxml, 'w') as output:
-      generator = Generator(pkgutil.get_data(__name__, cls.IVY_TEMPLATE_PATH),
-                            root_dir=get_buildroot(),
-                            lib=template_data)
+    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy.mustache')
+    template_text = pkgutil.get_data(__name__, template_relpath)
+    generator = Generator(template_text, lib=template_data)
+    with safe_open(ivyxml, 'w') as output:
       generator.write(output)
 
   @classmethod
@@ -404,12 +398,19 @@ class IvyUtils(object):
     # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
     # strategy generally.
     def add_jar(jar):
-      # TODO(John Sirois): XXX
+      # TODO(John Sirois): Maven allows for depending on an artifact at one rev and one of its
+      # attachments (classified artifacts) at another.  Ivy does not, allow this, the dependency
+      # can carry only 1 rev and that hosts multiple artifacts fro that rev.  This conflict
+      # resolution happens at the classifier level, allowing skew in a
+      # multi-artifact/multi-classifier dependency.  We only find out about the skew later in
+      # `_generate_jar_template` below which will blow up with a conflict.  Move this logic closer
+      # together to get a more clear validate, then emit ivy.xml then resolve flow instead of the
+      # spread-out validations happening here.
+      # See: https://github.com/pantsbuild/pants/issues/2239
       coordinate = (jar.org, jar.name, jar.classifier)
       existing = jars.get(coordinate)
-      jars[coordinate] = jar if not existing else (
-        cls._resolve_conflict(existing=existing, proposed=jar)
-      )
+      jars[coordinate] = jar if not existing else cls._resolve_conflict(existing=existing,
+                                                                        proposed=jar)
 
     def collect_jars(target):
       if isinstance(target, JarLibrary):
@@ -470,16 +471,13 @@ class IvyUtils(object):
       ))
       return proposed
     else:
-      try:
-        if Revision.lenient(proposed.rev) > Revision.lenient(existing.rev):
-          logger.debug('Upgrading {}#{};{} from rev {}  to {}'.format(
-            proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev,
-          ))
-          return proposed
-        else:
-          return existing
-      except Revision.BadRevision as e:
-        raise cls.BadRevisionError('Failed to parse jar revision', e)
+      if Revision.lenient(proposed.rev) > Revision.lenient(existing.rev):
+        logger.debug('Upgrading {}#{};{} from rev {}  to {}'.format(
+          proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev,
+        ))
+        return proposed
+      else:
+        return existing
 
   @classmethod
   def _generate_jar_template(cls, jars):
@@ -496,6 +494,7 @@ class IvyUtils(object):
       # TODO(John Sirois): Need to provide information about where these came from - could be
       # far-flung JarLibrary targets.  The jars here were collected from targets via
       # `calculate_classpath` above and so merging of the 2 could provide the context needed.
+      # See: https://github.com/pantsbuild/pants/issues/2239
       conflicting_dependencies = sorted(str(g) for g in global_dep_attributes)
       raise cls.IvyResolveConflictingDepsError('Found conflicting dependencies:\n\t{}'
                                                .format('\n\t'.join(conflicting_dependencies)))

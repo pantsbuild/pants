@@ -90,9 +90,12 @@ class Depmap(ConsoleTask):
             '{org}{sep}{name}').format(**params), is_internal_dep
 
   def _enumerate_visible_deps(self, dep, predicate):
-    dependencies = [x for x in getattr(dep, 'dependencies', [])] + [
-      x for x in getattr(dep, 'jar_dependencies', [])] if not self.is_internal_only else []
-
+    # We present the dependencies out of classpath order and instead in alphabetized internal deps,
+    # then alphabetized external deps order for ease in scanning output.
+    dependencies = sorted(x for x in getattr(dep, 'dependencies', []))
+    if not self.is_internal_only:
+      dependencies.extend(sorted((x for x in getattr(dep, 'jar_dependencies', [])),
+                                 key=lambda x: (x.org, x.name, x.rev, x.classifier)))
     for inner_dep in dependencies:
       dep_id, internal = self._dep_id(inner_dep)
       if predicate(internal):

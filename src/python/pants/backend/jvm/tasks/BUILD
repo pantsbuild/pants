@@ -253,7 +253,7 @@ python_library(
 
 resources(
   name = 'jar_publish_resources',
-  sources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
+  sources = globs('templates/jar_publish/*.mustache'),
 )
 
 python_library(

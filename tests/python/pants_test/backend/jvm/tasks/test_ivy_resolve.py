@@ -131,7 +131,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
                                   (u'default', artifact_path(u'bogus1'))]),
                       winning_cp)
 
-  def test_resolve_multiple_artifacts1(self):
+  def test_resolve_multiple_artifacts(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
     classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
 

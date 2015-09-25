@@ -308,12 +308,11 @@ class IvyTaskMixin(TaskBase):
 
     # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
     # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
+    # See: https://github.com/pantsbuild/pants/issues/2239
     try:
       jars, excludes = IvyUtils.calculate_classpath(targets, gather_excludes=not use_soft_excludes)
       with IvyUtils.ivy_lock:
         IvyUtils.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve, resolve_hash_name)
-        import shutil
-        shutil.copy(ivyxml, '/tmp/ivy.xml')
         runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
         try:
           result = execute_runner(runner, workunit_factory=self.context.new_workunit,

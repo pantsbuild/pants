@@ -78,7 +78,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                          'welcome-0.0.1-SNAPSHOT.jar',
                          'welcome-0.0.1-SNAPSHOT.pom',
                          'welcome-0.0.1-SNAPSHOT-sources.jar']}
-    self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish:jvm-run-example-lib',
+    self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish'
+                      ':jvm-run-example-lib',
                       dict(unique_artifacts.items() + shared_artifacts('0.0.1-SNAPSHOT').items()),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties',
                        'org.pantsbuild.testproject.publish/jvm-example-lib/publish.properties',
@@ -103,9 +104,11 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                          'distance-0.0.1-SNAPSHOT.jar',
                          'distance-0.0.1-SNAPSHOT.pom',
                          'distance-0.0.1-SNAPSHOT-sources.jar']}
-    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/protobuf:protobuf-java',
+    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/protobuf'
+                      ':protobuf-java',
                       unique_artifacts,
-                      ['org.pantsbuild.testproject.publish.protobuf/protobuf-java/publish.properties',
+                      ['org.pantsbuild.testproject.publish.protobuf/protobuf-java/'
+                       'publish.properties',
                        'org.pantsbuild.testproject.protobuf/distance/publish.properties'],
                       extra_options=['--doc-javadoc-skip'],
                       expected_primary_artifact_count=2)
@@ -125,11 +128,12 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       extra_options=['--override={}'.format(override)])
 
   # Collect all the common factors for running a publish_extras test, and execute the test.
-  def publish_extras_runner(self, extra_config=None, artifact_name=None, success_expected=True):
+  def publish_extras_runner(self, extra_config=None, artifact_name=None, extra_options=None,
+                            success_expected=True):
     self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
                       shared_artifacts('0.0.1-SNAPSHOT', artifact_name),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
-                      extra_options=['--doc-javadoc-skip'],
+                      extra_options=['--doc-javadoc-skip'] + (extra_options or []),
                       extra_config=extra_config,
                       success_expected=success_expected)
   #
