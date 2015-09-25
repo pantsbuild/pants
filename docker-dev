@@ -36,7 +36,10 @@ FROM pantsbuild/pants:latest
 # /home/${user}/pants volume mount of the pants clone has matching perms and can be used
 # transparently.
 
-RUN groupadd --gid ${gid} -r ${group} && \\
+# We only add the group if it doesn't already exist - groups very well may align between
+# the ubuntu image and the host.  We blindly add the user though since any sane host user
+# (not root), will not exist on the minimal ubunutu image.
+RUN getent group ${gid} || groupadd --gid ${gid} -r ${group} && \\
     useradd --uid ${uid}  -r -m -g ${group} ${user}
 
 VOLUME /home/${user}/.cache/pants
