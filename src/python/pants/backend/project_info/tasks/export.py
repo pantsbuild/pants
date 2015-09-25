@@ -9,6 +9,7 @@ import json
 import os
 from collections import defaultdict
 
+import six
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
@@ -252,7 +253,7 @@ class Export(PythonTask, ConsoleTask):
       default_interpreter = interpreters[0]
 
       interpreters_info = {}
-      for interpreter, targets in python_interpreter_targets_mapping.iteritems():
+      for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
         chroot = self.cached_chroot(
           interpreter=interpreter,
           pex_info=PexInfo.default(),
