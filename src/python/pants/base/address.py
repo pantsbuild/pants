@@ -9,7 +9,6 @@ import functools
 import os
 from collections import namedtuple
 
-from pants.base.deprecated import deprecated
 from pants.util.meta import AbstractClass
 
 
@@ -160,12 +159,6 @@ class Address(AbstractClass):
   def relative_spec(self):
     return ':{target_name}'.format(target_name=self._target_name)
 
-  @property
-  @deprecated(removal_version='0.0.50',
-              hint_message='Use `not isinstance(address, BuildFileAddress)` instead.')
-  def is_synthetic(self):
-    return False
-
   def reference(self, referencing_path=None):
     """How to reference this address in a BUILD file."""
     if referencing_path and self._spec_path == referencing_path:
@@ -223,21 +216,3 @@ class BuildFileAddress(Address):
   def __repr__(self):
     return ('BuildFileAddress({build_file}, {target_name})'
             .format(build_file=self.build_file, target_name=self.target_name))
-
-
-class SyntheticAddress(Address):
-  deprecate_me = functools.partial(deprecated, removal_version='0.0.50')
-
-  @classmethod
-  @deprecate_me(hint_message='Use `Address.parse(...)` instead.')
-  def parse(cls, *args, **kwargs):
-    return super(SyntheticAddress, cls).parse(*args, **kwargs)
-
-  @deprecate_me(hint_message='Use `Address(...)` instead.')
-  def __init__(self, *args, **kwargs):
-    super(SyntheticAddress, self).__init__(*args, **kwargs)
-
-  @property
-  @deprecate_me(hint_message='Use `not isinstance(address, BuildFileAddress)` instead.')
-  def is_synthetic(self):
-    return True

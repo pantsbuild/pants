@@ -21,6 +21,7 @@ from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.scm_build_file import ScmBuildFile
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.plugin_resolver import PluginResolver
+from pants.bin.repro import Reproducer
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
@@ -316,7 +317,7 @@ class GoalRunner(object):
   @classmethod
   def subsystems(cls):
     # Subsystems used outside of any task.
-    return {SourceRootBootstrapper, Reporting, RunTracker}
+    return {SourceRootBootstrapper, Reporting, Reproducer, RunTracker}
 
   def _execute_engine(self):
     unknown_goals = [goal.name for goal in self._goals if not goal.ordered_task_names()]

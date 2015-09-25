@@ -11,6 +11,7 @@ import re
 import traceback
 from collections import defaultdict
 
+import six
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.address import Address, parse_spec
@@ -93,7 +94,7 @@ class CmdLineSpecParser(object):
       targets = ', '.join(self._excluded_target_map[CmdLineSpecParser._UNMATCHED_KEY])
       logger.debug('Targets after excludes: {targets}'.format(targets=targets))
       excluded_count = 0
-      for pattern, targets in self._excluded_target_map.iteritems():
+      for pattern, targets in six.iteritems(self._excluded_target_map):
         if pattern != CmdLineSpecParser._UNMATCHED_KEY:
           logger.debug('Targets excluded by pattern {pattern}\n  {targets}'
                        .format(pattern=pattern,

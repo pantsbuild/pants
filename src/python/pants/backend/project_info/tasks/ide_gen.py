@@ -236,7 +236,7 @@ class IdeGen(JvmToolTaskMixin, Task):
       if target.is_jvm:
         if target.excludes:
           excludes.update(target.excludes)
-        jars.update(jar for jar in target.jar_dependencies if jar.rev)
+        jars.update(jar for jar in target.jar_dependencies)
         if is_cp(target):
           target.walk(compiles.add)
 

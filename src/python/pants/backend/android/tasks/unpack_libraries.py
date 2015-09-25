@@ -29,8 +29,8 @@ class AndroidLibraryFingerprintStrategy(DefaultFingerprintStrategy):
     # handing in list of items of the same type and a function to extract a fingerprint from each.
     if isinstance(target, AndroidLibrary):
       hasher = sha1()
-      for jar_import in sorted(target.imported_jars, key=lambda t: t.id):
-        hasher.update(jar_import.cache_key())
+      for cache_key in sorted(jar.cache_key() for jar in target.imported_jars):
+        hasher.update(cache_key)
       hasher.update(target.payload.fingerprint())
       return hasher.hexdigest()
     return None
