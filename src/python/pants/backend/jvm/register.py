@@ -11,6 +11,7 @@ from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository as repo
 from pants.backend.jvm.scala_artifact import ScalaArtifact
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
@@ -106,6 +107,10 @@ def build_file_aliases():
       'bundle': Bundle.factory,
     }
   )
+
+
+def global_subsystems():
+  return (ScalaPlatform,)
 
 
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals
