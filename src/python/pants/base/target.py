@@ -448,7 +448,7 @@ class Target(AbstractTarget):
     """Returns ``True`` if this target is derived from no other."""
     return self.derived_from == self
 
-  @property
+  @memoized_property
   def id(self):
     """A unique and unix safe identifier for the Target.
     Since other classes use this id to generate new file names and unix system has 255 character
