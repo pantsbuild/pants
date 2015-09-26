@@ -73,9 +73,8 @@ class TargetTest(BaseTest):
     long_id = long_target.id
     self.assertLessEqual(len(long_id), 200)
     self.assertEqual(long_id,
-                     'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.dummy10.\
-c582ce0f60008b3dc8196ae9e6ff5e8c40096974.dummy21.dummy22.dummy23.dummy24.dummy25.dummy26.dummy27.dummy28.dummy29.foo')
-
+                     'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.dummy10.du.\
+c582ce0f60008b3dc8196ae9e6ff5e8c40096974.y20.dummy21.dummy22.dummy23.dummy24.dummy25.dummy26.dummy27.dummy28.dummy29.foo')
     short_path = 'dummy'
     for i in xrange(1,10):
       short_path = os.path.join(short_path, 'dummy{}'.format(i))

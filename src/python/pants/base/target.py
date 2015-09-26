@@ -455,12 +455,9 @@ class Target(AbstractTarget):
     limitation on a file name, 200-character limit is chosen as a safe measure.
     """
     id_candidate = self.address.path_safe_spec
-    if len(id_candidate) > 200:
-      #avoid cut half way of a word which creates confusion
-      heads = '.'.join(id_candidate[:80].split('.')[:-1])
-      tails = '.'.join(id_candidate[-80:].split('.')[1:])
-      hash_string = sha1(id_candidate).hexdigest()
-      return '{}.{}.{}'.format(heads, hash_string, tails)
+    if len(id_candidate) >= 200:
+      # two dots + 79 char head + 79 char tail + 40 char sha1
+      return '{}.{}.{}'.format(id_candidate[:79], sha1(id_candidate).hexdigest(), id_candidate[-79:])
     return id_candidate
 
   @property
