@@ -463,6 +463,10 @@ class Target(AbstractTarget):
       return '{}.{}.{}'.format(heads, hash_string, tails)
     return id_candidate
 
+  @property
+  def identifier(self):
+    return self.id
+
   def walk(self, work, predicate=None):
     """Walk of this target's dependency graph, DFS preorder traversal, visiting each node exactly
     once.
