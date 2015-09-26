@@ -24,6 +24,7 @@ from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
