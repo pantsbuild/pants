@@ -64,21 +64,21 @@ class TargetTest(BaseTest):
       target = self.make_target('foo:bar', Target, foobar='barfoo')
       self.assertFalse(hasattr(target, 'foobar'))
 
-  def test_target_id(self):
-
+  def test_target_id_long(self):
     long_path = 'dummy'
     for i in xrange(1,30):
       long_path = os.path.join(long_path, 'dummy{}'.format(i))
     long_target = self.make_target('{}:foo'.format(long_path), Target)
     long_id = long_target.id
-    self.assertLessEqual(len(long_id), 200)
+    self.assertEqual(len(long_id), 200)
     self.assertEqual(long_id,
                      'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.dummy10.du.\
 c582ce0f60008b3dc8196ae9e6ff5e8c40096974.y20.dummy21.dummy22.dummy23.dummy24.dummy25.dummy26.dummy27.dummy28.dummy29.foo')
+
+  def test_target_id_short(self):
     short_path = 'dummy'
     for i in xrange(1,10):
       short_path = os.path.join(short_path, 'dummy{}'.format(i))
     short_target = self.make_target('{}:foo'.format(short_path), Target)
     short_id = short_target.id
-    self.assertLessEqual(len(short_id), 200)
     self.assertEqual(short_id, 'dummy.dummy1.dummy2.dummy3.dummy4.dummy5.dummy6.dummy7.dummy8.dummy9.foo')
