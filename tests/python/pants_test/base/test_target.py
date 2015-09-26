@@ -66,7 +66,7 @@ class TargetTest(BaseTest):
 
   def test_target_id_long(self):
     long_path = 'dummy'
-    for i in xrange(1,30):
+    for i in range(1,30):
       long_path = os.path.join(long_path, 'dummy{}'.format(i))
     long_target = self.make_target('{}:foo'.format(long_path), Target)
     long_id = long_target.id
@@ -77,7 +77,7 @@ c582ce0f60008b3dc8196ae9e6ff5e8c40096974.y20.dummy21.dummy22.dummy23.dummy24.dum
 
   def test_target_id_short(self):
     short_path = 'dummy'
-    for i in xrange(1,10):
+    for i in range(1,10):
       short_path = os.path.join(short_path, 'dummy{}'.format(i))
     short_target = self.make_target('{}:foo'.format(short_path), Target)
     short_id = short_target.id
