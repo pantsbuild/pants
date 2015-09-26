@@ -450,18 +450,18 @@ class Target(AbstractTarget):
 
   @property
   def id(self):
-    """A unique identifier for the Target.
-
-    The generated id is safe for use as a path name on unix systems.
+    """A unique and unix safe identifier for the Target.
+    Since other classes use this id to generate new file names and unix system has 255 character
+    limitation on a file name, 200-character limit is chosen as a safe measure.
     """
-    return self.address.path_safe_spec
+    id_candidate = self.address.path_safe_spec
+    if len(id_candidate) >= 200:
+      # two dots + 79 char head + 79 char tail + 40 char sha1
+      return '{}.{}.{}'.format(id_candidate[:79], sha1(id_candidate).hexdigest(), id_candidate[-79:])
+    return id_candidate
 
   @property
   def identifier(self):
-    """A unique identifier for the Target.
-
-    The generated id is safe for use as a path name on unix systems.
-    """
     return self.id
 
   def walk(self, work, predicate=None):
