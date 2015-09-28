@@ -9,10 +9,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.pantsbuild.testproject.publish</groupId>
-  <artifactId>classifiers</artifactId>
+  <artifactId>classifiers_2.10</artifactId>
   <packaging>jar</packaging>
   <version>0.0.1-SNAPSHOT</version>
-  <name>org.pantsbuild.testproject.publish:classifiers</name>
+  <name>org.pantsbuild.testproject.publish:classifiers_2.10</name>
   <description>This is a test. This is only a test.</description>
   <url>http://pantsbuild.github.io/</url>
   <licenses>

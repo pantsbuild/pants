@@ -33,6 +33,7 @@ class CheckPublishedDepsTest(ConsoleTaskTestBase):
       },
       objects={
         'artifact': Artifact,
+        'jar': JarDependency,
         'scala_artifact': ScalaArtifact,
         'scala_jar': ScalaJarDependency,
         'repo': Repository(name='repo',
