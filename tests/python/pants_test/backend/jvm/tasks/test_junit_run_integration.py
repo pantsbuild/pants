@@ -49,6 +49,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
   def test_junit_run_with_cobertura_coverage_succeeds(self):
     def validate_workdir(workdir):
+      # validate that the expected coverage file exists, and it reflects 100% line rate coverage
       coverage_xml = os.path.join(workdir, 'test/junit/coverage/xml/coverage.xml')
       self.assertTrue(os.path.isfile(coverage_xml))
       self.assertIn('line-rate="1.0"', open(coverage_xml).read())

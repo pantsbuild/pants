@@ -33,8 +33,17 @@ class JvmTask(Task):
     self.args = self.jvm.get_program_args()
     self.confs = self.get_options().confs
 
-  def classpath(self, targets, cp=None, classpath_product=None):
-    classpath = list(cp) if cp else []
+  def classpath(self, targets, classpath_prefix=None, classpath_product=None):
+    """Builds a classpath for the current task and given targets, optionally including a classpath
+    prefix or building from a non-default classpath product.
+
+    :param targets: the targets for which to build the classpath.
+    :param classpath_prefix: optional additional entries to prepend to the classpath.
+    :param classpath_product: an optional ClasspathProduct from which to build the classpath. if not
+    specified, the compile_classpath will be used.
+    :return: a list of classpath strings.
+    """
+    classpath = list(classpath_prefix) if classpath_prefix else []
 
     classpath_product = classpath_product or self.context.products.get_data('compile_classpath')
 

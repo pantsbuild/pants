@@ -154,7 +154,7 @@ class _JUnitRunner(object):
     bootstrapped_cp = self._task_exports.tool_classpath('junit')
 
     def compute_complete_classpath():
-      return self._task_exports.classpath(targets, cp=bootstrapped_cp)
+      return self._task_exports.classpath(targets, classpath_prefix=bootstrapped_cp)
 
     self._context.release_lock()
     self.instrument(targets, tests_and_targets.keys(), compute_complete_classpath)
@@ -301,7 +301,7 @@ class _JUnitRunner(object):
         # Batches of test classes will likely exist within the same targets: dedupe them.
         relevant_targets = set(map(tests_to_targets.get, batch))
         classpath = self._task_exports.classpath(relevant_targets,
-                                                 cp=self._task_exports.tool_classpath('junit'),
+                                                 classpath_prefix=self._task_exports.tool_classpath('junit'),
                                                  classpath_product=classpath_product)
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
@@ -484,10 +484,10 @@ class _Coverage(_JUnitRunner):
         target.walk(add_sources_under_test)
       return classes_under_test
 
-  def setup_instrumentation_targets(self, targets):
+  def initialize_instrument_classpath(self, targets):
     """Clones the existing compile_classpath and corresponding binaries to instrumentation specific
     paths.
-    
+
     :param targets: the targets which should be mutated.
     """
     safe_mkdir(self._coverage_instrument_dir, clean=True)
@@ -497,10 +497,12 @@ class _Coverage(_JUnitRunner):
     instrumentation_classpath = self._context.products.get_data('instrument_classpath')
 
     for target in targets:
-      if (self.is_coverage_target(target)):
+      if self.is_coverage_target(target):
         paths = instrumentation_classpath.get_for_target(target, False)
         for (config, path) in paths:
-          if (os.path.isfile(path)):
+          # there are two sorts of classpath entries we see in the compile classpath: jars and dirs
+          # the branches below handle the cloning of those respectively.
+          if os.path.isfile(path):
             shutil.copy2(path, self._coverage_instrument_dir)
             new_path = os.path.join(self._coverage_instrument_dir, os.path.basename(path))
           else:
@@ -658,7 +660,7 @@ class Cobertura(_Coverage):
     self._nothing_to_instrument = True
 
   def instrument(self, targets, tests, compute_junit_classpath):
-    self.setup_instrumentation_targets(targets)
+    self.initialize_instrument_classpath(targets)
     junit_classpath = compute_junit_classpath()
     cobertura_cp = self._task_exports.tool_classpath('cobertura-instrument')
     aux_classpath = os.pathsep.join(relativize_paths(junit_classpath, get_buildroot()))
