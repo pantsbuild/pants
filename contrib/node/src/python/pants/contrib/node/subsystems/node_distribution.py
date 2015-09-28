@@ -101,7 +101,7 @@ class NodeDistribution(object):
       :rtype: dict
       """
       env = kwargs.setdefault('env', os.environ.copy())
-      env['PATH'] = env['PATH'] + os.path.pathsep + self.bin_dir_path if 'PATH' in env else self.bin_dir_path
+      env['PATH'] = self.bin_dir_path + os.path.pathsep + env['PATH'] if env.get('PATH', '') else self.bin_dir_path
 
     def run(self, **kwargs):
       """Runs this command.
