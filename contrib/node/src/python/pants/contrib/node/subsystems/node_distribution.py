@@ -94,21 +94,18 @@ class NodeDistribution(object):
       return [os.path.join(self.bin_dir_path, self.executable)] + self.args
 
     def _prepare_env(self, kwargs):
-      """Takes a kwargs dict. Returns a copy of it with the env field (if present) removed.
-      Along with that, returns an env dict that is either a copy of the env dict from kwargs if it was present,
-      or os.environ.copy() if not. env['PATH'] is set/modified to contain the Node distribution's bin directory
-      at the front.
+      """Takes a kwargs dict, returns a modifed copy of its 'env' field and a copy of kwargs with 'env' removed.
+
+      If there is no 'env' field in the kwargs, os.environ.copy() is used. env['PATH'] is set/modified to contain
+      the Node distribution's bin directory at the front.
 
       :param kwargs: The original kwargs.
-      :returns: The modified kwargs and env copies.
+      :returns: An (env, kwargs) tuple containing the modified env copy and the kwargs copy with 'env' field removed.
       :rtype: (dict, dict)
       """
       kwargs = kwargs.copy()
-      env = kwargs.pop('env').copy() if 'env' in kwargs else os.environ.copy()
-      if 'PATH' in env and env['PATH']:
-        env['PATH'] = self.bin_dir_path + os.path.pathsep + env['PATH']
-      else:
-        env['PATH'] = self.bin_dir_path
+      env = kwargs.pop('env', os.environ).copy()
+      env['PATH'] = self.bin_dir_path + os.path.pathsep + env['PATH'] if env.get('PATH', '') else self.bin_dir_path
       return env, kwargs
 
     def run(self, **kwargs):
