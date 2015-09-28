@@ -8,14 +8,14 @@
 
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>org.pantsbuild.testproject.publish.hello</groupId>
-  <artifactId>welcome</artifactId>
+  <groupId>org.pantsbuild.testproject.publish</groupId>
+  <artifactId>jvm-example-lib_2.10</artifactId>
   <packaging>jar</packaging>
   <version>0.0.1-SNAPSHOT</version>
   <dependencies>
     <dependency>
-      <groupId>org.pantsbuild.testproject.publish</groupId>
-      <artifactId>hello-greet</artifactId>
+      <groupId>org.pantsbuild.testproject.publish.hello</groupId>
+      <artifactId>welcome_2.10</artifactId>
       <version>0.0.1-SNAPSHOT</version>
       <scope>compile</scope>
     </dependency>

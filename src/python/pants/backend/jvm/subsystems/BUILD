@@ -51,6 +51,7 @@ python_library(
     ':jvm_tool_mixin',
     'src/python/pants/option',
     'src/python/pants/subsystem',
+    'src/python/pants/util:memo',
   ],
 )
 

@@ -26,6 +26,7 @@ python_library(
     ':artifact',
     ':ossrh_publication_metadata',
     ':repository',
+    ':scala_artifact',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
@@ -63,6 +64,16 @@ resources(
 python_library(
   name='repository',
   sources=['repository.py'],
+)
+
+python_library(
+  name='scala_artifact',
+  sources=['scala_artifact.py'],
+  dependencies=[
+    ':artifact',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/util:memo',
+  ],
 )
 
 python_library(
