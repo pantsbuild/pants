@@ -60,7 +60,8 @@ class NodeDistributionTest(unittest.TestCase):
     with self.distribution() as node_distribution:
       node_cmd = node_distribution.node_command(args=['--eval', 'console.log(process.env["PATH"])'])
 
-      # Test the case in which we do not pass in env, which should fall back to env=os.environ.copy()
+      # Test the case in which we do not pass in env,
+      # which should fall back to env=os.environ.copy()
       output = node_cmd.check_output().strip()
       self.assertEqual(node_cmd.bin_dir_path, output.split(os.pathsep)[0])
 
