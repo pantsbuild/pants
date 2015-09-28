@@ -6,7 +6,6 @@ python_library(
   sources = ['address.py'],
   dependencies = [
     ':build_file',
-    'src/python/pants/base:deprecated',
     'src/python/pants/util:meta',
   ]
 )
@@ -31,6 +30,7 @@ python_library(
   sources = ['build_configuration.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/util:memo',
     ':addressable',
     ':build_file_aliases',
     ':parse_context',
@@ -83,7 +83,6 @@ python_library(
   sources = ['build_file_aliases.py'],
   dependencies = [
     ':build_file_target_factory',
-    ':deprecated',
     ':target',
     'src/python/pants/util:memo',
   ]

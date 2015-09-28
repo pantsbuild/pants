@@ -5,6 +5,7 @@ python_library(
   name='bin',
   sources=globs('*.py'),
   dependencies=[
+    '3rdparty/python:ansicolors',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     'src/python/pants/backend/core/tasks:task',
@@ -28,6 +29,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:memo',

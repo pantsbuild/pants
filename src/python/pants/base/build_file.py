@@ -100,13 +100,13 @@ class BuildFile(AbstractClass):
     def find_excluded(root, dirs, exclude_roots):
       """Removes any of the directories specified in exclude_roots from dirs.
       """
-      to_remove = []
+      to_remove = set()
       for exclude_root in exclude_roots:
         # root ends with a /, trim it off
         if root.rstrip('/') == exclude_root:
           for subdir in exclude_roots[exclude_root]:
             if subdir in dirs:
-              to_remove.append(subdir)
+              to_remove.add(subdir)
       return to_remove
 
     root_dir = os.path.realpath(root_dir)
@@ -123,6 +123,10 @@ class BuildFile(AbstractClass):
 
     for root, dirs, files in cls._walk(root_dir, base_path or '', topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
+      # For performance, ignore hidden dirs such as .git, .pants.d and .local_artifact_cache.
+      # TODO: Instead of this heuristic, only walk known source_roots.  But we can't do this
+      # until we're able to express source_roots in some way other than bootstrap BUILD files...
+      to_remove.update(d for d in dirs if d.startswith('.'))
       for subdir in to_remove:
         dirs.remove(subdir)
       for filename in files:
@@ -133,7 +137,7 @@ class BuildFile(AbstractClass):
 
   @abstractmethod
   def _walk(self, root_dir, relpath, topdown=False):
-    """Walk the file tree rooted at `path`.  Works like os.walk"""
+    """Walk the file tree rooted at `path`.  Works like os.walk."""
 
   @classmethod
   def _isdir(cls, path):

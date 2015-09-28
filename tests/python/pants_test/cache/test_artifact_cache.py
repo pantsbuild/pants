@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from threading import Thread
 
 from pants.base.build_invalidator import CacheKey
-from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
+from pants.cache.artifact_cache import call_insert, call_use_cached_files
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
 from pants.util.contextutil import pushd, temporary_dir, temporary_file

@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import six
+
 from pants.base.address import Address, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_graph import BuildGraph
@@ -164,7 +166,7 @@ class BuildGraphTest(BaseTest):
 
     self.assertEquals(
         [t.address.target_name for t in self.build_graph.transitive_subgraph_of_addresses_bfs([root])],
-        [str(unichr(x)) for x in xrange(ord('a'), ord('o') + 1)],
+        [str(six.unichr(x)) for x in six.moves.xrange(ord('a'), ord('o') + 1)],
     )
 
   def test_transitive_subgraph_of_addresses_bfs_predicate(self):

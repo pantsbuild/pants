@@ -14,6 +14,7 @@ from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.parse_context import ParseContext
 from pants.base.target_addressable import TargetAddressable
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_method
 
 
 logger = logging.getLogger(__name__)
@@ -130,6 +131,10 @@ class BuildConfiguration(object):
     """
     return self._subsystems
 
+  @memoized_method
+  def _get_addressable_factory(self, target_type, alias):
+    return TargetAddressable.factory(target_type=target_type, alias=alias)
+
   def initialize_parse_state(self, build_file):
     """Creates a fresh parse state for the given build file.
 
@@ -150,7 +155,7 @@ class BuildConfiguration(object):
     def create_call_proxy(tgt_type, tgt_alias=None):
       def registration_callback(address, addressable):
         registered_addressable_instances.append((address, addressable))
-      addressable_factory = TargetAddressable.factory(target_type=tgt_type, alias=tgt_alias)
+      addressable_factory = self._get_addressable_factory(tgt_type, tgt_alias)
       return AddressableCallProxy(addressable_factory=addressable_factory,
                                   build_file=build_file,
                                   registration_callback=registration_callback)

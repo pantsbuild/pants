@@ -48,7 +48,6 @@ python_library(
     ':jar_dependency_utils',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:revision',
     'src/python/pants/base:target',
@@ -58,7 +57,7 @@ python_library(
 
 resources(
   name='ivy_utils_resources',
-  sources=globs('tasks/templates/ivy_resolve/*.mustache'),
+  sources=globs('templates/ivy_utils/*.mustache'),
 )
 
 python_library(

@@ -284,6 +284,7 @@ python_library(
   dependencies = [
     ':console_task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/util:strutil',
   ],
 )
 

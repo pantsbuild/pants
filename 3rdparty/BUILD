@@ -37,8 +37,10 @@ jar_library(name='jsr305',
 
 jar_library(name='checkstyle',
             jars = [
-              jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5')
-                .exclude(org='com.google.collections', name='google-collections'),
+              jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5',
+                  excludes=[
+                    exclude(org='com.google.collections', name='google-collections'),
+                  ])
             ],
             dependencies = [
               # Needs this as the replacement for the excluded google-collections.
@@ -58,11 +60,13 @@ jar_library(name='cucumber-java',
 
 jar_library(name='log4j',
             jars = [
-              jar(org='log4j', name='log4j', rev='1.2.15')
-                .exclude(org='jline', name='jline')
-                .exclude(org='javax.jms', name='jms')
-                .exclude(org='com.sun.jdmk', name='jmxtools')
-                .exclude(org='com.sun.jmx', name='jmxri'),
+              jar(org='log4j', name='log4j', rev='1.2.15',
+                  excludes=[
+                    exclude(org='jline', name='jline'),
+                    exclude(org='javax.jms', name='jms'),
+                    exclude(org='com.sun.jdmk', name='jmxtools'),
+                    exclude(org='com.sun.jmx', name='jmxri'),
+                  ])
             ])
 
 jar_library(name='protobuf-2.4.1',

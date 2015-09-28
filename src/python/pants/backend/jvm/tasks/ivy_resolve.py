@@ -25,9 +25,6 @@ from pants.util.strutil import safe_shlex_split
 
 class IvyResolve(IvyTaskMixin, NailgunTask):
 
-  class Error(TaskError):
-    """Indicates an error performing an ivy resolve."""
-
   @classmethod
   def register_options(cls, register):
     super(IvyResolve, cls).register_options(register)
@@ -155,7 +152,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     safe_mkdir(self._outdir, clean=False)
 
     for conf in self.confs:
-      xml_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+      xml_path = self._get_report_path(conf, resolve_hash_name)
       if not os.path.exists(xml_path):
         # Make it clear that this is not the original report from Ivy by changing its name.
         xml_path = xml_path[:-4] + "-empty.xml"
@@ -185,3 +182,9 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
     if self._open and report:
       binary_util.ui_open(report)
+
+  def _get_report_path(self, conf, resolve_hash_name):
+    try:
+      return IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+    except IvyUtils.IvyResolveReportError as e:
+      raise self.Error('Failed to generate ivy report: {}'.format(e))

@@ -5,13 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import copy
 import logging
 import os
 import shutil
 import threading
 from hashlib import sha1
 
+from pants.backend.core.tasks.task import TaskBase
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.jar_dependency_utils import ResolvedJar
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -55,10 +55,13 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     return type(self) == type(other) and self._confs == other._confs
 
 
-class IvyTaskMixin(object):
+class IvyTaskMixin(TaskBase):
   """A mixin for Tasks that execute resolves via Ivy."""
 
-  class UnresolvedJarError(TaskError):
+  class Error(TaskError):
+    """Indicates an error performing an ivy resolve."""
+
+  class UnresolvedJarError(Error):
     """Indicates a jar dependency couldn't be mapped."""
 
   @classmethod
@@ -287,20 +290,14 @@ class IvyTaskMixin(object):
                confs=None,
                ivy=None,
                workunit_name='ivy',
-               jars=None,
                use_soft_excludes=False,
                resolve_hash_name=None):
-    ivy_jvm_options = copy.copy(self.get_options().jvm_options)
+    ivy_jvm_options = self.get_options().jvm_options[:]
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
 
     ivy = ivy or Bootstrapper.default_ivy()
     ivyxml = os.path.join(target_workdir, 'ivy.xml')
-
-    if not jars:
-      jars, excludes = IvyUtils.calculate_classpath(targets, gather_excludes=not use_soft_excludes)
-    else:
-      excludes = set()
 
     ivy_args = ['-ivy', ivyxml]
 
@@ -309,13 +306,20 @@ class IvyTaskMixin(object):
     ivy_args.extend(confs_to_resolve)
     ivy_args.extend(args)
 
-    with IvyUtils.ivy_lock:
-      IvyUtils.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve, resolve_hash_name)
-      runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
-      try:
-        result = execute_runner(runner, workunit_factory=self.context.new_workunit,
-                                workunit_name=workunit_name)
-        if result != 0:
-          raise self.Error('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
-      except runner.executor.Error as e:
-        raise self.Error(e)
+    # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
+    # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
+    # See: https://github.com/pantsbuild/pants/issues/2239
+    try:
+      jars, excludes = IvyUtils.calculate_classpath(targets, gather_excludes=not use_soft_excludes)
+      with IvyUtils.ivy_lock:
+        IvyUtils.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve, resolve_hash_name)
+        runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
+        try:
+          result = execute_runner(runner, workunit_factory=self.context.new_workunit,
+                                  workunit_name=workunit_name)
+          if result != 0:
+            raise self.Error('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
+        except runner.executor.Error as e:
+          raise self.Error(e)
+    except IvyUtils.IvyError as e:
+      raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
