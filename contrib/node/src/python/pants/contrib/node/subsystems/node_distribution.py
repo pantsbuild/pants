@@ -81,7 +81,7 @@ class NodeDistribution(object):
         os.rename(tmp_dist, outdir)
     return os.path.join(outdir, 'node')
 
-  class Command(AbstractClass, namedtuple('Command', ['bin_dir_path', 'executable', 'args'])):
+  class Command(namedtuple('Command', ['bin_dir_path', 'executable', 'args'])):
     """Describes a command to be run using a Node distribution."""
 
     @property
@@ -93,15 +93,23 @@ class NodeDistribution(object):
       """
       return [os.path.join(self.bin_dir_path, self.executable)] + self.args
 
-    def _add_bin_to_env_path(self, kwargs):
-      """Takes a kwargs dict, and adds the Node distribution's bin directory to the PATH in the env entry.
+    def _prepare_env(self, kwargs):
+      """Takes a kwargs dict. Returns a copy of it with the env field (if present) removed.
+      Along with that, returns an env dict that is either a copy of the env dict from kwargs if it was present,
+      or os.environ.copy() if not. env['PATH'] is set/modified to contain the Node distribution's bin directory
+      at the front.
 
-      :param kwargs: The original kwargs to be modified.
-      :returns: The modified kwargs.
-      :rtype: dict
+      :param kwargs: The original kwargs.
+      :returns: The modified kwargs and env copies.
+      :rtype: (dict, dict)
       """
-      env = kwargs.setdefault('env', os.environ.copy())
-      env['PATH'] = self.bin_dir_path + os.path.pathsep + env['PATH'] if env.get('PATH', '') else self.bin_dir_path
+      kwargs = kwargs.copy()
+      env = kwargs.pop('env').copy() if 'env' in kwargs else os.environ.copy()
+      if 'PATH' in env and env['PATH']:
+        env['PATH'] = self.bin_dir_path + os.path.pathsep + env['PATH']
+      else:
+        env['PATH'] = self.bin_dir_path
+      return env, kwargs
 
     def run(self, **kwargs):
       """Runs this command.
@@ -110,8 +118,8 @@ class NodeDistribution(object):
       :returns: A handle to the running command.
       :rtype: :class:`subprocess.Popen`
       """
-      self._add_bin_to_env_path(kwargs)
-      return subprocess.Popen(self.cmd, **kwargs)
+      env, kwargs = self._prepare_env(kwargs)
+      return subprocess.Popen(self.cmd, env=env, **kwargs)
 
     def check_output(self, **kwargs):
       """Runs this command returning its captured stdout.
@@ -121,8 +129,8 @@ class NodeDistribution(object):
       :rtype: string
       :raises: :class:`subprocess.CalledProcessError` if the command fails.
       """
-      self._add_bin_to_env_path(kwargs)
-      return subprocess.check_output(self.cmd, **kwargs)
+      env, kwargs = self._prepare_env(kwargs)
+      return subprocess.check_output(self.cmd, env=env, **kwargs)
 
     def __str__(self):
       return ' '.join(self.cmd)
@@ -148,6 +156,4 @@ class NodeDistribution(object):
     return self._create_command('npm', args)
 
   def _create_command(self, executable, args=None):
-    class NodeDistributionCommand(self.Command):
-      pass
-    return NodeDistributionCommand(os.path.join(self.path, 'bin'), executable, args or [])
+    return self.Command(os.path.join(self.path, 'bin'), executable, args or [])

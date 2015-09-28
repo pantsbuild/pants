@@ -60,10 +60,9 @@ class NodeDistributionTest(unittest.TestCase):
     with self.distribution() as node_distribution:
       node_cmd = node_distribution.node_command(args=['--eval', 'console.log(process.env["PATH"])'])
 
+      # Test the case in which we do not pass in env, which should fall back to env=os.environ.copy()
       output = node_cmd.check_output().strip()
-      if not output.startswith(node_cmd.bin_dir_path):
-        self.fail('Node process PATH did not start with node_cmd.bin_dir_path when using system env.\n'
-                  'PATH: {}\nnode_cmd.bin_dir_path: {}'.format(output, node_cmd.bin_dir_path))
+      self.assertEqual(node_cmd.bin_dir_path, output.split(os.pathsep)[0])
 
       output = node_cmd.check_output(env={'PATH': '/test/path'}).strip()
       self.assertEqual(node_cmd.bin_dir_path + os.path.pathsep + '/test/path', output)
