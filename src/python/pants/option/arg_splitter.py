@@ -44,7 +44,7 @@ class HelpRequest(AbstractClass):
 
 
 class OptionsHelp(HelpRequest):
-  """User requested help"""
+  """User requested help."""
 
   def __init__(self, advanced=False, all_scopes=False):
     """The user requested help for cmd-line options.
@@ -61,7 +61,10 @@ class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
 
   def __init__(self, unknown_goals):
-    """Handle unknown goals specifed by user"""
+    """Handle unknown goals specifed by user.
+
+    :param unknown_goals: goals provided by the user that we were unable to match
+    """
     super(UnknownGoalHelp, self).__init__()
     self.unknown_goals = unknown_goals
 
@@ -89,18 +92,17 @@ class ArgSplitter(object):
   _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS
 
   def __init__(self, known_scope_infos):
-    """Handle splitting command line args int sets of scoped flags and targets
+    """Handle splitting command line args into sets of scoped flags and targets
 
     Arguments are stored in a reverse order in self._unconsummed args in order
     to be able to efficiently pop arguments off.
-
-    Note: For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
-      cmd line, as an alternative to ... scope --flag-name.
-
-    TODO: Get rid of our reliance on known scopes here. We don't really need it now
-      that we heuristically identify target specs based on it containing /, : or being
-      a top-level directory.
     """
+    # Note: For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
+    #   cmd line, as an alternative to ... scope --flag-name.
+    #
+    # TODO: Get rid of our reliance on known scopes here. We don't really need it now
+    #   that we heuristically identify target specs based on it containing /, : or being
+    #   a top-level directory.
     self._known_scope_infos = known_scope_infos
     self._known_scopes = (set([si.scope for si in known_scope_infos]) |
                           {'help', 'help-advanced', 'help-all'})
@@ -129,11 +131,9 @@ class ArgSplitter(object):
     """Setup help request to have an instance of OptionsHelp"""
 
     def is_advanced(arg):
-      """If advanced isn't set check to see if its requested in args"""
       return self.help_request.advanced or arg in self._HELP_ADVANCED_ARGS
 
     def is_all_scopes(arg):
-      """If all_scopes isn't set check to see if its requested in args"""
       return self.help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
 
     # Setup base instance if it doesn't exist
