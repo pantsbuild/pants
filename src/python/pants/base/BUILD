@@ -30,6 +30,7 @@ python_library(
   sources = ['build_configuration.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/util:memo',
     ':addressable',
     ':build_file_aliases',
     ':parse_context',
