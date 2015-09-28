@@ -12,14 +12,13 @@ import os
 import pkgutil
 import shutil
 import sys
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
 from twitter.common.collections import OrderedSet
 from twitter.common.config import Properties
 
 from pants.backend.core.tasks.scm_publish import Namedver, ScmPublishMixin, Semver
-from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -32,12 +31,14 @@ from pants.base.build_file_parser import BuildFileParser
 from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
-from pants.base.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.option.custom_types import dict_option, list_option
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
+
+
+_TEMPLATES_RELPATH = os.path.join('templates', 'jar_publish')
 
 
 class PushDb(object):
@@ -122,7 +123,7 @@ class PushDb(object):
     db_set('revision.fingerprint', pe.fingerprint)
 
   def _accessors_for_target(self, target):
-    jar_dep, _, exported = target.get_artifact_info()
+    jar_dep, exported = target.get_artifact_info()
     if not exported:
       raise ValueError
 
@@ -143,115 +144,43 @@ class PushDb(object):
       Properties.dump(self._props, props)
 
 
-class DependencyWriter(object):
-  """
-    Builds up a template data representing a target and applies this to a template to produce a
-    dependency descriptor.
-  """
+class PomWriter(object):
+  def __init__(self, get_db, tag):
+    self._get_db = get_db
+    self._tag = tag
 
-  @staticmethod
-  def create_exclude(exclude):
-    return TemplateData(org=exclude.org, name=exclude.name)
-
-  def __init__(self, get_db, template_relpath, template_package_name=None):
-    self.get_db = get_db
-    self.template_package_name = template_package_name or __name__
-    self.template_relpath = template_relpath
-
-  def write(self, target, path, confs=None, extra_confs=None, classifier=None):
-    # TODO(John Sirois): a dict is used here to de-dup codegen targets which have both the original
-    # codegen target - say java_thrift_library - and the synthetic generated target (java_library)
-    # Consider reworking codegen tasks to add removal of the original codegen targets when rewriting
-    # the graph
+  def write(self, target, path):
     dependencies = OrderedDict()
-    internal_codegen = {}
-    configurations = set(confs or [])
     for internal_dep in target_internal_dependencies(target):
       jar = self._as_versioned_jar(internal_dep)
-      dependencies[(jar.org, jar.name)] = self.internaldep(jar, internal_dep, classifier=classifier)
-      if internal_dep.is_codegen:
-        internal_codegen[jar.name] = jar.name
+      key = (jar.org, jar.name)
+      dependencies[key] = self._internaldep(jar, internal_dep)
+
     for jar in target.jar_dependencies:
-      if jar.rev:
-        dependencies[(jar.org, jar.name, classifier)] = self.jardep(jar, classifier=classifier)
-        configurations |= set(jar._configurations)
+      jardep = self._jardep(jar)
+      if jardep:
+        key = (jar.org, jar.name, jar.classifier)
+        dependencies[key] = jardep
 
-    target_jar = self.internaldep(self._as_versioned_jar(target),
-                                  target,
-                                  classifier=classifier,
-                                  configurations=list(configurations))
-    target_jar = target_jar.extend(dependencies=dependencies.values())
+    target_jar = self._internaldep(self._as_versioned_jar(target), target)
+    if target_jar:
+      target_jar = target_jar.extend(dependencies=dependencies.values())
 
-    template_kwargs = self.templateargs(target_jar, confs, extra_confs, classifier)
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'pom.mustache')
+    template_text = pkgutil.get_data(__name__, template_relpath)
+    generator = Generator(template_text, project=target_jar)
     with safe_open(path, 'w') as output:
-      template = pkgutil.get_data(self.template_package_name, self.template_relpath)
-      Generator(template, **template_kwargs).write(output)
-
-  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
-    """
-      Subclasses must return a dict for use by their template given the target jar template data
-      and optional specific ivy configurations.
-    """
-    raise NotImplementedError()
-
-  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
-    """
-      Subclasses must return a template data for the given internal target (provided in jar
-      dependency form).
-    """
-    raise NotImplementedError()
+      generator.write(output)
 
   def _as_versioned_jar(self, internal_target):
     """Fetches the jar representation of the given target, and applies the latest pushdb version."""
-    jar, _, _ = internal_target.get_artifact_info()
-    pushdb_entry = self.get_db(internal_target).get_entry(internal_target)
+    jar, _ = internal_target.get_artifact_info()
+    pushdb_entry = self._get_db(internal_target).get_entry(internal_target)
     jar.rev = pushdb_entry.version().version()
     return jar
 
-  def jardep(self, jar_dependency, classifier=None):
-    """Subclasses must return a template data for the given external jar dependency."""
-    raise NotImplementedError()
-
-
-class PomWriter(DependencyWriter):
-
-  def __init__(self, get_db, tag):
-    super(PomWriter, self).__init__(
-        get_db,
-        os.path.join('templates', 'jar_publish', 'pom.mustache'))
-    self._tag = tag
-
-  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
-    return dict(project=target_jar)
-
-  def jardep(self, jar, classifier=None):
-    return TemplateData(
-      classifiers=self.classifiers(classifier, jar.artifacts),
-      artifact_id=jar.name,
-      group_id=jar.org,
-      version=jar.rev,
-      scope='compile',
-      excludes=[self.create_exclude(exclude) for exclude in jar.excludes if exclude.name])
-
-  @staticmethod
-  def classifiers(classifier, artifacts):
-    """Find a list of plausible classifiers.
-
-    :param classifier: the starting classifier
-    :param artifacts: a sequence of IvyArtifact's
-    :return: list like [TemplateData(classifier='sources'), TemplateData(classifier='javadoc')]
-    """
-    s = set()
-    if classifier:
-      s.add(classifier)
-    s.update([i.classifier for i in artifacts if i.classifier])
-
-    # We sort this for testing: having a test fail because the order changed isn't helpful.
-
-    return map(lambda x: TemplateData(classifier=x), sorted(s))
-
-  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
-    template_data = self.jardep(jar_dependency, classifier=classifier)
+  def _internaldep(self, jar_dependency, target):
+    template_data = self._jardep(jar_dependency)
     if isinstance(target.provides.publication_metadata, OSSRHPublicationMetadata):
       pom = target.provides.publication_metadata
 
@@ -268,45 +197,15 @@ class PomWriter(DependencyWriter):
                                            developers=pom.developers)
     return template_data
 
-
-class IvyWriter(DependencyWriter):
-  JAVADOC_CONFIG = 'javadoc'
-  SOURCES_CONFIG = 'sources'
-  DEFAULT_CONFIG = 'default'
-
-  def __init__(self, get_db):
-    super(IvyWriter, self).__init__(
-        get_db,
-        IvyUtils.IVY_TEMPLATE_PATH,
-        template_package_name=IvyUtils.IVY_TEMPLATE_PACKAGE_NAME)
-
-  def templateargs(self, target_jar, confs=None, extra_confs=None, classifier=None):
-    return dict(lib=target_jar.extend(
-        publications=set(confs or []),
-        extra_publications=extra_confs if extra_confs else {},
-        overrides=None))
-
-  def _jardep(self, jar, transitive=True, configurations='default', classifier=None):
+  def _jardep(self, jar):
     return TemplateData(
-        org=jar.org,
-        module=jar.name,
-        version=jar.rev,
-        mutable=False,
-        force=jar.force,
-        excludes=[self.create_exclude(exclude) for exclude in jar.excludes],
-        transitive=transitive,
-        artifacts=jar.artifacts,
-        classifier=classifier,
-        configurations=configurations)
-
-  def jardep(self, jar, classifier=None):
-    return self._jardep(jar,
-                        transitive=jar.transitive,
-                        configurations=jar._configurations,
-                        classifier=classifier)
-
-  def internaldep(self, jar_dependency, target, configurations=None, classifier=None):
-    return self._jardep(jar_dependency, configurations=configurations, classifier=classifier)
+      classifier=jar.classifier,
+      artifact_id=jar.name,
+      group_id=jar.org,
+      version=jar.rev,
+      scope='compile',
+      excludes=[TemplateData(org=exclude.org, name=exclude.name)
+                for exclude in jar.excludes if exclude.name])
 
 
 def coordinate(org, name, rev=None):
@@ -381,8 +280,6 @@ class JarPublish(ScmPublishMixin, JarTask):
        'myrepo': {
          # ivysettings.xml resolver to use for publishing
          'resolver': 'maven.example.com',
-         # ivy configurations to publish
-         'confs': ['default', 'sources', 'javadoc'],
          # address of a Credentials target to use when publishing
          'auth': 'address/of/credentials:target',
          # help message if unable to initialize the Credentials target.
@@ -390,6 +287,13 @@ class JarPublish(ScmPublishMixin, JarTask):
        },
      }
   """
+
+  class Publication(namedtuple('Publication', ['name', 'classifier', 'ext'])):
+    """Represents an artifact publication.
+
+    There will be at least 2 of these for any given published coordinate - a pom, and at least one
+    other artifact.
+    """
 
   @classmethod
   def register_options(cls, register):
@@ -441,13 +345,13 @@ class JarPublish(ScmPublishMixin, JarTask):
     register('--publish-extras', advanced=True, type=dict_option,
              help='Extra products to publish. See '
                   'https://pantsbuild.github.io/dev_tasks_publish_extras.html for details.')
-    register('--individual-plugins', advanced=True, default=False, type=bool,
+    register('--individual-plugins', advanced=True, default=False, action='store_true',
              help='Extra products to publish as a individual artifact.')
     register('--push-postscript', advanced=True, default=None,
              help='A post-script to add to pushdb commit messages and push tag commit messages.')
     register('--changelog', default=True, action='store_true',
-             help='A changelog.txt file will be created and printed to the console for each artifact '
-                  'published')
+             help='A changelog.txt file will be created and printed to the console for each '
+                  'artifact published')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -478,9 +382,10 @@ class JarPublish(ScmPublishMixin, JarTask):
     else:
       self.repos = self.get_options().repos
       if not self.repos:
-        raise TaskError("This repo is not configured to publish externally! Please configure per\n"
-                        "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
-                        "or re-run with the '--publish-local' flag.")
+        raise TaskError(
+          "This repo is not configured to publish externally! Please configure per\n"
+          "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
+          "or re-run with the '--publish-local' flag.")
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
@@ -509,22 +414,24 @@ class JarPublish(ScmPublishMixin, JarTask):
         org, name = components
         return org, name
       else:
+        spec = components[0]
+        address = Address.parse(spec)
         try:
-          # TODO(Eric Ayers) This code is suspect.  Target.get() is a very old method and almost certainly broken.
-          # Refactor to use methods from BuildGraph or BuildFileAddressMapper
-          address = Address.parse(get_buildroot(), coordinate)
-          target = Target.get(address)
+          self.context.build_graph.inject_address_closure(address)
+          target = self.context.build_graph.get_target(address)
           if not target:
-            siblings = Target.get_all_addresses(address.build_file)
+            siblings = self.context.address_mapper.addresses_in_spec_path(address.spec_path)
             prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
             raise TaskError('{} => {}?:\n    {}'.format(address, prompt,
                                                         '\n    '.join(str(a) for a in siblings)))
           if not target.is_exported:
             raise TaskError('{} is not an exported target'.format(coordinate))
           return target.provides.org, target.provides.name
-        except (BuildFile.BuildFileError, BuildFileParser.BuildFileParserError, AddressLookupError) as e:
-          raise TaskError('{message}\n  Problem with BUILD file  at {coordinate}'
-          .format(message=e, coordinate=coordinate))
+        except (BuildFile.BuildFileError,
+                BuildFileParser.BuildFileParserError,
+                AddressLookupError) as e:
+          raise TaskError('{message}\n  Problem identifying target at {spec}'
+                          .format(message=e, spec=spec))
 
     self.overrides = {}
     if self.get_options().override:
@@ -571,8 +478,6 @@ class JarPublish(ScmPublishMixin, JarTask):
     genmap = self.context.products.get(typename)
     product_mapping = genmap.get(tgt)
     if product_mapping is None:
-      if self.get_options().individual_plugins:
-        return
       raise ValueError("No product mapping in {} for {}. "
                        "You may need to run some other task first".format(typename, tgt))
     for basedir, jars in product_mapping.items():
@@ -601,27 +506,34 @@ class JarPublish(ScmPublishMixin, JarTask):
                       .format(repo.get('resolver'), repo.get('help', '')))
     return jvm_options
 
-  def publish(self, ivyxml_path, jar, entry, repo, published):
+  def publish(self, publications, jar, entry, repo, published):
     """Run ivy to publish a jar.  ivyxml_path is the path to the ivy file; published
     is a list of jars published so far (including this one). entry is a pushdb entry."""
-    jvm_options = self._ivy_jvm_options(repo)
-    resolver = repo['resolver']
-    path = repo.get('path')
 
     try:
       ivy = Bootstrapper.default_ivy()
     except Bootstrapper.Error as e:
       raise TaskError('Failed to push {0}! {1}'.format(pushdb_coordinate(jar, entry), e))
 
+    path = repo.get('path')
     ivysettings = self.generate_ivysettings(ivy, published, publish_local=path)
+
+    version = entry.version().version()
+    ivyxml = self.generate_ivy(jar, version, publications)
+
+    resolver = repo['resolver']
     args = [
       '-settings', ivysettings,
-      '-ivy', ivyxml_path,
-      '-deliverto', '{}/[organisation]/[module]/ivy-[revision].xml'.format(self.workdir),
+      '-ivy', ivyxml,
+
+      # Without this setting, the ivy.xml is delivered to the CWD, littering the workspace.  We
+      # don't need the ivy.xml, so just give it path under the workdir we won't use.
+      '-deliverto', ivyxml + '.unused',
+
       '-publish', resolver,
       '-publishpattern', '{}/[organisation]/[module]/'
                          '[artifact]-[revision](-[classifier]).[ext]'.format(self.workdir),
-      '-revision', entry.version().version(),
+      '-revision', version,
       '-m2compatible',
     ]
 
@@ -636,6 +548,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       args.append('-overwrite')
 
     try:
+      jvm_options = self._ivy_jvm_options(repo)
       ivy.execute(jvm_options=jvm_options, args=args,
                   workunit_factory=self.context.new_workunit, workunit_name='ivy-publish')
     except Ivy.Error as e:
@@ -679,37 +592,36 @@ class JarPublish(ScmPublishMixin, JarTask):
       entry = pushdb.get_entry(tgt)
       return entry.fingerprint or '0.0.0'
 
-    def stage_artifact(tgt, jar, version, tag, changelog, confs=None, artifact_ext='',
-                       extra_confs=None, classifier=''):
-      def path(name=None, suffix='', extension='jar'):
-        return self.artifact_path(jar, version, name=name, suffix=suffix, extension=extension,
-                                  artifact_ext=artifact_ext)
-
-      if self.publish_changelog:
-        with safe_open(path(suffix='-CHANGELOG', extension='txt'), 'wb') as changelog_file:
-          changelog_file.write(changelog.encode('utf-8'))
-      ivyxml = path(name='ivy', extension='xml')
-
-      IvyWriter(get_pushdb).write(tgt, ivyxml, confs=confs, extra_confs=extra_confs,
-                                  classifier=classifier)
-      PomWriter(get_pushdb, tag).write(tgt, path(extension='pom'), extra_confs=extra_confs,
-                                       classifier=classifier)
-
-      return ivyxml
-
     def stage_artifacts(tgt, jar, version, tag, changelog):
-      if self.get_options().individual_plugins:
-        return stage_individual_plugins(tgt, jar, version, tag, changelog)
-      DEFAULT_IVY_TYPE = 'jar'
-      DEFAULT_CLASSIFIER = ''
-      DEFAULT_EXTENSION = 'jar'
+      publications = OrderedSet()
 
-      self._copy_artifact(tgt, jar, version, typename='jars')
-      self.create_source_jar(tgt, jar, version)
-      doc_jar = self.create_doc_jar(tgt, jar, version)
+      # TODO Remove this once we fix https://github.com/pantsbuild/pants/issues/1229
+      if (not self.context.products.get('jars').has(tgt) and
+          not self.get_options().individual_plugins):
+        raise TaskError('Expected to find a primary artifact for {} but there was no jar for it.'
+                        .format(tgt.address.reference()))
 
-      confs = set(repo['confs'])
-      extra_confs = []
+      # TODO Remove this guard once we fix https://github.com/pantsbuild/pants/issues/1229, there
+      # should always be a primary artifact.
+      if self.context.products.get('jars').has(tgt):
+        self._copy_artifact(tgt, jar, version, typename='jars')
+        publications.add(self.Publication(name=jar.name, classifier=None, ext='jar'))
+
+        self.create_source_jar(tgt, jar, version)
+        publications.add(self.Publication(name=jar.name, classifier='sources', ext='jar'))
+
+        # don't request docs unless they are available for all transitive targets
+        # TODO: doc products should be checked by an independent jar'ing task, and
+        # conditionally enabled; see https://github.com/pantsbuild/pants/issues/568
+        doc_jar = self.create_doc_jar(tgt, jar, version)
+        if doc_jar:
+          publications.add(self.Publication(name=jar.name, classifier='javadoc', ext='jar'))
+
+        if self.publish_changelog:
+          changelog_path = self.artifact_path(jar, version, suffix='-CHANGELOG', extension='txt')
+          with safe_open(changelog_path, 'wb') as changelog_file:
+            changelog_file.write(changelog.encode('utf-8'))
+          publications.add(self.Publication(name=jar.name, classifier='CHANGELOG', ext='txt'))
 
       # Process any extra jars that might have been previously generated for this target, or a
       # target that it was derived from.
@@ -720,28 +632,22 @@ class JarPublish(ScmPublishMixin, JarTask):
           # current jar name. If not, the string will be taken verbatim.
           override_name = extra_config['override_name'].format(target_provides_name=jar.name)
 
-        classifier = DEFAULT_CLASSIFIER
+        classifier = None
         suffix = ''
-        ivy_type = DEFAULT_IVY_TYPE
         if 'classifier' in extra_config:
           classifier = extra_config['classifier']
           suffix = "-{0}".format(classifier)
-          ivy_type = classifier
 
-        extension = DEFAULT_EXTENSION
-        if 'extension' in extra_config:
-          extension = extra_config['extension']
-          if ivy_type == DEFAULT_IVY_TYPE:
-            ivy_type = extension
+        extension = extra_config.get('extension', 'jar')
 
-        # A lot of flexibility is allowed in naming the extra artifact. Because the name must be
-        # unique, some extra logic is required to ensure that the user supplied at least one
-        # non-default value (thus ensuring a uniquely-named artifact in the end).
-        if override_name == jar.name and classifier == DEFAULT_CLASSIFIER and extension == DEFAULT_EXTENSION:
+        extra_pub = self.Publication(name=override_name, classifier=classifier, ext=extension)
+
+        # A lot of flexibility is allowed in parameterizing the extra artifact, ensure those
+        # parameters lead to a unique publication.
+        # TODO(John Sirois): Check this much earlier.
+        if extra_pub in publications:
           raise TaskError("publish_extra for '{0}' must override one of name, classifier or "
                           "extension with a non-default value.".format(extra_product))
-
-        ivy_tmpl_key = classifier or '{}-{}'.format(override_name, extension)
 
         # Build a list of targets to check. This list will consist of the current target, plus the
         # entire derived_from chain.
@@ -752,63 +658,13 @@ class JarPublish(ScmPublishMixin, JarTask):
           target = target.derived_from
         for cur_tgt in target_list:
           if self.context.products.get(extra_product).has(cur_tgt):
-            self._copy_artifact(cur_tgt, jar, version, typename=extra_product,
-                                suffix=suffix, extension=extension,
-                                override_name=override_name)
-            confs.add(ivy_tmpl_key)
-            # Supply extra data about this jar into the Ivy template, so that Ivy will publish it
-            # to the final destination.
-            extra_confs.append({'name': override_name,
-                                'type': ivy_type,
-                                'conf': ivy_tmpl_key,
-                                'classifier': classifier,
-                                'ext': extension})
+            self._copy_artifact(cur_tgt, jar, version, typename=extra_product, suffix=suffix,
+                                extension=extension, override_name=override_name)
+            publications.add(extra_pub)
 
-      confs.add(IvyWriter.SOURCES_CONFIG)
-      # don't request docs unless they are available for all transitive targets
-      # TODO: doc products should be checked by an independent jar'ing task, and
-      # conditionally enabled; see https://github.com/pantsbuild/pants/issues/568
-      if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
-        confs.add(IvyWriter.JAVADOC_CONFIG)
-      return stage_artifact(tgt, jar, version, tag, changelog, confs, extra_confs=extra_confs)
-
-    # TODO Remove this once we fix https://github.com/pantsbuild/pants/issues/1229
-    def stage_individual_plugins(tgt, jar, version, tag_name, changelog):
-      DEFAULT_IVY_TYPE = 'jar'
-      DEFAULT_CLASSIFIER = ''
-      DEFAULT_CONF = 'default'
-      DEFAULT_EXT = 'jar'
-      product_config = {
-        'jars': {
-          'classifier': '',
-          },
-      }
-      product_config.update(self.get_options().publish_extras or {})
-      for product, config in product_config.items():
-        if self.context.products.get(product).has(tgt):
-          classifier = config.get('classifier', DEFAULT_CLASSIFIER)
-          suffix = '-' + classifier if classifier else ''
-          self._copy_artifact(tgt, jar, version, suffix=suffix, typename=product)
-          extra_confs = {}
-          if product == 'jars':
-            confs = set(repo['confs'])
-            self.create_source_jar(tgt, jar, version)
-            doc_jar = self.create_doc_jar(tgt, jar, version)
-            confs.add(IvyWriter.SOURCES_CONFIG)
-            if doc_jar and self._java_doc(tgt) and self._scala_doc(tgt):
-              confs.add(IvyWriter.JAVADOC_CONFIG)
-          else:
-            confs = [classifier, DEFAULT_CONF]
-            extra_confs = {'name': None,
-                           'type': config.get('ivy_type', DEFAULT_IVY_TYPE),
-                           'classifier': classifier,
-                           'conf': confs,
-                           'ext': DEFAULT_EXT}
-          return stage_artifact(tgt, jar, version, tag_name, changelog, confs,
-                              extra_confs=extra_confs, classifier=classifier)
-      raise ValueError('No product mapping in {0} for {1}. '
-                       'You may need to run some other task first'.format(product_config.keys(),
-                                                                          tgt))
+      pom_path = self.artifact_path(jar, version, extension='pom')
+      PomWriter(get_pushdb, tag).write(tgt, path=pom_path)
+      return publications
 
     if self.overrides:
       print('\nPublishing with revision overrides:')
@@ -825,7 +681,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       oldentry = pushdb.get_entry(target)
 
       # the jar version is ignored here, since it is overridden below with the new entry
-      jar, _, _ = target.get_artifact_info()
+      jar, _ = target.get_artifact_info()
       published.append(jar)
 
       if skip and (jar.org, jar.name) == self.restart_at:
@@ -878,8 +734,8 @@ class JarPublish(ScmPublishMixin, JarTask):
               print(changelog)
             else:
               # The changelog may contain non-ascii text, but the print function can, under certain
-              # circumstances, incorrectly detect the output encoding to be ascii and thus blow up on
-              # non-ascii changelog characters.  Here we explicitly control the encoding to avoid
+              # circumstances, incorrectly detect the output encoding to be ascii and thus blow up
+              # on non-ascii changelog characters.  Here we explicitly control the encoding to avoid
               # the print function's mis-interpretation.
               # TODO(John Sirois): Consider introducing a pants/util `print_safe` helper for this.
               message = '\nChanges for {} since {} @ {}:\n\n{}\n'.format(
@@ -892,12 +748,12 @@ class JarPublish(ScmPublishMixin, JarTask):
             raise TaskError('User aborted push')
 
         pushdb.set_entry(target, newentry)
-        ivyxml = stage_artifacts(target, jar, rev, tag_name, changelog)
+        publications = stage_artifacts(target, jar, rev, tag_name, changelog)
 
         if self.dryrun:
           print('Skipping publish of {0} in test mode.'.format(pushdb_coordinate(jar, newentry)))
         else:
-          self.publish(ivyxml, jar=jar, entry=newentry, repo=repo, published=published)
+          self.publish(publications, jar=jar, entry=newentry, repo=repo, published=published)
 
           if self.commit:
             coord = coordinate(org, name, rev)
@@ -1028,18 +884,39 @@ class JarPublish(ScmPublishMixin, JarTask):
       return ivy.ivy_settings
 
   def generate_ivysettings(self, ivy, publishedjars, publish_local=None):
-    template_relpath = os.path.join('templates', 'jar_publish', 'ivysettings.mustache')
-    template = pkgutil.get_data(__name__, template_relpath)
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivysettings.mustache')
+    template_text = pkgutil.get_data(__name__, template_relpath)
+
+    published = [TemplateData(org=jar.org, name=jar.name) for jar in publishedjars]
+
+    generator = Generator(template_text,
+                          ivysettings=self.fetch_ivysettings(ivy),
+                          dir=self.workdir,
+                          cachedir=self.cachedir,
+                          published=published,
+                          publish_local=publish_local)
+
     with safe_open(os.path.join(self.workdir, 'ivysettings.xml'), 'w') as wrapper:
-      generator = Generator(template,
-                            ivysettings=self.fetch_ivysettings(ivy),
-                            dir=self.workdir,
-                            cachedir=self.cachedir,
-                            published=[TemplateData(org=jar.org, name=jar.name)
-                                       for jar in publishedjars],
-                            publish_local=publish_local)
       generator.write(wrapper)
       return wrapper.name
+
+  def generate_ivy(self, jar, version, publications):
+    template_relpath = os.path.join(_TEMPLATES_RELPATH, 'ivy.mustache')
+    template_text = pkgutil.get_data(__name__, template_relpath)
+
+    pubs = [TemplateData(name=None if p.name == jar.name else p.name,
+                         classifier=p.classifier,
+                         ext=None if p.ext == 'jar' else p.ext) for p in publications]
+
+    generator = Generator(template_text,
+                          org=jar.org,
+                          name=jar.name,
+                          rev=version,
+                          publications=pubs)
+
+    with safe_open(os.path.join(self.workdir, 'ivy.xml'), 'w') as ivyxml:
+      generator.write(ivyxml)
+      return ivyxml.name
 
   def create_source_jar(self, target, open_jar, version):
     # TODO(Tejal Desai) pantsbuild/pants/65: Avoid creating 2 jars with java sources for a

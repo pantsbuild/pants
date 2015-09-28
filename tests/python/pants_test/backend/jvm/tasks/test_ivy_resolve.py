@@ -6,16 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.base.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
@@ -39,8 +37,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
     context = self.context(target_roots=targets)
-    self.create_task(context, 'unused').execute()
-    return context.products.get_data('compile_classpath', None)
+    self.create_task(context).execute()
+    return context.products.get_data('compile_classpath')
 
   #
   # Test section
@@ -59,10 +57,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Create jar_libraries with different versions of the same dep: this will cause
     # a pre-ivy "eviction" in IvyUtils.generate_ivy, but the same case can be triggered
     # due to an ivy eviction where the declared version loses to a transitive version.
-    losing_dep = JarDependency('com.google.guava', 'guava', '16.0',
-                               artifacts=[IvyArtifact('guava16.0')])
-    winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1',
-                               artifacts=[IvyArtifact('guava16.0.1')])
+    losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
+    winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1')
     losing_lib = self.make_target('//:a', JarLibrary, jars=[losing_dep])
     winning_lib = self.make_target('//:b', JarLibrary, jars=[winning_dep])
     # Confirm that the same artifact was added to each target.
@@ -74,7 +70,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
     symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
                    artifact_path('bogus1'): artifact_path('bogus1'),
                    artifact_path('unused'): artifact_path('unused')}
-    context.products.safe_create_data('ivy_resolve_symlink_map', lambda: symlink_map)
     task = self.create_task(context, 'unused')
 
     def mock_ivy_resolve(targets, *args, **kw):
@@ -84,13 +79,12 @@ class IvyResolveTest(JvmToolTaskTestBase):
         cache_key = vts.cache_key.hash
       else:
         cache_key = None
-      return ([], cache_key)
+      return [], symlink_map, cache_key
 
     task.ivy_resolve = mock_ivy_resolve
 
-    def mock_generate_ivy_jar_products(cache_key_ignored):
-      ivy_products = defaultdict(list)
-      ivy_info = IvyInfo()
+    def mock_parse_report(resolve_hash_name_ignored, conf):
+      ivy_info = IvyInfo(conf)
 
       # Guava 16.0 would be evicted by Guava 16.0.1.  But in a real
       # resolve, it's possible that before it was evicted, it would
@@ -125,10 +119,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
                             unused_artifact, [unrelated_parent])
       ivy_info.add_module(unrelated)
 
-      ivy_products['default'] = [ivy_info]
-      return ivy_products
+      return ivy_info
 
-    task._generate_ivy_jar_products = mock_generate_ivy_jar_products
+    task._parse_report = mock_parse_report
     task.execute()
     compile_classpath = context.products.get_data('compile_classpath', None)
     losing_cp = compile_classpath.get_for_target(losing_lib)
@@ -138,44 +131,39 @@ class IvyResolveTest(JvmToolTaskTestBase):
                                   (u'default', artifact_path(u'bogus1'))]),
                       winning_cp)
 
-  def test_resolve_multiple_artifacts1(self):
+  def test_resolve_multiple_artifacts(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
-    classifier_and_no_classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources',
-                                                 artifacts=[IvyArtifact('junit')])
+    classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
 
     no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
-    classifier_and_no_classifier_lib = self.make_target('//:b',
-                                                        JarLibrary,
-                                                        jars=[classifier_and_no_classifier])
+    classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier])
+    classifier_and_no_classifier_lib = self.make_target('//:c', JarLibrary,
+                                                        jars=[classifier, no_classifier])
 
-    compile_classpath = self.resolve([no_classifier_lib, classifier_and_no_classifier_lib])
+    compile_classpath = self.resolve([no_classifier_lib,
+                                      classifier_lib,
+                                      classifier_and_no_classifier_lib])
+    no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
+    classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
+    classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
+      [classifier_and_no_classifier_lib])
 
-    no_classifier_cp = compile_classpath.get_for_target(no_classifier_lib)
-    classifier_and_no_classifier_cp = compile_classpath.get_for_target(
-        classifier_and_no_classifier_lib)
+    self.assertIn(no_classifier.coordinate,
+                  {resolved_jar.coordinate
+                   for conf, resolved_jar in classifier_and_no_classifier_cp})
+    self.assertIn(classifier.coordinate,
+                  {resolved_jar.coordinate
+                   for conf, resolved_jar in classifier_and_no_classifier_cp})
 
-    sources_jar = 'junit-4.12-sources.jar'
-    regular_jar = 'junit-4.12.jar'
-    self.assertIn(sources_jar, (os.path.basename(j[-1]) for j in classifier_and_no_classifier_cp))
-    self.assertIn(regular_jar, (os.path.basename(j[-1]) for j in classifier_and_no_classifier_cp))
+    self.assertNotIn(classifier.coordinate, {resolved_jar.coordinate
+                                             for conf, resolved_jar in no_classifier_cp})
+    self.assertIn(no_classifier.coordinate, {resolved_jar.coordinate
+                                             for conf, resolved_jar in no_classifier_cp})
 
-    self.assertNotIn(sources_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
-    self.assertIn(regular_jar, (os.path.basename(j[-1]) for j in no_classifier_cp))
-
-  def test_resolve_multiple_artifacts2(self):
-    no_classifier2 = JarDependency('org.apache.avro', 'avro', rev='1.7.7')
-    classifier = JarDependency('org.apache.avro', 'avro', rev='1.7.7', classifier='tests')
-
-    lib = self.make_target('//:c', JarLibrary, jars=[no_classifier2, classifier])
-    compile_classpath = self.resolve([lib])
-    cp = compile_classpath.get_for_target(lib)
-    tests_jar = 'avro-1.7.7-tests.jar'
-    regular_jar = 'avro-1.7.7.jar'
-    self.assertIn(tests_jar, list((os.path.basename(j[-1]) for j in cp)))
-    self.assertIn(regular_jar, list((os.path.basename(j[-1]) for j in cp)))
-    # TODO(Eric Ayers):  I can't replicate the test in test_resolve_multiple_artifacts1
-    # probably because the previous example creates a unique key for the jar_dependency for //:b
-    # with a classifier.
+    self.assertNotIn(no_classifier.coordinate, {resolved_jar.coordinate
+                                                for conf, resolved_jar in classifier_cp})
+    self.assertIn(classifier.coordinate, {resolved_jar.coordinate
+                                          for conf, resolved_jar in classifier_cp})
 
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
@@ -189,24 +177,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     self.assertEquals(0, len(junit_jar_cp))
     self.assertEquals(0, len(excluding_cp))
-
-  def test_mapjars_excludes_excludes_all_in_jar_dependencies_even_with_soft_excludes(self):
-    junit_dep = JarDependency('junit', 'junit', rev='4.12')
-
-    junit_jar_lib = self.make_target('//:junit_lib', JarLibrary, jars=[junit_dep])
-    excluding_target = self.make_target('//:excluding_bin', JvmBinary, dependencies=[junit_jar_lib],
-                                        excludes=[Exclude('junit', 'junit')],
-                                        configurations=['default'])
-
-    self.set_options(soft_excludes=True)
-    context = self.context(target_roots=[junit_jar_lib, excluding_target])
-    context.products.require('jar_dependencies', predicate=lambda t: isinstance(t, JvmBinary))
-
-    with temporary_dir() as workdir:
-      self.create_task(context, workdir).execute()
-
-    jardepmap = context.products.get('jar_dependencies')
-    self.assertTrue(jardepmap.empty(), 'jardepmap')
 
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.

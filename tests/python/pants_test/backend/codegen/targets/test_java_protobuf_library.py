@@ -102,5 +102,4 @@ class JavaProtobufLibraryTest(BaseTest):
     '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    traversable_specs = [spec for spec in target.traversable_specs]
-    self.assertSequenceEqual([':import_jars'], traversable_specs)
+    self.assertEqual([':import_jars'], list(target.traversable_dependency_specs))

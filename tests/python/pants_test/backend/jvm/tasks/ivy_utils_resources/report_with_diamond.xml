@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
+<ivy-report version="1.0">
+  <info organisation="toplevel" module="toplevelmodule" revision="latest" />
+  <dependencies>
+    <module organisation="org1" name="name1">
+      <revision name="0.0.1">
+        <caller organisation="toplevel" name="toplevelmodule" callerrev="latest"/>
+        <artifacts>
+          <artifact location="ivy2cache_path/org1/name1.jar" extra-classifier="tests"/>
+        </artifacts>
+      </revision>
+    </module>
+    <module organisation="org2" name="name2">
+      <revision name="0.0.1">
+        <caller organisation="org1" name="name1" callerrev="0.0.1"/>
+        <caller organisation="org3" name="name3" callerrev="0.0.1"/>
+        <artifacts>
+          <artifact type="bundle" ext="jar" location="ivy2cache_path/org2/name2.jar"/>
+        </artifacts>
+      </revision>
+    </module>
+    <module organisation="org3" name="name3">
+      <revision name="0.0.1">
+        <caller organisation="org2" name="name2" callerrev="0.0.1"/>
+        <artifacts>
+          <artifact type="jar" ext="tar.gz" location="ivy2cache_path/org3/name3.tar.gz"/>
+        </artifacts>
+      </revision>
+    </module>
+  </dependencies>
+</ivy-report>

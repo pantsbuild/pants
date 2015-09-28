@@ -136,10 +136,9 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:unpack_libraries',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/backend/jvm/tasks:jar_import_products',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/fs:fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

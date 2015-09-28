@@ -10,10 +10,10 @@ from collections import namedtuple
 from pants.base.target import Target
 
 
-class InvalidationReport:
+class InvalidationReport(object):
   """Creates a report of all versioned target sets seen in the build."""
 
-  class TaskReport:
+  class TaskReport(object):
     class TaskEntry(namedtuple('TaskEntry', ['targets_hash', 'target_ids', 'cache_key_id',
                                              'cache_key_hash', 'phase', 'valid'])):
       """

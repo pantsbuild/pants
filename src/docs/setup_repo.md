@@ -12,8 +12,8 @@ Configuring with `pants.ini`
 ----------------------------
 
 Pants Build is very configurable. Your source tree's top-level directory
-should contain a `pants.ini` file that sets many, many options. You can
-modify a broad range of settings here, including specific binaries to
+should contain a `pants.ini` file that sets various options. You can
+modify a broad range of options here, including specific binaries to
 use in your toolchain, arguments to pass to tools, etc.
 
 These files are formatted as [Python config
@@ -46,7 +46,7 @@ several contexts, as in these excerpts that define/use `thrift_workdir`:
 It's also handy for defining values that are used in several contexts,
 since these values will be available in all those contexts. The code
 that combines DEFAULT values with others is in Pants'
-[base/config.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/base/config.py).
+[option/config.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/config.py).
 
 Configure Pants' own Runtime Dependencies
 -----------------------------------------
@@ -252,13 +252,11 @@ defined in your plugin:
       'public': {  # must match the name of the `Repository` object that you defined in your plugin.
         'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
                                          # in your custom ivysettings.xml.
-        'confs': ['default', 'sources', 'docs', 'changelog'],
         'auth': 'build-support:netrc',   # Pants spec to a 'credentials()' object.
         'help': 'Configure your ~/.netrc for maven.example.com access.'
       },
       'testing': {
         'resolver': 'artifactory.example.com',
-        'confs': ['default', 'sources', 'docs', 'changelog'],
         'auth': 'build-support:netrc',
         'help': 'Configure your ~/.netrc for artifactory.example.com access.'
       },

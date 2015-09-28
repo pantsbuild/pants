@@ -125,9 +125,9 @@ class BuildFileParser(object):
     except SyntaxError as e:
       raise self.ParseError(_format_context_msg(e.lineno, e.offset, e.__class__.__name__, e))
     except Exception as e:
-        raise self.ParseError("{error_type}: {message}\n while parsing BUILD file {build_file}"
-                              .format(error_type=e.__class__.__name__,
-                                      message=e, build_file=build_file))
+      raise self.ParseError("{error_type}: {message}\n while parsing BUILD file {build_file}"
+                            .format(error_type=e.__class__.__name__,
+                                    message=e, build_file=build_file))
 
     parse_state = self._build_configuration.initialize_parse_state(build_file)
     try:

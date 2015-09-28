@@ -181,7 +181,7 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, target_roots=None, console_outstream=None,
+  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None, console_outstream=None,
               workspace=None, for_subsystems=None):
 
     optionables = set()
@@ -216,6 +216,7 @@ class BaseTest(unittest.TestCase):
                                                    options=options)
 
     context = create_context(options=option_values,
+                             passthru_args=passthru_args,
                              target_roots=target_roots,
                              build_graph=self.build_graph,
                              build_file_parser=self.build_file_parser,

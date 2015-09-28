@@ -9,15 +9,21 @@ import os
 import xml.etree.ElementTree as ET
 from textwrap import dedent
 
-from mock import Mock
-
 from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyResolveMappingError, IvyUtils
+from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.base_test import BaseTest
+
+
+def coord(org, name, classifier=None, rev=None, ext=None):
+  rev = rev or '0.0.1'
+  return M2Coordinate(org=org, name=name, rev=rev, classifier=classifier, ext=ext)
 
 
 class IvyUtilsTestBase(BaseTest):
@@ -128,7 +134,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def test_module_ref_str_minus_classifier(self):
     module_ref = IvyModuleRef(org='org', name='name', rev='rev')
-    self.assertEquals("IvyModuleRef(org:name:rev:)", str(module_ref))
+    self.assertEquals("IvyModuleRef(org:name:rev::jar)", str(module_ref))
 
   def test_force_override(self):
     jars = list(self.a.payload.jars)
@@ -156,33 +162,75 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
       override = self.find_single(doc, 'dependencies/override')
       self.assert_attributes(override, org='org2', module='name2', rev='rev2')
 
-  def test_resove_conflict(self):
-    v1 = Mock()
-    v1.force = False
-    v1.rev = "1"
+  def test_resove_conflict_no_conflicts(self):
+    v1 = JarDependency('org.example', 'foo', '1', force=False)
+    v1_force = JarDependency('org.example', 'foo', '1', force=True)
+    v2 = JarDependency('org.example', 'foo', '2', force=False)
 
-    v1_force = Mock()
-    v1_force.force = True
-    v1_force.rev = "1"
-
-    v2 = Mock()
-    v2.force = False
-    v2.rev = "2"
-
-    # If neither version is forced, use the latest version
+    # If neither version is forced, use the latest version.
     self.assertIs(v2, IvyUtils._resolve_conflict(v1, v2))
     self.assertIs(v2, IvyUtils._resolve_conflict(v2, v1))
 
-    # If an earlier version is forced, use the forced version
+    # If an earlier version is forced, use the forced version.
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v2))
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v2, v1_force))
 
-    # If the same version is forced, use the forced version
+    # If the same version is forced, use the forced version.
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v1, v1_force))
     self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v1))
 
+    # If the same force is in play in multiple locations, allow it.
+    self.assertIs(v1_force, IvyUtils._resolve_conflict(v1_force, v1_force))
+
+  def test_resolve_conflict_conflict(self):
+    v1_force = JarDependency('org.example', 'foo', '1', force=True)
+    v2_force = JarDependency('org.example', 'foo', '2', force=True)
+
+    with self.assertRaises(IvyUtils.IvyResolveConflictingDepsError):
+      IvyUtils._resolve_conflict(v1_force, v2_force)
+
+    with self.assertRaises(IvyUtils.IvyResolveConflictingDepsError):
+      IvyUtils._resolve_conflict(v2_force, v1_force)
+
+  def test_get_resolved_jars_for_jar_library(self):
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
+    lib = self.make_target(spec=':org1-name1',
+                           target_type=JarLibrary,
+                           jars=[JarDependency(org='org1', name='name1', rev='0.0.1',
+                                               classifier='tests')])
+
+    resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
+
+    expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1',
+                                                       classifier='tests'),
+                'ivy2cache_path/org2/name2.jar': coord(org='org2', name='name2'),
+                'ivy2cache_path/org3/name3.tar.gz': coord(org='org3', name='name3', ext='tar.gz')}
+    self.maxDiff = None
+    coordinate_by_path = {rj.cache_path: rj.coordinate for rj in resolved_jars}
+    self.assertEqual(expected, coordinate_by_path)
+
+  def test_resolved_jars_with_different_version(self):
+    # If a jar is resolved as a different version than the requested one, the coordinates of
+    # the resolved jar should match the artifact, not the requested coordinates.
+    lib = self.make_target(spec=':org1-name1',
+                           target_type=JarLibrary,
+                           jars=[
+                             JarDependency(org='org1', name='name1',
+                                           rev='0.0.1',
+                                           classifier='tests')])
+
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_resolve_to_other_version.xml')
+
+    resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
+
+    self.maxDiff = None
+    self.assertEqual([coord(org='org1', name='name1',
+                           classifier='tests',
+                           rev='0.0.2')],
+                     [jar.coordinate for jar in resolved_jars])
+
   def test_does_not_visit_diamond_dep_twice(self):
-    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
 
     ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
     seen = set()
@@ -190,21 +238,18 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     def collector(r):
       self.assertNotIn(r, seen)
       seen.add(r)
-      return set([r])
+      return {r}
 
     result = ivy_info.traverse_dependency_graph(ref, collector)
 
-    self.assertEqual(
-          {
-            IvyModuleRef("toplevel", "toplevelmodule", "latest"),
-            IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
-            IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
-            IvyModuleRef(org='org3', name='name3', rev='0.0.1')
-          },
+    self.assertEqual({IvyModuleRef("toplevel", "toplevelmodule", "latest"),
+                      IvyModuleRef(org='org1', name='name1', rev='0.0.1', classifier='tests'),
+                      IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
+                      IvyModuleRef(org='org3', name='name3', rev='0.0.1', ext='tar.gz')},
           result)
 
   def test_does_not_follow_cycle(self):
-    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_cycle.xml')
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_cycle.xml')
 
     ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
     seen = set()
@@ -212,7 +257,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     def collector(r):
       self.assertNotIn(r, seen)
       seen.add(r)
-      return set([r])
+      return {r}
 
     result = ivy_info.traverse_dependency_graph(ref, collector)
 
@@ -226,12 +271,12 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           result)
 
   def test_memo_reused_across_calls(self):
-    ivy_info = self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_diamond.xml')
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
 
     ref = IvyModuleRef(org='org1', name='name1', rev='0.0.1')
 
     def collector(r):
-      return set([r])
+      return {r}
 
     memo = dict()
     result1 = ivy_info.traverse_dependency_graph(ref, collector, memo=memo)
@@ -242,13 +287,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           {
             IvyModuleRef(org='org1', name='name1', rev='0.0.1'),
             IvyModuleRef(org='org2', name='name2', rev='0.0.1'),
-            IvyModuleRef(org='org3', name='name3', rev='0.0.1')
+            IvyModuleRef(org='org3', name='name3', rev='0.0.1', ext='tar.gz')
           },
           result1)
 
   def test_parse_fails_when_same_classifier_different_type(self):
     with self.assertRaises(IvyResolveMappingError):
-      self.parse_ivy_report('tests/python/pants_test/tasks/ivy_utils_resources/report_with_same_classifier_different_type.xml')
+      self.parse_ivy_report('ivy_utils_resources/report_with_same_classifier_different_type.xml')
 
   def find_single(self, elem, xpath):
     results = list(elem.findall(xpath))
@@ -258,14 +303,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def assert_attributes(self, elem, **kwargs):
     self.assertEqual(dict(**kwargs), dict(elem.attrib))
 
-  def test_find_new_symlinks(self):
-    map1 = {'foo': 'bar'}
-    map2 = {}
-    diff_map = IvyUtils._find_new_symlinks(map1, map2)
-    self.assertEquals({}, diff_map)
-    diff_map = IvyUtils._find_new_symlinks(map2, map1)
-    self.assertEquals({'foo': 'bar'}, diff_map)
-
   def test_symlink_cachepath(self):
     self.maxDiff = None
     with temporary_dir() as mock_cache_dir:
@@ -273,7 +310,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
         with temporary_dir() as classpath_dir:
           input_path = os.path.join(classpath_dir, 'inpath')
           output_path = os.path.join(classpath_dir, 'classpath')
-          existing_symlink_map = {}
           foo_path = os.path.join(mock_cache_dir, 'foo.jar')
           with open(foo_path, 'w') as foo:
             foo.write("test jar contents")
@@ -281,7 +317,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           with open(input_path, 'w') as inpath:
             inpath.write(foo_path)
           result_map = IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir,
-                                                  output_path, existing_symlink_map)
+                                                  output_path)
           symlink_foo_path = os.path.join(symlink_dir, 'foo.jar')
           self.assertEquals(
             {
@@ -299,9 +335,8 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             bar.write("test jar contents2")
           with open(input_path, 'w') as inpath:
             inpath.write(os.pathsep.join([foo_path, bar_path]))
-          existing_symlink_map = result_map
           result_map = IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir,
-                                                  output_path, existing_symlink_map)
+                                                  output_path)
           symlink_bar_path = os.path.join(symlink_dir, 'bar.jar')
           self.assertEquals(
             {
@@ -319,21 +354,23 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           # Reverse the ordering and make sure order is preserved in the output path
           with open(input_path, 'w') as inpath:
             inpath.write(os.pathsep.join([bar_path, foo_path]))
-          IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir,
-                                                  output_path, result_map)
+          IvyUtils.symlink_cachepath(mock_cache_dir, input_path, symlink_dir, output_path)
           with open(output_path, 'r') as outpath:
             self.assertEquals(symlink_bar_path + os.pathsep + symlink_foo_path, outpath.readline())
 
   def test_missing_ivy_report(self):
-    self.set_options_for_scope(IvySubsystem.options_scope, cache_dir='DOES_NOT_EXIST', use_nailgun=False)
+    self.set_options_for_scope(IvySubsystem.options_scope,
+                               cache_dir='DOES_NOT_EXIST',
+                               use_nailgun=False)
 
     # Hack to initialize Ivy subsystem
     self.context()
 
     with self.assertRaises(IvyUtils.IvyResolveReportError):
-      IvyUtils.parse_xml_report('INVALID_REPORT_UNIQUE_NAME', 'default')
+      IvyUtils.parse_xml_report('INVALID_CACHE_DIR', 'INVALID_REPORT_UNIQUE_NAME', 'default')
 
-  def parse_ivy_report(self, path):
-    ivy_info = IvyUtils._parse_xml_report(path)
+  def parse_ivy_report(self, rel_path):
+    path = os.path.join('tests/python/pants_test/backend/jvm/tasks', rel_path)
+    ivy_info = IvyUtils._parse_xml_report(conf='default', path=path)
     self.assertIsNotNone(ivy_info)
     return ivy_info

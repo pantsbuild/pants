@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from threading import Thread
 
 from pants.base.build_invalidator import CacheKey
-from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
+from pants.cache.artifact_cache import call_insert, call_use_cached_files
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
 from pants.util.contextutil import pushd, temporary_dir, temporary_file
@@ -73,8 +73,13 @@ class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     return self._return_failed()
 
 
+CALLBACK_CALLED = Exception("callback")
 TEST_CONTENT1 = 'muppet'
 TEST_CONTENT2 = 'kermit'
+
+
+def raising_callback(cache_key):
+  raise CALLBACK_CALLED
 
 
 class TestArtifactCache(unittest.TestCase):
@@ -206,16 +211,16 @@ class TestArtifactCache(unittest.TestCase):
     key = CacheKey('muppet_key', 'fake_hash', 42)
 
     with self.setup_local_cache() as cache:
-      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [False])
+      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key, None)]), [False])
       with self.setup_test_file(cache.artifact_root) as path:
         context.subproc_map(call_insert, [(cache, key, [path], False)])
-      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
+      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key, None)]), [True])
 
     with self.setup_rest_cache() as cache:
-      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [False])
+      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key, None)]), [False])
       with self.setup_test_file(cache.artifact_root) as path:
         context.subproc_map(call_insert, [(cache, key, [path], False)])
-      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
+      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key, None)]), [True])
 
   def test_failed_multiproc(self):
     context = create_context()
@@ -223,7 +228,36 @@ class TestArtifactCache(unittest.TestCase):
 
     # Failed requests should return failure status, but not raise exceptions
     with self.setup_rest_cache(return_failed=True) as cache:
-      self.assertFalse(context.subproc_map(call_use_cached_files, [(cache, key)])[0])
+      self.assertFalse(context.subproc_map(call_use_cached_files, [(cache, key, None)])[0])
       with self.setup_test_file(cache.artifact_root) as path:
         context.subproc_map(call_insert, [(cache, key, [path], False)])
-      self.assertFalse(context.subproc_map(call_use_cached_files, [(cache, key)])[0])
+      self.assertFalse(context.subproc_map(call_use_cached_files, [(cache, key, None)])[0])
+
+  def test_successful_request_calls_hit_callback(self):
+    context = create_context()
+    key = CacheKey('muppet_key', 'fake_hash', 42)
+
+    with self.setup_local_cache() as cache:
+      self._do_test_successful_request_runs_callback(cache, context, key)
+
+    with self.setup_rest_cache() as cache:
+      self._do_test_successful_request_runs_callback(cache, context, key)
+
+  def _do_test_successful_request_runs_callback(self, cache, context, key):
+    with self.setup_test_file(cache.artifact_root) as path:
+      context.subproc_map(call_insert, [(cache, key, [path], False)])
+      results = context.subproc_map(call_use_cached_files, [(cache, key, raising_callback)])
+      self.assertEquals(CALLBACK_CALLED, results[0].err)
+
+  def test_failed_request_doesnt_call_hit_callback(self):
+    context = create_context()
+    key = CacheKey('muppet_key', 'fake_hash', 55)
+    with self.setup_local_cache() as cache:
+      self.assertEquals(
+        context.subproc_map(call_use_cached_files, [(cache, key, raising_callback)]),
+        [False])
+
+    with self.setup_rest_cache() as cache:
+      self.assertEquals(
+        context.subproc_map(call_use_cached_files, [(cache, key, raising_callback)]),
+        [False])

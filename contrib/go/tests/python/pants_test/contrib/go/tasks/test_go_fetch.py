@@ -45,6 +45,26 @@ class GoFetchTest(TaskTestBase):
                                                           gopath=self.build_root)
     self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
 
+  def test_get_remote_import_paths_relative_ignored(self):
+    go_fetch = self.create_task(self.context())
+    self.create_file('src/github.com/u/r/a/a_test.go', contents="""
+      package a
+
+      import (
+        "fmt"
+        "math"
+        "sync"
+
+        "bitbucket.org/u/b"
+        "github.com/u/c"
+        "./b"
+        "../c/d"
+      )
+    """)
+    remote_import_ids = go_fetch._get_remote_import_paths('github.com/u/r/a',
+                                                          gopath=self.build_root)
+    self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
+
   def test_resolve_and_inject_explicit(self):
     SourceRoot.register(os.path.join(self.build_root, '3rdparty'), GoRemoteLibrary)
     r1 = self.make_target(spec='3rdparty/r1', target_type=GoRemoteLibrary)

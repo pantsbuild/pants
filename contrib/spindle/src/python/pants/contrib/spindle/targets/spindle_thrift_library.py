@@ -14,6 +14,3 @@ class SpindleThriftLibrary(ExportableJvmLibrary):
   def __init__(self, *args, **kwargs):
     super(SpindleThriftLibrary, self).__init__(*args, **kwargs)
     self.add_labels('scala', 'codegen', 'synthetic')
-
-  def _as_jar_dependency(self):
-    return ExportableJvmLibrary._as_jar_dependency(self).withSources()

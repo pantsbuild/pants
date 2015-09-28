@@ -114,7 +114,7 @@ class ArtifactCache(object):
   def has(self, cache_key):
     pass
 
-  def use_cached_files(self, cache_key):
+  def use_cached_files(self, cache_key, hit_callback=None):
     """Use the files cached for the given key.
 
     Returned result indicates whether or not an artifact was successfully found
@@ -151,12 +151,12 @@ def call_use_cached_files(tup):
   To call a bound method, instead call a helper like this and pass tuple of the instance and args.
   The helper can then call the original method on the deserialized instance.
 
-  :param tup: A tuple of an ArtifactCache and arg (eg CacheKey) for ArtifactCache.use_cached_files.
+  :param tup: A tuple of an ArtifactCache and args (eg CacheKey) for ArtifactCache.use_cached_files.
   """
 
   try:
-    cache, key = tup
-    res = cache.use_cached_files(key)
+    cache, key, callback = tup
+    res = cache.use_cached_files(key, callback)
     if res:
       sys.stderr.write('.')
     else:

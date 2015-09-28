@@ -20,9 +20,11 @@ from pants.backend.core.tasks.clean import Cleaner, Invalidator
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
 from pants.backend.core.tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.backend.core.tasks.dependees import ReverseDepmap
+from pants.backend.core.tasks.explain_options_task import ExplainOptionsTask
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.core.tasks.filter import Filter
 from pants.backend.core.tasks.list_goals import ListGoals
+from pants.backend.core.tasks.list_owners import ListOwners
 from pants.backend.core.tasks.listtargets import ListTargets
 from pants.backend.core.tasks.markdown_to_html import MarkdownToHtml
 from pants.backend.core.tasks.minimal_cover import MinimalCover
@@ -157,6 +159,9 @@ def register_goals():
   task(name='changed', action=WhatChanged).install().with_description(
       'Print the targets changed since some prior commit.')
 
+  task(name='list-owners', action=ListOwners).install().with_description(
+      'Print targets that own the specified source')
+
   # Stub for other goals to schedule 'compile'. See noop.py for more on why this is useful.
   task(name='compile', action=NoopCompile).install('compile')
   task(name='compile-changed', action=CompileChanged).install().with_description(
@@ -172,3 +177,6 @@ def register_goals():
 
   task(name='bash-completion', action=BashCompletionTask).install().with_description(
     'Dump bash shell script for autocompletion of pants command lines.')
+
+  task(name='options', action=ExplainOptionsTask).install().with_description(
+    'List what options pants has set.')

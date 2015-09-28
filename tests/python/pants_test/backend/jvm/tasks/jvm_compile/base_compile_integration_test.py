@@ -9,6 +9,8 @@ import os
 from collections import defaultdict
 from contextlib import contextmanager
 
+import six
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -16,7 +18,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class BaseCompileIT(PantsRunIntegrationTest):
 
   @contextmanager
-  def do_test_compile(self, target, strategy,
+  def do_test_compile(self, target,
       expected_files=None, iterations=2, expect_failure=False, extra_args=None):
     """Runs a configurable number of iterations of compilation for the given target.
 
@@ -24,9 +26,9 @@ class BaseCompileIT(PantsRunIntegrationTest):
     """
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
-        for i in xrange(0, iterations):
+        for i in six.moves.xrange(0, iterations):
           pants_run = self.run_test_compile(workdir, cachedir, target,
-                                            strategy, clean_all=(i == 0),
+                                            clean_all=(i == 0),
                                             extra_args=extra_args)
           if expect_failure:
             self.assert_failure(pants_run)
@@ -48,18 +50,12 @@ class BaseCompileIT(PantsRunIntegrationTest):
                                to_find, '\n'.join(sorted(workdir_files))))
         yield found
 
-  def run_test_compile(self, workdir, cachedir, target, strategy, clean_all=False, extra_args=None):
+  def run_test_compile(self, workdir, cachedir, target, clean_all=False, extra_args=None):
     global_args = [
         '--cache-write',
         '--cache-write-to=[\'{}\']'.format(cachedir),
     ]
-    args = [
-        'compile',
-        '--compile-apt-strategy={}'.format(strategy),
-        '--compile-java-strategy={}'.format(strategy),
-        '--compile-zinc-strategy={}'.format(strategy),
-        target,
-      ] + (extra_args if extra_args else [])
+    args = ['compile', target] + (extra_args if extra_args else [])
     # Clean-all on the first iteration.
     if clean_all:
       args.insert(0, 'clean-all')

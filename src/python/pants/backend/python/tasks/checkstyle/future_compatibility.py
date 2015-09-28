@@ -18,6 +18,7 @@ from pants.subsystem.subsystem import Subsystem
 # Methods:
 #   - .iteritems
 #   - .iterkeys
+#   - .itervalues
 #
 # Comprehension builtins
 #   - filter
@@ -49,7 +50,9 @@ class FutureCompatibility(CheckstylePlugin):
   def nits(self):
     for call in self.iter_ast_types(ast.Call):
       if isinstance(call.func, ast.Attribute):
-        if call.func.attr in self.BAD_ITERS:
+        # Not a perfect solution since a user could have a dictionary named six or something similar
+        #   However, this should catch most cases where people are using iter* without six.
+        if call.func.attr in self.BAD_ITERS and getattr(call.func.value, 'id', '') != 'six':
           yield self.error(
             'T602',
             '{attr} disappears in Python 3.x.  Use non-iter instead.'.format(attr=call.func.attr),

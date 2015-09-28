@@ -31,6 +31,29 @@ class UnionProductsTest(BaseTest):
     self.assertEquals(self.products.get_for_target(b, transitive=False), OrderedSet([2]))
     self.assertEquals(self.products.get_for_target(c, transitive=False), OrderedSet([3]))
 
+  def test_copy(self):
+    c = self.make_target('c')
+    b = self.make_target('b', dependencies=[c])
+    a = self.make_target('a', dependencies=[b, c])
+    self.products.add_for_target(a, [1])
+    self.products.add_for_target(b, [2])
+
+    copied = self.products.copy()
+
+    self.assertEquals(self.products.get_for_target(a), OrderedSet([1, 2]))
+    self.assertEquals(self.products.get_for_target(b), OrderedSet([2]))
+    self.assertEquals(copied.get_for_target(a), OrderedSet([1, 2]))
+    self.assertEquals(copied.get_for_target(b), OrderedSet([2]))
+
+    copied.add_for_target(c, [3])
+
+    self.assertEquals(self.products.get_for_target(a), OrderedSet([1, 2]))
+    self.assertEquals(self.products.get_for_target(b), OrderedSet([2]))
+    self.assertEquals(self.products.get_for_target(c), OrderedSet())
+    self.assertEquals(copied.get_for_target(a), OrderedSet([1, 2, 3]))
+    self.assertEquals(copied.get_for_target(b), OrderedSet([2, 3]))
+    self.assertEquals(copied.get_for_target(c), OrderedSet([3]))
+
   def test_remove_for_target(self):
     c = self.make_target('c')
     b = self.make_target('b', dependencies=[c])

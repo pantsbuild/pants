@@ -97,6 +97,31 @@ a:visited {
   border-top: 1px solid gray;
 }
 
+.error-msg-hidden {
+  display: none;
+}
+
+.error-msg-shown {
+  font-size: 14pt;
+  color: red;
+}
+
+.stats-date {
+  font-size: 12pt;
+  font-weight: bold;
+  color: gray;
+  margin-right: 4px;
+}
+
+.stats-crumb {
+  font-size: 12pt;
+  font-weight: bold;
+}
+
+.timing-drilldown-breadcrumbs {
+  margin-bottom: 4px;
+}
+
 .bigtext {
   font-size: 16pt;
   font-weight: bold;

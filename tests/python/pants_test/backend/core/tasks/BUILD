@@ -30,7 +30,7 @@ python_tests(
   sources=['test_cache_cleanup.py'],
   coverage=['pants.backend.core.tasks.bash_completion'],
   dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile:java',
+    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
     'src/python/pants/util:contextutil',
@@ -105,6 +105,16 @@ python_tests(
     'src/python/pants/base:target',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name='paths',
+  sources=['test_paths.py'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:paths',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 

@@ -26,6 +26,11 @@ class ScaladocGen(JvmdocGen):
   def subsystem_dependencies(cls):
     return super(JvmdocGen, cls).subsystem_dependencies() + (DistributionLocator,)
 
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(ScaladocGen, cls).prepare(options, round_manager)
+    ScalaPlatform.prepare_tools(round_manager)
+
   def execute(self):
     def is_scala(target):
       return target.has_sources('.scala')
@@ -37,8 +42,10 @@ class ScaladocGen(JvmdocGen):
     for target in targets:
       sources.extend(target.sources_relative_to_buildroot())
       # TODO(Tejal Desai): pantsbuild/pants/65: Remove java_sources attribute for ScalaLibrary
-      for java_target in target.java_sources:
-        sources.extend(java_target.sources_relative_to_buildroot())
+      # A '.scala' owning target may not have java_sources, eg: junit_tests
+      if hasattr(target, 'java_sources'):
+        for java_target in target.java_sources:
+          sources.extend(java_target.sources_relative_to_buildroot())
 
     if not sources:
       return None

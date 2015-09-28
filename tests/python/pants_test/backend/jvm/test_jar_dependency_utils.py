@@ -19,18 +19,15 @@ class JarDependencyUtilsTest(unittest.TestCase):
                                            rev='the-ref', classifier='classify')
     self.assertEquals('org.example:lib:the-ref:classify:jar', str(org_name_ref_classifier))
 
-    org_name_classifier = M2Coordinate(org='org.example', name='lib',
-                                           classifier='classify')
+    org_name_classifier = M2Coordinate(org='org.example', name='lib', classifier='classify')
     self.assertEquals('org.example:lib::classify:jar', str(org_name_classifier))
 
     org_name_type_classifier = M2Coordinate(org='org.example', name='lib',
-                            type_='zip',
-                                       classifier='classify')
+                                            classifier='classify', ext='zip')
     self.assertEquals('org.example:lib::classify:zip', str(org_name_type_classifier))
 
     org_name_type_jar_classifier = M2Coordinate(org='org.example', name='lib',
-                                            type_='jar',
-                                            classifier='classify')
+                                                classifier='classify', ext='jar')
     self.assertEquals('org.example:lib::classify:jar', str(org_name_type_jar_classifier))
 
   def test_m2_coordinates_with_same_properties(self):
@@ -47,10 +44,30 @@ class JarDependencyUtilsTest(unittest.TestCase):
     self.assertNotEqual(coordinate1, coordinate2)
 
   def test_m2_coordinates_with_different_types_have_different_hashes(self):
-    coordinate1 = M2Coordinate('org.example', 'lib', type_='zip')
+    coordinate1 = M2Coordinate('org.example', 'lib', ext='zip')
     coordinate2 = M2Coordinate('org.example', 'lib')
 
     self.assertNotEqual(hash(coordinate1), hash(coordinate2))
+
+  def test_m2_coordinate_artifact_path_no_rev(self):
+    coordinate = M2Coordinate('org.example', 'lib')
+
+    self.assertEqual('org.example-lib.jar', coordinate.artifact_filename)
+
+  def test_m2_coordinate_artifact_path_no_classifier(self):
+    coordinate = M2Coordinate('org.example', 'lib', '1.0.0')
+
+    self.assertEqual('org.example-lib-1.0.0.jar', coordinate.artifact_filename)
+
+  def test_m2_coordinate_artifact_path_classifier(self):
+    coordinate = M2Coordinate('org.example', 'lib', '1.0.0', 'sources')
+
+    self.assertEqual('org.example-lib-1.0.0-sources.jar', coordinate.artifact_filename)
+
+  def test_m2_coordinate_artifact_path_explicit_ext(self):
+    coordinate = M2Coordinate('org.example', 'lib', '1.0.0', ext='tar.gz')
+
+    self.assertEqual('org.example-lib-1.0.0.tar.gz', coordinate.artifact_filename)
 
   def test_resolved_jars_with_same_properties(self):
     jar1 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'path')

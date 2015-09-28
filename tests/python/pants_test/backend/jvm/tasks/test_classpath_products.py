@@ -13,14 +13,15 @@ from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.classpath_products import (ArtifactClasspathEntry, ClasspathEntry,
+                                                        ClasspathProducts)
 from pants.base.exceptions import TaskError
 from pants_test.base_test import BaseTest
 
 
 def resolved_example_jar_at(path, org='com.example', name='lib'):
   return ResolvedJar(M2Coordinate(org=org, name=name),
-                     cache_path=path,
+                     cache_path=os.path.join('resolver-cache-dir', path),
                      pants_path=path)
 
 
@@ -30,10 +31,38 @@ class ClasspathProductsTest(BaseTest):
     a = self.make_target('a', JvmTarget)
 
     classpath_product = ClasspathProducts()
-    path = os.path.join(self.build_root, 'jar/path')
+    path = self.path('jar/path')
     self.add_jar_classpath_element_for_path(classpath_product, a, path)
 
     self.assertEqual([('default', path)], classpath_product.get_for_target(a))
+
+  def test_copy(self):
+    b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+    a = self.make_target('a', JvmTarget, dependencies=[b])
+
+    classpath_product = ClasspathProducts()
+    resolved_jar = self.add_jar_classpath_element_for_path(classpath_product,
+                                                           a,
+                                                           self._example_jar_path())
+    classpath_product.add_for_target(a, [('default', self.path('a/path'))])
+
+    copied = classpath_product.copy()
+
+    self.assertEqual([('default', resolved_jar.pants_path),
+                      ('default', self.path('a/path'))], classpath_product.get_for_target(a))
+    self.assertEqual([('default', resolved_jar.pants_path),
+                      ('default', self.path('a/path'))], copied.get_for_target(a))
+
+    self.add_excludes_for_targets(copied, b, a)
+    self.assertEqual([('default', resolved_jar.pants_path),
+                      ('default', self.path('a/path'))], classpath_product.get_for_target(a))
+    self.assertEqual([('default', self.path('a/path'))], copied.get_for_target(a))
+
+    copied.add_for_target(b, [('default', self.path('b/path'))])
+    self.assertEqual([('default', resolved_jar.pants_path),
+                      ('default', self.path('a/path'))], classpath_product.get_for_target(a))
+    self.assertEqual([('default', self.path('a/path')),
+                      ('default', self.path('b/path'))], copied.get_for_target(a))
 
   def test_fails_if_paths_outside_buildroot(self):
     a = self.make_target('a', JvmTarget)
@@ -69,7 +98,7 @@ class ClasspathProductsTest(BaseTest):
 
     self.assertEqual([], classpath)
 
-  def test_transitive_dependencys_excluded_classpath_element(self):
+  def test_transitive_dependencies_excluded_classpath_element(self):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
@@ -111,7 +140,7 @@ class ClasspathProductsTest(BaseTest):
 
     classpath_product = ClasspathProducts()
     com_example_jar_path = self._example_jar_path()
-    org_example_jar_path = os.path.join(self.build_root, 'ivy/jars/org.example/lib/123.4.jar')
+    org_example_jar_path = self.path('ivy/jars/org.example/lib/123.4.jar')
     classpath_product.add_jars_for_targets([a], 'default',
                                           [resolved_example_jar_at(com_example_jar_path),
                                            resolved_example_jar_at(org_example_jar_path,
@@ -239,11 +268,110 @@ class ClasspathProductsTest(BaseTest):
       'Jar: org:name:::jar has no specified path.',
       str(cm.exception))
 
-  def _example_jar_path(self):
-    return os.path.join(self.build_root, 'ivy/jars/com.example/lib/jars/123.4.jar')
+  def test_get_classpath_entries_for_targets_respect_excludes(self):
+    a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
 
-  def add_jar_classpath_element_for_path(self, classpath_product, target, example_jar_path):
-    classpath_product.add_jars_for_targets([target], 'default', [resolved_example_jar_at(example_jar_path)])
+    classpath_product = ClasspathProducts()
+    example_jar_path = self._example_jar_path()
+    self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
+    self.add_excludes_for_targets(classpath_product, a)
+
+    classpath = classpath_product.get_classpath_entries_for_targets([a])
+
+    self.assertEqual([], classpath)
+
+  def test_get_classpath_entries_for_targets_ignore_excludes(self):
+    a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+
+    classpath_product = ClasspathProducts()
+    example_jar_path = self._example_jar_path()
+    resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path,
+                                                           conf='fred-conf')
+    self.add_excludes_for_targets(classpath_product, a)
+
+    classpath = classpath_product.get_classpath_entries_for_targets([a], respect_excludes=False)
+
+    expected_entry = ArtifactClasspathEntry(example_jar_path,
+                                            resolved_jar.coordinate,
+                                            resolved_jar.cache_path)
+    self.assertEqual([('fred-conf', expected_entry)], list(classpath))
+
+  def test_get_classpath_entries_for_targets_transitive(self):
+    b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+    a = self.make_target('a', JvmTarget, dependencies=[b])
+
+    classpath_product = ClasspathProducts()
+    example_jar_path = self._example_jar_path()
+    resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
+
+    classpath_product.add_for_target(b, [('default', self.path('b/loose/classes/dir'))])
+    classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
+                                         ('default', self.path('an/internally/generated.jar'))])
+
+    classpath = classpath_product.get_classpath_entries_for_targets([a])
+    self.assertEqual([('default', ArtifactClasspathEntry(example_jar_path,
+                                                         resolved_jar.coordinate,
+                                                         resolved_jar.cache_path)),
+                      ('default', ClasspathEntry(self.path('a/loose/classes/dir'))),
+                      ('default', ClasspathEntry(self.path('an/internally/generated.jar'))),
+                      ('default', ClasspathEntry(self.path('b/loose/classes/dir')))],
+                     classpath)
+
+  def test_get_classpath_entries_for_targets_intransitive(self):
+    b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+    a = self.make_target('a', JvmTarget, dependencies=[b])
+
+    classpath_product = ClasspathProducts()
+    example_jar_path = self._example_jar_path()
+    resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
+
+    classpath_product.add_for_target(b, [('default', self.path('b/loose/classes/dir'))])
+    classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
+                                         ('default', self.path('an/internally/generated.jar'))])
+
+    classpath = classpath_product.get_classpath_entries_for_targets([a], transitive=False)
+    self.assertEqual([('default', ArtifactClasspathEntry(example_jar_path,
+                                                         resolved_jar.coordinate,
+                                                         resolved_jar.cache_path)),
+                      ('default', ClasspathEntry(self.path('a/loose/classes/dir'))),
+                      ('default', ClasspathEntry(self.path('an/internally/generated.jar')))],
+                     classpath)
+
+  def test_get_artifact_classpath_entries_for_targets(self):
+    b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+    a = self.make_target('a', JvmTarget, dependencies=[b])
+
+    classpath_product = ClasspathProducts()
+    example_jar_path = self._example_jar_path()
+    resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
+
+    # These non-artifact classpath entries should be ignored.
+    classpath_product.add_for_target(b, [('default', self.path('b/loose/classes/dir'))])
+    classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
+                                         ('default', self.path('an/internally/generated.jar'))])
+
+    classpath = classpath_product.get_artifact_classpath_entries_for_targets([a])
+    self.assertEqual([('default', ArtifactClasspathEntry(example_jar_path,
+                                                         resolved_jar.coordinate,
+                                                         resolved_jar.cache_path))],
+                     classpath)
+
+  def _example_jar_path(self):
+    return self.path('ivy/jars/com.example/lib/jars/123.4.jar')
+
+  def path(self, p):
+    return os.path.join(self.build_root, p)
+
+  def add_jar_classpath_element_for_path(self,
+                                         classpath_product,
+                                         target,
+                                         example_jar_path,
+                                         conf=None):
+    resolved_jar = resolved_example_jar_at(example_jar_path)
+    classpath_product.add_jars_for_targets(targets=[target],
+                                           conf=conf or 'default',
+                                           resolved_jars=[resolved_jar])
+    return resolved_jar
 
   def add_excludes_for_targets(self, classpath_product, *targets):
     classpath_product.add_excludes_for_targets(targets)

@@ -25,6 +25,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
 from pants.pantsd.process_manager import ProcessManager
+from pants.stats.statsdb import StatsDBFactory
 
 
 logger = logging.getLogger(__name__)
@@ -45,11 +46,14 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     self._GET_handlers = [
       ('/runs/', self._handle_runs),  # Show list of known pants runs.
       ('/run/', self._handle_run),  # Show a report for a single pants run.
+      ('/stats/', self._handle_stats),  # Show a stats analytics page.
+      ('/statsdata/', self._handle_statsdata),  # Get JSON stats data.
       ('/browse/', self._handle_browse),  # Browse filesystem under build root.
       ('/content/', self._handle_content),  # Show content of file.
       ('/assets/', self._handle_assets),  # Statically serve assets (css, js etc.)
       ('/poll', self._handle_poll),  # Handle poll requests for raw file content.
-      ('/latestrunid', self._handle_latest_runid)  # Return id of latest pants run.
+      ('/latestrunid', self._handle_latest_runid),  # Return id of latest pants run.
+      ('/favicon.ico', self._handle_favicon)  # Return favicon.
     ]
     BaseHTTPServer.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
 
@@ -70,7 +74,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self._handle_runs('', {})
         return
 
-      self._send_content('Invalid GET request {}'.format(self.path), 'text/html')
+      self._send_content('Invalid GET request {}'.format(self.path), 'text/html', code=400)
     except (IOError, ValueError):
       pass  # Printing these errors gets annoying, and there's nothing to do about them anyway.
       #sys.stderr.write('Invalid GET request {}'.format(self.path))
@@ -111,6 +115,17 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         'collapsible': lambda x: self._renderer.render_callable('collapsible', x, args)
       })
     self._send_content(self._renderer.render_name('base', args), 'text/html')
+
+  def _handle_stats(self, relpath, params):
+    """Show stats for pants runs in the statsdb."""
+    args = self._default_template_args('stats')
+    self._send_content(self._renderer.render_name('base', args), 'text/html')
+
+  def _handle_statsdata(self, relpath, params):
+    """Show stats for pants runs in the statsdb."""
+    statsdb = StatsDBFactory.global_instance().get_db()
+    statsdata = list(statsdb.get_aggregated_stats_for_cmd_line('cumulative_timings', '%'))
+    self._send_content(json.dumps(statsdata), 'application/json')
 
   def _handle_browse(self, relpath, params):
     """Handle requests to browse the filesystem under the build root."""
@@ -195,6 +210,10 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     else:
       self._send_content(latest_runinfo['id'], 'text/plain')
 
+  def _handle_favicon(self, relpath, params):
+    """Statically serve the favicon out of the assets dir."""
+    self._handle_assets('favicon.ico', params)
+
   def _partition_runs_by_day(self):
     """Split the runs by day, so we can display them grouped that way."""
     run_infos = self._get_all_run_infos()
@@ -257,7 +276,8 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   def _serve_file(self, abspath, params):
     """Show a file.
 
-    The actual content of the file is rendered by _handle_content."""
+    The actual content of the file is rendered by _handle_content.
+    """
     relpath = os.path.relpath(abspath, self._root)
     breadcrumbs = self._create_breadcrumbs(relpath)
     link_path = urlparse.urlunparse([None, None, relpath, None, urllib.urlencode(params), None])

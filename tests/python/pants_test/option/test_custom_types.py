@@ -36,6 +36,7 @@ class CustomTypesTest(unittest.TestCase):
     self._do_test({'a': 'b'}, '{ "a": "b" }')
     self._do_test({'a': 'b'}, "{ 'a': 'b' }")
     self._do_test({'a': [1, 2, 3]}, '{ "a": [1, 2, 3] }')
+    self._do_test({'a': [1, 2, 3, 4]}, '{ "a": [1, 2] + [3, 4] }')
     self._do_test_dict_error({})
     self._do_test_dict_error({'a': 'b'})
     self._do_test_dict_error({'a': [1, 2, 3]})
@@ -43,7 +44,6 @@ class CustomTypesTest(unittest.TestCase):
     self._do_test_dict_error('[1, 2, 3]')
     self._do_test_dict_error('1')
     self._do_test_dict_error('"a"')
-    self._do_test_dict_error('{ "a": [1, 2] + [3, 4] }')
 
   def test_list(self):
     self._do_test([], '[]')
@@ -51,6 +51,8 @@ class CustomTypesTest(unittest.TestCase):
     self._do_test((1, 2, 3), '1,2,3')
     self._do_test(['a', 'b', 'c'], '["a", "b", "c"]')
     self._do_test(['a', 'b', 'c'], "['a', 'b', 'c']")
+    self._do_test([1, 2, 3, 4], '[1, 2] + [3, 4]')
+    self._do_test((1, 2, 3, 4), '(1, 2) + (3, 4)')
     self._do_test_list_error([])
     self._do_test_list_error([1, 2, 3])
     self._do_test_list_error((1, 2, 3))
@@ -59,5 +61,3 @@ class CustomTypesTest(unittest.TestCase):
     self._do_test_list_error('{"a": "b"}')
     self._do_test_list_error('1')
     self._do_test_list_error('"a"')
-    self._do_test_list_error('[1, 2] + [3, 4]')
-    self._do_test_list_error('(1, 2) + (3, 4)')

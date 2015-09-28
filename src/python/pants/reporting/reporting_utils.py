@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.util.strutil import pluralize
+
 
 def items_to_report_element(items, item_type):
   """Converts an iterable of items to a (message, detail) pair.
@@ -20,17 +22,10 @@ def items_to_report_element(items, item_type):
   This is useful when we want to say "N targets" or "K sources"
   and allow the user to see which ones by clicking on that text.
   """
-  def pluralize(x):
-    if x.endswith('s'):
-      return x + 'es'
-    else:
-      return x + 's'
-
-  items = [str(x) for x in items]
   n = len(items)
-  text = '{} {}'.format(n, item_type if n == 1 else pluralize(item_type))
+  text = pluralize(n, item_type)
   if n == 0:
     return text
   else:
-    detail = '\n'.join(items)
+    detail = '\n'.join(str(x) for x in items)
     return text, detail

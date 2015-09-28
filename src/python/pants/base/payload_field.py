@@ -264,16 +264,6 @@ class ExcludesField(OrderedSet, PayloadField):
     return stable_json_sha1(tuple(repr(exclude) for exclude in self))
 
 
-class ConfigurationsField(OrderedSet, PayloadField):
-  """An OrderedSet subclass that mixes in PayloadField.
-
-  Must be initialized with an iterable of strings.
-  """
-
-  def _compute_fingerprint(self):
-    return combine_hashes(sha1(s).hexdigest() for s in self)
-
-
 class JarsField(tuple, PayloadField):
   """A tuple subclass that mixes in PayloadField.
 

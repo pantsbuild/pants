@@ -4,11 +4,11 @@ java_thrift_library(
   compiler='scrooge',
   language='android',
   rpc_style='finagle',
-  dependencies=['3rdparty:thrift'],
+  dependencies=['3rdparty:thrift-0.6.1'],
   provides=artifact(
     org='org.archimedes',
     name='android_generator',
-    repo=Repository(name='test',
+    repo=repository(name='test',
       url='https://dl.bintray.com/somerandom/url',
       push_db_basedir='/tmp')
   )

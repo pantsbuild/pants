@@ -10,6 +10,7 @@ from collections import defaultdict
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.optionable import Optionable
+from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import RankedValue
 
 
@@ -82,7 +83,7 @@ def create_option_values_for_optionable(optionable_type, **options):
   return create_option_values(option_values)
 
 
-def create_options(options):
+def create_options(options, passthru_args=None):
   """Create a fake Options object for testing.
 
   Note that the returned object only provides access to the provided options values. There is
@@ -107,7 +108,7 @@ def create_options(options):
       return self.for_scope('')
 
     def passthru_args_for_scope(self, scope):
-      return []
+      return passthru_args or []
 
     def items(self):
       return options.items()
@@ -137,6 +138,20 @@ def create_options_for_optionables(optionables, extra_scopes=None, options=None)
   """
   all_options = defaultdict(dict)
   bootstrap_option_values = None
+
+  def complete_scopes(scopes):
+    """Return all enclosing scopes.
+
+    This is similar to what `complete_scopes` does in `pants.option.options.Options` without
+    creating `ScopeInfo`s.
+    """
+    completed_scopes = set(scopes)
+    for scope in scopes:
+      while scope != '':
+        if scope not in completed_scopes:
+          completed_scopes.add(scope)
+        scope = enclosing_scope(scope)
+    return completed_scopes
 
   def register_func(on_scope):
     scoped_options = all_options[on_scope]
@@ -168,13 +183,15 @@ def create_options_for_optionables(optionables, extra_scopes=None, options=None)
   if extra_scopes:
     all_scopes.update(extra_scopes)
 
+  all_scopes = complete_scopes(all_scopes)
+
   # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
   # and therefore only have to inherit from our immediately enclosing scope.
   for s in sorted(all_scopes):
     if s != GLOBAL_SCOPE:
-      enclosing_scope = s.rpartition('.')[0]
+      scope = enclosing_scope(s)
       opts = all_options[s]
-      for key, val in all_options.get(enclosing_scope, {}).items():
+      for key, val in all_options.get(scope, {}).items():
         if key not in opts:  # Inner scope values override the inherited ones.
           opts[key] = val
 

@@ -10,6 +10,7 @@ import tempfile
 from abc import abstractmethod
 from contextlib import contextmanager
 
+import six
 from six import binary_type, string_types
 from twitter.common.collections import maybe_list
 
@@ -219,7 +220,12 @@ class JarTask(NailgunTask):
 
   @classmethod
   def global_subsystems(cls):
-    return super(JarTask, cls).global_subsystems() + (JarTool, )
+    return super(JarTask, cls).global_subsystems() + (JarTool,)
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarTask, cls).prepare(options, round_manager)
+    JarTool.prepare_tools(round_manager)
 
   @staticmethod
   def _flag(bool_value):
@@ -229,6 +235,7 @@ class JarTask(NailgunTask):
       Duplicate.SKIP: 'SKIP',
       Duplicate.REPLACE: 'REPLACE',
       Duplicate.CONCAT: 'CONCAT',
+      Duplicate.CONCAT_TEXT: 'CONCAT_TEXT',
       Duplicate.FAIL: 'THROW',
   }
 
@@ -292,6 +299,9 @@ class JarTask(NailgunTask):
         if JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args):
           raise TaskError('jar-tool failed')
 
+
+class JarBuilderTask(JarTask):
+
   class JarBuilder(AbstractClass):
     """A utility to aid in adding the classes and resources associated with targets to a jar."""
 
@@ -317,7 +327,7 @@ class JarTask(NailgunTask):
       :param JvmBinary jvm_binary_target:
       :param Manifest manifest:
       """
-      for header, value in jvm_binary_target.manifest_entries.entries.iteritems():
+      for header, value in six.iteritems(jvm_binary_target.manifest_entries.entries):
         manifest.addentry(header, value)
 
     @staticmethod
@@ -399,6 +409,11 @@ class JarTask(NailgunTask):
       """
       if not self._manifest.is_empty():
         jar.writestr(Manifest.PATH, self._manifest.contents())
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarBuilderTask, cls).prepare(options, round_manager)
+    cls.JarBuilder.prepare(round_manager)
 
   @contextmanager
   def create_jar_builder(self, jar):

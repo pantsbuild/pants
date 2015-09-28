@@ -13,10 +13,12 @@ target(
     ':console_task',
     ':deferred_sources_mapper',
     ':dependees',
+    ':explain_options',
     ':filemap',
     ':filter',
     ':group_task',
     ':list_goals',
+    ':list_owners',
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
@@ -24,8 +26,8 @@ target(
     ':noop',
     ':pathdeps',
     ':paths',
-    ':reporting_server',
     ':repl_task_mixin',
+    ':reporting_server',
     ':roots',
     ':run_prep_command',
     ':scm_publish',
@@ -47,7 +49,9 @@ target(
 python_library(
   name = 'bash_completion',
   sources = ['bash_completion.py'],
-  resources = globs('templates/bash_completion/*.mustache'),
+  resource_targets = [
+    ':bash_completion_resources',
+  ],
   dependencies = [
     ':console_task',
     ':task',
@@ -56,13 +60,20 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/help',
     'src/python/pants/option',
-    ],
-  )
+  ],
+)
+
+resources(
+  name = 'bash_completion_resources',
+  sources = globs('templates/bash_completion/*.mustache'),
+)
 
 python_library(
   name = 'builddictionary',
   sources = ['builddictionary.py'],
-  resources = globs('templates/builddictionary/*.mustache'),
+  resource_targets = [
+    ':builddictionary_resources',
+  ],
   dependencies = [
     ':common',
     ':reflect',
@@ -82,6 +93,12 @@ python_library(
     'src/python/pants/util:dirutil',
   ],
 )
+
+resources(
+  name = 'builddictionary_resources',
+  sources = globs('templates/builddictionary/*.mustache'),
+)
+
 
 python_library(
   name = 'clean',
@@ -134,6 +151,16 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
+  ],
+)
+
+python_library(
+  name = 'explain_options',
+  sources = ['explain_options_task.py'],
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    ':console_task',
+    'src/python/pants/option',
   ],
 )
 
@@ -193,7 +220,9 @@ python_library(
 python_library(
   name = 'markdown_to_html',
   sources = ['markdown_to_html.py'],
-  resources = globs('templates/markdown/*.mustache'),
+  resource_targets = [
+    ':markdown_to_html_resources',
+  ],
   dependencies = [
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',
@@ -209,6 +238,11 @@ python_library(
     'src/python/pants/binaries:binary_util',
     'src/python/pants/util:dirutil',
   ],
+)
+
+resources(
+  name = 'markdown_to_html_resources',
+  sources = globs('templates/markdown/*.mustache'),
 )
 
 python_library(
@@ -250,6 +284,7 @@ python_library(
   dependencies = [
     ':console_task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/util:strutil',
   ],
 )
 
@@ -343,13 +378,20 @@ python_library(
 python_library(
   name = 'targets_help',
   sources = ['targets_help.py'],
-  resources = globs('templates/targets_help/*.mustache'),
+  resource_targets = [
+    ':targets_help_resources',
+  ],
   dependencies = [
     ':builddictionary',
     ':common',
     ':console_task',
     ':reflect',
   ],
+)
+
+resources(
+  name = 'targets_help_resources',
+  sources = globs('templates/targets_help/*.mustache'),
 )
 
 python_library(
@@ -369,6 +411,15 @@ python_library(
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
     'src/python/pants/util:meta',
+  ],
+)
+
+python_library(
+  name = 'list_owners',
+  sources = ['list_owners.py'],
+  dependencies = [
+    ':console_task',
+    'src/python/pants/base:source_mapper',
   ],
 )
 

@@ -7,13 +7,26 @@ package org.pantsbuild.zinc
 import java.io.File
 import java.net.URLClassLoader
 import sbt.compiler.javac
-import sbt.{ ClasspathOptions, CompileOptions, CompileSetup, Logger, LoggerReporter, ScalaInstance }
-import sbt.compiler.{ AnalyzingCompiler, CompilerCache, CompileOutput, MixedAnalyzingCompiler, IC }
-import sbt.inc.{ Analysis, AnalysisStore, FileBasedStore, ZincPrivateAnalysis }
+import sbt.{
+  ClasspathOptions,
+  CompileOptions,
+  Logger,
+  LoggerReporter,
+  ScalaInstance
+}
+import sbt.compiler.{
+  AnalyzingCompiler,
+  CompileOutput,
+  CompilerCache,
+  IC,
+  MixedAnalyzingCompiler
+}
+import sbt.inc.ZincPrivateAnalysis
 import sbt.Path._
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 
-import org.pantsbuild.zinc.Cache.Implicits
+import org.pantsbuild.zinc.cache.Cache
+import org.pantsbuild.zinc.cache.Cache.Implicits
 
 object Compiler {
   val CompilerInterfaceId = "compiler-interface"
@@ -22,18 +35,12 @@ object Compiler {
   /**
    * Static cache for zinc compilers.
    */
-  val compilerCache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
+  private val compilerCache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
 
   /**
    * Static cache for resident scala compilers.
    */
-  val residentCache: GlobalsCache = createResidentCache(Setup.Defaults.residentCacheLimit)
-
-  /**
-   * Static cache for compile analyses.  Values must be Options because in get() we don't yet know if, on
-   * a cache miss, the underlying file will yield a valid Analysis.
-   */
-  val analysisCache = Cache[FileFPrint, Option[(Analysis, CompileSetup)]](Setup.Defaults.analysisCacheLimit)
+  private val residentCache: GlobalsCache = createResidentCache(Setup.Defaults.residentCacheLimit)
 
   /**
    * Get or create a zinc compiler based on compiler setup.
@@ -71,10 +78,18 @@ object Compiler {
    */
   def newJavaCompiler(instance: ScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler = {
     val compiler =
-      if (fork || javaHome.isDefined)
+      if (fork || javaHome.isDefined) {
         javac.JavaCompiler.fork(javaHome)
-      else
-        javac.JavaCompiler.local.getOrElse(javac.JavaCompiler.fork(None))
+      } else {
+        Option(javax.tools.ToolProvider.getSystemJavaCompiler).map { jc =>
+          // NB: using backported 0.13.10+ JavaCompiler input
+          new javac.ZincLocalJavaCompiler(jc)
+        }.getOrElse {
+          throw new RuntimeException(
+            "Unable to locate javac directly. Please ensure that a JDK is on zinc's classpath."
+          )
+        }
+      }
 
     val options = ClasspathOptions.javac(compiler = false)
     new javac.JavaCompilerAdapter(compiler, instance, options)
@@ -86,43 +101,6 @@ object Compiler {
   def createResidentCache(maxCompilers: Int): GlobalsCache = {
     if (maxCompilers <= 0) CompilerCache.fresh else CompilerCache(maxCompilers)
   }
-
-  /**
-   * Create an analysis store backed by analysisCache.
-   *
-   * TODO: for all but the "output" analysis, the synchronization is overkill; everything upstream is immutable
-   */
-  def cachedAnalysisStore(cacheFile: File): AnalysisStore = {
-    val fileStore = AnalysisStore.cached(FileBasedStore(cacheFile))
-
-    val fprintStore = new AnalysisStore {
-      def set(analysis: Analysis, setup: CompileSetup) {
-        fileStore.set(analysis, setup)
-        FileFPrint.fprint(cacheFile) foreach { analysisCache.put(_, Some((analysis, setup))) }
-      }
-      def get(): Option[(Analysis, CompileSetup)] = {
-        FileFPrint.fprint(cacheFile) flatMap { fprint =>
-          analysisCache.getOrElseUpdate(fprint) {
-            fileStore.get
-          }
-        }
-      }
-    }
-
-    AnalysisStore.sync(AnalysisStore.cached(fprintStore))
-  }
-
-  /**
-   * Analysis for the given file if it is already cached.
-   */
-  def analysisOptionFor(cacheFile: File): Option[Analysis] =
-    cachedAnalysisStore(cacheFile).get map (_._1)
-
-  /**
-   * Check whether an analysis is empty.
-   */
-  def analysisIsEmpty(cacheFile: File): Boolean =
-    analysisOptionFor(cacheFile).isEmpty
 
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.
@@ -149,13 +127,22 @@ object Compiler {
 
   /**
    * Get the compiler interface for this compiler setup. Compile it if not already cached.
+   * NB: This usually occurs within the compilerCache entry lock, but in the presence of
+   * multiple zinc processes (ie, without nailgun) we need to be more careful not to clobber
+   * another compilation attempt.
    */
   def compilerInterface(setup: Setup, scalaInstance: ScalaInstance, log: Logger): File = {
     val dir = setup.cacheDir / interfaceId(scalaInstance.actualVersion)
     val interfaceJar = dir / (CompilerInterfaceId + ".jar")
-    if (!interfaceJar.exists) {
+    if (!interfaceJar.isFile) {
       dir.mkdirs()
-      IC.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, interfaceJar, setup.sbtInterface, scalaInstance, log)
+      val tempJar = File.createTempFile("interface-", ".jar.tmp", dir)
+      try {
+        IC.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, tempJar, setup.sbtInterface, scalaInstance, log)
+        tempJar.renameTo(interfaceJar)
+      } finally {
+        tempJar.delete()
+      }
     }
     interfaceJar
   }
@@ -173,13 +160,9 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
    */
   def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
     import inputs._
-    if (forceClean && Compiler.analysisIsEmpty(cacheFile)) {
-      Util.cleanAllClasses(classesDirectory)
-    }
 
     // load the existing analysis
-    // TODO: differentiate output analysis from input analysis
-    val targetAnalysisStore = Compiler.cachedAnalysisStore(cacheFile)
+    val targetAnalysisStore = AnalysisMap.cachedStore(cacheFile)
     val (previousAnalysis, previousSetup) =
       targetAnalysisStore.get().map {
         case (a, s) => (a, Some(s))
@@ -200,8 +183,8 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
         javacOptions,
         previousAnalysis,
         previousSetup,
-        analysisMap = analysisMap.get,
-        definesClass,
+        analysisMap = analysisMap.getAnalysis _,
+        definesClass = analysisMap.definesClass _,
         reporter,
         compileOrder,
         skip = false,

@@ -1,7 +1,12 @@
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 python_library(
   name='python',
   sources=globs('*.py'),
-  resources=globs('templates/python_eval/*.mustache'),
+  resource_targets=[
+    ':resources'
+  ],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -12,6 +17,7 @@ python_library(
     '3rdparty/python:setuptools',
     '3rdparty/python:six',
     'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/python/tasks/checkstyle:all',
@@ -40,4 +46,9 @@ python_library(
     'src/python/pants/util:strutil',
     'src/python/pants/util:xml_parser',
   ]
+)
+
+resources(
+  name='resources',
+  sources=globs('templates/python_eval/*.mustache'),
 )
