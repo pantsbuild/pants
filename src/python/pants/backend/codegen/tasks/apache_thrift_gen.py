@@ -96,8 +96,7 @@ class ApacheThriftGen(SimpleCodegenTask):
         return self._service_deps
     return self._deps
 
-  @property
-  def synthetic_target_type(self):
+  def synthetic_target_type(self, target):
     return JavaLibrary
 
   def is_gentarget(self, target):

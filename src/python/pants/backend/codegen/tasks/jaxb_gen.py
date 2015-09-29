@@ -38,8 +38,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     java_main = 'com.sun.tools.internal.xjc.Driver'
     return self.runjava(classpath=classpath, main=java_main, args=args, workunit_name='xjc')
 
-  @property
-  def synthetic_target_type(self):
+  def synthetic_target_type(self, target):
     return JavaLibrary
 
   def is_gentarget(self, target):
