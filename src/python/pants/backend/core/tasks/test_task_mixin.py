@@ -7,18 +7,34 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
-from pants.backend.core.tasks.task import TaskBase
-
 
 class TestTaskMixin(object):
-  """A mixin to combine with test runner tasks
+  """A mixin to combine with test runner tasks. The task
   """
 
   def execute(self):
+    """Run the task
+    """
+
     targets = self._get_targets()
+    self._validate_targets(targets)
     self._execute(targets)
 
   @abstractmethod
   def _get_targets(self):
-    """Ensures the targets are valid, returns the ones that need to be run
+    """Returns the targets that are relevant test targets
+    """
+
+  @abstractmethod
+  def _validate_targets(self, targets):
+    """Ensures that these targets are valid and should be run
+
+    :param targets: list of the targets to validate
+    """
+
+  @abstractmethod
+  def _execute(self, targets):
+    """Actually goes ahead and runs the tests for the targets
+
+    :param targets: list of the targets whose tests are to be run
     """

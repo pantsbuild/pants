@@ -123,6 +123,9 @@ class PytestRun(TestTaskMixin, PythonTask):
     test_targets = list(filter(is_python_test, self.context.targets()))
     return test_targets
 
+  def _validate_targets(self, targets):
+    pass
+
   def _execute(self, test_targets):
     if test_targets:
       self.context.release_lock()
