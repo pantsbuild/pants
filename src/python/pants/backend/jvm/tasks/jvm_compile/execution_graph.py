@@ -314,9 +314,10 @@ class ExecutionGraph(object):
             log.debug(traceback.format_exc())
             raise ExecutionFailure("Error in on_failure for {}".format(finished_key), e)
 
-          # Propagate failures downstream.
+          # Propagate failures downstream without adding repeated jobs.
           for dependee in direct_dependees:
-            finished_queue.put((dependee, CANCELED, None))
+            if status_table.get(dependee) not in status_table.DONE_STATES:
+              finished_queue.put((dependee, CANCELED, None))
 
         # Log success or failure for this job.
         if result_status is FAILED:
