@@ -5,21 +5,21 @@ python_library(
   name='bin',
   sources=globs('*.py'),
   dependencies=[
+    ':plugins',
     '3rdparty/python:ansicolors',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/backend/python:python_setup',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
-    'src/python/pants/base:build_file_address_mapper',
-    'src/python/pants/base:build_file_parser',
-    'src/python/pants/base:build_graph',
     'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/base:extension_loader',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:scm_build_file',
     'src/python/pants/base:workunit',
+    'src/python/pants/build_graph',
     'src/python/pants/engine',
     'src/python/pants/goal',
     'src/python/pants/goal:context',
@@ -33,6 +33,19 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',
     'src/python/pants/util:memo',
+  ],
+)
+
+target(
+  name = 'plugins',
+  dependencies = [
+    'src/python/pants/backend/authentication',
+    'src/python/pants/backend/codegen:plugin',
+    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/maven_layout:plugin',
+    'src/python/pants/backend/project_info:plugin',
+    'src/python/pants/backend/python:plugin',
   ],
 )
 

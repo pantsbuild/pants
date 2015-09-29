@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
-from pants.base.source_mapper import LazySourceMapper
+from pants.build_graph.source_mapper import LazySourceMapper
 
 
 class ListOwners(ConsoleTask):

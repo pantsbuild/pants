@@ -12,7 +12,7 @@ from hashlib import sha1
 from six import string_types
 
 from pants.backend.core.wrapped_globs import FilesetWithSpec
-from pants.base.address import Address, Addresses, BuildFileAddress
+from pants.base.address import Address, Addresses
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -215,7 +215,7 @@ class Target(AbstractTarget):
     :param address: The Address that maps to this Target in the BuildGraph.
     :type address: :class:`pants.base.address.Address`
     :param build_graph: The BuildGraph that this Target lives within.
-    :type build_graph: :class:`pants.base.build_graph.BuildGraph`
+    :type build_graph: :class:`pants.build_graph.build_graph.BuildGraph`
     :param string type_alias: The type_alias used to construct this target, may be None if
                               constructed directly.
     :param payload: The configuration encapsulated by this target.  Also in charge of most

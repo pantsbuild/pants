@@ -9,7 +9,7 @@ from pants.base.address import Address, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.build_file_parser import BuildFileParser
+from pants.build_graph.build_file_parser import BuildFileParser
 
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and

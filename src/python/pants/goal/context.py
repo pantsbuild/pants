@@ -13,11 +13,11 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.build_graph import BuildGraph
 from pants.base.source_root import SourceRoot
 from pants.base.target import Target
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.build_graph import BuildGraph
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.pidlock import OwnerPrintingPIDLockFile

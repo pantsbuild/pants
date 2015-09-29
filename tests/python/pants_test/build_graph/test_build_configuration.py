@@ -9,10 +9,10 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.base.target import Target
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 

@@ -11,8 +11,8 @@ import traceback
 from pkg_resources import Requirement
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_configuration import BuildConfiguration
 from pants.base.exceptions import BackendConfigurationError
+from pants.build_graph.build_configuration import BuildConfiguration
 
 
 class PluginLoadingError(Exception): pass
@@ -116,7 +116,7 @@ def load_build_configuration_from_source(build_configuration, additional_backend
 def load_backend(build_configuration, backend_package):
   """Installs the given backend package into the build configuration.
 
-  :param build_configuration the :class:``pants.base.build_configuration.BuildConfiguration`` to
+  :param build_configuration the :class:``pants.build_graph.build_configuration.BuildConfiguration`` to
     install the backend plugin into.
   :param string backend_package: the package name containing the backend plugin register module that
     provides the plugin entrypoints.

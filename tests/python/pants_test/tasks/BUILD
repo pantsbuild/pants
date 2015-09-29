@@ -22,7 +22,6 @@ target(
   name = 'tasks',
   dependencies = [
     ':builddict',
-    ':cache_manager',
     ':check_published_deps',
     ':console_task',
     ':detect_duplicates',
@@ -149,17 +148,6 @@ python_tests(
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/python:plugin',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'cache_manager',
-  sources = ['test_cache_manager.py'],
-  dependencies = [
-    ':task_test_base',
-    'tests/python/pants_test/testutils',
-    'src/python/pants/base:build_invalidator',
-    'src/python/pants/base:cache_manager',
   ]
 )
 

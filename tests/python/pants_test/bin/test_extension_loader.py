@@ -15,12 +15,12 @@ from pkg_resources import (Distribution, EmptyProvider, VersionConflict, Working
                            yield_lines)
 
 from pants.backend.core.tasks.task import Task
-from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import BuildConfigurationError
-from pants.base.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
-                                         load_plugins)
 from pants.base.target import Target
+from pants.bin.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
+                                        load_plugins)
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.subsystem.subsystem import Subsystem

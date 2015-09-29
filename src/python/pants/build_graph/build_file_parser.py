@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
-# Target separated appropriately.  The BulidFileParser is intended to have knowledge of just
+# Target separated appropriately.  The BuildFileParser is intended to have knowledge of just
 # BuildFile and Address.
 #
 # Here are some guidelines to help maintain this abstraction:

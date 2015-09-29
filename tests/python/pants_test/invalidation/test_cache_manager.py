@@ -8,8 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import shutil
 import tempfile
 
-from pants.base.build_invalidator import CacheKey, CacheKeyGenerator
-from pants.base.cache_manager import InvalidationCacheManager, InvalidationCheck, VersionedTarget
+from pants.invalidation.build_invalidator import CacheKey, CacheKeyGenerator
+from pants.invalidation.cache_manager import (InvalidationCacheManager, InvalidationCheck,
+                                              VersionedTarget)
 from pants_test.base_test import BaseTest
 
 

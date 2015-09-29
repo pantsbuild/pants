@@ -10,7 +10,7 @@ import os
 import tempfile
 from contextlib import contextmanager
 
-from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.util.contextutil import temporary_dir
 
 
