@@ -24,7 +24,6 @@ from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -449,20 +448,20 @@ class Target(AbstractTarget):
     """Returns ``True`` if this target is derived from no other."""
     return self.derived_from == self
 
-  @memoized_property
+  @property
   def id(self):
-    """A unique and unix safe identifier for the Target.
-    Since other classes use this id to generate new file names and unix system has 255 character
-    limitation on a file name, 200-character limit is chosen as a safe measure.
+    """A unique identifier for the Target.
+
+    The generated id is safe for use as a path name on unix systems.
     """
-    id_candidate = self.address.path_safe_spec
-    if len(id_candidate) >= 200:
-      # two dots + 79 char head + 79 char tail + 40 char sha1
-      return '{}.{}.{}'.format(id_candidate[:79], sha1(id_candidate).hexdigest(), id_candidate[-79:])
-    return id_candidate
+    return self.address.path_safe_spec
 
   @property
   def identifier(self):
+    """A unique identifier for the Target.
+
+    The generated id is safe for use as a path name on unix systems.
+    """
     return self.id
 
   def walk(self, work, predicate=None):
