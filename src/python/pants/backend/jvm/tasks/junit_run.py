@@ -72,7 +72,6 @@ class _JUnitRunner(object):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register('--skip', action='store_true', help='Skip running junit.')
     register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
@@ -837,16 +836,8 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   def execute(self):
     super(JUnitRun, self).execute()
 
-  def _test_target_candidates(self, targets):
-    for target in targets:
-      if isinstance(target, junit_tests):
-        yield target
-
   def _get_targets(self):
-    if not self.get_options().skip:
-      return list(self._test_target_candidates(self.context.targets()))
-    else:
-      return []
+    return [target for target in self.context.targets() if isinstance(target, junit_tests)]
 
   def _validate_targets(self, targets):
     # TODO: move this check to an optional phase in goal_runner, so

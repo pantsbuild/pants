@@ -12,13 +12,19 @@ class TestTaskMixin(object):
   """A mixin to combine with test runner tasks. The task
   """
 
+  @classmethod
+  def register_options(cls, register):
+    super(TestTaskMixin, cls).register_options(register)
+    register('--skip', action='store_true', help='Skip running tests.')
+
   def execute(self):
     """Run the task
     """
 
-    targets = self._get_targets()
-    self._validate_targets(targets)
-    self._execute(targets)
+    if not self.get_options().skip:
+      targets = self._get_targets()
+      self._validate_targets(targets)
+      self._execute(targets)
 
   @abstractmethod
   def _get_targets(self):
