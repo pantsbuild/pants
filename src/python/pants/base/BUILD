@@ -16,16 +16,6 @@ python_library(
 )
 
 python_library(
-  name = 'addressable',
-  sources = ['addressable.py'],
-  dependencies = [
-    ':address',
-    ':build_file_target_factory',
-    'src/python/pants/util:meta',
-  ]
-)
-
-python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
@@ -203,16 +193,6 @@ python_library(
   dependencies = [
     ':deprecated',
     'src/python/pants/build_graph',
-  ],
-)
-
-python_library(
-  name = 'target_addressable',
-  sources = ['target_addressable.py'],
-  dependencies = [
-    '3rdparty/python:six',
-    ':addressable',
-    ':exceptions',
   ],
 )
 

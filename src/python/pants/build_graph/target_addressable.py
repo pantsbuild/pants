@@ -9,8 +9,8 @@ import logging
 
 from six import string_types
 
-from pants.base.addressable import Addressable
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.addressable import Addressable
 
 
 class TargetAddressable(Addressable):
