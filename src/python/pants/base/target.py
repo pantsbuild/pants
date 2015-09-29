@@ -12,7 +12,7 @@ from hashlib import sha1
 from six import string_types
 
 from pants.backend.core.wrapped_globs import FilesetWithSpec
-from pants.base.address import Address, Addresses, BuildFileAddress
+from pants.base.address import Address, Addresses
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -24,6 +24,7 @@ from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
@@ -215,7 +216,7 @@ class Target(AbstractTarget):
     :param address: The Address that maps to this Target in the BuildGraph.
     :type address: :class:`pants.base.address.Address`
     :param build_graph: The BuildGraph that this Target lives within.
-    :type build_graph: :class:`pants.base.build_graph.BuildGraph`
+    :type build_graph: :class:`pants.build_graph.build_graph.BuildGraph`
     :param string type_alias: The type_alias used to construct this target, may be None if
                               constructed directly.
     :param payload: The configuration encapsulated by this target.  Also in charge of most
@@ -448,20 +449,20 @@ class Target(AbstractTarget):
     """Returns ``True`` if this target is derived from no other."""
     return self.derived_from == self
 
-  @property
+  @memoized_property
   def id(self):
-    """A unique identifier for the Target.
-
-    The generated id is safe for use as a path name on unix systems.
+    """A unique and unix safe identifier for the Target.
+    Since other classes use this id to generate new file names and unix system has 255 character
+    limitation on a file name, 200-character limit is chosen as a safe measure.
     """
-    return self.address.path_safe_spec
+    id_candidate = self.address.path_safe_spec
+    if len(id_candidate) >= 200:
+      # two dots + 79 char head + 79 char tail + 40 char sha1
+      return '{}.{}.{}'.format(id_candidate[:79], sha1(id_candidate).hexdigest(), id_candidate[-79:])
+    return id_candidate
 
   @property
   def identifier(self):
-    """A unique identifier for the Target.
-
-    The generated id is safe for use as a path name on unix systems.
-    """
     return self.id
 
   def walk(self, work, predicate=None):

@@ -15,7 +15,7 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
-from pants.base.cache_manager import VersionedTargetSet
+from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 

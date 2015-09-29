@@ -84,12 +84,12 @@ jar_library(name='protobuf-test-import',
 jar_library(name='scrooge-core',
             jars = [
               # used by scrooge-generator in BUILD.tools:scrooge-gen
-              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.20.0'),
+              scala_jar(org='com.twitter', name='scrooge-core', rev='3.20.0'),
             ])
 
 jar_library(name='shapeless',
             jars=[
-              jar(org='com.chuusai', name='shapeless_2.10.4', rev='2.0.0'),
+              scala_jar(org='com.chuusai', name='shapeless', rev='2.2.5'),
             ])
 
 jar_library(name='slf4j-api',
@@ -97,11 +97,11 @@ jar_library(name='slf4j-api',
               jar(org='org.slf4j', name='slf4j-api', rev='1.6.1'),
             ])
 
-jar_library(name = 'spindle-runtime',
-            jars = [
-              jar(org = 'com.foursquare', name = 'spindle-runtime_2.10', rev = '3.0.0-M7'),
+jar_library(name='spindle-runtime',
+            jars=[
+              scala_jar(org='com.foursquare', name='spindle-runtime', rev='3.0.0-M7'),
             ],
-            dependencies = [
+            dependencies=[
               'contrib/spindle/3rdparty:rogue',
             ])
 
@@ -158,5 +158,5 @@ jar_library(name='junit',
 
 jar_library(name='scalatest',
             jars=[
-              jar('org.scalatest', 'scalatest_2.10', '2.2.4')
+              scala_jar('org.scalatest', 'scalatest', '2.2.4')
             ])

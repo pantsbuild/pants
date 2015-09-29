@@ -31,7 +31,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
-from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
 

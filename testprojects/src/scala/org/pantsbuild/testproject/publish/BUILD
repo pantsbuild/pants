@@ -6,7 +6,7 @@ scala_library(name = 'jvm-run-example-lib',
     'testprojects/src/scala/org/pantsbuild/testproject/publish/hello/welcome',
   ],
   sources = ['JvmRunExample.scala'],
-  provides = artifact(org='org.pantsbuild.testproject.publish',
-                      name='jvm-example-lib',
-                      repo=testing,)
+  provides = scala_artifact(org='org.pantsbuild.testproject.publish',
+                            name='jvm-example-lib',
+                            repo=testing,)
 )

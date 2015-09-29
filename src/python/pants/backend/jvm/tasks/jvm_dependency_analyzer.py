@@ -16,7 +16,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.base.build_environment import get_buildroot
-from pants.base.build_graph import sort_targets
+from pants.build_graph.build_graph import sort_targets
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.memo import memoized_property

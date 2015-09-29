@@ -1,6 +1,6 @@
 scala_library(
   name='cache',
-  provides=artifact(
+  provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc-cache',
     repo=public,

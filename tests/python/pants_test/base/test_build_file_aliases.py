@@ -10,8 +10,8 @@ import unittest
 
 from pants.base.address import Address
 from pants.base.build_file_aliases import BuildFileAliases, TargetMacro
-from pants.base.build_graph import BuildGraph
 from pants.base.target import Target
+from pants.build_graph.build_graph import BuildGraph
 
 
 class BuildFileAliasesTest(unittest.TestCase):

@@ -84,11 +84,11 @@ python_library(
     'src/python/pants/backend/maven_layout',
     'src/python/pants/backend/python:python_requirements',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file_parser',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/util:dirutil',
   ],
@@ -192,7 +192,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     ':task',
-    'src/python/pants/base:build_graph',
+    'src/python/pants/build_graph',
     'src/python/pants/base:workunit',
     'src/python/pants/goal',
     'src/python/pants/option',
@@ -284,6 +284,7 @@ python_library(
   dependencies = [
     ':console_task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/util:strutil',
   ],
 )
 
@@ -398,13 +399,12 @@ python_library(
   sources = ['task.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:build_invalidator',
-    'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/cache',
+    'src/python/pants/invalidation',
     'src/python/pants/ivy',
     'src/python/pants/java:executor',
     'src/python/pants/reporting',
@@ -418,7 +418,7 @@ python_library(
   sources = ['list_owners.py'],
   dependencies = [
     ':console_task',
-    'src/python/pants/base:source_mapper',
+    'src/python/pants/build_graph',
   ],
 )
 
@@ -429,7 +429,7 @@ python_library(
     ':console_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_mapper',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:workspace',
   ],
 )

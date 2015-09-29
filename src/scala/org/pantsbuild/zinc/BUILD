@@ -1,6 +1,6 @@
 scala_library(
   name='zinc',
-  provides=artifact(
+  provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc',
     repo=public,

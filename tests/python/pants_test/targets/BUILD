@@ -42,7 +42,7 @@ python_tests(
   sources = ['test_sort_targets.py'],
   dependencies = [
     ':base',
-    'src/python/pants/base:build_graph',
+    'src/python/pants/build_graph',
     'src/python/pants/backend/core/targets:common',
   ]
 )

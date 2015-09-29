@@ -117,6 +117,9 @@ class Depmap(ConsoleTask):
     def output_deps(dep, indent, outputted, stack):
       dep_id, internal = self._dep_id(dep)
 
+      if self.is_minimal and dep_id in outputted:
+        return
+
       if self.path_to:
         # If we hit the search target from self.path_to, yield the stack items and bail.
         if dep_id == self.path_to:
@@ -124,7 +127,7 @@ class Depmap(ConsoleTask):
             yield make_line(dep_id, indent)
           return
       else:
-        if not (dep_id in outputted and self.is_minimal) and self.output_candidate(internal):
+        if self.output_candidate(internal):
           yield make_line(dep_id,
                           0 if self.is_external_only else indent,
                           is_dupe=dep_id in outputted)

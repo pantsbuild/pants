@@ -41,7 +41,7 @@ class JarDependency(object):
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
     """
     self.org = org
-    self.name = name
+    self._base_name = name
     self.rev = rev
     self.force = force
 
@@ -76,6 +76,14 @@ class JarDependency(object):
 
     self.excludes += (Exclude(org, name),)
     return self
+
+  @property
+  def name(self):
+    return self._base_name
+
+  @name.setter
+  def name(self, value):
+    self._base_name = value
 
   def __str__(self):
     return 'JarDependency({})'.format(self.coordinate)
