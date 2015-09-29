@@ -15,6 +15,7 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.core.tasks.test_task import TestTask
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -789,7 +790,7 @@ class Cobertura(_Coverage):
       binary_util.ui_open(coverage_html_file)
 
 
-class JUnitRun(JvmToolTaskMixin, JvmTask):
+class JUnitRun(TestTask, JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
@@ -840,6 +841,9 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
       self._runner = _JUnitRunner(task_exports, self.context)
 
   def execute(self):
+    super(JUnitRun, self).execute()
+
+  def _validate_targets(self):
     if not self.get_options().skip:
       targets = self.context.targets()
       # TODO: move this check to an optional phase in goal_runner, so
@@ -849,4 +853,7 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
           msg = 'JavaTests target must include a non-empty set of sources.'
           raise TargetDefinitionException(target, msg)
 
-      self._runner.execute(targets)
+      return targets
+
+  def _execute(self, targets):
+    self._runner.execute(targets)

@@ -20,6 +20,7 @@ from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
+from pants.backend.core.tasks.test_task import TestTask
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
@@ -66,7 +67,7 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
-class PytestRun(PythonTask):
+class PytestRun(TestTask, PythonTask):
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
     # to avoid confusion when debugging pants tests.
@@ -113,10 +114,16 @@ class PytestRun(PythonTask):
     return True
 
   def execute(self):
+    super(PytestRun, self).execute()
+
+  def _validate_targets(self):
     def is_python_test(target):
       return isinstance(target, PythonTests)
 
     test_targets = list(filter(is_python_test, self.context.targets()))
+    return test_targets
+
+  def _execute(self, test_targets):
     if test_targets:
       self.context.release_lock()
       with self.context.new_workunit(name='run',

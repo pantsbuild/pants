@@ -34,6 +34,7 @@ target(
     ':sorttargets',
     ':targets_help',
     ':task',
+    ':test_task',
     ':what_changed',
   ]
 )
@@ -410,6 +411,14 @@ python_library(
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
     'src/python/pants/util:meta',
+  ],
+)
+
+python_library(
+  name = 'test_task',
+  sources = ['test_task.py'],
+  dependencies = [
+    ':task',
   ],
 )
 
