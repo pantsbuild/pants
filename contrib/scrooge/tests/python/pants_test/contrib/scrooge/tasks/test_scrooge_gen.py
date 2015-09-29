@@ -132,15 +132,14 @@ class ScroogeGenTest(TaskTestBase):
     try:
       Context.add_new_target = MagicMock()
       task.execute()
-      relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
-      spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
-      address = Address.parse(spec=spec)
-      Context.add_new_target.assert_called_once_with(address,
-                                                     library_type,
-                                                     sources=sources,
-                                                     excludes=OrderedSet(),
+      address = task.get_synthetic_address(target)
+
+      Context.add_new_target.assert_called_once_with(address=address,
+                                                     target_type=library_type,
                                                      dependencies=OrderedSet(),
                                                      provides=None,
+                                                     sources=[],
                                                      derived_from=target)
+
     finally:
       Context.add_new_target = saved_add_new_target

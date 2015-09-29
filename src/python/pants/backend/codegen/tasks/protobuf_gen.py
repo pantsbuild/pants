@@ -93,8 +93,7 @@ class ProtobufGen(SimpleCodegenTask):
   def javadeps(self):
     return self.resolve_deps(self.get_options().javadeps)
 
-  @property
-  def synthetic_target_type(self):
+  def synthetic_target_type(self, target):
     return JavaLibrary
 
   def synthetic_target_extra_dependencies(self, target):
