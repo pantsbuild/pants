@@ -10,16 +10,14 @@ import java.io.{
   IOException
 }
 
-import sbt.{
-  CompileSetup,
-  Logger
-}
+import sbt.CompileSetup
 import sbt.inc.{
   Analysis,
   AnalysisStore,
   FileBasedStore,
   Locate
 }
+import sbt.util.Logger
 
 import org.pantsbuild.zinc.cache.{
   Cache,

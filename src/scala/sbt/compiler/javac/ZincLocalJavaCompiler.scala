@@ -7,7 +7,7 @@ package sbt.compiler.javac
 import java.io.{ File, PrintWriter }
 
 import xsbti.Reporter
-import sbt.{ LoggerWriter, Logger }
+import sbt.util.{ Logger, LoggerWriter }
 
 /**
  * TODO: A backport of

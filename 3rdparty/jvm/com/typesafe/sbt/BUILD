@@ -1,5 +1,5 @@
 jar_library(
-  name='incremental-compiler',
+  name='incrementalcompiler',
   jars=[
     # NB: when this is bumped past 0.13.10, please see:
     #   https://rbcommons.com/s/twitter/r/2810/

@@ -5,10 +5,10 @@ package org.pantsbuild.zinc
 
 import java.io.File
 
-import sbt.{
+import sbt.IO
+import sbt.util.{
   ConsoleLogger,
   ConsoleOut,
-  IO,
   Logger
 }
 

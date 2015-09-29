@@ -6,10 +6,10 @@ package sbt.compiler.javac
 
 import java.io.File
 import javax.tools.{ Diagnostic, JavaFileObject, DiagnosticListener }
-
-import sbt.Logger
-import xsbti.{ Severity, Reporter, Maybe }
 import javax.tools.Diagnostic.NOPOS
+
+import sbt.util.Logger
+import xsbti.{ Severity, Reporter, Maybe }
 
 /**
  * TODO: A backport of

@@ -7,7 +7,16 @@
 package org.pantsbuild.zinc.logging
 
 import java.io.{ BufferedOutputStream, File, FileOutputStream, PrintWriter }
-import sbt.{ AbstractLogger, ConsoleLogger, FullLogger, ConsoleOut, Level, Logger, MultiLogger }
+
+import sbt.util.{
+  AbstractLogger,
+  ConsoleLogger,
+  FullLogger,
+  ConsoleOut,
+  Level,
+  Logger,
+  MultiLogger
+}
 
 object Loggers {
   /**

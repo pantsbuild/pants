@@ -7,11 +7,12 @@ package org.pantsbuild.zinc
 import java.io.File
 import java.util.{ List => JList, Map => JMap }
 
-import sbt.Logger
+import scala.collection.JavaConverters._
+
 import sbt.Path._
 import sbt.compiler.IC
 import sbt.inc.{ Analysis, Locate, ZincPrivateAnalysis }
-import scala.collection.JavaConverters._
+import sbt.util.Logger
 import xsbti.compile.CompileOrder
 
 /**

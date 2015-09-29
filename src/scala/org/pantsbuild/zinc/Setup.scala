@@ -6,9 +6,10 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList }
-import sbt.Logger
-import sbt.Path._
 import scala.collection.JavaConverters._
+
+import sbt.Path._
+import sbt.util.Logger
 
 /**
  * All identity-affecting options for a zinc compiler. All fields in this struct

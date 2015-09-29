@@ -10,8 +10,6 @@ import sbt.compiler.javac
 import sbt.{
   ClasspathOptions,
   CompileOptions,
-  Logger,
-  LoggerReporter,
   ScalaInstance
 }
 import sbt.compiler.{
@@ -23,6 +21,7 @@ import sbt.compiler.{
 }
 import sbt.inc.ZincPrivateAnalysis
 import sbt.Path._
+import sbt.util.{ Logger, LoggerReporter }
 import xsbti.compile.{ JavaCompiler, GlobalsCache }
 
 import org.pantsbuild.zinc.cache.Cache
