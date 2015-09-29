@@ -116,7 +116,7 @@ class PytestRun(TestTask, PythonTask):
   def execute(self):
     super(PytestRun, self).execute()
 
-  def _validate_targets(self):
+  def _get_targets(self):
     def is_python_test(target):
       return isinstance(target, PythonTests)
 

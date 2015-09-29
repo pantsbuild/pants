@@ -12,10 +12,10 @@ from pants.backend.core.tasks.task import TaskBase
 
 class TestTask(TaskBase):
   def execute(self):
-    targets = self.validate_targets()
+    targets = self._get_targets()
     self._execute(targets)
 
   @abstractmethod
-  def _validate_targets(self):
+  def _get_targets(self):
     """Ensures the targets are valid, returns the ones that need to be run
     """

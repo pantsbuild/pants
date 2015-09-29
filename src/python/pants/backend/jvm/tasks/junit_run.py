@@ -843,7 +843,7 @@ class JUnitRun(TestTask, JvmToolTaskMixin, JvmTask):
   def execute(self):
     super(JUnitRun, self).execute()
 
-  def _validate_targets(self):
+  def _get_targets(self):
     if not self.get_options().skip:
       targets = self.context.targets()
       # TODO: move this check to an optional phase in goal_runner, so
