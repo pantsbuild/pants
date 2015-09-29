@@ -32,7 +32,7 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
   def __init__(self, confs):
     super(IvyResolveFingerprintStrategy, self).__init__()
-    self._confs = sorted(confs or [])
+    self._confs = sorted(map(str, confs or []))
 
   def compute_fingerprint(self, target):
     hasher = sha1()
@@ -150,7 +150,7 @@ class IvyTaskMixin(TaskBase):
                                               conf=cnf))
 
     # Build the 3rdparty classpath product.
-    for conf in confs:
+    for conf in map(str, confs):
       ivy_info = self._parse_report(resolve_hash_name, conf)
       if not ivy_info:
         continue
@@ -223,7 +223,7 @@ class IvyTaskMixin(TaskBase):
       report_confs = confs or ['default']
       report_paths = []
       resolve_hash_name = global_vts.cache_key.hash
-      for conf in report_confs:
+      for conf in map(str, report_confs):
         report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
         if not os.path.exists(report_path):
           report_missing = True
@@ -303,7 +303,7 @@ class IvyTaskMixin(TaskBase):
 
     confs_to_resolve = confs or ('default',)
     ivy_args.append('-confs')
-    ivy_args.extend(confs_to_resolve)
+    ivy_args.extend(map(str, confs_to_resolve))
     ivy_args.extend(args)
 
     # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better

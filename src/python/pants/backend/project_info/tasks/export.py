@@ -15,26 +15,28 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.jvm.ivy_utils import IvyModuleRef
+from pants.backend.jvm.ivy_utils import IvyConf, IvyModuleRef
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.memo import memoized_property
+from pants.java.executor import SubprocessExecutor
+from pants.util.memo import memoized_method, memoized_property
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin
 # Please add fkorotkov, tdesai to reviews for this file
-class Export(PythonTask, ConsoleTask):
+class Export(IvyTaskMixin, PythonTask, ConsoleTask):
   """Generates a JSON description of the targets as configured in pants.
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
@@ -102,36 +104,51 @@ class Export(PythonTask, ConsoleTask):
              help='Causes libraries with javadocs to be output.')
     register('--sources', default=False, action='store_true',
              help='Causes sources to be output.')
+    register('--resolve', default=True, action='store_true', advanced=True,
+             help='Whether to resolve jars or just depend on the compile classpath.')
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(Export, cls).prepare(options, round_manager)
     if options.libraries or options.libraries_sources or options.libraries_javadocs:
-      # TODO(John Sirois): Clean this up by using IvyUtils in here, passing it the confs we need
-      # as a parameter.
-      # See: https://github.com/pantsbuild/pants/issues/2177
+      round_manager.require_data('java')
+      round_manager.require_data('scala')
+    if not options.resolve:
       round_manager.require_data('compile_classpath')
-
-      # NB: These are fake products that only serve as signals to the upstream producer of
-      # 'compile_classpath' to resolve extra classifiers (ivy confs).  A hack that can go away with
-      # execution of the TODO above.
-      round_manager.require('jar_map_default')
-      if options.libraries_sources:
-        round_manager.require('jar_map_sources')
-      if options.libraries_javadocs:
-        round_manager.require('jar_map_javadoc')
 
   def __init__(self, *args, **kwargs):
     super(Export, self).__init__(*args, **kwargs)
     self.format = self.get_options().formatted
 
+  @memoized_method(key_factory=lambda self, targets: frozenset(targets))
+  def resolve_jars(self, targets):
+    export_classpath = None
+    executor = SubprocessExecutor(DistributionLocator.cached())
+    confs = []
+    if self.get_options().libraries:
+      confs.append('default')
+    if self.get_options().libraries_sources:
+      confs.append(IvyConf('sources', True))
+    if self.get_options().libraries_javadocs:
+      confs.append(IvyConf('javadoc', True))
+    if confs:
+      export_classpath = ClasspathProducts()
+      self.resolve(executor=executor,
+                   targets=targets,
+                   classpath_products=export_classpath,
+                   confs=confs,
+                   extra_args=())
+    return export_classpath
+
   def console_output(self, targets):
     targets_map = {}
     resource_target_map = {}
-    classpath_products = (self.context.products.get_data('compile_classpath')
-                          if self.get_options().libraries else None)
-
     python_interpreter_targets_mapping = defaultdict(list)
+
+    classpath_products = None
+    if self.get_options().libraries:
+      classpath_products = (self.resolve_jars(targets) if self.get_options().resolve
+                            else self.context.products.get_data('compile_classpath'))
 
     def process_target(current_target):
       """

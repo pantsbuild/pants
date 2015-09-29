@@ -168,7 +168,12 @@ class ExportTest(ConsoleTaskTestBase):
       '''.strip())
 
   def execute_export(self, *specs):
-    context = self.context(target_roots=[self.target(spec) for spec in specs])
+    context = self.context(target_roots=[self.target(spec) for spec in specs],
+                           options={
+                             'test_scope': {
+                               'resolve': False,
+                             }
+                           })
     context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
     return self.execute_console_task_given_context(context=context)
 

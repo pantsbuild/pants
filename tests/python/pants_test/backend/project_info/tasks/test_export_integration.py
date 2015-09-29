@@ -74,7 +74,7 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       json_data = self.run_export(test_target,
                                   workdir,
                                   load_libs=True,
-                                  extra_args=['--resolve-ivy-soft-excludes'])
+                                  extra_args=['--export-soft-excludes'])
       self.assertIsNotNone(json_data
                            .get('libraries')
                            .get('com.martiansoftware:nailgun-server:0.9.1'))

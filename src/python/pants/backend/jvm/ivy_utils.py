@@ -189,6 +189,26 @@ class IvyInfo(object):
     return resolved_jars
 
 
+class IvyConf(namedtuple('IvyConf', ['name', 'required'])):
+  """Represents an ivy artifact conf."""
+
+  def __repr__(self):
+    return self.name
+
+  def __str__(self):
+    return self.name
+
+  def __eq__(self, other):
+    if other is None:
+      return False
+    if isinstance(other, IvyConf):
+      return tuple(self) == tuple(other)
+    return str(self) == str(other)
+
+  def __ne__(self, other):
+    return not self.__eq__(other)
+
+
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
 
@@ -351,6 +371,14 @@ class IvyUtils(object):
       org, name = cls.identify(targets)
 
     extra_configurations = [conf for conf in confs if conf and conf != 'default']
+    required_extra_configurations = []
+    optional_extra_configurations = []
+
+    for conf in extra_configurations:
+      if isinstance(conf, IvyConf) and not conf.required:
+        optional_extra_configurations.append(str(conf))
+      else:
+        required_extra_configurations.append(str(conf))
 
     jars_by_key = OrderedDict()
     for jar in jars:
@@ -377,6 +405,8 @@ class IvyUtils(object):
         org=org,
         module=name,
         extra_configurations=extra_configurations,
+        optional_extra_configurations=optional_extra_configurations,
+        required_extra_configurations=required_extra_configurations,
         dependencies=dependencies,
         excludes=excludes,
         overrides=overrides)

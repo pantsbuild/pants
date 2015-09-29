@@ -13,17 +13,19 @@ from collections import defaultdict
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.ivy_utils import IvyConf
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.address import BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.binaries import binary_util
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.memo import memoized_method
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,7 @@ def is_java(target):
   return target.has_sources('.java') or target.is_java
 
 
-class IdeGen(JvmToolTaskMixin, Task):
+class IdeGen(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
@@ -111,20 +113,6 @@ class IdeGen(JvmToolTaskMixin, Task):
     if options.scala:
       round_manager.require('scala')
 
-    # TODO(Garrett Malmquist): Clean this up by using IvyUtils in the caller, passing it confs as
-    # the parameter.
-    # See: https://github.com/pantsbuild/pants/issues/2177
-    round_manager.require_data('compile_classpath')
-
-    # NB: These are fake products that only serve as signals to the upstream producer of
-    # 'compile_classpath' to resolve extra classifiers (ivy confs).  A hack that can go away with
-    # execution of the TODO above.
-    round_manager.require('jar_map_default')
-    if options.source_jars:
-      round_manager.require('jar_map_sources')
-    if options.javadoc_jars:
-      round_manager.require('jar_map_javadoc')
-
   class Error(TaskError):
     """IdeGen Error."""
 
@@ -175,6 +163,23 @@ class IdeGen(JvmToolTaskMixin, Task):
 
     self.intransitive = self.get_options().intransitive
     self.debug_port = self.get_options().debug_port
+
+  @memoized_method
+  def resolve_jars(self):
+    executor = self.create_java_executor()
+    targets = self.context.targets()
+    ide_classpath = ClasspathProducts()
+    confs = ['default']
+    if self.get_options().source_jars:
+      confs.append(IvyConf('sources', False))
+    if self.get_options().javadoc_jars:
+      confs.append(IvyConf('javadoc', False))
+    self.resolve(executor=executor,
+                 targets=targets,
+                 classpath_products=ide_classpath,
+                 confs=confs,
+                 extra_args=())
+    return ide_classpath
 
   def _prepare_project(self):
     targets, self._project = self.configure_project(
@@ -296,7 +301,7 @@ class IdeGen(JvmToolTaskMixin, Task):
     external_javadoc_jar_dir = os.path.join(self.gen_project_workdir, 'external-libjavadoc')
     safe_mkdir(external_javadoc_jar_dir, clean=True)
 
-    classpath_products = self.context.products.get_data('compile_classpath')
+    classpath_products = self.resolve_jars()
     cp_entry_by_classifier_by_orgname = defaultdict(lambda: defaultdict(dict))
     for conf, jar_entry in classpath_products.get_artifact_classpath_entries_for_targets(targets):
       coord = (jar_entry.coordinate.org, jar_entry.coordinate.name)

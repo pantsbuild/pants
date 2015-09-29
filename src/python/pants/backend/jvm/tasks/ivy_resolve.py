@@ -59,14 +59,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def product_types(cls):
-    # TODO(John Sirois): These products support `IdeGen` and `Resolve` signalling their resolve
-    # confs needs (via the 'jar_map_[conf suffix]'). Fix those tasks to do their own resolves.
-    # See: https://github.com/pantsbuild/pants/issues/2177
-    hack_product_signals = ['jar_map_default',
-                            'jar_map_sources',
-                            'jar_map_javadoc']
-
-    return ['compile_classpath'] + hack_product_signals
+    return ['compile_classpath']
 
   @classmethod
   def prepare(cls, options, round_manager):
