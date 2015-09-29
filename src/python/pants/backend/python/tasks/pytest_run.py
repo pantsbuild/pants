@@ -20,7 +20,7 @@ from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.core.tasks.test_task import TestTask
+from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
@@ -67,7 +67,7 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
-class PytestRun(TestTask, PythonTask):
+class PytestRun(TestTaskMixin, PythonTask):
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
     # to avoid confusion when debugging pants tests.

@@ -34,7 +34,7 @@ target(
     ':sorttargets',
     ':targets_help',
     ':task',
-    ':test_task',
+    ':test_task_mixin',
     ':what_changed',
   ]
 )
@@ -415,8 +415,8 @@ python_library(
 )
 
 python_library(
-  name = 'test_task',
-  sources = ['test_task.py'],
+  name = 'test_task_mixin',
+  sources = ['test_task_mixin.py'],
   dependencies = [
     ':task',
   ],

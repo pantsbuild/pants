@@ -10,7 +10,10 @@ from abc import abstractmethod
 from pants.backend.core.tasks.task import TaskBase
 
 
-class TestTask(TaskBase):
+class TestTaskMixin(object):
+  """A mixin to combine with test runner tasks
+  """
+
   def execute(self):
     targets = self._get_targets()
     self._execute(targets)

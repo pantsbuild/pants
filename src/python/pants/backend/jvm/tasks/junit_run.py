@@ -15,7 +15,7 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.test_task import TestTask
+from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -790,7 +790,7 @@ class Cobertura(_Coverage):
       binary_util.ui_open(coverage_html_file)
 
 
-class JUnitRun(TestTask, JvmToolTaskMixin, JvmTask):
+class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
