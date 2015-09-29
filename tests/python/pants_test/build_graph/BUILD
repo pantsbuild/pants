@@ -6,8 +6,11 @@ target(
   name = 'all',
   dependencies = [
     ':build_configuration',
+    ':build_file_aliases',
     ':build_file_parser',
     ':build_graph',
+    ':source_mapper',
+    ':target',
   ]
 )
 
@@ -23,6 +26,15 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name = 'build_file_aliases',
+  sources = ['test_build_file_aliases.py'],
+  dependencies = [
+    'src/python/pants/base:address',
+    'src/python/pants/build_graph',
   ]
 )
 
@@ -59,5 +71,18 @@ python_tests(
     'src/python/pants/base:build_file_aliases',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+
+python_tests(
+  name = 'target',
+  sources = ['test_target.py'],
+  dependencies = [
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

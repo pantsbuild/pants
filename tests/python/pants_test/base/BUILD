@@ -33,7 +33,6 @@ target(
     ':address',
     ':build_environment',
     ':build_file_address_mapper',
-    ':build_file_aliases',
     ':build_root',
     ':cmd_line_spec_parser',
     ':deprecated',
@@ -46,7 +45,6 @@ target(
     ':revision',
     ':run_info',
     ':source_root',
-    ':target',
     ':validation',
     ':worker_pool',
   ]
@@ -113,17 +111,6 @@ python_tests(
   dependencies = [
     'src/python/pants/base:deprecated',
     'src/python/pants:version',
-  ]
-)
-
-python_tests(
-  name = 'build_file_aliases',
-  sources = ['test_build_file_aliases.py'],
-  dependencies = [
-    'src/python/pants/base:address',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:target',
-    'src/python/pants/build_graph',
   ]
 )
 
@@ -199,18 +186,6 @@ python_tests(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'target',
-  sources = ['test_target.py'],
-  dependencies = [
-    'src/python/pants/base:payload',
-    'src/python/pants/base:payload_field',
-    'src/python/pants/base:target',
-    'tests/python/pants_test:base_test',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

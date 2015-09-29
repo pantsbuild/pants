@@ -10,9 +10,9 @@ import logging
 from collections import Iterable, namedtuple
 
 from pants.base.addressable import AddressableCallProxy
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.parse_context import ParseContext
 from pants.base.target_addressable import TargetAddressable
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -44,7 +44,7 @@ class BuildConfiguration(object):
 
     :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
               mappings.
-    :rtype: :class:`pants.base.build_file_aliases.BuildFileAliases`
+    :rtype: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     """
     target_factories_by_alias = self._target_by_alias.copy()
     target_factories_by_alias.update(self._target_macro_factory_by_alias)
@@ -57,7 +57,7 @@ class BuildConfiguration(object):
     """Registers the given aliases to be exposed in parsed BUILD files.
 
     :param aliases: The BuildFileAliases to register.
-    :type aliases: :class:`pants.base.build_file_aliases.BuildFileAliases`
+    :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     """
     if not isinstance(aliases, BuildFileAliases):
       raise TypeError('The aliases must be a BuildFileAliases, given {}'.format(aliases))
