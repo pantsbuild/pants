@@ -489,6 +489,7 @@ class _Coverage(_JUnitRunner):
     paths.
 
     :param targets: the targets which should be mutated.
+    :returns the instrument_classpath ClasspathProducts containing the mutated paths.
     """
     safe_mkdir(self._coverage_instrument_dir, clean=True)
 
@@ -497,24 +498,26 @@ class _Coverage(_JUnitRunner):
     instrumentation_classpath = self._context.products.get_data('instrument_classpath')
 
     for target in targets:
-      if self.is_coverage_target(target):
-        paths = instrumentation_classpath.get_for_target(target, False)
-        for (config, path) in paths:
-          # there are two sorts of classpath entries we see in the compile classpath: jars and dirs
-          # the branches below handle the cloning of those respectively.
-          if os.path.isfile(path):
-            shutil.copy2(path, self._coverage_instrument_dir)
-            new_path = os.path.join(self._coverage_instrument_dir, os.path.basename(path))
-          else:
-            files = os.listdir(path)
-            for file in files:
-              shutil.copy2(file, self._coverage_instrument_dir)
-            new_path = self._coverage_instrument_dir
+      if not self.is_coverage_target(target):
+        continue
+      paths = instrumentation_classpath.get_for_target(target, False)
+      for (config, path) in paths:
+        # there are two sorts of classpath entries we see in the compile classpath: jars and dirs
+        # the branches below handle the cloning of those respectively.
+        if os.path.isfile(path):
+          shutil.copy2(path, self._coverage_instrument_dir)
+          new_path = os.path.join(self._coverage_instrument_dir, os.path.basename(path))
+        else:
+          files = os.listdir(path)
+          for file in files:
+            shutil.copy2(file, self._coverage_instrument_dir)
+          new_path = self._coverage_instrument_dir
 
-          instrumentation_classpath.remove_for_target(target, [(config, path)])
-          instrumentation_classpath.add_for_target(target, [(config, new_path)])
-          self._context.log.debug(
-            "compile_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+        instrumentation_classpath.remove_for_target(target, [(config, path)])
+        instrumentation_classpath.add_for_target(target, [(config, new_path)])
+        self._context.log.debug(
+          "compile_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+    return instrumentation_classpath
 
 
 class Emma(_Coverage):
@@ -660,12 +663,11 @@ class Cobertura(_Coverage):
     self._nothing_to_instrument = True
 
   def instrument(self, targets, tests, compute_junit_classpath):
-    self.initialize_instrument_classpath(targets)
+    instrumentation_classpath = self.initialize_instrument_classpath(targets)
     junit_classpath = compute_junit_classpath()
     cobertura_cp = self._task_exports.tool_classpath('cobertura-instrument')
     aux_classpath = os.pathsep.join(relativize_paths(junit_classpath, get_buildroot()))
     safe_delete(self._coverage_datafile)
-    instrumentation_classpath = self._context.products.get_data('instrument_classpath')
     files_to_instrument = []
     for target in targets:
       if self.is_coverage_target(target):

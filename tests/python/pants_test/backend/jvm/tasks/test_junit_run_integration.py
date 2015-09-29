@@ -48,12 +48,12 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest', 'testprojects/tests/java/org/pantsbuild/testproject/matcher']))
 
   def test_junit_run_with_cobertura_coverage_succeeds(self):
-    def validate_workdir(workdir):
+    with self.run_pants(['clean-all', 'test.junit', 'testprojects/tests/java/org/pantsbuild/testproject/unicode::', '--test-junit-coverage-processor=cobertura', '--test-junit-coverage']) as results:
+      self.assert_success(results)
       # validate that the expected coverage file exists, and it reflects 100% line rate coverage
-      coverage_xml = os.path.join(workdir, 'test/junit/coverage/xml/coverage.xml')
+      coverage_xml = os.path.join(results.workdir, 'test/junit/coverage/xml/coverage.xml')
       self.assertTrue(os.path.isfile(coverage_xml))
       self.assertIn('line-rate="1.0"', open(coverage_xml).read())
-    self.assert_success(self.run_pants(['clean-all', 'test.junit', 'testprojects/tests/java/org/pantsbuild/testproject/unicode::', '--test-junit-coverage-processor=cobertura', '--test-junit-coverage'], workdir_validation=validate_workdir))
 
   def test_junit_run_against_invalid_class_fails(self):
     pants_run = self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest_BAD_CLASS', 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])
