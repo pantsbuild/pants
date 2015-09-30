@@ -48,7 +48,7 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest', 'testprojects/tests/java/org/pantsbuild/testproject/matcher']))
 
   def test_junit_run_with_cobertura_coverage_succeeds(self):
-    with self.run_pants(['clean-all', 'test.junit', 'testprojects/tests/java/org/pantsbuild/testproject/unicode::', '--test-junit-coverage-processor=cobertura', '--test-junit-coverage']) as results:
+    with self.pants_results(['clean-all', 'test.junit', 'testprojects/tests/java/org/pantsbuild/testproject/unicode::', '--test-junit-coverage-processor=cobertura', '--test-junit-coverage']) as results:
       self.assert_success(results)
       # validate that the expected coverage file exists, and it reflects 100% line rate coverage
       coverage_xml = os.path.join(results.workdir, 'test/junit/coverage/xml/coverage.xml')
