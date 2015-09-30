@@ -15,6 +15,7 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -71,7 +72,6 @@ class _JUnitRunner(object):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register('--skip', action='store_true', help='Skip running junit.')
     register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
@@ -224,10 +224,9 @@ class _JUnitRunner(object):
     for these tests instead.
     """
 
-    java_tests_targets = list(self._test_target_candidates(targets))
-    tests_from_targets = dict(list(self._calculate_tests_from_targets(java_tests_targets)))
+    tests_from_targets = dict(list(self._calculate_tests_from_targets(targets)))
 
-    if java_tests_targets and self._tests_to_run:
+    if targets and self._tests_to_run:
       # If there are some junit_test targets in the graph, find ones that match the requested
       # test(s).
       tests_with_targets = {}
@@ -357,18 +356,13 @@ class _JUnitRunner(object):
       for c in self._interpret_test_spec(test_spec):
         yield c
 
-  def _test_target_candidates(self, targets):
-    for target in targets:
-      if isinstance(target, junit_tests):
-        yield target
-
   def _calculate_tests_from_targets(self, targets):
     """
     :param list targets: list of targets to calculate test classes for.
     generates tuples (class_name, target).
     """
     targets_to_classes = self._context.products.get_data('classes_by_target')
-    for target in self._test_target_candidates(targets):
+    for target in targets:
       target_products = targets_to_classes.get(target)
       if target_products:
         for _, classes in target_products.rel_paths():
@@ -789,7 +783,7 @@ class Cobertura(_Coverage):
       binary_util.ui_open(coverage_html_file)
 
 
-class JUnitRun(JvmToolTaskMixin, JvmTask):
+class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
@@ -840,13 +834,18 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
       self._runner = _JUnitRunner(task_exports, self.context)
 
   def execute(self):
-    if not self.get_options().skip:
-      targets = self.context.targets()
-      # TODO: move this check to an optional phase in goal_runner, so
-      # that missing sources can be detected early.
-      for target in targets:
-        if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
-          msg = 'JavaTests target must include a non-empty set of sources.'
-          raise TargetDefinitionException(target, msg)
+    super(JUnitRun, self).execute()
 
-      self._runner.execute(targets)
+  def _get_targets(self):
+    return [target for target in self.context.targets() if isinstance(target, junit_tests)]
+
+  def _validate_targets(self, targets):
+    # TODO: move this check to an optional phase in goal_runner, so
+    # that missing sources can be detected early.
+    for target in targets:
+      if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
+        msg = 'JavaTests target must include a non-empty set of sources.'
+        raise TargetDefinitionException(target, msg)
+
+  def _execute(self, targets):
+    self._runner.execute(targets)
