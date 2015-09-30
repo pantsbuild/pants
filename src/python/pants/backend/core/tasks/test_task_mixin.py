@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
+from pants.util.timeout import Timeout
+
 
 class TestTaskMixin(object):
   """A mixin to combine with test runner tasks.
@@ -25,8 +27,7 @@ class TestTaskMixin(object):
     """Run the task
     """
 
-    options = self.get_options()
-    if not options.skip:
+    if not self.get_options().skip:
       targets = self._get_targets()
       self._validate_targets(targets)
       timeout = self._timeout_for_targets(targets)
@@ -35,6 +36,11 @@ class TestTaskMixin(object):
       
   def _timeout_for_targets(self, targets):
     timeouts = [target.timeout for target in targets]
+    if 0 in timeouts or None in timeouts:
+      timeout = None
+    else:
+      timeout = sum(timeouts)
+
     if self.get_options().timeouts:
       if not timeout:
         return self.get_options().default_timeout
