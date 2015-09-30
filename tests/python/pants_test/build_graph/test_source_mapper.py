@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 # TODO: Create a dummy target type in this test and remove this dep.
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.source_mapper import LazySourceMapper, SpecSourceMapper
 from pants_test.base_test import BaseTest
 

@@ -9,9 +9,9 @@ import os
 import unittest
 
 from pants.base.address import Address
-from pants.base.build_file_aliases import BuildFileAliases, TargetMacro
-from pants.base.target import Target
+from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.target import Target
 
 
 class BuildFileAliasesTest(unittest.TestCase):

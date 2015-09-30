@@ -53,8 +53,8 @@ from pants.backend.jvm.tasks.prepare_services import PrepareServices
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.deprecated import deprecated
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 

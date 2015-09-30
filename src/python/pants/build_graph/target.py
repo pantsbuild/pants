@@ -473,9 +473,9 @@ class Target(AbstractTarget):
     work and descending. Work can return targets in which case these will be added to the walk
     candidate set if not already walked.
 
-    :param work: Callable that takes a :py:class:`pants.base.target.Target`
+    :param work: Callable that takes a :py:class:`pants.build_graph.target.Target`
       as its single argument.
-    :param predicate: Callable that takes a :py:class:`pants.base.target.Target`
+    :param predicate: Callable that takes a :py:class:`pants.build_graph.target.Target`
       as its single argument and returns True if the target should passed to ``work``.
     """
     if not callable(work):

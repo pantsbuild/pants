@@ -11,7 +11,7 @@ import os
 from collections import namedtuple
 
 from pants.base.hash_utils import hash_all
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.fs.fs import safe_filename
 from pants.util.dirutil import safe_mkdir
 

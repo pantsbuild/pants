@@ -47,9 +47,9 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -62,8 +62,8 @@ python_tests(
     'src/python/pants/backend/core/tasks:filter',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
@@ -102,7 +102,7 @@ python_tests(
   sources=['test_mutex_task_mixin.py'],
   dependencies=[
     'src/python/pants/backend/core/tasks:mutex_task_mixin',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
   ]
@@ -133,8 +133,7 @@ python_tests(
   sources=['test_target_filter_task_mixin.py'],
   dependencies=[
     'src/python/pants/backend/core/tasks:target_filter_task_mixin',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )

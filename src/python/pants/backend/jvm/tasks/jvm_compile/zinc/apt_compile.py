@@ -9,7 +9,7 @@ import os
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.util.dirutil import safe_open
 
 

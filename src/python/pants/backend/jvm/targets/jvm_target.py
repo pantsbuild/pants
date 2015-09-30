@@ -14,7 +14,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
 
 

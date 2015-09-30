@@ -14,8 +14,8 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TargetDefinitionException, TaskError
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.products import MultipleRootedProducts
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem

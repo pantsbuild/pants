@@ -39,8 +39,8 @@ from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 

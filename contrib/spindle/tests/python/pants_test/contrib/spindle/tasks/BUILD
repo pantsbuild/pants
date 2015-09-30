@@ -17,7 +17,7 @@ python_tests(
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ],
 )

@@ -9,8 +9,8 @@ import six
 
 from pants.base.address import Address, parse_spec
 from pants.base.address_lookup_error import AddressLookupError
-from pants.base.target import Target
 from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 

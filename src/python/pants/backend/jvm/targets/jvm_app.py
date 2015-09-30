@@ -15,7 +15,7 @@ from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import BundleField, PrimitiveField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 class RelativeToMapper(object):

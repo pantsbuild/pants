@@ -6,7 +6,7 @@ contrib_plugin(
   dependencies=[
     'contrib/spindle/src/python/pants/contrib/spindle/targets',
     'contrib/spindle/src/python/pants/contrib/spindle/tasks',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.spindle',

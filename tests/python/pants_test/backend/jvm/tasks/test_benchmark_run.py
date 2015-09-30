@@ -10,7 +10,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
