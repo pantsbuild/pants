@@ -33,7 +33,7 @@ python_tests(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/targets:go_binary',
     'contrib/go/src/python/pants/contrib/go/tasks:go_binary_create',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
@@ -52,7 +52,7 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go:plugin',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )

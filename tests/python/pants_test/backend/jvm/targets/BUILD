@@ -16,7 +16,7 @@ python_tests(
   sources=['test_jar_library.py'],
   dependencies=[
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )
@@ -40,7 +40,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload_field',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )

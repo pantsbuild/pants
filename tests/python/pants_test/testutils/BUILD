@@ -5,8 +5,8 @@ python_library(
   name = 'testutils',
   sources = globs('*.py'),
   dependencies = [
-    'src/python/pants/base:target',
-    'src/python/pants/reporting',
     'src/python/pants/backend/core/targets:common',
+    'src/python/pants/build_graph',
+    'src/python/pants/reporting',
   ],
 )

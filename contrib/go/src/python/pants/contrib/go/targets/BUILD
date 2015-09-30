@@ -50,6 +50,6 @@ python_library(
   name='go_target',
   sources=['go_target.py'],
   dependencies=[
-    'src/python/pants/base:target'
+    'src/python/pants/build_graph'
   ]
 )

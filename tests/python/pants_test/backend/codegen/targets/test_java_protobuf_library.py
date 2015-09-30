@@ -11,7 +11,7 @@ from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibr
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 

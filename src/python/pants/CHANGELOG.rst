@@ -150,7 +150,7 @@ If you want to find out where options are coming from, the `options` goal can he
 If you're not sure which target(s) own a given file::
 
     $ ./pants -q list-owners -- src/python/pants/base/target.py
-    src/python/pants/base:target
+    src/python/pants/build_graph
 
 The latter comes from new contributor Tansy Arron-Walker.
 

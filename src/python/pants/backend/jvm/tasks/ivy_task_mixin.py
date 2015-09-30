@@ -96,7 +96,7 @@ class IvyTaskMixin(TaskBase):
     :param executor: A java executor to run ivy with.
     :type executor: :class:`pants.java.executor.Executor`
     :param targets: The targets to resolve jvm dependencies for.
-    :type targets: :class:`collections.Iterable` of :class:`pants.base.target.Target`
+    :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
     :param classpath_products: The classpath products to populate with the results of the resolve.
     :type classpath_products: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
     :param confs: The ivy configurations to resolve; ('default',) by default.
@@ -186,7 +186,7 @@ class IvyTaskMixin(TaskBase):
     returned, ie: ([], {}, None).
 
     :param targets: The targets to resolve jvm dependencies for.
-    :type targets: :class:`collections.Iterable` of :class:`pants.base.target.Target`
+    :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
     :param executor: A java executor to run ivy with.
     :type executor: :class:`pants.java.executor.Executor`
 

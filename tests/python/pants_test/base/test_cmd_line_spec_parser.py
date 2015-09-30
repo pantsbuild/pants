@@ -9,9 +9,9 @@ import os
 import re
 
 from pants.base.address import Address
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.target import Target
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 

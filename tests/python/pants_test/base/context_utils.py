@@ -11,8 +11,8 @@ from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
 
-from pants.base.target import Target
 from pants.base.workunit import WorkUnit
+from pants.build_graph.target import Target
 from pants.goal.context import Context
 from pants_test.option.util.fakes import create_options
 

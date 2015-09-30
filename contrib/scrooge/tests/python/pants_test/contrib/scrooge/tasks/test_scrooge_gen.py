@@ -14,8 +14,8 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase

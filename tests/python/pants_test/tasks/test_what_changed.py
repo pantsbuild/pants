@@ -20,8 +20,8 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.workspace import Workspace
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 

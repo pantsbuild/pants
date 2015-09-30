@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from pants.base.target import Target
 from pants.build_graph.build_graph import sort_targets
+from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.util.dirutil import safe_mkdir
 

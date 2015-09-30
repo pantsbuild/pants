@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 

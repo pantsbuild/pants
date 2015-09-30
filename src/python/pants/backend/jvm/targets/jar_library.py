@@ -13,7 +13,7 @@ from pants.base.address import Address
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, JarsField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 class JarLibrary(Target):

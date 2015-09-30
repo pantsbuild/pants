@@ -10,8 +10,8 @@ import os
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_manual import manual
+from pants.build_graph.build_file_aliases import BuildFileAliases
 
 
 public_repo = Repository(name='public',

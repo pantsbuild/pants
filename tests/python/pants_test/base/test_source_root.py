@@ -13,7 +13,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.address import Address, parse_spec
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.source_root import SourceRoot, SourceRootTree
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 class TestTarget(Target):
