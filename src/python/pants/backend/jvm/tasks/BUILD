@@ -70,9 +70,9 @@ python_library(
     ':jar_task',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/subsystems:shader',
-    'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/invalidation',
     'src/python/pants/ivy',
     'src/python/pants/java:executor',
     'src/python/pants/java:util',
@@ -174,9 +174,9 @@ python_library(
     ':nailgun_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/invalidation',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
@@ -187,12 +187,13 @@ python_library(
   name = 'ivy_task_mixin',
   sources = ['ivy_task_mixin.py'],
   dependencies = [
+    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:jar_dependency_utils',
-    'src/python/pants/base:cache_manager',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/invalidation',
     'src/python/pants/ivy',
     'src/python/pants/java:util',
     'src/python/pants/util:memo',
@@ -237,11 +238,10 @@ python_library(
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
-    'src/python/pants/base:build_file_parser',
-    'src/python/pants/base:build_graph',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/option',
     'src/python/pants/scm',
@@ -252,7 +252,7 @@ python_library(
 
 resources(
   name = 'jar_publish_resources',
-  sources = globs('templates/jar_publish/*.mustache', 'templates/ivy_resolve/*.mustache'),
+  sources = globs('templates/jar_publish/*.mustache'),
 )
 
 python_library(
@@ -329,10 +329,10 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_graph',
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/build_graph',
   ]
 )
 
@@ -344,11 +344,11 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_graph',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',

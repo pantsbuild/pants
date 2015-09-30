@@ -1,6 +1,107 @@
 RELEASE HISTORY
 ===============
 
+0.0.50 (9/25/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release removes the 'global' jvm compile strategy in favor of the 'isolated' strategy and
+switches the default java incremental compilation frontend from jmake to zinc.  If you were using
+'global' and/or jmake you'll have some pants.ini cleanup to do.  You can run the migration tool
+from the `pantsbuild/pants repository <https://github.com/pantsbuild/pants>`_ by cloning the repo
+and running the following command from there against your own repo's pants.ini::
+
+    pantsbuild/pants $ ./pants run migrations/options/src/python:migrate_config -- [path to your repo's pants.ini]
+
+There have been several additional deprecated APIs removed in this release, please review the
+API Changes section below.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove artifacts from JarDependency; Kill IvyArtifact.
+  `RB #2858 <https://rbcommons.com/s/twitter/r/2858>`_
+
+* Kill deprecated `BuildFileAliases.create` method.
+  `RB #2888 <https://rbcommons.com/s/twitter/r/2888>`_
+
+* Remove the deprecated `SyntheticAddress` class.
+  `RB #2886 <https://rbcommons.com/s/twitter/r/2886>`_
+
+* Slim down the API of the Config class and move it to options/.
+  `RB #2865 <https://rbcommons.com/s/twitter/r/2865>`_
+
+* Remove the JVM global compile strategy, switch default java compiler to zinc
+  `RB #2852 <https://rbcommons.com/s/twitter/r/2852>`_
+
+* Support arbitrary expressions in option values.
+  `RB #2860 <https://rbcommons.com/s/twitter/r/2860>`_
+
+Bugfixes
+~~~~~~~~
+
+* Change jar-tool to use CONCAT_TEXT by default for handling duplicates under META-INF/services
+  `RB #2881 <https://rbcommons.com/s/twitter/r/2881>`_
+
+* Upgrade to jarjar 1.6.0.
+  `RB #2880 <https://rbcommons.com/s/twitter/r/2880>`_
+
+* Improve error handling for nailgun client connection attempts
+  `RB #2869 <https://rbcommons.com/s/twitter/r/2869>`_
+
+* Fix Go targets to glob more than '.go' files.
+  `RB #2873 <https://rbcommons.com/s/twitter/r/2873>`_
+
+* Defend against concurrent bootstrap of the zinc compiler interface
+  `RB #2872 <https://rbcommons.com/s/twitter/r/2872>`_
+  `RB #2867 <https://rbcommons.com/s/twitter/r/2867>`_
+  `RB #2866 <https://rbcommons.com/s/twitter/r/2866>`_
+
+* Fix missing underscore, add simple unit test
+  `RB #2805 <https://rbcommons.com/s/twitter/r/2805>`_
+  `RB #2862 <https://rbcommons.com/s/twitter/r/2862>`_
+
+* Fix a protocol bug in `GopkgInFetcher` for v0's.
+  `RB #2857 <https://rbcommons.com/s/twitter/r/2857>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow resolving buildcache hosts via a REST service
+  `RB #2815 <https://rbcommons.com/s/twitter/r/2815>`_
+
+* Implement profiling inside pants.
+  `RB #2885 <https://rbcommons.com/s/twitter/r/2885>`_
+
+* Adds a new CONCAT_TEXT rule to jar tool to handle text files that might be missing the last newline.
+  `RB #2875 <https://rbcommons.com/s/twitter/r/2875>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Enable Future compatibility style checks
+  `RB #2884 <https://rbcommons.com/s/twitter/r/2884>`_
+
+* Fix another scoped option issue in the test harnesses
+  `RB #2850 <https://rbcommons.com/s/twitter/r/2850>`_
+  `RB #2870 <https://rbcommons.com/s/twitter/r/2870>`_
+
+* Fix go_local_source_test_base.py for OSX.
+  `RB #2882 <https://rbcommons.com/s/twitter/r/2882>`_
+
+* Fix javadocs and add jvm doc gen to CI.
+  `Issue #65 <https://github.com/pantsbuild/pants/issues/65>`_
+  `RB #2877 <https://rbcommons.com/s/twitter/r/2877>`_
+
+* Fixup release dry runs; use isolated plugin cache.
+  `RB #2874 <https://rbcommons.com/s/twitter/r/2874>`_
+
+* Fix scoped options initialization in test
+  `RB #2815 <https://rbcommons.com/s/twitter/r/2815>`_
+  `RB #2850 <https://rbcommons.com/s/twitter/r/2850>`_
+
 0.0.49 (9/21/2015)
 ------------------
 

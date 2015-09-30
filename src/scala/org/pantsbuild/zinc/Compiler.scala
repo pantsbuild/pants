@@ -127,13 +127,22 @@ object Compiler {
 
   /**
    * Get the compiler interface for this compiler setup. Compile it if not already cached.
+   * NB: This usually occurs within the compilerCache entry lock, but in the presence of
+   * multiple zinc processes (ie, without nailgun) we need to be more careful not to clobber
+   * another compilation attempt.
    */
   def compilerInterface(setup: Setup, scalaInstance: ScalaInstance, log: Logger): File = {
     val dir = setup.cacheDir / interfaceId(scalaInstance.actualVersion)
     val interfaceJar = dir / (CompilerInterfaceId + ".jar")
-    if (!interfaceJar.exists) {
+    if (!interfaceJar.isFile) {
       dir.mkdirs()
-      IC.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, interfaceJar, setup.sbtInterface, scalaInstance, log)
+      val tempJar = File.createTempFile("interface-", ".jar.tmp", dir)
+      try {
+        IC.compileInterfaceJar(CompilerInterfaceId, setup.compilerInterfaceSrc, tempJar, setup.sbtInterface, scalaInstance, log)
+        tempJar.renameTo(interfaceJar)
+      } finally {
+        tempJar.delete()
+      }
     }
     interfaceJar
   }

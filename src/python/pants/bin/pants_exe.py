@@ -10,8 +10,18 @@ import sys
 import traceback
 import warnings
 
-from pants.base.build_environment import get_buildroot
-from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer
+from colors import green
+
+
+# We want to present warnings to the user, set this up before importing any of our own code,
+# to ensure all deprecation warnings are seen, including module deprecations.
+# The "default" action displays a warning for a particular file and line number exactly once.
+# See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete list.
+warnings.simplefilter('default', DeprecationWarning)
+
+from pants.base.build_environment import get_buildroot  # isort:skip
+from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer  # isort:skip
+from pants.bin.repro import Reproducer  # isort:skip
 
 
 class _Exiter(object):
@@ -39,7 +49,7 @@ class _Exiter(object):
   def unhandled_exception_hook(self, exception_class, exception, tb):
     msg = ''
     if self._is_print_backtrace:
-      msg = '\nException caught:\n' + ''.join(self._format_tb(tb))
+      msg = '\nException caught: ({})\n{}'.format(type(exception), ''.join(self._format_tb(tb)))
     if str(exception):
       msg += '\nException message: {}\n'.format(exception)
     else:
@@ -53,12 +63,6 @@ class _Exiter(object):
 
 
 def _run(exiter):
-  # We want to present warnings to the user, set this up early to ensure all warnings are seen.
-  # The "default" action displays a warning for a particular file and line number exactly once.
-  # See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete action
-  # list.
-  warnings.simplefilter('default')
-
   # Bootstrap options and logging.
   options, build_config = OptionsInitializer().setup()
 
@@ -71,9 +75,37 @@ def _run(exiter):
   # Determine the build root dir.
   root_dir = get_buildroot()
 
-  # Setup and run GoalRunner.
-  goal_runner = GoalRunner.Factory(root_dir, options, build_config, run_tracker, reporting).setup()
-  result = goal_runner.run()
+  # Capture a repro of the 'before' state for this build, if needed.
+  repro = Reproducer.global_instance().create_repro()
+  if repro:
+    repro.capture(run_tracker.run_info.get_as_dict())
+
+  # Set up and run GoalRunner.
+  def run():
+    goal_runner = GoalRunner.Factory(root_dir, options, build_config,
+                                     run_tracker, reporting).setup()
+    return goal_runner.run()
+
+  # Run with profiling, if requested.
+  profile_path = os.environ.get('PANTS_PROFILE')
+  if profile_path:
+    import cProfile
+    profiler = cProfile.Profile()
+    try:
+      result = profiler.runcall(run)
+    finally:
+      profiler.dump_stats(profile_path)
+      print('Dumped profile data to {}'.format(profile_path))
+      view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && '
+                       'open {path}.png'.format(path=profile_path))
+      print('Use, e.g., {} to render and view.'.format(view_cmd))
+  else:
+    result = run()
+
+  if repro:
+    # TODO: Have Repro capture the 'after' state (as a diff) as well?
+    repro.log_location_of_repro_file()
+
   exiter.do_exit(result)
 
 

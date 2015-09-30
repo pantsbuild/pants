@@ -5,16 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import ast
 from textwrap import dedent
 
 import six
 
 
-def parse_literal(val, acceptable_types, name=None, raise_type=ValueError):
-  """Attempts to parse the given `val` as a python literal of the specified `acceptable_types`.
+def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
+  """Attempts to parse the given `val` as a python expression of the specified `acceptable_types`.
 
-  :param string val: A string containing a python literal.
+  :param string val: A string containing a python expression.
   :param acceptable_types: The acceptable types of the parsed object.
   :type acceptable_types: type|tuple of types.  The tuple may be nested; ie anything `isinstance`
                           accepts.
@@ -44,8 +43,8 @@ def parse_literal(val, acceptable_types, name=None, raise_type=ValueError):
     return '\n'.join(lines)
 
   try:
-    parsed_value = ast.literal_eval(val)
-  except ValueError as e:
+    parsed_value = eval(val)
+  except (ValueError, SyntaxError) as e:
     raise raise_type(dedent("""\
       The {name} cannot be evaluated as a literal expression: {error}
       Given raw value:

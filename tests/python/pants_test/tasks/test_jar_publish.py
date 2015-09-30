@@ -14,18 +14,16 @@ from mock import Mock
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
-from pants.backend.jvm.targets.jar_dependency import IvyArtifact
+from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jar_publish import JarPublish, PomWriter
+from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
-from pants.base.generator import TemplateData
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants_test.tasks.task_test_base import TaskTestBase
-from pants_test.testutils.compile_strategy_utils import set_compile_strategies
 
 
 class JarPublishTest(TaskTestBase):
@@ -54,6 +52,7 @@ class JarPublishTest(TaskTestBase):
       },
       objects={
         'artifact': Artifact,
+        'scala_artifact': ScalaArtifact,
         'internal': Repository(name='internal', url='http://example.com',
                                push_db_basedir=self.push_db_basedir),
       },
@@ -62,11 +61,11 @@ class JarPublishTest(TaskTestBase):
   def _prepare_for_publishing(self, with_alias=False):
     targets = {}
     targets['a'] = self.create_library('a', 'java_library', 'a', ['A.java'],
-                                       provides="""artifact(org='com.example', name='nail', repo=internal)""")
+      provides="""artifact(org='com.example', name='nail', repo=internal)""")
 
     targets['b'] = self.create_library('b', 'java_library', 'b', ['B.java'],
-                                       provides="""artifact(org='com.example', name='shoe', repo=internal)""",
-                                       dependencies=['a'])
+      provides="""artifact(org='com.example', name='shoe', repo=internal)""",
+      dependencies=['a'])
 
     if with_alias:
       # add an alias target between c and b
@@ -76,8 +75,8 @@ class JarPublishTest(TaskTestBase):
       c_deps = ['b']
 
     targets['c'] = self.create_library('c', 'java_library', 'c', ['C.java'],
-                                       provides="""artifact(org='com.example', name='horse', repo=internal)""",
-                                       dependencies=c_deps)
+      provides="""artifact(org='com.example', name='horse', repo=internal)""",
+      dependencies=c_deps)
 
     return targets.values()
 
@@ -85,7 +84,6 @@ class JarPublishTest(TaskTestBase):
     return {
       'internal': {
         'resolver': 'example.com',
-        'confs': ['default', 'sources', 'docs', 'changelog'],
       }
     }
 
@@ -105,7 +103,6 @@ class JarPublishTest(TaskTestBase):
     repos = {
       'another-repo': {
         'resolver': 'example.org',
-        'confs': ['default', 'sources', 'docs', 'changelog'],
       }
     }
 
@@ -121,7 +118,6 @@ class JarPublishTest(TaskTestBase):
           assert "Repository internal has no" in str(e)
           raise e
 
-  @set_compile_strategies
   def test_publish_local_dryrun(self):
     targets = self._prepare_for_publishing()
 
@@ -250,13 +246,6 @@ class JarPublishTest(TaskTestBase):
   def test_publish_local_only(self):
     with pytest.raises(TaskError):
       self.create_task(self.context())
-
-  def test_publish_classifiers(self):
-    artifacts = map(lambda x: IvyArtifact(x, classifier=x), ['a', 'c', 'b'])
-    p = PomWriter(None, None)
-    c = p.classifiers('a', artifacts)
-    r = map(lambda x: TemplateData(classifier=x), ['a', 'b', 'c'])
-    self.assertEquals(r, c)
 
 
 class FailNTimes(object):

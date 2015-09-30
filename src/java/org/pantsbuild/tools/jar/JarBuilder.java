@@ -134,8 +134,15 @@ public class JarBuilder implements Closeable {
 
     /**
      * This action appends the content of the duplicate entry to the original entry.
+     * Treats the resources are binary files.
      */
     CONCAT,
+
+    /**
+     * Same as CONCAT, but treats these entries as newline delimited text files. Appends a newline
+     * to the end of the file if needed in order to separate file entries.
+     */
+    CONCAT_TEXT,
 
     /**
      * This action throws a {@link DuplicateEntryException}.
@@ -214,12 +221,13 @@ public class JarBuilder implements Closeable {
 
     /**
      * Creates a handler that merges well-known mergeable resources and otherwise skips duplicates.
-     * <p/>
+     * <p>
      * Merged resources include META-INF/services/ files.
+     * </p>
      */
     public static DuplicateHandler skipDuplicatesConcatWellKnownMetadata() {
       DuplicatePolicy concatServices =
-          DuplicatePolicy.pathMatches("^META-INF/services/", DuplicateAction.CONCAT);
+          DuplicatePolicy.pathMatches("^META-INF/services/", DuplicateAction.CONCAT_TEXT);
       ImmutableList<DuplicatePolicy> policies = ImmutableList.of(concatServices);
       return new DuplicateHandler(DuplicateAction.SKIP, policies);
     }
@@ -361,14 +369,56 @@ public class JarBuilder implements Closeable {
     };
   }
 
-  private static final class NamedByteSource extends ByteSource {
+  /**
+   * Input stream that always insures that a non-empty stream ends with a newline.
+   */
+  private static class NewlineAppendingInputStream extends InputStream {
+    private InputStream underlyingStream;
+    private int lastByteRead = -1;
+    private boolean atEOS = false;
+
+    public NewlineAppendingInputStream(InputStream stream) {
+      this.underlyingStream = stream;
+    }
+
+    @Override public int read() throws IOException {
+      if (atEOS) {
+        return -1;
+      }
+
+      int nextByte = this.underlyingStream.read();
+      if (nextByte == -1) {
+
+        atEOS = true;
+        if (lastByteRead == -1 || lastByteRead == '\n') {
+          return -1;
+        }
+        return '\n';
+      }
+      lastByteRead = nextByte;
+      return nextByte;
+    }
+  }
+
+  private static final class NamedTextByteSource extends NamedByteSource {
+    private NamedTextByteSource(NamedByteSource source) {
+      super(source.source, source.name, source.inputSupplier);
+    }
+
+    @Override
+    public InputStream openStream() throws IOException {
+      return new NewlineAppendingInputStream(inputSupplier.openStream());
+    }
+  }
+
+  private static class NamedByteSource extends ByteSource {
     static NamedByteSource create(Source source, String name, ByteSource inputSupplier) {
       return new NamedByteSource(source, name, inputSupplier);
     }
 
-    private final Source source;
-    private final String name;
-    private final ByteSource inputSupplier;
+    protected final Source source;
+    protected final String name;
+    protected final ByteSource inputSupplier;
 
     private NamedByteSource(Source source, String name, ByteSource inputSupplier) {
       this.source = source;
@@ -400,6 +450,19 @@ public class JarBuilder implements Closeable {
      * Returns the path this entry will be added into the jar at.
      */
     String getJarPath();
+  }
+
+  private static class ReadableTextEntry extends ReadableEntry {
+    static final Function<ReadableEntry, NamedByteSource> GET_CONTENTS =
+        new Function<ReadableEntry, NamedByteSource>() {
+          @Override public NamedByteSource apply(ReadableEntry item) {
+            return new NamedTextByteSource(item.contents);
+          }
+        };
+
+    ReadableTextEntry(NamedByteSource contents, String path) {
+      super(contents, path);
+    }
   }
 
   private static class ReadableEntry implements Entry {
@@ -1036,17 +1099,18 @@ public class JarBuilder implements Closeable {
 
     DuplicateAction action = duplicateHandler.actionFor(jarPath);
     switch (action) {
-      case SKIP:
+      case SKIP: {
         ReadableEntry original = Iterables.get(itemEntries, 0);
         listener.onSkip(Optional.of(original), Iterables.skip(itemEntries, 1));
         return Optional.of(original);
+      }
 
-      case REPLACE:
-        ReadableEntry replacement = Iterables.getLast(itemEntries);
-        listener.onReplace(Iterables.limit(itemEntries, itemEntries.size() - 1), replacement);
-        return Optional.of(replacement);
-
-      case CONCAT:
+        case REPLACE: {
+          ReadableEntry replacement = Iterables.getLast(itemEntries);
+          listener.onReplace(Iterables.limit(itemEntries, itemEntries.size() - 1), replacement);
+          return Optional.of(replacement);
+      }
+      case CONCAT: {
         ByteSource concat =
             ByteSource.concat(Iterables.transform(itemEntries, ReadableEntry.GET_CONTENTS));
 
@@ -1057,6 +1121,20 @@ public class JarBuilder implements Closeable {
 
         listener.onConcat(jarPath, itemEntries);
         return Optional.of(concatenatedEntry);
+      }
+
+      case CONCAT_TEXT: {
+        ByteSource concat_text =
+            ByteSource.concat(Iterables.transform(itemEntries, ReadableTextEntry.GET_CONTENTS));
+
+        ReadableEntry concatenatedTextEntry =
+            new ReadableEntry(
+                NamedByteSource.create(memorySource(), jarPath, concat_text),
+                jarPath);
+
+        listener.onConcat(jarPath, itemEntries);
+        return Optional.of(concatenatedTextEntry);
+      }
 
       case THROW:
         throw new DuplicateEntryException(Iterables.get(itemEntries, 1));

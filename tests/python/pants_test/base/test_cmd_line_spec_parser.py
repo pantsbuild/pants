@@ -129,19 +129,25 @@ class CmdLineSpecParserTest(BaseTest):
     self.assertEqual(sort(Address.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
 
-  def test_pants_dot_d_excluded(self):
+  def test_spec_excludes(self):
     expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
 
     # This bogus BUILD file gets in the way of parsing.
-    self.add_to_build_file('.pants.d/some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
+    self.add_to_build_file('some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
     with self.assertRaises(CmdLineSpecParser.BadSpecError):
       self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
+    # Test absolute path in spec_excludes.
     self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper,
-                                         spec_excludes=[os.path.join(self.build_root, '.pants.d')])
+                                         spec_excludes=[os.path.join(self.build_root, 'some')])
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
-  def test_exclude_malformed_build_file(self):
+    # Test relative path in spec_excludes.
+    self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper,
+                                         spec_excludes=['some'])
+    self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
+
+  def test_exclude_target_regexps(self):
     expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
 
     # This bogus BUILD file gets in the way of parsing.

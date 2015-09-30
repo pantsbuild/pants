@@ -14,10 +14,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
 
-  def test_autovalue_isolated_classfiles(self):
+  def test_autovalue_classfiles(self):
     self.build_and_run(
-      pants_args=['binary', '--compile-java-strategy=isolated',
-                  'examples/src/java/org/pantsbuild/example/autovalue'],
+      pants_args=['binary', 'examples/src/java/org/pantsbuild/example/autovalue'],
       rel_out_path='dist',
       java_args=['-jar', 'autovalue.jar'],
       expected_output='Hello Autovalue!'

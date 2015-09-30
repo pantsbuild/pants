@@ -7,15 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
-from pants_test.testutils.compile_strategy_utils import provide_compile_strategies
 
 
 class AptCompileIntegrationTest(BaseCompileIT):
 
-  @provide_compile_strategies
-  def test_apt_compile(self, strategy):
+  def test_apt_compile(self):
     with self.do_test_compile('testprojects/src/java/org/pantsbuild/testproject/annotation/processor',
-                              strategy,
                               expected_files=['ResourceMappingProcessor.class',
                                               'javax.annotation.processing.Processor']) as found:
 
@@ -33,10 +30,8 @@ class AptCompileIntegrationTest(BaseCompileIT):
         self.assertEqual('org.pantsbuild.testproject.annotation.processor.ResourceMappingProcessor',
                           fp.read().strip())
 
-  @provide_compile_strategies
-  def test_apt_compile_and_run(self, strategy):
+  def test_apt_compile_and_run(self):
     with self.do_test_compile('testprojects/src/java/org/pantsbuild/testproject/annotation/main',
-                              strategy,
                               expected_files=['Main.class',
                                               'deprecation_report.txt']) as found:
 
@@ -50,8 +45,7 @@ class AptCompileIntegrationTest(BaseCompileIT):
       with open(self.get_only(found, 'deprecation_report.txt')) as fp:
         self.assertIn('org.pantsbuild.testproject.annotation.main.Main', fp.read().splitlines())
 
-  @provide_compile_strategies
-  def test_stale_apt_with_deps(self, strategy):
+  def test_stale_apt_with_deps(self):
     """An annotation processor with a dependency doesn't pollute other annotation processors.
 
     At one point, when you added an annotation processor, it stayed configured for all subsequent
@@ -62,7 +56,6 @@ class AptCompileIntegrationTest(BaseCompileIT):
     # Demonstrate that the annotation processor is working
     with self.do_test_compile(
         'testprojects/src/java/org/pantsbuild/testproject/annotation/processorwithdep/main',
-        strategy,
         expected_files=['Main.class', 'Main_HelloWorld.class', 'Main_HelloWorld.java']) as found:
       gen_file = self.get_only(found, 'Main_HelloWorld.java')
       self.assertTrue(gen_file.endswith(
@@ -77,8 +70,7 @@ class AptCompileIntegrationTest(BaseCompileIT):
         self.assert_success(self.run_test_compile(
           workdir,
           cachedir,
-          'testprojects/src/java/org/pantsbuild/testproject/annotation/processorwithdep::',
-          strategy))
+          'testprojects/src/java/org/pantsbuild/testproject/annotation/processorwithdep::'))
 
         # When we run a second compile with annotation processors, make sure the previous annotation
         # processor doesn't stick around to spoil the compile
@@ -86,5 +78,4 @@ class AptCompileIntegrationTest(BaseCompileIT):
           workdir,
           cachedir,
           'testprojects/src/java/org/pantsbuild/testproject/annotation/processor::',
-          strategy,
           clean_all=False))

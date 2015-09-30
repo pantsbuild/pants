@@ -25,6 +25,7 @@ class ExtraTestJarExample(JarTask):
   will create an 'example.txt' file, which will be placed in an additional jar. During publishing,
   this additional jar will be published along with the target.
   """
+
   def __init__(self, context, workdir):
     # Constructor for custom task. Setup things that you need at pants initialization time.
     super(ExtraTestJarExample, self).__init__(context, workdir)

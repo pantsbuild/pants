@@ -14,6 +14,7 @@ from pants.backend.codegen.register import build_file_aliases as register_codege
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.wire_gen import WireGen
 from pants.backend.core.register import build_file_aliases as register_core
+from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TaskError
@@ -322,8 +323,8 @@ class WireGenTest(TaskTestBase):
     wire = self.make_target('3rdparty:wire',
                             JarLibrary,
                             jars=[
-                              JarDependency('com.squareup.wire', 'wire-compiler', '3.0.0')
-                                .exclude('com.google.guava', 'guava')
+                              JarDependency('com.squareup.wire', 'wire-compiler', '3.0.0',
+                                            excludes=[Exclude('com.google.guava', 'guava')])
                             ])
     alias = self.make_target('a/random/long/address:spec', Target, dependencies=[guava, wire])
     self.set_options(wire_compiler='a/random/long/address:spec')

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+import six
 from zincutils.zinc_analysis import ZincAnalysis as UnderlyingAnalysis
 
 from pants.backend.jvm.tasks.jvm_compile.analysis import Analysis
@@ -75,4 +76,4 @@ class ZincAnalysis(Analysis):
     return str(self.underlying_analysis)
 
   def __unicode__(self):
-    return unicode(self.underlying_analysis)
+    return six.text_type(self.underlying_analysis)

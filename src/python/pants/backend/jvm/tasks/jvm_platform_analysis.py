@@ -14,9 +14,9 @@ from colors import red
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.build_graph import CycleException, sort_targets
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.build_graph.build_graph import CycleException, sort_targets
 from pants.util.memo import memoized_property
 
 

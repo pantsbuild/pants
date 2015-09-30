@@ -10,6 +10,7 @@ import tempfile
 from abc import abstractmethod
 from contextlib import contextmanager
 
+import six
 from six import binary_type, string_types
 from twitter.common.collections import maybe_list
 
@@ -234,6 +235,7 @@ class JarTask(NailgunTask):
       Duplicate.SKIP: 'SKIP',
       Duplicate.REPLACE: 'REPLACE',
       Duplicate.CONCAT: 'CONCAT',
+      Duplicate.CONCAT_TEXT: 'CONCAT_TEXT',
       Duplicate.FAIL: 'THROW',
   }
 
@@ -325,7 +327,7 @@ class JarBuilderTask(JarTask):
       :param JvmBinary jvm_binary_target:
       :param Manifest manifest:
       """
-      for header, value in jvm_binary_target.manifest_entries.entries.iteritems():
+      for header, value in six.iteritems(jvm_binary_target.manifest_entries.entries):
         manifest.addentry(header, value)
 
     @staticmethod

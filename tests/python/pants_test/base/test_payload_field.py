@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from hashlib import sha1
 
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
                                       JarsField, PrimitiveField, PythonRequirementsField,

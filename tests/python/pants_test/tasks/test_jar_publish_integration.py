@@ -68,21 +68,22 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     safe_rmtree(self.pushdb_root)
 
   def test_scala_publish(self):
-    unique_artifacts = {'org/pantsbuild/testproject/publish/jvm-example-lib/0.0.1-SNAPSHOT':
+    unique_artifacts = {'org/pantsbuild/testproject/publish/jvm-example-lib_2.10/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
-                         'jvm-example-lib-0.0.1-SNAPSHOT.jar',
-                         'jvm-example-lib-0.0.1-SNAPSHOT.pom',
-                         'jvm-example-lib-0.0.1-SNAPSHOT-sources.jar'],
-                        'org/pantsbuild/testproject/publish/hello/welcome/0.0.1-SNAPSHOT':
+                         'jvm-example-lib_2.10-0.0.1-SNAPSHOT.jar',
+                         'jvm-example-lib_2.10-0.0.1-SNAPSHOT.pom',
+                         'jvm-example-lib_2.10-0.0.1-SNAPSHOT-sources.jar'],
+                        'org/pantsbuild/testproject/publish/hello/welcome_2.10/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
-                         'welcome-0.0.1-SNAPSHOT.jar',
-                         'welcome-0.0.1-SNAPSHOT.pom',
-                         'welcome-0.0.1-SNAPSHOT-sources.jar']}
-    self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish:jvm-run-example-lib',
+                         'welcome_2.10-0.0.1-SNAPSHOT.jar',
+                         'welcome_2.10-0.0.1-SNAPSHOT.pom',
+                         'welcome_2.10-0.0.1-SNAPSHOT-sources.jar']}
+    self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish'
+                      ':jvm-run-example-lib',
                       dict(unique_artifacts.items() + shared_artifacts('0.0.1-SNAPSHOT').items()),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties',
-                       'org.pantsbuild.testproject.publish/jvm-example-lib/publish.properties',
-                       'org.pantsbuild.testproject.publish.hello/welcome/publish.properties'],
+                       'org.pantsbuild.testproject.publish/jvm-example-lib_2.10/publish.properties',
+                       'org.pantsbuild.testproject.publish.hello/welcome_2.10/publish.properties'],
                       extra_options=['--doc-scaladoc-skip'],
                       expected_primary_artifact_count=3,
                       assert_publish_config_contents=True)
@@ -103,9 +104,11 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                          'distance-0.0.1-SNAPSHOT.jar',
                          'distance-0.0.1-SNAPSHOT.pom',
                          'distance-0.0.1-SNAPSHOT-sources.jar']}
-    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/protobuf:protobuf-java',
+    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/protobuf'
+                      ':protobuf-java',
                       unique_artifacts,
-                      ['org.pantsbuild.testproject.publish.protobuf/protobuf-java/publish.properties',
+                      ['org.pantsbuild.testproject.publish.protobuf/protobuf-java/'
+                       'publish.properties',
                        'org.pantsbuild.testproject.protobuf/distance/publish.properties'],
                       extra_options=['--doc-javadoc-skip'],
                       expected_primary_artifact_count=2)
@@ -187,12 +190,35 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
   def test_scala_publish_classifiers(self):
     self.publish_test('testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers',
                       dict({
-                        'org/pantsbuild/testproject/publish/classifiers/0.0.1-SNAPSHOT': [
-                          'classifiers-0.0.1-SNAPSHOT.pom',
+                        'org/pantsbuild/testproject/publish/classifiers_2.10/0.0.1-SNAPSHOT': [
+                          'classifiers_2.10-0.0.1-SNAPSHOT.pom',
                           'ivy-0.0.1-SNAPSHOT.xml',
                         ]}),
                       [],
                       assert_publish_config_contents=True)
+
+  def test_override_via_coord(self):
+    self.publish_test(
+      target='testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers',
+      artifacts=dict({'org/pantsbuild/testproject/publish/classifiers_2.10/1.2.3-SNAPSHOT': [
+                        'classifiers_2.10-1.2.3-SNAPSHOT.pom',
+                        'ivy-1.2.3-SNAPSHOT.xml',
+                      ]}),
+      pushdb_files=[],
+      extra_options=['--override=org.pantsbuild.testproject.publish#classifiers_2.10=1.2.3'],
+      assert_publish_config_contents=True)
+
+  def test_override_via_address(self):
+    target = 'testprojects/src/scala/org/pantsbuild/testproject/publish/classifiers'
+    self.publish_test(
+      target=target,
+      artifacts=dict({'org/pantsbuild/testproject/publish/classifiers_2.10/1.2.3-SNAPSHOT': [
+        'classifiers_2.10-1.2.3-SNAPSHOT.pom',
+        'ivy-1.2.3-SNAPSHOT.xml',
+      ]}),
+      pushdb_files=[],
+      extra_options=['--override={}=1.2.3'.format(target)],
+      assert_publish_config_contents=True)
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True,

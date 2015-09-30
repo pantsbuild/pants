@@ -97,6 +97,8 @@ def deprecated(removal_version, hint_message=None):
 
     if hint_message:
       warning_message += (':\n' + hint_message)
+    else:
+      warning_message += '.'
 
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -104,3 +106,26 @@ def deprecated(removal_version, hint_message=None):
       return func(*args, **kwargs)
     return wrapper
   return decorator
+
+
+def deprecated_module(removal_version, hint_message=None):
+  """Marks an entire module as deprecated.
+
+  Add a call to this at the top of the deprecated module, and it will print a warning message
+  when the module is imported.
+
+  Arguments are as for deprecated(), above.
+  """
+  if removal_version is None:
+    raise MissingRemovalVersionError('A removal_version must be specified for this deprecation.')
+
+  check_deprecated_semver(removal_version)
+
+  warning_message = ('\nModule is deprecated and will be removed in version '
+                     '{removal_version}').format(removal_version=removal_version)
+
+  if hint_message:
+    warning_message += (': ' + hint_message)
+  else:
+    warning_message += '.'
+  warnings.warn(warning_message, DeprecationWarning, stacklevel=2)

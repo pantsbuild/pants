@@ -9,6 +9,7 @@ import json
 import os
 from collections import defaultdict
 
+import six
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
@@ -21,7 +22,6 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
@@ -31,8 +31,8 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.util.memo import memoized_property
 
 
-# Changing the behavior of this task may affect the IntelliJ Pants plugin
-# Please add fkorotkov, tdesai to reviews for this file
+# Changing the behavior of this task may affect the IntelliJ Pants plugin.
+# Please add fkorotkov, tdesai to reviews for this file.
 class Export(PythonTask, ConsoleTask):
   """Generates a JSON description of the targets as configured in pants.
 
@@ -252,7 +252,7 @@ class Export(PythonTask, ConsoleTask):
       default_interpreter = interpreters[0]
 
       interpreters_info = {}
-      for interpreter, targets in python_interpreter_targets_mapping.iteritems():
+      for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
         chroot = self.cached_chroot(
           interpreter=interpreter,
           pex_info=PexInfo.default(),

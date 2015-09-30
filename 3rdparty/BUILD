@@ -37,8 +37,10 @@ jar_library(name='jsr305',
 
 jar_library(name='checkstyle',
             jars = [
-              jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5')
-                .exclude(org='com.google.collections', name='google-collections'),
+              jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5',
+                  excludes=[
+                    exclude(org='com.google.collections', name='google-collections'),
+                  ])
             ],
             dependencies = [
               # Needs this as the replacement for the excluded google-collections.
@@ -58,11 +60,13 @@ jar_library(name='cucumber-java',
 
 jar_library(name='log4j',
             jars = [
-              jar(org='log4j', name='log4j', rev='1.2.15')
-                .exclude(org='jline', name='jline')
-                .exclude(org='javax.jms', name='jms')
-                .exclude(org='com.sun.jdmk', name='jmxtools')
-                .exclude(org='com.sun.jmx', name='jmxri'),
+              jar(org='log4j', name='log4j', rev='1.2.15',
+                  excludes=[
+                    exclude(org='jline', name='jline'),
+                    exclude(org='javax.jms', name='jms'),
+                    exclude(org='com.sun.jdmk', name='jmxtools'),
+                    exclude(org='com.sun.jmx', name='jmxri'),
+                  ])
             ])
 
 jar_library(name='protobuf-2.4.1',
@@ -80,12 +84,12 @@ jar_library(name='protobuf-test-import',
 jar_library(name='scrooge-core',
             jars = [
               # used by scrooge-generator in BUILD.tools:scrooge-gen
-              jar(org='com.twitter', name='scrooge-core_2.10', rev='3.20.0'),
+              scala_jar(org='com.twitter', name='scrooge-core', rev='3.20.0'),
             ])
 
 jar_library(name='shapeless',
             jars=[
-              jar(org='com.chuusai', name='shapeless_2.10.4', rev='2.0.0'),
+              scala_jar(org='com.chuusai', name='shapeless', rev='2.2.5'),
             ])
 
 jar_library(name='slf4j-api',
@@ -93,11 +97,16 @@ jar_library(name='slf4j-api',
               jar(org='org.slf4j', name='slf4j-api', rev='1.6.1'),
             ])
 
-jar_library(name = 'spindle-runtime',
-            jars = [
-              jar(org = 'com.foursquare', name = 'spindle-runtime_2.10', rev = '3.0.0-M7'),
+jar_library(name='spindle-runtime',
+            jars=[
+              scala_jar(org='com.foursquare', name='spindle-runtime', rev='3.0.0-M7'),
+            ],
+            dependencies=[
+              'contrib/spindle/3rdparty:rogue',
             ])
 
+# NB: we have two versions of thrift here due to scrooge requiring one version while apache
+# thrift requires another. this is not usually recommended
 jar_library(name='libthrift-0.9.2',
             jars = [
               jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
@@ -110,7 +119,17 @@ target(name='thrift-0.9.2',
          ':slf4j-api',
        ])
 
-target(name='thrift', dependencies = [ ':thrift-0.9.2' ])
+jar_library(name='libthrift-0.6.1',
+            jars = [
+              jar(org='org.apache.thrift', name='libthrift', rev='0.6.1')
+            ])
+
+target(name='thrift-0.6.1',
+       dependencies = [
+         ':commons-lang',
+         ':libthrift-0.6.1',
+         ':slf4j-api',
+       ])
 
 
 ###############
@@ -139,5 +158,5 @@ jar_library(name='junit',
 
 jar_library(name='scalatest',
             jars=[
-              jar('org.scalatest', 'scalatest_2.10', '2.2.4')
+              scala_jar('org.scalatest', 'scalatest', '2.2.4')
             ])

@@ -85,12 +85,17 @@ class Duplicate(JarRule):
   CONCAT = 'CONCAT'
   """Concatenates the contents of all duplicate entries encountered in the order encountered."""
 
+  CONCAT_TEXT = 'CONCAT_TEXT'
+  """Concatenates the contents of all duplicate entries encountered in the order encountered,
+  separating entries with newlines if needed.
+  """
+
   FAIL = 'FAIL'
   """Raises a :class:``Duplicate.Error`` when a duplicate entry is
   encountered.
   """
 
-  _VALID_ACTIONS = frozenset((SKIP, REPLACE, CONCAT, FAIL))
+  _VALID_ACTIONS = frozenset((SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL))
 
   @classmethod
   def validate_action(cls, action):
@@ -110,7 +115,8 @@ class Duplicate(JarRule):
     :param string apply_pattern: A regular expression that matches duplicate jar entries this rule
       applies to.
     :param action: An action to take to handle one or more duplicate entries.  Must be one of:
-      ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT`` or ``Duplicate.FAIL``.
+      ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT``, ``Duplicate.CONCAT_TEXT``,
+      or ``Duplicate.FAIL``.
     """
     payload = Payload()
     payload.add_fields({
@@ -176,7 +182,7 @@ class JarRules(FingerprintedMixin):
              Skip(r'^META-INF/[^/]+\.DSA$'),  # default signature alg. file
              Skip(r'^META-INF/[^/]+\.RSA$'),  # default signature alg. file
              Skip(r'^META-INF/INDEX.LIST$'),  # interferes with Class-Path: see man jar for i option
-             Duplicate(r'^META-INF/services/', Duplicate.CONCAT)]  # 1 svc fqcn per line
+             Duplicate(r'^META-INF/services/', Duplicate.CONCAT_TEXT)]  # 1 svc fqcn per line
 
     return JarRules(rules=rules + additional_rules, default_dup_action=default_dup_action)
 

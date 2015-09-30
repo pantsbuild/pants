@@ -6,10 +6,49 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
-from collections import defaultdict
+from collections import deque
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
+from pants.util.strutil import pluralize
+
+
+def format_path(path):
+  return '[{}]'.format(', '.join([target.address.reference() for target in path]))
+
+
+def find_paths_breadth_first(from_target, to_target, log):
+  """Yields the paths between from_target to to_target if they exist.
+
+  The paths are returned ordered by length, shortest first.
+  If there are cycles, it checks visited edges to prevent recrossing them."""
+  log.debug('Looking for all paths from {} to {}'.format(from_target.address.reference(),
+                                                         to_target.address.reference()))
+
+  if from_target == to_target:
+    yield [from_target]
+    return
+
+  visited_edges = set()
+  to_walk_paths = deque([[from_target]])
+  while len(to_walk_paths) > 0:
+    cur_path = to_walk_paths.popleft()
+    target = cur_path[-1]
+
+    if len(cur_path) > 1:
+      prev_target = cur_path[-2]
+    else:
+      prev_target = None
+    current_edge = (prev_target, target)
+
+    if current_edge not in visited_edges:
+      for dep in target.dependencies:
+        dep_path = cur_path + [dep]
+        if dep == to_target:
+          yield dep_path
+        else:
+          to_walk_paths.append(dep_path)
+      visited_edges.add(current_edge)
 
 
 class PathFinder(ConsoleTask):
@@ -18,79 +57,39 @@ class PathFinder(ConsoleTask):
     self.log = self.context.log
     self.target_roots = self.context.target_roots
 
-  @classmethod
-  def _find_paths(cls, from_target, to_target, log):
-    log.debug('Looking for all paths from {} to {}'.format(from_target.address.reference(),
-                                                           to_target.address.reference()))
-
-    paths = cls._find_paths_rec(from_target, to_target)
-    print('Found {} paths'.format(len(paths)))
-    print('')
-    for path in paths:
-      log.debug('\t[{}]'.format(', '.join([target.address.reference() for target in path])))
-
-  all_paths = defaultdict(lambda: defaultdict(list))
-
-  @classmethod
-  def _find_paths_rec(cls, from_target, to_target):
-    if from_target == to_target:
-      return [[from_target]]
-
-    if from_target not in cls.all_paths or to_target not in cls.all_paths[from_target]:
-      paths = []
-      for dep in from_target.dependencies:
-        for path in cls._find_paths_rec(dep, to_target):
-          new_path = copy.copy(path)
-          new_path.insert(0, from_target)
-          paths.append(new_path)
-
-      cls.all_paths[from_target][to_target] = paths
-
-    return cls.all_paths[from_target][to_target]
-
-  examined_targets = set()
-
-  @classmethod
-  def _find_path(cls, from_target, to_target, log):
-    log.debug('Looking for path from {} to {}'.format(from_target.address.reference(),
-                                                      to_target.address.reference()))
-
-    queue = [([from_target], 0)]
-    while True:
-      if not queue:
-        print('no path found from {} to {}!'.format(from_target.address.reference(),
-                                                    to_target.address.reference()))
-        break
-
-      path, indent = queue.pop(0)
-      next_target = path[-1]
-      if next_target in cls.examined_targets:
-        continue
-      cls.examined_targets.add(next_target)
-
-      log.debug('{} examining {}'.format('  ' * indent, next_target))
-
-      if next_target == to_target:
-        print('')
-        for target in path:
-          print('{}'.format(target.address.reference()))
-        break
-
-      for dep in next_target.dependencies:
-        queue.append((path + [dep], indent + 1))
+  def validate_target_roots(self):
+    if len(self.target_roots) != 2:
+      raise TaskError('Specify two targets please (found {})'.format(len(self.target_roots)))
 
 
 class Path(PathFinder):
-  def execute(self):
-    if len(self.target_roots) != 2:
-      raise TaskError('Specify two targets please (found {})'.format(len(self.target_roots)))
+  """Find a dependency path from one target to another."""
 
-    self._find_path(self.target_roots[0], self.target_roots[1], self.log)
+  def console_output(self, ignored_targets):
+    self.validate_target_roots()
+
+    from_target = self.target_roots[0]
+    to_target = self.target_roots[1]
+
+    for path in find_paths_breadth_first(from_target, to_target, self.log):
+      yield format_path(path)
+      break
+    else:
+      yield 'No path found from {} to {}!'.format(from_target.address.reference(),
+                                                  to_target.address.reference())
 
 
 class Paths(PathFinder):
-  def execute(self):
-    if len(self.target_roots) != 2:
-      raise TaskError('Specify two targets please (found {})'.format(len(self.target_roots)))
+  """Find all dependency paths from one target to another."""
 
-    self._find_paths(self.target_roots[0], self.target_roots[1], self.log)
+  def console_output(self, ignored_targets):
+    self.validate_target_roots()
+    from_target = self.target_roots[0]
+    to_target = self.target_roots[1]
+
+    paths = list(find_paths_breadth_first(from_target, to_target, self.log))
+    yield 'Found {}'.format(pluralize(len(paths), 'path'))
+    if paths:
+      yield ''
+      for path in paths:
+        yield '\t{}'.format(format_path(path))

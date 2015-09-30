@@ -26,6 +26,7 @@ python_library(
     ':artifact',
     ':ossrh_publication_metadata',
     ':repository',
+    ':scala_artifact',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
@@ -48,7 +49,6 @@ python_library(
     ':jar_dependency_utils',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:revision',
     'src/python/pants/base:target',
@@ -58,12 +58,22 @@ python_library(
 
 resources(
   name='ivy_utils_resources',
-  sources=globs('tasks/templates/ivy_resolve/*.mustache'),
+  sources=globs('templates/ivy_utils/*.mustache'),
 )
 
 python_library(
   name='repository',
   sources=['repository.py'],
+)
+
+python_library(
+  name='scala_artifact',
+  sources=['scala_artifact.py'],
+  dependencies=[
+    ':artifact',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/util:memo',
+  ],
 )
 
 python_library(

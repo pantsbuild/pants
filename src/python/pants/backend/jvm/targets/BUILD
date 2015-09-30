@@ -30,6 +30,7 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_manual',
@@ -64,14 +65,16 @@ python_library(
   sources = [
     'scala_library.py',
     'scalac_plugin.py',
+    'scala_jar_dependency.py',
   ],
   dependencies = [
-    ':jvm',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':jvm',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:target',
     'src/python/pants/base:validation',
+    'src/python/pants/util:memo',
   ],
 )

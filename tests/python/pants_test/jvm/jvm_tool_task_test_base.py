@@ -9,8 +9,10 @@ import os
 import shutil
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.build_file_aliases import BuildFileAliases
@@ -29,7 +31,9 @@ class JvmToolTaskTestBase(TaskTestBase):
         'jar_library': JarLibrary,
       },
       objects={
+        'exclude': Exclude,
         'jar': JarDependency,
+        'scala_jar': ScalaJarDependency,
       },
     )
 

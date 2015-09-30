@@ -10,18 +10,21 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository as repo
+from pants.backend.jvm.scala_artifact import ScalaArtifact
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import Credentials
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import IvyArtifact, JarDependency
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
@@ -80,6 +83,7 @@ def build_file_aliases():
     },
     objects={
       'artifact': Artifact,
+      'scala_artifact': ScalaArtifact,
       'ossrh': OSSRHPublicationMetadata,
       'license': License,
       'scm': Scm,
@@ -88,8 +92,8 @@ def build_file_aliases():
       'DirectoryReMapper': DirectoryReMapper,
       'Duplicate': Duplicate,
       'exclude': Exclude,
-      'ivy_artifact': IvyArtifact,
       'jar': JarDependency,
+      'scala_jar': ScalaJarDependency,
       'jar_rules': JarRules,
       'Repository': Repository,
       'repository': repo,
@@ -103,6 +107,10 @@ def build_file_aliases():
       'bundle': Bundle.factory,
     }
   )
+
+
+def global_subsystems():
+  return (ScalaPlatform,)
 
 
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals

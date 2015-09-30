@@ -13,14 +13,15 @@ import pkg_resources
 from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.base.build_environment import get_scm
 from pants.base.build_file import FilesystemBuildFile
-from pants.base.build_file_address_mapper import BuildFileAddressMapper
-from pants.base.build_file_parser import BuildFileParser
-from pants.base.build_graph import BuildGraph
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.extension_loader import load_plugins_and_backends
 from pants.base.scm_build_file import ScmBuildFile
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.bin.extension_loader import load_plugins_and_backends
 from pants.bin.plugin_resolver import PluginResolver
+from pants.bin.repro import Reproducer
+from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
+from pants.build_graph.build_file_parser import BuildFileParser
+from pants.build_graph.build_graph import BuildGraph
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
@@ -316,7 +317,7 @@ class GoalRunner(object):
   @classmethod
   def subsystems(cls):
     # Subsystems used outside of any task.
-    return {SourceRootBootstrapper, Reporting, RunTracker}
+    return {SourceRootBootstrapper, Reporting, Reproducer, RunTracker}
 
   def _execute_engine(self):
     unknown_goals = [goal.name for goal in self._goals if not goal.ordered_task_names()]

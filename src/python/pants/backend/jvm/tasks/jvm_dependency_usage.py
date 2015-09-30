@@ -13,7 +13,6 @@ from collections import OrderedDict, defaultdict, namedtuple
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile_isolated_strategy import create_size_estimators
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.base.target import Target
