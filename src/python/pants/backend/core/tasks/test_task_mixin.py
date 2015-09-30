@@ -21,8 +21,7 @@ class TestTaskMixin(object):
     """Run the task
     """
 
-    options = self.get_options()
-    if not options.skip:
+    if not self.get_options().skip:
       targets = self._get_targets()
       self._validate_targets(targets)
       self._execute(targets)
