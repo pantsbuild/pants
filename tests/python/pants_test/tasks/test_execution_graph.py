@@ -248,3 +248,27 @@ class ExecutionGraphTest(unittest.TestCase):
     self.assertEqual(exec_graph._job_priority, {"A": 25, "B": 22, "C": 20, "D": 24, "E": 16})
     self.execute(exec_graph)
     self.assertEqual(self.jobs_run, ["A", "D", "B", "C", "E"])
+
+  def test_jobs_not_canceled_multiple_times(self):
+    failures = list()
+
+    def collect_failure(jobname):
+      def fn():
+        failures.append(jobname)
+      return fn
+
+    def my_job(name, result_fn, deps):
+      return self.job(name, result_fn, deps, 1, on_failure=collect_failure(name))
+
+    exec_graph = ExecutionGraph([my_job('A', raising_fn, []),
+                                 my_job('B1', passing_fn, ['A']),
+                                 my_job('B2', passing_fn, ['A']),
+                                 my_job('C1', passing_fn, ['B1', 'B2']),
+                                 my_job('C2', passing_fn, ['B1', 'B2']),
+                                 my_job('E', passing_fn, ['C2'])])
+
+    with self.assertRaises(ExecutionFailure):
+      self.execute(exec_graph)
+
+    self.assertEqual(self.jobs_run, ['A'])
+    self.assertEqual(failures, ['A', 'B1', 'B2', 'C1', 'C2', 'E'])
