@@ -16,18 +16,25 @@ class TestTaskMixinTest(TaskTestBase):
     class TestTaskMixinTask(TestTaskMixin, TaskBase):
       call_list = []
 
-      def execute(self):
-        super(TestTaskMixinTask, self).execute()
-
       def _execute(self, targets):
         self.call_list.append(['_execute', targets])
 
       def _get_targets(self):
-        self.call_list.append(['_get_targets'])
-        return ['targetA', 'targetB']
+        return ['TargetA', 'TargetB']
 
-      def _validate_targets(self, targets):
-        self.call_list.append(['_validate_targets', targets])
+      @property
+      def _test_target_filter(self):
+        def target_filter(target):
+          self.call_list.append(['target_filter', target])
+          if target == 'TargetA':
+            return False
+          else:
+            return True
+
+        return target_filter
+
+      def _validate_target(self, target):
+        self.call_list.append(['_validate_target', target])
 
     return TestTaskMixinTask
 
@@ -37,9 +44,10 @@ class TestTaskMixinTest(TaskTestBase):
     self.task.execute()
 
     # Confirm that everything ran as expected
-    self.assertIn(['_get_targets'], self.task.call_list)
-    self.assertIn(['_validate_targets', ['targetA', 'targetB']], self.task.call_list)
-    self.assertIn(['_execute', ['targetA', 'targetB']], self.task.call_list)
+    self.assertIn(['target_filter', 'TargetA'], self.task.call_list)
+    self.assertIn(['target_filter', 'TargetB'], self.task.call_list)
+    self.assertIn(['_validate_target', 'TargetB'], self.task.call_list)
+    self.assertIn(['_execute', ['TargetB']], self.task.call_list)
 
     print(self.task.call_list)
 

@@ -113,17 +113,14 @@ class PytestRun(TestTaskMixin, PythonTask):
   def supports_passthru_args(cls):
     return True
 
-  def execute(self):
-    super(PytestRun, self).execute()
-
-  def _get_targets(self):
-    def is_python_test(target):
+  @property
+  def _test_target_filter(self):
+    def target_filter(target):
       return isinstance(target, PythonTests)
 
-    test_targets = list(filter(is_python_test, self.context.targets()))
-    return test_targets
+    return target_filter
 
-  def _validate_targets(self, targets):
+  def _validate_target(self, target):
     pass
 
   def _execute(self, test_targets):
