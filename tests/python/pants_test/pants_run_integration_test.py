@@ -9,7 +9,8 @@ import ConfigParser
 import os
 import subprocess
 import unittest
-from collections import Counter, defaultdict, namedtuple
+from collections import namedtuple
+from contextlib import contextmanager
 from operator import eq, ne
 
 from colors import strip_color
@@ -20,7 +21,9 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
-PantsResult = namedtuple('PantsResult', ['command', 'returncode', 'stdout_data', 'stderr_data'])
+PantsResult = namedtuple(
+  'PantsResult',
+  ['command', 'returncode', 'stdout_data', 'stderr_data', 'workdir'])
 
 
 def ensure_cached(expected_num_artifacts=None):
@@ -108,8 +111,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     (stdout_data, stderr_data) = proc.communicate(stdin_data)
+
     return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"),
-                       stderr_data.decode("utf-8"))
+                       stderr_data.decode("utf-8"), workdir)
 
   def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
     """Runs pants in a subprocess.
@@ -121,7 +125,21 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
+      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,  **kwargs)
+
+  @contextmanager
+  def pants_results(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
+    """Similar to run_pants in that it runs pants in a subprocess, but yields in order to give
+    callers a chance to do any necessary validations on the workdir.
+
+    :param list command: A list of command line arguments coming after `./pants`.
+    :param config: Optional data for a generated ini file. A map of <section-name> ->
+    map of key -> value. If order in the ini file matters, this should be an OrderedDict.
+    :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
+    :returns a tuple (returncode, stdout_data, stderr_data).
+    """
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,  **kwargs)
 
   def bundle_and_run(self, target, bundle_name, args=None):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.

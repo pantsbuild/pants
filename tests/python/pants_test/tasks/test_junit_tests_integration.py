@@ -117,32 +117,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('org.pantsbuild.example.hello.welcome', package_report)
     self.assertIn('org.pantsbuild.example.hello.greet', package_report)
 
-  # NB: fix in process over here: https://rbcommons.com/s/twitter/r/2803/
-  @pytest.mark.xfail
-  def test_junit_test_with_coberta(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'test',
-          'examples/tests/java//org/pantsbuild/example/hello/greet',
-          'examples/tests/scala/org/pantsbuild/example/hello/welcome',
-          '--interpreter=CPython>=2.6,<3',
-          '--interpreter=CPython>=3.3',
-          '--test-junit-coverage-processor=cobertura',
-          '--test-junit-coverage',
-          '--test-junit-coverage-jvm-options=-Xmx1g',
-          '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
-          workdir)
-      self.assert_success(pants_run)
-      self._assert_junit_output(workdir)
-
-      self.assertTrue(os.path.exists(
-        os.path.join(workdir, 'test', 'junit', 'coverage', 'html', 'index.html')))
-      xmlf = os.path.join(workdir, 'test', 'junit', 'coverage', 'xml', 'coverage.xml')
-      self.assertTrue(os.path.exists(xmlf))
-      hits = ElementTree.parse(xmlf).findall("packages/package/classes/class/lines/line")
-      if all(i.attrib['hits'] == "0" for i in hits):
-        self.fail("no nonzero hits found in the generated coverage.xml")
-
   def test_junit_test_requiring_cwd_fails_without_option_specified(self):
     pants_run = self.run_pants([
         'test',
