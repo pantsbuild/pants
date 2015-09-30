@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 
 class TestTaskMixin(object):
-  """A mixin to combine with test runner tasks. The task
+  """A mixin to combine with test runner tasks.
   """
 
   @classmethod
@@ -21,7 +21,8 @@ class TestTaskMixin(object):
     """Run the task
     """
 
-    if not self.get_options().skip:
+    options = self.get_options()
+    if not options.skip:
       targets = self._get_targets()
       self._validate_targets(targets)
       self._execute(targets)
