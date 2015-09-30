@@ -49,7 +49,7 @@ class _Exiter(object):
   def unhandled_exception_hook(self, exception_class, exception, tb):
     msg = ''
     if self._is_print_backtrace:
-      msg = '\nException caught:\n' + ''.join(self._format_tb(tb))
+      msg = '\nException caught: ({})\n{}'.format(type(exception), ''.join(self._format_tb(tb)))
     if str(exception):
       msg += '\nException message: {}\n'.format(exception)
     else:
