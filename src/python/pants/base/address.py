@@ -98,7 +98,7 @@ class Address(AbstractClass):
   """A target address.
 
   An address is a unique name representing a
-  :class:`pants.base.target.Target`. It's composed of the
+  :class:`pants.build_graph.target.Target`. It's composed of the
   path from the root of the repo to the Target plus the target name.
 
   While not their only use, a noteworthy use of addresses is specifying

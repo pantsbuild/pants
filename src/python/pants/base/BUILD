@@ -57,9 +57,8 @@ python_library(
   name = 'build_file_aliases',
   sources = ['build_file_aliases.py'],
   dependencies = [
-    ':build_file_target_factory',
-    ':target',
-    'src/python/pants/util:memo',
+    ':deprecated',
+    'src/python/pants/build_graph',
   ]
 )
 
@@ -202,19 +201,8 @@ python_library(
   name = 'target',
   sources = ['target.py'],
   dependencies = [
-    '3rdparty/python:six',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':address',
-    ':build_environment',
-    ':fingerprint_strategy',
-    ':hash_utils',
-    ':payload',
-    ':payload_field',
-    ':source_root',
-    ':target_addressable',
-    'src/python/pants/backend/core:wrapped_globs',
-    'src/python/pants/option',
-    'src/python/pants/subsystem',
+    ':deprecated',
+    'src/python/pants/build_graph',
   ],
 )
 

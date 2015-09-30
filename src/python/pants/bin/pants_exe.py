@@ -12,9 +12,16 @@ import warnings
 
 from colors import green
 
-from pants.base.build_environment import get_buildroot
-from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer
-from pants.bin.repro import Reproducer
+
+# We want to present warnings to the user, set this up before importing any of our own code,
+# to ensure all deprecation warnings are seen, including module deprecations.
+# The "default" action displays a warning for a particular file and line number exactly once.
+# See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete list.
+warnings.simplefilter('default', DeprecationWarning)
+
+from pants.base.build_environment import get_buildroot  # isort:skip
+from pants.bin.goal_runner import GoalRunner, OptionsInitializer, ReportingInitializer  # isort:skip
+from pants.bin.repro import Reproducer  # isort:skip
 
 
 class _Exiter(object):
@@ -56,12 +63,6 @@ class _Exiter(object):
 
 
 def _run(exiter):
-  # We want to present warnings to the user, set this up early to ensure all warnings are seen.
-  # The "default" action displays a warning for a particular file and line number exactly once.
-  # See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete action
-  # list.
-  warnings.simplefilter('default')
-
   # Bootstrap options and logging.
   options, build_config = OptionsInitializer().setup()
 
