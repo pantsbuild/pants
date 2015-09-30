@@ -20,8 +20,8 @@ from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
 from pants.base.payload_field import DeferredSourcesField, SourcesField
 from pants.base.source_root import SourceRoot
-from pants.base.target_addressable import TargetAddressable
 from pants.base.validation import assert_list
+from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
