@@ -54,8 +54,7 @@ class TestTaskMixin(object):
         return timeout
     else:
       return None
-    
-  @abstractmethod
+
   def _get_targets(self):
     """This is separated out so it can be overridden for testing purposes
 
