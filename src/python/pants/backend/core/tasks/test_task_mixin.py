@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from abc import abstractmethod, abstractproperty
+from abc import abstractmethod
 
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout
