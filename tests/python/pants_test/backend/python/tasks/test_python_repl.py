@@ -16,10 +16,10 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.base.address import Address
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.go import register

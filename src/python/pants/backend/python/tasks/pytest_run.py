@@ -26,8 +26,8 @@ from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError, TestFailedTaskError
-from pants.base.target import Target
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.build_graph.target import Target
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -113,17 +113,14 @@ class PytestRun(TestTaskMixin, PythonTask):
   def supports_passthru_args(cls):
     return True
 
-  def execute(self):
-    super(PytestRun, self).execute()
-
-  def _get_targets(self):
-    def is_python_test(target):
+  @property
+  def _test_target_filter(self):
+    def target_filter(target):
       return isinstance(target, PythonTests)
 
-    test_targets = list(filter(is_python_test, self.context.targets()))
-    return test_targets
+    return target_filter
 
-  def _validate_targets(self, targets):
+  def _validate_target(self, target):
     pass
 
   def _execute(self, test_targets):

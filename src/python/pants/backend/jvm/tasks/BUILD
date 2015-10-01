@@ -240,7 +240,6 @@ python_library(
     'src/python/pants/base:build_file',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
-    'src/python/pants/base:target',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/option',
@@ -508,7 +507,7 @@ python_library(
   dependencies = [
     ':nailgun_task',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/process',
     'src/python/pants/util:dirutil'

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import namedtuple
 
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 class InvalidationReport(object):

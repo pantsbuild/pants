@@ -134,7 +134,7 @@ class Export(PythonTask, ConsoleTask):
 
     def process_target(current_target):
       """
-      :type current_target:pants.base.target.Target
+      :type current_target:pants.build_graph.target.Target
       """
       def get_target_type(target):
         if target.is_test:
@@ -311,7 +311,7 @@ class Export(PythonTask, ConsoleTask):
   @staticmethod
   def _source_roots_for_target(target):
     """
-    :type target:pants.base.target.Target
+    :type target:pants.build_graph.target.Target
     """
     def root_package_prefix(source_file):
       source = os.path.dirname(source_file)

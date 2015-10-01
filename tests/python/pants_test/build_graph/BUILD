@@ -21,8 +21,6 @@ python_tests(
   sources = ['test_build_configuration.py'],
   dependencies = [
     'src/python/pants/base:build_file',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:target',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -44,8 +42,6 @@ python_tests(
   dependencies = [
     'src/python/pants/base:address',
     'src/python/pants/base:build_file',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:target',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
@@ -57,7 +53,6 @@ python_tests(
   dependencies = [
     'src/python/pants/base:address',
     'src/python/pants/base:address_lookup_error',
-    'src/python/pants/base:target',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test'
   ],
@@ -68,7 +63,6 @@ python_tests(
   sources = ['test_source_mapper.py'],
   dependencies = [
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_file_aliases',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]

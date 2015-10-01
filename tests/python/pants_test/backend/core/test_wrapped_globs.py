@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.address_lookup_error import AddressLookupError
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 

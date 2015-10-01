@@ -17,7 +17,7 @@ from twitter.common.collections import maybe_list
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jar_task import JarBuilderTask, JarTask
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import open_zip, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree

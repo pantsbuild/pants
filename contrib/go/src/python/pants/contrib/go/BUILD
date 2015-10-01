@@ -6,7 +6,7 @@ contrib_plugin(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/targets',
     'contrib/go/src/python/pants/contrib/go/tasks',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.go',

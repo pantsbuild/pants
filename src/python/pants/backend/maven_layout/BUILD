@@ -7,7 +7,7 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     ':maven_layout',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
   ]
 )
 

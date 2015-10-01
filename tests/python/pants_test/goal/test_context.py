@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.address import Address
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 

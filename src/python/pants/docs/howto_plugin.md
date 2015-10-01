@@ -76,7 +76,7 @@ exposed in build files, targets, tasks and goals:
         :::python
         # plugins/ext_maven_layout/register.py
 
-        from pants.base.build_file_aliases import BuildFileAliases
+        from pants.build_graph.build_file_aliases import BuildFileAliases
         from ext_maven_layout.ext_maven_layout import ext_maven_layout
 
         def build_file_aliases():

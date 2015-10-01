@@ -42,8 +42,8 @@ python_tests(
   sources = ['test_sort_targets.py'],
   dependencies = [
     ':base',
-    'src/python/pants/build_graph',
     'src/python/pants/backend/core/targets:common',
+    'src/python/pants/build_graph',
   ]
 )
 
@@ -52,8 +52,8 @@ python_tests(
   sources = ['test_java_agent.py'],
   dependencies=[
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )
@@ -71,8 +71,8 @@ python_tests(
   sources = ['test_python_binary.py'],
   dependencies = [
     ':base',
-    'src/python/pants/base:target',
     'src/python/pants/backend/python/targets:python',
+    'src/python/pants/build_graph',
   ]
 )
 
@@ -84,7 +84,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
   ]
 )
 

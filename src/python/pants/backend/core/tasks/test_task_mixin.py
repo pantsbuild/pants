@@ -5,13 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 
 from pants.util.timeout import Timeout
 
 
 class TestTaskMixin(object):
   """A mixin to combine with test runner tasks.
+
+  The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
+  expressed can support both languages, and any additional languages that are added to pants.
+
   """
 
   @classmethod
@@ -28,8 +32,10 @@ class TestTaskMixin(object):
     """
 
     if not self.get_options().skip:
-      targets = self._get_targets()
-      self._validate_targets(targets)
+      targets = self._get_relevant_targets()
+      for target in targets:
+        self._validate_target(target)
+        
       timeout = self._timeout_for_targets(targets)
       with Timeout(timeout):
         self._execute(targets)
@@ -51,14 +57,33 @@ class TestTaskMixin(object):
     
   @abstractmethod
   def _get_targets(self):
+    """This is separated out so it can be overridden for testing purposes
+
+    :return: list of targets
+    """
+    return self.context.targets()
+
+  def _get_relevant_targets(self):
     """Returns the targets that are relevant test targets
+    """
+    test_targets = list(filter(self._test_target_filter, self._get_targets()))
+    return test_targets
+
+  @abstractproperty
+  def _test_target_filter(self):
+    """A filter to run on targets to see if they are relevant to this test task
+
+      :return: function from target->boolean
     """
 
   @abstractmethod
-  def _validate_targets(self, targets):
-    """Ensures that these targets are valid and should be run
+  def _validate_target(self, target):
+    """Ensures that this target is valid.
 
-    :param targets: list of the targets to validate
+    We don't need the type check here because _get_targets() combines with _test_target_type to
+    filter the list of targets to only the targets relevant for this test task.
+
+    :param target: the target to validate
     """
 
   @abstractmethod

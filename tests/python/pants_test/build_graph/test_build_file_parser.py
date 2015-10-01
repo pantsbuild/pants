@@ -11,9 +11,9 @@ from textwrap import dedent
 
 from pants.base.address import BuildFileAddress
 from pants.base.build_file import FilesystemBuildFile
-from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.target import Target
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 
