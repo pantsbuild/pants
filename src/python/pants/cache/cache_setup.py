@@ -214,8 +214,8 @@ class CacheFactory(object):
     pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
-    best_url = min(pingtimes, key=lambda t: t[1])[0]
-    if best_url == Pinger.UNREACHABLE:
+    best_url, ping_time = min(pingtimes, key=lambda t: t[1])
+    if ping_time == Pinger.UNREACHABLE:
       self._log.warn('No reachable artifact caches.')
       return None
 
