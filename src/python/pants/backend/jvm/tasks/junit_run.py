@@ -861,7 +861,6 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     else:
       self._runner = _JUnitRunner(task_exports, self.context)
 
-  @property
   def _test_target_filter(self):
     def target_filter(target):
       return isinstance(target, junit_tests)
