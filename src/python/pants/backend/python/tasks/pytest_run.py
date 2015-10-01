@@ -113,7 +113,6 @@ class PytestRun(TestTaskMixin, PythonTask):
   def supports_passthru_args(cls):
     return True
 
-  @property
   def _test_target_filter(self):
     def target_filter(target):
       return isinstance(target, PythonTests)

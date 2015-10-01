@@ -41,10 +41,10 @@ class TestTaskMixin(object):
   def _get_relevant_targets(self):
     """Returns the targets that are relevant test targets
     """
-    test_targets = list(filter(self._test_target_filter, self._get_targets()))
+    test_targets = list(filter(self._test_target_filter(), self._get_targets()))
     return test_targets
 
-  @abstractproperty
+  @abstractmethod
   def _test_target_filter(self):
     """A filter to run on targets to see if they are relevant to this test task
 
