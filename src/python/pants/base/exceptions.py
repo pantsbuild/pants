@@ -16,7 +16,6 @@ class TaskError(Exception):
     """
     self._exit_code = kwargs.pop('exit_code', 1)
     self._failed_targets = kwargs.pop('failed_targets', [])
-    self._timedout_targets = kwargs.pop('timedout_targets', [])
     super(TaskError, self).__init__(*args, **kwargs)
 
   @property
@@ -27,31 +26,12 @@ class TaskError(Exception):
   def failed_targets(self):
     return self._failed_targets
 
-  @property
-  def timedout_targets(self):
-    return self._timedout_targets
 
-
-class TestTaskError(TaskError):
-  """Raised when a test task fails, for any reason
-
-  """
-
-
-class TestFailedTaskError(TestTaskError):
+class TestFailedTaskError(TaskError):
   """Raised when an actual test run failed.
 
   This is used to distinguish test run failures from infrastructure failures.
   """
-
-
-class TestTimeoutTaskError(TestTaskError):
-  """Raise when an actual test run has timed out
-
-  """
-
-  def __str__(self):
-    return "Tests timed out"
 
 
 class TargetDefinitionException(Exception):
