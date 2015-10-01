@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod, abstractproperty
 
+from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout
 
 
@@ -37,21 +38,21 @@ class TestTaskMixin(object):
         self._validate_target(target)
         
       timeout = self._timeout_for_targets(targets)
-      with Timeout(timeout):
-        self._execute(targets)
+      try:
+        with Timeout(timeout):
+          self._execute(targets)
+      except KeyboardInterrupt:
+        raise TestFailedTaskError(failed_targets=targets)
       
   def _timeout_for_targets(self, targets):
-    timeouts = [target.timeout for target in targets]
-    if 0 in timeouts or None in timeouts:
-      timeout = None
-    else:
-      timeout = sum(timeouts)
-
     if self.get_options().timeouts:
-      if not timeout:
-        return self.get_options().default_timeout
+      default_timeout = self.get_options().default_timeout
+
+      timeouts = [target.timeout if target.timeout else default_timeout for target in targets]
+      if 0 in timeouts or None in timeouts:
+        return None
       else:
-        return timeout
+        return sum(timeouts)
     else:
       return None
 

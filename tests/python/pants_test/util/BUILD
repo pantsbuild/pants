@@ -102,3 +102,11 @@ python_tests(
     'src/python/pants/util:contextutil',
   ]
 )
+
+python_tests(
+  name = 'timeout',
+  sources = ['test_timeout.py'],
+  dependencies = [
+    'src/python/pants/util:timeout',
+  ],
+)

@@ -10,6 +10,7 @@ import re
 
 TIMEOUT_TAG = 'timeout'
 
+
 class TestTargetMixin(object):
   """Mix this in with test targets to get timeout and other test-specific target parameters
   """
@@ -29,4 +30,4 @@ class TestTargetMixin(object):
   def timeout(self):
     p = re.compile(TIMEOUT_TAG + r': ([0-9]+)$')
     matches = [m.groups()[0] for m in map(p.match, self.tags) if m and m.groups()]
-    return matches[0] if matches else None
+    return int(matches[0]) if matches else None
