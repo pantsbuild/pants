@@ -18,7 +18,7 @@ from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.setup_py import SetupPy
-from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
@@ -29,7 +29,7 @@ def build_file_aliases():
       'python_library': PythonLibrary,
       'python_requirement_library': PythonRequirementLibrary,
       'python_test_suite': Dependencies,  # Legacy alias.
-      'python_tests': PythonTests,
+      PythonTests.alias(): TargetMacro.Factory.wrap(PythonTests.create, PythonTests)
     },
     objects={
       'python_requirement': PythonRequirement,

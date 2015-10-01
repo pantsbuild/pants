@@ -54,7 +54,7 @@ from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.deprecated import deprecated
-from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -74,8 +74,8 @@ def build_file_aliases():
       'unpacked_jars': UnpackedJars,
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
-      'java_tests': JavaTests,
-      'junit_tests': JavaTests,
+      JavaTests.alias(): TargetMacro.Factory.wrap(JavaTests.create, JavaTests),
+      'junit_tests': TargetMacro.Factory.wrap(JavaTests.create, JavaTests),
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
       'scala_library': ScalaLibrary,
