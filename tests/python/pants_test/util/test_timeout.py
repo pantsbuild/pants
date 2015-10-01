@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import time
 import unittest
-from contextlib import contextmanager
 
 from pants.util.timeout import Timeout
 
