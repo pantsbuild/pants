@@ -9,7 +9,7 @@ import os.path
 
 from pants.base.payload import Payload
 from pants.base.payload_field import DeferredSourcesField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
 

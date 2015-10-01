@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.goal.goal import Goal
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.arg_splitter import GLOBAL_SCOPE

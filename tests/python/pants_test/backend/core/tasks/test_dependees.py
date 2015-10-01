@@ -17,9 +17,9 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 

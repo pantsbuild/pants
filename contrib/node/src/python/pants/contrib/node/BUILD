@@ -6,7 +6,7 @@ contrib_plugin(
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/targets',
     'contrib/node/src/python/pants/contrib/node/tasks',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.node',

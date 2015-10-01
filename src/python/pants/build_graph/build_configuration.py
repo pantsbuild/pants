@@ -9,10 +9,10 @@ import inspect
 import logging
 from collections import Iterable, namedtuple
 
-from pants.base.addressable import AddressableCallProxy
 from pants.base.parse_context import ParseContext
-from pants.base.target_addressable import TargetAddressable
+from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target_addressable import TargetAddressable
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 

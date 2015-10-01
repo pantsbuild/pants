@@ -26,8 +26,8 @@ from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError, TestFailedTaskError
-from pants.base.target import Target
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.build_graph.target import Target
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open

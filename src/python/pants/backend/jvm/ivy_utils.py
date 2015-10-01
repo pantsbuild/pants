@@ -23,7 +23,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.util.dirutil import safe_mkdir, safe_open
 
 

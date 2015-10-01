@@ -20,8 +20,8 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
 from pants.base.validation import assert_list
+from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_file
 from pants_test.tasks.task_test_base import TaskTestBase
 

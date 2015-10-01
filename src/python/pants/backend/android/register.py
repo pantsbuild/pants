@@ -15,7 +15,7 @@ from pants.backend.android.tasks.dx_compile import DxCompile
 from pants.backend.android.tasks.sign_apk import SignApkTask
 from pants.backend.android.tasks.unpack_libraries import UnpackLibraries
 from pants.backend.android.tasks.zipalign import Zipalign
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 

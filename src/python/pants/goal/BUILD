@@ -33,9 +33,8 @@ python_library(
     ':products',
     ':workspace',
     'src/python/pants/base:build_environment',
-    'src/python/pants/build_graph',
     'src/python/pants/base:source_root',
-    'src/python/pants/base:target', # XXX(fixme)
+    'src/python/pants/build_graph', # XXX(fixme)
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/java/distribution:distribution',

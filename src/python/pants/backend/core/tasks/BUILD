@@ -88,7 +88,6 @@ python_library(
     'src/python/pants/base:build_manual',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
-    'src/python/pants/base:target',
     'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/util:dirutil',
@@ -149,9 +148,9 @@ python_library(
     ':console_task',
     ':target_filter_task_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:target',
     'src/python/pants/backend/core/targets:common',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
   ],
 )
 
@@ -193,8 +192,8 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     ':task',
-    'src/python/pants/build_graph',
     'src/python/pants/base:workunit',
+    'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/option',
   ],
@@ -320,8 +319,8 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_manual',
     'src/python/pants/base:generator',
-    'src/python/pants/base:target',
-    'src/python/pants/goal:goal',
+    'src/python/pants/build_graph',
+    'src/python/pants/goal',
     'src/python/pants/help',
     'src/python/pants/option',
   ],
@@ -363,7 +362,7 @@ python_library(
     ':common',
     ':console_task',
     '3rdparty/python/twitter/commons:twitter.common.util',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
   ],
 )
 

@@ -23,9 +23,9 @@ from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.setup_py import SetupPy
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir

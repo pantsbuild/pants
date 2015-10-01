@@ -11,7 +11,7 @@ from pants.backend.jvm.tasks.resources_task import ResourcesTask
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField, stable_json_sha1
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.goal.products import UnionProducts
 from pants.util.dirutil import touch
 from pants_test.tasks.task_test_base import TaskTestBase

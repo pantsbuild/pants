@@ -70,7 +70,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/tasks:benchmark_run',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
@@ -246,8 +246,8 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',
     'src/python/pants/backend/python/tasks:python',
-    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:products',
     'src/python/pants/ivy',
     'src/python/pants/java/distribution:distribution',
@@ -286,7 +286,7 @@ python_tests(
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:products',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
@@ -301,7 +301,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:prepare_resources',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]

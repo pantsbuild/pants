@@ -31,7 +31,7 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/jvm/tasks:all',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
   ],
@@ -51,7 +51,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:generator',
     'src/python/pants/base:revision',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/util:dirutil',
   ],
 )
