@@ -9,12 +9,20 @@ import os
 
 from pants.base.address import Address
 from pants.engine.exp import parsers
-from pants.engine.exp.serializable import Serializable
+from pants.engine.exp.objects import Serializable
 from pants.util.memo import memoized_property
 
 
 class MappingError(Exception):
   """Indicates an error mapping addressable objects."""
+
+
+class UnaddressableObjectError(MappingError):
+  """Indicates an un-addressable object was found at the top level."""
+
+
+class DuplicateNameError(MappingError):
+  """Indicates more than one top-level object was found with the same name."""
 
 
 class AddressMap(object):
@@ -43,12 +51,12 @@ class AddressMap(object):
       objects_by_name = {}
       for obj in objects:
         if not Serializable.is_serializable(obj) or not obj._asdict().get('name'):
-          raise MappingError('Parsed a non-addressable object: {!r}'.format(obj))
+          raise UnaddressableObjectError('Parsed a non-addressable object: {!r}'.format(obj))
         attributes = obj._asdict()
         name = attributes['name']
         if name in objects_by_name:
-          raise MappingError('An object already exists at {!r} with name {!r}: {!r}.  Cannot map '
-                             '{!r}'.format(path, name, objects_by_name[name], obj))
+          raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
+                                   'map {!r}'.format(path, name, objects_by_name[name], obj))
         objects_by_name[name] = obj
       return cls(path, objects_by_name)
 
@@ -77,6 +85,10 @@ class AddressMap(object):
     return 'AddressMap(path={!r}, objects_by_name={!r})'.format(self._path, self._objects_by_name)
 
 
+class DifferingFamiliesError(MappingError):
+  """Indicates an attempt was made to merge address maps from different families together."""
+
+
 class AddressFamily(object):
   """Represents the family of addressed objects in a namespace.
 
@@ -101,10 +113,12 @@ class AddressFamily(object):
 
     spec_paths = {os.path.dirname(address_map.path) for address_map in address_maps}
     if len(spec_paths) > 1:
-      raise MappingError('Expected all AddressMaps to share the same parent directory but given '
-                         'a mix of parent directories:\n\t{}'
-                         .format('\n\t'.join(sorted(spec_paths))))
+      raise DifferingFamiliesError('Expected all AddressMaps to share the same parent directory '
+                                   'but given a mix of parent directories:\n\t{}'
+                                   .format('\n\t'.join(sorted(spec_paths))))
     spec_path = os.path.relpath(spec_paths.pop(), build_root)
+    if spec_path == '.':
+      spec_path = ''
 
     objects_by_name = {}
     for address_map in address_maps:
@@ -113,13 +127,13 @@ class AddressFamily(object):
         previous = objects_by_name.get(name)
         if previous:
           previous_path, _ = previous
-          raise MappingError('An object with name {name!r} is already defined in '
-                             '{previous_path!r}, will not overwrite with {obj!r} from '
-                             '{current_path!r}.'
-                             .format(name=name,
-                                     previous_path=previous_path,
-                                     obj=obj,
-                                     current_path=current_path))
+          raise DuplicateNameError('An object with name {name!r} is already defined in '
+                                   '{previous_path!r}, will not overwrite with {obj!r} from '
+                                   '{current_path!r}.'
+                                   .format(name=name,
+                                           previous_path=previous_path,
+                                           obj=obj,
+                                           current_path=current_path))
         objects_by_name[name] = (current_path, obj)
     return AddressFamily(namespace=spec_path,
                          objects_by_name={name: obj for name, (_, obj) in objects_by_name.items()})
