@@ -10,15 +10,18 @@ import unittest
 from functools import partial
 
 from pants.base.address import Address
+from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import CycleError, Graph, ResolvedTypeMismatchError, ResolveError
 from pants.engine.exp.parsers import parse_json, parse_python_assignments, parse_python_callbacks
-from pants.engine.exp.targets import ApacheThriftConfig, Config, PublishConfig, Target
+from pants.engine.exp.targets import ApacheThriftConfiguration, PublishConfiguration, Target
 
 
 class GraphTest(unittest.TestCase):
   def setUp(self):
-    self.symbol_table = {type_.__name__: type_
-                         for type_ in (ApacheThriftConfig, Config, Target, PublishConfig)}
+    self.symbol_table = {'ApacheThriftConfig': ApacheThriftConfiguration,
+                         'Config': Configuration,
+                         'Target': Target,
+                         'PublishConfig': PublishConfiguration}
 
   def create_graph(self, build_pattern=None, parser=None):
     return Graph(build_root=os.path.dirname(__file__), build_pattern=build_pattern, parser=parser)
@@ -33,22 +36,24 @@ class GraphTest(unittest.TestCase):
 
     resolved_java1 = graph.resolve(address('java1'))
 
-    nonstrict = ApacheThriftConfig(address=address('nonstrict'),
-                                   version='0.9.2',
-                                   strict=False,
-                                   lang='java')
-    public = Config(address=address('public'), url='https://oss.sonatype.org/#stagingRepositories')
+    nonstrict = ApacheThriftConfiguration(address=address('nonstrict'),
+                                          version='0.9.2',
+                                          strict=False,
+                                          lang='java')
+    public = Configuration(address=address('public'),
+                           url='https://oss.sonatype.org/#stagingRepositories')
     thrift1 = Target(address=address('thrift1'), sources=[])
     thrift2 = Target(address=address('thrift2'), sources=[], dependencies=[thrift1])
     expected_java1 = Target(address=address('java1'),
                             sources=[],
                             configurations=[
-                              ApacheThriftConfig(version='0.9.2', strict=True, lang='java'),
+                              ApacheThriftConfiguration(version='0.9.2', strict=True, lang='java'),
                               nonstrict,
-                              PublishConfig(
+                              PublishConfiguration(
                                 default_repo=public,
                                 repos={
-                                  'jake': Config(url='https://dl.bintray.com/pantsbuild/maven'),
+                                  'jake':
+                                    Configuration(url='https://dl.bintray.com/pantsbuild/maven'),
                                   'jane': public
                                 }
                               )

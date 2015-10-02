@@ -11,6 +11,15 @@ python_library(
 )
 
 python_library(
+  name='configuration',
+  sources=['configuration.py'],
+  dependencies=[
+    ':addressable',
+    ':objects',
+  ]
+)
+
+python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
@@ -57,6 +66,6 @@ python_library(
   sources=['targets.py'],
   dependencies=[
     ':addressable',
-    ':objects',
+    ':configuration',
   ]
 )
