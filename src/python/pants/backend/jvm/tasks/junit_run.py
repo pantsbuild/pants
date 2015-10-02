@@ -95,6 +95,9 @@ class _JUnitRunner(object):
              help='If true, will strictly require running junits with the same version of java as '
                   'the platform -target level. Otherwise, the platform -target level will be '
                   'treated as the minimum jvm to run.')
+    register('--allow-empty-sources', action='store_true', default=False, advanced=True,
+             help='Allows a junit_tests() target to be defined with no sources.  Otherwise,'
+                  'such a target will raise an error during the test run.')
     register_jvm_tool(register,
                       'junit',
                       classpath=[
@@ -362,7 +365,7 @@ class _JUnitRunner(object):
 
   def _test_target_candidates(self, targets):
     for target in targets:
-      if isinstance(target, junit_tests):
+      if isinstance(target, junit_tests) and target.payload.sources.source_paths:
         yield target
 
   def _calculate_tests_from_targets(self, targets):
@@ -872,9 +875,10 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
       targets = self.context.targets()
       # TODO: move this check to an optional phase in goal_runner, so
       # that missing sources can be detected early.
-      for target in targets:
-        if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
-          msg = 'JavaTests target must include a non-empty set of sources.'
-          raise TargetDefinitionException(target, msg)
+      if not self.get_options().allow_empty_sources:
+        for target in targets:
+          if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
+            msg = 'JavaTests target must include a non-empty set of sources.'
+            raise TargetDefinitionException(target, msg)
 
       self._runner.execute(targets)

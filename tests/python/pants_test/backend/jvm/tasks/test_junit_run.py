@@ -175,3 +175,15 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'must include a non-empty set of sources'):
       task.execute()
+
+  def test_allow_empty_sources(self):
+    self.add_to_build_file('foo', dedent('''
+        java_tests(
+          name='empty',
+          sources=[],
+        )
+        '''
+    ))
+    self.set_options(allow_empty_sources=True)
+    task = self.create_task(self.context(target_roots=[self.target('foo:empty')]))
+    task.execute()
