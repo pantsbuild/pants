@@ -16,15 +16,13 @@ class TestTargetMixin(object):
   """
 
   @classmethod
-  def create(cls, parse_context, timeout = None, **kwargs):
+  def create(cls, parse_context, timeout = None, tags = None, **kwargs):
     if timeout is not None:
       timeout_tag = "{timeout_tag:s}: {timeout:d}".format(timeout_tag=TIMEOUT_TAG, timeout=timeout)
-      if 'tags' in kwargs:
-        kwargs['tags'].append(timeout_tag)
-      else:
-        kwargs['tags'] = [timeout_tag]
+      tags = tags or []
+      tags.append(timeout_tag)
 
-    parse_context.create_object(cls, type_alias=cls.alias(), **kwargs)
+    parse_context.create_object(cls, type_alias=cls.alias(), tags=tags, **kwargs)
 
   @property
   def timeout(self):
