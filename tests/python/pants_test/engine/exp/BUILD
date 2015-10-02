@@ -15,9 +15,9 @@ python_tests(
   sources=['test_graph.py'],
   dependencies=[
     'src/python/pants/base:address',
+    'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:parsers',
-    'src/python/pants/engine/exp:targets',
   ]
 )
 
@@ -41,11 +41,11 @@ python_tests(
 )
 
 python_tests(
-  name='targets',
-  sources=['test_targets.py'],
+  name='configuration',
+  sources=['test_configuration.py'],
   dependencies=[
     'src/python/pants/base:address',
+    'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:objects',
-    'src/python/pants/engine/exp:targets',
   ]
 )
