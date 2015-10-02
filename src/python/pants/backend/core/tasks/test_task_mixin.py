@@ -29,8 +29,7 @@ class TestTaskMixin(object):
              help='The default timeout (in seconds) for a test if timeout is not set in BUILD')
 
   def execute(self):
-    """Run the task
-    """
+    """Run the task."""
 
     if not self.get_options().skip:
       targets = self._get_relevant_targets()
@@ -57,23 +56,23 @@ class TestTaskMixin(object):
       return None
 
   def _get_targets(self):
-    """This is separated out so it can be overridden for testing purposes
+    """This is separated out so it can be overridden for testing purposes.
 
     :return: list of targets
     """
     return self.context.targets()
 
   def _get_relevant_targets(self):
-    """Returns the targets that are relevant test targets
-    """
+    """Returns the targets that are relevant test targets."""
+
     test_targets = list(filter(self._test_target_filter(), self._get_targets()))
     return test_targets
 
   @abstractmethod
   def _test_target_filter(self):
-    """A filter to run on targets to see if they are relevant to this test task
+    """A filter to run on targets to see if they are relevant to this test task.
 
-      :return: function from target->boolean
+    :return: function from target->boolean
     """
 
   @abstractmethod
@@ -88,7 +87,7 @@ class TestTaskMixin(object):
 
   @abstractmethod
   def _execute(self, targets):
-    """Actually goes ahead and runs the tests for the targets
+    """Actually goes ahead and runs the tests for the targets.
 
     :param targets: list of the targets whose tests are to be run
     """
