@@ -104,7 +104,7 @@ class _JUnitRunner(object):
     register_jvm_tool(register,
                       'junit',
                       classpath=[
-                        JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.8'),
+                        JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.10'),
                       ],
                       main=JUnitRun._MAIN,
                       # TODO(John Sirois): Investigate how much less we can get away with.
