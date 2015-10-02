@@ -13,13 +13,13 @@ from pants.util.timeout import Timeout
 
 class TestTimeout(unittest.TestCase):
   def test_timeout_success(self):
-    with Timeout(5):
+    with Timeout(2):
       time.sleep(1)
 
   def test_timeout_failure(self):
     with self.assertRaises(KeyboardInterrupt):
-      with Timeout(5):
-        time.sleep(10)
+      with Timeout(1):
+        time.sleep(2)
 
   def test_timeout_none(self):
     with Timeout(None):

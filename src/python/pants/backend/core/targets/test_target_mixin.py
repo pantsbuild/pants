@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -18,7 +18,7 @@ class TestTargetMixin(object):
   @classmethod
   def create(cls, parse_context, timeout = None, **kwargs):
     if timeout is not None:
-      timeout_tag = "%s: %d" % (TIMEOUT_TAG, timeout)
+      timeout_tag = "{timeout_tag:s}: {timeout:d}".format(timeout_tag=TIMEOUT_TAG, timeout=timeout)
       if 'tags' in kwargs:
         kwargs['tags'].append(timeout_tag)
       else:

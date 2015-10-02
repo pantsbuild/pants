@@ -26,7 +26,7 @@ class TestTaskMixin(object):
     register('--timeouts', action='store_true', default=True,
              help='Enable test timeouts')
     register('--default-timeout', action='store', default=0, type=int,
-             help='The default timeout for a test if timeout is not set in BUILD')
+             help='The default timeout (in seconds) for a test if timeout is not set in BUILD')
 
   def execute(self):
     """Run the task
@@ -36,7 +36,7 @@ class TestTaskMixin(object):
       targets = self._get_relevant_targets()
       for target in targets:
         self._validate_target(target)
-        
+
       timeout = self._timeout_for_targets(targets)
       try:
         with Timeout(timeout):

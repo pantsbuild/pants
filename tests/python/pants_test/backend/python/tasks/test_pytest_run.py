@@ -101,7 +101,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
               self.assertEqual(1, core.two())
         """))
     self.create_file(
-      'tests/test_core_two_seconds.py',
+      'tests/test_core_sleep.py',
       dedent("""
           import core, time
 
@@ -152,9 +152,9 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           )
 
           python_tests(
-            name='two_seconds_no_timeout',
+            name='sleep_no_timeout',
             sources=[
-              'test_core_two_seconds.py',
+              'test_core_sleep.py',
             ],
             timeout = 0,
             dependencies=[
@@ -166,9 +166,9 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           )
 
           python_tests(
-            name='two_seconds_timeout',
+            name='sleep_timeout',
             sources=[
-              'test_core_two_seconds.py',
+              'test_core_sleep.py',
             ],
             timeout = 1,
             dependencies=[
@@ -208,8 +208,8 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     self.red = self.target('tests:red')
     self.red_in_class = self.target('tests:red_in_class')
-    self.two_seconds_no_timeout = self.target('tests:two_seconds_no_timeout')
-    self.two_seconds_timeout = self.target('tests:two_seconds_timeout')
+    self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
+    self.sleep_timeout = self.target('tests:sleep_timeout')
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
 
@@ -230,14 +230,14 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     """
 
-    self.run_tests(targets=[self.two_seconds_no_timeout, self.two_seconds_timeout])
+    self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
 
   def test_timeout(self):
     """Check that a two second test will fail with a one second timeout
     """
 
-    self.run_failing_tests(targets=[self.two_seconds_timeout],
-                           failed_targets=[self.two_seconds_timeout])
+    self.run_failing_tests(targets=[self.sleep_timeout],
+                           failed_targets=[self.sleep_timeout])
 
   def test_junit_xml_option(self):
     # We expect xml of the following form:
