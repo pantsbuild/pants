@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import MutableMapping, MutableSequence
 
-import six
-
 from pants.engine.exp.addressable import (Exactly, SubclassesOf, SuperclassesOf, addressable,
                                           addressable_mapping, addressables)
 from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable, ValidationError
@@ -146,9 +144,15 @@ class Config(Serializable, SerializableFactory, Validatable):
 
   def _extract_inheritable_attributes(self, serializable):
     attributes = serializable._asdict()
+
     # Allow for un-named (embedded) objects inheriting from named objects
     attributes.pop('name', None)
     attributes.pop('address', None)
+
+    # We should never inherit special fields - these are for local book-keeping only.
+    for field in self._SPECIAL_FIELDS:
+      attributes.pop(field, None)
+
     return attributes
 
   def create(self):
@@ -169,9 +173,8 @@ class Config(Serializable, SerializableFactory, Validatable):
         if k not in self._SPECIAL_FIELDS:
           if isinstance(v, MutableMapping):
             attributes.setdefault(k, {}).update(v)
-          elif isinstance(v, MutableSequence) and not isinstance(v, six.string_types):
-            prior = attributes.setdefault(k, [])
-            prior.extend(v)
+          elif isinstance(v, MutableSequence):
+            attributes.setdefault(k, []).extend(v)
           elif v is not None:
             attributes[k] = v
       config_type = type(self)
@@ -216,6 +219,9 @@ class Config(Serializable, SerializableFactory, Validatable):
   def __eq__(self, other):
     return isinstance(other, Config) and self._key() == other._key()
 
+  def __ne__(self, other):
+    return not (self == other)
+
   def __repr__(self):
     # TODO(John Sirois): Do something else here.  This is recursive and so printing a Node prints
     # its whole closure and will be too expensive and bewildering past simple example debugging.
@@ -255,8 +261,7 @@ class ApacheThriftConfig(Config, Validatable):
   #
   # Also an example of a more constrained config object that has an explicit set of allowed fields
   # and that can have pydoc hung directly off the constructor to convey a fully accurate BUILD
-  # dictionary entry with no hierarchy walking or ignoring of "special" fields - there are no
-  # special fields.
+  # dictionary entry.
 
   def __init__(self, name=None, version=None, strict=None, lang=None, options=None, **kwargs):
     super(ApacheThriftConfig, self).__init__(name=name,

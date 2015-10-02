@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import collections
 from abc import abstractmethod
 
 import six
@@ -15,7 +16,7 @@ from pants.util.meta import AbstractClass
 class TypeConstraint(AbstractClass):
   """Represents a type constraint.
 
-  Not intended for direct use, instead use one of :class:`SuperclassesOf`, :class:`Exact` or
+  Not intended for direct use; instead, use one of :class:`SuperclassesOf`, :class:`Exact` or
   :class:`SubclassesOf`.
   """
 
@@ -39,6 +40,9 @@ class TypeConstraint(AbstractClass):
   def __eq__(self, other):
     return type(self) == type(other) and self._type == other._type
 
+  def __ne__(self, other):
+    return not (self == other)
+
   def __str__(self):
     return '{variance_symbol}{constrained_type}'.format(variance_symbol=self._variance_symbol,
                                                         constrained_type=self._type.__name__)
@@ -49,7 +53,7 @@ class TypeConstraint(AbstractClass):
 
 
 class SuperclassesOf(TypeConstraint):
-  """Objects of the exact type as well as any super types are allowed."""
+  """Objects of the exact type as well as any super-types are allowed."""
 
   _variance_symbol = '-'
 
@@ -67,7 +71,7 @@ class Exactly(TypeConstraint):
 
 
 class SubclassesOf(TypeConstraint):
-  """Objects of the exact type as well as any sub types are allowed."""
+  """Objects of the exact type as well as any sub-types are allowed."""
 
   _variance_symbol = '+'
 
@@ -75,8 +79,8 @@ class SubclassesOf(TypeConstraint):
     return issubclass(type(obj), self._type)
 
 
-class AddressError(Exception):
-  """Indicates an error assigning or resolving an address."""
+class AddressedError(TypeError):
+  """Indicates an error assigning an addressed item."""
 
 
 class Addressed(object):
@@ -85,6 +89,8 @@ class Addressed(object):
   def __init__(self, type_constraint, address_spec):
     self._type_constraint = type_constraint
     self._address_spec = address_spec
+
+    self._key = (self._type_constraint, self._address_spec)
 
   @property
   def type_constraint(self):
@@ -103,6 +109,15 @@ class Addressed(object):
     """
     return self._address_spec
 
+  def __hash__(self):
+    return hash(self._key)
+
+  def __eq__(self, other):
+    return isinstance(other, Addressed) and self._key == other._key
+
+  def __ne__(self, other):
+    return not (self == other)
+
   def __repr__(self):
     return 'Addressed(type_constraint={!r}, address={!r})'.format(self._type_constraint,
                                                                   self._address_spec)
@@ -120,6 +135,8 @@ def addressable(type_constraint, value):
                 an object should be resolved from; aka. a 'pointer'.
   :returns: The `value` if it satisfies the type constraint directly or else an :class:`Addressed`
             pointer to a value to resolve later.
+  :raises: :class:`AddressedError` if the given value is not a pointer or a value of the correct
+           type.
   """
   if value is None:
     return None
@@ -134,7 +151,7 @@ def addressable(type_constraint, value):
   elif isinstance(value, six.string_types):
     return Addressed(type_constraint, value)
   else:
-    raise AddressError('The given value is not an address or an {!r}: {!r}'
+    raise AddressedError('The given value is not an address or an {!r}: {!r}'
                        .format(type_constraint, value))
 
 
@@ -152,6 +169,11 @@ def addressables(type_constraint, values):
             :class:`Addressed` pointers to values to resolve later.
   :rtype: list
   """
+  if values and (not isinstance(values, collections.Iterable) or
+                 isinstance(values, six.string_types)):
+    raise AddressedError('Expected values to be an iterable of values, but given {} of type {}'
+                         .format(values, type(values).__name__))
+
   # TODO(John Sirois): Instead of re-traversing all lists later to hydrate any potentially contained
   # Addressed objects, this could return a (marker) type.  The hydration could then avoid deep
   # introspection and just look for a - say - `Resolvable` value, and only resolve those.  Only if
@@ -173,4 +195,7 @@ def addressable_mapping(type_constraint, mapping):
             pointers to values to resolve later.
   :rtype: dict
   """
+  if mapping and not isinstance(mapping, collections.Mapping):
+    raise AddressedError('Expected mapping to be mapping object, but given {} of type {}'
+                         .format(mapping, type(mapping).__name__))
   return {k: addressable(type_constraint, v) for k, v in mapping.items()} if mapping else {}

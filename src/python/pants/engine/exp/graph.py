@@ -49,6 +49,8 @@ class Graph(object):
     self._build_root = os.path.realpath(build_root)
     self._build_pattern = re.compile(build_pattern or r'^BUILD(\.[a-zA-Z0-9_-]+)?$')
     self._parser = parser
+
+    # Our resolution cache.
     self._resolved_by_address = {}
 
   def resolve(self, address):
@@ -74,13 +76,14 @@ class Graph(object):
     :raises: :class:`pants.engine.exp.objects.ValidationError` if the object was resolvable but
              invalid.
     """
-    resolved = self._resolved_by_address.get(address)
-    if not resolved:
-      resolved = self._resolve_recursively(address, resolve_path=[])
-      self._resolved_by_address[address] = resolved
-    return resolved
+    return self._resolve_recursively(address)
 
-  def _resolve_recursively(self, address, resolve_path):
+  def _resolve_recursively(self, address, resolve_path=None):
+    resolved = self._resolved_by_address.get(address)
+    if resolved:
+      return resolved
+
+    resolve_path = resolve_path or []
     if address in resolve_path:
       raise CycleError('Cycle detected along path:\n\t{}'
                        .format('\n\t'.join('* {}'.format(a) if a == address else str(a)
@@ -120,7 +123,7 @@ class Graph(object):
           hydrated_item = hydrated_item.create()
 
         # Finally make sure objects that can self-validate get a chance to do so before we cache
-        # them as the pointee of address.
+        # them as the pointee of `hydrated_item.address`.
         if isinstance(hydrated_item, Validatable):
           hydrated_item.validate()
 
@@ -140,6 +143,7 @@ class Graph(object):
 
     resolved = resolve_item(obj, addr=address)
     resolve_path.pop(-1)
+    self._resolved_by_address[address] = resolved
     return resolved
 
   def _find_build_file_sources(self, path):

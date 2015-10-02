@@ -60,3 +60,67 @@
   "name": "public",
   "url": "https://oss.sonatype.org/#stagingRepositories"
 }
+
+{
+  "typename": "Config",
+  "name": "type_mismatch",
+
+  # This should trigger a type mismatch when resolved since ApacheThriftConfig is not a superclass
+  # of Config
+  "extends": ":nonstrict"
+}
+
+{
+  "typename": "Config",
+  "name": "self_cycle",
+
+  # This should trigger a cycle error when resolved since we're trying to depend on ourselves for
+  # inheritance purposes.
+  "extends": ":self_cycle"
+}
+
+# A single-hop direct cycle - though through different types of dependency edges.
+{
+  "typename": "Target",
+  "name": "direct_cycle",
+  "dependencies": [
+    ":direct_cycle_dep"
+  ]
+}
+
+{
+  "typename": "Target",
+  "name": "direct_cycle_dep",
+  "configurations": [
+    ":direct_cycle"
+  ]
+}
+
+# A multi-hop cycle
+{
+  "typename": "Target",
+  "name": "indirect_cycle",
+  "merges": ":one"
+}
+
+{
+  "typename": "Target",
+  "name": "one",
+  "dependencies": [
+    ":two"
+  ]
+}
+
+{
+  "typename": "Target",
+  "name": "two",
+  "extends": ":three"
+}
+
+{
+  "typename": "Target",
+  "name": "three",
+  "configurations": [
+    ":one"
+  ]
+}

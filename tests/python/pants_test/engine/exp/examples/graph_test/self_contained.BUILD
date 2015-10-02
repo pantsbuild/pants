@@ -13,7 +13,7 @@ Target(
     ':thrift1',
   ]
 )
-ApacheThriftConfig
+
 # Right now the base Config class only allows either `extends` or `merges`, but more complex chains
 # can always be built up via a sequence of objects extending or merging others.
 Target(
