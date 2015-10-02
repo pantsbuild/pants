@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
+from pants.backend.core.tasks.mutex_task_mixin import MutexTaskMixin
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_task import JvmTask
@@ -17,7 +18,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.java.util import execute_java
 
 
-class BenchmarkRun(JvmToolTaskMixin, JvmTask):
+class BenchmarkRun(JvmToolTaskMixin, JvmTask, MutexTaskMixin):
   _CALIPER_MAIN = 'com.google.caliper.Runner'
 
   @classmethod
@@ -60,6 +61,16 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)
+
+  @classmethod
+  def mutex_base(cls):
+    return BenchmarkRun
+
+  @classmethod
+  def select_targets(cls, target):
+    return isinstance(target, Benchmark)
+
+  def execute_for(self, targets):
     # TODO(Steve Gury):
     # Find all the target classes from the Benchmark target itself
     # https://jira.twitter.biz/browse/AWESOME-1938
@@ -70,11 +81,6 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
       self.args.append('--measureMemory')
     if self.get_options().debug:
       self.args.append('--debug')
-
-  def execute(self):
-    targets = self.context.targets()
-    if not any(isinstance(t, Benchmark) for t in targets):
-      raise TaskError('No jvm targets specified for benchmarking.')
 
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
     # the JAR manifest as something that goes in the bootclasspath.

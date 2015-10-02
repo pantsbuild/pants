@@ -45,6 +45,7 @@ python_library(
   dependencies = [
     ':jvm_task',
     ':jvm_tool_task_mixin',
+    'src/python/pants/backend/core/tasks:mutex_task_mixin',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:workunit',
