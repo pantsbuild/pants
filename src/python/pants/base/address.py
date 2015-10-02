@@ -94,7 +94,7 @@ class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
   """
 
 
-class Address(AbstractClass):
+class Address(object):
   """A target address.
 
   An address is a unique name representing a
