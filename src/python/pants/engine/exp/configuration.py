@@ -14,9 +14,9 @@ from pants.engine.exp.objects import Serializable, SerializableFactory, Validata
 class Configuration(Serializable, SerializableFactory, Validatable):
   """A serializable object describing some bit of build configuration.
 
-  All build configuration data is composed of basic python builtin types and higher-level config
-  objects that aggregate configuration data.  Config objects can carry a name in which case they
-  become addressable and can be reused.
+  All build configuration data is composed of basic python builtin types and higher-level
+  configuration objects that aggregate configuration data.  Configuration objects can carry a name
+  in which case they become addressable and can be reused.
   """
 
   # Internal book-keeping fields to exclude from hash codes/equality checks.
@@ -53,12 +53,12 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
     # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
     # our superclasses logically provide fields within this constrained set.
-    # NB: Since Config is at base an ~unconstrained struct, a superclass does allow for arbitrary
-    # and thus more fields to be defined than a subclass might logically support.  We accept this
-    # hole in a trade for generally expected behavior when Config is subclassed in the style of
-    # constructors with named parameters representing the full complete set of expected parameters
-    # leaving **kwargs only for use by 'the system'; ie for `typename` and `address` plumbing for
-    # example.
+    # NB: Since Configuration is at base an ~unconstrained struct, a superclass does allow for
+    # arbitrary and thus more fields to be defined than a subclass might logically support.  We
+    # accept this hole in a trade for generally expected behavior when Configuration is subclassed
+    # in the style of constructors with named parameters representing the full complete set of
+    # expected parameters leaving **kwargs only for use by 'the system'; ie for `typename` and
+    # `address` plumbing for example.
     self._kwargs['extends'] = addressable(SuperclassesOf(type(self)), extends)
     self._kwargs['merges'] = addressable(SuperclassesOf(type(self)), merges)
 
@@ -77,10 +77,10 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   def name(self):
     """Return the name of this object, if any.
 
-    In general config objects need not be named, in which case they are generally embedded objects;
-    ie: attributes values of enclosing named config objects.  Any top-level config object though
-    will carry a unique name (in the config object's enclosing namespace) that can be used to
-    address it.
+    In general configuration objects need not be named, in which case they are generally embedded
+    objects; ie: attributes values of enclosing named configuration objects.  Any top-level
+    configuration object, though, will carry a unique name (in the configuration object's enclosing
+    namespace) that can be used to address it.
 
     :rtype: string
     """
@@ -90,9 +90,9 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   def address(self):
     """Return the address of this object, if any.
 
-    In general config objects need not be identified by an address, in which case they are generally
-    embedded objects; ie: attributes values of enclosing named config objects.  Any top-level config
-    object though will be identifiable via a unique address.
+    In general configuration objects need not be identified by an address, in which case they are
+    generally embedded objects; ie: attributes values of enclosing named configuration objects.
+    Any top-level configuration object, though, will be identifiable via a unique address.
 
     :rtype: :class:`pants.base.address.Address`
     """
@@ -164,8 +164,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
       attributes = self._extract_inheritable_attributes(self.extends)
       attributes.update((k, v) for k, v in self._asdict().items()
                         if k not in self._SPECIAL_FIELDS and v is not None)
-      config_type = type(self)
-      return config_type(**attributes)
+      configuration_type = type(self)
+      return configuration_type(**attributes)
     elif self.merges:
       attributes = self._extract_inheritable_attributes(self.merges)
       for k, v in self._asdict().items():
@@ -176,8 +176,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
             attributes.setdefault(k, []).extend(v)
           elif v is not None:
             attributes[k] = v
-      config_type = type(self)
-      return config_type(**attributes)
+      configuration_type = type(self)
+      return configuration_type(**attributes)
     else:
       return self
 
