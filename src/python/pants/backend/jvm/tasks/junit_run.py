@@ -29,7 +29,7 @@ from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
-from pants.util.strutil import safe_shlex_split
+from pants.util.strutil import pluralize, safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
@@ -95,6 +95,9 @@ class _JUnitRunner(object):
              help='If true, will strictly require running junits with the same version of java as '
                   'the platform -target level. Otherwise, the platform -target level will be '
                   'treated as the minimum jvm to run.')
+    register('--failure-summary', action='store_true', default=True,
+             help='If true, includes a summary of which test-cases failed at the end of a failed '
+                  'junit run.')
     register_jvm_tool(register,
                       'junit',
                       classpath=[
@@ -120,6 +123,7 @@ class _JUnitRunner(object):
     self._working_dir = options.cwd or get_buildroot()
     self._strict_jvm_version = options.strict_jvm_version
     self._args = copy.copy(task_exports.args)
+    self._failure_summary = options.failure_summary
     if options.suppress_output:
       self._args.append('-suppress-output')
     if self._fail_fast:
@@ -250,9 +254,13 @@ class _JUnitRunner(object):
       return tests_from_targets
 
   def _get_failed_targets(self, tests_and_targets):
-    """Return a list of failed targets.
+    """Return a mapping of target -> set of individual test cases that failed.
+
+    Targets with no failed tests are omitted.
 
     Analyzes JUnit XML files to figure out which test had failed.
+
+    The individual test cases are formatted strings of the form org.foo.bar.classname#methodName.
 
     :tests_and_targets: {test: target} mapping.
     """
@@ -260,7 +268,7 @@ class _JUnitRunner(object):
     def get_test_filename(test):
       return os.path.join(self._task_exports.workdir, 'TEST-{0}.xml'.format(test))
 
-    failed_targets = []
+    failed_targets = defaultdict(set)
 
     for test, target in tests_and_targets.items():
       if target is None:
@@ -278,11 +286,15 @@ class _JUnitRunner(object):
           int_errors = int(str_errors)
 
           if target and (int_failures or int_errors):
-            failed_targets.append(target)
+            for testcase in xml.parsed.getElementsByTagName('testcase'):
+              failed_targets[target].add('{testclass}#{testname}'.format(
+                testclass=testcase.getAttribute('classname'),
+                testname=testcase.getAttribute('name'),
+              ))
         except (XmlParser.XmlError, ValueError) as e:
           self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
 
-    return failed_targets
+    return dict(failed_targets)
 
   def _run_tests(self, tests_to_targets, extra_jvm_options=None,
                  classpath_prepend=(), classpath_append=()):
@@ -326,12 +338,20 @@ class _JUnitRunner(object):
             break
 
     if result != 0:
-      failed_targets = self._get_failed_targets(tests_to_targets)
-      raise TestFailedTaskError(
-        'java {0} ... exited non-zero ({1}); {2} failed targets.'
-        .format(JUnitRun._MAIN, result, len(failed_targets)),
-        failed_targets=failed_targets
+      failed_targets_and_tests = self._get_failed_targets(tests_to_targets)
+      failed_targets = sorted(failed_targets_and_tests, key=lambda target: target.address.spec)
+      error_message_lines = []
+      if self._failure_summary:
+        for target in failed_targets:
+          error_message_lines.append('\n{0}{1}'.format(' '*4, target.address.spec))
+          for test in sorted(failed_targets_and_tests[target]):
+            error_message_lines.append('{0}{1}'.format(' '*8, test))
+      error_message_lines.append(
+        '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
+        .format(main=JUnitRun._MAIN, code=result, failed=len(failed_targets),
+                targets=pluralize(len(failed_targets), 'target'))
       )
+      raise TestFailedTaskError('\n'.join(error_message_lines), failed_targets=list(failed_targets))
 
   def _infer_workdir(self, target):
     if target.cwd is not None:
