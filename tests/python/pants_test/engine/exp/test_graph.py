@@ -24,16 +24,19 @@ class GraphTest(unittest.TestCase):
     return Graph(build_root=os.path.dirname(__file__), build_pattern=build_pattern, parser=parser)
 
   def do_test_codegen_simple(self, graph):
-    resolved_java1 = graph.resolve(Address.parse('examples/graph_test:java1'))
+    def address(name):
+      return Address(spec_path='examples/graph_test', target_name=name)
 
-    nonstrict = ApacheThriftConfig(name='nonstrict',
+    resolved_java1 = graph.resolve(address('java1'))
+
+    nonstrict = ApacheThriftConfig(address=address('nonstrict'),
                                    version='0.9.2',
                                    strict=False,
                                    lang='java')
-    public = Config(name='public', url='https://oss.sonatype.org/#stagingRepositories')
-    thrift1 = Target(name='thrift1', sources=[])
-    thrift2 = Target(name='thrift2', sources=[], dependencies=[thrift1])
-    expected_java1 = Target(name='java1',
+    public = Config(address=address('public'), url='https://oss.sonatype.org/#stagingRepositories')
+    thrift1 = Target(address=address('thrift1'), sources=[])
+    thrift2 = Target(address=address('thrift2'), sources=[], dependencies=[thrift1])
+    expected_java1 = Target(address=address('java1'),
                             sources=[],
                             configurations=[
                               ApacheThriftConfig(version='0.9.2', strict=True, lang='java'),

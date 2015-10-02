@@ -13,7 +13,7 @@ from json.encoder import JSONEncoder
 
 import six
 
-from pants.engine.exp.serializable import Serializable
+from pants.engine.exp.objects import Serializable
 from pants.util.memo import memoized
 
 

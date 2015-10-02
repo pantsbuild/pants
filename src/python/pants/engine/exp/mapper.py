@@ -9,7 +9,7 @@ import os
 
 from pants.base.address import Address
 from pants.engine.exp import parsers
-from pants.engine.exp.serializable import Serializable
+from pants.engine.exp.objects import Serializable
 from pants.util.memo import memoized_property
 
 

@@ -6,6 +6,7 @@ python_library(
   sources=['addressable.py'],
   dependencies=[
     '3rdparty/python:six',
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -16,7 +17,7 @@ python_library(
     '3rdparty/python:six',
     ':addressable',
     ':mapper',
-    ':serializable',
+    ':objects',
     'src/python/pants/base:address',
     'src/python/pants/util:memo',
   ]
@@ -26,10 +27,18 @@ python_library(
   name='mapper',
   sources=['mapper.py'],
   dependencies=[
+    ':objects',
     ':parsers',
-    ':serializable',
     'src/python/pants/base:address',
     'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
+  name='objects',
+  sources=['objects.py'],
+  dependencies=[
+    'src/python/pants/util:meta',
   ]
 )
 
@@ -38,16 +47,8 @@ python_library(
   sources=['parsers.py'],
   dependencies=[
     '3rdparty/python:six',
-    ':serializable',
+    ':objects',
     'src/python/pants/util:memo',
-  ]
-)
-
-python_library(
-  name='serializable',
-  sources=['serializable.py'],
-  dependencies=[
-    'src/python/pants/util:meta',
   ]
 )
 
@@ -56,6 +57,6 @@ python_library(
   sources=['targets.py'],
   dependencies=[
     ':addressable',
-    ':serializable',
+    ':objects',
   ]
 )
