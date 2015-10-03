@@ -38,6 +38,7 @@ python_tests(
   sources=['test_parsers.py'],
   dependencies=[
     'src/python/pants/engine/exp:parsers',
+    'src/python/pants/util:contextutil',
   ]
 )
 
