@@ -216,8 +216,18 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
   def _key(self):
     if self._hashable_key is None:
-      self._hashable_key = sorted((k, v) for k, v in self._kwargs.items()
-                                  if k not in self._SPECIAL_FIELDS)
+      if self.address:
+        self._hashable_key = self.address
+      else:
+        def hashable(value):
+          if isinstance(value, dict):
+            return tuple(sorted((k, hashable(v)) for k, v in value.items()))
+          elif isinstance(value, list):
+            return tuple(hashable(v) for v in value)
+          else:
+            return value
+        self._hashable_key = tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
+                                          if k not in self._SPECIAL_FIELDS))
     return self._hashable_key
 
   def __hash__(self):
@@ -230,9 +240,12 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     return not (self == other)
 
   def __repr__(self):
-    # TODO(John Sirois): Do something else here.  This is recursive and so printing a Node prints
-    # its whole closure and will be too expensive for inlined objects and too bewildering past
-    # simple example debugging.
-    return '{classname}({args})'.format(classname=type(self).__name__,
-                                        args=', '.join(sorted('{}={!r}'.format(k, v)
-                                                              for k, v in self._kwargs.items())))
+    classname = type(self).__name__
+    if self.address:
+      return '{classname}(address={address})'.format(classname=classname,
+                                                     address=self.address.reference())
+    else:
+      return '{classname}({args})'.format(classname=classname,
+                                          args=', '.join(sorted('{}={!r}'.format(k, v)
+                                                                for k, v in self._kwargs.items()
+                                                                if v)))

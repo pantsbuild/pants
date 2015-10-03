@@ -14,6 +14,7 @@ from json.encoder import JSONEncoder
 
 import six
 
+from pants.build_graph.address import Address
 from pants.engine.exp.objects import Resolvable, Serializable
 from pants.util.memo import memoized
 
@@ -51,7 +52,7 @@ def _read(path):
     raise ParseError('Problem reading path {}: {}'.format(path, e))
 
 
-def _object_decoder(obj, symbol_table=None):
+def _object_decoder(obj, symbol_table):
   # A magic field will indicate type and this can be used to wrap the object in a type.
   type_alias = obj.get('type_alias', None)
   if not type_alias:
@@ -163,8 +164,10 @@ def parse_json(path, symbol_table=None):
       for line_number, line in comment_lines:
         formatted_json_lines.insert(line_number, format_line(line))
 
-      raise ParseError('{error}\nIn document:\n{json_data}'
-                       .format(error=e, json_data='\n'.join(header_lines + formatted_json_lines)))
+      raise ParseError('{error}\nIn document at {path}:\n{json_data}'
+                       .format(error=e,
+                               path=path,
+                               json_data='\n'.join(header_lines + formatted_json_lines)))
 
   return objects
 
@@ -172,7 +175,8 @@ def parse_json(path, symbol_table=None):
 def _object_encoder(obj, inline):
   if isinstance(obj, Resolvable):
     return obj.resolve() if inline else obj.address
-
+  if isinstance(obj, Address):
+    return obj.reference()
   if not Serializable.is_serializable(obj):
     raise ParseError('Can only encode Serializable objects in JSON, given {!r} of type {}'
                      .format(obj, type(obj).__name__))
@@ -181,7 +185,7 @@ def _object_encoder(obj, inline):
   if 'type_alias' not in encoded:
     encoded = encoded.copy()
     encoded['type_alias'] = '{}.{}'.format(inspect.getmodule(obj).__name__, type(obj).__name__)
-  return encoded
+  return {k: v for k, v in encoded.items() if v}
 
 
 def encode_json(obj, inline=False, **kwargs):
