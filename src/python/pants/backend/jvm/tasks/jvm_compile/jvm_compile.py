@@ -590,12 +590,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       classes_by_src[None] = list(unclaimed_classes)
     return classes_by_src_by_context
 
-  def class_name_for_class_file(self, compile_context, class_file_name):
-    if not class_file_name.endswith(".class"):
-      return None
+  def classname_for_classfile(self, compile_context, class_file_name):
     assert class_file_name.startswith(compile_context.classes_dir)
-    class_file_name = class_file_name[len(compile_context.classes_dir) + 1:-len(".class")]
-    return class_file_name.replace("/", ".")
+    return ClasspathUtil.classname_for_rel_classfile(class_file_name[len(compile_context.classes_dir) + 1:])
 
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
@@ -615,7 +612,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
       def add_products_by_target(files):
         for f in files:
-          clsname = self.class_name_for_class_file(compile_context, f)
+          clsname = self.classname_for_classfile(compile_context, f)
           if clsname:
             # Is a class.
             classes_by_target[target].add_abs_paths(classes_dir, [f])

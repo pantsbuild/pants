@@ -9,6 +9,9 @@ import os
 
 from twitter.common.collections import OrderedSet
 
+from pants.util.contextutil import open_zip
+from pants.util.dirutil import fast_relpath, safe_walk
+
 
 class ClasspathUtil(object):
 
@@ -53,14 +56,14 @@ class ClasspathUtil(object):
     return cls._pluck_paths(full_classpath_tuples)
 
   @classmethod
-  def classpath_entries(cls, targets, classpath_products, confs):
+  def classpath_entries(cls, targets, classpath_products, confs, transitive=True):
     """Returns the list of jar entries for a classpath covering all the passed targets.
 
     :param targets: Targets to build a aggregated classpath for
     :param UnionProducts classpath_products: Product containing classpath elements.
     :param confs: The list of confs for use by this classpath
     """
-    classpath_tuples = classpath_products.get_for_targets(targets)
+    classpath_tuples = classpath_products.get_for_targets(targets, transitive=transitive)
 
     tuples = cls._filter_classpath_by_confs(classpath_tuples, confs)
 
@@ -77,3 +80,33 @@ class ClasspathUtil(object):
   @classmethod
   def _pluck_paths(cls, classpath):
     return [path for conf, path in classpath]
+
+  @classmethod
+  def classpath_contents(cls, targets, classpath_products, confs, transitive=True):
+    """Provides a generator over the contents (classes/resources) of a classpath.
+
+    No particular order is guaranteed (TODO: yet?).
+    """
+    for entry in cls.classpath_entries(targets, classpath_products, confs, transitive=transitive):
+      if entry.endswith('.jar') and os.path.isfile(entry):
+        with open_zip(entry, mode='r') as jar:
+          for name in jar.namelist():
+            yield name
+      elif os.path.isdir(entry):
+        for abs_sub_dir, dirnames, filenames in safe_walk(entry):
+          def rel_walk_name(name):
+            return fast_relpath(os.path.join(abs_sub_dir, name), entry)
+          for name in dirnames:
+            yield '{}/'.format(rel_walk_name(name))
+          for name in filenames:
+            yield rel_walk_name(name)
+      else:
+        # non-jar and non-directory classpath entries should be ignored
+        pass
+
+  @classmethod
+  def classname_for_rel_classfile(cls, class_file_name):
+    """Return the class name for the given relative-to-a-classpath-entry file, or None."""
+    if not class_file_name.endswith(".class"):
+      return None
+    return class_file_name[:-len(".class")].replace("/", ".")

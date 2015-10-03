@@ -19,6 +19,7 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -59,8 +60,7 @@ _TaskExports = namedtuple('_TaskExports',
 
 
 def _classfile_to_classname(cls):
-  clsname, _ = os.path.splitext(cls.replace('/', '.'))
-  return clsname
+  return ClasspathUtil.classname_for_rel_classfile(cls)
 
 
 class _JUnitRunner(object):
@@ -393,13 +393,17 @@ class _JUnitRunner(object):
     :param list targets: list of targets to calculate test classes for.
     generates tuples (class_name, target).
     """
-    targets_to_classes = self._context.products.get_data('classes_by_target')
+    classpath_products = self._context.products.get_data('compile_classpath')
     for target in self._test_target_candidates(targets):
-      target_products = targets_to_classes.get(target)
-      if target_products:
-        for _, classes in target_products.rel_paths():
-          for cls in classes:
-            yield (_classfile_to_classname(cls), target)
+      contents = ClasspathUtil.classpath_contents(
+          (target,),
+          classpath_products,
+          self._task_exports.confs,
+          transitive=False)
+      for f in contents:
+        classname = ClasspathUtil.classname_for_rel_classfile(f)
+        if classname:
+          yield (classname, target)
 
   def _classnames_from_source_file(self, srcfile):
     relsrc = os.path.relpath(srcfile, get_buildroot())
@@ -860,10 +864,12 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(options, round_manager)
+    # Resources must have been prepared.
     round_manager.require_data('resources_by_target')
-
-    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
-    round_manager.require_data('classes_by_target')
+    
+    # And the products of compilation.
+    round_manager.require_data('compile_classpath')
+    # TODO: Make this product optional based on whether a sourcefile has been specified.
     round_manager.require_data('classes_by_source')
 
   def __init__(self, *args, **kwargs):

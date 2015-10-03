@@ -288,6 +288,7 @@ python_library(
   sources = ['junit_run.py'],
   dependencies = [
     '3rdparty/python:six',
+    ':classpath_util',
     ':jvm_task',
     ':jvm_tool_task_mixin',
     'src/python/pants/backend/core/tasks:task',
