@@ -79,7 +79,7 @@ class JvmDependencyAnalyzer(Task):
           ('default',),
           transitive=False)
       for f in contents:
-        targets_by_file[f].add(tgt)
+        targets_by_file[f].add(target)
 
     return targets_by_file
 

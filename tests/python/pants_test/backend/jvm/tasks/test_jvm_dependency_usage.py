@@ -24,21 +24,19 @@ class TestJvmDependencyUsage(TaskTestBase):
 
   def _setup(self, target_classfiles):
     """Takes a dict mapping targets to lists of classfiles."""
-    context = self.context()
-    task = self.create_task(context)
+    context = self.context(target_roots=target_classfiles.keys())
 
     # Create classfiles in a target-specific directory, and add it to the classpath for the target.
     compile_classpath = context.products.get_data('compile_classpath', ClasspathProducts)
     for target, classfiles in target_classfiles.items():
-      target_dir = os.path.join(task.workdir, target.id)
+      target_dir = os.path.join(self.test_workdir, target.id)
       safe_mkdir(target_dir)
       for classfile in classfiles:
         touch(os.path.join(target_dir, classfile))
-      print(">>> creating {} under {} for {}".format(classfiles, target_dir, target.address.spec))
       compile_classpath.add_for_target(target, [('default', target_dir)])
 
     product_deps_by_src = context.products.get_data('product_deps_by_src', dict)
-    return task, compile_classpath, product_deps_by_src
+    return self.create_task(context), compile_classpath, product_deps_by_src
 
   def make_java_target(self, *args, **kwargs):
     assert 'target_type' not in kwargs
