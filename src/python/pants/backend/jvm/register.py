@@ -36,7 +36,7 @@ from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
-from pants.backend.jvm.tasks.jar_create import RuntimeJarCreate, RemoteJarCreate
+from pants.backend.jvm.tasks.jar_create import RemoteJarCreate, RuntimeJarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun

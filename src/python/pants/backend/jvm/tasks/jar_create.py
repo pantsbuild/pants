@@ -64,6 +64,8 @@ class BaseJarCreate(JarBuilderTask):
     pass
 
   def execute(self):
+    self._prepare_products()
+
     with self.invalidated(self.context.targets(is_jvm_library)) as invalidation_check:
       with self.context.new_workunit(name='jar-create', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
@@ -121,9 +123,9 @@ class RuntimeJarCreate(BaseJarCreate):
     return False
 
   def _prepare_products(self):
-    compile_classpath = self.context.products.get('compile_classpath')
+    compile_classpath = self.context.products.get_data('compile_classpath')
     self.context.products.safe_create_data('runtime_classpath', compile_classpath.copy)
 
   def _add_jar_to_products(self, target, jar_dir, jar_name):
-    runtime_classpath = self.context.products.get('runtime_classpath')
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
     runtime_classpath.add_for_target(target, [('default', os.path.join(jar_dir, jar_name))])
