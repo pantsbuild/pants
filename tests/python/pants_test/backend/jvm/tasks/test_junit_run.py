@@ -140,10 +140,10 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     java_tests_products.add_rel_paths(test_abs_path, ['FooTest.class'])
     class_products[java_tests] = java_tests_products
 
-    # Also we need to add the FooTest.class's classpath to the compile_classpath
+    # Also we need to add the FooTest.class's classpath to the runtime_classpath
     # products data mapping so JUnitRun will be able to add that into the final
     # classpath under which the junit will be executed.
-    self.populate_compile_classpath(context=context, classpath=[test_abs_path])
+    self.populate_classpath(context=context, classpath=[test_abs_path], product_name='runtime_classpath')
 
     # Finally execute the task.
     self.execute(context)

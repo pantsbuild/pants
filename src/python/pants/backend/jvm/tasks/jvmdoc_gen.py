@@ -70,11 +70,10 @@ class JvmdocGen(JvmTask):
   def prepare(cls, options, round_manager):
     super(JvmdocGen, cls).prepare(options, round_manager)
 
-    # TODO(John Sirois): this is a fake requirement in order to force compile run before this
-    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
-    # and depend on that.
-    # See: https://github.com/pantsbuild/pants/issues/310
-    round_manager.require_data('classes_by_target')
+    # NB: Because this task extends JvmTask, it requires 'runtime_classpath'. That's
+    # overkill, but it does ensure that this task runs after compilation. Instead, it
+    # could probably just extend NailgunTask.
+    round_manager.require_data('compile_classpath')
 
   def __init__(self, *args, **kwargs):
     super(JvmdocGen, self).__init__(*args, **kwargs)
@@ -113,7 +112,8 @@ class JvmdocGen(JvmTask):
 
     with self.invalidated(targets) as invalidation_check:
       safe_mkdir(self.workdir)
-      classpath = self.classpath(targets)
+      classpath_product = self.context.products.get_data('compile_classpath')
+      classpath = self.classpath(targets, classpath_product=classpath_product)
 
       def find_jvmdoc_targets():
         invalid_targets = set()

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants_test.backend.jvm.jvm_test_mixin import JvmTestMixin
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -15,7 +16,7 @@ class DummyJvmTask(JvmTask):
     pass
 
 
-class JvmTaskTest(TaskTestBase):
+class JvmTaskTest(TaskTestBase, JvmTestMixin):
   """Test some base functionality in JvmTask."""
 
   @classmethod
@@ -32,7 +33,7 @@ class JvmTaskTest(TaskTestBase):
 
     context = self.context(target_roots=[self.t1, self.t2, self.t3])
 
-    self.populate_compile_classpath(context)
+    self.populate_classpath(context, product_name='runtime_classpath')
 
     self.task = self.create_task(context, self.workdir)
 

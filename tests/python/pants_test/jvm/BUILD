@@ -21,6 +21,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
+    'tests/python/pants_test/backend/jvm:jvm_test_mixin',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )

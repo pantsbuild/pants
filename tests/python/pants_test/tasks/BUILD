@@ -413,6 +413,7 @@ python_tests(
     ':task_test_base',
     'src/python/pants/backend/jvm/tasks:jvm_task',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/backend/jvm:jvm_test_mixin',
   ]
 )
 
@@ -423,6 +424,7 @@ python_tests(
     ':task_test_base',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/backend/jvm:jvm_test_mixin',
   ]
 )
 

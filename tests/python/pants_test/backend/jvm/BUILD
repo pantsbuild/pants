@@ -17,3 +17,11 @@ python_tests(
     'src/python/pants/backend/jvm:jar_dependency_utils',
   ]
 )
+
+python_tests(
+  name = 'jvm_test_mixin',
+  sources = ['jvm_test_mixin.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+  ]
+)
