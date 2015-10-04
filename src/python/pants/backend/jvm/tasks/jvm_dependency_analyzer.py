@@ -70,18 +70,35 @@ class JvmDependencyAnalyzer(Task):
           for src in java_source.sources_relative_to_buildroot():
             targets_by_file[os.path.join(buildroot, src)].add(target)
 
-    # Compute class -> target.
+    # Compute classfile -> target and jar -> target.
     self.context.log.debug('Mapping classpath...')
+    confs = ('default',)
     for target in self.context.targets():
-      contents = ClasspathUtil.classpath_contents(
+      # Classpath content.
+      files = ClasspathUtil.classpath_contents(
           (target,),
           compile_classpath,
-          ('default',),
+          confs,
           transitive=False)
-      for f in contents:
-        targets_by_file[f].add(target)
+      # And jars; for binary deps, zinc doesn't emit precise deps (yet).
+      jars = ClasspathUtil.classpath_entries(
+          (target,),
+          compile_classpath,
+          confs,
+          transitive=False,
+          jars_only=True)
+      for coll in [files, jars]:
+        for f in coll:
+          targets_by_file[f].add(target)
 
     return targets_by_file
+
+  def _jar_classfiles(self, jar_file):
+    """Returns an iterator over the classfiles inside jar_file."""
+    with open_zip(jar_file, 'r') as jar:
+      for cls in jar.namelist():
+        if cls.endswith(b'.class'):
+          yield cls
 
   @memoized_property
   def bootstrap_jar_classfiles(self):

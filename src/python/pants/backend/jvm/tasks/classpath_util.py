@@ -21,7 +21,7 @@ class ClasspathUtil(object):
     adds paths from extra_classpath_tuples to the end of the resulting list.
 
     :param targets: Targets to build a aggregated classpath for
-    :param UnionProducts classpath_products: Product containing classpath elements.
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
     :param extra_classpath_tuples: Additional (conf, path) pairs to be added to the classpath
     :param confs: The list of confs for use by this classpath
     """
@@ -39,7 +39,7 @@ class ClasspathUtil(object):
     paths from extra_classpath_tuples to the end of the resulting list.
 
     :param target: The target to generate a classpath for
-    :param UnionProducts classpath_products: Product containing classpath elements.
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
     :param extra_classpath_tuples: Additional classpath entries
     :param confs: The list of confs for use by this classpath
     :param target_closure: The transitive closure of the target
@@ -56,30 +56,28 @@ class ClasspathUtil(object):
     return cls._pluck_paths(full_classpath_tuples)
 
   @classmethod
-  def classpath_entries(cls, targets, classpath_products, confs, transitive=True):
-    """Returns the list of jar entries for a classpath covering all the passed targets.
+  def classpath_entries(cls, targets, classpath_products, confs, transitive=True, jars_only=False):
+    """Returns the list of entries for a classpath covering all the passed targets.
 
     :param targets: Targets to build a aggregated classpath for
-    :param UnionProducts classpath_products: Product containing classpath elements.
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
     :param confs: The list of confs for use by this classpath
     """
     classpath_tuples = classpath_products.get_for_targets(targets, transitive=transitive)
 
     tuples = cls._filter_classpath_by_confs(classpath_tuples, confs)
 
-    return cls._pluck_paths(tuples)
+    return cls._pluck_paths(tuples, jars_only=jars_only)
 
   @classmethod
   def _filter_classpath_by_confs(cls, classpath_tuples, confs):
-    def conf_needed(conf):
-      return conf in confs if confs is not None else True
-
-    return [(conf, path) for conf, path in classpath_tuples
-            if conf_needed(conf)]
+    accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
+    return [(conf, path) for conf, path in classpath_tuples if accept(conf)]
 
   @classmethod
-  def _pluck_paths(cls, classpath):
-    return [path for conf, path in classpath]
+  def _pluck_paths(cls, classpath, jars_only=False):
+    accept = (lambda p: cls.is_jar(p)) if jars_only else (lambda _: True)
+    return [path for conf, path in classpath if accept(path)]
 
   @classmethod
   def classpath_contents(cls, targets, classpath_products, confs, transitive=True):
@@ -88,7 +86,7 @@ class ClasspathUtil(object):
     No particular order is guaranteed (TODO: yet?).
     """
     for entry in cls.classpath_entries(targets, classpath_products, confs, transitive=transitive):
-      if entry.endswith('.jar') and os.path.isfile(entry):
+      if cls.is_jar(entry):
         with open_zip(entry, mode='r') as jar:
           for name in jar.namelist():
             yield name
@@ -110,3 +108,8 @@ class ClasspathUtil(object):
     if not class_file_name.endswith(".class"):
       return None
     return class_file_name[:-len(".class")].replace("/", ".")
+
+  @classmethod
+  def is_jar(cls, path):
+    """True if the given path represents an existing jar file."""
+    return path.endswith('.jar') and os.path.isfile(path)
