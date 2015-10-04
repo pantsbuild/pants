@@ -378,13 +378,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def compile_context(self, target):
     analysis_file = JvmCompile._analysis_for_target(self._analysis_dir, target)
     classes_dir = os.path.join(self._classes_dir, target.id)
-    # Generate a short unique path for the jar to allow for shorter classpaths.
-    #   TODO: likely unnecessary after https://github.com/pantsbuild/pants/issues/1988
-    jar_file = os.path.join(self._jars_dir, '{}.jar'.format(sha1(target.id).hexdigest()[:12]))
     return CompileContext(target,
                           analysis_file,
                           classes_dir,
-                          jar_file,
                           self._sources_for_target(target))
 
   def execute_chunk(self, relevant_targets):
@@ -466,16 +462,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       exec_graph.execute(self._worker_pool, self.context.log)
     except ExecutionFailure as e:
       raise TaskError("Compilation failure: {}".format(e))
-
-  def finalize_execute(self, chunks):
-    targets = list(itertools.chain(*chunks))
-    # Replace the classpath entry for each target with its jar'd representation.
-    compile_classpaths = self.context.products.get_data('compile_classpath')
-    for target in targets:
-      cc = self.compile_context(target)
-      for conf in self._confs:
-        compile_classpaths.remove_for_target(target, [(conf, cc.classes_dir)])
-        compile_classpaths.add_for_target(target, [(conf, cc.jar_file)])
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
                    log_file, progress_message, settings):
@@ -569,12 +555,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Build a mapping of srcs to classes for each context.
     classes_by_src_by_context = defaultdict(dict)
     for compile_context in compile_contexts:
-      # Walk the context's jar to build a set of unclaimed classfiles.
+      # Walk the class directory to build a set of unclaimed classfiles.
       unclaimed_classes = set()
-      with compile_context.open_jar(mode='r') as jar:
-        for name in jar.namelist():
-          if not name.endswith('/'):
-            unclaimed_classes.add(os.path.join(compile_context.classes_dir, name))
+      for abs_sub_dir, _, filenames in safe_walk(compile_context.classes_dir):
+        for name in filenames:
+          unclaimed_classes.add(os.path.join(abs_sub_dir, name))
 
       # Grab the analysis' view of which classfiles were generated.
       classes_by_src = classes_by_src_by_context[compile_context]
@@ -753,9 +738,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                     target.platform)
         atomic_copy(tmp_analysis_file, compile_context.analysis_file)
 
-        # Jar the compiled output.
-        self._create_context_jar(compile_context)
-
       # Update the products with the latest classes.
       register_vts([compile_context])
 
@@ -785,22 +767,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                       on_success=vts.update,
                       on_failure=vts.force_invalidate))
     return jobs
-
-  def _create_context_jar(self, compile_context):
-    """Jar up the compile_context to its output jar location.
-
-    TODO(stuhood): In the medium term, we hope to add compiler support for this step, which would
-    allow the jars to be used as compile _inputs_ as well. Currently using jar'd compile outputs as
-    compile inputs would make the compiler's analysis useless.
-      see https://github.com/twitter-forks/sbt/tree/stuhood/output-jars
-    """
-    root = compile_context.classes_dir
-    with compile_context.open_jar(mode='w') as jar:
-      for abs_sub_dir, dirnames, filenames in safe_walk(root):
-        for name in dirnames + filenames:
-          abs_filename = os.path.join(abs_sub_dir, name)
-          arcname = fast_relpath(abs_filename, root)
-          jar.write(abs_filename, arcname)
 
   def _write_to_artifact_cache(self, vts, compile_context, get_update_artifact_cache_work):
     assert len(vts.targets) == 1
@@ -833,8 +799,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     log_file = self._capture_log_file(compile_context.target)
     if log_file and os.path.exists(log_file):
       artifacts.append(log_file)
-    # Jar.
-    artifacts.append(compile_context.jar_file)
 
     # Get the 'work' that will publish these artifacts to the cache.
     # NB: the portable analysis_file won't exist until we finish.

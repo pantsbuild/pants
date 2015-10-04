@@ -5,12 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import zipfile
-from contextlib import contextmanager
-
-from pants.util.contextutil import open_zip
-
-
 class CompileContext(object):
   """A context for the compilation of a target.
 
@@ -18,17 +12,11 @@ class CompileContext(object):
   and a finalized compile in its permanent location.
   """
 
-  def __init__(self, target, analysis_file, classes_dir, jar_file, sources):
+  def __init__(self, target, analysis_file, classes_dir, sources):
     self.target = target
     self.analysis_file = analysis_file
     self.classes_dir = classes_dir
-    self.jar_file = jar_file
     self.sources = sources
-
-  @contextmanager
-  def open_jar(self, mode):
-    with open_zip(self.jar_file, mode=mode, compression=zipfile.ZIP_STORED) as jar:
-      yield jar
 
   @property
   def _id(self):
