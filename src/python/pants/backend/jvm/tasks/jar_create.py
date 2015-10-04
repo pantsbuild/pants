@@ -59,14 +59,15 @@ class BaseJarCreate(JarBuilderTask):
     """Adds the given jar to the products for the given target."""
     pass
 
-  def _prepare_products(self):
+  def _prepare_products(self, relevant_targets):
     """Performs any pre-execution preparation of products required by subclasses."""
     pass
 
   def execute(self):
-    self._prepare_products()
+    relevant_targets = self.context.targets(is_jvm_library)
+    self._prepare_products(relevant_targets)
 
-    with self.invalidated(self.context.targets(is_jvm_library)) as invalidation_check:
+    with self.invalidated(relevant_targets) as invalidation_check:
       with self.context.new_workunit(name='jar-create', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
           jar_name = vt.target.name + '.jar'
@@ -122,9 +123,15 @@ class RuntimeJarCreate(BaseJarCreate):
   def compressed(cls):
     return False
 
-  def _prepare_products(self):
+  def _prepare_products(self, relevant_targets):
+    """Clone the compile_classpath to a runtime_classpath."""
     compile_classpath = self.context.products.get_data('compile_classpath')
     self.context.products.safe_create_data('runtime_classpath', compile_classpath.copy)
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    # Remove direct entries for relevant targets: they will be added later.
+    for target in relevant_targets:
+      paths = runtime_classpath.get_for_target(target, False)
+      runtime_classpath.remove_for_target(target, paths)
 
   def _add_jar_to_products(self, target, jar_dir, jar_name):
     runtime_classpath = self.context.products.get_data('runtime_classpath')
