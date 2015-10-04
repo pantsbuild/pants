@@ -59,6 +59,11 @@ class BaseJarCreate(JarBuilderTask):
     """Adds the given jar to the products for the given target."""
     pass
 
+  @abstractmethod
+  def _jar_name(self, target):
+    """Generates a jar name for the given target."""
+    pass
+
   def _prepare_products(self, relevant_targets):
     """Performs any pre-execution preparation of products required by subclasses."""
     pass
@@ -70,7 +75,7 @@ class BaseJarCreate(JarBuilderTask):
     with self.invalidated(relevant_targets) as invalidation_check:
       with self.context.new_workunit(name='jar-create', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
-          jar_name = vt.target.name + '.jar'
+          jar_name = self._jar_name(vt.target)
           jar_dir = vt.results_dir
           jar_path = os.path.join(jar_dir, jar_name)
 
@@ -108,6 +113,9 @@ class RemoteJarCreate(BaseJarCreate):
   def compressed(cls):
     return True
 
+  def _jar_name(self, target):
+    return target.name + '.jar'
+
   def _add_jar_to_products(self, target, jar_dir, jar_name):
     jar_mapping = self.context.products.get('jars')
     jar_mapping.add(target, jar_dir).append(jar_name)
@@ -132,6 +140,9 @@ class RuntimeJarCreate(BaseJarCreate):
     for target in relevant_targets:
       paths = runtime_classpath.get_for_target(target, False)
       runtime_classpath.remove_for_target(target, paths)
+
+  def _jar_name(self, target):
+    return 'r.jar'
 
   def _add_jar_to_products(self, target, jar_dir, jar_name):
     runtime_classpath = self.context.products.get_data('runtime_classpath')

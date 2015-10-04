@@ -14,7 +14,7 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
+from pants.backend.jvm.tasks.jar_create import RemoteJarCreate, is_jvm_library
 from pants.base.source_root import SourceRoot
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import open_zip
@@ -26,7 +26,7 @@ class JarCreateTestBase(JarTaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return JarCreate
+    return RemoteJarCreate
 
   @property
   def alias_groups(self):
@@ -135,7 +135,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
             with closing(jar.open(content)) as fp:
               self.assertEqual(os.path.basename(content), fp.read())
 
-  @ensure_cached(JarCreate)
+  @ensure_cached(RemoteJarCreate)
   def test_classfile_jar_contents(self):
     context = self.context()
     with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):
