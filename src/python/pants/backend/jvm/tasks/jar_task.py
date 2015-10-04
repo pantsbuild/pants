@@ -17,6 +17,7 @@ from twitter.common.collections import maybe_list
 from pants.backend.jvm.subsystems.jar_tool import JarTool
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import safe_args
@@ -341,7 +342,7 @@ class JarBuilderTask(JarTask):
       prepared ``JarTask.JarBuilder`` ready for use.
       """
       round_manager.require_data('resources_by_target')
-      round_manager.require_data('classes_by_target')
+      round_manager.require_data('compile_classpath')
 
     def __init__(self, context, jar):
       self._context = context
@@ -357,13 +358,33 @@ class JarBuilderTask(JarTask):
       :returns: The list of targets that actually contributed classes or resources or both to the
         jar.
       """
-      classes_by_target = self._context.products.get_data('classes_by_target')
+      compile_classpath = self._context.products.get_data('compile_classpath')
       resources_by_target = self._context.products.get_data('resources_by_target')
 
       targets_added = []
 
+      def add_classpath_entry(entry):
+        if ClasspathUtil.is_jar(entry):
+          self._jar.writejar(entry)
+        elif ClasspathUtil.is_dir(entry):
+          for rel_file in ClasspathUtil.directory_contents(entry):
+            self._jar.write(os.path.join(entry, rel_file), rel_file)
+        else:
+          # non-jar and non-directory classpath entries should be ignored
+          pass
+
+      def add_rooted_products(target_products):
+        if target_products:
+          for root, products in target_products.rel_paths():
+            for prod in products:
+              self._jar.write(os.path.join(root, prod), prod)
+
       def add_to_jar(tgt):
-        target_classes = classes_by_target.get(tgt)
+        target_classpath = ClasspathUtil.classpath_entries(
+            (tgt,),
+            compile_classpath,
+            ('default',),
+            transitive=False)
 
         target_resources = []
 
@@ -375,18 +396,13 @@ class JarBuilderTask(JarTask):
         if tgt.has_resources:
           target_resources.extend(resources_by_target.get(r) for r in tgt.resources)
 
-        if target_classes or target_resources:
+        if target_classpath or target_resources:
           targets_added.append(tgt)
 
-          def add_products(target_products):
-            if target_products:
-              for root, products in target_products.rel_paths():
-                for prod in products:
-                  self._jar.write(os.path.join(root, prod), prod)
-
-          add_products(target_classes)
+          for entry in target_classpath:
+            add_classpath_entry(entry)
           for resources_target in target_resources:
-            add_products(resources_target)
+            add_rooted_products(resources_target)
 
           if isinstance(tgt, JavaAgent):
             self._add_agent_manifest(tgt, self._manifest)

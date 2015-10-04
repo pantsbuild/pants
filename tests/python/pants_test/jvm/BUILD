@@ -39,5 +39,7 @@ python_library(
   sources=['jar_task_test_base.py'],
   dependencies=[
     ':nailgun_task_test_base',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/util:dirutil',
   ]
 )

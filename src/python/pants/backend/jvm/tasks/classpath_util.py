@@ -91,13 +91,8 @@ class ClasspathUtil(object):
           for name in jar.namelist():
             yield name
       elif os.path.isdir(entry):
-        for abs_sub_dir, dirnames, filenames in safe_walk(entry):
-          def rel_walk_name(name):
-            return fast_relpath(os.path.join(abs_sub_dir, name), entry)
-          for name in dirnames:
-            yield '{}/'.format(rel_walk_name(name))
-          for name in filenames:
-            yield rel_walk_name(name)
+        for f in cls.directory_contents(entry):
+          yield f
       else:
         # non-jar and non-directory classpath entries should be ignored
         pass
@@ -110,6 +105,21 @@ class ClasspathUtil(object):
     return class_file_name[:-len(".class")].replace("/", ".")
 
   @classmethod
+  def directory_contents(cls, classpath_entry):
+    def rel_walk_name(abs_sub_dir, name):
+      return fast_relpath(os.path.join(abs_sub_dir, name), classpath_entry)
+    for abs_sub_dir, dirnames, filenames in safe_walk(classpath_entry):
+      for name in dirnames:
+        yield '{}/'.format(rel_walk_name(abs_sub_dir, name))
+      for name in filenames:
+        yield rel_walk_name(abs_sub_dir, name)
+
+  @classmethod
   def is_jar(cls, path):
     """True if the given path represents an existing jar file."""
     return path.endswith('.jar') and os.path.isfile(path)
+
+  @classmethod
+  def is_dir(cls, path):
+    """True if the given path represents an existing directory."""
+    return os.path.isdir(path)

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
 import unittest
 from collections import defaultdict
@@ -354,3 +355,12 @@ class BaseTest(unittest.TestCase):
         return product
       product_mapping.add(target, outdir, map(create_product, products))
       yield temporary_dir
+
+  def assertUnorderedPrefixEqual(self, expected, actual_iter):
+    """Consumes len(expected) items from the given iter, and asserts that they match, unordered."""
+    actual = list(itertools.islice(actual_iter, len(expected)))
+    self.assertEqual(sorted(expected), sorted(actual))
+
+  def assertPrefixEqual(self, expected, actual_iter):
+    """Consumes len(expected) items from the given iter, and asserts that they match, in order."""
+    self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))

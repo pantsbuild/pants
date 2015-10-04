@@ -223,15 +223,6 @@ class JarBuilderTest(BaseJarTaskTest):
     super(JarBuilderTest, self).setUp()
     self.set_options(max_subprocess_args=100)
 
-  def _add_to_classes_by_target(self, context, tgt, filename):
-    class_products = context.products.get_data('classes_by_target',
-                                               lambda: defaultdict(MultipleRootedProducts))
-    java_agent_products = MultipleRootedProducts()
-    java_agent_products.add_rel_paths(os.path.join(self.build_root,
-                                                   os.path.dirname(filename)),
-                                      [os.path.basename(filename)])
-    class_products[tgt] = java_agent_products
-
   def test_agent_manifest(self):
     self.add_to_build_file('src/java/pants/agents', dedent("""
         java_agent(
@@ -247,12 +238,9 @@ class JarBuilderTest(BaseJarTaskTest):
     context = self.context(target_roots=[java_agent])
     jar_builder_task = self.prepare_execute(context)
 
-    classfile = '.pants.d/javac/classes/FakeAgent.class'
-    self.create_file(classfile, '0xCAFEBABE')
-    self._add_to_classes_by_target(context, java_agent, classfile)
+    self.add_to_compile_classpath(context, java_agent, {'FakeAgent.class': '0xCAFEBABE'})
     context.products.safe_create_data('resources_by_target',
-
-                                  lambda: defaultdict(MultipleRootedProducts))
+                                      lambda: defaultdict(MultipleRootedProducts))
     with self.jarfile() as existing_jarfile:
       with jar_builder_task.open_jar(existing_jarfile) as jar:
         with jar_builder_task.create_jar_builder(jar) as jar_builder:
@@ -287,9 +275,7 @@ class JarBuilderTest(BaseJarTaskTest):
     binary_target = self.target('src/java/hello:hello')
     context = self.context(target_roots=[binary_target])
 
-    classfile = '.pants.d/javac/classes/hello/Hello.class'
-    self.create_file(classfile, '0xDEADBEEF')
-    self._add_to_classes_by_target(context, binary_target, classfile)
+    self.add_to_compile_classpath(context, binary_target, {'Hello.class': '0xDEADBEEF'})
     context.products.safe_create_data('resources_by_target',
                                       lambda: defaultdict(MultipleRootedProducts))
 

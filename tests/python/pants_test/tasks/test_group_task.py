@@ -137,17 +137,6 @@ class BaseGroupTaskTest(BaseTest):
     self.task = self.group_task(self._context, workdir='/not/real')
     self.task.execute()
 
-  def assertUnorderedPrefixEqual(self, expected, actual_iter):
-    """The ordering of the execution of some of these items isn't guaranteed.
-
-    https://groups.google.com/d/msg/pants-devel/Rer9_ytsyf8/gi8zokWNexYJ
-    """
-    actual = list(itertools.islice(actual_iter, len(expected)))
-    self.assertEqual(sorted(expected), sorted(actual))
-
-  def assertPrefixEqual(self, expected, actual_iter):
-    self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
-
   def prepare_action(self, tag):
     return 'prepare', tag, self._context
 
