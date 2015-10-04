@@ -155,4 +155,16 @@ class UnpackJarsTest(TaskTestBase):
 
       self.assertEquals([foo_target], unpacked_targets)
 
+      # Change the include pattern and the target should be unpacked again
+      self.reset_build_graph()  # Forget about the old definition of the unpack/jars:foo-jar target
+
+      make_unpacked_jar = functools.partial(self._make_unpacked_jar,
+                                            include_patterns=['a/b/c/foo.proto'])
+      foo_target = make_unpacked_jar(rev2)
+      unpack_task = self.create_task(self.context(target_roots=[foo_target]))
+      self._add_dummy_product(unpack_task, foo_target, jar_filename, rev2)
+      unpacked_targets = unpack_task.execute()
+
+      self.assertEquals([foo_target], unpacked_targets)
+
       # TODO(Eric Ayers) Check the 'unpacked_archives' product
