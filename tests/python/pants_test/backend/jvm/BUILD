@@ -5,6 +5,7 @@ target(
   name = 'jvm',
   dependencies = [
     ':jar_dependency_utils',
+    ':jvm_test_mixin',
     'tests/python/pants_test/backend/jvm/targets',
     'tests/python/pants_test/backend/jvm/tasks',
   ]
@@ -18,7 +19,7 @@ python_tests(
   ]
 )
 
-python_tests(
+python_library(
   name = 'jvm_test_mixin',
   sources = ['jvm_test_mixin.py'],
   dependencies = [
