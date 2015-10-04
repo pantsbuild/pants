@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from abc import abstractproperty
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -29,20 +30,19 @@ class JvmDependencyAnalyzer(Task):
   determining which targets correspond to the actual source dependencies of any given target.
   """
 
+  @abstractproperty
+  @classmethod
+  def skip(cls, options):
+    """Return true if the task should be entirely skipped, and thus have no product requirements."""
+    pass
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmDependencyAnalyzer, cls).prepare(options, round_manager)
-    if not options.skip:
+    if not cls.skip(options):
       round_manager.require_data('classes_by_target')
       round_manager.require_data('compile_classpath')
       round_manager.require_data('product_deps_by_src')
-
-  @classmethod
-  def register_options(cls, register):
-    super(JvmDependencyAnalyzer, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             fingerprint=True,
-             help='Skip this entire task.')
 
   @memoized_property
   def targets_by_file(self):

@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from pex.compatibility import to_bytes
 
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
@@ -43,7 +44,7 @@ class DuplicateDetector(JvmBinaryTask):
   def prepare(cls, options, round_manager):
     super(DuplicateDetector, cls).prepare(options, round_manager)
     round_manager.require_data('resources_by_target')
-    round_manager.require_data('classes_by_target')
+    round_manager.require_data('compile_classpath')
 
   def __init__(self, *args, **kwargs):
     super(DuplicateDetector, self).__init__(*args, **kwargs)
@@ -83,15 +84,20 @@ class DuplicateDetector(JvmBinaryTask):
 
   def _get_internal_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
-    classes_by_target = self.context.products.get_data('classes_by_target')
+    classpath_products = self.context.products.get_data('compile_classpath')
     resources_by_target = self.context.products.get_data('resources_by_target')
 
-    target_products = classes_by_target.get(binary_target)
-    if target_products:  # Will be None if binary_target has no sources.
-      for _, classes in target_products.rel_paths():
-        for cls in classes:
-          artifacts_by_file_name[cls].add(binary_target)
+    # Select classfiles from the classpath.
+    contents = ClasspathUtil.classpath_contents(
+        (binary_target,),
+        classpath_products,
+        ('default',),
+        transitive=False)
+    for f in contents:
+      if f.endswith('.class'):
+        artifacts_by_file_name[f].add(binary_target)
 
+    # TODO: Get resources from the classpath as well?
     target_resources = []
     if binary_target.has_resources:
       target_resources.extend(resources_by_target.get(r) for r in binary_target.resources)

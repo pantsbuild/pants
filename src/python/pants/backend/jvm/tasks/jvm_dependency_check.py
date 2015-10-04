@@ -29,7 +29,7 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyCheck, cls).register_options(register)
-    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
+    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='off',
              fingerprint=True,
              help='Check for missing dependencies in compiled code. Reports actual '
                   'dependencies A -> B where there is no transitive BUILD file dependency path '
@@ -69,12 +69,17 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
     self._check_unnecessary_deps = munge_flag('unnecessary_deps')
     self._target_whitelist = self.get_options().missing_deps_whitelist
 
+  @classmethod
+  def skip(cls, options):
+    values = [options.missing_deps, options.missing_direct_deps, options.unnecessary_deps]
+    return all(v == 'off' for v in values)
+
   @property
   def cache_target_dirs(self):
     return True
 
   def execute(self):
-    if self.get_options().skip:
+    if self.skip(self.get_options()):
       return
     with self.invalidated(self.context.targets(),
                           invalidate_dependents=True) as invalidation_check:

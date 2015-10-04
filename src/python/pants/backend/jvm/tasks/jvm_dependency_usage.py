@@ -60,14 +60,16 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmDependencyUsage, cls).prepare(options, round_manager)
-    if not options.skip:
-      round_manager.require_data('classes_by_source')
-      round_manager.require_data('classes_by_target')
-      round_manager.require_data('product_deps_by_src')
+    round_manager.require_data('classes_by_source')
+    round_manager.require_data('classes_by_target')
+    round_manager.require_data('product_deps_by_src')
+
+  @classmethod
+  def skip(cls, options):
+    """This task is always explicitly requested."""
+    return False
 
   def execute(self):
-    if self.get_options().skip:
-      return
     targets = (self.context.targets() if self.get_options().transitive
                else self.context.target_roots)
     graph = self.create_dep_usage_graph(targets, get_buildroot())
