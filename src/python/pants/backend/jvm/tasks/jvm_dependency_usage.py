@@ -13,6 +13,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.target import Target
@@ -61,7 +62,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   def prepare(cls, options, round_manager):
     super(JvmDependencyUsage, cls).prepare(options, round_manager)
     round_manager.require_data('classes_by_source')
-    round_manager.require_data('classes_by_target')
+    round_manager.require_data('compile_classpath')
     round_manager.require_data('product_deps_by_src')
 
   @classmethod
@@ -127,6 +128,15 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       rel_src = fast_relpath(dep, buildroot)
       return set(p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths)
 
+  def _count_products(self, compile_classpath, target):
+    contents = ClasspathUtil.classpath_contents(
+        (target,),
+        compile_classpath,
+        ('default',),
+        transitive=False)
+    # Generators don't implement len.
+    return sum(1 for _ in contents)
+
   def create_dep_usage_graph(self, targets, buildroot):
     """Creates a graph of concrete targets, with their sum of products and dependencies.
 
@@ -135,7 +145,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
 
     # Initialize all Nodes.
     classes_by_source = self.context.products.get_data('classes_by_source')
-    classes_by_target = self.context.products.get_data('classes_by_target')
+    compile_classpath = self.context.products.get_data('compile_classpath')
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
     nodes = dict()
     for target in targets:
@@ -143,7 +153,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
         continue
       # Create or extend a Node for the concrete version of this target.
       concrete_target = target.concrete_derived_from
-      products_total = sum(len(paths) for _, paths in classes_by_target[target].rel_paths())
+      products_total = self._count_products(compile_classpath, target)
       node = nodes.get(concrete_target)
       if not node:
         node = nodes.setdefault(concrete_target, Node(concrete_target))

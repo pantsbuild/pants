@@ -327,11 +327,12 @@ python_library(
   sources = ['jvm_dependency_analyzer.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':classpath_util',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
+    'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
   ]
 )
@@ -359,6 +360,7 @@ python_library(
   name = 'jvm_dependency_usage',
   sources = ['jvm_dependency_usage.py'],
   dependencies = [
+    ':classpath_util',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',

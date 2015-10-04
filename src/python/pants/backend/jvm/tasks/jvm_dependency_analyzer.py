@@ -15,6 +15,7 @@ from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_graph import sort_targets
@@ -40,7 +41,6 @@ class JvmDependencyAnalyzer(Task):
   def prepare(cls, options, round_manager):
     super(JvmDependencyAnalyzer, cls).prepare(options, round_manager)
     if not cls.skip(options):
-      round_manager.require_data('classes_by_target')
       round_manager.require_data('compile_classpath')
       round_manager.require_data('product_deps_by_src')
 
@@ -54,6 +54,7 @@ class JvmDependencyAnalyzer(Task):
     "canonical" target will be the first one in the list of targets.
     """
     targets_by_file = defaultdict(OrderedSet)
+    compile_classpath = self.context.products.get_data('compile_classpath')
 
     # Compute src -> target.
     self.context.log.debug('Mapping sources...')
@@ -70,32 +71,17 @@ class JvmDependencyAnalyzer(Task):
             targets_by_file[os.path.join(buildroot, src)].add(target)
 
     # Compute class -> target.
-    self.context.log.debug('Mapping classes...')
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    for tgt, target_products in classes_by_target.items():
-      for classes_dir, classes in target_products.rel_paths():
-        for cls in classes:
-          targets_by_file[cls].add(tgt)
-          targets_by_file[os.path.join(classes_dir, cls)].add(tgt)
-
-    # Compute jar -> target.
-    self.context.log.debug('Mapping jars...')
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    for jar_lib in self.context.targets(lambda t: isinstance(t, JarLibrary)):
-      for _, artifact_path in compile_classpath.get_for_target(jar_lib, transitive=False):
-        targets_by_file[artifact_path].add(jar_lib)
-        if artifact_path.endswith('.jar'):
-          for cls in self._jar_classfiles(artifact_path):
-            targets_by_file[cls].add(jar_lib)
+    self.context.log.debug('Mapping classpath...')
+    for target in self.context.targets():
+      contents = ClasspathUtil.classpath_contents(
+          (target,),
+          compile_classpath,
+          ('default',),
+          transitive=False)
+      for f in contents:
+        targets_by_file[f].add(tgt)
 
     return targets_by_file
-
-  def _jar_classfiles(self, jar_file):
-    """Returns an iterator over the classfiles inside jar_file."""
-    with open_zip(jar_file, 'r') as jar:
-      for cls in jar.namelist():
-        if cls.endswith(b'.class'):
-          yield cls
 
   @memoized_property
   def bootstrap_jar_classfiles(self):
