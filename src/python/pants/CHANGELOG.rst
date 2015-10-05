@@ -1,6 +1,90 @@
 RELEASE HISTORY
 ===============
 
+0.0.51 (10/2/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release moves some packages commonly used in plugins from `pants.base` to `pants.build_graph`.
+The old packages still work, but have been deprecated and will be removed in 0.0.53.
+
+API Changes
+~~~~~~~~~~~
+
+* Move various build graph-related files to new pkg: build_graph.
+  `RB #2899 <https://rbcommons.com/s/twitter/r/2899>`_
+  `RB #2908 <https://rbcommons.com/s/twitter/r/2908>`_
+  `RB #2909 <https://rbcommons.com/s/twitter/r/2909>`_
+
+Bugfixes
+~~~~~~~~
+
+* Ensure execution graph cancellation only happens once per job
+  `RB #2910 <https://rbcommons.com/s/twitter/r/2910>`_
+
+* Two performance hacks in build file parsing.
+  `RB #2895 <https://rbcommons.com/s/twitter/r/2895>`_
+
+* Performance fix for ./pants depmap --minimal
+  `RB #2896 <https://rbcommons.com/s/twitter/r/2896>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Introduce instrument_classpath, and modify cobertura to use native class filtering
+  `RB #2893 <https://rbcommons.com/s/twitter/r/2893>`_
+
+* Implement deprecation messages for entire modules.
+  `RB #2904 <https://rbcommons.com/s/twitter/r/2904>`_
+
+* Upstream the scala_jar and scala_artifact helpers to suffix the scala platform version.
+  `RB #2891 <https://rbcommons.com/s/twitter/r/2891>`_
+
+* Adding the bootstrapped node/npm to the PATH when executing commands
+  `RB #2883 <https://rbcommons.com/s/twitter/r/2883>`_
+
+* Update path(s) tasks, add tests, extract pluralize to strutil
+  `RB #2892 <https://rbcommons.com/s/twitter/r/2892>`_
+
+* Fix duplicate changelog link.
+  `RB #2890 <https://rbcommons.com/s/twitter/r/2890>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Extract Config as Configuration to its own module.
+  `RB #2924 <https://rbcommons.com/s/twitter/r/2924>`_
+
+* Define a lifecycle for Config objects.
+  `RB #2920 <https://rbcommons.com/s/twitter/r/2920>`_
+
+* Add baseline functionality for engine experiments.
+  `RB #2914 <https://rbcommons.com/s/twitter/r/2914>`_
+
+* Reformatting the junit output to be consistent with pants.
+  `RB #2917 <https://rbcommons.com/s/twitter/r/2917>`_
+  `RB #2925 <https://rbcommons.com/s/twitter/r/2925>`_
+
+* Allow junit tests to have empty sources
+  `RB #2923 <https://rbcommons.com/s/twitter/r/2923>`_
+
+* Adding a summary list of failing testcases to junit_run.
+  `RB #2916 <https://rbcommons.com/s/twitter/r/2916>`_
+
+* Adding the java language level to the IdeaGen module output.
+  `RB #2911 <https://rbcommons.com/s/twitter/r/2911>`_
+
+* Make a nicer diagnostic on parse error in pants.ini
+  `RB #2907 <https://rbcommons.com/s/twitter/r/2907>`_
+
+* Shorten long target ids by replacing superfluous characters with a hash
+  `RB #2894 <https://rbcommons.com/s/twitter/r/2894>`_
+
+* Migrate scrooge to SimpleCodegenTask
+  `RB #2808 <https://rbcommons.com/s/twitter/r/2808>`_
+
 0.0.50 (9/25/2015)
 ------------------
 
