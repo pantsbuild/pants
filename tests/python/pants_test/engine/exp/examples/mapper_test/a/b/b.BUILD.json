@@ -1,0 +1,12 @@
+{
+  "typename": "target",
+  "name": "b",
+  "dependencies": ["//d:e"],
+  "configurations": [
+    "//a",
+    {
+      "typename": "configuration",
+      "embedded": "yes"
+    }
+  ]
+}

@@ -6,16 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-import os
-import re
 
 import six
 
 from pants.base.address import Address
 from pants.engine.exp.addressable import Addressed
-from pants.engine.exp.mapper import AddressFamily, AddressMap
+from pants.engine.exp.mapper import MappingError
 from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable
-from pants.util.memo import memoized_method
 
 
 class ResolveError(Exception):
@@ -34,21 +31,17 @@ class ResolvedTypeMismatchError(ResolveError):
 class Graph(object):
   """A lazy, directed acyclic graph of objects. Not necessarily connected."""
 
-  def __init__(self, build_root, build_pattern=None, parser=None):
+  def __init__(self, address_mapper):
     """Creates a build graph rooted at the given `build_root`.
 
     Both the set of files that define a BUILD graph and the parser used to parse those files can be
     customized.  See the `pants.engine.exp.parsers` module for example parsers.
 
-    :param string build_pattern: A regular expression for identifying BUILD files used to resolve
-                                 addresses; by default looks for `BUILD*` files.
-    :param parser: The BUILD file parser to use; by default a JSON BUILD file format parser.
-    :type parser: A :class:`collections.Callable` that takes a byte string and produces a list of
-                  parsed addressable Serializable objects found in the byte string.
+    :param address_mapper: An address mapper that can resolve addresses as the hydrated objects
+                           they point to.
+    :type address_mapper: :class:`pants.engine.exp.mapper.AddressMapper`.
     """
-    self._build_root = os.path.realpath(build_root)
-    self._build_pattern = re.compile(build_pattern or r'^BUILD(\.[a-zA-Z0-9_-]+)?$')
-    self._parser = parser
+    self._address_mapper = address_mapper
 
     # Our resolution cache.
     self._resolved_by_address = {}
@@ -76,7 +69,10 @@ class Graph(object):
     :raises: :class:`pants.engine.exp.objects.ValidationError` if the object was resolvable but
              invalid.
     """
-    return self._resolve_recursively(address)
+    try:
+      return self._resolve_recursively(address)
+    except MappingError as e:
+      raise ResolveError('Failed to resolve {}: {}'.format(address, e))
 
   def _resolve_recursively(self, address, resolve_path=None):
     resolved = self._resolved_by_address.get(address)
@@ -90,10 +86,7 @@ class Graph(object):
                                            for a in resolve_path + [address])))
     resolve_path.append(address)
 
-    address_family = self._address_family(address.spec_path)
-    obj = address_family.addressables.get(address)
-    if not obj:
-      raise ResolveError('Object with address {} was not found'.format(address))
+    obj = self._address_mapper.resolve(address)
 
     def resolve_item(item, addr=None):
       if Serializable.is_serializable(item):
@@ -145,20 +138,3 @@ class Graph(object):
     resolve_path.pop(-1)
     self._resolved_by_address[address] = resolved
     return resolved
-
-  def _find_build_file_sources(self, path):
-    abspath = os.path.realpath(os.path.join(self._build_root, path))
-    if not os.path.isdir(abspath):
-      raise ResolveError('Expected {} to be a directory containing build files.'.format(path))
-    for f in os.listdir(abspath):
-      if self._build_pattern.match(f):
-        absfile = os.path.join(abspath, f)
-        if os.path.isfile(absfile):
-          yield absfile
-
-  @memoized_method
-  def _address_family(self, spec_path):
-    address_maps = []
-    for source in self._find_build_file_sources(spec_path):
-      address_maps.append(AddressMap.parse(source, parse=self._parser))
-    return AddressFamily.create(self._build_root, address_maps)
