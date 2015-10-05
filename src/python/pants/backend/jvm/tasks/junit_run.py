@@ -388,6 +388,9 @@ class _JUnitRunner(object):
     generates tuples (class_name, target).
     """
     targets_to_classes = self._context.products.get_data('classes_by_target')
+    if targets_to_classes is None:
+      return
+
     for target in targets:
       target_products = targets_to_classes.get(target)
       if target_products:
