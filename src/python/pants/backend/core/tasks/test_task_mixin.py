@@ -42,11 +42,17 @@ class TestTaskMixin(object):
       except KeyboardInterrupt:
         raise TestFailedTaskError(failed_targets=targets)
 
+  def _timeout_for_target(self, target):
+    try:
+      return target.timeout
+    except AttributeError:
+      return None
+
   def _timeout_for_targets(self, targets):
     if self.get_options().timeouts:
       timeout_default = self.get_options().timeout_default
 
-      timeouts = [target.timeout if target.timeout else timeout_default for target in targets]
+      timeouts = [self._timeout_for_target(target) if self._timeout_for_target(target) else timeout_default for target in targets]
       if 0 in timeouts or None in timeouts:
         return None
       else:

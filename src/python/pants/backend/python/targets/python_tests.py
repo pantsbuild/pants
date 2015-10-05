@@ -7,11 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from twitter.common.collections import maybe_list
 
-from pants.backend.core.targets.test_target_mixin import TestTargetMixin
 from pants.backend.python.targets.python_target import PythonTarget
 
 
-class PythonTests(TestTargetMixin, PythonTarget):
+class PythonTests(PythonTarget):
   """Tests a Python library."""
 
   def __init__(self, coverage=None, timeout=None, **kwargs):

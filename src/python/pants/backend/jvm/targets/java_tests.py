@@ -5,14 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.targets.test_target_mixin import TestTargetMixin
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 
-class JavaTests(TestTargetMixin, JvmTarget):
+class JavaTests(JvmTarget):
   """Tests JVM sources with JUnit."""
 
   def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None, **kwargs):

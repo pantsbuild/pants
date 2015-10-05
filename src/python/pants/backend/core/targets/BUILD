@@ -15,7 +15,6 @@ python_library(
     'doc.py',
     'prep_command.py',
     'resources.py',
-    'test_target_mixin.py',
   ],
   dependencies = [
     'src/python/pants/base:payload',
