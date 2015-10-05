@@ -16,7 +16,6 @@ class TestTaskMixin(object):
 
   The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
   expressed can support both languages, and any additional languages that are added to pants.
-
   """
 
   @classmethod
@@ -77,12 +76,13 @@ class TestTaskMixin(object):
 
   @abstractmethod
   def _validate_target(self, target):
-    """Ensures that this target is valid.
+    """Ensures that this target is valid. Raises TargetDefinitionException if the target is invalid.
 
     We don't need the type check here because _get_targets() combines with _test_target_type to
     filter the list of targets to only the targets relevant for this test task.
-
+im
     :param target: the target to validate
+    :raises: TargetDefinitionException
     """
 
   @abstractmethod
