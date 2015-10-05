@@ -49,8 +49,6 @@ class TestTaskMixinTest(TaskTestBase):
     self.assertIn(['_validate_target', 'TargetB'], self.task.call_list)
     self.assertIn(['_execute', ['TargetB']], self.task.call_list)
 
-    print(self.task.call_list)
-
   def test_execute_skip(self):
     # Set the skip option
     self.set_options(skip=True)
