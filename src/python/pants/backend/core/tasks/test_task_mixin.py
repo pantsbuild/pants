@@ -25,7 +25,7 @@ class TestTaskMixin(object):
     register('--skip', action='store_true', help='Skip running tests.')
     register('--timeouts', action='store_true', default=True,
              help='Enable test timeouts')
-    register('--default-timeout', action='store', default=0, type=int,
+    register('--timeout-default', action='store', default=0, type=int,
              help='The default timeout (in seconds) for a test if timeout is not set in BUILD')
 
   def execute(self):
@@ -42,12 +42,12 @@ class TestTaskMixin(object):
           self._execute(targets)
       except KeyboardInterrupt:
         raise TestFailedTaskError(failed_targets=targets)
-      
+
   def _timeout_for_targets(self, targets):
     if self.get_options().timeouts:
-      default_timeout = self.get_options().default_timeout
+      timeout_default = self.get_options().timeout_default
 
-      timeouts = [target.timeout if target.timeout else default_timeout for target in targets]
+      timeouts = [target.timeout if target.timeout else timeout_default for target in targets]
       if 0 in timeouts or None in timeouts:
         return None
       else:
