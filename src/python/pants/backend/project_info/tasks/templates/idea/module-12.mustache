@@ -27,7 +27,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <facet type="bash" name="BashSupport"/>
     {{/module.bash?}}
   </component>
-  <component name="NewModuleRootManager" inherit-compiler-output="true">
+  <component name="NewModuleRootManager" inherit-compiler-output="true"{{#module.java_language_level?}} LANGUAGE_LEVEL="{{module.java_language_level}}"{{/module.java_language_level?}}>
     <exclude-output/>
 
     <content url="file://{{module.root_dir}}">
