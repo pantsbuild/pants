@@ -5,19 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import re
-
-
-TIMEOUT_TAG = 'timeout'
+from abc import abstractproperty
 
 
 class TestTargetMixin(object):
   """Mix this in with test targets to get timeout and other test-specific target parameters."""
 
-  def __init__(self, timeout = None, **kwargs):
-    self._timeout = timeout
-    super(TestTargetMixin, self).__init__(**kwargs)
-
-  @property
+  @abstractproperty
   def timeout(self):
-    return self._timeout
+    """Return the timeout. The language-specific code needs to implement this."""
