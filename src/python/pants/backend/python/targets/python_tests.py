@@ -14,10 +14,6 @@ from pants.backend.python.targets.python_target import PythonTarget
 class PythonTests(TestTargetMixin, PythonTarget):
   """Tests a Python library."""
 
-  @classmethod
-  def alias(cls):
-    return "python_tests"
-
   def __init__(self, coverage=None, **kwargs):
     """
     :param coverage: the module(s) whose coverage should be generated, e.g.

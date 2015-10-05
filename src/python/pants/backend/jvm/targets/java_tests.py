@@ -15,10 +15,6 @@ from pants.base.payload_field import PrimitiveField
 class JavaTests(TestTargetMixin, JvmTarget):
   """Tests JVM sources with JUnit."""
 
-  @classmethod
-  def alias(cls):
-    return 'java_tests'
-
   def __init__(self, cwd=None, test_platform=None, payload=None, **kwargs):
     """
     :param str cwd: working directory (relative to the build root) for the tests under this

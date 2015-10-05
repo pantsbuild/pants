@@ -29,7 +29,7 @@ def build_file_aliases():
       'python_library': PythonLibrary,
       'python_requirement_library': PythonRequirementLibrary,
       'python_test_suite': Dependencies,  # Legacy alias.
-      PythonTests.alias(): TargetMacro.Factory.wrap(PythonTests.create, PythonTests)
+      'python_tests': PythonTests,
     },
     objects={
       'python_requirement': PythonRequirement,
