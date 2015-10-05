@@ -22,6 +22,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
@@ -882,7 +883,7 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
     if options.coverage or options.is_flagged('coverage_open'):
       coverage_processor = options.coverage_processor
       if coverage_processor == 'emma':
-        self._runner = Emma(task_exports, self.context)
+        self._runner = self._build_emma_coverage_engine(task_exports)
       elif coverage_processor == 'cobertura':
         self._runner = Cobertura(task_exports, self.context)
       else:
@@ -902,3 +903,7 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
             raise TargetDefinitionException(target, msg)
 
       self._runner.execute(targets)
+
+  @deprecated('0.0.55', "emma support will be removed in future versions.")
+  def _build_emma_coverage_engine(self, task_exports):
+    return Emma(task_exports, self.context)
