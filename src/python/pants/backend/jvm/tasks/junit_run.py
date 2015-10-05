@@ -891,10 +891,10 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     def target_filter(target):
       return isinstance(target, junit_tests)
     return target_filter
-  
+
   def _validate_target(self, target):
     # TODO: move this check to an optional phase in goal_runner, so
-    # that missing sources can be detected early.    
+    # that missing sources can be detected early.
     if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
       msg = 'JavaTests target must include a non-empty set of sources.'
       raise TargetDefinitionException(target, msg)
