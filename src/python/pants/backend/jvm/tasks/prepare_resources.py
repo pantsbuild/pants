@@ -26,18 +26,7 @@ class PrepareResources(ResourcesTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(ResourcesTask, cls).prepare(options, round_manager)
-
-    # NOTE(Garrett Malmquist): This is a fake dependency to force resources to occur after jvm
-    # compile. It solves some problems we've been having getting our annotation processors to
-    # compile consistently due to extraneous resources polluting the classpath. Perhaps this could
-    # be fixed more elegantly whenever we get a formal classpath object?
-
-    # TODO(John Sirois): Although we don't have a formal classpath object, we do have a compilation
-    # mode that uses isolated classpaths and in that mode the Square problem should go away.
-    # Kill this fake dep when Square is using the isolated compile strategy (or when pants is
-    # globally).  Tracked by https://github.com/pantsbuild/pants/issues/1645
-
-    round_manager.require_data('classes_by_target')
+    round_manager.require_data('compile_classpath')
 
   def __init__(self, *args, **kwargs):
     super(PrepareResources, self).__init__(*args, **kwargs)

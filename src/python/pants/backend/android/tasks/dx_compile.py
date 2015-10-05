@@ -57,7 +57,7 @@ class DxCompile(AndroidTask, NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(DxCompile, cls).prepare(options, round_manager)
-    round_manager.require_data('classes_by_target')
+    round_manager.require_data('compile_classpath')
     round_manager.require_data('unpacked_libraries')
 
   def __init__(self, *args, **kwargs):

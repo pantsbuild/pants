@@ -550,9 +550,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # uses it internally.
     self.context.products.safe_create_data('resources_by_target', make_products)
 
-    # JvmDependencyCheck uses classes_by_target
-    self.context.products.safe_create_data('classes_by_target', make_products)
-
     self.context.products.safe_create_data('product_deps_by_src', dict)
 
   def compute_classes_by_source(self, compile_contexts):
@@ -596,7 +593,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
-    classes_by_target = self.context.products.get_data('classes_by_target')
     compile_classpath = self.context.products.get_data('compile_classpath')
     resources_by_target = self.context.products.get_data('resources_by_target')
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
@@ -615,7 +611,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           clsname = self.classname_for_classfile(compile_context, f)
           if clsname:
             # Is a class.
-            classes_by_target[target].add_abs_paths(classes_dir, [f])
             resources = resource_mapping.get(clsname, [])
             resources_by_target[target].add_abs_paths(classes_dir, resources)
           else:
@@ -824,8 +819,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     resources_by_target = self.context.products.get_data('resources_by_target')
     add_abs_products(resources_by_target.get(compile_context.target))
     # Classes.
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    add_abs_products(classes_by_target.get(compile_context.target))
+    for f in ClasspathUtil.directory_contents(compile_context.classes_dir):
+      artifacts.add(os.path.join(compile_context.classes_dir, f))
     # Log file.
     log_file = self._capture_log_file(compile_context.target)
     if log_file and os.path.exists(log_file):

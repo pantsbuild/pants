@@ -161,7 +161,7 @@ Specifically, the JVM compile tasks:
     :::python
     jvm_compile = GroupTask.named(
     'jvm-compilers',
-    product_type=['classes_by_target', 'classes_by_source'],
+    product_type=['compile_classpath', 'classes_by_source'],
     flag_namespace=['compile'])
 
     jvm_compile.add_member(ScalaCompile)

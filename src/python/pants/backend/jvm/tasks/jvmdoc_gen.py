@@ -69,12 +69,7 @@ class JvmdocGen(JvmTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmdocGen, cls).prepare(options, round_manager)
-
-    # TODO(John Sirois): this is a fake requirement in order to force compile run before this
-    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
-    # and depend on that.
-    # See: https://github.com/pantsbuild/pants/issues/310
-    round_manager.require_data('classes_by_target')
+    round_manager.require_data('compile_classpath')
 
   def __init__(self, *args, **kwargs):
     super(JvmdocGen, self).__init__(*args, **kwargs)
