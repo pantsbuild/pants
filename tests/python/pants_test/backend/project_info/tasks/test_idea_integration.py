@@ -11,16 +11,18 @@ import xml.dom.minidom as minidom
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
+from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class IdeaIntegrationTest(PantsRunIntegrationTest):
+class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
   RESOURCE = 'java-resource'
   TEST_RESOURCE = 'java-test-resource'
 
   def _idea_test(self, specs, project_dir=os.path.join('.pants.d', 'idea', 'idea', 'IdeaGen'),
-                 project_name=None, check_func=None, config=None):
+                 project_name=None, check_func=None, config=None, load_extra_confs=True,
+                 extra_args=None):
     """Helper method that tests idea generation on the input spec list.
 
     :param project_dir: directory passed to --idea-project-dir
@@ -35,11 +37,15 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=project_dir) as project_dir_path:
 
       extra_flags = ['--idea-project-dir={dir}'.format(dir=project_dir_path)]
+      extra_flags.extend(extra_args or ())
 
       if project_name is None:
         project_name = "project"  # to match Pants' built-in default w/o --idea-project-name
       else:
         extra_flags += ['--idea-project-name={name}'.format(name=project_name)]
+
+      if not load_extra_confs:
+        extra_flags += ['--no-idea-source-jars', '--no-idea-javadoc-jars']
 
       all_flags = ['idea', '--no-open'] + specs + extra_flags
       pants_run = self.run_pants(all_flags, config=config)
@@ -58,6 +64,17 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
       if check_func:
         check_func(workdir)
+
+  def evaluate_subtask(self, targets, workdir, load_extra_confs, extra_args, expected_jars):
+    def check(path):
+      for jar in expected_jars:
+        parts = jar.split(':')
+        jar_name = '{}.jar'.format('-'.join(parts[1:]))
+        jar_path = os.path.join(get_buildroot(), path, 'external-libs', jar_name)
+        self.assertTrue(os.path.exists(jar_path), 'Expected {} to exist.'.format(jar_path))
+
+    self._idea_test(targets, load_extra_confs=load_extra_confs, extra_args=extra_args,
+                    check_func=check)
 
   def _get_new_module_root_manager(self, dom):
     module = dom.getElementsByTagName('module')[0]
@@ -391,7 +408,7 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
       def check_jars(jars, expected_jars):
         # Make sure the .jar files are present on disk
         for jar in expected_jars:
-          self.assertTrue(os.path.exists(jar))
+          self.assertTrue(os.path.exists(jar), '{} does not exist.'.format(jar))
         to_find = set('jar://{}!/'.format(jar) for jar in expected_jars)
         for external_library in jars:
           to_find.discard(external_library.getAttribute('url'))
