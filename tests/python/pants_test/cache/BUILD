@@ -7,7 +7,8 @@ target(
     ':artifact',
     ':artifact_cache',
     ':cache_setup',
-    ':resolver'
+    ':pinger',
+    ':resolver',
   ]
 )
 
@@ -37,12 +38,23 @@ python_tests(
   name = 'cache_setup',
   sources = ['test_cache_setup.py'],
   dependencies = [
+    '3rdparty/python:mock',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/cache',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/testutils',
+  ]
+)
+
+python_tests(
+  name = 'pinger',
+  sources = ['test_pinger.py'],
+  dependencies = [
+    'src/python/pants/cache',
+    'tests/python/pants_test:base_test',
+    '3rdparty/python:six',
   ]
 )
 

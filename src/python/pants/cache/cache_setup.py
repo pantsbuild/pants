@@ -74,6 +74,8 @@ class CacheSetup(Subsystem):
              help='The gzip compression level (0-9) for created artifacts.')
     register('--max-entries-per-target', advanced=True, type=int, default=None,
              help='Maximum number of old cache files to keep per task target pair')
+    register('--pinger-timeout', advanced=True, type=float, default=0.5, help='number of seconds before pinger times out')
+    register('--pinger-tries', advanced=True, type=float, default=2, help='number of times pinger tries a cache')
 
   @classmethod
   def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
@@ -107,7 +109,7 @@ class CacheFactory(object):
     # Caches are supposed to be close, and we don't want to waste time pinging on no-op builds.
     # So we ping twice with a short timeout.
     # TODO: Make lazy.
-    self._pinger = pinger or Pinger(timeout=0.5, tries=2)
+    self._pinger = pinger or Pinger(timeout=self._options.pinger_timeout, tries=self._options.pinger_tries)
 
     # resolver is also close but failing to resolve might have broader impact than
     # single ping failure, therefore use a higher timeout with more retries.
