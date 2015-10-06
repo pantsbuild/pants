@@ -81,11 +81,12 @@ class DuplicateDetector(JvmBinaryTask):
       return True
     return False
 
-  def _get_internal_dependencies(self, target):
+  def _get_internal_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
     classpath_products = self.context.products.get_data('runtime_classpath')
 
     # Select classfiles from the classpath.
+    target = binary_target
     targets = [target] + target.resources if target.has_resources else [target]
     contents = ClasspathUtil.classpath_contents(
         targets,
@@ -94,7 +95,7 @@ class DuplicateDetector(JvmBinaryTask):
         transitive=False)
     for f in contents:
       if not f.endswith('/'):
-        artifacts_by_file_name[f].add(binary_target)
+        artifacts_by_file_name[f].add(target)
     return artifacts_by_file_name
 
   def _get_external_dependencies(self, binary_target):
