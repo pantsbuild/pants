@@ -398,7 +398,7 @@ class _JUnitRunner(object):
       contents = ClasspathUtil.classpath_contents(
           (target,),
           classpath_products,
-          self._task_exports.confs,
+          confs=self._task_exports.confs,
           transitive=False)
       for f in contents:
         classname = ClasspathUtil.classname_for_rel_classfile(f)

@@ -88,11 +88,7 @@ class DuplicateDetector(JvmBinaryTask):
     # Select classfiles from the classpath.
     target = binary_target
     targets = [target] + target.resources if target.has_resources else [target]
-    contents = ClasspathUtil.classpath_contents(
-        targets,
-        classpath_products,
-        ('default',),
-        transitive=False)
+    contents = ClasspathUtil.classpath_contents(targets, classpath_products, transitive=False)
     for f in contents:
       if not f.endswith('/'):
         artifacts_by_file_name[f].add(target)

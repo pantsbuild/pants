@@ -318,7 +318,7 @@ class BaseTest(unittest.TestCase):
             touch(os.path.join(root_dir, buildfile))
           yield os.path.realpath(root_dir)
 
-  def populate_compile_classpath(self, context, classpath=None):
+  def populate_runtime_classpath(self, context, classpath=None):
     """
     Helps actual test cases to populate the 'runtime_classpath' products data mapping
     in the context, which holds the classpath value for targets.
@@ -328,8 +328,8 @@ class BaseTest(unittest.TestCase):
                       [os.path.join(self.buildroot, 'none')] will be used.
     """
     classpath = classpath or []
-    compile_classpaths = context.products.get_data('runtime_classpath', lambda: UnionProducts())
-    compile_classpaths.add_for_targets(context.targets(),
+    classpath_products = context.products.get_data('runtime_classpath', lambda: UnionProducts())
+    classpath_products.add_for_targets(context.targets(),
                                        [('default', entry) for entry in classpath])
 
   @contextmanager

@@ -32,7 +32,7 @@ class JvmTaskTest(TaskTestBase):
 
     context = self.context(target_roots=[self.t1, self.t2, self.t3])
 
-    self.populate_compile_classpath(context)
+    self.populate_runtime_classpath(context)
 
     self.task = self.create_task(context, self.workdir)
 

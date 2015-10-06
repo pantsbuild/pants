@@ -130,7 +130,7 @@ class BaseGroupTaskTest(BaseTest):
 
     self._context = self.context(target_roots=self.create_targets(),
                                  for_task_types=[self.group_task])
-    self.populate_compile_classpath(self._context)
+    self.populate_runtime_classpath(self._context)
     self.group_task._prepare(self.options, round_manager=RoundManager(self._context))
 
 

@@ -134,7 +134,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # the compiled test java classes that JUnitRun will know which test
     # classes to execute. In a normal run, this "runtime_classpath" will be
     # populated by java compilation step.
-    self.populate_compile_classpath(context=context, classpath=[test_abs_path])
+    self.populate_runtime_classpath(context=context, classpath=[test_abs_path])
 
     # Finally execute the task.
     self.execute(context)

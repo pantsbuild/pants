@@ -594,8 +594,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     # Register a mapping between sources and classfiles (if requested).
     if classes_by_source is not None:
-      for compile_context, computed_classes_by_source in \
-          self.compute_classes_by_source(compile_contexts).items():
+      ccbsbc = self.compute_classes_by_source(compile_contexts).items()
+      for compile_context, computed_classes_by_source in ccbsbc:
         target = compile_context.target
         classes_dir = compile_context.classes_dir
 
@@ -608,7 +608,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       extra_resources = self.extra_products(compile_context.target)
       entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
       runtime_classpath.add_for_target(compile_context.target, entries)
-      
+
       # And classfile product dependencies (if requested).
       if product_deps_by_src is not None:
         product_deps_by_src[compile_context.target] = \

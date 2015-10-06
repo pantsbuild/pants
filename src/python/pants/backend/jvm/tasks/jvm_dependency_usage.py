@@ -129,11 +129,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       return set(p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths)
 
   def _count_products(self, classpath_products, target):
-    contents = ClasspathUtil.classpath_contents(
-        (target,),
-        classpath_products,
-        ('default',),
-        transitive=False)
+    contents = ClasspathUtil.classpath_contents((target,), classpath_products, transitive=False)
     # Generators don't implement len.
     return sum(1 for _ in contents)
 

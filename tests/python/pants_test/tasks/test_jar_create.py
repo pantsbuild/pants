@@ -147,7 +147,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
     context = self.context()
 
     def idict(*args):
-      return dict(zip(args, args))
+      return {a: a for a in args}
 
     self.add_to_runtime_classpath(context, self.jl, idict('a.class', 'b.class'))
     self.add_to_runtime_classpath(context, self.sl, idict('c.class'))

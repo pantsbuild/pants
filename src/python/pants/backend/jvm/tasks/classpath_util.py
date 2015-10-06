@@ -56,18 +56,19 @@ class ClasspathUtil(object):
     return cls._pluck_paths(full_classpath_tuples)
 
   @classmethod
-  def classpath_entries(cls, targets, classpath_products, confs, transitive=True, jars_only=False):
+  def classpath_entries(cls, targets, classpath_products, confs=('default',), transitive=True):
     """Returns the list of entries for a classpath covering all the passed targets.
 
     :param targets: Targets to build a aggregated classpath for
     :param ClasspathProducts classpath_products: Product containing classpath elements.
     :param confs: The list of confs for use by this classpath
+    :param transitive: Whether to walk recursively from the given targets
     """
     classpath_tuples = classpath_products.get_for_targets(targets, transitive=transitive)
 
     tuples = cls._filter_classpath_by_confs(classpath_tuples, confs)
 
-    return cls._pluck_paths(tuples, jars_only=jars_only)
+    return cls._pluck_paths(tuples)
 
   @classmethod
   def _filter_classpath_by_confs(cls, classpath_tuples, confs):
@@ -75,15 +76,17 @@ class ClasspathUtil(object):
     return [(conf, path) for conf, path in classpath_tuples if accept(conf)]
 
   @classmethod
-  def _pluck_paths(cls, classpath, jars_only=False):
-    accept = (lambda p: cls.is_jar(p)) if jars_only else (lambda _: True)
-    return [path for conf, path in classpath if accept(path)]
+  def _pluck_paths(cls, classpath):
+    return [path for conf, path in classpath]
 
   @classmethod
-  def classpath_contents(cls, targets, classpath_products, confs, transitive=True):
+  def classpath_contents(cls, targets, classpath_products, confs=('default',), transitive=True):
     """Provides a generator over the contents (classes/resources) of a classpath.
 
-    No particular order is guaranteed (TODO: yet?).
+    :param targets: Targets to iterate the contents classpath for
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
+    :param confs: The list of confs for use by this classpath
+    :param transitive: Whether to walk recursively from the given targets
     """
     for entry in cls.classpath_entries(targets, classpath_products, confs, transitive=transitive):
       if cls.is_jar(entry):
@@ -98,14 +101,14 @@ class ClasspathUtil(object):
         pass
 
   @classmethod
-  def classname_for_rel_classfile(cls, class_file_name):
-    """Return the class name for the given relative-to-a-classpath-entry file, or None."""
-    if not class_file_name.endswith(".class"):
-      return None
-    return class_file_name[:-len(".class")].replace("/", ".")
-
-  @classmethod
   def directory_contents(cls, classpath_entry):
+    """Provides a generator over the contents of a classpath directory entry.
+
+    Subdirectories are included and differentiated via a trailing forward slash (for symmetry
+    with ZipFile.namelist).
+
+    :param classpath_entry: A directory classpath entry
+    """
     def rel_walk_name(abs_sub_dir, name):
       return fast_relpath(os.path.join(abs_sub_dir, name), classpath_entry)
     for abs_sub_dir, dirnames, filenames in safe_walk(classpath_entry):
@@ -115,9 +118,16 @@ class ClasspathUtil(object):
         yield rel_walk_name(abs_sub_dir, name)
 
   @classmethod
+  def classname_for_rel_classfile(cls, class_file_name):
+    """Return the class name for the given relative-to-a-classpath-entry file, or None."""
+    if not class_file_name.endswith('.class'):
+      return None
+    return class_file_name[:-len('.class')].replace('/', '.')
+
+  @classmethod
   def is_jar(cls, path):
-    """True if the given path represents an existing jar file."""
-    return path.endswith('.jar') and os.path.isfile(path)
+    """True if the given path represents an existing jar or zip file."""
+    return (path.endswith('.jar') or path.endswith('.zip')) and os.path.isfile(path)
 
   @classmethod
   def is_dir(cls, path):
