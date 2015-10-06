@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from abc import abstractproperty
+from abc import abstractmethod
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -31,8 +31,8 @@ class JvmDependencyAnalyzer(Task):
   determining which targets correspond to the actual source dependencies of any given target.
   """
 
-  @abstractproperty
   @classmethod
+  @abstractmethod
   def skip(cls, options):
     """Return true if the task should be entirely skipped, and thus have no product requirements."""
     pass

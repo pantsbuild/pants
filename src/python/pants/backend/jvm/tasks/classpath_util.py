@@ -130,7 +130,7 @@ class ClasspathUtil(object):
   @classmethod
   def is_jar(cls, path):
     """True if the given path represents an existing jar or zip file."""
-    return (path.endswith('.jar') or path.endswith('.zip')) and os.path.isfile(path)
+    return path.endswith(('.jar', '.zip')) and os.path.isfile(path)
 
   @classmethod
   def is_dir(cls, path):
