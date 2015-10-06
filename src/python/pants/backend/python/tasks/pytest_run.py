@@ -20,6 +20,7 @@ from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
+from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
@@ -66,7 +67,7 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
-class PytestRun(PythonTask):
+class PytestRun(TestTaskMixin, PythonTask):
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
     # to avoid confusion when debugging pants tests.
@@ -112,11 +113,17 @@ class PytestRun(PythonTask):
   def supports_passthru_args(cls):
     return True
 
-  def execute(self):
-    def is_python_test(target):
+  def _test_target_filter(self):
+    def target_filter(target):
       return isinstance(target, PythonTests)
 
-    test_targets = list(filter(is_python_test, self.context.targets()))
+    return target_filter
+
+  def _validate_target(self, target):
+    pass
+
+  def _execute(self, all_targets):
+    test_targets = self._get_test_targets()
     if test_targets:
       self.context.release_lock()
       with self.context.new_workunit(name='run',
@@ -139,11 +146,10 @@ class PytestRun(PythonTask):
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
       fail_hard = not self.get_options().fail_slow and not self.get_options().coverage
       for target in targets:
-        if isinstance(target, PythonTests):
-          rv = self._do_run_tests([target], workunit)
-          results[target] = rv
-          if not rv.success and fail_hard:
-            break
+        rv = self._do_run_tests([target], workunit)
+        results[target] = rv
+        if not rv.success and fail_hard:
+          break
 
       for target in sorted(results):
         self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
