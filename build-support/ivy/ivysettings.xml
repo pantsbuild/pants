@@ -5,7 +5,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 -->
 
 <ivysettings>
-
   <settings defaultResolver="pants-chain-repos"/>
 
   <properties environment="env" />
@@ -27,21 +26,28 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
            We setup the maven central resolver to require successful pom downloads here. -->
       <ibiblio name="maven-central" m2compatible="true" descriptor="required"/>
 
+      <!-- NB: Although url resolvers (like <ibiblio/>) can be pointer at local file:// system
+           URLs, this leads to issues resolving any <dependency/> with a custom artifact that
+           defines a file:// url itself.  We stick to <filesystem/> resolvers here for the
+           two android SDK resolvers as a result. -->
+
       <!-- Android SDK Support Library, found in reference to the ANDROID_HOME variable. -->
-      <ibiblio name="local.android"
-               m2compatible="true"
-               root="file://${android.repo.dir}/"/>
+      <filesystem name="local.android" m2compatible="true" local="true">
+        <ivy pattern="${android.repo.dir}/${m2.repo.pom}"/>
+        <artifact pattern="${android.repo.dir}/${m2.repo.artifact}"/>
+      </filesystem>
+
       <!-- Google Libraries for the Android SDK, found in reference to ANDROID_HOME. -->
-      <ibiblio name="local.google"
-               m2compatible="true"
-               root="file://${google.repo.dir}/"/>
+      <filesystem name="local.google" m2compatible="true" local="true">
+        <ivy pattern="${google.repo.dir}/${m2.repo.pom}"/>
+        <artifact pattern="${google.repo.dir}/${m2.repo.artifact}"/>
+      </filesystem>
 
       <!-- The mvn standard local filesystem repo/cache -->
       <filesystem name="local.m2" m2compatible="true" local="true" checkmodified="true">
         <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
         <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
       </filesystem>
-
     </chain>
   </resolvers>
 </ivysettings>
