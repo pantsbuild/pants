@@ -15,6 +15,7 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -70,7 +71,6 @@ class _JUnitRunner(object):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register('--skip', action='store_true', help='Skip running junit.')
     register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
@@ -145,15 +145,16 @@ class _JUnitRunner(object):
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
 
-  def execute(self, targets):
+  def execute(self, test_targets, all_targets):
     # We only run tests within java_tests/junit_tests targets.
     #
     # But if coverage options are specified, we want to instrument
     # and report on all the original targets, not just the test targets.
     #
-    # Thus, we filter out the non-java-tests targets first but
-    # keep the original targets set intact for coverages.
-    tests_and_targets = self._collect_test_targets(targets)
+    # We've already filtered out the non-test targets in the
+    # TestTaskMixin, so the mixin passes to us both the test
+    # targets and the unfiltered list of targets
+    tests_and_targets = self._collect_test_targets(test_targets)
 
     if not tests_and_targets:
       return
@@ -161,13 +162,13 @@ class _JUnitRunner(object):
     bootstrapped_cp = self._task_exports.tool_classpath('junit')
 
     def compute_complete_classpath():
-      return self._task_exports.classpath(targets, classpath_prefix=bootstrapped_cp)
+      return self._task_exports.classpath(all_targets, classpath_prefix=bootstrapped_cp)
 
     self._context.release_lock()
-    self.instrument(targets, tests_and_targets.keys(), compute_complete_classpath)
+    self.instrument(all_targets, tests_and_targets.keys(), compute_complete_classpath)
 
     def _do_report(exception=None):
-      self.report(targets, tests_and_targets.keys(), tests_failed_exception=exception)
+      self.report(all_targets, tests_and_targets.keys(), tests_failed_exception=exception)
     try:
       self.run(tests_and_targets)
       _do_report(exception=None)
@@ -175,7 +176,7 @@ class _JUnitRunner(object):
       _do_report(exception=e)
       raise
 
-  def instrument(self, targets, tests, compute_junit_classpath):
+  def instrument(self, all_targets, tests, compute_junit_classpath):
     """Called from coverage classes. Run any code instrumentation needed.
 
     Subclasses should override this if they need more work done.
@@ -198,7 +199,7 @@ class _JUnitRunner(object):
 
     self._run_tests(tests_and_targets)
 
-  def report(self, targets, tests, tests_failed_exception):
+  def report(self, all_targets, tests, tests_failed_exception):
     """Post-processing of any test output.
 
     Subclasses should override this if they need anything done here.
@@ -230,10 +231,9 @@ class _JUnitRunner(object):
     for these tests instead.
     """
 
-    java_tests_targets = list(self._test_target_candidates(targets))
-    tests_from_targets = dict(list(self._calculate_tests_from_targets(java_tests_targets)))
+    tests_from_targets = dict(list(self._calculate_tests_from_targets(targets)))
 
-    if java_tests_targets and self._tests_to_run:
+    if targets and self._tests_to_run:
       # If there are some junit_test targets in the graph, find ones that match the requested
       # test(s).
       tests_with_targets = {}
@@ -386,18 +386,16 @@ class _JUnitRunner(object):
       for c in self._interpret_test_spec(test_spec):
         yield c
 
-  def _test_target_candidates(self, targets):
-    for target in targets:
-      if isinstance(target, junit_tests) and target.payload.sources.source_paths:
-        yield target
-
   def _calculate_tests_from_targets(self, targets):
     """
     :param list targets: list of targets to calculate test classes for.
     generates tuples (class_name, target).
     """
     targets_to_classes = self._context.products.get_data('classes_by_target')
-    for target in self._test_target_candidates(targets):
+    if targets_to_classes is None:
+      return
+
+    for target in targets:
       target_products = targets_to_classes.get(target)
       if target_products:
         for _, classes in target_products.rel_paths():
@@ -476,7 +474,7 @@ class _Coverage(_JUnitRunner):
     self._coverage_force = options.coverage_force
 
   @abstractmethod
-  def instrument(self, targets, tests, compute_junit_classpath):
+  def instrument(self, all_targets, tests, compute_junit_classpath):
     pass
 
   @abstractmethod
@@ -484,7 +482,7 @@ class _Coverage(_JUnitRunner):
     pass
 
   @abstractmethod
-  def report(self, targets, tests, tests_failed_exception):
+  def report(self, all_targets, tests, tests_failed_exception):
     pass
 
   # Utility methods, called from subclasses
@@ -557,11 +555,11 @@ class Emma(_Coverage):
                         JarDependency(org='emma', name='emma', rev='2.1.5320')
                       ])
 
-  def instrument(self, targets, tests, compute_junit_classpath):
+  def instrument(self, all_targets, tests, compute_junit_classpath):
     junit_classpath = compute_junit_classpath()
     safe_mkdir(self._coverage_instrument_dir, clean=True)
     self._emma_classpath = self._task_exports.tool_classpath('emma')
-    with binary_util.safe_args(self.get_coverage_patterns(targets),
+    with binary_util.safe_args(self.get_coverage_patterns(all_targets),
                                self._task_exports.task_options) as patterns:
       args = [
         'instr',
@@ -573,7 +571,7 @@ class Emma(_Coverage):
       for pattern in patterns:
         args.extend(['-filter', pattern])
       main = 'emma'
-      execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
+      execute_java = self.preferred_jvm_distribution_for_targets(all_targets).execute_java
       result = execute_java(classpath=self._emma_classpath,
                             main=main,
                             jvm_options=self._coverage_jvm_options,
@@ -590,7 +588,7 @@ class Emma(_Coverage):
                     classpath_append=self._emma_classpath,
                     extra_jvm_options=['-Demma.coverage.out.file={0}'.format(self._coverage_file)])
 
-  def report(self, targets, tests, tests_failed_exception=None):
+  def report(self, all_targets, tests, tests_failed_exception=None):
     if tests_failed_exception:
       self._context.log.warn('Test failed: {0}'.format(str(tests_failed_exception)))
       if self._coverage_force:
@@ -608,7 +606,8 @@ class Emma(_Coverage):
     def collect_source_base(target):
       if self.is_coverage_target(target):
         source_bases.add(target.target_base)
-    for target in self._test_target_candidates(targets):
+
+    for target in all_targets:
       target.walk(collect_source_base)
     for source_base in source_bases:
       args.extend(['-sp', source_base])
@@ -622,7 +621,7 @@ class Emma(_Coverage):
                  '-Dreport.out.encoding=UTF-8'] + sorting)
 
     main = 'emma'
-    execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
+    execute_java = self.preferred_jvm_distribution_for_targets(all_targets).execute_java
     result = execute_java(classpath=self._emma_classpath,
                           main=main,
                           jvm_options=self._coverage_jvm_options,
@@ -688,14 +687,14 @@ class Cobertura(_Coverage):
     self._exclude_classes = options.coverage_cobertura_exclude_classes
     self._nothing_to_instrument = True
 
-  def instrument(self, targets, tests, compute_junit_classpath):
-    instrumentation_classpath = self.initialize_instrument_classpath(targets)
+  def instrument(self, all_targets, tests, compute_junit_classpath):
+    instrumentation_classpath = self.initialize_instrument_classpath(all_targets)
     junit_classpath = compute_junit_classpath()
     cobertura_cp = self._task_exports.tool_classpath('cobertura-instrument')
     aux_classpath = os.pathsep.join(relativize_paths(junit_classpath, get_buildroot()))
     safe_delete(self._coverage_datafile)
     files_to_instrument = []
-    for target in targets:
+    for target in all_targets:
       if self.is_coverage_target(target):
         paths = instrumentation_classpath.get_for_target(target, False)
         for (name, path) in paths:
@@ -723,7 +722,7 @@ class Cobertura(_Coverage):
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
         self._context.log.debug(
           "executing cobertura instrumentation with the following args: {}".format(args))
-        execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
+        execute_java = self.preferred_jvm_distribution_for_targets(all_targets).execute_java
         result = execute_java(classpath=cobertura_cp,
                               main=main,
                               jvm_options=self._coverage_jvm_options,
@@ -761,7 +760,7 @@ class Cobertura(_Coverage):
               source_by_class[product] = source_file
     return source_by_class
 
-  def report(self, targets, tests, tests_failed_exception=None):
+  def report(self, all_targets, tests, tests_failed_exception=None):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping report...')
       return
@@ -827,7 +826,7 @@ class Cobertura(_Coverage):
         report_format,
         ]
       main = 'net.sourceforge.cobertura.reporting.ReportMain'
-      execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
+      execute_java = self.preferred_jvm_distribution_for_targets(all_targets).execute_java
       result = execute_java(classpath=cobertura_cp,
                             main=main,
                             jvm_options=self._coverage_jvm_options,
@@ -843,7 +842,7 @@ class Cobertura(_Coverage):
       binary_util.ui_open(coverage_html_file)
 
 
-class JUnitRun(JvmToolTaskMixin, JvmTask):
+class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
@@ -893,15 +892,17 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
     else:
       self._runner = _JUnitRunner(task_exports, self.context)
 
-  def execute(self):
-    if not self.get_options().skip:
-      targets = self.context.targets()
-      # TODO: move this check to an optional phase in goal_runner, so
-      # that missing sources can be detected early.
-      if not self.get_options().allow_empty_sources:
-        for target in targets:
-          if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
-            msg = 'JavaTests target must include a non-empty set of sources.'
-            raise TargetDefinitionException(target, msg)
+  def _test_target_filter(self):
+    def target_filter(target):
+      return isinstance(target, junit_tests)
+    return target_filter
 
-      self._runner.execute(targets)
+  def _validate_target(self, target):
+    # TODO: move this check to an optional phase in goal_runner, so
+    # that missing sources can be detected early.
+    if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
+      msg = 'JavaTests target must include a non-empty set of sources.'
+      raise TargetDefinitionException(target, msg)
+
+  def _execute(self, test_targets, all_targets):
+    self._runner.execute(test_targets, all_targets)
