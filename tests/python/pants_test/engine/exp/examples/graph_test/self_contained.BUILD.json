@@ -1,0 +1,126 @@
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+{
+  "typename": "Target",
+  "name": "thrift1",
+  "sources": []
+}
+
+{
+  "typename": "Target",
+  "name": "thrift2",
+  "sources": [],
+  "dependencies": [
+    ":thrift1"
+  ]
+}
+
+{
+  "typename": "Target",
+  "name": "java1",
+  "sources": [],
+  "dependencies": [
+    ":thrift2"
+  ],
+  "configurations": [
+    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
+    # off / prove the capabilities of the new BUILD graph parser.
+    {
+      "typename": "ApacheThriftConfig",
+      "version": "0.9.2",
+      "strict": true,
+      "lang": "java"
+    },
+    ":nonstrict",
+    {
+      "typename": "PublishConfig",
+      "default_repo": ":public",
+      "repos": {
+        "jake": {
+          "typename": "Config",
+          "url": "https://dl.bintray.com/pantsbuild/maven"
+        },
+        "jane": ":public"
+      }
+    }
+  ]
+}
+
+{
+  "typename": "ApacheThriftConfig",
+  "name": "nonstrict",
+  "version": "0.9.2",
+  "strict": false,
+  "lang": "java"
+}
+
+{
+  "typename": "Config",
+  "name": "public",
+  "url": "https://oss.sonatype.org/#stagingRepositories"
+}
+
+{
+  "typename": "Config",
+  "name": "type_mismatch",
+
+  # This should trigger a type mismatch when resolved since ApacheThriftConfig is not a superclass
+  # of Config
+  "extends": ":nonstrict"
+}
+
+{
+  "typename": "Config",
+  "name": "self_cycle",
+
+  # This should trigger a cycle error when resolved since we're trying to depend on ourselves for
+  # inheritance purposes.
+  "extends": ":self_cycle"
+}
+
+# A single-hop direct cycle - though through different types of dependency edges.
+{
+  "typename": "Target",
+  "name": "direct_cycle",
+  "dependencies": [
+    ":direct_cycle_dep"
+  ]
+}
+
+{
+  "typename": "Target",
+  "name": "direct_cycle_dep",
+  "configurations": [
+    ":direct_cycle"
+  ]
+}
+
+# A multi-hop cycle
+{
+  "typename": "Target",
+  "name": "indirect_cycle",
+  "merges": ":one"
+}
+
+{
+  "typename": "Target",
+  "name": "one",
+  "dependencies": [
+    ":two"
+  ]
+}
+
+{
+  "typename": "Target",
+  "name": "two",
+  "extends": ":three"
+}
+
+{
+  "typename": "Target",
+  "name": "three",
+  "configurations": [
+    ":one"
+  ]
+}

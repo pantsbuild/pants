@@ -9,7 +9,7 @@ import functools
 from contextlib import contextmanager
 
 from pants.backend.core.tasks.mutex_task_mixin import MutexTaskMixin
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 

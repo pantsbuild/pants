@@ -68,6 +68,9 @@ class StatusTable(object):
   def mark_as(self, state, key):
     self._statuses[key] = state
 
+  def mark_queued(self, key):
+    self.mark_as(QUEUED, key)
+
   def unfinished_items(self):
     """Returns a list of (name, status) tuples, only including entries marked as unfinished."""
     return [(key, stat) for key, stat in self._statuses.items() if stat not in self.DONE_STATES]
@@ -75,14 +78,14 @@ class StatusTable(object):
   def failed_keys(self):
     return [key for key, stat in self._statuses.items() if stat == FAILED]
 
-  def get(self, key):
-    return self._statuses.get(key)
+  def is_unstarted(self, key):
+    return self._statuses.get(key) is UNSTARTED
 
   def mark_one_successful_dependency(self, key):
     self._pending_dependencies_count[key] -= 1
 
   def is_ready_to_submit(self, key):
-    return self._pending_dependencies_count[key] == 0
+    return self.is_unstarted(key) and self._pending_dependencies_count[key] == 0
 
   def are_all_done(self):
     return all(s in self.DONE_STATES for s in self._statuses.values())
@@ -269,7 +272,7 @@ class ExecutionGraph(object):
       while len(heap) > 0 and jobs_in_flight.get() < pool.num_workers:
         priority, job_key = heappop(heap)
         jobs_in_flight.increment()
-        status_table.mark_as(QUEUED, job_key)
+        status_table.mark_queued(job_key)
         pool.submit_async_work(Work(worker, [(job_key, (self._jobs[job_key]))]))
 
     def submit_jobs(job_keys):
@@ -316,7 +319,9 @@ class ExecutionGraph(object):
 
           # Propagate failures downstream.
           for dependee in direct_dependees:
-            finished_queue.put((dependee, CANCELED, None))
+            if status_table.is_unstarted(dependee):
+              status_table.mark_queued(dependee)
+              finished_queue.put((dependee, CANCELED, None))
 
         # Log success or failure for this job.
         if result_status is FAILED:

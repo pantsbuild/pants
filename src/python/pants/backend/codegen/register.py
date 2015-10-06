@@ -19,7 +19,7 @@ from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
 from pants.backend.codegen.tasks.ragel_gen import RagelGen
 from pants.backend.codegen.tasks.wire_gen import WireGen
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 

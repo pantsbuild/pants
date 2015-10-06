@@ -16,6 +16,6 @@ python_library(
     '3rdparty/python:pyflakes',
     'src/python/pants/backend/codegen/targets:python',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
   ]
 )

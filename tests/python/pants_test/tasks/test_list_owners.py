@@ -9,8 +9,8 @@ from textwrap import dedent
 
 from pants.backend.core.tasks.list_owners import ListOwners
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 

@@ -9,7 +9,7 @@ import json
 import os
 from textwrap import dedent
 
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
 from pants_test.tasks.task_test_base import TaskTestBase
 

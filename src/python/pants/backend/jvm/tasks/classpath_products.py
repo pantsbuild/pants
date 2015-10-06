@@ -168,7 +168,7 @@ class ClasspathProducts(object):
     Does not look up transitive excludes.
 
     :param targets: The targets to add excludes for.
-    :type targets: list of :class:`pants.base.target.Target`
+    :type targets: list of :class:`pants.build_graph.target.Target`
     """
     for target in targets:
       self._add_excludes_for_target(target)

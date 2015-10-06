@@ -41,7 +41,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_requirement',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test'
   ]
 )

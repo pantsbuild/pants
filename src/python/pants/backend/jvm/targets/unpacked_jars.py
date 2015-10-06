@@ -10,7 +10,7 @@ import logging
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 logger = logging.getLogger(__name__)

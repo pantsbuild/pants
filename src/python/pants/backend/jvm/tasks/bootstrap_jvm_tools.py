@@ -19,9 +19,9 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
-from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
+from pants.build_graph.target import Target
+from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java import util
 from pants.java.executor import Executor

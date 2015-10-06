@@ -10,7 +10,7 @@ from collections import defaultdict
 from twitter.common.util import topological_sort
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 class SortTargets(ConsoleTask):

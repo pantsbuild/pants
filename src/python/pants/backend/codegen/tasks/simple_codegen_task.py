@@ -15,10 +15,10 @@ from pants.backend.core.tasks.task import Task
 from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
-from pants.base.build_graph import sort_targets
 from pants.base.dep_lookup_error import DepLookupError
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.build_graph import sort_targets
 from pants.util.dirutil import safe_rmtree, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -80,8 +80,15 @@ class SimpleCodegenTask(Task):
     """
     return []
 
-  @property
-  def synthetic_target_type(self):
+  def synthetic_target_type_by_target(self, target):
+    """The type of target this codegen task generates.
+
+    For example, the target type for JaxbGen would simply be JavaLibrary.
+    :return: a type (class) that inherits from Target.
+    """
+    raise NotImplementedError
+
+  def synthetic_target_type(self, target):
     """The type of target this codegen task generates.
 
     For example, the target type for JaxbGen would simply be JavaLibrary.
@@ -206,6 +213,13 @@ class SimpleCodegenTask(Task):
         return False
     return True
 
+  def get_synthetic_address(self,target):
+    target_workdir = self.codegen_workdir(target)
+    synthetic_name = target.id
+    sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
+    synthetic_address = Address(sources_rel_path, synthetic_name)
+    return synthetic_address
+
   def execute(self):
     targets = self.codegen_targets()
     with self.invalidated(targets,
@@ -221,9 +235,6 @@ class SimpleCodegenTask(Task):
 
       for target in targets:
         target_workdir = self.codegen_workdir(target)
-        synthetic_name = target.id
-        sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
-        synthetic_address = Address(sources_rel_path, synthetic_name)
         raw_generated_sources = list(self.codegen_strategy.find_sources(target))
         # Make the sources robust regardless of whether subclasses return relative paths, or
         # absolute paths that are subclasses of the workdir.
@@ -234,8 +245,8 @@ class SimpleCodegenTask(Task):
                                       for src in generated_sources]
 
         self.target = self.context.add_new_target(
-          address=synthetic_address,
-          target_type=self.synthetic_target_type,
+          address=self.get_synthetic_address(target),
+          target_type=self.synthetic_target_type(target),
           dependencies=self.synthetic_target_extra_dependencies(target),
           sources=relative_generated_sources,
           derived_from=target,

@@ -17,5 +17,5 @@ class BuildFileTargetFactory(AbstractClass):
   def target_types(self):
     """The set of target types this factory can produce.
 
-    :rytpe: :class:`collections.Iterable` of :class:`pants.base.target.Target` types.
+    :rytpe: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target` types.
     """

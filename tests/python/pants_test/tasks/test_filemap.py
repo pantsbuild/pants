@@ -10,8 +10,8 @@ from textwrap import dedent
 
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.source_root import SourceRoot
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 

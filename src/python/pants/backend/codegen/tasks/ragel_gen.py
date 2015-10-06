@@ -48,8 +48,7 @@ class RagelGen(SimpleCodegenTask):
                                      self.get_options().version,
                                      'ragel')
 
-  @property
-  def synthetic_target_type(self):
+  def synthetic_target_type(self, target):
     return JavaLibrary
 
   def is_gentarget(self, target):
