@@ -820,7 +820,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     add_abs_products(resources_by_target.get(compile_context.target))
     # Classes.
     for f in ClasspathUtil.directory_contents(compile_context.classes_dir):
-      artifacts.add(os.path.join(compile_context.classes_dir, f))
+      artifacts.append(os.path.join(compile_context.classes_dir, f))
     # Log file.
     log_file = self._capture_log_file(compile_context.target)
     if log_file and os.path.exists(log_file):
