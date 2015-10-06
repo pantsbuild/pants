@@ -602,7 +602,8 @@ class Emma(_Coverage):
     def collect_source_base(target):
       if self.is_coverage_target(target):
         source_bases.add(target.target_base)
-    for target in self._test_target_candidates(targets):
+
+    for target in targets:
       target.walk(collect_source_base)
     for source_base in source_bases:
       args.extend(['-sp', source_base])
