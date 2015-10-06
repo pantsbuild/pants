@@ -7,16 +7,31 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 <ivysettings>
   <settings defaultResolver="pants-chain-repos"/>
 
-  <properties environment="env" />
   <property name="m2.repo.relpath" value="[organisation]/[module]/[revision]"/>
   <property name="m2.repo.pom" value="${m2.repo.relpath}/[module]-[revision].pom"/>
   <property name="m2.repo.artifact"
             value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
 
-  <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
-  <property name="android.repo.dir" value="${env.ANDROID_HOME}/extras/android/m2repository"/>
-  <property name="google.repo.dir" value="${env.ANDROID_HOME}/extras/google/m2repository"/>
+  <!-- This dance to set ANDROID_HOME seems more complex than it need be, but an absolute path is
+       needed whether or not the ANDROID_HOME env var is set and just using the following does
+       not work to default the value when unset in the environment:
+
+       <properties environment="env"/>
+       <property name="env.ANDROID_HOME" value="/please-export-your-ANDROID_HOME" override="false"/>
+
+       -->
+  <properties environment="env"/>
+  <property name="ANDROID_HOME"
+            value="/please-export-your-ANDROID_HOME"
+            unlessset="env.ANDROID_HOME"/>
+  <property name="ANDROID_HOME"
+            value="${env.ANDROID_HOME}"
+            ifset="env.ANDROID_HOME"/>
+
+  <property name="android.repo.dir" value="${ANDROID_HOME}/extras/android/m2repository"/>
+  <property name="google.repo.dir" value="${ANDROID_HOME}/extras/google/m2repository"/>
+
   <resolvers>
 
     <chain name="pants-chain-repos" returnFirst="true">
