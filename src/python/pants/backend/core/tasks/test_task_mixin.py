@@ -24,10 +24,11 @@ class TestTaskMixin(object):
     """Run the task."""
 
     if not self.get_options().skip:
-      targets = self._get_relevant_targets()
-      for target in targets:
+      test_targets = self._get_test_targets()
+      all_targets = self._get_targets()
+      for target in test_targets:
         self._validate_target(target)
-      self._execute(targets)
+      self._execute(test_targets, all_targets)
 
   def _get_targets(self):
     """This is separated out so it can be overridden for testing purposes.
@@ -36,7 +37,7 @@ class TestTaskMixin(object):
     """
     return self.context.targets()
 
-  def _get_relevant_targets(self):
+  def _get_test_targets(self):
     """Returns the targets that are relevant test targets."""
 
     test_targets = list(filter(self._test_target_filter(), self._get_targets()))
@@ -61,7 +62,7 @@ im
     """
 
   @abstractmethod
-  def _execute(self, targets):
+  def _execute(self, test_targets, all_targets):
     """Actually goes ahead and runs the tests for the targets.
 
     :param targets: list of the targets whose tests are to be run
