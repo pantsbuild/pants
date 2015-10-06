@@ -105,10 +105,10 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     class TestTaskMixinTask(TestTaskMixin, TaskBase):
       call_list = []
 
-      def _execute(self, test_targets, all_targets):
+      def _execute(self, all_targets):
         import time
         time.sleep(2)
-        self.call_list.append(['_execute', test_targets])
+        self.call_list.append(['_execute', all_targets])
 
       def _get_targets(self):
         return [targetB]
@@ -136,4 +136,4 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     task = self.create_task(self.context())
 
     task.execute()
-    self.assertIn(['_execute', [targetB], [targetB]], task.call_list)
+    self.assertIn(['_execute', [targetB]], task.call_list)
