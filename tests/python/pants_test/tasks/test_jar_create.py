@@ -149,11 +149,11 @@ class JarCreateExecuteTest(JarCreateTestBase):
     def idict(*args):
       return dict(zip(args, args))
 
-    self.add_to_compile_classpath(context, self.jl, idict('a.class', 'b.class'))
-    self.add_to_compile_classpath(context, self.sl, idict('c.class'))
-    self.add_to_compile_classpath(context, self.binary, idict('b.class'))
-    self.add_to_compile_classpath(context, self.scala_lib, idict('scala_foo.class', 'java_foo.class'))
-    self.add_to_compile_classpath(context, self.res, idict('r.txt.transformed'))
+    self.add_to_runtime_classpath(context, self.jl, idict('a.class', 'b.class'))
+    self.add_to_runtime_classpath(context, self.sl, idict('c.class'))
+    self.add_to_runtime_classpath(context, self.binary, idict('b.class'))
+    self.add_to_runtime_classpath(context, self.scala_lib, idict('scala_foo.class', 'java_foo.class'))
+    self.add_to_runtime_classpath(context, self.res, idict('r.txt.transformed'))
 
     self.execute(context)
 
@@ -164,8 +164,11 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
   def test_empty_scala_files(self):
     context = self.context()
-    # Create a classpath for a _different_ library, in order to initialize the product.
-    self.add_to_compile_classpath(context, self.sl, dict())
-    with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
-      self.execute(context)
-      self.assertFalse(context.products.get('jars').has(self.empty_sl))
+
+    # Create classpaths for other libraries, in order to initialize the product.
+    self.add_to_runtime_classpath(context, self.sl, dict())
+    self.add_to_runtime_classpath(context, self.res, dict('r.txt.transformed': ''))
+
+    self.execute(context)
+
+    self.assertFalse(context.products.get('jars').has(self.empty_sl))

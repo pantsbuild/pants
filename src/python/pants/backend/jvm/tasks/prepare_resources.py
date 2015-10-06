@@ -49,6 +49,3 @@ class PrepareResources(ResourcesTask):
       # TODO(Benjy Weinberger): Symlink instead?
       shutil.copy(os.path.join(self._buildroot, target.target_base, resource_file_from_source_root),
                   os.path.join(chroot, resource_file_from_source_root))
-
-  def relative_resource_paths(self, target, chroot):
-    return list(target.sources_relative_to_source_root())

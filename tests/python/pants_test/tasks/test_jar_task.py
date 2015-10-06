@@ -238,9 +238,7 @@ class JarBuilderTest(BaseJarTaskTest):
     context = self.context(target_roots=[java_agent])
     jar_builder_task = self.prepare_execute(context)
 
-    self.add_to_compile_classpath(context, java_agent, {'FakeAgent.class': '0xCAFEBABE'})
-    context.products.safe_create_data('resources_by_target',
-                                      lambda: defaultdict(MultipleRootedProducts))
+    self.add_to_runtime_classpath(context, java_agent, {'FakeAgent.class': '0xCAFEBABE'})
     with self.jarfile() as existing_jarfile:
       with jar_builder_task.open_jar(existing_jarfile) as jar:
         with jar_builder_task.create_jar_builder(jar) as jar_builder:
@@ -275,9 +273,7 @@ class JarBuilderTest(BaseJarTaskTest):
     binary_target = self.target('src/java/hello:hello')
     context = self.context(target_roots=[binary_target])
 
-    self.add_to_compile_classpath(context, binary_target, {'Hello.class': '0xDEADBEEF'})
-    context.products.safe_create_data('resources_by_target',
-                                      lambda: defaultdict(MultipleRootedProducts))
+    self.add_to_runtime_classpath(context, binary_target, {'Hello.class': '0xDEADBEEF'})
 
     jar_builder_task = self.prepare_execute(context)
 

@@ -27,16 +27,16 @@ class TestJvmDependencyUsage(TaskTestBase):
     context = self.context(target_roots=target_classfiles.keys())
 
     # Create classfiles in a target-specific directory, and add it to the classpath for the target.
-    compile_classpath = context.products.get_data('compile_classpath', ClasspathProducts)
+    classpath_products = context.products.get_data('runtime_classpath', ClasspathProducts)
     for target, classfiles in target_classfiles.items():
       target_dir = os.path.join(self.test_workdir, target.id)
       safe_mkdir(target_dir)
       for classfile in classfiles:
         touch(os.path.join(target_dir, classfile))
-      compile_classpath.add_for_target(target, [('default', target_dir)])
+      classpath_products.add_for_target(target, [('default', target_dir)])
 
     product_deps_by_src = context.products.get_data('product_deps_by_src', dict)
-    return self.create_task(context), compile_classpath, product_deps_by_src
+    return self.create_task(context), product_deps_by_src
 
   def make_java_target(self, *args, **kwargs):
     assert 'target_type' not in kwargs
@@ -52,7 +52,7 @@ class TestJvmDependencyUsage(TaskTestBase):
     t2 = self.make_java_target(spec=':t2', sources=['c.java'], dependencies=[t1])
     t3 = self.make_java_target(spec=':t3', sources=['d.java', 'e.java'], dependencies=[t1])
     self.set_options(size_estimator='filecount')
-    dep_usage, classes_by_target, product_deps_by_src = self._setup({
+    dep_usage, product_deps_by_src = self._setup({
         t1: ['a.class', 'b.class'],
         t2: ['c.class'],
         t3: ['d.class', 'e.class'],
@@ -87,7 +87,7 @@ class TestJvmDependencyUsage(TaskTestBase):
                                sources=['a.java', 'b.java'],
                                dependencies=[t1, t1_x, t1_y, t1_z])
     self.set_options(size_estimator='nosize')
-    dep_usage, classes_by_target, product_deps_by_src = self._setup({
+    dep_usage, product_deps_by_src = self._setup({
         t1_x: ['x1.class'],
         t1_y: ['y1.class'],
         t1_z: ['z1.class', 'z2.class', 'z3.class'],

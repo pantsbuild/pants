@@ -320,15 +320,15 @@ class BaseTest(unittest.TestCase):
 
   def populate_compile_classpath(self, context, classpath=None):
     """
-    Helps actual test cases to populate the 'compile_classpath' products data mapping
+    Helps actual test cases to populate the 'runtime_classpath' products data mapping
     in the context, which holds the classpath value for targets.
 
     :param context: The execution context where the products data mapping lives.
     :param classpath: a list of classpath strings. If not specified,
                       [os.path.join(self.buildroot, 'none')] will be used.
     """
-    classpath = classpath or [os.path.join(self.build_root, 'none')]
-    compile_classpaths = context.products.get_data('compile_classpath', lambda: UnionProducts())
+    classpath = classpath or []
+    compile_classpaths = context.products.get_data('runtime_classpath', lambda: UnionProducts())
     compile_classpaths.add_for_targets(context.targets(),
                                        [('default', entry) for entry in classpath])
 
