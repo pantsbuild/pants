@@ -43,7 +43,6 @@ class DuplicateDetector(JvmBinaryTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(DuplicateDetector, cls).prepare(options, round_manager)
-    round_manager.require_data('resources_by_target')
     round_manager.require_data('compile_classpath')
 
   def __init__(self, *args, **kwargs):
@@ -82,28 +81,20 @@ class DuplicateDetector(JvmBinaryTask):
       return True
     return False
 
-  def _get_internal_dependencies(self, binary_target):
+  def _get_internal_dependencies(self, target):
     artifacts_by_file_name = defaultdict(set)
     classpath_products = self.context.products.get_data('compile_classpath')
-    resources_by_target = self.context.products.get_data('resources_by_target')
 
     # Select classfiles from the classpath.
+    targets = [target] + target.resources if target.has_resources else [target]
     contents = ClasspathUtil.classpath_contents(
-        (binary_target,),
+        targets,
         classpath_products,
         ('default',),
         transitive=False)
     for f in contents:
-      if f.endswith('.class'):
+      if not f.endswith('/'):
         artifacts_by_file_name[f].add(binary_target)
-
-    # TODO: Get resources from the classpath as well?
-    target_resources = []
-    if binary_target.has_resources:
-      target_resources.extend(resources_by_target.get(r) for r in binary_target.resources)
-
-    for r in target_resources:
-      artifacts_by_file_name[r].add(binary_target)
     return artifacts_by_file_name
 
   def _get_external_dependencies(self, binary_target):
