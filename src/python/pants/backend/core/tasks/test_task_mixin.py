@@ -28,7 +28,7 @@ class TestTaskMixin(object):
       all_targets = self._get_targets()
       for target in test_targets:
         self._validate_target(target)
-      self._execute(test_targets, all_targets)
+      self._execute(all_targets)
 
   def _get_targets(self):
     """This is separated out so it can be overridden for testing purposes.
@@ -62,7 +62,7 @@ im
     """
 
   @abstractmethod
-  def _execute(self, test_targets, all_targets):
+  def _execute(self, all_targets):
     """Actually goes ahead and runs the tests for the targets.
 
     :param targets: list of the targets whose tests are to be run

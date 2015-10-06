@@ -122,7 +122,8 @@ class PytestRun(TestTaskMixin, PythonTask):
   def _validate_target(self, target):
     pass
 
-  def _execute(self, test_targets, all_targets):
+  def _execute(self, all_targets):
+    test_targets = self._get_test_targets()
     if test_targets:
       self.context.release_lock()
       with self.context.new_workunit(name='run',
