@@ -218,7 +218,7 @@ class AddressMapper(object):
 
   @memoized_method
   def _parse(self, path):
-    return AddressMap.parse(self._normalize_parse_path(path), parse=self._parser)
+    return AddressMap.parse(path, parse=self._parser)
 
   @memoized_method
   def family(self, namespace):
@@ -231,7 +231,7 @@ class AddressMapper(object):
     """
     address_maps = []
     for path in self._find_build_files(namespace):
-      address_maps.append(self._parse(path))
+      address_maps.append(self._parse(self._normalize_parse_path(path)))
     if not address_maps:
       raise ResolveError('No addresses registered in namespace {}'.format(namespace))
     return AddressFamily.create(self._build_root, address_maps)
@@ -262,7 +262,9 @@ class AddressMapper(object):
     # TODO(John Sirois): replace @memoized caches with hand-build local caches if needed when
     # considering concurrency implications of a seperate thread calling invalidate while other
     # threads access the cache.
-    path = os.path.realpath(path if os.path.isabs(path) else os.path.join(self._build_root, path))
-    self._parse.forget(self, self._normalize_parse_path(path))
-    namespace = os.path.relpath(os.path.dirname(path), self._build_root)
+    path = path if os.path.isabs(path) else os.path.join(self._build_root, path)
+    normalized_path = self._normalize_parse_path(path)
+
+    self._parse.forget(self, normalized_path)
+    namespace = os.path.relpath(os.path.dirname(normalized_path), self._build_root)
     self.family.forget(self, namespace)

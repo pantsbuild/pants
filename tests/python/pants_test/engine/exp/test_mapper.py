@@ -124,9 +124,9 @@ class AddressFamilyTest(unittest.TestCase):
 
 class AddressMapperTest(unittest.TestCase):
   def setUp(self):
-    work_dir = safe_mkdtemp()
-    self.addCleanup(safe_rmtree, work_dir)
-    self.build_root = os.path.join(work_dir, 'build_root')
+    self.work_dir = safe_mkdtemp()
+    self.addCleanup(safe_rmtree, self.work_dir)
+    self.build_root = os.path.join(self.work_dir, 'build_root')
     shutil.copytree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'),
                     self.build_root)
 
@@ -228,5 +228,37 @@ class AddressMapperTest(unittest.TestCase):
     self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b')))
 
     self.address_mapper.invalidate_build_file(build_file)
+    with self.assertRaises(ResolveError):
+      self.address_mapper.resolve(Address.parse('a/b'))
+
+  def test_invalidation_un_normalized(self):
+    resolved = self.address_mapper.resolve(Address.parse('a/b'))
+    a_b_target = Target(name='b',
+                        dependencies=['//d:e'],
+                        configurations=['//a', Configuration(embedded='yes')])
+    self.assertEqual(a_b_target, resolved)
+
+    os.unlink(os.path.join(self.build_root, 'a/b/b.BUILD.json'))
+    self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b')))
+
+    un_normalized_build_root = os.path.join(self.work_dir, 'build_root_linked')
+    os.symlink(self.build_root, un_normalized_build_root)
+    un_normalized_build_file = os.path.join(un_normalized_build_root, 'a/b/b.BUILD.json')
+    self.address_mapper.invalidate_build_file(un_normalized_build_file)
+    with self.assertRaises(ResolveError):
+      self.address_mapper.resolve(Address.parse('a/b'))
+
+  def test_invalidation_relative(self):
+    resolved = self.address_mapper.resolve(Address.parse('a/b'))
+    a_b_target = Target(name='b',
+                        dependencies=['//d:e'],
+                        configurations=['//a', Configuration(embedded='yes')])
+    self.assertEqual(a_b_target, resolved)
+
+    build_file = os.path.join(self.build_root, 'a/b/b.BUILD.json')
+    os.unlink(build_file)
+    self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b')))
+
+    self.address_mapper.invalidate_build_file('a/b/b.BUILD.json')
     with self.assertRaises(ResolveError):
       self.address_mapper.resolve(Address.parse('a/b'))
