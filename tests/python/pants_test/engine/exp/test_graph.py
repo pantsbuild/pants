@@ -12,6 +12,7 @@ from functools import partial
 from pants.base.address import Address
 from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import CycleError, Graph, ResolvedTypeMismatchError, ResolveError
+from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json, parse_python_assignments, parse_python_callbacks
 from pants.engine.exp.targets import ApacheThriftConfiguration, PublishConfiguration, Target
 
@@ -24,7 +25,10 @@ class GraphTest(unittest.TestCase):
                          'PublishConfig': PublishConfiguration}
 
   def create_graph(self, build_pattern=None, parser=None):
-    return Graph(build_root=os.path.dirname(__file__), build_pattern=build_pattern, parser=parser)
+    mapper = AddressMapper(build_root=os.path.dirname(__file__),
+                           build_pattern=build_pattern,
+                           parser=parser)
+    return Graph(mapper)
 
   def create_json_graph(self):
     return self.create_graph(build_pattern=r'.+\.BUILD.json$',
