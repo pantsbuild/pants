@@ -122,7 +122,7 @@ class PytestRun(TestTaskMixin, PythonTask):
   def _validate_target(self, target):
     pass
 
-  def _execute(self, test_targets):
+  def _execute(self, test_targets, all_targets):
     if test_targets:
       self.context.release_lock()
       with self.context.new_workunit(name='run',
@@ -145,11 +145,10 @@ class PytestRun(TestTaskMixin, PythonTask):
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
       fail_hard = not self.get_options().fail_slow and not self.get_options().coverage
       for target in targets:
-        if isinstance(target, PythonTests):
-          rv = self._do_run_tests([target], workunit)
-          results[target] = rv
-          if not rv.success and fail_hard:
-            break
+        rv = self._do_run_tests([target], workunit)
+        results[target] = rv
+        if not rv.success and fail_hard:
+          break
 
       for target in sorted(results):
         self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
