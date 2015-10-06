@@ -26,6 +26,7 @@ python_tests(
   sources=['test_go_distribution.py'],
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
+    'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
