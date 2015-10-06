@@ -22,7 +22,6 @@ class TestTaskMixinTest(TaskTestBase):
       def _get_targets(self):
         return ['TargetA', 'TargetB']
 
-      @property
       def _test_target_filter(self):
         def target_filter(target):
           self.call_list.append(['target_filter', target])
