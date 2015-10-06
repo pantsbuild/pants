@@ -20,6 +20,7 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -61,8 +62,7 @@ _TaskExports = namedtuple('_TaskExports',
 
 
 def _classfile_to_classname(cls):
-  clsname, _ = os.path.splitext(cls.replace('/', '.'))
-  return clsname
+  return ClasspathUtil.classname_for_rel_classfile(cls)
 
 
 class _JUnitRunner(object):
@@ -311,7 +311,7 @@ class _JUnitRunner(object):
                                                     self._infer_workdir,
                                                     lambda target: target.test_platform)
 
-    # the below will be None if not set, and we'll default back to compile_classpath
+    # the below will be None if not set, and we'll default back to runtime_classpath
     classpath_product = self._context.products.get_data('instrument_classpath')
 
     result = 0
@@ -392,16 +392,17 @@ class _JUnitRunner(object):
     :param list targets: list of targets to calculate test classes for.
     generates tuples (class_name, target).
     """
-    targets_to_classes = self._context.products.get_data('classes_by_target')
-    if targets_to_classes is None:
-      return
-
+    classpath_products = self._context.products.get_data('runtime_classpath')
     for target in targets:
-      target_products = targets_to_classes.get(target)
-      if target_products:
-        for _, classes in target_products.rel_paths():
-          for cls in classes:
-            yield (_classfile_to_classname(cls), target)
+      contents = ClasspathUtil.classpath_contents(
+          (target,),
+          classpath_products,
+          confs=self._task_exports.confs,
+          transitive=False)
+      for f in contents:
+        classname = ClasspathUtil.classname_for_rel_classfile(f)
+        if classname:
+          yield (classname, target)
 
   def _classnames_from_source_file(self, srcfile):
     relsrc = os.path.relpath(srcfile, get_buildroot())
@@ -510,7 +511,7 @@ class _Coverage(_JUnitRunner):
       return classes_under_test
 
   def initialize_instrument_classpath(self, targets):
-    """Clones the existing compile_classpath and corresponding binaries to instrumentation specific
+    """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
     paths.
 
     :param targets: the targets which should be mutated.
@@ -518,8 +519,8 @@ class _Coverage(_JUnitRunner):
     """
     safe_mkdir(self._coverage_instrument_dir, clean=True)
 
-    compile_classpath = self._context.products.get_data('compile_classpath')
-    self._context.products.safe_create_data('instrument_classpath', compile_classpath.copy)
+    runtime_classpath = self._context.products.get_data('runtime_classpath')
+    self._context.products.safe_create_data('instrument_classpath', runtime_classpath.copy)
     instrumentation_classpath = self._context.products.get_data('instrument_classpath')
 
     for target in targets:
@@ -541,7 +542,7 @@ class _Coverage(_JUnitRunner):
         instrumentation_classpath.remove_for_target(target, [(config, path)])
         instrumentation_classpath.add_for_target(target, [(config, new_path)])
         self._context.log.debug(
-          "compile_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+          "runtime_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
     return instrumentation_classpath
 
 
@@ -863,10 +864,10 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(options, round_manager)
-    round_manager.require_data('resources_by_target')
 
-    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
-    round_manager.require_data('classes_by_target')
+    # Compilation and resource preparation must have completed.
+    round_manager.require_data('runtime_classpath')
+    # TODO: Make this product optional based on whether a sourcefile has been specified.
     round_manager.require_data('classes_by_source')
 
   def __init__(self, *args, **kwargs):

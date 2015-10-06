@@ -88,6 +88,7 @@ python_tests(
   ],
   dependencies = [
     'src/python/pants/backend/android/tasks:all',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
     'src/python/pants/goal:products',
     'src/python/pants/util:dirutil',
