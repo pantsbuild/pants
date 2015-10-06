@@ -851,7 +851,7 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
     for c in [_JUnitRunner, _Coverage, Emma, Cobertura]:
       c.register_options(register, cls.register_jvm_tool)
     register('--coverage', action='store_true', help='Collect code coverage data.')
-    register('--coverage-processor', advanced=True, default='emma',
+    register('--coverage-processor', advanced=True, default='cobertura',
              help='Which coverage subsystem to use.')
 
   @classmethod
@@ -904,6 +904,6 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
 
       self._runner.execute(targets)
 
-  @deprecated('0.0.55', "emma support will be removed in future versions.")
+  @deprecated('0.0.55', 'emma support will be removed in future versions.')
   def _build_emma_coverage_engine(self, task_exports):
     return Emma(task_exports, self.context)
