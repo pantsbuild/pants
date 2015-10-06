@@ -5,7 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
+import re
 
 from pants.base.address import Address
 from pants.engine.exp import parsers
@@ -46,19 +48,23 @@ class AddressMap(object):
                  addressable Serializable objects parsed from it.
     """
     parse = parse or parsers.parse_json
-    with open(path, 'r') as fp:
-      objects = parse(fp.read())
-      objects_by_name = {}
-      for obj in objects:
-        if not Serializable.is_serializable(obj) or not obj._asdict().get('name'):
-          raise UnaddressableObjectError('Parsed a non-addressable object: {!r}'.format(obj))
-        attributes = obj._asdict()
-        name = attributes['name']
-        if name in objects_by_name:
-          raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
-                                   'map {!r}'.format(path, name, objects_by_name[name], obj))
-        objects_by_name[name] = obj
-      return cls(path, objects_by_name)
+    objects = parse(path)
+    objects_by_name = {}
+    for obj in objects:
+      if not Serializable.is_serializable(obj):
+        raise UnaddressableObjectError('Parsed a non-serilizable object: {!r}'.format(obj))
+      attributes = obj._asdict()
+
+      name = attributes.get('name')
+      if not name:
+        raise UnaddressableObjectError('Parsed a non-addressable object: {!r}'.format(obj))
+
+      if name in objects_by_name:
+        raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
+                                 'map {!r}'.format(path, name, objects_by_name[name], obj))
+
+      objects_by_name[name] = obj
+    return cls(path, objects_by_name)
 
   def __init__(self, path, objects_by_name):
     """Not intended for direct use, instead see `parse`."""
@@ -167,3 +173,22 @@ class AddressFamily(object):
   def __repr__(self):
     return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(self._namespace,
                                                                         self._objects_by_name)
+
+
+def walk_addressables(parser, build_root, rel_path=None, build_pattern=None, spec_excludes=None):
+  build_pattern = re.compile(build_pattern or r'^BUILD(\.[a-zA-Z0-9_-]+)?$')
+  map_root = os.path.join(build_root, rel_path or '')
+  for root, dirs, files in os.walk(map_root):
+    if spec_excludes:
+      for i, d in enumerate(dirs):
+        dir_path = os.path.join(root, d)
+        if dir_path in spec_excludes:
+          del dirs[i]
+    maps = []
+    for f in files:
+      if build_pattern.match(f):
+        build_path = os.path.join(root, f)
+        maps.append(AddressMap.parse(build_path, parser))
+    if maps:
+      for address, obj in AddressFamily.create(build_root, maps).addressables.items():
+        yield address, obj

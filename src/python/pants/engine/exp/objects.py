@@ -18,6 +18,10 @@ class Serializable(AbstractClass):
   def is_serializable(obj):
     return isinstance(obj, Serializable) or (not inspect.isclass(obj) and hasattr(obj, '_asdict'))
 
+  @staticmethod
+  def is_serializable_type(type_):
+    return issubclass(type_, Serializable) or (inspect.isclass(type_) and hasattr(type_, '_asdict'))
+
   @abstractmethod
   def _asdict(self):
     """Return a dict mapping this class' properties.

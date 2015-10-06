@@ -12,7 +12,7 @@ from functools import partial
 from pants.base.address import Address
 from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import CycleError, Graph, ResolvedTypeMismatchError, ResolveError
-from pants.engine.exp.parsers import parse_json, parse_python_assignments, parse_python_callbacks
+from pants.engine.exp.parsers import parse_json, python_assignments_parser, python_callbacks_parser
 from pants.engine.exp.targets import ApacheThriftConfiguration, PublishConfiguration, Target
 
 
@@ -68,14 +68,12 @@ class GraphTest(unittest.TestCase):
 
   def test_python(self):
     graph = self.create_graph(build_pattern=r'.+\.BUILD.python$',
-                              parser=partial(parse_python_assignments,
-                                             symbol_table=self.symbol_table))
+                              parser=python_assignments_parser(self.symbol_table))
     self.do_test_codegen_simple(graph)
 
   def test_python_classic(self):
     graph = self.create_graph(build_pattern=r'.+\.BUILD$',
-                              parser=partial(parse_python_callbacks,
-                                             symbol_table=self.symbol_table))
+                              parser=python_callbacks_parser(self.symbol_table))
     self.do_test_codegen_simple(graph)
 
   def test_resolve_cache(self):

@@ -20,7 +20,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   """
 
   # Internal book-keeping fields to exclude from hash codes/equality checks.
-  _SPECIAL_FIELDS = ('extends', 'merges', 'typename')
+  _SPECIAL_FIELDS = ('extends', 'merges', 'type_alias')
 
   def __init__(self, abstract=False, extends=None, merges=None, **kwargs):
     """Creates a new configuration data blob.
@@ -47,9 +47,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
                   this configuration or this configurations superclasses.
     :param **kwargs: The configuration parameters.
     """
-    self._kwargs = kwargs
-
-    self._kwargs['abstract'] = abstract
+    kwargs['abstract'] = abstract
 
     # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
     # our superclasses logically provide fields within this constrained set.
@@ -57,10 +55,12 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     # arbitrary and thus more fields to be defined than a subclass might logically support.  We
     # accept this hole in a trade for generally expected behavior when Configuration is subclassed
     # in the style of constructors with named parameters representing the full complete set of
-    # expected parameters leaving **kwargs only for use by 'the system'; ie for `typename` and
+    # expected parameters leaving **kwargs only for use by 'the system'; ie for `type_alias` and
     # `address` plumbing for example.
-    self._kwargs['extends'] = addressable(SuperclassesOf(type(self)), extends)
-    self._kwargs['merges'] = addressable(SuperclassesOf(type(self)), merges)
+    kwargs['extends'] = addressable(SuperclassesOf(type(self)), extends)
+    kwargs['merges'] = addressable(SuperclassesOf(type(self)), merges)
+
+    self._kwargs = kwargs
 
     # Allow for configuration items that are directly constructed in memory.  These can have an
     # address directly assigned (vs. inferred from name + source file location) and we only require
@@ -99,8 +99,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     return self._kwargs.get('address')
 
   @property
-  def typename(self):
-    """Return the type name this target was constructed via.
+  def type_alias(self):
+    """Return the type alias this target was constructed via.
 
     For a target read from a BUILD file, this will be target alias, like 'java_library'.
     For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
@@ -110,7 +110,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
     :rtype: string
     """
-    return self._kwargs.get('typename', type(self).__name__)
+    return self._kwargs.get('type_alias', type(self).__name__)
 
   @property
   def abstract(self):
@@ -139,10 +139,10 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     return self._kwargs['merges']
 
   def _asdict(self):
-    return self._kwargs.copy()
+    return self._kwargs
 
   def _extract_inheritable_attributes(self, serializable):
-    attributes = serializable._asdict()
+    attributes = serializable._asdict().copy()
 
     # Allow for un-named (embedded) objects inheriting from named objects
     attributes.pop('name', None)
@@ -208,8 +208,20 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
   def _key(self):
     if self._hashable_key is None:
-      self._hashable_key = sorted((k, v) for k, v in self._kwargs.items()
-                                  if k not in self._SPECIAL_FIELDS)
+      # If we're addressable, our address is enough for a unique key.
+      if self.address:
+        return self.address
+
+      # Otherwise, use value-equals semantics.
+      def hashable(value):
+        if isinstance(value, MutableMapping):
+          return tuple(sorted((k, hashable(v)) for k, v in value.items()))
+        elif isinstance(value, MutableSequence):
+          return tuple(value)
+        else:
+          return value
+      self._hashable_key = tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
+                                        if k not in self._SPECIAL_FIELDS))
     return self._hashable_key
 
   def __hash__(self):

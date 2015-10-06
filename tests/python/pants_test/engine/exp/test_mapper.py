@@ -22,10 +22,10 @@ class Thing(object):
     self._kwargs = kwargs
 
   def _asdict(self):
-    return self._kwargs.copy()
+    return self._kwargs
 
   def _key(self):
-    return {k: v for k, v in self._kwargs.items() if k != 'typename'}
+    return {k: v for k, v in self._kwargs.items() if k != 'type_alias'}
 
   def __eq__(self, other):
     return isinstance(other, Thing) and self._key() == other._key()
@@ -46,12 +46,12 @@ class AddressMapTest(unittest.TestCase):
   def test_parse(self):
     with self.parse_address_map(dedent("""
       {
-        "typename": "thing",
+        "type_alias": "thing",
         "name": "one",
         "age": 42
       }
       {
-        "typename": "thing",
+        "type_alias": "thing",
         "name": "two",
         "age": 37
       }
@@ -67,13 +67,13 @@ class AddressMapTest(unittest.TestCase):
 
   def test_not_named(self):
     with self.assertRaises(UnaddressableObjectError):
-      with self.parse_address_map('{"typename": "thing"}'):
+      with self.parse_address_map('{"type_alias": "thing"}'):
         self.fail()
 
   def test_duplicate_names(self):
     with self.assertRaises(DuplicateNameError):
-      with self.parse_address_map('{"typename": "thing", "name": "one"}'
-                                  '{"typename": "thing", "name": "one"}'):
+      with self.parse_address_map('{"type_alias": "thing", "name": "one"}'
+                                  '{"type_alias": "thing", "name": "one"}'):
         self.fail()
 
 
