@@ -8,9 +8,19 @@ You can specify node_remote_module targets referring to remote 3rd party Node mo
 you can specify node_module targets defining projects in the source tree.
 
 node_module targets can depend on node_remote_module targets in the "dependencies" field of
-their specification in a BUILD file. However, a node_module target will work with a package.json
+their specification in a BUILD file. A node_module target will work with a package.json
 source file in the same directory, combining the BUILD dependencies with the additional fields from
 the source package.json to form the complete package.json used for tasks on the target.
+
+The way this currently works is, when resolving a target, Pants drops the dependencies,
+devDependencies, peerDependencies and optionalDependencies fields from the target's corresponding
+package.json file, and installs with a dependencies field populated from the BUILD file target
+dependencies. This has the benefit of letting Pants work with an existing package.json file
+for a project that can be installed via "npm install" without Pants.
+However a project that takes advantage of this ability to be installed via a normal "npm install"
+in the source tree would need its dependencies duplicated in the BUILD target and package.json file.
+Obviously this is not desirable. Over time, Pants support for NPM should improve to work with a
+fully functional package.json with no duplication of information in the BUILD file.
 
 # Functionality
 
