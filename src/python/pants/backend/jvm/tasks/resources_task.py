@@ -25,6 +25,7 @@ class ResourcesTask(Task):
 
   @classmethod
   def product_types(cls):
+    # TODO: needs to expose a runtime_classpath product
     return ['resources_by_target']
 
   @classmethod

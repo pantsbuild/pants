@@ -341,7 +341,6 @@ class JarBuilderTask(JarTask):
       Later, in execute context, the `create_jar_builder` method can be called to get back a
       prepared ``JarTask.JarBuilder`` ready for use.
       """
-      round_manager.require_data('resources_by_target')
       round_manager.require_data('compile_classpath')
 
     def __init__(self, context, jar):
@@ -359,7 +358,6 @@ class JarBuilderTask(JarTask):
         jar.
       """
       compile_classpath = self._context.products.get_data('compile_classpath')
-      resources_by_target = self._context.products.get_data('resources_by_target')
 
       targets_added = []
 
@@ -373,36 +371,20 @@ class JarBuilderTask(JarTask):
           # non-jar and non-directory classpath entries should be ignored
           pass
 
-      def add_rooted_products(target_products):
-        if target_products:
-          for root, products in target_products.rel_paths():
-            for prod in products:
-              self._jar.write(os.path.join(root, prod), prod)
-
       def add_to_jar(tgt):
+        # Fetch classpath entries for this target and any associated resource targets.
+        tgts = [tgt] + tgt.resources if tgt.has_resources else [tgt]
         target_classpath = ClasspathUtil.classpath_entries(
-            (tgt,),
+            tgts,
             compile_classpath,
             ('default',),
             transitive=False)
 
-        target_resources = []
-
-        # TODO(pl): https://github.com/pantsbuild/pants/issues/206
-        resource_products_on_target = resources_by_target.get(tgt)
-        if resource_products_on_target:
-          target_resources.append(resource_products_on_target)
-
-        if tgt.has_resources:
-          target_resources.extend(resources_by_target.get(r) for r in tgt.resources)
-
-        if target_classpath or target_resources:
+        if target_classpath:
           targets_added.append(tgt)
 
           for entry in target_classpath:
             add_classpath_entry(entry)
-          for resources_target in target_resources:
-            add_rooted_products(resources_target)
 
           if isinstance(tgt, JavaAgent):
             self._add_agent_manifest(tgt, self._manifest)

@@ -153,13 +153,14 @@ class JarCreateExecuteTest(JarCreateTestBase):
     self.add_to_compile_classpath(context, self.sl, idict('c.class'))
     self.add_to_compile_classpath(context, self.binary, idict('b.class'))
     self.add_to_compile_classpath(context, self.scala_lib, idict('scala_foo.class', 'java_foo.class'))
-    with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
-      self.execute(context)
+    self.add_to_compile_classpath(context, self.res, idict('r.txt.transformed'))
 
-      self.assert_jar_contents(context, 'jars', self.jl, ['a.class', 'b.class'], ['r.txt.transformed'])
-      self.assert_jar_contents(context, 'jars', self.sl, ['c.class'])
-      self.assert_jar_contents(context, 'jars', self.binary, ['b.class'], ['r.txt.transformed'])
-      self.assert_jar_contents(context, 'jars', self.scala_lib, ['scala_foo.class', 'java_foo.class'])
+    self.execute(context)
+
+    self.assert_jar_contents(context, 'jars', self.jl, ['a.class', 'b.class'], ['r.txt.transformed'])
+    self.assert_jar_contents(context, 'jars', self.sl, ['c.class'])
+    self.assert_jar_contents(context, 'jars', self.binary, ['b.class'], ['r.txt.transformed'])
+    self.assert_jar_contents(context, 'jars', self.scala_lib, ['scala_foo.class', 'java_foo.class'])
 
   def test_empty_scala_files(self):
     context = self.context()
