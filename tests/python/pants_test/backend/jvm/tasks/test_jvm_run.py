@@ -11,10 +11,11 @@ from contextlib import contextmanager
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.util.contextutil import pushd, temporary_dir
+from pants_test.backend.jvm.jvm_test_mixin import JvmTestMixin
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class JvmRunTest(TaskTestBase):
+class JvmRunTest(TaskTestBase, JvmTestMixin):
 
   @classmethod
   def task_type(cls):
@@ -31,7 +32,9 @@ class JvmRunTest(TaskTestBase):
     context = self.context(target_roots=[jvm_binary])
     jvm_run = self.create_task(context)
     self._cmdline_classpath = [os.path.join(self.build_root, c) for c in ['bob', 'fred']]
-    self.populate_compile_classpath(context=jvm_run.context, classpath=self._cmdline_classpath)
+    self.populate_classpath(context=jvm_run.context,
+                            classpath=self._cmdline_classpath,
+                            product_name='runtime_classpath')
     with temporary_dir() as pwd:
       with pushd(pwd):
         cmdline_file = os.path.join(pwd, 'a')

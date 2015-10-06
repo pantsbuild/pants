@@ -10,6 +10,7 @@ import os
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants_test.backend.jvm.jvm_test_mixin import JvmTestMixin
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -40,7 +41,7 @@ options = {
 }
 
 
-class JvmdocGenTest(TaskTestBase):
+class JvmdocGenTest(TaskTestBase, JvmTestMixin):
   """Test some base functionality in JvmdocGen."""
 
   @classmethod
@@ -56,7 +57,7 @@ class JvmdocGenTest(TaskTestBase):
 
     self.targets = context.targets()
 
-    self.populate_compile_classpath(context)
+    self.populate_classpath(context)
 
     self.task = self.create_task(context, self.workdir)
 

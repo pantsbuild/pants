@@ -36,7 +36,7 @@ from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
-from pants.backend.jvm.tasks.jar_create import JarCreate
+from pants.backend.jvm.tasks.jar_create import RemoteJarCreate, RuntimeJarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
@@ -165,7 +165,7 @@ def register_goals():
   task(name='scaladoc', action=ScaladocGen).install('doc')
 
   # Bundling.
-  task(name='jar', action=JarCreate).install('jar')
+  task(name='jar', action=RemoteJarCreate).install('jar')
   detect_duplicates = task(name='dup', action=DuplicateDetector)
 
   task(name='binary', action=BinaryCreate).install().with_description('Create a runnable binary.')
@@ -186,6 +186,9 @@ def register_goals():
 
   task(name='jar', action=JarPublish).install('publish').with_description(
       'Publish artifacts.')
+
+  # Runtime preparation.
+  task(name='jar', action=RuntimeJarCreate).install('runtime')
 
   # Testing.
   task(name='junit', action=JUnitRun).install('test').with_description('Test compiled code.')

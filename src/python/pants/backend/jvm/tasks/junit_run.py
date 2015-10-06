@@ -310,7 +310,7 @@ class _JUnitRunner(object):
                                                     self._infer_workdir,
                                                     lambda target: target.test_platform)
 
-    # the below will be None if not set, and we'll default back to compile_classpath
+    # the below will be None if not set, and we'll default back to runtime_classpath
     classpath_product = self._context.products.get_data('instrument_classpath')
 
     result = 0
@@ -511,7 +511,7 @@ class _Coverage(_JUnitRunner):
       return classes_under_test
 
   def initialize_instrument_classpath(self, targets):
-    """Clones the existing compile_classpath and corresponding binaries to instrumentation specific
+    """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
     paths.
 
     :param targets: the targets which should be mutated.
@@ -519,8 +519,8 @@ class _Coverage(_JUnitRunner):
     """
     safe_mkdir(self._coverage_instrument_dir, clean=True)
 
-    compile_classpath = self._context.products.get_data('compile_classpath')
-    self._context.products.safe_create_data('instrument_classpath', compile_classpath.copy)
+    runtime_classpath = self._context.products.get_data('runtime_classpath')
+    self._context.products.safe_create_data('instrument_classpath', runtime_classpath.copy)
     instrumentation_classpath = self._context.products.get_data('instrument_classpath')
 
     for target in targets:
@@ -542,7 +542,7 @@ class _Coverage(_JUnitRunner):
         instrumentation_classpath.remove_for_target(target, [(config, path)])
         instrumentation_classpath.add_for_target(target, [(config, new_path)])
         self._context.log.debug(
-          "compile_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+          "runtime_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
     return instrumentation_classpath
 
 
