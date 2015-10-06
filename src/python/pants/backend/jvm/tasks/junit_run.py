@@ -291,10 +291,13 @@ class _JUnitRunner(object):
 
           if target and (int_failures or int_errors):
             for testcase in xml.parsed.getElementsByTagName('testcase'):
-              failed_targets[target].add('{testclass}#{testname}'.format(
-                testclass=testcase.getAttribute('classname'),
-                testname=testcase.getAttribute('name'),
-              ))
+              test_failed = testcase.getElementsByTagName('failure')
+              test_errored = testcase.getElementsByTagName('error')
+              if test_failed or test_errored:
+                failed_targets[target].add('{testclass}#{testname}'.format(
+                  testclass=testcase.getAttribute('classname'),
+                  testname=testcase.getAttribute('name'),
+                ))
         except (XmlParser.XmlError, ValueError) as e:
           self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
 

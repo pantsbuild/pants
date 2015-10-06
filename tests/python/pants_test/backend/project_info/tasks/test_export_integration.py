@@ -13,21 +13,35 @@ from twitter.common.collections import maybe_list
 from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir
+from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
-class ExportIntegrationTest(PantsRunIntegrationTest):
+class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
   _confs_args = [
     '--export-libraries-sources',
     '--export-libraries-javadocs',
   ]
 
-  def run_export(self, test_target, workdir, load_libs=False, extra_args=None):
+  def run_export(self, test_target, workdir, load_libs=False, only_default=False, extra_args=None):
+    """Runs ./pants export ... and returns its json output.
+
+    :param string test_target: spec of the target to run on.
+    :param string workdir: working directory to run pants with.
+    :param bool load_libs: whether to load external libraries (of any conf).
+    :param bool only_default: if loading libraries, whether to only resolve the default conf, or to
+      additionally resolve sources and javadocs.
+    :param list extra_args: list of extra arguments for the pants invocation.
+    :return: the json output of the console task.
+    :rtype: dict
+    """
     export_out_file = os.path.join(workdir, 'export_out.txt')
     args = ['export',
             '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
+    if load_libs and only_default:
+      libs_args = []
     pants_run = self.run_pants_with_workdir(args + libs_args + (extra_args or []), workdir)
     self.assert_success(pants_run)
     self.assertTrue(os.path.exists(export_out_file),
@@ -38,6 +52,14 @@ class ExportIntegrationTest(PantsRunIntegrationTest):
       if not load_libs:
         self.assertIsNone(json_data.get('libraries'))
       return json_data
+
+  def evaluate_subtask(self, targets, workdir, load_extra_confs, extra_args, expected_jars):
+    json_data = self.run_export(targets, workdir, load_libs=True, only_default=not load_extra_confs,
+                                extra_args=extra_args)
+    for jar in expected_jars:
+      self.assertIn(jar, json_data['libraries'])
+      for path in json_data['libraries'][jar].values():
+        self.assertTrue(os.path.exists(path), 'Expected jar at {} to actually exist.'.format(path))
 
   def test_export_code_gen(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:

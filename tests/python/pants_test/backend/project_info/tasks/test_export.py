@@ -170,7 +170,9 @@ class ExportTest(ConsoleTaskTestBase):
   def execute_export(self, *specs):
     context = self.context(target_roots=[self.target(spec) for spec in specs])
     context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
-    return self.execute_console_task_given_context(context=context)
+    task = self.create_task(context)
+    return list(task.console_output(list(task.context.targets()),
+                                    context.products.get_data('compile_classpath')))
 
   def execute_export_json(self, *specs):
     return json.loads(''.join(self.execute_export(*specs)))

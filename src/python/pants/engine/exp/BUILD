@@ -28,7 +28,6 @@ python_library(
     ':mapper',
     ':objects',
     'src/python/pants/base:address',
-    'src/python/pants/util:memo',
   ]
 )
 

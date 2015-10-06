@@ -74,6 +74,8 @@ class CacheSetup(Subsystem):
              help='The gzip compression level (0-9) for created artifacts.')
     register('--max-entries-per-target', advanced=True, type=int, default=None,
              help='Maximum number of old cache files to keep per task target pair')
+    register('--pinger-timeout', advanced=True, type=float, default=0.5, help='number of seconds before pinger times out')
+    register('--pinger-tries', advanced=True, type=float, default=2, help='number of times pinger tries a cache')
 
   @classmethod
   def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
@@ -107,7 +109,7 @@ class CacheFactory(object):
     # Caches are supposed to be close, and we don't want to waste time pinging on no-op builds.
     # So we ping twice with a short timeout.
     # TODO: Make lazy.
-    self._pinger = pinger or Pinger(timeout=0.5, tries=2)
+    self._pinger = pinger or Pinger(timeout=self._options.pinger_timeout, tries=self._options.pinger_tries)
 
     # resolver is also close but failing to resolve might have broader impact than
     # single ping failure, therefore use a higher timeout with more retries.
@@ -210,18 +212,17 @@ class CacheFactory(object):
 
   def select_best_url(self, remote_spec):
     urls = remote_spec.split('|')
-    if len(urls) == 1:
-      return urls[0]  # No need to ping if we only have one option anyway.
-    netlocs = map(lambda url: urlparse.urlparse(url)[1], urls)
-    pingtimes = self._pinger.pings(netlocs)  # List of pairs (host, time in ms).
+    netloc_to_url = {urlparse.urlparse(url).netloc: url for url in urls}
+    pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
-    argmin = min(range(len(pingtimes)), key=lambda i: pingtimes[i][1])
-    best_url = urls[argmin]
-    if pingtimes[argmin][1] == Pinger.UNREACHABLE:
-      return None  # No reachable artifact caches.
+    best_url, ping_time = min(pingtimes, key=lambda t: t[1])
+    if ping_time == Pinger.UNREACHABLE:
+      self._log.warn('No reachable artifact caches.')
+      return None
+
     self._log.debug('Best artifact cache is {0}'.format(best_url))
-    return best_url
+    return netloc_to_url[best_url]
 
   def _do_create_artifact_cache(self, spec, action):
     """Returns an artifact cache for the specified spec.
