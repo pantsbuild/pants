@@ -7,8 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.android_task import AndroidTask
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.base.exceptions import TaskError
@@ -57,7 +60,7 @@ class DxCompile(AndroidTask, NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(DxCompile, cls).prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data('runtime_classpath')
     round_manager.require_data('unpacked_libraries')
 
   def __init__(self, *args, **kwargs):
@@ -69,7 +72,7 @@ class DxCompile(AndroidTask, NailgunTask):
   def cache_target_dirs(self):
     return True
 
-  def _render_args(self, outdir, classes):
+  def _render_args(self, outdir, entries):
     dex_file = os.path.join(outdir, self.DEX_NAME)
     args = []
     # Glossary of dx.jar flags.
@@ -79,7 +82,7 @@ class DxCompile(AndroidTask, NailgunTask):
     #   : '--output' tells the dx.jar where to put and what to name the created file.
     #            See comment on self.classes_dex for restrictions.
     args.extend(['--dex', '--no-strict', '--output={0}'.format(dex_file)])
-    args.extend(classes)
+    args.extend(entries)
     return args
 
   def _compile_dex(self, args, build_tools_version):
@@ -118,20 +121,25 @@ class DxCompile(AndroidTask, NailgunTask):
           class_files[class_file] = class_location
     return class_files.values()
 
-  def _gather_classes(self, target):
-    # Gather relevant classes from a walk of AndroidBinary's dependency graph.
-    classes_by_target = self.context.products.get_data('classes_by_target')
+  def _gather_dex_entries(self, target):
+    """Gather relevant dex inputs from a walk of AndroidBinary's dependency graph.
+t
+    The dx tool accepts 1) directories, 2) jars/zips, or 3) loose classfiles. The return value
+    will contain any or all of those.
+    """
+    classpath_products = self.context.products.get_data('runtime_classpath')
     unpacked_archives = self.context.products.get('unpacked_libraries')
 
-    gathered_classes = set()
+    gathered_entries = OrderedSet()
     class_files = {}
 
-    def get_classes(tgt):
-      # Classes allowed to be None for testing ease - TODO(mateor) update tests to not require this.
-      target_classes = classes_by_target.get(tgt) if classes_by_target else None
-      if target_classes:
-        for _, products in target_classes.abs_paths():
-          gathered_classes.update(products)
+    def get_entries(tgt):
+      # NB: This walk seemed to rely on the assumption that only internal targets had
+      # classes_by_target; that's preserved here by not looking at the classpath entries for
+      # external targets.
+      if not isinstance(JarLibrary):
+        cp_entries = ClasspathUtil.classpath_entries((tgt,), classpath_products, transitive=False)
+        gathered_entries.update(cp_entries)
 
       # Gather classes from the contents of unpacked libraries.
       unpacked = unpacked_archives.get(tgt)
@@ -147,8 +155,8 @@ class DxCompile(AndroidTask, NailgunTask):
                   "This likely indicates a version conflict in the target's dependencies.\n"
                   "\nTarget:\n{}\n{}".format(target, e))
 
-    target.walk(get_classes)
-    return gathered_classes
+    target.walk(get_entries)
+    return gathered_entries
 
   def execute(self):
     targets = self.context.targets(self.is_android_binary)
@@ -156,11 +164,11 @@ class DxCompile(AndroidTask, NailgunTask):
     with self.invalidated(targets) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if not vt.valid:
-          classes = self._gather_classes(vt.target)
-          if not classes:
+          entries = self._gather_dex_entries(vt.target)
+          if not entries:
             raise self.EmptyDexError("No classes were found for {}.".format(vt.target))
 
-          args = self._render_args(vt.results_dir, classes)
+          args = self._render_args(vt.results_dir, entries)
           self._compile_dex(args, vt.target.build_tools_version)
         self.context.products.get('dex').add(vt.target, vt.results_dir).append(self.DEX_NAME)
 
