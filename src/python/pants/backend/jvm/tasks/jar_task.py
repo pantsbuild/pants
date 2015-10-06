@@ -365,7 +365,7 @@ class JarBuilderTask(JarTask):
         if ClasspathUtil.is_jar(entry):
           self._jar.writejar(entry)
         elif ClasspathUtil.is_dir(entry):
-          for rel_file in ClasspathUtil.directory_contents(entry):
+          for rel_file in ClasspathUtil.classpath_entries_contents([entry]):
             self._jar.write(os.path.join(entry, rel_file), rel_file)
         else:
           # non-jar and non-directory classpath entries should be ignored

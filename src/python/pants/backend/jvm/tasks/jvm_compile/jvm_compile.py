@@ -783,7 +783,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       if ClasspathUtil.is_jar(entry):
         artifacts.append(entry)
       elif ClasspathUtil.is_dir(entry):
-        for rel_file in ClasspathUtil.directory_contents(entry):
+        for rel_file in ClasspathUtil.classpath_entries_contents([entry]):
           artifacts.append(os.path.join(entry, rel_file))
       else:
         # non-jar and non-directory classpath entries should be ignored

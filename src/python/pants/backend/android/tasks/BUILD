@@ -69,6 +69,7 @@ python_library(
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:android_task',
     'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/backend/jvm/tasks:unpack_jars',

@@ -88,34 +88,37 @@ class ClasspathUtil(object):
     :param confs: The list of confs for use by this classpath
     :param transitive: Whether to walk recursively from the given targets
     """
-    for entry in cls.classpath_entries(targets, classpath_products, confs, transitive=transitive):
+    classpath_entries = cls.classpath_entries(targets, classpath_products, confs, transitive=transitive)
+    for f in cls.classpath_entries_contents(classpath_entries):
+      yield f
+
+  @classmethod
+  def classpath_entries_contents(cls, classpath_entries):
+    """Provides a generator over the contents (classes/resources) of a classpath.
+
+    Subdirectories are included and differentiated via a trailing forward slash (for symmetry
+    across ZipFile.namelist and directory walks).
+
+    :param classpath_entries: A sequence of classpath_entries. Non-jars/dirs are ignored.
+    """
+    for entry in classpath_entries:
       if cls.is_jar(entry):
+        # Walk the jar namelist.
         with open_zip(entry, mode='r') as jar:
           for name in jar.namelist():
             yield name
       elif os.path.isdir(entry):
-        for f in cls.directory_contents(entry):
-          yield f
+        # Walk the directory, including subdirs.
+        def rel_walk_name(abs_sub_dir, name):
+          return fast_relpath(os.path.join(abs_sub_dir, name), entry)
+        for abs_sub_dir, dirnames, filenames in safe_walk(entry):
+          for name in dirnames:
+            yield '{}/'.format(rel_walk_name(abs_sub_dir, name))
+          for name in filenames:
+            yield rel_walk_name(abs_sub_dir, name)
       else:
         # non-jar and non-directory classpath entries should be ignored
         pass
-
-  @classmethod
-  def directory_contents(cls, classpath_entry):
-    """Provides a generator over the contents of a classpath directory entry.
-
-    Subdirectories are included and differentiated via a trailing forward slash (for symmetry
-    with ZipFile.namelist).
-
-    :param classpath_entry: A directory classpath entry
-    """
-    def rel_walk_name(abs_sub_dir, name):
-      return fast_relpath(os.path.join(abs_sub_dir, name), classpath_entry)
-    for abs_sub_dir, dirnames, filenames in safe_walk(classpath_entry):
-      for name in dirnames:
-        yield '{}/'.format(rel_walk_name(abs_sub_dir, name))
-      for name in filenames:
-        yield rel_walk_name(abs_sub_dir, name)
 
   @classmethod
   def classname_for_rel_classfile(cls, class_file_name):

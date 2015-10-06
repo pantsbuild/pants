@@ -11,6 +11,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.android_task import AndroidTask
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
@@ -123,7 +124,7 @@ class DxCompile(AndroidTask, NailgunTask):
 
   def _gather_dex_entries(self, target):
     """Gather relevant dex inputs from a walk of AndroidBinary's dependency graph.
-t
+
     The dx tool accepts 1) directories, 2) jars/zips, or 3) loose classfiles. The return value
     will contain any or all of those.
     """
@@ -137,7 +138,7 @@ t
       # NB: This walk seemed to rely on the assumption that only internal targets had
       # classes_by_target; that's preserved here by not looking at the classpath entries for
       # external targets.
-      if not isinstance(JarLibrary):
+      if not isinstance(tgt, JarLibrary):
         cp_entries = ClasspathUtil.classpath_entries((tgt,), classpath_products, transitive=False)
         gathered_entries.update(cp_entries)
 
@@ -148,7 +149,7 @@ t
         for archives in unpacked.values():
           for unpacked_dir in archives:
             try:
-              gathered_classes.update(self._filter_unpacked_dir(tgt, unpacked_dir, class_files))
+              gathered_entries.update(self._filter_unpacked_dir(tgt, unpacked_dir, class_files))
             except TaskError as e:
               raise self.DuplicateClassFileException(
                   "Attempted to add duplicate class files from separate libraries into dex file! "

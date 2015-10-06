@@ -9,6 +9,7 @@ import os
 from collections import defaultdict
 
 from pants.backend.android.tasks.dx_compile import DxCompile
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
 from pants.goal.products import MultipleRootedProducts
 from pants.util.dirutil import safe_rmtree, touch
@@ -17,7 +18,6 @@ from pants_test.android.test_android_base import TestAndroidBase, distribution
 
 class DxCompileTest(TestAndroidBase):
 
-  JAVA_CLASSES_LOC = os.path.join(get_buildroot(), '.pants.d/compile/java/classes')
   UNPACKED_LIBS_LOC = os.path.join(get_buildroot(), '.pants.d/unpack-jars/unpack-libs/explode-jars')
 
   @classmethod
@@ -54,56 +54,52 @@ class DxCompileTest(TestAndroidBase):
 
   def tearDown(self):
     # Delete any previously mocked files.
-    safe_rmtree(self.JAVA_CLASSES_LOC)
     safe_rmtree(os.path.join(self.UNPACKED_LIBS_LOC))
 
-  def _mock_classes_by_target(self, context, target, files):
-    # Create class files to mock the classes_by_target product.
-    class_products = context.products.get_data('classes_by_target',
-                                               lambda: defaultdict(MultipleRootedProducts))
-    java_agent_products = MultipleRootedProducts()
-    for class_file in files:
-      self.create_file(os.path.join(self.JAVA_CLASSES_LOC, class_file), '0xCAFEBABE')
-      java_agent_products.add_rel_paths(self.JAVA_CLASSES_LOC, ['{}'.format(class_file)])
-    class_products[target] = java_agent_products
-    return context
+  def _mock_products(self, context, target, class_filenames=None, unpacked_filenames=None):
+    # Create class files to mock the runtime_classpath product.
+    self.add_to_runtime_classpath(context, target, {f: '' for f in (class_filenames or [])})
 
-  def _mock_unpacked_libraries(self, context, target, unpacked):
     # Create class files to mock the unpack_libraries product.
-    for archive in unpacked:
+    for archive in (unpacked_filenames or []):
       relative_unpack_dir = (os.path.join(self.UNPACKED_LIBS_LOC, archive))
 
       unpacked_products = context.products.get('unpacked_libraries')
       unpacked_products.add(target, self.build_root).append(relative_unpack_dir)
-    return context
 
-  def test_gather_classes(self):
+  def _gather(self, context, target):
+    """Creates a task for the context, and yields the files that would be placed in the dex."""
+    gathered = []
+    for entry in self.create_task(context)._gather_dex_entries(target):
+      if ClasspathUtil.is_jar(entry) or ClasspathUtil.is_dir(entry):
+        gathered.extend(ClasspathUtil.classpath_entries_contents([entry]))
+      else:
+        gathered.append(entry)
+    return gathered
+
+  def test_gather_dex_entries(self):
     with self.android_binary() as binary:
-      # Add class files to classes_by_target product.
+      # Add class files to runtime_classpath product.
       context = self.context(target_roots=binary)
       classes = self.base_class_files('org.pantsbuild.android', 'example')
-      task_context = self._mock_classes_by_target(context, binary, classes)
-      dx_task = self.create_task(task_context)
+      self._mock_products(context, binary, classes)
 
-      # Test that the proper class files are gathered for inclusion in the dex file.
-      class_files = dx_task._gather_classes(binary)
+      # Test that the proper entries are gathered for inclusion in the dex file.
+      class_files = self._gather(context, binary)
       for filename in classes:
-        file_path = os.path.join(self.JAVA_CLASSES_LOC, filename)
-        self.assertIn(file_path, class_files)
+        self.assertIn(filename, class_files)
 
-  def test_gather_classes_from_deps(self):
-    # Make sure classes_by_target are being gathered from a binary's android_library dependencies.
+  def test_gather_dex_entries_from_deps(self):
+    # Make sure runtime_classpath are being gathered from a binary's android_library dependencies.
     with self.android_library() as android_library:
       with self.android_binary(dependencies=[android_library]) as binary:
         context = self.context(target_roots=binary)
         classes = self.base_class_files('org.pantsbuild.android', 'example')
-        task_context = self._mock_classes_by_target(context, android_library, classes)
-        dx_task = self.create_task(task_context)
+        self._mock_products(context, android_library, classes)
 
-        gathered_classes = dx_task._gather_classes(binary)
+        gathered_classes = self._gather(context, binary)
         for class_file in classes:
-          file_path = os.path.join(self.JAVA_CLASSES_LOC, class_file)
-          self.assertIn(file_path, gathered_classes)
+          self.assertIn(class_file, gathered_classes)
 
   def test_gather_unpacked_libs(self):
     # Ensure that classes from unpacked android_dependencies are included in classes bound for dex.
@@ -111,10 +107,9 @@ class DxCompileTest(TestAndroidBase):
       with self.android_binary(dependencies=[android_library]) as binary:
         context = self.context(target_roots=binary)
         classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-        task_context = self._mock_unpacked_libraries(context, android_library, classes)
-        dx_task = self.create_task(task_context)
+        self._mock_products(context, android_library, [], classes)
 
-        gathered_classes = dx_task._gather_classes(binary)
+        gathered_classes = self._gather(context, binary)
         for location in classes:
           for class_file in classes[location]:
             file_path = os.path.join(self.UNPACKED_LIBS_LOC, location, class_file)
@@ -124,18 +119,15 @@ class DxCompileTest(TestAndroidBase):
     with self.android_library() as library:
       with self.android_binary(dependencies=[library]) as binary:
         context = self.context(target_roots=binary)
-        classes_by_target = self.base_class_files('org.pantsbuild.android', 'example')
+        classes = self.base_class_files('org.pantsbuild.android', 'example')
         unpacked_classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-        task_context = self._mock_classes_by_target(context, library, classes_by_target)
-        both_context = self._mock_unpacked_libraries(task_context, library, unpacked_classes)
-        dx_task = self.create_task(both_context)
+        self._mock_products(context, library, classes, unpacked_classes)
 
-        gathered_classes = dx_task._gather_classes(binary)
+        gathered_classes = self._gather(context, binary)
 
         # Test that compiled classes are gathered for dex file.
-        for class_file in classes_by_target:
-          file_path = os.path.join(self.JAVA_CLASSES_LOC, class_file)
-          self.assertIn(file_path, gathered_classes)
+        for class_file in classes:
+          self.assertIn(class_file, gathered_classes)
 
         # Test that unpacked classes are gathered for dex file.
         for location in unpacked_classes:
@@ -145,46 +137,43 @@ class DxCompileTest(TestAndroidBase):
 
   # UnpackedLibraries are filtered by DxCompile to allow binaries to share unpacked libraries.
   # The following tests check the filter functionality.
-  def test_include_filter_in_gather_classes(self):
+  def test_include_filter_in_gather_dex_entries(self):
     with self.android_library(include_patterns=['**/a/**/Example.class']) as android_library:
       with self.android_binary(dependencies=[android_library]) as binary:
         context = self.context(target_roots=binary)
         classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-        task_context = self._mock_unpacked_libraries(context, android_library, classes)
-        dx_task = self.create_task(task_context)
+        self._mock_products(context, android_library, [], classes)
 
-        gathered_classes = dx_task._gather_classes(binary)
+        gathered_classes = self._gather(context, binary)
         for location in classes:
           included_file = os.path.join(self.UNPACKED_LIBS_LOC, location, 'a/b/c/Example.class')
           excluded_file = os.path.join(self.UNPACKED_LIBS_LOC, location, 'a/b/c/Hello.class')
           self.assertIn(included_file, gathered_classes)
           self.assertNotIn(excluded_file, gathered_classes)
 
-  def test_exclude_filter_in_gather_classes(self):
+  def test_exclude_filter_in_gather_dex_entries(self):
     with self.android_library(exclude_patterns=['**/a/**/Example.class']) as android_library:
       with self.android_binary(dependencies=[android_library]) as binary:
         context = self.context(target_roots=binary)
         classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-        task_context = self._mock_unpacked_libraries(context, android_library, classes)
-        dx_task = self.create_task(task_context)
+        self._mock_products(context, android_library, [], classes)
 
-        gathered_classes = dx_task._gather_classes(binary)
+        gathered_classes = self._gather(context, binary)
         for location in classes:
           included_file = os.path.join(self.UNPACKED_LIBS_LOC, location, 'a/b/c/Hello.class')
           excluded_file = os.path.join(self.UNPACKED_LIBS_LOC, location, 'a/b/c/Example.class')
           self.assertIn(included_file, gathered_classes)
           self.assertNotIn(excluded_file, gathered_classes)
 
-  def test_both_filters_in_gather_classes(self):
+  def test_both_filters_in_gather_dex_entries(self):
     with self.android_library(include_patterns=['**/a/**/Hello.class'],
                               exclude_patterns=['**/a/**/Example.class']) as android_library:
       with self.android_binary(dependencies=[android_library]) as binary:
         context = self.context(target_roots=binary)
         classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-        task_context = self._mock_unpacked_libraries(context, android_library, classes)
-        dx_task = self.create_task(task_context)
+        self._mock_products(context, android_library, [], classes)
 
-        gathered_classes = dx_task._gather_classes(binary)
+        gathered_classes = self._gather(context, binary)
         for location in classes:
           included_file = os.path.join(self.UNPACKED_LIBS_LOC, location, 'a/b/c/Hello.class')
           excluded_file = os.path.join(self.UNPACKED_LIBS_LOC, location, 'a/b/c/Example.class')
@@ -192,16 +181,18 @@ class DxCompileTest(TestAndroidBase):
           self.assertNotIn(excluded_file, gathered_classes)
 
   def test_no_matching_classes(self):
-    # No classes_by_target and no classes that pass the file filter.
+    # No classpath entries and no classes that pass the file filter.
     with self.android_library(include_patterns=['**/a/**/*.NONE']) as android_library:
       with self.android_binary(dependencies=[android_library]) as binary:
-        context = self.context(target_roots=binary)
-        classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-        task_context = self._mock_unpacked_libraries(context, android_library, classes)
-        dx_task = self.create_task(task_context)
+        with self.android_library(target_name='other') as other:
+          context = self.context(target_roots=binary)
+          # Initialize the classpath, but not for the relevant target.
+          self._mock_products(context, other, [])
+          # Then run for the empty target.
+          dx_task = self.create_task(context)
 
-        with self.assertRaises(DxCompile.EmptyDexError):
-          dx_task.execute()
+          with self.assertRaises(DxCompile.EmptyDexError):
+            dx_task.execute()
 
   # Test deduping and version conflicts within android_dependencies. The Dx tool returns failure if
   # more than one copy of a class is packed into the dex file and it is very easy to fetch
@@ -212,8 +203,8 @@ class DxCompileTest(TestAndroidBase):
       with self.android_binary(dependencies=[android_library]) as binary:
         context = self.context(target_roots=binary)
         unpacked_classes = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-        task_context = self._mock_unpacked_libraries(context, android_library, unpacked_classes)
-        dx_task = self.create_task(task_context)
+        self._mock_products(context, android_library, [], unpacked_classes)
+        dx_task = self.create_task(context)
 
         gathered_classes = dx_task._filter_unpacked_dir(android_library, self.UNPACKED_LIBS_LOC, {})
         for location in unpacked_classes:
@@ -227,13 +218,12 @@ class DxCompileTest(TestAndroidBase):
         context = self.context(target_roots=binary)
         first_unpacked = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
         duplicate_unpacked = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
-        task_context = self._mock_unpacked_libraries(context, library, first_unpacked)
-        both_context = self._mock_unpacked_libraries(task_context, library, duplicate_unpacked)
-        dx_task = self.create_task(both_context)
+        self._mock_products(context, library, [], first_unpacked)
+        self._mock_products(context, library, [], duplicate_unpacked)
 
-        gathered_classes = dx_task._gather_classes(binary)
-        # Should be just one copy of each class gathered.
-        self.assertEqual(len(gathered_classes), 3)
+        gathered_classes = self._gather(context, binary)
+        # Should be just one copy of each unpackaged class gathered.
+        self.assertEqual(len([c for c in gathered_classes if c.endswith('.class')]), 3)
 
   def test_dependency_version_conflict(self):
     with self.android_library() as android_library:
@@ -241,13 +231,12 @@ class DxCompileTest(TestAndroidBase):
         context = self.context(target_roots=binary)
         first_unpacked = self.base_unpacked_files('org.pantsbuild.android', 'example', '1.0')
         conflicting = self.base_unpacked_files('org.pantsbuild.android', 'example', '2.0')
-        task_context = self._mock_unpacked_libraries(context, android_library, first_unpacked)
-        both_context = self._mock_unpacked_libraries(task_context, android_library, conflicting)
-        dx_task = self.create_task(both_context)
+        self._mock_products(context, android_library, [], first_unpacked)
+        self._mock_products(context, android_library, [], conflicting)
 
         # Raises an exception when gathering classes with conflicting version numbers.
         with self.assertRaises(DxCompile.DuplicateClassFileException):
-          dx_task._gather_classes(binary)
+          list(self._gather(context, binary))
 
   # Test misc. methods
   def test_render_args(self):
