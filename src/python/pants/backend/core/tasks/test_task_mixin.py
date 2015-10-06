@@ -62,22 +62,23 @@ class TestTaskMixin(object):
 
     if not self.get_options().timeouts:
       return None
+
+    timeout_default = self.get_options().timeout_default
+
+    # Gather up all the timeouts.
+    timeouts = [self._timeout_for_target(target) for target in targets]
+
+    # If any target's timeout is None or 0, then set it to the default timeout
+    timeouts_w_default = [timeout if timeout else timeout_default for timeout in timeouts]
+
+    # Even after we've done that, there may be a 0 or None in the timeout list if the
+    # default timeout is set to 0 or None. So if that's the case, then the timeout is
+    # disabled
+    if 0 in timeouts_w_default or None in timeouts:
+      return None
     else:
-      timeout_default = self.get_options().timeout_default
-
-      # Gather up all the timeouts. If any target's timeout is not set or 0, then set it to the default timeout
-      timeouts = [self._timeout_for_target(target)
-                  if self._timeout_for_target(target) else timeout_default for target in targets]
-
-      # Even after we've done that, there may be a 0 or None in the timeout list if the
-      # default timeout is set to 0 or None. So if that's the case, then the timeout is
-      # disabled
-      if 0 in timeouts or None in timeouts:
-        return None
-      else:
-        # Sum the timeouts for all the targets, using the default timeout where one is not set
-        return sum(timeouts)
-
+      # Sum the timeouts for all the targets, using the default timeout where one is not set
+      return sum(timeouts_w_default)
 
   def _get_targets(self):
     """This is separated out so it can be overridden for testing purposes.
