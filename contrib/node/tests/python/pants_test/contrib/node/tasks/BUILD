@@ -2,7 +2,23 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name='tasks',
+  name='all',
+  dependencies=[
+    ':integration',
+    ':unit',
+  ]
+)
+
+target(
+  name='integration',
+  dependencies=[
+    ':node_repl_integration',
+    ':npm_resolve_integration',
+  ]
+)
+
+target(
+  name='unit',
   dependencies=[
     ':node_task',
     ':npm_resolve',
@@ -12,6 +28,14 @@ target(
 python_tests(
   name='node_repl_integration',
   sources=['test_node_repl_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ]
+)
+
+python_tests(
+  name='npm_resolve_integration',
+  sources=['test_npm_resolve_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
   ]

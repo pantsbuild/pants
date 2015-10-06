@@ -210,18 +210,17 @@ class CacheFactory(object):
 
   def select_best_url(self, remote_spec):
     urls = remote_spec.split('|')
-    if len(urls) == 1:
-      return urls[0]  # No need to ping if we only have one option anyway.
-    netlocs = map(lambda url: urlparse.urlparse(url)[1], urls)
-    pingtimes = self._pinger.pings(netlocs)  # List of pairs (host, time in ms).
+    netloc_to_url = {urlparse.urlparse(url).netloc: url for url in urls}
+    pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
-    argmin = min(range(len(pingtimes)), key=lambda i: pingtimes[i][1])
-    best_url = urls[argmin]
-    if pingtimes[argmin][1] == Pinger.UNREACHABLE:
-      return None  # No reachable artifact caches.
+    best_url, ping_time = min(pingtimes, key=lambda t: t[1])
+    if ping_time == Pinger.UNREACHABLE:
+      self._log.warn('No reachable artifact caches.')
+      return None
+
     self._log.debug('Best artifact cache is {0}'.format(best_url))
-    return best_url
+    return netloc_to_url[best_url]
 
   def _do_create_artifact_cache(self, spec, action):
     """Returns an artifact cache for the specified spec.
