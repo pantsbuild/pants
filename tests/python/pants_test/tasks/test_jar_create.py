@@ -166,8 +166,8 @@ class JarCreateExecuteTest(JarCreateTestBase):
     context = self.context()
 
     # Create classpaths for other libraries, in order to initialize the product.
-    self.add_to_runtime_classpath(context, self.sl, dict())
-    self.add_to_runtime_classpath(context, self.res, dict('r.txt.transformed': ''))
+    self.add_to_runtime_classpath(context, self.sl, {})
+    self.add_to_runtime_classpath(context, self.res, {'r.txt.transformed': ''})
 
     self.execute(context)
 
