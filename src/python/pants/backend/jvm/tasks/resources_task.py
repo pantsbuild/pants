@@ -10,8 +10,8 @@ from abc import abstractmethod
 from collections import defaultdict
 
 from pants.backend.core.tasks.task import Task
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.base.build_environment import get_buildroot
-from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.util.dirutil import relativize_path, safe_mkdir
 
@@ -25,8 +25,7 @@ class ResourcesTask(Task):
 
   @classmethod
   def product_types(cls):
-    # TODO: needs to expose a runtime_classpath product
-    return ['resources_by_target']
+    return ['runtime_classpath']
 
   @classmethod
   def register_options(cls, register):
@@ -47,8 +46,7 @@ class ResourcesTask(Task):
     # Tracked and returned for use in tests.
     processed_targets = []
 
-    self.context.products.safe_create_data('resources_by_target',
-                                           lambda: defaultdict(MultipleRootedProducts))
+    compile_classpath = self.context.products.get_data('compile_classpath')
 
     all_relevant_resources_targets = self.find_all_relevant_resources_targets()
     if not all_relevant_resources_targets:
@@ -67,17 +65,13 @@ class ResourcesTask(Task):
             processed_targets.append(invalid_target)
           vts.update()
 
-    resources_by_target = self.context.products.get_data('resources_by_target')
-    compile_classpath = self.context.products.get_data('compile_classpath')
+    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
     for resources_target in all_relevant_resources_targets:
       chroot = self.compute_target_dir(resources_target)
       relative_resource_paths = self.relative_resource_paths(resources_target, chroot)
       if relative_resource_paths:
         for conf in self.get_options().confs:
-          # TODO(John Sirois): Introduce the notion of RuntimeClasspath and populate that product
-          # instead of mutating the compile_classpath.
-          compile_classpath.add_for_target(resources_target, [(conf, chroot)])
-        resources_by_target[resources_target].add_rel_paths(chroot, relative_resource_paths)
+          runtime_classpath.add_for_target(resources_target, [(conf, chroot)])
 
     return processed_targets
 

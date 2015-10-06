@@ -50,11 +50,6 @@ class JvmRun(JvmTask):
   def supports_passthru_args(cls):
     return True
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(JvmRun, cls).prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
-
   def __init__(self, *args, **kwargs):
     super(JvmRun, self).__init__(*args, **kwargs)
     self.only_write_cmd_line = self.get_options().only_write_cmd_line

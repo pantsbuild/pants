@@ -475,9 +475,9 @@ python_library(
   name = 'resources_task',
   sources = ['resources_task.py'],
   dependencies = [
+    ':classpath_products',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:build_environment',
-    'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/util:dirutil',
   ],

@@ -341,7 +341,7 @@ class JarBuilderTask(JarTask):
       Later, in execute context, the `create_jar_builder` method can be called to get back a
       prepared ``JarTask.JarBuilder`` ready for use.
       """
-      round_manager.require_data('compile_classpath')
+      round_manager.require_data('runtime_classpath')
 
     def __init__(self, context, jar):
       self._context = context
@@ -357,7 +357,7 @@ class JarBuilderTask(JarTask):
       :returns: The list of targets that actually contributed classes or resources or both to the
         jar.
       """
-      compile_classpath = self._context.products.get_data('compile_classpath')
+      classpath_products = self._context.products.get_data('runtime_classpath')
 
       targets_added = []
 
@@ -376,7 +376,7 @@ class JarBuilderTask(JarTask):
         tgts = [tgt] + tgt.resources if tgt.has_resources else [tgt]
         target_classpath = ClasspathUtil.classpath_entries(
             tgts,
-            compile_classpath,
+            classpath_products,
             ('default',),
             transitive=False)
 

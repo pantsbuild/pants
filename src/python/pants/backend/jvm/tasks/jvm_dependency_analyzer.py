@@ -41,7 +41,7 @@ class JvmDependencyAnalyzer(Task):
   def prepare(cls, options, round_manager):
     super(JvmDependencyAnalyzer, cls).prepare(options, round_manager)
     if not cls.skip(options):
-      round_manager.require_data('compile_classpath')
+      round_manager.require_data('runtime_classpath')
       round_manager.require_data('product_deps_by_src')
 
   @memoized_property
@@ -54,7 +54,7 @@ class JvmDependencyAnalyzer(Task):
     "canonical" target will be the first one in the list of targets.
     """
     targets_by_file = defaultdict(OrderedSet)
-    compile_classpath = self.context.products.get_data('compile_classpath')
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
 
     # Compute src -> target.
     self.context.log.debug('Mapping sources...')
@@ -77,13 +77,13 @@ class JvmDependencyAnalyzer(Task):
       # Classpath content.
       files = ClasspathUtil.classpath_contents(
           (target,),
-          compile_classpath,
+          runtime_classpath,
           confs,
           transitive=False)
       # And jars; for binary deps, zinc doesn't emit precise deps (yet).
       jars = ClasspathUtil.classpath_entries(
           (target,),
-          compile_classpath,
+          runtime_classpath,
           confs,
           transitive=False,
           jars_only=True)

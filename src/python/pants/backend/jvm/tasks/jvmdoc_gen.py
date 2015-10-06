@@ -66,11 +66,6 @@ class JvmdocGen(JvmTask):
   def product_types(cls):
     return [cls.jvmdoc().product_type]
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(JvmdocGen, cls).prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
-
   def __init__(self, *args, **kwargs):
     super(JvmdocGen, self).__init__(*args, **kwargs)
 

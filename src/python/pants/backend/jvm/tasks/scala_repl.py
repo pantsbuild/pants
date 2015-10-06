@@ -26,11 +26,6 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     return super(ScalaRepl, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
-  def prepare(cls, options, round_manager):
-    super(ScalaRepl, cls).prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
-
-  @classmethod
   def select_targets(cls, target):
     return isinstance(target, (JarLibrary, JvmTarget))
 

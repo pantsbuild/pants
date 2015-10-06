@@ -62,7 +62,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   def prepare(cls, options, round_manager):
     super(JvmDependencyUsage, cls).prepare(options, round_manager)
     round_manager.require_data('classes_by_source')
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data('runtime_classpath')
     round_manager.require_data('product_deps_by_src')
 
   @classmethod
@@ -128,10 +128,10 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       rel_src = fast_relpath(dep, buildroot)
       return set(p for _, paths in classes_by_source[rel_src].rel_paths() for p in paths)
 
-  def _count_products(self, compile_classpath, target):
+  def _count_products(self, classpath_products, target):
     contents = ClasspathUtil.classpath_contents(
         (target,),
-        compile_classpath,
+        classpath_products,
         ('default',),
         transitive=False)
     # Generators don't implement len.
@@ -145,7 +145,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
 
     # Initialize all Nodes.
     classes_by_source = self.context.products.get_data('classes_by_source')
-    compile_classpath = self.context.products.get_data('compile_classpath')
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
     nodes = dict()
     for target in targets:
@@ -153,7 +153,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
         continue
       # Create or extend a Node for the concrete version of this target.
       concrete_target = target.concrete_derived_from
-      products_total = self._count_products(compile_classpath, target)
+      products_total = self._count_products(runtime_classpath, target)
       node = nodes.get(concrete_target)
       if not node:
         node = nodes.setdefault(concrete_target, Node(concrete_target))

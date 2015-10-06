@@ -47,12 +47,6 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
                           ],
                           classpath_spec='//:benchmark-java-allocation-instrumenter-2.1')
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(BenchmarkRun, cls).prepare(options, round_manager)
-
-    round_manager.require_data('compile_classpath')
-
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)
     # TODO(Steve Gury):

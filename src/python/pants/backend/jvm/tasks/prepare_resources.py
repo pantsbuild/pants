@@ -23,18 +23,13 @@ class PrepareResources(ResourcesTask):
   dedicated, isolated resource chroots for use in the classpath as well as for packaging purposes.
   """
 
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(ResourcesTask, cls).prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
-
   def __init__(self, *args, **kwargs):
     super(PrepareResources, self).__init__(*args, **kwargs)
     self._buildroot = get_buildroot()
 
   def find_all_relevant_resources_targets(self):
     # NB: Ordering isn't relevant here, because it is applied during the dep walk to
-    # consume from the compile_classpath.
+    # consume from the runtime_classpath.
     def is_jvm_target(target):
       return isinstance(target, JvmTarget)
     jvm_targets = self.context.targets(predicate=is_jvm_target)
