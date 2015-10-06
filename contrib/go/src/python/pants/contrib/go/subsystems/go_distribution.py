@@ -32,7 +32,7 @@ class GoDistribution(object):
       register('--supportdir', advanced=True, default='bin/go',
                help='Find the go distributions under this dir.  Used as part of the path to lookup '
                     'the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', advanced=True, default='1.5',
+      register('--version', advanced=True, default='1.5.1',
                help='Go distribution version.  Used as part of the path to lookup the distribution '
                     'with --binary-util-baseurls and --pants-bootstrapdir')
 
