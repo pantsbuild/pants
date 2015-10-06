@@ -44,7 +44,7 @@ class TestTaskMixin(object):
         raise TestFailedTaskError(failed_targets=test_targets)
 
   def _timeout_for_target(self, target):
-    return getattr(self, 'timeout', None)
+    return getattr(target, 'timeout', None)
 
   def _timeout_for_targets(self, targets):
     """
@@ -54,7 +54,7 @@ class TestTaskMixin(object):
     aggregate all the target specific timeouts into one value that will cover all the tests. If some targets
     have no timeout configured (or set to 0), their timeout will be set to the default timeout.
     If there is no default timeout, or if it is set to zero, there will be no timeout, if any of the test targets
-    have a timeout set to 0 or no itmeout configured.
+    have a timeout set to 0 or no timeout configured.
 
     :param targets: list of test targets
     :return: timeout to cover all the targets, in seconds
@@ -74,7 +74,7 @@ class TestTaskMixin(object):
     # Even after we've done that, there may be a 0 or None in the timeout list if the
     # default timeout is set to 0 or None. So if that's the case, then the timeout is
     # disabled
-    if 0 in timeouts_w_default or None in timeouts:
+    if 0 in timeouts_w_default or None in timeouts_w_default:
       return None
     else:
       # Sum the timeouts for all the targets, using the default timeout where one is not set

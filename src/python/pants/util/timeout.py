@@ -41,7 +41,7 @@ class Timeout(object):
       self._timer.start()
 
   def __exit__(self, type_, value, traceback):
-    if isinstance(type_, KeyboardInterrupt):
+    if type_ is KeyboardInterrupt:
       raise TimeoutReached
     elif self._timer is not None:
       self._timer.cancel()

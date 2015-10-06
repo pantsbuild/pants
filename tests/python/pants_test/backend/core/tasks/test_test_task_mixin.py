@@ -5,11 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.targets.test_target_mixin import TestTargetMixin
 from pants.backend.core.tasks.task import TaskBase
 from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.base.exceptions import TestFailedTaskError
-from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -28,8 +26,8 @@ class TestTaskMixinTest(TaskTestBase):
     class TestTaskMixinTask(TestTaskMixin, TaskBase):
       call_list = []
 
-      def _execute(self, targets):
-        self.call_list.append(['_execute', targets])
+      def _execute(self, test_targets, all_targets):
+        self.call_list.append(['_execute', test_targets, all_targets])
 
       def _get_targets(self):
         return [targetA, targetB]
@@ -58,7 +56,7 @@ class TestTaskMixinTest(TaskTestBase):
     self.assertIn(['target_filter', targetA], task.call_list)
     self.assertIn(['target_filter', targetB], task.call_list)
     self.assertIn(['_validate_target', targetB], task.call_list)
-    self.assertIn(['_execute', [targetB]], task.call_list)
+    self.assertIn(['_execute', [targetB], [targetA, targetB]], task.call_list)
 
   def test_execute_skip(self):
     # Set the skip option
@@ -74,7 +72,7 @@ class TestTaskMixinTest(TaskTestBase):
     there is no timeout for the entire run
     """
 
-    self.set_options(timeouts=True, default_timeout=None)
+    self.set_options(timeouts=True, timeout_default=None)
     task = self.create_task(self.context())
 
     self.assertIsNone(task._timeout_for_targets([targetA, targetB]))
@@ -85,7 +83,7 @@ class TestTaskMixinTest(TaskTestBase):
 
     """
 
-    self.set_options(timeouts=False, default_timeout=2)
+    self.set_options(timeouts=False, timeout_default=2)
     task = self.create_task(self.context())
 
     self.assertIsNone(task._timeout_for_targets([targetA, targetB]))
@@ -95,7 +93,7 @@ class TestTaskMixinTest(TaskTestBase):
     If there is a default timeout, use that for targets which have no timeout set
 
     """
-    self.set_options(timeouts=True, default_timeout=2)
+    self.set_options(timeouts=True, timeout_default=2)
     task = self.create_task(self.context())
 
     self.assertEquals(task._timeout_for_targets([targetA, targetB]), 3)
@@ -107,15 +105,14 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     class TestTaskMixinTask(TestTaskMixin, TaskBase):
       call_list = []
 
-      def _execute(self, targets):
+      def _execute(self, test_targets, all_targets):
         import time
         time.sleep(2)
-        self.call_list.append(['_execute', targets])
+        self.call_list.append(['_execute', test_targets])
 
       def _get_targets(self):
         return [targetB]
 
-      @property
       def _test_target_filter(self):
         def target_filter(target):
           return True
@@ -139,4 +136,4 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     task = self.create_task(self.context())
 
     task.execute()
-    self.assertIn(['_execute', [targetB]], task.call_list)
+    self.assertIn(['_execute', [targetB], [targetB]], task.call_list)
