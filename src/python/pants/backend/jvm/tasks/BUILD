@@ -191,6 +191,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/invalidation',
