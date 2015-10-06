@@ -14,9 +14,11 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -115,3 +117,15 @@ class JvmToolTaskTestBase(TaskTestBase):
     task = self.prepare_execute(context)
     task.execute()
     return task
+
+  def add_to_runtime_classpath(self, context, tgt, files_dict):
+    """Creates and adds the given files to the classpath for the given target under a temp path."""
+    compile_classpath = context.products.get_data('runtime_classpath', ClasspathProducts)
+    # Create a temporary directory under the target id, then dump all files.
+    target_dir = os.path.join(self.test_workdir, tgt.id)
+    safe_mkdir(target_dir)
+    classpath_dir = safe_mkdtemp(dir=target_dir)
+    for rel_path, content in files_dict.items():
+      safe_file_dump(os.path.join(classpath_dir, rel_path), content)
+    # Add to the classpath.
+    compile_classpath.add_for_target(tgt, [('default', classpath_dir)])

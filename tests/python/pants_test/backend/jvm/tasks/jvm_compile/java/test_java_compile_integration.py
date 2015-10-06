@@ -16,13 +16,7 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class JavaCompileIntegrationTest(BaseCompileIT):
 
-  def test_resources_by_target_and_partitions(self):
-    """
-    This tests that resources_by_target interacts correctly with
-    partitions; we want to make sure that even targets that are outside
-    the current partition don't cause crashes when they are looked up in
-    resources_by_targets (see jvm_compile.py).
-    """
+  def test_basic_binary(self):
     with temporary_dir() as cache_dir:
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 

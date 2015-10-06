@@ -144,7 +144,7 @@ def register_goals():
   # Compilation.
   jvm_compile = GroupTask.named(
       'jvm-compilers',
-      product_type=['classes_by_target', 'classes_by_source', 'resources_by_target', 'product_deps_by_src'],
+      product_type=['runtime_classpath', 'classes_by_source', 'product_deps_by_src'],
       flag_namespace=['compile'])
 
   # It's important we add AptCompile before other java-compiling tasks since the first selector wins,

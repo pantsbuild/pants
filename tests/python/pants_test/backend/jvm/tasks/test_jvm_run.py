@@ -31,7 +31,7 @@ class JvmRunTest(TaskTestBase):
     context = self.context(target_roots=[jvm_binary])
     jvm_run = self.create_task(context)
     self._cmdline_classpath = [os.path.join(self.build_root, c) for c in ['bob', 'fred']]
-    self.populate_compile_classpath(context=jvm_run.context, classpath=self._cmdline_classpath)
+    self.populate_runtime_classpath(context=jvm_run.context, classpath=self._cmdline_classpath)
     with temporary_dir() as pwd:
       with pushd(pwd):
         cmdline_file = os.path.join(pwd, 'a')

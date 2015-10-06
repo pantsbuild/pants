@@ -24,7 +24,7 @@ class JvmTask(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data('runtime_classpath')
 
   def __init__(self, *args, **kwargs):
     super(JvmTask, self).__init__(*args, **kwargs)
@@ -40,12 +40,12 @@ class JvmTask(Task):
     :param targets: the targets for which to build the classpath.
     :param classpath_prefix: optional additional entries to prepend to the classpath.
     :param classpath_product: an optional ClasspathProduct from which to build the classpath. if not
-    specified, the compile_classpath will be used.
+    specified, the runtime_classpath will be used.
     :return: a list of classpath strings.
     """
     classpath = list(classpath_prefix) if classpath_prefix else []
 
-    classpath_product = classpath_product or self.context.products.get_data('compile_classpath')
+    classpath_product = classpath_product or self.context.products.get_data('runtime_classpath')
 
     classpath_for_targets = ClasspathUtil.classpath_entries(
       targets, classpath_product, self.confs)
