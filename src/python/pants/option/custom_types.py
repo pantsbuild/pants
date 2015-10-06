@@ -28,6 +28,11 @@ def list_option(s):
   return _convert(s, (list, tuple))
 
 
+def target_option(s):
+  """Same type as 'str', but indicates a single target spec."""
+  return _convert(s, str)
+
+
 def target_list_option(s):
   """Same type as 'list_option', but indicates list contents are target specs."""
   return _convert(s, (list, tuple))

@@ -10,6 +10,7 @@ from textwrap import dedent
 
 from pants.base.dep_lookup_error import DepLookupError
 from pants.base.exceptions import TaskError
+from pants.option.custom_types import target_option
 
 
 class JvmToolMixin(object):
@@ -98,6 +99,7 @@ class JvmToolMixin(object):
 
     register('--{}'.format(key),
              advanced=True,
+             type=target_option,
              default='//:{}'.format(key) if classpath_spec is None else classpath_spec,
              help=help,
              fingerprint=fingerprint)
