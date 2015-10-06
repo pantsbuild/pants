@@ -39,7 +39,7 @@ class TestTaskMixin(object):
       timeout = self._timeout_for_targets(test_targets)
       try:
         with Timeout(timeout):
-          self._execute(test_targets, all_targets)
+          self._execute(all_targets)
       except TimeoutReached:
         raise TestFailedTaskError(failed_targets=test_targets)
 
@@ -112,7 +112,7 @@ im
     """
 
   @abstractmethod
-  def _execute(self, test_targets, all_targets):
+  def _execute(self, all_targets):
     """Actually goes ahead and runs the tests for the targets.
 
     :param targets: list of the targets whose tests are to be run
