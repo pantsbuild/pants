@@ -12,7 +12,7 @@ import pytest
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
                                    MissingRemovalVersionError, PastRemovalVersionError,
-                                   check_deprecated_semver, deprecated)
+                                   check_deprecated_semver, deprecated, deprecated_module)
 from pants.version import VERSION
 
 
@@ -28,7 +28,7 @@ def _test_deprecation():
       assert isinstance(warning.message, DeprecationWarning)
       return warning.message
 
-    warnings.simplefilter("always")
+    warnings.simplefilter('always')
     assert len(seen_warnings) == 0
     yield assert_deprecation_warning
     assert_deprecation_warning()
@@ -68,6 +68,18 @@ def test_deprecated_property():
 
   with _test_deprecation():
     assert expected_return == Test().deprecated_property
+
+
+def test_deprecated_module():
+  with _test_deprecation() as extract_deprecation_warning:
+    # Note: Attempting to import here a dummy module that just calls deprecated_module() does not
+    # properly trigger the deprecation, due to a bad interaction with pytest that I've not fully
+    # understood.  But we trust python to correctly execute modules on import, so just testing a
+    # direct call of deprecated_module() here is fine.
+    deprecated_module(FUTURE_VERSION, hint_message='Do not use me.')
+    warning_message = str(extract_deprecation_warning())
+    assert 'Module is deprecated' in warning_message
+    assert 'Do not use me' in warning_message
 
 
 def test_deprecation_hint():

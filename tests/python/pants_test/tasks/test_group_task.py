@@ -10,7 +10,7 @@ import uuid
 
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.tasks.group_task import GroupIterator, GroupMember, GroupTask
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.engine.round_manager import RoundManager
 from pants_test.base_test import BaseTest
 

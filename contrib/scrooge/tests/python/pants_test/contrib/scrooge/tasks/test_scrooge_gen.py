@@ -14,8 +14,8 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -132,15 +132,14 @@ class ScroogeGenTest(TaskTestBase):
     try:
       Context.add_new_target = MagicMock()
       task.execute()
-      relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
-      spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
-      address = Address.parse(spec=spec)
-      Context.add_new_target.assert_called_once_with(address,
-                                                     library_type,
-                                                     sources=sources,
-                                                     excludes=OrderedSet(),
+      address = task.get_synthetic_address(target)
+
+      Context.add_new_target.assert_called_once_with(address=address,
+                                                     target_type=library_type,
                                                      dependencies=OrderedSet(),
                                                      provides=None,
+                                                     sources=[],
                                                      derived_from=target)
+
     finally:
       Context.add_new_target = saved_add_new_target

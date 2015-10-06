@@ -13,7 +13,7 @@ from pants.backend.jvm.targets.jvm_binary import (Duplicate, JarRules, JvmBinary
                                                   Skip)
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload_field import FingerprintedField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 

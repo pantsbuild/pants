@@ -15,7 +15,7 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
 

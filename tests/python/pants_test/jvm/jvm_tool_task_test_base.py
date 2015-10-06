@@ -12,9 +12,10 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.build_environment import get_pants_cachedir
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.ivy.bootstrapper import Bootstrapper
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -32,6 +33,7 @@ class JvmToolTaskTestBase(TaskTestBase):
       objects={
         'exclude': Exclude,
         'jar': JarDependency,
+        'scala_jar': ScalaJarDependency,
       },
     )
 

@@ -12,6 +12,7 @@ import tempfile
 from xml.dom import minidom
 
 from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.project_info.tasks.ide_gen import IdeGen, Project
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
@@ -223,6 +224,14 @@ class IdeaGen(IdeGen):
 
     exclude_folders += self.get_options().exclude_folders
 
+    java_language_level = None
+    for target in project.targets:
+      if isinstance(target, JvmTarget):
+        if java_language_level is None or java_language_level < target.platform.source_level:
+          java_language_level = target.platform.source_level
+    if java_language_level is not None:
+      java_language_level = 'JDK_{0}_{1}'.format(*java_language_level.components[:2])
+
     configured_module = TemplateData(
       root_dir=get_buildroot(),
       path=self.module_filename,
@@ -241,6 +250,7 @@ class IdeaGen(IdeGen):
       annotation_processing=self.annotation_processing_template,
       extra_components=[],
       exclude_folders=exclude_folders,
+      java_language_level=java_language_level,
     )
 
     outdir = os.path.abspath(self.intellij_output_dir)

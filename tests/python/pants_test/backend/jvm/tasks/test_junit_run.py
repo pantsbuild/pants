@@ -14,8 +14,8 @@ from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TargetDefinitionException, TaskError
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.products import MultipleRootedProducts
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
@@ -175,3 +175,15 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'must include a non-empty set of sources'):
       task.execute()
+
+  def test_allow_empty_sources(self):
+    self.add_to_build_file('foo', dedent('''
+        java_tests(
+          name='empty',
+          sources=[],
+        )
+        '''
+    ))
+    self.set_options(allow_empty_sources=True)
+    task = self.create_task(self.context(target_roots=[self.target('foo:empty')]))
+    task.execute()

@@ -10,7 +10,8 @@ from textwrap import dedent
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
@@ -18,9 +19,15 @@ class JavaProtobufLibraryTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases(targets={'java_protobuf_library': JavaProtobufLibrary,
-                                     'jar_library': JarLibrary},
-                            objects={'jar': JarDependency})
+    return BuildFileAliases(
+        targets={
+          'java_protobuf_library': JavaProtobufLibrary,
+          'jar_library': JarLibrary},
+        objects={
+          'jar': JarDependency,
+          'scala_jar': ScalaJarDependency,
+        }
+      )
 
   def test_empty(self):
     self.add_to_build_file('BUILD', dedent('''

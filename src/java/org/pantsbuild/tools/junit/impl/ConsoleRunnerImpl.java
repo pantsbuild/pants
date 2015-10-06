@@ -473,7 +473,7 @@ public class ConsoleRunnerImpl {
         if (desc.isSuite()) {
           return true;
         }
-        String descString = desc.getDisplayName();
+        String descString = Util.getPantsFriendlyDisplayName(desc);
         // Note that currently even when parallelThreads is true, the first time this
         // is called in serial order, by our own iterator below.
         synchronized (this) {
@@ -498,7 +498,7 @@ public class ConsoleRunnerImpl {
     class AlphabeticComparator implements Comparator<Description> {
       @Override
       public int compare(Description o1, Description o2) {
-        return o1.getDisplayName().compareTo(o2.getDisplayName());
+        return Util.getPantsFriendlyDisplayName(o1).compareTo(Util.getPantsFriendlyDisplayName(o2));
       }
     }
 

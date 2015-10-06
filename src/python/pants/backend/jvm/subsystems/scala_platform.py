@@ -25,10 +25,29 @@ class ScalaPlatform(JvmToolMixin, Subsystem):
     # dependency for the scala_library target.
     register('--runtime', advanced=True, type=list_option, default=['//:scala-library'],
              help='Target specs pointing to the scala runtime libraries.')
+    # TODO: The choice of a platform version should likely drive automatic selection of the
+    # appropriate scala-library and scala-compiler dependencies.
+    register('--version', advanced=True, default='2.10',
+             help='The scala "platform version", which is suffixed onto all published '
+                  'libraries. This should match the declared compiler/library versions.')
     cls.register_jvm_tool(register, 'scalac', classpath_spec='//:scala-compiler')
 
   def compiler_classpath(self, products):
     return self.tool_classpath_from_products(products, 'scalac', scope=self.options_scope)
+
+  @property
+  def version(self):
+    return self.get_options().version
+
+  def suffix_version(self, name):
+    """Appends the platform version to the given artifact name.
+
+    Also validates that the name doesn't already end with the version.
+    """
+    if name.endswith(self.version):
+      raise ValueError('The name "{0}" should not be suffixed with the scala platform version '
+                      '({1}): it will be added automatically.'.format(name, self.version))
+    return '{0}_{1}'.format(name, self.version)
 
   @property
   def runtime(self):

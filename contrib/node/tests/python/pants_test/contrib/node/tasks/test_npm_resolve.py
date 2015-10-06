@@ -10,7 +10,7 @@ import os
 from textwrap import dedent
 
 from pants.base.source_root import SourceRoot
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_module import NodeModule

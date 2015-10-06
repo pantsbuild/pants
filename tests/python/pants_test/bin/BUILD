@@ -4,8 +4,22 @@
 target(
   name='bin',
   dependencies=[
+    ':extension_loader',
     ':goal_runner',
     ':plugin_resolver',
+    ':repro',
+  ]
+)
+
+python_tests(
+  name = 'extension_loader',
+  sources = ['test_extension_loader.py'],
+  dependencies = [
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'src/python/pants/goal',
+    'src/python/pants/goal:task_registrar',
+    'src/python/pants/subsystem',
   ]
 )
 

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import os
 from collections import namedtuple
 
@@ -95,11 +94,11 @@ class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
   """
 
 
-class Address(AbstractClass):
+class Address(object):
   """A target address.
 
   An address is a unique name representing a
-  :class:`pants.base.target.Target`. It's composed of the
+  :class:`pants.build_graph.target.Target`. It's composed of the
   path from the root of the repo to the Target plus the target name.
 
   While not their only use, a noteworthy use of addresses is specifying

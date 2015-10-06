@@ -25,18 +25,18 @@ jar_library(name = 'scala-repl',
 
 jar_library(name = 'scalastyle',
             jars = [
-              jar(org='org.scalastyle', name='scalastyle_2.10', rev='0.3.2')
+              scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
             ])
 
 jar_library(name = 'scrooge-gen',
             jars = [
-              jar(org='com.twitter', name='scrooge-generator_2.10', rev='3.20.0',
-                  excludes=[
-                    # scrooge requires libthrift 0.5.0-1 which is not available on
-                    # the default maven repos. Force scrooge to use thrift-0.6.1, which
-                    # is compatible, instead.
-                    exclude(org = 'org.apache.thrift', name = 'libthrift')
-                  ])
+              scala_jar(org='com.twitter', name='scrooge-generator', rev='3.20.0',
+                        excludes=[
+                          # scrooge requires libthrift 0.5.0-1 which is not available on
+                          # the default maven repos. Force scrooge to use thrift-0.6.1, which
+                          # is compatible, instead.
+                          exclude(org = 'org.apache.thrift', name = 'libthrift')
+                        ])
             ],
             dependencies = [
               '3rdparty:thrift-0.6.1',
@@ -44,10 +44,10 @@ jar_library(name = 'scrooge-gen',
 
 jar_library(name = 'scrooge-linter',
             jars = [
-              jar(org='com.twitter', name='scrooge-linter_2.10', rev='3.20.0',
-                  excludes=[
-                    exclude(org = 'org.apache.thrift', name = 'libthrift')
-                  ])
+              scala_jar(org='com.twitter', name='scrooge-linter', rev='3.20.0',
+                        excludes=[
+                          exclude(org = 'org.apache.thrift', name = 'libthrift')
+                        ])
             ],
             dependencies = [
               '3rdparty:thrift-0.6.1',

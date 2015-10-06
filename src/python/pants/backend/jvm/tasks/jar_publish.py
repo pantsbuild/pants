@@ -27,10 +27,10 @@ from pants.base.address import Address
 from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
-from pants.base.build_file_parser import BuildFileParser
-from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
+from pants.build_graph.build_file_parser import BuildFileParser
+from pants.build_graph.build_graph import sort_targets
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.option.custom_types import dict_option, list_option

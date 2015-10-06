@@ -38,8 +38,8 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
-    'src/python/pants/base:target',
     'src/python/pants/base:validation',
+    'src/python/pants/build_graph',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
@@ -65,14 +65,16 @@ python_library(
   sources = [
     'scala_library.py',
     'scalac_plugin.py',
+    'scala_jar_dependency.py',
   ],
   dependencies = [
-    ':jvm',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':jvm',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:target',
     'src/python/pants/base:validation',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:memo',
   ],
 )

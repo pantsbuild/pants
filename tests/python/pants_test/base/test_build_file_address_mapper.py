@@ -10,8 +10,8 @@ from textwrap import dedent
 
 from pants.base.address import Address, BuildFileAddress
 from pants.base.address_lookup_error import AddressLookupError
-from pants.base.build_file_address_mapper import BuildFileAddressMapper
-from pants.base.target import Target
+from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 

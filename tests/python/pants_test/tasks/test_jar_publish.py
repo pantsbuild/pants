@@ -14,11 +14,12 @@ from mock import Mock
 from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
+from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_publish import JarPublish
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
@@ -51,6 +52,7 @@ class JarPublishTest(TaskTestBase):
       },
       objects={
         'artifact': Artifact,
+        'scala_artifact': ScalaArtifact,
         'internal': Repository(name='internal', url='http://example.com',
                                push_db_basedir=self.push_db_basedir),
       },

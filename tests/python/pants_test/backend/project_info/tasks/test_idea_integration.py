@@ -286,6 +286,32 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
                      '--idea-infer-test-from-siblings'],
                     check_func=do_check)
 
+  def _test_idea_language_level(self, targets, expected):
+    def do_check(path):
+      iml_file = os.path.join(path, 'project.iml')
+      dom = minidom.parse(iml_file)
+      module = dom.getElementsByTagName('module')[0]
+      for component in module.getElementsByTagName('component'):
+        if component.getAttribute('name') == 'NewModuleRootManager':
+          received = component.getAttribute('LANGUAGE_LEVEL')
+          self.assertEquals(expected, received,
+                            'Language level was {0} instead of {1}.'.format(received, expected))
+          break
+    self._idea_test(targets, check_func=do_check)
+
+  def test_idea_language_level_homogenous(self):
+    self._test_idea_language_level(
+      targets=['testprojects/src/java/org/pantsbuild/testproject/targetlevels/java7'],
+      expected='JDK_1_7'
+    )
+
+  def test_idea_language_level_heterogenous(self):
+    self._test_idea_language_level(
+      targets=['testprojects/src/java/org/pantsbuild/testproject/targetlevels/java7',
+               'testprojects/src/java/org/pantsbuild/testproject/targetlevels/java8'],
+      expected='JDK_1_8'
+    )
+
   def test_idea_exclude_maven_targets(self):
     def do_check(path):
       """Expect to see at least these two excludeFolder entries:

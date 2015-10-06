@@ -63,10 +63,9 @@ python_tests(
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:all_utils',
     'src/python/pants/base:address',
-    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
   ]
 )
@@ -96,9 +95,9 @@ python_tests(
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
-    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
+    'src/python/pants/build_graph',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

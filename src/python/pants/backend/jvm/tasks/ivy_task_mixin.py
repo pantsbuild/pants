@@ -16,9 +16,9 @@ from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.jar_dependency_utils import ResolvedJar
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.cache_manager import VersionedTargetSet
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
+from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.util import execute_runner
@@ -96,7 +96,7 @@ class IvyTaskMixin(TaskBase):
     :param executor: A java executor to run ivy with.
     :type executor: :class:`pants.java.executor.Executor`
     :param targets: The targets to resolve jvm dependencies for.
-    :type targets: :class:`collections.Iterable` of :class:`pants.base.target.Target`
+    :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
     :param classpath_products: The classpath products to populate with the results of the resolve.
     :type classpath_products: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
     :param confs: The ivy configurations to resolve; ('default',) by default.
@@ -186,7 +186,7 @@ class IvyTaskMixin(TaskBase):
     returned, ie: ([], {}, None).
 
     :param targets: The targets to resolve jvm dependencies for.
-    :type targets: :class:`collections.Iterable` of :class:`pants.base.target.Target`
+    :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
     :param executor: A java executor to run ivy with.
     :type executor: :class:`pants.java.executor.Executor`
 

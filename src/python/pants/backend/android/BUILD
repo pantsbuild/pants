@@ -7,7 +7,7 @@ pants_plugin(
   dependencies=[
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:all',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.backend.android',
