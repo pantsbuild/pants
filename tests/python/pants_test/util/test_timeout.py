@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import time
 import unittest
 
-from pants.util.timeout import Timeout
+from pants.util.timeout import Timeout, TimeoutReached
 
 
 class TestTimeout(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestTimeout(unittest.TestCase):
       time.sleep(1)
 
   def test_timeout_failure(self):
-    with self.assertRaises(KeyboardInterrupt):
+    with self.assertRaises(TimeoutReached):
       with Timeout(1):
         time.sleep(2)
 

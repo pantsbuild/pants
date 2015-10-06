@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from abc import abstractmethod
 
 from pants.base.exceptions import TestFailedTaskError
-from pants.util.timeout import Timeout
+from pants.util.timeout import Timeout, TimeoutReached
 
 
 class TestTaskMixin(object):
@@ -39,7 +39,7 @@ class TestTaskMixin(object):
       try:
         with Timeout(timeout):
           self._execute(targets)
-      except KeyboardInterrupt:
+      except TimeoutReached:
         raise TestFailedTaskError(failed_targets=targets)
 
   def _timeout_for_target(self, target):

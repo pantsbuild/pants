@@ -10,6 +10,10 @@ import thread
 import threading
 
 
+class TimeoutReached(Exception):
+  pass
+
+
 class Timeout(object):
   """Timeout generator
 
@@ -37,5 +41,7 @@ class Timeout(object):
       self._timer.start()
 
   def __exit__(self, type, value, traceback):
-    if self._timer is not None:
+    if type is KeyboardInterrupt:
+      raise TimeoutReached
+    elif self._timer is not None:
       self._timer.cancel()
