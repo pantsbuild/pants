@@ -16,8 +16,8 @@ class TestTaskMixinTest(TaskTestBase):
     class TestTaskMixinTask(TestTaskMixin, TaskBase):
       call_list = []
 
-      def _execute(self, targets):
-        self.call_list.append(['_execute', targets])
+      def _execute(self, test_targets, all_targets):
+        self.call_list.append(['_execute', test_targets, all_targets])
 
       def _get_targets(self):
         return ['TargetA', 'TargetB']
@@ -46,7 +46,7 @@ class TestTaskMixinTest(TaskTestBase):
     self.assertIn(['target_filter', 'TargetA'], self.task.call_list)
     self.assertIn(['target_filter', 'TargetB'], self.task.call_list)
     self.assertIn(['_validate_target', 'TargetB'], self.task.call_list)
-    self.assertIn(['_execute', ['TargetB']], self.task.call_list)
+    self.assertIn(['_execute', ['TargetB'], ['TargetA', 'TargetB']], self.task.call_list)
 
   def test_execute_skip(self):
     # Set the skip option
