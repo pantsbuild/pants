@@ -30,9 +30,11 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
                 {{#mutable}}changing="true"{{/mutable}}
     >
       <conf name="default" mapped="default"/>
+      {{^any_have_url}}
       {{#lib.extra_configurations}}
       <conf name="{{.}}" mapped="{{.}}"/>
       {{/lib.extra_configurations}}
+      {{/any_have_url}}
       {{#artifacts?}}
         {{#artifacts}}
       {{! NB: The 'name' and 'type' are required artifact fields. }}
@@ -46,9 +48,11 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
         {{/artifacts}}
         {{! When specifying explicit artifacts, extra optional conf resolution is turned off.
             These <include/>s turn the optional resolutions back on. }}
+        {{^any_have_url}}
         {{#lib.extra_configurations}}
       <include name="{{module}}" conf="{{.}}"/>
         {{/lib.extra_configurations}}
+        {{/any_have_url}}
       {{/artifacts?}}
       {{#excludes}}
       {{#name}}

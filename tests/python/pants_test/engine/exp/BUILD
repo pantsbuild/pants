@@ -17,6 +17,7 @@ python_tests(
     'src/python/pants/base:address',
     'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:graph',
+    'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:targets',
   ]
@@ -27,9 +28,12 @@ python_tests(
   sources=['test_mapper.py'],
   dependencies=[
     'src/python/pants/base:address',
+    'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:targets',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 

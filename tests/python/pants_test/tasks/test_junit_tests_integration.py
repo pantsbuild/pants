@@ -282,6 +282,54 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '''))
       yield tests_subdir
 
+  @contextmanager
+  def _mixed_test_cases(self):
+    with temporary_dir(root_dir=self.workdir_root()) as source_dir:
+      with open(os.path.join(source_dir, 'BUILD'), 'w+') as f:
+        f.write('source_root("{}/tests")\n'.format(os.path.basename(source_dir)))
+      tests_dir = os.path.join(source_dir, 'tests')
+      subpath = os.path.join('org', 'pantsbuild', 'tmp', 'tests')
+      tests_subdir = os.path.join(tests_dir, subpath)
+      os.makedirs(tests_subdir)
+      with open(os.path.join(tests_subdir, 'BUILD'), 'w+') as f:
+        f.write(dedent('''
+          java_tests(name='tests',
+            sources=['AllTests.java'],
+            dependencies=['3rdparty:junit'],
+          )
+        '''))
+      with open(os.path.join(tests_subdir, 'AllTests.java'), 'w+') as f:
+        f.write(dedent('''
+          package org.pantsbuild.tmp.tests;
+
+          import org.junit.Test;
+          import static org.junit.Assert.*;
+
+          public class AllTests {
+
+            @Test
+            public void test1Failure() {
+              assertTrue(false);
+            }
+
+            @Test
+            public void test2Success() {
+              assertTrue(true);
+            }
+
+            @Test
+            public void test3Failure() {
+              assertTrue(false);
+            }
+
+            @Test
+            public void test4Error() {
+              throw new RuntimeException();
+            }
+          }
+        '''))
+      yield tests_subdir
+
   def test_junit_test_failure_summary(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
       with self._failing_test_cases() as tests_dir:
@@ -324,3 +372,23 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         self.assertNotIn('org/pantsbuild/tmp/tests:three\n'
                          'org.pantsbuild.tmp.tests.subtest.ThreeTest#testTripleFirst',
                          output)
+
+  def test_junit_test_successes_and_failures(self):
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with self._mixed_test_cases() as tests_dir:
+        pants_run = self.run_pants_with_workdir([
+          'test',
+          '--test-junit-failure-summary',
+          '--no-test-junit-fail-fast',
+          os.path.relpath(tests_dir),
+        ], workdir)
+        group = [
+          'org/pantsbuild/tmp/tests:tests',
+          'org.pantsbuild.tmp.tests.AllTests#test1Failure',
+          'org.pantsbuild.tmp.tests.AllTests#test3Failure',
+          'org.pantsbuild.tmp.tests.AllTests#test4Error',
+        ]
+        output = '\n'.join(line.strip() for line in pants_run.stdout_data.split('\n'))
+        self.assertIn('\n'.join(group), output,
+                      '{group}\n not found in\n\n{output}.'.format(group='\n'.join(group),
+                                                                   output=output))

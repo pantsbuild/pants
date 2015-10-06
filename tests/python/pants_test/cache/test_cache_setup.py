@@ -69,7 +69,10 @@ class TestCacheSetup(BaseTest):
     self.resolver.resolve = Mock(return_value=[self.REMOTE_URI_1, self.REMOTE_URI_2])
     self.log = MockLogger()
     self.pinger = MockPinger({'host1': 5, 'host2:666': 3, 'host3': 7})
-    self.cache_factory = CacheFactory(options={}, log=MockLogger(),
+    options = Mock()
+    options.pinger_timeout = .5
+    options.pinger_tries = 2
+    self.cache_factory = CacheFactory(options=options, log=MockLogger(),
                                  stable_name='test', resolver=self.resolver)
 
   def test_sanitize_cache_spec(self):
