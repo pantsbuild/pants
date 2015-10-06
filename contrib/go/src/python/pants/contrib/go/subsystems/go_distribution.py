@@ -79,9 +79,9 @@ class GoDistribution(object):
 
     @classmethod
     def _create(cls, goroot, cmd, gopath=None, args=None):
-      env = OrderedDict(GOROOT=goroot)
-      if gopath:
-        env.update(GOPATH=gopath)
+      # Forcibly nullify the GOPATH if the command does not need one - this can prevent bad user
+      # GOPATHs from erroring out commands; see: https://github.com/pantsbuild/pants/issues/2321.
+      env = OrderedDict(GOROOT=goroot, GOPATH=gopath or '')
       return cls([os.path.join(goroot, 'bin', 'go'), cmd] + (args or []), env=env)
 
     def spawn(self, env=None, **kwargs):
