@@ -43,22 +43,40 @@ class TestTaskMixin(object):
         raise TestFailedTaskError(failed_targets=targets)
 
   def _timeout_for_target(self, target):
-    try:
-      return target.timeout
-    except AttributeError:
-      return None
+    return getattr(self, 'timeout', None)
 
   def _timeout_for_targets(self, targets):
-    if self.get_options().timeouts:
+    """
+    Calculate the total timeout based on the timeout configuration for all the targets.
+
+    Because the timeout wraps all the test targets rather than individual tests, we have to somehow
+    aggregate all the target specific timeouts into one value that will cover all the tests. If some targets
+    have no timeout configured (or set to 0), their timeout will be set to the default timeout.
+    If there is no default timeout, or if it is set to zero, there will be no timeout, if any of the test targets
+    have a timeout set to 0 or no itmeout configured.
+
+    :param targets: list of test targets
+    :return: timeout to cover all the targets, in seconds
+    """
+
+    if not self.get_options().timeouts:
+      return None
+    else:
       timeout_default = self.get_options().timeout_default
 
-      timeouts = [self._timeout_for_target(target) if self._timeout_for_target(target) else timeout_default for target in targets]
+      # Gather up all the timeouts. If any target's timeout is not set or 0, then set it to the default timeout
+      timeouts = [self._timeout_for_target(target)
+                  if self._timeout_for_target(target) else timeout_default for target in targets]
+
+      # Even after we've done that, there may be a 0 or None in the timeout list if the
+      # default timeout is set to 0 or None. So if that's the case, then the timeout is
+      # disabled
       if 0 in timeouts or None in timeouts:
         return None
       else:
+        # Sum the timeouts for all the targets, using the default timeout where one is not set
         return sum(timeouts)
-    else:
-      return None
+
 
   def _get_targets(self):
     """This is separated out so it can be overridden for testing purposes.
