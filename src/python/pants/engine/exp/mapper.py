@@ -6,11 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 
 from pants.base.address import Address
 from pants.engine.exp import parsers
 from pants.engine.exp.objects import Serializable
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 class MappingError(Exception):
@@ -167,3 +168,103 @@ class AddressFamily(object):
   def __repr__(self):
     return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(self._namespace,
                                                                         self._objects_by_name)
+
+
+class ResolveError(MappingError):
+  """Indicates an error resolving targets."""
+
+
+# TODO(John Sirois): Support in-memory injection of (synthetic) addressables to support conversion
+# of the legacy system.
+class AddressMapper(object):
+  """Maps addresses to the objects they point to.
+
+  An address mapper serves as its own cache of the BUILD files it has parsed.  Although it has no
+  knowledge of BUILD file contents, it does expose an `invalidate_build_file` for external agents
+  aware of file changes to mark the corresponding address namespaces as being in-need of re-parsing.
+  """
+
+  def __init__(self, build_root, build_pattern=None, parser=None):
+    """Creates an address mapper rooted at the given `build_root`.
+
+    Both the set of files that define a mappable BUILD files and the parser used to parse those
+    files can be customized.  See the `pants.engine.exp.parsers` module for example parsers.
+
+    :param string build_root: The root of the BUILD files; typically the code repository root
+                              directory.
+    :param string build_pattern: A regular expression for identifying BUILD files used to resolve
+                                 addresses; by default looks for `BUILD*` files.
+    :param parser: The BUILD file parser to use; by default a JSON BUILD file format parser.
+    :type parser: A :class:`collections.Callable` that takes a byte string and produces a list of
+                  parsed addressable Serializable objects found in the byte string.
+    """
+    self._build_root = os.path.realpath(build_root)
+    self._build_pattern = re.compile(build_pattern or r'^BUILD(\.[a-zA-Z0-9_-]+)?$')
+    self._parser = parser
+
+  def _find_build_files(self, dir_path):
+    abs_dir_path = os.path.join(self._build_root, dir_path)
+    if not os.path.isdir(abs_dir_path):
+      raise ResolveError('Expected {} to be a directory containing build files.'.format(dir_path))
+    for f in os.listdir(abs_dir_path):
+      if self._build_pattern.match(f):
+        abs_build_file = os.path.join(abs_dir_path, f)
+        if os.path.isfile(abs_build_file):
+          yield abs_build_file
+
+  @staticmethod
+  def _normalize_parse_path(path):
+    return os.path.realpath(path)
+
+  @memoized_method
+  def _parse(self, path):
+    return AddressMap.parse(path, parse=self._parser)
+
+  @memoized_method
+  def family(self, namespace):
+    """Load the address family in the given namespace.
+
+    :param string namespace: The namespace of the address family to load.
+    :returns: The address family at the given namespace.
+    :rtype: :class:`AddressFamily`
+    :raises: :class:`ResolveError` if the address family could not be found.
+    """
+    address_maps = []
+    for path in self._find_build_files(namespace):
+      address_maps.append(self._parse(self._normalize_parse_path(path)))
+    if not address_maps:
+      raise ResolveError('No addresses registered in namespace {}'.format(namespace))
+    return AddressFamily.create(self._build_root, address_maps)
+
+  def resolve(self, address):
+    """Resolve the given address to a named Serializable object.
+
+    :param address: The address to resolve to an named Serializable object.
+    :type address: :class:`pants.base.address.Address`
+    :returns: The resolved object.
+    :raises: :class:`ResolveError` if the object could not be resolved.
+    """
+    family = self.family(address.spec_path)
+    obj = family.addressables.get(address)
+    if not obj:
+      raise ResolveError('Object with address {} was not found'.format(address))
+    return obj
+
+  def invalidate_build_file(self, path):
+    """Force the given build file path to be re-parsed on next access of its namespace.
+
+    The namespace containing BUILD file is also invalidated such that the enclosing family is
+    completely recalculated.  This allows for adding new paths to a BUILD file family, modifying
+    existing paths or marking paths as having been deleted.
+
+    :param string path: The path of the build file; either absolute or relative to the build root.
+    """
+    # TODO(John Sirois): replace @memoized caches with hand-build local caches if needed when
+    # considering concurrency implications of a seperate thread calling invalidate while other
+    # threads access the cache.
+    path = path if os.path.isabs(path) else os.path.join(self._build_root, path)
+    normalized_path = self._normalize_parse_path(path)
+
+    self._parse.forget(self, normalized_path)
+    namespace = os.path.relpath(os.path.dirname(normalized_path), self._build_root)
+    self.family.forget(self, namespace)

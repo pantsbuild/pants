@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
 import unittest
 from collections import defaultdict
@@ -317,18 +318,18 @@ class BaseTest(unittest.TestCase):
             touch(os.path.join(root_dir, buildfile))
           yield os.path.realpath(root_dir)
 
-  def populate_compile_classpath(self, context, classpath=None):
+  def populate_runtime_classpath(self, context, classpath=None):
     """
-    Helps actual test cases to populate the 'compile_classpath' products data mapping
+    Helps actual test cases to populate the 'runtime_classpath' products data mapping
     in the context, which holds the classpath value for targets.
 
     :param context: The execution context where the products data mapping lives.
     :param classpath: a list of classpath strings. If not specified,
                       [os.path.join(self.buildroot, 'none')] will be used.
     """
-    classpath = classpath or [os.path.join(self.build_root, 'none')]
-    compile_classpaths = context.products.get_data('compile_classpath', lambda: UnionProducts())
-    compile_classpaths.add_for_targets(context.targets(),
+    classpath = classpath or []
+    classpath_products = context.products.get_data('runtime_classpath', lambda: UnionProducts())
+    classpath_products.add_for_targets(context.targets(),
                                        [('default', entry) for entry in classpath])
 
   @contextmanager
@@ -354,3 +355,12 @@ class BaseTest(unittest.TestCase):
         return product
       product_mapping.add(target, outdir, map(create_product, products))
       yield temporary_dir
+
+  def assertUnorderedPrefixEqual(self, expected, actual_iter):
+    """Consumes len(expected) items from the given iter, and asserts that they match, unordered."""
+    actual = list(itertools.islice(actual_iter, len(expected)))
+    self.assertEqual(sorted(expected), sorted(actual))
+
+  def assertPrefixEqual(self, expected, actual_iter):
+    """Consumes len(expected) items from the given iter, and asserts that they match, in order."""
+    self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))

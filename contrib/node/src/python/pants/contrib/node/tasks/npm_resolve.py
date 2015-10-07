@@ -112,10 +112,36 @@ class NpmResolve(NodeTask):
       return node_paths.node_path(target) if self.is_node_module(target) else target.version
     dependencies = {dep.package_name: render_dep(dep) for dep in npm_package.dependencies}
 
-    package = {
-      'name': npm_package.package_name,
-      'version': '0.0.0',
-      'dependencies': dependencies
-    }
-    with open(os.path.join(node_path, 'package.json'), 'wb') as fp:
+    package_json_path = os.path.join(node_path, 'package.json')
+
+    if os.path.isfile(package_json_path):
+      with open(package_json_path, 'r') as fp:
+        package = json.load(fp)
+    else:
+      package = {}
+
+    if not package.has_key('name'):
+      package['name'] = npm_package.package_name
+    elif package['name'] != npm_package.package_name:
+      raise TaskError('Package name in the corresponding package.json is not the same '
+                      'as the BUILD target name for {}'.format(npm_package.address.reference()))
+
+    if not package.has_key('version'):
+      package['version'] = '0.0.0'
+
+    # TODO(Chris Pesto): Preserve compatibility with normal package.json files by dropping existing
+    # dependency fields. This lets Pants accept working package.json files from standalone projects
+    # that can be "npm install"ed without Pants. Taking advantage of this means expressing
+    # dependencies in package.json and BUILD, though. In the future, work to make
+    # Pants more compatible with package.json to eliminate duplication if you still want your
+    # project to "npm install" through NPM by itself.
+    dependenciesToRemove = [
+      'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
+    ]
+    for dependencyType in dependenciesToRemove:
+      package.pop(dependencyType, None)
+
+    package['dependencies'] = dependencies
+
+    with open(package_json_path, 'wb') as fp:
       json.dump(package, fp, indent=2)

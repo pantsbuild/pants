@@ -70,7 +70,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':compile_context',
     ':execution_graph',
-    ':resource_mapping',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/tasks:classpath_util',
@@ -95,11 +94,6 @@ python_library(
   dependencies = [
     'src/python/pants/base:worker_pool',
   ],
-)
-
-python_library(
-  name = 'resource_mapping',
-  sources = ['resource_mapping.py'],
 )
 
 python_library(

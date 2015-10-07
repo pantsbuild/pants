@@ -137,3 +137,54 @@ class NpmResolveTest(TaskTestBase):
     lines = {line.strip() for line in out.splitlines()}
     self.assertIn('type of boolean is: boolean', lines)
     self.assertIn('type of bool is: boolean', lines)
+
+  def test_resolve_preserves_package_json(self):
+    SourceRoot.register('src/node', NodeModule)
+
+    util = self.make_target(spec='src/node/util',
+                            target_type=NodeModule,
+                            sources=[],
+                            dependencies=[])
+
+    self.create_file('src/node/scripts_project/package.json', contents=dedent("""
+      {
+        "name": "scripts_project",
+        "version": "1.2.3",
+        "dependencies": { "A": "file://A" },
+        "devDependencies": { "B": "file://B" },
+        "peerDependencies": { "C": "file://C" },
+        "optionalDependencies": { "D": "file://D" },
+        "scripts": {
+          "test": "mocha */dist.js"
+        }
+      }
+    """))
+    scripts_project = self.make_target(spec='src/node/scripts_project',
+                                       target_type=NodeModule,
+                                       sources=['package.json'],
+                                       dependencies=[util])
+    context = self.context(target_roots=[scripts_project])
+    task = self.create_task(context)
+    task.execute()
+
+    node_paths = context.products.get_data(NodePaths)
+    node_path = node_paths.node_path(scripts_project)
+    self.assertIsNotNone(node_paths.node_path(scripts_project))
+
+    package_json_path = os.path.join(node_path, 'package.json')
+    with open(package_json_path) as fp:
+      package = json.load(fp)
+      self.assertEqual('scripts_project', package['name'],
+                       'Expected to find package name of `scripts_project`, but found: {}'
+                       .format(package['name']))
+      self.assertEqual('1.2.3', package['version'],
+                       'Expected to find package version of `1.2.3`, but found: {}'
+                       .format(package['version']))
+      self.assertEqual('mocha */dist.js', package['scripts']['test'],
+                       'Expected to find package test script of `mocha */dist.js`, but found: {}'
+                       .format(package['scripts']['test']))
+      self.assertEqual(node_paths.node_path(util), package['dependencies']['util'])
+      self.assertNotIn('A', package['dependencies'])
+      self.assertNotIn('devDependencies', package)
+      self.assertNotIn('peerDependencies', package)
+      self.assertNotIn('optionalDependencies', package)
