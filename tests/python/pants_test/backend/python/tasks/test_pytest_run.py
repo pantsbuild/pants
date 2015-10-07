@@ -225,16 +225,12 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.run_failing_tests(targets=[self.red_in_class], failed_targets=[self.red_in_class])
 
   def test_one_timeout(self):
-    """When we have two targets and any of them doesn't have a timeout, then no timeout
-    is set, unless there is a default
-
-    """
+    """When we have two targets and any of them doesn't have a timeout, then no timeout is set, unless there is a default."""
 
     self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
 
   def test_timeout(self):
-    """Check that a two second test will fail with a one second timeout
-    """
+    """Check that a two second test will fail with a one second timeout."""
 
     self.run_failing_tests(targets=[self.sleep_timeout],
                            failed_targets=[self.sleep_timeout])

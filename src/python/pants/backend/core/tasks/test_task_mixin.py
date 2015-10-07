@@ -47,8 +47,7 @@ class TestTaskMixin(object):
     return getattr(target, 'timeout', None)
 
   def _timeout_for_targets(self, targets):
-    """
-    Calculate the total timeout based on the timeout configuration for all the targets.
+    """Calculate the total timeout based on the timeout configuration for all the targets.
 
     Because the timeout wraps all the test targets rather than individual tests, we have to somehow
     aggregate all the target specific timeouts into one value that will cover all the tests. If some targets

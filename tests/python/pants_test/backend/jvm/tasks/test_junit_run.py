@@ -89,6 +89,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
   def test_junit_runner_timeout_success(self):
+    """When we set a timeout and the test takes less time to run, succeed."""
+
     self.set_options(timeout_default=1)
     self.set_options(timeouts=True)
     self.execute_junit_runner(
@@ -106,6 +108,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     )
 
   def test_junit_runner_timeout_fail(self):
+    """When we set a timeout and the test takes too long to run, fail."""
+
     self.set_options(timeout_default=1)
     self.set_options(timeouts=True)
     with self.assertRaises(TaskError) as cm:

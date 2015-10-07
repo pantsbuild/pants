@@ -68,9 +68,7 @@ class TestTaskMixinTest(TaskTestBase):
     self.assertListEqual(task.call_list, [])
 
   def test_get_timeouts_no_default(self):
-    """If there is no default and one of the targets has no timeout, then
-    there is no timeout for the entire run
-    """
+    """If there is no default and one of the targets has no timeout, then there is no timeout for the entire run."""
 
     self.set_options(timeouts=True, timeout_default=None)
     task = self.create_task(self.context())
@@ -78,10 +76,7 @@ class TestTaskMixinTest(TaskTestBase):
     self.assertIsNone(task._timeout_for_targets([targetA, targetB]))
 
   def test_get_timeouts_disabled(self):
-    """
-    If timeouts are disabled, there is no timeout for the entire run
-
-    """
+    """If timeouts are disabled, there is no timeout for the entire run."""
 
     self.set_options(timeouts=False, timeout_default=2)
     task = self.create_task(self.context())
@@ -89,10 +84,8 @@ class TestTaskMixinTest(TaskTestBase):
     self.assertIsNone(task._timeout_for_targets([targetA, targetB]))
 
   def test_get_timeouts_w_default(self):
-    """
-    If there is a default timeout, use that for targets which have no timeout set
+    """If there is a default timeout, use that for targets which have no timeout set."""
 
-    """
     self.set_options(timeouts=True, timeout_default=2)
     task = self.create_task(self.context())
 
