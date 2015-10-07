@@ -101,8 +101,8 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     super(TestTaskMixinTimeoutTest, self).setUp()
     self.mox = mox.Mox()
 
-    global global_handler
-    global_handler = self.empty_handler
+    global timeout_handler
+    timeout_handler = self.empty_handler
 
   def tearDown(self):
     super(TestTaskMixinTimeoutTest, self).tearDown()
@@ -113,8 +113,8 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     pass
 
   def set_handler(self, dummy, handler):
-    global global_handler
-    global_handler = handler
+    global timeout_handler
+    timeout_handler = handler
 
   @classmethod
   def task_type(cls):
@@ -122,7 +122,7 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
       call_list = []
 
       def _execute(self, all_targets):
-        global_handler()
+        timeout_handler()
         self.call_list.append(['_execute', all_targets])
 
       def _get_targets(self):
