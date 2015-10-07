@@ -744,24 +744,6 @@ class Cobertura(_Coverage):
                     classpath_prepend=self._task_exports.tool_classpath('cobertura-run'),
                     extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
 
-  def _build_sources_by_class(self):
-    """Invert classes_by_source."""
-
-    classes_by_source = self._context.products.get_data('classes_by_source')
-    source_by_class = dict()
-    for source_file, source_products in classes_by_source.items():
-      for root, products in source_products.rel_paths():
-        for product in products:
-          if not '$' in product:
-            if source_by_class.get(product):
-              if source_by_class.get(product) != source_file:
-                self._context.log.warn(
-                  'Inconsistency finding source for class {0}: already had {1}, also found {2}'
-                  .format(product, source_by_class.get(product), source_file))
-            else:
-              source_by_class[product] = source_file
-    return source_by_class
-
   def report(self, targets, tests, tests_failed_exception=None):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping report...')
@@ -773,53 +755,12 @@ class Cobertura(_Coverage):
       else:
         return
     cobertura_cp = self._task_exports.tool_classpath('cobertura-report')
-    # Link files in the real source tree to files named using the classname.
-    # Do not include class file names containing '$', as these will always have
-    # a corresponding $-less class file, and they all point back to the same
-    # source.
-    # Put all these links to sources under self._coverage_dir/src
-    all_classes = set()
-    for basedir, classes in self._rootdirs.items():
-      all_classes.update([cls for cls in classes if '$' not in cls])
-    sources_by_class = self._build_sources_by_class()
-    coverage_source_root_dir = os.path.join(self._coverage_dir, 'src')
-    safe_rmtree(coverage_source_root_dir)
-    for cls in all_classes:
-      source_file = sources_by_class.get(cls)
-      if source_file:
-        # the class in @cls
-        #    (e.g., 'org/pantsbuild/example/hello/welcome/WelcomeEverybody.class')
-        # was compiled from the file in @source_file
-        #    (e.g., 'src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala')
-        # Note that, in the case of scala files, the path leading up to Welcome.scala does not
-        # have to match the path in the corresponding .class file AT ALL. In this example,
-        # @source_file could very well have been 'src/hello-kitty/Welcome.scala'.
-        # However, cobertura expects the class file path to match the corresponding source
-        # file path below the source base directory(ies) (passed as (a) positional argument(s)),
-        # while it still gets the source file basename from the .class file.
-        # Here we create a fake hierachy under coverage_dir/src to mimic what cobertura expects.
-
-        class_dir = os.path.dirname(cls)   # e.g., 'org/pantsbuild/example/hello/welcome'
-        fake_source_directory = os.path.join(coverage_source_root_dir, class_dir)
-        safe_mkdir(fake_source_directory)
-        fake_source_file = os.path.join(fake_source_directory, os.path.basename(source_file))
-        try:
-          os.symlink(os.path.relpath(source_file, fake_source_directory),
-                     fake_source_file)
-        except OSError as e:
-          # These warnings appear when source files contain multiple classes.
-          self._context.log.warn(
-            'Could not symlink {0} to {1}: {2}'.format(source_file, fake_source_file, e))
-      else:
-        self._context.log.error('class {0} does not exist in a source file!'.format(cls))
-    report_formats = []
-    report_formats.append('xml')
-    report_formats.append('html')
-    for report_format in report_formats:
+    source_roots = { t.target_base for t in targets if self.is_coverage_target(t) }
+    for report_format in ['xml', 'html']:
       report_dir = os.path.join(self._coverage_dir, report_format)
       safe_mkdir(report_dir, clean=True)
-      args = [
-        coverage_source_root_dir,
+      args = list(source_roots)
+      args += [
         '--datafile',
         self._coverage_datafile,
         '--destination',
