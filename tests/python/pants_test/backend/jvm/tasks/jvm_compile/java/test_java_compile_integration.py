@@ -177,7 +177,15 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       dotted_path = path_prefix.replace(os.path.sep, '.')
       artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
                                   '{}.jarversionincompatibility'.format(dotted_path))
-      config = {'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]}}
+      config = {
+          'cache.compile.zinc': {
+            'write_to': [cache_dir],
+            'read_from': [cache_dir],
+          },
+          'compile.zinc': {
+            'incremental_caching': True,
+          },
+      }
 
       pants_run = self.run_pants_with_workdir(['compile.java',
                                                ('{}:only-15-directly'.format(path_prefix))],
@@ -190,7 +198,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
       # Rerun for guava 16
       pants_run = self.run_pants_with_workdir(['compile.java',
-                                               (u'{}:alongside-16'.format(path_prefix)), '-ldebug'],
+                                               (u'{}:alongside-16'.format(path_prefix))],
                                               workdir,
                                               config)
       self.assert_success(pants_run)
