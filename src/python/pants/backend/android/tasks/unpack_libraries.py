@@ -153,8 +153,8 @@ class UnpackLibraries(Task):
     address = Address(self.workdir, '{}-android_library'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidLibrary,
                                              manifest=manifest,
-                                             include_patterns=target.include_patterns,
-                                             exclude_patterns=target.exclude_patterns,
+                                             include_patterns=target.payload.include_patterns,
+                                             exclude_patterns=target.payload.exclude_patterns,
                                              dependencies=deps,
                                              derived_from=target)
     return new_target
