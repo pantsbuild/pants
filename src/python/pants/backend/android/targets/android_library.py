@@ -31,11 +31,12 @@ class AndroidLibrary(ImportJarsMixin, AndroidTarget):
     # TODO(mateor) Perhaps add a BUILD file attribute to force archive type: one of (jar, aar).
     payload = payload or Payload()
     payload.add_fields({
-      'library_specs': PrimitiveField(libraries or ())
+      'library_specs': PrimitiveField(libraries or ()),
+      'include_patterns' : PrimitiveField(include_patterns or ()),
+      'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
     })
     self.libraries = libraries
-    self.include_patterns = include_patterns or []
-    self.exclude_patterns = exclude_patterns or []
+
 
     super(AndroidLibrary, self).__init__(payload=payload, **kwargs)
 
