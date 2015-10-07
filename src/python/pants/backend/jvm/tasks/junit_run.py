@@ -65,6 +65,23 @@ def _classfile_to_classname(cls):
   return ClasspathUtil.classname_for_rel_classfile(cls)
 
 
+def interpret_test_spec(test_spec):
+  """Parses a test spec string.
+
+  Returns either a (sourcefile,method) on the left, or a (classname,method) on the right.
+  """
+  components = test_spec.split('#', 2)
+  classname_or_srcfile = components[0]
+  methodname = '#' + components[1] if len(components) == 2 else ''
+
+  if os.path.exists(classname_or_srcfile):
+    # It's a source file.
+    return ((classname_or_srcfile, methodname), None)
+  else:
+    # It's a classname.
+    return (None, (classname_or_srcfile, methodname))
+
+
 class _JUnitRunner(object):
   """Helper class to run JUnit tests with or without coverage.
 
@@ -384,8 +401,16 @@ class _JUnitRunner(object):
 
   def _get_tests_to_run(self):
     for test_spec in self._tests_to_run:
-      for c in self._interpret_test_spec(test_spec):
-        yield c
+      src_spec, cls_spec = interpret_test_spec(test_spec)
+      if src_spec:
+        sourcefile, methodname = src_spec
+        for classname in self._classnames_from_source_file(sourcefile):
+          # Tack the methodname onto all classes in the source file, as we
+          # can't know which method the user intended.
+          yield classname + methodname
+      else:
+        classname, methodname = cls_spec
+        yield classname + methodname
 
   def _calculate_tests_from_targets(self, targets):
     """
@@ -415,21 +440,6 @@ class _JUnitRunner(object):
       for _, classes in source_products.rel_paths():
         for cls in classes:
           yield _classfile_to_classname(cls)
-
-  def _interpret_test_spec(self, test_spec):
-    components = test_spec.split('#', 2)
-    classname_or_srcfile = components[0]
-    methodname = '#' + components[1] if len(components) == 2 else ''
-
-    if os.path.exists(classname_or_srcfile):  # It's a source file.
-      srcfile = classname_or_srcfile  # Alias for clarity.
-      for cls in self._classnames_from_source_file(srcfile):
-        # Tack the methodname onto all classes in the source file, as we
-        # can't know which method the user intended.
-        yield cls + methodname
-    else:  # It's a classname.
-      classname = classname_or_srcfile
-      yield classname + methodname
 
 
 #TODO(jtrobec): move code coverage into tasks, and out of the general UT code.
