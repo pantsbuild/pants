@@ -99,8 +99,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         import static org.junit.Assert.assertTrue;
         public class FooTest {
           @Test
-          public void testFoo() throws InterruptedException {
-            Thread.sleep(500);
+          public void testFoo() {
             assertTrue(5 > 3);
           }
         }
