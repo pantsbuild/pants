@@ -144,6 +144,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
 
+    # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
+    #  https://github.com/sbt/sbt/pull/2085
+    #  https://github.com/sbt/sbt/pull/2160
+    register('--incremental-caching', advanced=True, action='store_true', default=False,
+             help='When set, the results of incremental compiles will be written to the cache. '
+                  'This is unset by defaults, because it is generally a good precaution to cache '
+                  'only clean/cold builds.')
+
   @classmethod
   def product_types(cls):
     raise TaskError('Expected to be installed in GroupTask, which has its own '
@@ -686,14 +694,19 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       log_file = self._capture_log_file(compile_context.target)
 
       # Double check the cache before beginning compilation
-      if not check_cache(vts):
+      hit_cache = check_cache(vts)
+      incremental = False
+
+      if not hit_cache:
         # Mutate analysis within a temporary directory, and move it to the final location
         # on success.
         tmpdir = os.path.join(self.analysis_tmpdir, compile_context.target.id)
         safe_mkdir(tmpdir)
         tmp_analysis_file = self._analysis_for_target(
             tmpdir, compile_context.target)
+        # If the analysis exists for this context, it is an incremental compile.
         if os.path.exists(compile_context.analysis_file):
+          incremental = True
           shutil.copy(compile_context.analysis_file, tmp_analysis_file)
         target, = vts.targets
         compile_vts(vts,
@@ -713,8 +726,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       # Update the products with the latest classes.
       register_vts([compile_context])
 
-      # Kick off the background artifact cache write.
-      if update_artifact_cache_vts_work:
+      # We write to the cache only if we didn't hit during the double check, and optionally
+      # only for clean builds.
+      should_cache = (self.get_options().incremental_caching or not incremental) and not hit_cache
+      if should_cache and update_artifact_cache_vts_work:
+        # Kick off the background artifact cache write.
         self._write_to_artifact_cache(vts, compile_context, update_artifact_cache_vts_work)
 
     jobs = []
