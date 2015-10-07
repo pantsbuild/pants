@@ -23,7 +23,7 @@ class TestTaskMixin(object):
     super(TestTaskMixin, cls).register_options(register)
     register('--skip', action='store_true', help='Skip running tests.')
     register('--timeouts', action='store_true', default=True,
-             help='Enable test timeouts')
+             help='Enable test timeouts.')
     register('--timeout-default', action='store', default=0, type=int,
              help='The default timeout (in seconds) for a test if timeout is not set in BUILD')
 

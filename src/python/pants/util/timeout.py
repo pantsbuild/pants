@@ -15,8 +15,7 @@ class TimeoutReached(Exception):
 
 
 class Timeout(object):
-  """
-  Timeout generator. If seconds is None or 0, then the there is no timeout.
+  """Timeout generator. If seconds is None or 0, then the there is no timeout.
 
     try:
       with Timeout(seconds):
@@ -36,7 +35,7 @@ class Timeout(object):
   def _handle_timeout(self):
     sys.stderr.flush()  # Python 3 stderr is likely buffered.
     self._triggered = True
-    thread.interrupt_main()  # raises KeyboardInterrupt
+    thread.interrupt_main()  # Raises KeyboardInterrupt.
 
   def __enter__(self):
     if self._timer is not None:
