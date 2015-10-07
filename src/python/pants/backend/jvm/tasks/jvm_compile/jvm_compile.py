@@ -504,7 +504,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                             .format(self.name(), vts.targets))
     else:
       # Do some reporting.
-      self.context.log.debug(
+      self.context.log.info(
         'Compiling ',
         items_to_report_element(sources, '{} source'.format(self.name())),
         ' in ',
@@ -729,7 +729,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       # We write to the cache only if we didn't hit during the double check, and optionally
       # only for clean builds.
       is_cacheable = not hit_cache and (self.get_options().incremental_caching or not incremental)
-      self.context.log.info(
+      self.context.log.debug(
           'Completed compile for {}. '
           'Hit cache: {}, was incremental: {}, is cacheable: {}, cache writes enabled: {}.'.format(
             compile_context.target.address.spec,
