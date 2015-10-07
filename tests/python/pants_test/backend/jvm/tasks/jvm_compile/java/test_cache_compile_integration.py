@@ -45,11 +45,14 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         'compile.java': {'use_jmake': tool_name == 'java' },
       }
 
-      self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
+      srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
+      buildfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD')
+
+      self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
                           class A {}
                           class Main {}"""))
-      self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD'),
+      self.create_file(buildfile,
                        dedent("""java_library(name='cachetest',
                                        sources=['A.java']
                           )"""))
@@ -60,14 +63,14 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Caches values A.class, Main.class
       self.run_compile(cachetest_spec, config, workdir, tool_name)
 
-      self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
+      self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
                             class A {}
                             class NotMain {}"""))
       # Caches values A.class, NotMain.class and leaves them on the filesystem
       self.run_compile(cachetest_spec, config, workdir, tool_name)
 
-      self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
+      self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
                           class A {}
                           class Main {}"""))
@@ -88,3 +91,34 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                                       'cachetest',
                                       )
       self.assertEqual(sorted(os.listdir(class_file_dir)), sorted(['A.class', 'Main.class']))
+
+  def test_incremental_caching_off(self):
+    """Tests that with --no-incremental-caching, we don't write incremental artifacts."""
+    with temporary_dir() as cache_dir, \
+        temporary_dir(root_dir=self.workdir_root()) as workdir, \
+        temporary_dir(root_dir=get_buildroot()) as src_dir:
+
+      tool_name = 'zinc'
+      config = {
+        'cache.compile.{}'.format(tool_name): {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.java': {'use_jmake': tool_name == 'java' },
+        'compile.zinc': {'incremental_caching': False },
+      }
+
+      srcfile = os.path.join(src_dir, 'A.java')
+      buildfile = os.path.join(src_dir, 'BUILD')
+      spec = os.path.join(src_dir, ':cachetest')
+
+      self.create_file(srcfile, """class A {}""")
+      self.create_file(buildfile, """java_library(name='cachetest', sources=['A.java'])""")
+
+
+      # Confirm that the result is one cached artifact.
+      self.run_compile(spec, config, workdir, tool_name)
+      clean_artifacts = os.listdir(cache_dir)
+      self.assertEquals(1, len(clean_artifacts))
+
+      # Modify the file, and confirm that artifacts haven't changed.
+      self.create_file(srcfile, """final class A {}""")
+      self.run_compile(spec, config, workdir, tool_name)
+      self.assertEquals(clean_artifacts, os.listdir(cache_dir))
