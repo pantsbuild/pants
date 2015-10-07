@@ -149,7 +149,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     #  https://github.com/sbt/sbt/pull/2160
     register('--incremental-caching', advanced=True, action='store_true', default=False,
              help='When set, the results of incremental compiles will be written to the cache. '
-                  'This is unset by defaults, because it is generally a good precaution to cache '
+                  'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
   @classmethod
@@ -728,8 +728,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
       # We write to the cache only if we didn't hit during the double check, and optionally
       # only for clean builds.
-      should_cache = (self.get_options().incremental_caching or not incremental) and not hit_cache
-      if should_cache and update_artifact_cache_vts_work:
+      is_cacheable = not hit_cache and (self.get_options().incremental_caching or not incremental)
+      self.context.log.info(
+          'Completed compile for {}. '
+          'Hit cache: {}, was incremental: {}, is cacheable: {}, cache writes enabled: {}.'.format(
+            compile_context.target.address.spec,
+            hit_cache,
+            incremental,
+            is_cacheable,
+            update_artifact_cache_vts_work is not None
+            ))
+      if is_cacheable and update_artifact_cache_vts_work:
         # Kick off the background artifact cache write.
         self._write_to_artifact_cache(vts, compile_context, update_artifact_cache_vts_work)
 
