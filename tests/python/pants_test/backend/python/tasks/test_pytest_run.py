@@ -224,6 +224,9 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
     self.run_failing_tests(targets=[self.red_in_class], failed_targets=[self.red_in_class])
 
+  def test_mixed(self):
+    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
+
   def test_one_timeout(self):
     """When we have two targets and any of them doesn't have a timeout, then no timeout is set, unless there is a default."""
 
