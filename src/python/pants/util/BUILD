@@ -71,4 +71,7 @@ python_library(
 python_library(
   name = 'timeout',
   sources = ['timeout.py'],
+  dependencies = [
+    '3rdparty/python:mox',
+  ],
 )
