@@ -128,8 +128,8 @@ class UnpackLibrariesTest(TestAndroidBase):
         self.assertEqual(created_library.derived_from, android_library)
         self.assertTrue(created_library.is_synthetic)
         self.assertTrue(isinstance(created_library, AndroidLibrary))
-        self.assertEqual(android_library.include_patterns, created_library.include_patterns)
-        self.assertEqual(android_library.exclude_patterns, created_library.exclude_patterns)
+        self.assertEqual(android_library.payload.include_patterns, created_library.payload.include_patterns)
+        self.assertEqual(android_library.payload.exclude_patterns, created_library.payload.exclude_patterns)
         self.assertEqual(len(created_library.dependencies), 2)
         for dep in created_library.dependencies:
           self.assertTrue(isinstance(dep, AndroidResources) or isinstance(dep, JarLibrary))

@@ -16,13 +16,7 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class JavaCompileIntegrationTest(BaseCompileIT):
 
-  def test_resources_by_target_and_partitions(self):
-    """
-    This tests that resources_by_target interacts correctly with
-    partitions; we want to make sure that even targets that are outside
-    the current partition don't cause crashes when they are looked up in
-    resources_by_targets (see jvm_compile.py).
-    """
+  def test_basic_binary(self):
     with temporary_dir() as cache_dir:
       config = {'cache.compile.java': {'write_to': [cache_dir]}}
 
@@ -183,7 +177,15 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       dotted_path = path_prefix.replace(os.path.sep, '.')
       artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
                                   '{}.jarversionincompatibility'.format(dotted_path))
-      config = {'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]}}
+      config = {
+          'cache.compile.zinc': {
+            'write_to': [cache_dir],
+            'read_from': [cache_dir],
+          },
+          'compile.zinc': {
+            'incremental_caching': True,
+          },
+      }
 
       pants_run = self.run_pants_with_workdir(['compile.java',
                                                ('{}:only-15-directly'.format(path_prefix))],
@@ -196,7 +198,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
       # Rerun for guava 16
       pants_run = self.run_pants_with_workdir(['compile.java',
-                                               (u'{}:alongside-16'.format(path_prefix)), '-ldebug'],
+                                               (u'{}:alongside-16'.format(path_prefix))],
                                               workdir,
                                               config)
       self.assert_success(pants_run)

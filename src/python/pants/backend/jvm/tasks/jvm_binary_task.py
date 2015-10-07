@@ -39,7 +39,7 @@ class JvmBinaryTask(JarBuilderTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmBinaryTask, cls).prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data('runtime_classpath')
     Shader.Factory.prepare_tools(round_manager)
 
   @classmethod
@@ -57,7 +57,7 @@ class JvmBinaryTask(JarBuilderTask):
     :returns: A list of (jar path, coordinate) tuples.
     :rtype: list of (string, :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`)
     """
-    classpath_products = self.context.products.get_data('compile_classpath')
+    classpath_products = self.context.products.get_data('runtime_classpath')
     classpath_entries = classpath_products.get_artifact_classpath_entries_for_targets([binary])
     confs = confs or ('default',)
     external_jars = OrderedSet(jar_entry for conf, jar_entry in classpath_entries if conf in confs)

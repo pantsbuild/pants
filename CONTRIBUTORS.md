@@ -86,6 +86,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Peter Seibel
 + Qicheng Ma
 + Ryan Williams
++ Sameer Brenn
 + Sara Solano
 + Senthil Kumaran
 + Sergey Serebryakov

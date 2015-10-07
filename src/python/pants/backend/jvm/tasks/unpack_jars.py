@@ -113,8 +113,8 @@ class UnpackJars(Task):
 
     :param Target unpacked_jars: A target with include_patterns and exclude_patterns attributes.
     """
-    return cls.calculate_unpack_filter(includes=unpacked_jars.include_patterns,
-                                       excludes=unpacked_jars.exclude_patterns,
+    return cls.calculate_unpack_filter(includes=unpacked_jars.payload.include_patterns,
+                                       excludes=unpacked_jars.payload.exclude_patterns,
                                        spec=unpacked_jars.address.spec)
 
   def _unpack(self, unpacked_jars):

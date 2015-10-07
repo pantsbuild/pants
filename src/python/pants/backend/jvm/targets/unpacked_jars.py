@@ -35,12 +35,12 @@ class UnpackedJars(ImportJarsMixin, Target):
     """
     payload = payload or Payload()
     payload.add_fields({
-      'library_specs': PrimitiveField(libraries or ())
+      'library_specs': PrimitiveField(libraries or ()),
+      'include_patterns' : PrimitiveField(include_patterns or ()),
+      'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
     })
     super(UnpackedJars, self).__init__(payload=payload, **kwargs)
 
-    self.include_patterns = include_patterns or []
-    self.exclude_patterns = exclude_patterns or []
     self._files = None
 
     if not libraries:

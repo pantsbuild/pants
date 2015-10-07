@@ -171,7 +171,7 @@ class Products(object):
 
   Right now this class is in an intermediate stage, as we transition to a more robust Products concept.
   The abuses have been switched to use 'data_products' (see below) which is just a dictionary
-  of product type (e.g., 'classes_by_target') to arbitrary payload. That payload can be anything,
+  of product type (e.g., 'classes_by_source') to arbitrary payload. That payload can be anything,
   but the MultipleRootedProducts class is useful for products that do happen to fit into the
   (basedir, [files-under-basedir]) paradigm.
 

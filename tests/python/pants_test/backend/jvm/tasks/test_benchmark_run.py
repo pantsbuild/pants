@@ -25,7 +25,7 @@ class BenchmarkRunTest(JvmToolTaskTestBase):
 
     self.set_options(target='foo:hello')
     context = self.context(target_roots=[self.target('foo:hello')])
-    self.populate_compile_classpath(context)
+    self.populate_runtime_classpath(context)
 
     with self.assertRaises(TaskError):
       self.execute(context)

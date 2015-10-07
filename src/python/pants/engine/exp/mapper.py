@@ -203,7 +203,7 @@ class AddressMapper(object):
     self._parser = parser
 
   def _find_build_files(self, dir_path):
-    abs_dir_path = os.path.realpath(os.path.join(self._build_root, dir_path))
+    abs_dir_path = os.path.join(self._build_root, dir_path)
     if not os.path.isdir(abs_dir_path):
       raise ResolveError('Expected {} to be a directory containing build files.'.format(dir_path))
     for f in os.listdir(abs_dir_path):
@@ -211,6 +211,10 @@ class AddressMapper(object):
         abs_build_file = os.path.join(abs_dir_path, f)
         if os.path.isfile(abs_build_file):
           yield abs_build_file
+
+  @staticmethod
+  def _normalize_parse_path(path):
+    return os.path.realpath(path)
 
   @memoized_method
   def _parse(self, path):
@@ -227,7 +231,7 @@ class AddressMapper(object):
     """
     address_maps = []
     for path in self._find_build_files(namespace):
-      address_maps.append(self._parse(path))
+      address_maps.append(self._parse(self._normalize_parse_path(path)))
     if not address_maps:
       raise ResolveError('No addresses registered in namespace {}'.format(namespace))
     return AddressFamily.create(self._build_root, address_maps)
@@ -259,6 +263,8 @@ class AddressMapper(object):
     # considering concurrency implications of a seperate thread calling invalidate while other
     # threads access the cache.
     path = path if os.path.isabs(path) else os.path.join(self._build_root, path)
-    self._parse.forget(self, path)
-    namespace = os.path.relpath(os.path.dirname(path), self._build_root)
+    normalized_path = self._normalize_parse_path(path)
+
+    self._parse.forget(self, normalized_path)
+    namespace = os.path.relpath(os.path.dirname(normalized_path), self._build_root)
     self.family.forget(self, namespace)
