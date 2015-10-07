@@ -504,7 +504,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                             .format(self.name(), vts.targets))
     else:
       # Do some reporting.
-      self.context.log.info(
+      self.context.log.debug(
         'Compiling ',
         items_to_report_element(sources, '{} source'.format(self.name())),
         ' in ',
