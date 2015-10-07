@@ -496,15 +496,19 @@ class _Coverage(_JUnitRunner):
       return self._coverage_filters
     else:
       classes_under_test = set()
-      classes_by_source = self._context.products.get_data('classes_by_source')
+      classpath_products = self._context.products.get_data('runtime_classpath')
 
       def add_sources_under_test(tgt):
         if self.is_coverage_target(tgt):
-          for source in tgt.sources_relative_to_buildroot():
-            source_products = classes_by_source.get(source)
-            if source_products:
-              for _, classes in source_products.rel_paths():
-                classes_under_test.update(_classfile_to_classname(cls) for cls in classes)
+          contents = ClasspathUtil.classpath_contents(
+              (tgt,),
+              classpath_products,
+              confs=self._task_exports.confs,
+              transitive=False)
+          for f in contents:
+            clsname = _classfile_to_classname(f)
+            if clsname:
+              classes_under_test.add(clsname)
 
       for target in targets:
         target.walk(add_sources_under_test)
