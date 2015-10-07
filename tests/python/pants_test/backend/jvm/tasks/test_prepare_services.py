@@ -119,34 +119,3 @@ class PrepareServicesTest(TaskTestBase):
 
       assert_contents(resource_files['ServiceInterfaceA'], ['ServiceImplA1, ServiceImplA2'])
       assert_contents(resource_files['ServiceInterfaceC'], ['ServiceImplC1'])
-
-  def test_relative_resource_paths_none(self):
-    task = self.create_task(self.context())
-
-    target = self.make_target('java:target', target_type=JavaLibrary)
-    relative_resource_paths = task.relative_resource_paths(target, '/chroot/path/does/not/matter')
-    self.assertEqual([], relative_resource_paths)
-
-    self.reset_build_graph()
-    target = self.make_target('java:target', target_type=JavaLibrary, services={})
-    relative_resource_paths = task.relative_resource_paths(target, '/chroot/path/does/not/matter')
-    self.assertEqual([], relative_resource_paths)
-
-    self.reset_build_graph()
-    target = self.make_target('java:target',
-                              target_type=JavaLibrary,
-                              services={'ServiceInterface': []})
-    relative_resource_paths = task.relative_resource_paths(target, '/chroot/path/does/not/matter')
-    self.assertEqual([], relative_resource_paths)
-
-  def test_relative_resource_paths(self):
-    task = self.create_task(self.context())
-    target = self.make_target('java:target',
-                              target_type=JavaLibrary,
-                              services={'ServiceInterfaceA': ['ServiceImplA1, ServiceImplA2'],
-                                        'ServiceInterfaceB': [],
-                                        'ServiceInterfaceC': ['ServiceImplC1']})
-    relative_resource_paths = task.relative_resource_paths(target, '/chroot/path/does/not/matter')
-    self.assertEqual(sorted(os.path.join('META-INF', 'services', svc)
-                            for svc in ('ServiceInterfaceA', 'ServiceInterfaceC')),
-                     sorted(relative_resource_paths))

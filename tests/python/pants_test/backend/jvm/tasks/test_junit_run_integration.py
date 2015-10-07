@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import codecs
 import os.path
 from unittest import skipIf
 
@@ -53,7 +54,13 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
       # validate that the expected coverage file exists, and it reflects 100% line rate coverage
       coverage_xml = os.path.join(results.workdir, 'test/junit/coverage/xml/coverage.xml')
       self.assertTrue(os.path.isfile(coverage_xml))
-      self.assertIn('line-rate="1.0"', open(coverage_xml).read())
+      with codecs.open(coverage_xml, 'r', encoding='utf8') as xml:
+        self.assertIn('line-rate="1.0"', xml.read())
+      # validate that the html report was able to find sources for annotation
+      cucumber_src_html = os.path.join(results.workdir, 'test/junit/coverage/html/org.pantsbuild.testproject.unicode.cucumber.CucumberAnnotatedExample.html')
+      self.assertTrue(os.path.isfile(cucumber_src_html))
+      with codecs.open(cucumber_src_html, 'r', encoding='utf8') as src:
+        self.assertIn('String pleasantry()', src.read())
 
   def test_junit_run_against_invalid_class_fails(self):
     pants_run = self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest_BAD_CLASS', 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])

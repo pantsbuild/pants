@@ -20,6 +20,7 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -62,8 +63,7 @@ _TaskExports = namedtuple('_TaskExports',
 
 
 def _classfile_to_classname(cls):
-  clsname, _ = os.path.splitext(cls.replace('/', '.'))
-  return clsname
+  return ClasspathUtil.classname_for_rel_classfile(cls)
 
 
 class _JUnitRunner(object):
@@ -312,7 +312,7 @@ class _JUnitRunner(object):
                                                     self._infer_workdir,
                                                     lambda target: target.test_platform)
 
-    # the below will be None if not set, and we'll default back to compile_classpath
+    # the below will be None if not set, and we'll default back to runtime_classpath
     classpath_product = self._context.products.get_data('instrument_classpath')
 
     result = 0
@@ -393,16 +393,17 @@ class _JUnitRunner(object):
     :param list targets: list of targets to calculate test classes for.
     generates tuples (class_name, target).
     """
-    targets_to_classes = self._context.products.get_data('classes_by_target')
-    if targets_to_classes is None:
-      return
-
+    classpath_products = self._context.products.get_data('runtime_classpath')
     for target in targets:
-      target_products = targets_to_classes.get(target)
-      if target_products:
-        for _, classes in target_products.rel_paths():
-          for cls in classes:
-            yield (_classfile_to_classname(cls), target)
+      contents = ClasspathUtil.classpath_contents(
+          (target,),
+          classpath_products,
+          confs=self._task_exports.confs,
+          transitive=False)
+      for f in contents:
+        classname = ClasspathUtil.classname_for_rel_classfile(f)
+        if classname:
+          yield (classname, target)
 
   def _classnames_from_source_file(self, srcfile):
     relsrc = os.path.relpath(srcfile, get_buildroot())
@@ -511,7 +512,7 @@ class _Coverage(_JUnitRunner):
       return classes_under_test
 
   def initialize_instrument_classpath(self, targets):
-    """Clones the existing compile_classpath and corresponding binaries to instrumentation specific
+    """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
     paths.
 
     :param targets: the targets which should be mutated.
@@ -519,8 +520,8 @@ class _Coverage(_JUnitRunner):
     """
     safe_mkdir(self._coverage_instrument_dir, clean=True)
 
-    compile_classpath = self._context.products.get_data('compile_classpath')
-    self._context.products.safe_create_data('instrument_classpath', compile_classpath.copy)
+    runtime_classpath = self._context.products.get_data('runtime_classpath')
+    self._context.products.safe_create_data('instrument_classpath', runtime_classpath.copy)
     instrumentation_classpath = self._context.products.get_data('instrument_classpath')
 
     for target in targets:
@@ -542,7 +543,7 @@ class _Coverage(_JUnitRunner):
         instrumentation_classpath.remove_for_target(target, [(config, path)])
         instrumentation_classpath.add_for_target(target, [(config, new_path)])
         self._context.log.debug(
-          "compile_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+          "runtime_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
     return instrumentation_classpath
 
 
@@ -744,24 +745,6 @@ class Cobertura(_Coverage):
                     classpath_prepend=self._task_exports.tool_classpath('cobertura-run'),
                     extra_jvm_options=['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile])
 
-  def _build_sources_by_class(self):
-    """Invert classes_by_source."""
-
-    classes_by_source = self._context.products.get_data('classes_by_source')
-    source_by_class = dict()
-    for source_file, source_products in classes_by_source.items():
-      for root, products in source_products.rel_paths():
-        for product in products:
-          if not '$' in product:
-            if source_by_class.get(product):
-              if source_by_class.get(product) != source_file:
-                self._context.log.warn(
-                  'Inconsistency finding source for class {0}: already had {1}, also found {2}'
-                  .format(product, source_by_class.get(product), source_file))
-            else:
-              source_by_class[product] = source_file
-    return source_by_class
-
   def report(self, targets, tests, tests_failed_exception=None):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping report...')
@@ -773,53 +756,12 @@ class Cobertura(_Coverage):
       else:
         return
     cobertura_cp = self._task_exports.tool_classpath('cobertura-report')
-    # Link files in the real source tree to files named using the classname.
-    # Do not include class file names containing '$', as these will always have
-    # a corresponding $-less class file, and they all point back to the same
-    # source.
-    # Put all these links to sources under self._coverage_dir/src
-    all_classes = set()
-    for basedir, classes in self._rootdirs.items():
-      all_classes.update([cls for cls in classes if '$' not in cls])
-    sources_by_class = self._build_sources_by_class()
-    coverage_source_root_dir = os.path.join(self._coverage_dir, 'src')
-    safe_rmtree(coverage_source_root_dir)
-    for cls in all_classes:
-      source_file = sources_by_class.get(cls)
-      if source_file:
-        # the class in @cls
-        #    (e.g., 'org/pantsbuild/example/hello/welcome/WelcomeEverybody.class')
-        # was compiled from the file in @source_file
-        #    (e.g., 'src/scala/org/pantsbuild/example/hello/welcome/Welcome.scala')
-        # Note that, in the case of scala files, the path leading up to Welcome.scala does not
-        # have to match the path in the corresponding .class file AT ALL. In this example,
-        # @source_file could very well have been 'src/hello-kitty/Welcome.scala'.
-        # However, cobertura expects the class file path to match the corresponding source
-        # file path below the source base directory(ies) (passed as (a) positional argument(s)),
-        # while it still gets the source file basename from the .class file.
-        # Here we create a fake hierachy under coverage_dir/src to mimic what cobertura expects.
-
-        class_dir = os.path.dirname(cls)   # e.g., 'org/pantsbuild/example/hello/welcome'
-        fake_source_directory = os.path.join(coverage_source_root_dir, class_dir)
-        safe_mkdir(fake_source_directory)
-        fake_source_file = os.path.join(fake_source_directory, os.path.basename(source_file))
-        try:
-          os.symlink(os.path.relpath(source_file, fake_source_directory),
-                     fake_source_file)
-        except OSError as e:
-          # These warnings appear when source files contain multiple classes.
-          self._context.log.warn(
-            'Could not symlink {0} to {1}: {2}'.format(source_file, fake_source_file, e))
-      else:
-        self._context.log.error('class {0} does not exist in a source file!'.format(cls))
-    report_formats = []
-    report_formats.append('xml')
-    report_formats.append('html')
-    for report_format in report_formats:
+    source_roots = { t.target_base for t in targets if self.is_coverage_target(t) }
+    for report_format in ['xml', 'html']:
       report_dir = os.path.join(self._coverage_dir, report_format)
       safe_mkdir(report_dir, clean=True)
-      args = [
-        coverage_source_root_dir,
+      args = list(source_roots)
+      args += [
         '--datafile',
         self._coverage_datafile,
         '--destination',
@@ -864,10 +806,10 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(options, round_manager)
-    round_manager.require_data('resources_by_target')
 
-    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
-    round_manager.require_data('classes_by_target')
+    # Compilation and resource preparation must have completed.
+    round_manager.require_data('runtime_classpath')
+    # TODO: Make this product optional based on whether a sourcefile has been specified.
     round_manager.require_data('classes_by_source')
 
   def __init__(self, *args, **kwargs):

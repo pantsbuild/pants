@@ -17,10 +17,10 @@ from pants.backend.android.targets.android_resources import AndroidResources
 from pants.backend.android.targets.android_target import AndroidTarget
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import chmod_plus_x, touch
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
-class TestAndroidBase(TaskTestBase):
+class TestAndroidBase(JvmToolTaskTestBase):
   """Base class for Android tests that provides some mock structures useful for testing."""
 
   @staticmethod

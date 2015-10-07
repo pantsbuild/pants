@@ -208,10 +208,12 @@ python_tests(
   name = 'jvm_dependency_usage',
   sources = ['test_jvm_dependency_usage.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:jvm_dependency_usage',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/goal:products',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -282,12 +284,12 @@ python_tests(
   name = 'resources_task',
   sources = ['test_resources_task.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:resources_task',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-    'src/python/pants/goal:products',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]

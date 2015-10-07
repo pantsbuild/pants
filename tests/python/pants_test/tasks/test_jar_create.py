@@ -124,42 +124,51 @@ class JarCreateExecuteTest(JarCreateTestBase):
       **kwargs)
 
   def assert_jar_contents(self, context, product_type, target, *contents):
+    """Contents is a list of lists representing contents from particular classpath entries.
+
+    Ordering across classpath entries is guaranteed, but not within classpath entries.
+    """
     jar_mapping = context.products.get(product_type).get(target)
     self.assertEqual(1, len(jar_mapping))
     for basedir, jars in jar_mapping.items():
       self.assertEqual(1, len(jars))
       with open_zip(os.path.join(basedir, jars[0])) as jar:
-        self.assertEqual(['META-INF/', 'META-INF/MANIFEST.MF'] + list(contents), jar.namelist())
-        for content in contents:
-          if not content.endswith('/'):
-            with closing(jar.open(content)) as fp:
-              self.assertEqual(os.path.basename(content), fp.read())
+        actual_iter = iter(jar.namelist())
+        self.assertPrefixEqual(['META-INF/', 'META-INF/MANIFEST.MF'], actual_iter)
+        for content_set in list(contents):
+          self.assertUnorderedPrefixEqual(content_set, actual_iter)
+          for content in content_set:
+            if not content.endswith('/'):
+              with closing(jar.open(content)) as fp:
+                self.assertEqual(os.path.basename(content), fp.read())
 
   @ensure_cached(JarCreate)
   def test_classfile_jar_contents(self):
     context = self.context()
-    with self.add_data(context.products, 'classes_by_target', self.jl, 'a.class', 'b.class'):
-      with self.add_data(context.products, 'classes_by_target', self.sl, 'c.class'):
-        with self.add_data(context.products, 'classes_by_target', self.binary, 'b.class'):
-          with self.add_data(context.products,
-                             'resources_by_target',
-                             self.res,
-                             'r.txt.transformed'):
-            with self.add_data(context.products, 'classes_by_target', self.scala_lib,
-                               'scala_foo.class', 'java_foo.class'):
-              self.execute(context)
 
-              self.assert_jar_contents(context, 'jars', self.jl,
-                                        'a.class', 'b.class', 'r.txt.transformed')
-              self.assert_jar_contents(context, 'jars', self.sl, 'c.class')
-              self.assert_jar_contents(context, 'jars', self.binary,
-                                        'b.class', 'r.txt.transformed')
-              self.assert_jar_contents(context, 'jars', self.scala_lib, 'scala_foo.class',
-                                        'java_foo.class')
+    def idict(*args):
+      return {a: a for a in args}
+
+    self.add_to_runtime_classpath(context, self.jl, idict('a.class', 'b.class'))
+    self.add_to_runtime_classpath(context, self.sl, idict('c.class'))
+    self.add_to_runtime_classpath(context, self.binary, idict('b.class'))
+    self.add_to_runtime_classpath(context, self.scala_lib, idict('scala_foo.class', 'java_foo.class'))
+    self.add_to_runtime_classpath(context, self.res, idict('r.txt.transformed'))
+
+    self.execute(context)
+
+    self.assert_jar_contents(context, 'jars', self.jl, ['a.class', 'b.class'], ['r.txt.transformed'])
+    self.assert_jar_contents(context, 'jars', self.sl, ['c.class'])
+    self.assert_jar_contents(context, 'jars', self.binary, ['b.class'], ['r.txt.transformed'])
+    self.assert_jar_contents(context, 'jars', self.scala_lib, ['scala_foo.class', 'java_foo.class'])
 
   def test_empty_scala_files(self):
     context = self.context()
-    with self.add_data(context.products, 'classes_by_target', self.empty_sl):
-      with self.add_data(context.products, 'resources_by_target', self.res, 'r.txt.transformed'):
-        self.execute(context)
-        self.assertFalse(context.products.get('jars').has(self.empty_sl))
+
+    # Create classpaths for other libraries, in order to initialize the product.
+    self.add_to_runtime_classpath(context, self.sl, {})
+    self.add_to_runtime_classpath(context, self.res, {'r.txt.transformed': ''})
+
+    self.execute(context)
+
+    self.assertFalse(context.products.get('jars').has(self.empty_sl))

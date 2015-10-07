@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from pex.compatibility import to_bytes
 
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
@@ -42,8 +43,7 @@ class DuplicateDetector(JvmBinaryTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(DuplicateDetector, cls).prepare(options, round_manager)
-    round_manager.require_data('resources_by_target')
-    round_manager.require_data('classes_by_target')
+    round_manager.require_data('runtime_classpath')
 
   def __init__(self, *args, **kwargs):
     super(DuplicateDetector, self).__init__(*args, **kwargs)
@@ -83,21 +83,15 @@ class DuplicateDetector(JvmBinaryTask):
 
   def _get_internal_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    resources_by_target = self.context.products.get_data('resources_by_target')
+    classpath_products = self.context.products.get_data('runtime_classpath')
 
-    target_products = classes_by_target.get(binary_target)
-    if target_products:  # Will be None if binary_target has no sources.
-      for _, classes in target_products.rel_paths():
-        for cls in classes:
-          artifacts_by_file_name[cls].add(binary_target)
-
-    target_resources = []
-    if binary_target.has_resources:
-      target_resources.extend(resources_by_target.get(r) for r in binary_target.resources)
-
-    for r in target_resources:
-      artifacts_by_file_name[r].add(binary_target)
+    # Select classfiles from the classpath.
+    target = binary_target
+    targets = ([target] + target.resources) if target.has_resources else [target]
+    contents = ClasspathUtil.classpath_contents(targets, classpath_products, transitive=False)
+    for f in contents:
+      if not f.endswith('/'):
+        artifacts_by_file_name[f].add(target)
     return artifacts_by_file_name
 
   def _get_external_dependencies(self, binary_target):
