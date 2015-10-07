@@ -819,8 +819,8 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   @classmethod
   def request_classes_by_source(cls, test_specs):
     """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
-    for spec in test_specs:
-      src_spec, _ = interpret_test_spec
+    for test_spec in test_specs:
+      src_spec, _ = interpret_test_spec(test_spec)
       if src_spec:
         return True
     return False
