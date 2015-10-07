@@ -5,11 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from collections import defaultdict
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
 from pants.goal.products import MultipleRootedProducts
+from pants.util.dirutil import safe_mkdir, touch
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -19,12 +22,21 @@ class TestJvmDependencyUsage(TaskTestBase):
   def task_type(cls):
     return JvmDependencyUsage
 
-  def _setup(self):
-    context = self.context()
-    classes_by_target = context.products.get_data('classes_by_target',
-                                                  lambda: defaultdict(MultipleRootedProducts))
+  def _setup(self, target_classfiles):
+    """Takes a dict mapping targets to lists of classfiles."""
+    context = self.context(target_roots=target_classfiles.keys())
+
+    # Create classfiles in a target-specific directory, and add it to the classpath for the target.
+    classpath_products = context.products.get_data('runtime_classpath', ClasspathProducts)
+    for target, classfiles in target_classfiles.items():
+      target_dir = os.path.join(self.test_workdir, target.id)
+      safe_mkdir(target_dir)
+      for classfile in classfiles:
+        touch(os.path.join(target_dir, classfile))
+      classpath_products.add_for_target(target, [('default', target_dir)])
+
     product_deps_by_src = context.products.get_data('product_deps_by_src', dict)
-    return context, classes_by_target, product_deps_by_src
+    return self.create_task(context), product_deps_by_src
 
   def make_java_target(self, *args, **kwargs):
     assert 'target_type' not in kwargs
@@ -40,16 +52,16 @@ class TestJvmDependencyUsage(TaskTestBase):
     t2 = self.make_java_target(spec=':t2', sources=['c.java'], dependencies=[t1])
     t3 = self.make_java_target(spec=':t3', sources=['d.java', 'e.java'], dependencies=[t1])
     self.set_options(size_estimator='filecount')
-    context, classes_by_target, product_deps_by_src = self._setup()
-    classes_by_target[t1].add_rel_paths('', ['a.class', 'b.class'])
-    classes_by_target[t2].add_rel_paths('', ['c.class'])
-    classes_by_target[t3].add_rel_paths('', ['d.class', 'e.class'])
+    dep_usage, product_deps_by_src = self._setup({
+        t1: ['a.class', 'b.class'],
+        t2: ['c.class'],
+        t3: ['d.class', 'e.class'],
+      })
     product_deps_by_src[t1] = {}
     product_deps_by_src[t2] = {'c.java': ['a.class']}
     product_deps_by_src[t3] = {'d.java': ['a.class', 'b.class'],
                                'e.java': ['a.class', 'b.class']}
 
-    dep_usage = self.create_task(context)
     graph = dep_usage.create_dep_usage_graph([t1, t2, t3], '')
 
     self.assertEqual(graph._nodes[t1].products_total, 2)
@@ -75,18 +87,18 @@ class TestJvmDependencyUsage(TaskTestBase):
                                sources=['a.java', 'b.java'],
                                dependencies=[t1, t1_x, t1_y, t1_z])
     self.set_options(size_estimator='nosize')
-    context, classes_by_target, product_deps_by_src = self._setup()
-    classes_by_target[t1_x].add_rel_paths('', ['x1.class'])
-    classes_by_target[t1_y].add_rel_paths('', ['y1.class'])
-    classes_by_target[t1_z].add_rel_paths('', ['z1.class', 'z2.class', 'z3.class'])
-    classes_by_target[t2].add_rel_paths('', ['a.class', 'b.class'])
+    dep_usage, product_deps_by_src = self._setup({
+        t1_x: ['x1.class'],
+        t1_y: ['y1.class'],
+        t1_z: ['z1.class', 'z2.class', 'z3.class'],
+        t2: ['a.class', 'b.class'],
+      })
     product_deps_by_src[t1] = {}
     product_deps_by_src[t1_x] = {}
     product_deps_by_src[t1_y] = {}
     product_deps_by_src[t1_z] = {}
     product_deps_by_src[t2] = {'a.java': ['x1.class'],
                                'b.java': ['z1.class', 'z2.class']}
-    dep_usage = self.create_task(context)
     graph = dep_usage.create_dep_usage_graph([t1, t1_x, t1_y, t1_z, t2], '')
 
     self.assertEqual(graph._nodes[t1].products_total, 5)

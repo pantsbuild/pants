@@ -15,24 +15,33 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
   def test_run_repl(self):
     command = ['-q',
                'repl',
-               'contrib/node/examples/3rdparty/node:typ']
+               'contrib/node/examples/3rdparty/node/react']
     program = dedent("""
-        var typ = require('typ');
-        console.log("type of boolean is: " + typ.BOOLEAN);
+        var React = require('react');
+        var HelloWorldClass = React.createClass({
+          render: function() {
+            return React.createElement("div", null, "Hello World");
+          }
+        });
+        console.log(React.renderToStaticMarkup(React.createElement(HelloWorldClass)));
       """)
     pants_run = self.run_pants(command=command, stdin_data=program)
 
     self.assert_success(pants_run)
-    self.assertEqual('type of boolean is: boolean', pants_run.stdout_data.strip())
+    self.assertEqual('<div>Hello World</div>', pants_run.stdout_data.strip())
 
   def test_run_repl_passthrough(self):
+    eval_string = (
+      'var React = require("react");'
+      'console.log(React.renderToStaticMarkup(React.createElement("div", null, "Hello World")));'
+    )
     command = ['-q',
                'repl',
-               'contrib/node/examples/3rdparty/node:typ',
+               'contrib/node/examples/3rdparty/node/react',
                '--',
                '--eval',
-               'var typ = require("typ"); console.log("type of boolean is: " + typ.BOOLEAN)']
+               eval_string]
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
-    self.assertEqual('type of boolean is: boolean', pants_run.stdout_data.strip())
+    self.assertEqual('<div>Hello World</div>', pants_run.stdout_data.strip())

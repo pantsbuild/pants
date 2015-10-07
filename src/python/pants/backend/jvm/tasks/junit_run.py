@@ -15,10 +15,12 @@ from collections import defaultdict, namedtuple
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
+from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
@@ -29,7 +31,7 @@ from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
-from pants.util.strutil import safe_shlex_split
+from pants.util.strutil import pluralize, safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
@@ -55,12 +57,12 @@ _TaskExports = namedtuple('_TaskExports',
                            'confs',
                            'register_jvm_tool',
                            'tool_classpath',
-                           'workdir'])
+                           'workdir',
+                           'test_targets'])
 
 
 def _classfile_to_classname(cls):
-  clsname, _ = os.path.splitext(cls.replace('/', '.'))
-  return clsname
+  return ClasspathUtil.classname_for_rel_classfile(cls)
 
 
 class _JUnitRunner(object):
@@ -70,7 +72,6 @@ class _JUnitRunner(object):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register('--skip', action='store_true', help='Skip running junit.')
     register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
@@ -95,10 +96,16 @@ class _JUnitRunner(object):
              help='If true, will strictly require running junits with the same version of java as '
                   'the platform -target level. Otherwise, the platform -target level will be '
                   'treated as the minimum jvm to run.')
+    register('--failure-summary', action='store_true', default=True,
+             help='If true, includes a summary of which test-cases failed at the end of a failed '
+                  'junit run.')
+    register('--allow-empty-sources', action='store_true', default=False, advanced=True,
+             help='Allows a junit_tests() target to be defined with no sources.  Otherwise,'
+                  'such a target will raise an error during the test run.')
     register_jvm_tool(register,
                       'junit',
                       classpath=[
-                        JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.8'),
+                        JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.10'),
                       ],
                       main=JUnitRun._MAIN,
                       # TODO(John Sirois): Investigate how much less we can get away with.
@@ -120,6 +127,7 @@ class _JUnitRunner(object):
     self._working_dir = options.cwd or get_buildroot()
     self._strict_jvm_version = options.strict_jvm_version
     self._args = copy.copy(task_exports.args)
+    self._failure_summary = options.failure_summary
     if options.suppress_output:
       self._args.append('-suppress-output')
     if self._fail_fast:
@@ -144,9 +152,10 @@ class _JUnitRunner(object):
     # But if coverage options are specified, we want to instrument
     # and report on all the original targets, not just the test targets.
     #
-    # Thus, we filter out the non-java-tests targets first but
-    # keep the original targets set intact for coverages.
-    tests_and_targets = self._collect_test_targets(targets)
+    # We've already filtered out the non-test targets in the
+    # TestTaskMixin, so the mixin passes to us both the test
+    # targets and the unfiltered list of targets
+    tests_and_targets = self._collect_test_targets(self._task_exports.test_targets)
 
     if not tests_and_targets:
       return
@@ -223,10 +232,9 @@ class _JUnitRunner(object):
     for these tests instead.
     """
 
-    java_tests_targets = list(self._test_target_candidates(targets))
-    tests_from_targets = dict(list(self._calculate_tests_from_targets(java_tests_targets)))
+    tests_from_targets = dict(list(self._calculate_tests_from_targets(targets)))
 
-    if java_tests_targets and self._tests_to_run:
+    if targets and self._tests_to_run:
       # If there are some junit_test targets in the graph, find ones that match the requested
       # test(s).
       tests_with_targets = {}
@@ -250,9 +258,13 @@ class _JUnitRunner(object):
       return tests_from_targets
 
   def _get_failed_targets(self, tests_and_targets):
-    """Return a list of failed targets.
+    """Return a mapping of target -> set of individual test cases that failed.
+
+    Targets with no failed tests are omitted.
 
     Analyzes JUnit XML files to figure out which test had failed.
+
+    The individual test cases are formatted strings of the form org.foo.bar.classname#methodName.
 
     :tests_and_targets: {test: target} mapping.
     """
@@ -260,7 +272,7 @@ class _JUnitRunner(object):
     def get_test_filename(test):
       return os.path.join(self._task_exports.workdir, 'TEST-{0}.xml'.format(test))
 
-    failed_targets = []
+    failed_targets = defaultdict(set)
 
     for test, target in tests_and_targets.items():
       if target is None:
@@ -278,11 +290,18 @@ class _JUnitRunner(object):
           int_errors = int(str_errors)
 
           if target and (int_failures or int_errors):
-            failed_targets.append(target)
+            for testcase in xml.parsed.getElementsByTagName('testcase'):
+              test_failed = testcase.getElementsByTagName('failure')
+              test_errored = testcase.getElementsByTagName('error')
+              if test_failed or test_errored:
+                failed_targets[target].add('{testclass}#{testname}'.format(
+                  testclass=testcase.getAttribute('classname'),
+                  testname=testcase.getAttribute('name'),
+                ))
         except (XmlParser.XmlError, ValueError) as e:
           self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
 
-    return failed_targets
+    return dict(failed_targets)
 
   def _run_tests(self, tests_to_targets, extra_jvm_options=None,
                  classpath_prepend=(), classpath_append=()):
@@ -292,7 +311,7 @@ class _JUnitRunner(object):
                                                     self._infer_workdir,
                                                     lambda target: target.test_platform)
 
-    # the below will be None if not set, and we'll default back to compile_classpath
+    # the below will be None if not set, and we'll default back to runtime_classpath
     classpath_product = self._context.products.get_data('instrument_classpath')
 
     result = 0
@@ -326,12 +345,20 @@ class _JUnitRunner(object):
             break
 
     if result != 0:
-      failed_targets = self._get_failed_targets(tests_to_targets)
-      raise TestFailedTaskError(
-        'java {0} ... exited non-zero ({1}); {2} failed targets.'
-        .format(JUnitRun._MAIN, result, len(failed_targets)),
-        failed_targets=failed_targets
+      failed_targets_and_tests = self._get_failed_targets(tests_to_targets)
+      failed_targets = sorted(failed_targets_and_tests, key=lambda target: target.address.spec)
+      error_message_lines = []
+      if self._failure_summary:
+        for target in failed_targets:
+          error_message_lines.append('\n{0}{1}'.format(' '*4, target.address.spec))
+          for test in sorted(failed_targets_and_tests[target]):
+            error_message_lines.append('{0}{1}'.format(' '*8, test))
+      error_message_lines.append(
+        '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
+        .format(main=JUnitRun._MAIN, code=result, failed=len(failed_targets),
+                targets=pluralize(len(failed_targets), 'target'))
       )
+      raise TestFailedTaskError('\n'.join(error_message_lines), failed_targets=list(failed_targets))
 
   def _infer_workdir(self, target):
     if target.cwd is not None:
@@ -360,23 +387,22 @@ class _JUnitRunner(object):
       for c in self._interpret_test_spec(test_spec):
         yield c
 
-  def _test_target_candidates(self, targets):
-    for target in targets:
-      if isinstance(target, junit_tests):
-        yield target
-
   def _calculate_tests_from_targets(self, targets):
     """
     :param list targets: list of targets to calculate test classes for.
     generates tuples (class_name, target).
     """
-    targets_to_classes = self._context.products.get_data('classes_by_target')
-    for target in self._test_target_candidates(targets):
-      target_products = targets_to_classes.get(target)
-      if target_products:
-        for _, classes in target_products.rel_paths():
-          for cls in classes:
-            yield (_classfile_to_classname(cls), target)
+    classpath_products = self._context.products.get_data('runtime_classpath')
+    for target in targets:
+      contents = ClasspathUtil.classpath_contents(
+          (target,),
+          classpath_products,
+          confs=self._task_exports.confs,
+          transitive=False)
+      for f in contents:
+        classname = ClasspathUtil.classname_for_rel_classfile(f)
+        if classname:
+          yield (classname, target)
 
   def _classnames_from_source_file(self, srcfile):
     relsrc = os.path.relpath(srcfile, get_buildroot())
@@ -485,7 +511,7 @@ class _Coverage(_JUnitRunner):
       return classes_under_test
 
   def initialize_instrument_classpath(self, targets):
-    """Clones the existing compile_classpath and corresponding binaries to instrumentation specific
+    """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
     paths.
 
     :param targets: the targets which should be mutated.
@@ -493,8 +519,8 @@ class _Coverage(_JUnitRunner):
     """
     safe_mkdir(self._coverage_instrument_dir, clean=True)
 
-    compile_classpath = self._context.products.get_data('compile_classpath')
-    self._context.products.safe_create_data('instrument_classpath', compile_classpath.copy)
+    runtime_classpath = self._context.products.get_data('runtime_classpath')
+    self._context.products.safe_create_data('instrument_classpath', runtime_classpath.copy)
     instrumentation_classpath = self._context.products.get_data('instrument_classpath')
 
     for target in targets:
@@ -516,7 +542,7 @@ class _Coverage(_JUnitRunner):
         instrumentation_classpath.remove_for_target(target, [(config, path)])
         instrumentation_classpath.add_for_target(target, [(config, new_path)])
         self._context.log.debug(
-          "compile_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+          "runtime_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
     return instrumentation_classpath
 
 
@@ -582,7 +608,8 @@ class Emma(_Coverage):
     def collect_source_base(target):
       if self.is_coverage_target(target):
         source_bases.add(target.target_base)
-    for target in self._test_target_candidates(targets):
+
+    for target in targets:
       target.walk(collect_source_base)
     for source_base in source_bases:
       args.extend(['-sp', source_base])
@@ -758,7 +785,7 @@ class Cobertura(_Coverage):
       binary_util.ui_open(coverage_html_file)
 
 
-class JUnitRun(JvmToolTaskMixin, JvmTask):
+class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
@@ -778,10 +805,10 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(options, round_manager)
-    round_manager.require_data('resources_by_target')
 
-    # List of FQCN, FQCN#method, sourcefile or sourcefile#method.
-    round_manager.require_data('classes_by_target')
+    # Compilation and resource preparation must have completed.
+    round_manager.require_data('runtime_classpath')
+    # TODO: Make this product optional based on whether a sourcefile has been specified.
     round_manager.require_data('classes_by_source')
 
   def __init__(self, *args, **kwargs):
@@ -794,7 +821,8 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
                                 confs=self.confs,
                                 register_jvm_tool=self.register_jvm_tool,
                                 tool_classpath=self.tool_classpath,
-                                workdir=self.workdir)
+                                workdir=self.workdir,
+                                test_targets=self._get_test_targets())
 
     options = self.get_options()
     if options.coverage or options.is_flagged('coverage_open'):
@@ -808,14 +836,17 @@ class JUnitRun(JvmToolTaskMixin, JvmTask):
     else:
       self._runner = _JUnitRunner(task_exports, self.context)
 
-  def execute(self):
-    if not self.get_options().skip:
-      targets = self.context.targets()
-      # TODO: move this check to an optional phase in goal_runner, so
-      # that missing sources can be detected early.
-      for target in targets:
-        if isinstance(target, junit_tests) and not target.payload.sources.source_paths:
-          msg = 'JavaTests target must include a non-empty set of sources.'
-          raise TargetDefinitionException(target, msg)
+  def _test_target_filter(self):
+    def target_filter(target):
+      return isinstance(target, junit_tests)
+    return target_filter
 
-      self._runner.execute(targets)
+  def _validate_target(self, target):
+    # TODO: move this check to an optional phase in goal_runner, so
+    # that missing sources can be detected early.
+    if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
+      msg = 'JavaTests target must include a non-empty set of sources.'
+      raise TargetDefinitionException(target, msg)
+
+  def _execute(self, targets):
+    self._runner.execute(targets)

@@ -79,12 +79,12 @@ tell Pants about these inter-task dependencies...
 The "early" task class defines a `product_types` class method that
 returns a list of strings:
 
-!inc[start-at=  def product_types&end-at=resources_by_target](../backend/jvm/tasks/resources_task.py)
+!inc[start-at=  def product_types&end-at=runtime_classpath](../backend/jvm/tasks/resources_task.py)
 
 The "late" task defines a `prepare` method that calls
 `round_manager.require_data` to "require" one of those same strings:
 
-!inc[start-at=  def prepare&end-at=resources_by_target](../backend/jvm/tasks/detect_duplicates.py)
+!inc[start-at=  def prepare&end-at=runtime_classpath](../backend/jvm/tasks/detect_duplicates.py)
 
 Pants uses this information to determine which tasks must run first to
 prepare data required by other tasks. (If one task requires data that no
@@ -161,7 +161,7 @@ Specifically, the JVM compile tasks:
     :::python
     jvm_compile = GroupTask.named(
     'jvm-compilers',
-    product_type=['classes_by_target', 'classes_by_source'],
+    product_type=['compile_classpath', 'classes_by_source'],
     flag_namespace=['compile'])
 
     jvm_compile.add_member(ScalaCompile)

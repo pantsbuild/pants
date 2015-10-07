@@ -10,6 +10,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Brian Wickman
 + Chris Aniszczyk
 + Chris Chen
++ Chris Pesto
 + Cody Gibb
 + Craig Schertz
 + Dan Davydov

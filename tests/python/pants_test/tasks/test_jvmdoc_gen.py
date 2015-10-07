@@ -56,7 +56,7 @@ class JvmdocGenTest(TaskTestBase):
 
     self.targets = context.targets()
 
-    self.populate_compile_classpath(context)
+    self.populate_runtime_classpath(context)
 
     self.task = self.create_task(context, self.workdir)
 

@@ -57,26 +57,26 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                                            bundle_artifact,
                                                            tar_gz_artifact])
 
-    with self.add_data(context.products, 'classes_by_target', binary_target, 'Foo.class'):
-      with self.add_data(context.products, 'resources_by_target', binary_target, 'foo.txt'):
-        self.execute(context)
-        products = context.products.get('jvm_bundles')
-        self.assertIsNotNone(products)
-        product_data = products.get(app_target)
-        dist_root = os.path.join(self.build_root, 'dist')
-        self.assertEquals({dist_root: ['FooApp-bundle']}, product_data)
+    self.add_to_runtime_classpath(context, binary_target, {'Foo.class': '', 'foo.txt': ''})
 
-        bundle_root = os.path.join(dist_root, 'FooApp-bundle')
-        self.assertEqual(sorted(['foo-binary.jar',
-                                 'libs/org.example-foo-1.0.0.jar',
-                                 'libs/org.pantsbuild-bar-2.0.0.zip',
-                                 'libs/org.apache-baz-3.0.0-tests.jar',
-                                 'libs/org.gnu-gary-4.0.0.tar.gz']),
-                         sorted(self.iter_files(bundle_root)))
+    self.execute(context)
+    products = context.products.get('jvm_bundles')
+    self.assertIsNotNone(products)
+    product_data = products.get(app_target)
+    dist_root = os.path.join(self.build_root, 'dist')
+    self.assertEquals({dist_root: ['FooApp-bundle']}, product_data)
 
-        with open_zip(os.path.join(bundle_root, 'foo-binary.jar')) as jar:
-          self.assertEqual(sorted(['META-INF/', 'META-INF/MANIFEST.MF', 'Foo.class', 'foo.txt']),
-                           sorted(jar.namelist()))
+    bundle_root = os.path.join(dist_root, 'FooApp-bundle')
+    self.assertEqual(sorted(['foo-binary.jar',
+                             'libs/org.example-foo-1.0.0.jar',
+                             'libs/org.pantsbuild-bar-2.0.0.zip',
+                             'libs/org.apache-baz-3.0.0-tests.jar',
+                             'libs/org.gnu-gary-4.0.0.tar.gz']),
+                     sorted(self.iter_files(bundle_root)))
+
+    with open_zip(os.path.join(bundle_root, 'foo-binary.jar')) as jar:
+      self.assertEqual(sorted(['META-INF/', 'META-INF/MANIFEST.MF', 'Foo.class', 'foo.txt']),
+                       sorted(jar.namelist()))
 
   def test_jvm_bundle_missing_product(self):
     binary_target = self.make_target(spec='//foo:foo-binary',
@@ -96,7 +96,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                             conf='default',
                                             resolved_jars=[jar_artifact])
 
-    with self.add_data(context.products, 'classes_by_target', binary_target, 'Foo.class'):
-      with self.add_data(context.products, 'resources_by_target', binary_target, 'foo.txt'):
-        with self.assertRaises(BundleCreate.MissingJarError):
-          self.execute(context)
+    self.add_to_runtime_classpath(context, binary_target, {'Foo.class': '', 'foo.txt': ''})
+
+    with self.assertRaises(BundleCreate.MissingJarError):
+      self.execute(context)

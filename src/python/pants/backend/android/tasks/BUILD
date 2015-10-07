@@ -65,11 +65,14 @@ python_library(
   name = 'dx_compile',
   sources = ['dx_compile.py'],
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:android_task',
     'src/python/pants/backend/core/tasks:common',
-    'src/python/pants/backend/jvm/tasks:unpack_jars',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/backend/jvm/tasks:unpack_jars',
     'src/python/pants/base:exceptions',
   ],
 )

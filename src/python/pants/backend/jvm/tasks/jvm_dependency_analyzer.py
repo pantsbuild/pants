@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from abc import abstractmethod
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -14,6 +15,7 @@ from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_graph import sort_targets
@@ -30,19 +32,17 @@ class JvmDependencyAnalyzer(Task):
   """
 
   @classmethod
-  def prepare(cls, options, round_manager):
-    super(JvmDependencyAnalyzer, cls).prepare(options, round_manager)
-    if not options.skip:
-      round_manager.require_data('classes_by_target')
-      round_manager.require_data('compile_classpath')
-      round_manager.require_data('product_deps_by_src')
+  @abstractmethod
+  def skip(cls, options):
+    """Return true if the task should be entirely skipped, and thus have no product requirements."""
+    pass
 
   @classmethod
-  def register_options(cls, register):
-    super(JvmDependencyAnalyzer, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             fingerprint=True,
-             help='Skip this entire task.')
+  def prepare(cls, options, round_manager):
+    super(JvmDependencyAnalyzer, cls).prepare(options, round_manager)
+    if not cls.skip(options):
+      round_manager.require_data('runtime_classpath')
+      round_manager.require_data('product_deps_by_src')
 
   @memoized_property
   def targets_by_file(self):
@@ -54,6 +54,7 @@ class JvmDependencyAnalyzer(Task):
     "canonical" target will be the first one in the list of targets.
     """
     targets_by_file = defaultdict(OrderedSet)
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
 
     # Compute src -> target.
     self.context.log.debug('Mapping sources...')
@@ -69,24 +70,17 @@ class JvmDependencyAnalyzer(Task):
           for src in java_source.sources_relative_to_buildroot():
             targets_by_file[os.path.join(buildroot, src)].add(target)
 
-    # Compute class -> target.
-    self.context.log.debug('Mapping classes...')
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    for tgt, target_products in classes_by_target.items():
-      for classes_dir, classes in target_products.rel_paths():
-        for cls in classes:
-          targets_by_file[cls].add(tgt)
-          targets_by_file[os.path.join(classes_dir, cls)].add(tgt)
-
-    # Compute jar -> target.
-    self.context.log.debug('Mapping jars...')
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    for jar_lib in self.context.targets(lambda t: isinstance(t, JarLibrary)):
-      for _, artifact_path in compile_classpath.get_for_target(jar_lib, transitive=False):
-        targets_by_file[artifact_path].add(jar_lib)
-        if artifact_path.endswith('.jar'):
-          for cls in self._jar_classfiles(artifact_path):
-            targets_by_file[cls].add(jar_lib)
+    # Compute classfile -> target and jar -> target.
+    self.context.log.debug('Mapping classpath...')
+    for target in self.context.targets():
+      # Classpath content.
+      files = ClasspathUtil.classpath_contents((target,), runtime_classpath, transitive=False)
+      # And jars; for binary deps, zinc doesn't emit precise deps (yet).
+      cp_entries = ClasspathUtil.classpath_entries((target,), runtime_classpath, transitive=False)
+      jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
+      for coll in [files, jars]:
+        for f in coll:
+          targets_by_file[f].add(target)
 
     return targets_by_file
 

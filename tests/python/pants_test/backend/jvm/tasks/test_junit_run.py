@@ -130,20 +130,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # in that bug, the resources target must be the first one in the list.
     context = self.context(target_roots=[resources, java_tests])
 
-    # Before we run the task, we need to inject the "classes_by_target" with
+    # Before we run the task, we need to inject the "runtime_classpath" with
     # the compiled test java classes that JUnitRun will know which test
-    # classes to execute. In a normal run, this "classes_by_target" will be
-    # populated by java compiling step.
-    class_products = context.products.get_data(
-      'classes_by_target', lambda: defaultdict(MultipleRootedProducts))
-    java_tests_products = MultipleRootedProducts()
-    java_tests_products.add_rel_paths(test_abs_path, ['FooTest.class'])
-    class_products[java_tests] = java_tests_products
-
-    # Also we need to add the FooTest.class's classpath to the compile_classpath
-    # products data mapping so JUnitRun will be able to add that into the final
-    # classpath under which the junit will be executed.
-    self.populate_compile_classpath(context=context, classpath=[test_abs_path])
+    # classes to execute. In a normal run, this "runtime_classpath" will be
+    # populated by java compilation step.
+    self.populate_runtime_classpath(context=context, classpath=[test_abs_path])
 
     # Finally execute the task.
     self.execute(context)
@@ -175,3 +166,16 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'must include a non-empty set of sources'):
       task.execute()
+
+  def test_allow_empty_sources(self):
+    self.add_to_build_file('foo', dedent('''
+        java_tests(
+          name='empty',
+          sources=[],
+        )
+        '''
+    ))
+    self.set_options(allow_empty_sources=True)
+    context = self.context(target_roots=[self.target('foo:empty')])
+    self.populate_runtime_classpath(context=context)
+    self.create_task(context).execute()

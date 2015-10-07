@@ -54,6 +54,3 @@ class PrepareServices(ResourcesTask):
           write_line('# Generated from pants target {}'.format(target.address.spec))
           for impl in impls:
             write_line(impl)
-
-  def relative_resource_paths(self, target, chroot):
-    return [self.service_info_path(service) for service, impls in target.services.items() if impls]

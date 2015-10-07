@@ -47,4 +47,31 @@ final class Util {
   static boolean isAssertionFailure(Failure failure) {
     return failure.getException() instanceof AssertionError;
   }
+
+  /**
+   * Returns a pants-friendly formatted description of the test-case.
+   *
+   * Pants likes test-cases formatted as org.foo.bar.TestClassName#testMethodName
+   *
+   * @param description The test description to produce a formatted name for.
+   * @return The formatted name of the test-case, if possible. If the Description does not have a
+   * class name or a method name, falls back on the description.getDisplayName().
+   */
+  static String getPantsFriendlyDisplayName(Description description) {
+    String className = description.getClassName();
+    String methodName = description.getMethodName();
+    String vanillaDisplayName = description.getDisplayName();
+    if (className.equals(vanillaDisplayName) || methodName.equals(vanillaDisplayName)) {
+      // This happens if the Description isn't actually describing a test method. We don't handle
+      // this, so just use the default formatting.
+      return vanillaDisplayName;
+    }
+
+    StringBuffer sb = new StringBuffer(className.length() + methodName.length() + 1);
+    sb.append(className);
+    sb.append("#");
+    sb.append(methodName);
+    return sb.toString();
+  }
+
 }
