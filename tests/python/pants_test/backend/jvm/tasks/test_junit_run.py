@@ -88,6 +88,43 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
+  def test_junit_runner_timeout_success(self):
+    self.set_options(timeout_default=1)
+    self.set_options(timeouts=True)
+    self.execute_junit_runner(
+      dedent("""
+        import org.junit.Test;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest {
+          @Test
+          public void testFoo() throws InterruptedException {
+            Thread.sleep(500);
+            assertTrue(5 > 3);
+          }
+        }
+      """)
+    )
+
+  def test_junit_runner_timeout_fail(self):
+    self.set_options(timeout_default=1)
+    self.set_options(timeouts=True)
+    with self.assertRaises(TaskError) as cm:
+      self.execute_junit_runner(
+        dedent("""
+          import org.junit.Test;
+          import static org.junit.Assert.assertTrue;
+          public class FooTest {
+            @Test
+            public void testFoo() throws InterruptedException {
+              Thread.sleep(2000);
+              assertTrue(5 > 3);
+            }
+          }
+        """)
+      )
+
+    self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+
   def execute_junit_runner(self, content):
 
     # Create the temporary base test directory
