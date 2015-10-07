@@ -817,13 +817,24 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
+  def request_classes_by_source(cls, test_specs):
+    """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
+    for spec in test_specs:
+      src_spec, _ = interpret_test_spec
+      if src_spec:
+        return True
+    return False
+
+  @classmethod
   def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(options, round_manager)
 
     # Compilation and resource preparation must have completed.
     round_manager.require_data('runtime_classpath')
-    # TODO: Make this product optional based on whether a sourcefile has been specified.
-    round_manager.require_data('classes_by_source')
+
+    # If the given test specs require the classes_by_source product, request it.
+    if cls.request_classes_by_source(options.test or []):
+      round_manager.require_data('classes_by_source')
 
   def __init__(self, *args, **kwargs):
     super(JUnitRun, self).__init__(*args, **kwargs)
