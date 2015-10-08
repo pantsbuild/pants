@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import importlib
 import inspect
+import threading
 from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 
@@ -54,12 +55,13 @@ def _object_decoder(obj, symbol_table=None):
 
 @memoized(key_factory=lambda t: tuple(sorted(t.items())) if t is not None else None)
 def _get_decoder(symbol_table=None):
-  return functools.partial(_object_decoder,
-                           symbol_table=symbol_table.__getitem__ if symbol_table else _as_type)
+  decoder = functools.partial(_object_decoder,
+                              symbol_table=symbol_table.__getitem__ if symbol_table else _as_type)
+  return JSONDecoder(encoding='UTF-8', object_hook=decoder, strict=True)
 
 
-def parse_json(json, symbol_table=None):
-  """Parses the given json encoded string into a list of top-level objects found.
+def parse_json(path, symbol_table=None):
+  """Parse the given json encoded string into a list of top-level objects found.
 
   The parser accepts both blank lines and comment lines (those beginning with optional whitespace
   followed by the '#' character) as well as more than one top-level JSON object.
@@ -68,14 +70,16 @@ def parse_json(json, symbol_table=None):
   This includes `namedtuple` subtypes as well as any custom class with an `_asdict` method defined;
   see :class:`pants.engine.exp.serializable.Serializable`.
 
-  :param string json: A json encoded document with extra support for blank lines, comments and
-                      multiple top-level objects.
+  :param string path: The path of a json encoded document with extra support for blank lines,
+                      comments and multiple top-level objects.
   :returns: A list of decoded json data.
   :rtype: list
   :raises: :class:`ParseError` if there were any problems encountered parsing the given `json`.
   """
+  with open(path) as fp:
+    json = fp.read()
 
-  decoder = JSONDecoder(encoding='UTF-8', object_hook=_get_decoder(symbol_table), strict=True)
+  decoder = _get_decoder(symbol_table)
 
   # Strip comment lines and blank lines, which we allow, but preserve enough information about the
   # stripping to constitute a reasonable error message that can be used to find the portion of the
@@ -174,7 +178,7 @@ def _object_encoder(obj, inline):
 
 
 def encode_json(obj, inline=False, **kwargs):
-  """Encodes the given object as json.
+  """Encode the given object as json.
 
   Supports objects that follow the `_asdict` protocol.  See `parse_json` for more information.
 
@@ -193,8 +197,8 @@ def encode_json(obj, inline=False, **kwargs):
   return encoder.encode(obj)
 
 
-def parse_python_assignments(python, symbol_table=None):
-  """Parses the given python code into a list of top-level addressable Serializable objects found.
+def python_assignments_parser(symbol_table=None):
+  """Return a parser that parses the given python code into a list of top-level objects found.
 
   Only Serializable objects assigned to top-level variables will be collected and returned.  These
   objects will be addressable via their top-level variable names in the parsed namespace.
@@ -204,39 +208,53 @@ def parse_python_assignments(python, symbol_table=None):
   :rtype: list
   :raises: :class:`ParseError` if there were any problems encountered parsing the given `python`.
   """
-  def aliased(type_name, object_type, **kwargs):
-    return object_type(type_alias=type_name, **kwargs)
+  def aliased(type_alias, object_type, **kwargs):
+    return object_type(type_alias=type_alias, **kwargs)
 
   parse_globals = {}
   for alias, symbol in (symbol_table or {}).items():
     parse_globals[alias] = functools.partial(aliased, alias, symbol)
 
-  symbols = {}
-  six.exec_(python, parse_globals, symbols)
-  objects = []
-  for name, obj in symbols.items():
-    if Serializable.is_serializable(obj):
-      attributes = obj._asdict().copy()
-      redundant_name = attributes.pop('name', name)
-      if redundant_name and redundant_name != name:
-        raise ParseError('The object named {!r} is assigned to a mismatching name {!r}'
-                         .format(redundant_name, name))
+  def parse(path):
+    symbols = {}
+    with open(path) as fp:
+      six.exec_(fp.read(), parse_globals, symbols)
+
+    objects = []
+    for name, obj in symbols.items():
+      if isinstance(obj, type):
+        # Allow type imports
+        continue
+
+      if not Serializable.is_serializable(obj):
+        raise ParseError('Found a non-serializable top-level object: {}'.format(obj))
+
+      attributes = obj._asdict()
+      if 'name' in attributes:
+        attributes = attributes.copy()
+        redundant_name = attributes.pop('name', None)
+        if redundant_name and redundant_name != name:
+          raise ParseError('The object named {!r} is assigned to a mismatching name {!r}'
+                           .format(redundant_name, name))
       obj_type = type(obj)
       named_obj = obj_type(name=name, **attributes)
       objects.append(named_obj)
-  return objects
+    return objects
+
+  return parse
 
 
-def parse_python_callbacks(python, symbol_table):
-  """Parses the given python code into a list of top-level addressable Serializable objects found.
+def python_callbacks_parser(symbol_table):
+  """Return a parser that parses the given python code into a list of top-level objects found.
 
   Only Serializable objects with `name`s will be collected and returned.  These objects will be
   addressable via their name in the parsed namespace.
 
-  :param string python: A python build file blob.
-  :returns: A list of decoded addressable, Serializable objects.
-  :rtype: list
-  :raises: :class:`ParseError` if there were any problems encountered parsing the given `python`.
+  :param dict symbol_table: The symbol table to expose to the python file being parsed.
+  :returns: A callable that accepts a string path and returns a list of decoded addressable,
+            Serializable objects.  The callable will raise :class:`ParseError` if there were any
+            problems encountered parsing the python BUILD file at the given path.
+  :rtype: :class:`collections.Callable`
   """
   objects = []
 
@@ -252,5 +270,16 @@ def parse_python_callbacks(python, symbol_table):
   parse_globals = {}
   for alias, symbol in symbol_table.items():
     parse_globals[alias] = functools.partial(registered, alias, symbol)
-  six.exec_(python, parse_globals, {})
-  return objects
+
+  lock = threading.Lock()
+
+  def parse(path):
+    with open(path) as fp:
+      python = fp.read()
+
+    with lock:
+      del objects[:]
+      six.exec_(python, parse_globals, {})
+      return list(objects)
+
+  return parse
