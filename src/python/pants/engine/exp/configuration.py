@@ -20,7 +20,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   """
 
   # Internal book-keeping fields to exclude from hash codes/equality checks.
-  _SPECIAL_FIELDS = ('extends', 'merges', 'typename')
+  _SPECIAL_FIELDS = ('extends', 'merges', 'type_alias')
 
   def __init__(self, abstract=False, extends=None, merges=None, **kwargs):
     """Creates a new configuration data blob.
@@ -91,8 +91,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     return self._kwargs.get('address')
 
   @property
-  def typename(self):
-    """Return the type name this target was constructed via.
+  def type_alias(self):
+    """Return the type alias this target was constructed via.
 
     For a target read from a BUILD file, this will be target alias, like 'java_library'.
     For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
@@ -102,7 +102,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
     :rtype: string
     """
-    return self._kwargs.get('typename', type(self).__name__)
+    return self._kwargs.get('type_alias', type(self).__name__)
 
   @property
   def abstract(self):
@@ -120,7 +120,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   # arbitrary and thus more fields to be defined than a subclass might logically support.  We
   # accept this hole in a trade for generally expected behavior when `Configuration` is subclassed
   # in the style of constructors with named parameters representing the full complete set of
-  # expected parameters leaving **kwargs only for use by 'the system'; ie for `typename` and
+  # expected parameters leaving **kwargs only for use by 'the system'; ie for `type_alias` and
   # `address` plumbing for example.
   #
   # Of note is the fact that we pass a constraint type and not a concrete constraint value.  This

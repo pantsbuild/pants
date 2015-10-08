@@ -23,7 +23,7 @@ class Bob(object):
     return self._kwargs.copy()
 
   def _key(self):
-    return {k: v for k, v in self._kwargs.items() if k != 'typename'}
+    return {k: v for k, v in self._kwargs.items() if k != 'type_alias'}
 
   def __eq__(self, other):
     return isinstance(other, Bob) and self._key() == other._key()
@@ -49,21 +49,21 @@ class JsonParserTest(unittest.TestCase):
     document = dedent("""
     # An simple example with a single Bob.
     {
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "hobbies": [1, 2, 3]
     }
     """)
     results = parsers.parse_json(document)
     self.assertEqual(1, len(results))
     self.assertEqual([Bob(hobbies=[1, 2, 3])], self.round_trip(results[0]))
-    self.assertEqual('pants_test.engine.exp.test_parsers.Bob', results[0]._asdict()['typename'])
+    self.assertEqual('pants_test.engine.exp.test_parsers.Bob', results[0]._asdict()['type_alias'])
 
   def test_symbol_table(self):
     symbol_table = {'bob': Bob}
     document = dedent("""
     # An simple example with a single Bob.
     {
-      "typename": "bob",
+      "type_alias": "bob",
       "hobbies": [1, 2, 3]
     }
     """)
@@ -71,15 +71,15 @@ class JsonParserTest(unittest.TestCase):
     self.assertEqual(1, len(results))
     self.assertEqual([Bob(hobbies=[1, 2, 3])],
                      self.round_trip(results[0], symbol_table=symbol_table))
-    self.assertEqual('bob', results[0]._asdict()['typename'])
+    self.assertEqual('bob', results[0]._asdict()['type_alias'])
 
   def test_nested_single(self):
     document = dedent("""
     # An example with nested Bobs.
     {
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "uncle": {
-        "typename": "pants_test.engine.exp.test_parsers.Bob",
+        "type_alias": "pants_test.engine.exp.test_parsers.Bob",
         "age": 42
       },
       "hobbies": [1, 2, 3]
@@ -93,12 +93,12 @@ class JsonParserTest(unittest.TestCase):
     document = dedent("""
     # An example with deeply nested Bobs.
     {
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "configs": [
         {
           "mappings": {
             "uncle": {
-              "typename": "pants_test.engine.exp.test_parsers.Bob",
+              "type_alias": "pants_test.engine.exp.test_parsers.Bob",
               "age": 42
             }
           }
@@ -115,15 +115,15 @@ class JsonParserTest(unittest.TestCase):
     document = dedent("""
     # An example with many nested Bobs.
     {
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "cousins": [
         {
-          "typename": "pants_test.engine.exp.test_parsers.Bob",
+          "type_alias": "pants_test.engine.exp.test_parsers.Bob",
           "name": "Jake",
           "age": 42
         },
         {
-          "typename": "pants_test.engine.exp.test_parsers.Bob",
+          "type_alias": "pants_test.engine.exp.test_parsers.Bob",
           "name": "Jane",
           "age": 37
         }
@@ -141,13 +141,13 @@ class JsonParserTest(unittest.TestCase):
 
     # One with hobbies.
     {
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "hobbies": [1, 2, 3]
     }
 
     # Another that is aged.
     {
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "age": 42
     }
     """)
@@ -160,7 +160,7 @@ class JsonParserTest(unittest.TestCase):
 
     # One with hobbies.
       {
-        "typename": "pants_test.engine.exp.test_parsers.Bob",
+        "type_alias": "pants_test.engine.exp.test_parsers.Bob",
 
         # And internal comment and blank lines.
 
@@ -169,7 +169,7 @@ class JsonParserTest(unittest.TestCase):
     }
 
     # Another that is aged.
-    {"typename": "pants_test.engine.exp.test_parsers.Bob","age": 42}
+    {"type_alias": "pants_test.engine.exp.test_parsers.Bob","age": 42}
     """).strip()
     results = parsers.parse_json(document)
     self.assertEqual([Bob(hobbies=[1, 2, 3]), {}, Bob(age=42)], results)
@@ -180,7 +180,7 @@ class JsonParserTest(unittest.TestCase):
 
     # One with hobbies.
       {
-        "typename": "pants_test.engine.exp.test_parsers.Bob",
+        "type_alias": "pants_test.engine.exp.test_parsers.Bob",
 
         # And internal comment and blank lines.
 
@@ -190,7 +190,7 @@ class JsonParserTest(unittest.TestCase):
 
     # Another that is imaginary aged.
     {
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "age": 42i,
 
       "four": 1,
@@ -210,7 +210,7 @@ class JsonParserTest(unittest.TestCase):
 
     # This message from the json stdlib varies between python releases, so fuzz the match a bit.
     self.assertRegexpMatches(actual_lines[0],
-                             r"""Expecting (?:,|','|",") delimiter: line 3 column 12 \(char 69\)""")
+                             r"""Expecting (?:,|','|",") delimiter: line 3 column 12 \(char 71\)""")
 
     self.assertEqual(dedent("""
       In document:
@@ -218,7 +218,7 @@ class JsonParserTest(unittest.TestCase):
 
           # One with hobbies.
             {
-              "typename": "pants_test.engine.exp.test_parsers.Bob",
+              "type_alias": "pants_test.engine.exp.test_parsers.Bob",
 
               # And internal comment and blank lines.
 
@@ -228,7 +228,7 @@ class JsonParserTest(unittest.TestCase):
 
           # Another that is imaginary aged.
        1: {
-       2:   "typename": "pants_test.engine.exp.test_parsers.Bob",
+       2:   "type_alias": "pants_test.engine.exp.test_parsers.Bob",
        3:   "age": 42i,
 
        4:   "four": 1,
@@ -261,10 +261,10 @@ class JsonEncoderTest(unittest.TestCase):
     expected_json = dedent("""
     {
       "name": "bob",
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "friend": {
         "name": "bill",
-        "typename": "pants_test.engine.exp.test_parsers.Bob"
+        "type_alias": "pants_test.engine.exp.test_parsers.Bob"
       },
       "relative": "::an opaque address::"
     }
@@ -276,14 +276,14 @@ class JsonEncoderTest(unittest.TestCase):
     expected_json = dedent("""
     {
       "name": "bob",
-      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "type_alias": "pants_test.engine.exp.test_parsers.Bob",
       "friend": {
         "name": "bill",
-        "typename": "pants_test.engine.exp.test_parsers.Bob"
+        "type_alias": "pants_test.engine.exp.test_parsers.Bob"
       },
       "relative": {
         "name": "bill",
-        "typename": "pants_test.engine.exp.test_parsers.Bob"
+        "type_alias": "pants_test.engine.exp.test_parsers.Bob"
       }
     }
     """).strip()
@@ -303,8 +303,8 @@ class PythonAssignmentsParserTest(unittest.TestCase):
     results = parsers.parse_python_assignments(document)
     self.assertEqual([Bob(name='nancy', hobbies=[1, 2, 3])], results)
 
-    # No symbol table was used so no `typename` plumbing can be expected.
-    self.assertNotIn('typename', results[0]._asdict())
+    # No symbol table was used so no `type_alias` plumbing can be expected.
+    self.assertNotIn('type_alias', results[0]._asdict())
 
   def test_symbol_table(self):
     symbol_table = {'nancy': Bob}
@@ -315,7 +315,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
     """)
     results = parsers.parse_python_assignments(document, symbol_table=symbol_table)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
-    self.assertEqual('nancy', results[0]._asdict()['typename'])
+    self.assertEqual('nancy', results[0]._asdict()['type_alias'])
 
 
 class PythonCallbacksParserTest(unittest.TestCase):
@@ -329,4 +329,4 @@ class PythonCallbacksParserTest(unittest.TestCase):
     """)
     results = parsers.parse_python_callbacks(document, symbol_table)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
-    self.assertEqual('nancy', results[0]._asdict()['typename'])
+    self.assertEqual('nancy', results[0]._asdict()['type_alias'])
