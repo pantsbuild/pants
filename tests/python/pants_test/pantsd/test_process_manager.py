@@ -6,14 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 import unittest
 from contextlib import contextmanager
 
 import mock
 import psutil
 
-from pants.pantsd.process_manager import ProcessGroup, ProcessManager
+from pants.pantsd.process_manager import ProcessGroup, ProcessManager, swallow_psutil_exceptions
 from pants.util.contextutil import temporary_dir
 
 
@@ -31,7 +30,7 @@ class TestProcessGroup(unittest.TestCase):
     self.pg = ProcessGroup('test')
 
   def test_swallow_psutil_exceptions(self):
-    with self.pg._swallow_psutil_exceptions():
+    with swallow_psutil_exceptions():
       raise psutil.NoSuchProcess('test')
 
   def test_iter_processes(self):

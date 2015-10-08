@@ -22,21 +22,22 @@ from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
+def swallow_psutil_exceptions():
+  """A contextmanager that swallows standard psutil access exceptions."""
+  try:
+    yield
+  except (psutil.AccessDenied, psutil.NoSuchProcess):
+    # This masks common, but usually benign psutil process access exceptions that might be seen
+    # when accessing attributes/methods on psutil.Process objects.
+    pass
+
+
 class ProcessGroup(object):
   """Wraps a logical group of processes and provides convenient access to ProcessManager objects."""
 
   def __init__(self, name):
     self._name = name
-
-  @contextmanager
-  def _swallow_psutil_exceptions(self):
-    """A contextmanager that swallows standard psutil access exceptions."""
-    try:
-      yield
-    except (psutil.AccessDenied, psutil.NoSuchProcess):
-      # This masks common, but usually benign psutil process access exceptions that might be seen
-      # when accessing attributes/methods on psutil.Process objects.
-      pass
 
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
@@ -44,7 +45,7 @@ class ProcessGroup(object):
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
-    with self._swallow_psutil_exceptions():
+    with swallow_psutil_exceptions():
       for proc in (x for x in psutil.process_iter() if proc_filter(x)):
         yield proc
 
@@ -91,13 +92,10 @@ class ProcessManager(object):
 
     :returns: The command line or else `None` if the underlying process has died.
     """
-    try:
+    with swallow_psutil_exceptions():
       process = self._as_process()
       if process:
         return process.cmdline()
-    except psutil.NoSuchProcess:
-      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
-      pass
     return None
 
   @property
@@ -258,7 +256,7 @@ class ProcessManager(object):
       if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
           (self.process_name and self.process_name != process.name())):  # Check for stale pids.
         return False
-    except psutil.NoSuchProcess:
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
       # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
       return False
 
