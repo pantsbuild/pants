@@ -27,8 +27,9 @@ class TestTaskMixin(object):
              "set on their target will time out after the given number of seconds if not completed. "
              "If no timeout is set, then either the default timeout is used or no timeout is configured. "
              "In the current implementation, all the timeouts for the test targets to be run are summed and "
-             "all tests are run with the total timeout covering the entire run of tests. This should "
-             "change in the future to provide more granularity.")
+             "all tests are run with the total timeout covering the entire run of tests. If a single target "
+             "in a test run has no timeout and there is no default, the entire run will have no timeout. This "
+             "should change in the future to provide more granularity.")
     register('--timeout-default', action='store', default=0, type=int,
              help='The default timeout (in seconds) for a test if timeout is not set on the target.')
 
