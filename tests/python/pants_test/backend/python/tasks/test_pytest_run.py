@@ -11,10 +11,12 @@ import xml.dom.minidom as DOM
 from textwrap import dedent
 
 import coverage
+from mock import patch
 
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.contextutil import pushd
+from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -103,10 +105,9 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.create_file(
       'tests/test_core_sleep.py',
       dedent("""
-          import core, time
+          import core
 
           def test_three():
-            time.sleep(2)
             assert 1 == core.one()
         """))
     self.add_to_build_file(
@@ -230,13 +231,18 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_one_timeout(self):
     """When we have two targets and any of them doesn't have a timeout, then no timeout is set, unless there is a default."""
 
-    self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
+      mock_timeout.assert_called_with(None)
 
   def test_timeout(self):
-    """Check that a two second test will fail with a one second timeout."""
+    """Check that a failed timeout returns the right results."""
 
-    self.run_failing_tests(targets=[self.sleep_timeout],
-                           failed_targets=[self.sleep_timeout])
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      mock_timeout().__exit__ .side_effect = TimeoutReached(1)
+      self.run_failing_tests(targets=[self.sleep_timeout],
+                             failed_targets=[self.sleep_timeout])
+      mock_timeout.assert_called_with(1)
 
   def test_junit_xml_option(self):
     # We expect xml of the following form:
