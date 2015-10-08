@@ -255,6 +255,7 @@ python_tests(
     'src/python/pants/ivy',
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]

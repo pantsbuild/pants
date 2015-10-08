@@ -449,6 +449,10 @@ notes = {
   ('compile.cpp-compile', 'cc_extensions'): 'Value used to be a string (but default was a list), '
                                             'is now a list. Values also now include the dot, e.g.,'
                                             'it\'s now .cpp, not cpp.',
+
+  ('test.junit', 'coverage-processor'): 'The default value for this option has changed from "emma" '
+                                        'to "cobertura".',
+
   ('test.junit', 'coverage_console'): 'Option no longer exists. Coverage always written to stdout.',
   ('test.junit', 'coverage_html'): 'Option no longer exists. Coverage always written to html file.',
   ('test.junit', 'coverage_xml'): 'Option no longer exists. Coverage always written to xml file.',

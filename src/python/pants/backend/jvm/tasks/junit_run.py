@@ -24,6 +24,7 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
@@ -63,6 +64,23 @@ _TaskExports = namedtuple('_TaskExports',
 
 def _classfile_to_classname(cls):
   return ClasspathUtil.classname_for_rel_classfile(cls)
+
+
+def interpret_test_spec(test_spec):
+  """Parses a test spec string.
+
+  Returns either a (sourcefile,method) on the left, or a (classname,method) on the right.
+  """
+  components = test_spec.split('#', 2)
+  classname_or_srcfile = components[0]
+  methodname = '#' + components[1] if len(components) == 2 else ''
+
+  if os.path.exists(classname_or_srcfile):
+    # It's a source file.
+    return ((classname_or_srcfile, methodname), None)
+  else:
+    # It's a classname.
+    return (None, (classname_or_srcfile, methodname))
 
 
 class _JUnitRunner(object):
@@ -384,8 +402,16 @@ class _JUnitRunner(object):
 
   def _get_tests_to_run(self):
     for test_spec in self._tests_to_run:
-      for c in self._interpret_test_spec(test_spec):
-        yield c
+      src_spec, cls_spec = interpret_test_spec(test_spec)
+      if src_spec:
+        sourcefile, methodname = src_spec
+        for classname in self._classnames_from_source_file(sourcefile):
+          # Tack the methodname onto all classes in the source file, as we
+          # can't know which method the user intended.
+          yield classname + methodname
+      else:
+        classname, methodname = cls_spec
+        yield classname + methodname
 
   def _calculate_tests_from_targets(self, targets):
     """
@@ -415,21 +441,6 @@ class _JUnitRunner(object):
       for _, classes in source_products.rel_paths():
         for cls in classes:
           yield _classfile_to_classname(cls)
-
-  def _interpret_test_spec(self, test_spec):
-    components = test_spec.split('#', 2)
-    classname_or_srcfile = components[0]
-    methodname = '#' + components[1] if len(components) == 2 else ''
-
-    if os.path.exists(classname_or_srcfile):  # It's a source file.
-      srcfile = classname_or_srcfile  # Alias for clarity.
-      for cls in self._classnames_from_source_file(srcfile):
-        # Tack the methodname onto all classes in the source file, as we
-        # can't know which method the user intended.
-        yield cls + methodname
-    else:  # It's a classname.
-      classname = classname_or_srcfile
-      yield classname + methodname
 
 
 #TODO(jtrobec): move code coverage into tasks, and out of the general UT code.
@@ -496,15 +507,19 @@ class _Coverage(_JUnitRunner):
       return self._coverage_filters
     else:
       classes_under_test = set()
-      classes_by_source = self._context.products.get_data('classes_by_source')
+      classpath_products = self._context.products.get_data('runtime_classpath')
 
       def add_sources_under_test(tgt):
         if self.is_coverage_target(tgt):
-          for source in tgt.sources_relative_to_buildroot():
-            source_products = classes_by_source.get(source)
-            if source_products:
-              for _, classes in source_products.rel_paths():
-                classes_under_test.update(_classfile_to_classname(cls) for cls in classes)
+          contents = ClasspathUtil.classpath_contents(
+              (tgt,),
+              classpath_products,
+              confs=self._task_exports.confs,
+              transitive=False)
+          for f in contents:
+            clsname = _classfile_to_classname(f)
+            if clsname:
+              classes_under_test.add(clsname)
 
       for target in targets:
         target.walk(add_sources_under_test)
@@ -795,7 +810,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     for c in [_JUnitRunner, _Coverage, Emma, Cobertura]:
       c.register_options(register, cls.register_jvm_tool)
     register('--coverage', action='store_true', help='Collect code coverage data.')
-    register('--coverage-processor', advanced=True, default='emma',
+    register('--coverage-processor', advanced=True, default='cobertura',
              help='Which coverage subsystem to use.')
 
   @classmethod
@@ -803,13 +818,24 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator,)
 
   @classmethod
+  def request_classes_by_source(cls, test_specs):
+    """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
+    for test_spec in test_specs:
+      src_spec, _ = interpret_test_spec(test_spec)
+      if src_spec:
+        return True
+    return False
+
+  @classmethod
   def prepare(cls, options, round_manager):
     super(JUnitRun, cls).prepare(options, round_manager)
 
     # Compilation and resource preparation must have completed.
     round_manager.require_data('runtime_classpath')
-    # TODO: Make this product optional based on whether a sourcefile has been specified.
-    round_manager.require_data('classes_by_source')
+
+    # If the given test specs require the classes_by_source product, request it.
+    if cls.request_classes_by_source(options.test or []):
+      round_manager.require_data('classes_by_source')
 
   def __init__(self, *args, **kwargs):
     super(JUnitRun, self).__init__(*args, **kwargs)
@@ -828,13 +854,17 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.coverage or options.is_flagged('coverage_open'):
       coverage_processor = options.coverage_processor
       if coverage_processor == 'emma':
-        self._runner = Emma(task_exports, self.context)
+        self._runner = self._build_emma_coverage_engine(task_exports)
       elif coverage_processor == 'cobertura':
         self._runner = Cobertura(task_exports, self.context)
       else:
         raise TaskError('unknown coverage processor {0}'.format(coverage_processor))
     else:
       self._runner = _JUnitRunner(task_exports, self.context)
+
+  @deprecated('0.0.55', 'emma support will be removed in future versions.')
+  def _build_emma_coverage_engine(self, task_exports):
+    return Emma(task_exports, self.context)
 
   def _test_target_filter(self):
     def target_filter(target):

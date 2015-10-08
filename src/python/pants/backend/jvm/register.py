@@ -59,7 +59,7 @@ from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
-@deprecated(removal_version='0.0.52', hint_message="Replace 'Repository' with 'repository'.")
+@deprecated(removal_version='0.0.53', hint_message="Replace 'Repository' with 'repository'.")
 def Repository(*args, **kwargs):
   return repo(*args, **kwargs)
 

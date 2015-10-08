@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
@@ -20,9 +21,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     if tool_name == 'zinc':
       args.append('--no-compile-java-use-jmake')
 
-    pants_run = self.run_pants_with_workdir(
-      args,
-      workdir, config)
+    pants_run = self.run_pants_with_workdir(args, workdir, config)
     self.assert_success(pants_run)
 
   def create_file(self, path, value):
@@ -43,13 +42,17 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       config = {
         'cache.compile.{}'.format(tool_name): {'write_to': [cache_dir], 'read_from': [cache_dir]},
         'compile.java': {'use_jmake': tool_name == 'java' },
+        'compile.zinc': {'incremental_caching': True },
       }
 
-      self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
+      srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
+      buildfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD')
+
+      self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
                           class A {}
                           class Main {}"""))
-      self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD'),
+      self.create_file(buildfile,
                        dedent("""java_library(name='cachetest',
                                        sources=['A.java']
                           )"""))
@@ -60,14 +63,14 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Caches values A.class, Main.class
       self.run_compile(cachetest_spec, config, workdir, tool_name)
 
-      self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
+      self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
                             class A {}
                             class NotMain {}"""))
       # Caches values A.class, NotMain.class and leaves them on the filesystem
       self.run_compile(cachetest_spec, config, workdir, tool_name)
 
-      self.create_file(os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java'),
+      self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
                           class A {}
                           class Main {}"""))
@@ -88,3 +91,42 @@ class CacheCompileIntegrationTest(BaseCompileIT):
                                       'cachetest',
                                       )
       self.assertEqual(sorted(os.listdir(class_file_dir)), sorted(['A.class', 'Main.class']))
+
+  def test_incremental_caching(self):
+    """Tests that with --no-incremental-caching, we don't write incremental artifacts."""
+    with temporary_dir() as cache_dir, \
+        temporary_dir(root_dir=self.workdir_root()) as workdir, \
+        temporary_dir(root_dir=get_buildroot()) as src_dir:
+
+      tool_name = 'zinc'
+      def config(incremental_caching):
+        return {
+          'cache.compile.{}'.format(tool_name): {'write_to': [cache_dir], 'read_from': [cache_dir]},
+          'compile.{}'.format(tool_name): {'incremental_caching': incremental_caching},
+        }
+
+      srcfile = os.path.join(src_dir, 'A.java')
+      buildfile = os.path.join(src_dir, 'BUILD')
+      spec = os.path.join(src_dir, ':cachetest')
+      artifact_dir = os.path.join(cache_dir,
+                                  ZincCompile.stable_name(),
+                                  '{}.cachetest'.format(os.path.basename(src_dir)))
+
+      self.create_file(srcfile, """class A {}""")
+      self.create_file(buildfile, """java_library(name='cachetest', sources=['A.java'])""")
+
+
+      # Confirm that the result is one cached artifact.
+      self.run_compile(spec, config(False), workdir, tool_name)
+      clean_artifacts = os.listdir(artifact_dir)
+      self.assertEquals(1, len(clean_artifacts))
+
+      # Modify the file, and confirm that artifacts haven't changed.
+      self.create_file(srcfile, """final class A {}""")
+      self.run_compile(spec, config(False), workdir, tool_name)
+      self.assertEquals(clean_artifacts, os.listdir(artifact_dir))
+
+      # Modify again, this time with incremental and confirm that we have a second artifact.
+      self.create_file(srcfile, """public final class A {}""")
+      self.run_compile(spec, config(True), workdir, tool_name)
+      self.assertEquals(2, len(os.listdir(artifact_dir)))
