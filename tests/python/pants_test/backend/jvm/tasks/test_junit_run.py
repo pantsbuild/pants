@@ -115,7 +115,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     """When we set a timeout and force a failure, fail."""
 
     with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
-      mock_timeout().__exit__ .side_effect = TimeoutReached(1)
+      mock_timeout().__exit__.side_effect = TimeoutReached(1)
 
       self.set_options(timeout_default=1)
       self.set_options(timeouts=True)

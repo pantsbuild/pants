@@ -123,7 +123,7 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     task = self.create_task(self.context())
 
     with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
-      mock_timeout().__exit__ .side_effect = TimeoutReached(1)
+      mock_timeout().__exit__.side_effect = TimeoutReached(1)
 
       with self.assertRaises(TestFailedTaskError):
         task.execute()
