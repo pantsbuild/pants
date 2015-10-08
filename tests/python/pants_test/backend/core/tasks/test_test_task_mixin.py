@@ -5,9 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from mock import patch
+
 from pants.backend.core.tasks.task import TaskBase
 from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
-from pants.base.exceptions import TestFailedTaskError
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -99,8 +100,6 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
       call_list = []
 
       def _execute(self, all_targets):
-        import time
-        time.sleep(2)
         self.call_list.append(['_execute', all_targets])
 
       def _get_targets(self):
@@ -121,12 +120,14 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     self.set_options(timeouts=True)
     task = self.create_task(self.context())
 
-    with self.assertRaises(TestFailedTaskError):
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
       task.execute()
+      mock_timeout.assert_called_with(1)
 
   def test_timeout_disabled(self):
     self.set_options(timeouts=False)
     task = self.create_task(self.context())
 
-    task.execute()
-    self.assertIn(['_execute', [targetB]], task.call_list)
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      task.execute()
+      mock_timeout.assert_called_with(None)
