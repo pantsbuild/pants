@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from mock import patch
+from mock import Mock, patch
 
 from pants.backend.core.tasks.task import TaskBase
 from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
+from pants.base.exceptions import TestFailedTaskError
+from pants.util.timeout import TimeoutReached
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -121,7 +123,11 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     task = self.create_task(self.context())
 
     with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
-      task.execute()
+      mock_timeout().__exit__ .side_effect = TimeoutReached(1)
+
+      with self.assertRaises(TestFailedTaskError):
+        task.execute()
+
       mock_timeout.assert_called_with(1)
 
   def test_timeout_disabled(self):
