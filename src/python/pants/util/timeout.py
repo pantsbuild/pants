@@ -24,11 +24,11 @@ class Timeout(object):
       <handle timeout>
   """
 
-  def __init__(self, seconds):
+  def __init__(self, seconds, threading_timer=threading.Timer):
     self._triggered = False
 
     if seconds:
-      self._timer = threading.Timer(seconds, self._handle_timeout)
+      self._timer = threading_timer(seconds, self._handle_timeout)
     else:
       self._timer = None
 
@@ -50,6 +50,7 @@ class Timeout(object):
     the exception still gets raised.
     """
     if self._triggered:
-      raise TimeoutReached
+      raise TimeoutReached()
+
     elif self._timer is not None:
       self._timer.cancel()

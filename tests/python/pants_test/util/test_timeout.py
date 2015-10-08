@@ -5,51 +5,58 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import threading
-
-import mox
+import unittest
 
 from pants.util.timeout import Timeout, TimeoutReached
 
 
-class TestTimeout(mox.MoxTestBase):
+class TestTimeout(unittest.TestCase):
   def setUp(self):
     super(TestTimeout, self).setUp()
-    def empty_handler():
-      pass
+    self._fake_timer = None
 
-    self._handler = empty_handler
+  def make_fake_timer(self, seconds, handler):
+    class FakeTimer(object):
+      def __init__(self, seconds, handler):
+        self._seconds = seconds
+        self._handler = handler
+        self._clock = 0
+        self._started = False
 
-  def set_handler(self, dummy, handler):
-    self._handler = handler
+      def cancel(self):
+        pass
+
+      def start(self):
+        self._started = True
+
+      def move_clock_forward(self, seconds):
+        if not self._started:
+          raise Exception("Timer not started but clock moved forward")
+
+        self._clock += seconds
+        if self._clock > self._seconds:
+          self._handler()
+
+    self._fake_timer = FakeTimer(seconds, handler)
+    return self._fake_timer
+
+  def move_clock_forward(self, seconds):
+    if self._fake_timer is not None:
+      self._fake_timer.move_clock_forward(seconds)
 
   def test_timeout_success(self):
-    self.mox.StubOutWithMock(threading, 'Timer')
-    threading.Timer(2, mox.IgnoreArg()).WithSideEffects(self.set_handler)
-    self.mox.ReplayAll()
-
-    with Timeout(2):
-      pass
+    with Timeout(2, threading_timer=self.make_fake_timer):
+      self.move_clock_forward(1)
 
   def test_timeout_failure(self):
-    self.mox.StubOutWithMock(threading, 'Timer')
-    threading.Timer(1, mox.IgnoreArg()).WithSideEffects(self.set_handler)
-    self.mox.ReplayAll()
-
     with self.assertRaises(TimeoutReached):
-      with Timeout(1):
-        self._handler()
+      with Timeout(2, threading_timer=self.make_fake_timer):
+        self.move_clock_forward(3)
 
   def test_timeout_none(self):
-    self.mox.StubOutWithMock(threading, 'Timer')
-    self.mox.ReplayAll()
-
-    with Timeout(None):
-      pass
+    with Timeout(None, threading_timer=self.make_fake_timer):
+      self.move_clock_forward(3)
 
   def test_timeout_zero(self):
-    self.mox.StubOutWithMock(threading, 'Timer')
-    self.mox.ReplayAll()
-
-    with Timeout(0):
-      self._handler()
+    with Timeout(0, threading_timer=self.make_fake_timer):
+      self.move_clock_forward(3)
