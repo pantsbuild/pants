@@ -5,10 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import threading
-
-import mox
-
 from pants.backend.core.tasks.task import TaskBase
 from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.base.exceptions import TestFailedTaskError
@@ -97,32 +93,14 @@ class TestTaskMixinTest(TaskTestBase):
 
 
 class TestTaskMixinTimeoutTest(TaskTestBase):
-  def setUp(self):
-    super(TestTaskMixinTimeoutTest, self).setUp()
-    self.mox = mox.Mox()
-
-    global timeout_handler
-    timeout_handler = self.empty_handler
-
-  def tearDown(self):
-    super(TestTaskMixinTimeoutTest, self).tearDown()
-    self.mox.UnsetStubs()
-    self.mox.VerifyAll()
-
-  def empty_handler(self):
-    pass
-
-  def set_handler(self, dummy, handler):
-    global timeout_handler
-    timeout_handler = handler
-
   @classmethod
   def task_type(cls):
     class TestTaskMixinTask(TestTaskMixin, TaskBase):
       call_list = []
 
       def _execute(self, all_targets):
-        timeout_handler()
+        import time
+        time.sleep(2)
         self.call_list.append(['_execute', all_targets])
 
       def _get_targets(self):
@@ -140,10 +118,6 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     return TestTaskMixinTask
 
   def test_timeout(self):
-    self.mox.StubOutWithMock(threading, 'Timer')
-    threading.Timer(1, mox.IgnoreArg()).WithSideEffects(self.set_handler)
-    self.mox.ReplayAll()
-
     self.set_options(timeouts=True)
     task = self.create_task(self.context())
 
@@ -151,9 +125,6 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
       task.execute()
 
   def test_timeout_disabled(self):
-    self.mox.StubOutWithMock(threading, 'Timer')
-    self.mox.ReplayAll()
-
     self.set_options(timeouts=False)
     task = self.create_task(self.context())
 
