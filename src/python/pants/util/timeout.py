@@ -11,7 +11,8 @@ import threading
 
 
 class TimeoutReached(Exception):
-  pass
+  def __init__(self, seconds):
+    super(TimeoutReached, self).__init__("Timeout of {} seconds reached".format(seconds))
 
 
 class Timeout(object):
@@ -26,9 +27,10 @@ class Timeout(object):
 
   def __init__(self, seconds, threading_timer=threading.Timer):
     self._triggered = False
+    self._seconds = seconds
 
-    if seconds:
-      self._timer = threading_timer(seconds, self._handle_timeout)
+    if self._seconds:
+      self._timer = threading_timer(self._seconds, self._handle_timeout)
     else:
       self._timer = None
 
@@ -50,7 +52,7 @@ class Timeout(object):
     the exception still gets raised.
     """
     if self._triggered:
-      raise TimeoutReached()
+      raise TimeoutReached(self._seconds)
 
     elif self._timer is not None:
       self._timer.cancel()
