@@ -23,9 +23,14 @@ class TestTaskMixin(object):
     super(TestTaskMixin, cls).register_options(register)
     register('--skip', action='store_true', help='Skip running tests.')
     register('--timeouts', action='store_true', default=True,
-             help='Enable test timeouts.')
+             help="Enable test target timeouts. If timeouts are enabled then tests with a target= parameter "
+             "set on their target will time out after the given number of seconds if not completed. "
+             "If no timeout is set, then either the default timeout is used or no timeout is configured. "
+             "In the current implementation, all the timeouts for the test targets to be run are summed and "
+             "all tests are run with the total timeout covering the entire run of tests. This should "
+             "change in the future to provide more granularity.")
     register('--timeout-default', action='store', default=0, type=int,
-             help='The default timeout (in seconds) for a test if timeout is not set in BUILD')
+             help='The default timeout (in seconds) for a test if timeout is not set on the target.')
 
   def execute(self):
     """Run the task."""
