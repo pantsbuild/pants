@@ -13,7 +13,7 @@ from json.encoder import JSONEncoder
 
 import six
 
-from pants.engine.exp.objects import Serializable
+from pants.engine.exp.objects import Resolvable, Serializable
 from pants.util.memo import memoized
 
 
@@ -56,19 +56,6 @@ def _object_decoder(obj, symbol_table=None):
 def _get_decoder(symbol_table=None):
   return functools.partial(_object_decoder,
                            symbol_table=symbol_table.__getitem__ if symbol_table else _as_type)
-
-
-def _object_encoder(o):
-  if not Serializable.is_serializable(o):
-    raise ParseError('Can only encode Serializable objects in JSON, given {!r} of type {}'
-                     .format(o, type(o).__name__))
-  encoded = o._asdict()
-  if 'typename' not in encoded:
-    encoded['typename'] = '{}.{}'.format(inspect.getmodule(o).__name__, type(o).__name__)
-  return encoded
-
-
-encoder = JSONEncoder(encoding='UTF-8', default=_object_encoder, sort_keys=True, indent=True)
 
 
 def parse_json(json, symbol_table=None):
@@ -171,17 +158,38 @@ def parse_json(json, symbol_table=None):
   return objects
 
 
-def encode_json(obj):
+def _object_encoder(obj, inline=True):
+  if isinstance(obj, Resolvable):
+    return obj.resolve() if inline else obj.address
+
+  if not Serializable.is_serializable(obj):
+    raise ParseError('Can only encode Serializable objects in JSON, given {!r} of type {}'
+                     .format(obj, type(obj).__name__))
+
+  encoded = obj._asdict()
+  if 'typename' not in encoded:
+    encoded = encoded.copy()
+    encoded['typename'] = '{}.{}'.format(inspect.getmodule(obj).__name__, type(obj).__name__)
+  return encoded
+
+
+def encode_json(obj, inline=False, **kwargs):
   """Encodes the given object as json.
 
   Supports objects that follow the `_asdict` protocol.  See `parse_json` for more information.
 
   :param obj: A serializable object.
-  :returns: A json encoded blob representing the object.
+  :param bool inline: `True` to inline all resolvable objects as nested JSON objects, `False` to
+                      serialize those objects' addresses instead; `False` by default.
+  :param **kwargs: Any kwargs accepted by :class:`json.JSONEncoder` besides `encoding` and
+                   `default`.
+  :returns: A UTF-8 json encoded blob representing the object.
   :rtype: string
   :raises: :class:`ParseError` if there were any problems encoding the given `obj` in json.
   """
-  # TODO(John Sirois): Support an alias map from type (or from fqcn) -> typename.
+  encoder = JSONEncoder(encoding='UTF-8',
+                        default=functools.partial(_object_encoder, inline=inline),
+                        **kwargs)
   return encoder.encode(obj)
 
 
@@ -208,7 +216,7 @@ def parse_python_assignments(python, symbol_table=None):
   objects = []
   for name, obj in symbols.items():
     if Serializable.is_serializable(obj):
-      attributes = obj._asdict()
+      attributes = obj._asdict().copy()
       redundant_name = attributes.pop('name', name)
       if redundant_name and redundant_name != name:
         raise ParseError('The object named {!r} is assigned to a mismatching name {!r}'

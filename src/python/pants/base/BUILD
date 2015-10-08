@@ -4,10 +4,6 @@
 python_library(
   name = 'address',
   sources = ['address.py'],
-  dependencies = [
-    ':build_file',
-    'src/python/pants/util:meta',
-  ]
 )
 
 python_library(
