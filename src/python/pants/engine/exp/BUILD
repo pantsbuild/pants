@@ -6,6 +6,7 @@ python_library(
   sources=['addressable.py'],
   dependencies=[
     '3rdparty/python:six',
+    ':objects',
     'src/python/pants/util:meta',
   ]
 )

@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import namedtuple
 
-from pants.util.meta import AbstractClass
-
 
 def parse_spec(spec, relative_to=None):
   """Parses a target address spec and returns the path from the root of the repo to this Target
