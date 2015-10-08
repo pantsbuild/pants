@@ -24,22 +24,14 @@ class JvmToolMixin(object):
   class JvmTool(namedtuple('JvmTool', ['scope', 'key', 'classpath', 'main', 'custom_rules'])):
     """Represents a jvm tool classpath request."""
 
-    def dep_spec(self, options):
-      """Returns the target address spec that points to this JVM tool's classpath dependencies.
+    def dep_address(self, options):
+      """Returns the target address that points to this JVM tool's classpath dependencies.
 
-      :rtype: string
+      :rtype: :class:`pants.base.address.Address`
       """
       option = self.key.replace('-', '_')
-      dep_spec = options.for_scope(self.scope)[option]
-      if dep_spec.startswith('['):
-        raise ValueError(dedent("""\
-          JVM tool configuration now expects a single target address, use the
-          following in pants.ini:
-
-          [{scope}]
-          {key}: //tool/classpath:address
-          """.format(scope=self.scope, key=self.key)))
-      return dep_spec
+      dep_address = options.for_scope(self.scope)[option]
+      return dep_address
 
     def is_default(self, options):
       """Return `True` if this option was not set by the user.

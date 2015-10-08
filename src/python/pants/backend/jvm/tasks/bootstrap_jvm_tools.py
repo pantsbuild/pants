@@ -113,8 +113,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   def _alternate_target_roots(cls, options, address_mapper, build_graph):
     processed = set()
     for jvm_tool in JvmToolMixin.get_registered_tools():
-      dep_spec = jvm_tool.dep_spec(options)
-      dep_address = Address.parse(dep_spec)
+      dep_address = jvm_tool.dep_address(options)
       # Some JVM tools are requested multiple times, we only need to handle them once.
       if dep_address not in processed:
         processed.add(dep_address)
@@ -187,8 +186,8 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       # self.invalidated twice on a Task that does meaningful invalidation on its
       # targets. -pl
       for jvm_tool in registered_tools:
-        dep_spec = jvm_tool.dep_spec(self.context.options)
-        callback = self.cached_bootstrap_classpath_callback(dep_spec, jvm_tool)
+        dep_address = jvm_tool.dep_address(self.context.options)
+        callback = self.cached_bootstrap_classpath_callback(dep_address, jvm_tool)
         callback_product_map[jvm_tool.scope][jvm_tool.key] = callback
 
   def _resolve_tool_targets(self, dep_spec, jvm_tool):
