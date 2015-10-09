@@ -78,14 +78,6 @@ python_library(
 )
 
 python_library(
-  name = 'dep_lookup_error',
-  dependencies = [
-    ':address_lookup_error',
-  ],
-  sources = ['dep_lookup_error.py'],
-)
-
-python_library(
   name = 'deprecated',
   sources = ['deprecated.py'],
   dependencies = [

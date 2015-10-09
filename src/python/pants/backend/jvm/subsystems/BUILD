@@ -5,8 +5,8 @@ python_library(
   name = 'jvm_tool_mixin',
   sources = ['jvm_tool_mixin.py'],
   dependencies = [
-    'src/python/pants/base:dep_lookup_error',
     'src/python/pants/base:exceptions',
+    'src/python/pants/option',
   ],
 )
 
