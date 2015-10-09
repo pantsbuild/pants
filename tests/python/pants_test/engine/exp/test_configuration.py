@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.base.address import Address
+from pants.build_graph.address import Address
 from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.objects import ValidationError
 

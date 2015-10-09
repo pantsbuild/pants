@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.base.address import Address
+from pants.build_graph.address import Address
 from pants.engine.exp import parsers
 from pants.engine.exp.objects import Serializable
 from pants.util.memo import memoized_method, memoized_property
@@ -164,7 +164,7 @@ class AddressFamily(object):
   def addressables(self):
     """Return a mapping from address to thin addressable objects in this namespace.
 
-    :rtype: dict from :class:`pants.base.address.Address` to thin addressable objects.
+    :rtype: dict from :class:`pants.build_graph.address.Address` to thin addressable objects.
     """
     return {Address(spec_path=self._namespace, target_name=name): obj
             for name, obj in self._objects_by_name.items()}
@@ -249,7 +249,7 @@ class AddressMapper(object):
     """Resolve the given address to a named Serializable object.
 
     :param address: The address to resolve to an named Serializable object.
-    :type address: :class:`pants.base.address.Address`
+    :type address: :class:`pants.build_graph.address.Address`
     :returns: The resolved object.
     :raises: :class:`ResolveError` if the object could not be resolved.
     """

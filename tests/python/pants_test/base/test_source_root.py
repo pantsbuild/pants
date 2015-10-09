@@ -10,9 +10,9 @@ import unittest
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import Address, parse_spec
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.source_root import SourceRoot, SourceRootTree
+from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.target import Target
 
 

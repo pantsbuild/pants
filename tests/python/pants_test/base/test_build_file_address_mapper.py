@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.base.address import Address, BuildFileAddress
-from pants.base.address_lookup_error import AddressLookupError
+from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest

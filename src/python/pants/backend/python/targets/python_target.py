@@ -10,10 +10,10 @@ from twitter.common.collections import maybe_list
 
 from pants.backend.core.targets.resources import Resources
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.base.address import Address
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
+from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
 

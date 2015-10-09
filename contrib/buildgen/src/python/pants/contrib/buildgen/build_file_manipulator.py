@@ -11,7 +11,7 @@ import re
 import sys
 from difflib import unified_diff
 
-from pants.base.address import Address, BuildFileAddress
+from pants.build_graph.address import Address, BuildFileAddress
 
 
 logger = logging.getLogger(__name__)

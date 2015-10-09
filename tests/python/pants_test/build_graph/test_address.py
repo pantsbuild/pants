@@ -9,9 +9,9 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from pants.base.address import Address, BuildFileAddress, parse_spec
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_root import BuildRoot
+from pants.build_graph.address import Address, BuildFileAddress, parse_spec
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch
 

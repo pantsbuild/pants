@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
-from pants.base.address import BuildFileAddress
 from pants.base.build_file_target_factory import BuildFileTargetFactory
+from pants.build_graph.address import BuildFileAddress
 from pants.util.meta import AbstractClass
 
 

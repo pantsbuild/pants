@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from functools import partial
 from textwrap import dedent
 
-from pants.base.address import Address
+from pants.build_graph.address import Address
 from pants.engine.exp import parsers
 from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,

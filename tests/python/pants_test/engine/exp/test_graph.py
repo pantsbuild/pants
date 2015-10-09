@@ -9,7 +9,7 @@ import os
 import unittest
 from functools import partial
 
-from pants.base.address import Address
+from pants.build_graph.address import Address
 from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
                                     Resolver)

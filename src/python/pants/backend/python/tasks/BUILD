@@ -28,7 +28,6 @@ python_library(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python:python_setup',
     'src/python/pants/backend/python:thrift_builder',
-    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
