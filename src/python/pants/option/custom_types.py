@@ -33,7 +33,7 @@ def target_option(s):
 
   TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
   """
-  return _convert(s, str)
+  return s
 
 
 def target_list_option(s):
