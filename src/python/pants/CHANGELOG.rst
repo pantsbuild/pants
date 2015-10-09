@@ -1,6 +1,60 @@
 RELEASE HISTORY
 ===============
 
+0.0.53 (10/9/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+Due to the hotfix release on Wednesday, this is a fairly light release. But because it addresses two potential correctness issues related to JVM tooling, it is well worth picking up!
+
+API Changes
+~~~~~~~~~~~
+
+* Move address.py/address_lookup_error.py from base to build_graph
+  `RB #2954 <https://rbcommons.com/s/twitter/r/2954>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add native timeouts to python and junit tests
+  `RB #2919 <https://rbcommons.com/s/twitter/r/2919>`_
+
+* Be more conservative about caching incremental JVM compiles
+  `RB #2940 <https://rbcommons.com/s/twitter/r/2940>`_
+
+Bugfixes
+~~~~~~~~
+
+* Restore deep jvm-tool fingerprinting
+  `RB #2955 <https://rbcommons.com/s/twitter/r/2955>`_
+
+* Handle AccessDenied exception in more cases for daemon process scanning
+  `RB #2951 <https://rbcommons.com/s/twitter/r/2951>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade to pex 1.1.0
+  `RB #2956 <https://rbcommons.com/s/twitter/r/2956>`_
+
+* [exp] Support for scanning addresses, implement `list`
+  `RB #2952 <https://rbcommons.com/s/twitter/r/2952>`_
+
+* [exp] Optimize python parsers
+  `RB #2947 <https://rbcommons.com/s/twitter/r/2947>`_
+
+* [exp] Switch from 'typename' to 'type_alias'.
+  `RB #2945 <https://rbcommons.com/s/twitter/r/2945>`_
+
+* [exp] Support a non-inlined lazy resolve mode in Graph.
+  `RB #2944 <https://rbcommons.com/s/twitter/r/2944>`_
+
+* Emit a nice error message if the compiler used to bootstrap pants isn't functional
+  `RB #2949 <https://rbcommons.com/s/twitter/r/2949>`_
+
+
 0.0.52 (10/7/2015)
 ------------------
 
