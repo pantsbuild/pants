@@ -26,6 +26,8 @@ class Timeout(object):
   """
 
   def __init__(self, seconds, threading_timer=threading.Timer):
+
+    # self._triggered is not protected by a mutex because boolean set/get is atomic in Python
     self._triggered = False
     self._seconds = seconds
 
