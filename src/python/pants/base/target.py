@@ -9,7 +9,7 @@ from pants.base.deprecated import deprecated_module
 from pants.build_graph.target import AbstractTarget, Target
 
 
-deprecated_module('0.0.53', hint_message='Use pants.build_graph.target instead.')
+deprecated_module('0.0.54', hint_message='Use pants.build_graph.target instead.')
 
 AbstractTarget = AbstractTarget
 Target = Target
