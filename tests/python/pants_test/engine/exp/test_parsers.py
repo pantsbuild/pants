@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import unittest
 from textwrap import dedent
 
 from pants.engine.exp import parsers
+from pants.engine.exp.objects import Resolvable
 from pants.engine.exp.parsers import ParseError
 
 
@@ -28,6 +30,9 @@ class Bob(object):
 
 
 class JsonParserTest(unittest.TestCase):
+  def round_trip(self, obj, symbol_table=None):
+    return parsers.parse_json(parsers.encode_json(obj, inline=True), symbol_table=symbol_table)
+
   def test_comments(self):
     document = dedent("""
     # Top level comment.
@@ -38,8 +43,7 @@ class JsonParserTest(unittest.TestCase):
     """)
     results = parsers.parse_json(document)
     self.assertEqual(1, len(results))
-    self.assertEqual([dict(hobbies=[1, 2, 3])],
-                     parsers.parse_json(parsers.encode_json(results[0])))
+    self.assertEqual([dict(hobbies=[1, 2, 3])], self.round_trip(results[0]))
 
   def test_single(self):
     document = dedent("""
@@ -51,8 +55,7 @@ class JsonParserTest(unittest.TestCase):
     """)
     results = parsers.parse_json(document)
     self.assertEqual(1, len(results))
-    self.assertEqual([Bob(hobbies=[1, 2, 3])],
-                     parsers.parse_json(parsers.encode_json(results[0])))
+    self.assertEqual([Bob(hobbies=[1, 2, 3])], self.round_trip(results[0]))
     self.assertEqual('pants_test.engine.exp.test_parsers.Bob', results[0]._asdict()['typename'])
 
   def test_symbol_table(self):
@@ -67,7 +70,7 @@ class JsonParserTest(unittest.TestCase):
     results = parsers.parse_json(document, symbol_table=symbol_table)
     self.assertEqual(1, len(results))
     self.assertEqual([Bob(hobbies=[1, 2, 3])],
-                     parsers.parse_json(parsers.encode_json(results[0]), symbol_table=symbol_table))
+                     self.round_trip(results[0], symbol_table=symbol_table))
     self.assertEqual('bob', results[0]._asdict()['typename'])
 
   def test_nested_single(self):
@@ -84,8 +87,7 @@ class JsonParserTest(unittest.TestCase):
     """)
     results = parsers.parse_json(document)
     self.assertEqual(1, len(results))
-    self.assertEqual([Bob(uncle=Bob(age=42), hobbies=[1, 2, 3])],
-                     parsers.parse_json(parsers.encode_json(results[0])))
+    self.assertEqual([Bob(uncle=Bob(age=42), hobbies=[1, 2, 3])], self.round_trip(results[0]))
 
   def test_nested_deep(self):
     document = dedent("""
@@ -107,7 +109,7 @@ class JsonParserTest(unittest.TestCase):
     results = parsers.parse_json(document)
     self.assertEqual(1, len(results))
     self.assertEqual([Bob(configs=[dict(mappings=dict(uncle=Bob(age=42)))])],
-                     parsers.parse_json(parsers.encode_json(results[0])))
+                     self.round_trip(results[0]))
 
   def test_nested_many(self):
     document = dedent("""
@@ -131,7 +133,7 @@ class JsonParserTest(unittest.TestCase):
     results = parsers.parse_json(document)
     self.assertEqual(1, len(results))
     self.assertEqual([Bob(cousins=[Bob(name='Jake', age=42), Bob(name='Jane', age=37)])],
-                     parsers.parse_json(parsers.encode_json(results[0])))
+                     self.round_trip(results[0]))
 
   def test_multiple(self):
     document = dedent("""
@@ -237,6 +239,56 @@ class JsonParserTest(unittest.TestCase):
        9:   "nine": 1
       10: }
       """).strip(), '\n'.join(actual_lines[1:]))
+
+
+class JsonEncoderTest(unittest.TestCase):
+  def setUp(self):
+    bill = Bob(name='bill')
+
+    class SimpleResolvable(Resolvable):
+      @property
+      def address(self):
+        return '::an opaque address::'
+
+      def resolve(self):
+        return bill
+
+    resolvable_bill = SimpleResolvable()
+
+    self.bob = Bob(name='bob', relative=resolvable_bill, friend=bill)
+
+  def test_shallow_encoding(self):
+    expected_json = dedent("""
+    {
+      "name": "bob",
+      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "friend": {
+        "name": "bill",
+        "typename": "pants_test.engine.exp.test_parsers.Bob"
+      },
+      "relative": "::an opaque address::"
+    }
+    """).strip()
+    self.assertEqual(json.dumps(json.loads(expected_json)),
+                     parsers.encode_json(self.bob, inline=False))
+
+  def test_inlined_encoding(self):
+    expected_json = dedent("""
+    {
+      "name": "bob",
+      "typename": "pants_test.engine.exp.test_parsers.Bob",
+      "friend": {
+        "name": "bill",
+        "typename": "pants_test.engine.exp.test_parsers.Bob"
+      },
+      "relative": {
+        "name": "bill",
+        "typename": "pants_test.engine.exp.test_parsers.Bob"
+      }
+    }
+    """).strip()
+    self.assertEqual(json.dumps(json.loads(expected_json)),
+                     parsers.encode_json(self.bob, inline=True))
 
 
 class PythonAssignmentsParserTest(unittest.TestCase):

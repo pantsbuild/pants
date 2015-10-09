@@ -6,9 +6,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import inspect
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 
 from pants.util.meta import AbstractClass
+
+
+class Resolvable(AbstractClass):
+  """Represents a resolvable object."""
+
+  @abstractproperty
+  def address(self):
+    """Return the opaque address descriptor that this resolvable resolves."""
+
+  @abstractmethod
+  def resolve(self):
+    """Resolve and return the resolvable object."""
 
 
 class Serializable(AbstractClass):
@@ -28,8 +40,9 @@ class Serializable(AbstractClass):
     >>> s = Serializable(...)
     >>> Serializable(**s._asdict()) == s
 
-    Additionally the dict must also contain nothing except python primitive values, ie: dicts,
-    lists, strings, numbers, bool values, etc.
+    Additionally the dict must also contain nothing except Serializables, python primitive values,
+    ie: dicts, lists, strings, numbers, bool values, etc or Resolvables that resolve to Serilizables
+    or primitive values.
 
     Any :class:`collections.namedtuple` satisfies the Serializable contract automatically via duck
     typing if it is composed of only primitive python values or Serializable values.
