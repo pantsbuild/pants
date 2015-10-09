@@ -20,7 +20,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   """
 
   # Internal book-keeping fields to exclude from hash codes/equality checks.
-  _SPECIAL_FIELDS = ('extends', 'merges', 'typename')
+  _SPECIAL_FIELDS = ('extends', 'merges', 'type_alias')
 
   def __init__(self, abstract=False, extends=None, merges=None, **kwargs):
     """Creates a new configuration data blob.
@@ -51,16 +51,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
     self._kwargs['abstract'] = abstract
 
-    # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
-    # our superclasses logically provide fields within this constrained set.
-    # NB: Since Configuration is at base an ~unconstrained struct, a superclass does allow for
-    # arbitrary and thus more fields to be defined than a subclass might logically support.  We
-    # accept this hole in a trade for generally expected behavior when Configuration is subclassed
-    # in the style of constructors with named parameters representing the full complete set of
-    # expected parameters leaving **kwargs only for use by 'the system'; ie for `typename` and
-    # `address` plumbing for example.
-    self._kwargs['extends'] = addressable(SuperclassesOf(type(self)), extends)
-    self._kwargs['merges'] = addressable(SuperclassesOf(type(self)), merges)
+    self.extends = extends
+    self.merges = merges
 
     # Allow for configuration items that are directly constructed in memory.  These can have an
     # address directly assigned (vs. inferred from name + source file location) and we only require
@@ -99,8 +91,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     return self._kwargs.get('address')
 
   @property
-  def typename(self):
-    """Return the type name this target was constructed via.
+  def type_alias(self):
+    """Return the type alias this target was constructed via.
 
     For a target read from a BUILD file, this will be target alias, like 'java_library'.
     For a target constructed in memory, this will be the simple class name, like 'JavaLibrary'.
@@ -110,7 +102,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
     :rtype: string
     """
-    return self._kwargs.get('typename', type(self).__name__)
+    return self._kwargs.get('type_alias', type(self).__name__)
 
   @property
   def abstract(self):
@@ -122,27 +114,39 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     """
     return self._kwargs['abstract']
 
-  @property
+  # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
+  # our superclasses logically provide fields within this constrained set.
+  # NB: Since `Configuration` is at base an ~unconstrained struct, a superclass does allow for
+  # arbitrary and thus more fields to be defined than a subclass might logically support.  We
+  # accept this hole in a trade for generally expected behavior when `Configuration` is subclassed
+  # in the style of constructors with named parameters representing the full complete set of
+  # expected parameters leaving **kwargs only for use by 'the system'; ie for `type_alias` and
+  # `address` plumbing for example.
+  #
+  # Of note is the fact that we pass a constraint type and not a concrete constraint value.  This
+  # tells addressable to use `SuperclassesOf([Configuration instance's type])`, which is what we
+  # want.  Aka, for `ConfigurationSubclassA`, the constraint is
+  # `SuperclassesOf(ConfigurationSubclassA)`.
+  #
+  @addressable(SuperclassesOf)
   def extends(self):
     """Return the object this object extends, if any.
 
     :rtype: Serializable
     """
-    return self._kwargs['extends']
 
-  @property
+  @addressable(SuperclassesOf)
   def merges(self):
     """Return the object this object merges in, if any.
 
     :rtype: Serializable
     """
-    return self._kwargs['merges']
 
   def _asdict(self):
-    return self._kwargs.copy()
+    return self._kwargs
 
   def _extract_inheritable_attributes(self, serializable):
-    attributes = serializable._asdict()
+    attributes = serializable._asdict().copy()
 
     # Allow for un-named (embedded) objects inheriting from named objects
     attributes.pop('name', None)
@@ -171,9 +175,13 @@ class Configuration(Serializable, SerializableFactory, Validatable):
       for k, v in self._asdict().items():
         if k not in self._SPECIAL_FIELDS:
           if isinstance(v, MutableMapping):
-            attributes.setdefault(k, {}).update(v)
+            mapping = attributes.get(k) or {}
+            mapping.update(v)
+            attributes[k] = mapping
           elif isinstance(v, MutableSequence):
-            attributes.setdefault(k, []).extend(v)
+            sequence = attributes.get(k) or []
+            sequence.extend(v)
+            attributes[k] = sequence
           elif v is not None:
             attributes[k] = v
       configuration_type = type(self)
@@ -223,7 +231,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
   def __repr__(self):
     # TODO(John Sirois): Do something else here.  This is recursive and so printing a Node prints
-    # its whole closure and will be too expensive and bewildering past simple example debugging.
+    # its whole closure and will be too expensive for inlined objects and too bewildering past
+    # simple example debugging.
     return '{classname}({args})'.format(classname=type(self).__name__,
                                         args=', '.join(sorted('{}={!r}'.format(k, v)
                                                               for k, v in self._kwargs.items())))

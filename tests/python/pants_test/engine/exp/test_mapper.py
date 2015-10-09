@@ -30,36 +30,36 @@ class Thing(object):
     self._kwargs = kwargs
 
   def _asdict(self):
-    return self._kwargs.copy()
+    return self._kwargs
 
   def _key(self):
-    return {k: v for k, v in self._kwargs.items() if k != 'typename'}
+    return {k: v for k, v in self._kwargs.items() if k != 'type_alias'}
 
   def __eq__(self, other):
     return isinstance(other, Thing) and self._key() == other._key()
 
 
 class AddressMapTest(unittest.TestCase):
-  _parse = functools.partial(parsers.parse_json, symbol_table={'thing': Thing})
+  _parser = functools.partial(parsers.parse_json, symbol_table={'thing': Thing})
 
   @contextmanager
   def parse_address_map(self, json):
     with temporary_file() as fp:
       fp.write(json)
       fp.close()
-      address_map = AddressMap.parse(fp.name, parse=self._parse)
+      address_map = AddressMap.parse(fp.name, parser=self._parser)
       self.assertEqual(fp.name, address_map.path)
       yield address_map
 
   def test_parse(self):
     with self.parse_address_map(dedent("""
       {
-        "typename": "thing",
+        "type_alias": "thing",
         "name": "one",
         "age": 42
       }
       {
-        "typename": "thing",
+        "type_alias": "thing",
         "name": "two",
         "age": 37
       }
@@ -75,13 +75,13 @@ class AddressMapTest(unittest.TestCase):
 
   def test_not_named(self):
     with self.assertRaises(UnaddressableObjectError):
-      with self.parse_address_map('{"typename": "thing"}'):
+      with self.parse_address_map('{"type_alias": "thing"}'):
         self.fail()
 
   def test_duplicate_names(self):
     with self.assertRaises(DuplicateNameError):
-      with self.parse_address_map('{"typename": "thing", "name": "one"}'
-                                  '{"typename": "thing", "name": "one"}'):
+      with self.parse_address_map('{"type_alias": "thing", "name": "one"}'
+                                  '{"type_alias": "thing", "name": "one"}'):
         self.fail()
 
 
@@ -135,6 +135,10 @@ class AddressMapperTest(unittest.TestCase):
                                         build_pattern=r'.+\.BUILD.json$',
                                         parser=parser)
 
+    self.a_b_target = Target(name='b',
+                             dependencies=['//d:e'],
+                             configurations=['//a', Configuration(embedded='yes')])
+
   def test_no_family(self):
     with self.assertRaises(ResolveError):
       self.address_mapper.family('a/c')
@@ -161,7 +165,7 @@ class AddressMapperTest(unittest.TestCase):
 
     build_file = os.path.join(self.build_root, 'a/c/c.BUILD.json')
     with safe_open(build_file, 'w') as fp:
-      fp.write('{"typename": "configuration", "name": "c"}')
+      fp.write('{"type_alias": "configuration", "name": "c"}')
 
     resolved = self.address_mapper.resolve(Address.parse('a/c'))
     self.assertEqual(Configuration(name='c'), resolved)
@@ -171,22 +175,16 @@ class AddressMapperTest(unittest.TestCase):
 
   def test_resolve(self):
     resolved = self.address_mapper.resolve(Address.parse('a/b'))
-    self.assertEqual(Target(name='b',
-                            dependencies=['//d:e'],
-                            configurations=['//a', Configuration(embedded='yes')]),
-                     resolved)
+    self.assertEqual(self.a_b_target, resolved)
 
   def test_invalidate_build_file_added(self):
     address_family = self.address_mapper.family('a/b')
 
-    a_b_target = Target(name='b',
-                        dependencies=['//d:e'],
-                        configurations=['//a', Configuration(embedded='yes')])
-    self.assertEqual({Address.parse('a/b'): a_b_target},
+    self.assertEqual({Address.parse('a/b'): self.a_b_target},
                      address_family.addressables)
 
     with open(os.path.join(self.build_root, 'a/b/sibling.BUILD.json'), 'w') as fp:
-      fp.write('{"typename": "configuration", "name": "c"}')
+      fp.write('{"type_alias": "configuration", "name": "c"}')
 
     still_valid = self.address_mapper.family('a/b')
     self.assertIs(address_family, still_valid)
@@ -194,7 +192,7 @@ class AddressMapperTest(unittest.TestCase):
     self.address_mapper.invalidate_build_file('a/b/sibling.BUILD.json')
     newly_formed = self.address_mapper.family('a/b')
     self.assertIsNot(address_family, newly_formed)
-    self.assertEqual({Address.parse('a/b'): a_b_target,
+    self.assertEqual({Address.parse('a/b'): self.a_b_target,
                       Address.parse('a/b:c'): Configuration(name='c')},
                      newly_formed.addressables)
 
@@ -204,7 +202,7 @@ class AddressMapperTest(unittest.TestCase):
 
     build_file = os.path.join(self.build_root, 'a/b/b.BUILD.json')
     with safe_open(build_file, 'w+') as fp:
-      fp.write('{"typename": "configuration", "name": "c"}')
+      fp.write('{"type_alias": "configuration", "name": "c"}')
 
     with self.assertRaises(ResolveError):
       self.address_mapper.resolve(Address.parse('a/b:c'))
@@ -218,10 +216,7 @@ class AddressMapperTest(unittest.TestCase):
 
   def test_invalidate_build_file_removed(self):
     resolved = self.address_mapper.resolve(Address.parse('a/b'))
-    a_b_target = Target(name='b',
-                        dependencies=['//d:e'],
-                        configurations=['//a', Configuration(embedded='yes')])
-    self.assertEqual(a_b_target, resolved)
+    self.assertEqual(self.a_b_target, resolved)
 
     build_file = os.path.join(self.build_root, 'a/b/b.BUILD.json')
     os.unlink(build_file)
@@ -233,10 +228,7 @@ class AddressMapperTest(unittest.TestCase):
 
   def test_invalidation_un_normalized(self):
     resolved = self.address_mapper.resolve(Address.parse('a/b'))
-    a_b_target = Target(name='b',
-                        dependencies=['//d:e'],
-                        configurations=['//a', Configuration(embedded='yes')])
-    self.assertEqual(a_b_target, resolved)
+    self.assertEqual(self.a_b_target, resolved)
 
     os.unlink(os.path.join(self.build_root, 'a/b/b.BUILD.json'))
     self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b')))
@@ -250,10 +242,7 @@ class AddressMapperTest(unittest.TestCase):
 
   def test_invalidation_relative(self):
     resolved = self.address_mapper.resolve(Address.parse('a/b'))
-    a_b_target = Target(name='b',
-                        dependencies=['//d:e'],
-                        configurations=['//a', Configuration(embedded='yes')])
-    self.assertEqual(a_b_target, resolved)
+    self.assertEqual(self.a_b_target, resolved)
 
     build_file = os.path.join(self.build_root, 'a/b/b.BUILD.json')
     os.unlink(build_file)
@@ -262,3 +251,26 @@ class AddressMapperTest(unittest.TestCase):
     self.address_mapper.invalidate_build_file('a/b/b.BUILD.json')
     with self.assertRaises(ResolveError):
       self.address_mapper.resolve(Address.parse('a/b'))
+
+  @staticmethod
+  def addr(spec):
+    return Address.parse(spec)
+
+  def test_walk_addressables(self):
+    self.assertEqual(sorted([(self.addr('//:root'), Configuration(name='root')),
+                             (self.addr('a/b:b'), self.a_b_target),
+                             (self.addr('a/d:d'), Target(name='d')),
+                             (self.addr('a/d/e:e'), Target(name='e')),
+                             (self.addr('a/d/e:e-prime'), Configuration(name='e-prime'))]),
+                     sorted(self.address_mapper.walk_addressables()))
+
+  def test_walk_addressables_rel_path(self):
+    self.assertEqual(sorted([(self.addr('a/d:d'), Target(name='d')),
+                             (self.addr('a/d/e:e'), Target(name='e')),
+                             (self.addr('a/d/e:e-prime'), Configuration(name='e-prime'))]),
+                     sorted(self.address_mapper.walk_addressables(rel_path='a/d')))
+
+  def test_walk_addressables_path_excludes(self):
+    self.assertEqual([(self.addr('//:root'), Configuration(name='root')),
+                      (self.addr('a/d:d'), Target(name='d'))],
+                     list(self.address_mapper.walk_addressables(path_excludes=['a/b', 'a/d/e'])))

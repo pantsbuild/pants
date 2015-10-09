@@ -8,12 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import importlib
 import inspect
+import threading
 from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 
 import six
 
-from pants.engine.exp.objects import Serializable
+from pants.engine.exp.objects import Resolvable, Serializable
 from pants.util.memo import memoized
 
 
@@ -44,35 +45,23 @@ class ParseError(Exception):
 
 def _object_decoder(obj, symbol_table=None):
   # A magic field will indicate type and this can be used to wrap the object in a type.
-  typename = obj.get('typename', None)
-  if not typename:
+  type_alias = obj.get('type_alias', None)
+  if not type_alias:
     return obj
   else:
-    symbol = symbol_table(typename)
+    symbol = symbol_table(type_alias)
     return symbol(**obj)
 
 
 @memoized(key_factory=lambda t: tuple(sorted(t.items())) if t is not None else None)
 def _get_decoder(symbol_table=None):
-  return functools.partial(_object_decoder,
-                           symbol_table=symbol_table.__getitem__ if symbol_table else _as_type)
+  decoder = functools.partial(_object_decoder,
+                              symbol_table=symbol_table.__getitem__ if symbol_table else _as_type)
+  return JSONDecoder(encoding='UTF-8', object_hook=decoder, strict=True)
 
 
-def _object_encoder(o):
-  if not Serializable.is_serializable(o):
-    raise ParseError('Can only encode Serializable objects in JSON, given {!r} of type {}'
-                     .format(o, type(o).__name__))
-  encoded = o._asdict()
-  if 'typename' not in encoded:
-    encoded['typename'] = '{}.{}'.format(inspect.getmodule(o).__name__, type(o).__name__)
-  return encoded
-
-
-encoder = JSONEncoder(encoding='UTF-8', default=_object_encoder, sort_keys=True, indent=True)
-
-
-def parse_json(json, symbol_table=None):
-  """Parses the given json encoded string into a list of top-level objects found.
+def parse_json(path, symbol_table=None):
+  """Parse the given json encoded string into a list of top-level objects found.
 
   The parser accepts both blank lines and comment lines (those beginning with optional whitespace
   followed by the '#' character) as well as more than one top-level JSON object.
@@ -81,14 +70,16 @@ def parse_json(json, symbol_table=None):
   This includes `namedtuple` subtypes as well as any custom class with an `_asdict` method defined;
   see :class:`pants.engine.exp.serializable.Serializable`.
 
-  :param string json: A json encoded document with extra support for blank lines, comments and
-                      multiple top-level objects.
+  :param string path: The path of a json encoded document with extra support for blank lines,
+                      comments and multiple top-level objects.
   :returns: A list of decoded json data.
   :rtype: list
   :raises: :class:`ParseError` if there were any problems encountered parsing the given `json`.
   """
+  with open(path) as fp:
+    json = fp.read()
 
-  decoder = JSONDecoder(encoding='UTF-8', object_hook=_get_decoder(symbol_table), strict=True)
+  decoder = _get_decoder(symbol_table)
 
   # Strip comment lines and blank lines, which we allow, but preserve enough information about the
   # stripping to constitute a reasonable error message that can be used to find the portion of the
@@ -171,22 +162,43 @@ def parse_json(json, symbol_table=None):
   return objects
 
 
-def encode_json(obj):
-  """Encodes the given object as json.
+def _object_encoder(obj, inline):
+  if isinstance(obj, Resolvable):
+    return obj.resolve() if inline else obj.address
+
+  if not Serializable.is_serializable(obj):
+    raise ParseError('Can only encode Serializable objects in JSON, given {!r} of type {}'
+                     .format(obj, type(obj).__name__))
+
+  encoded = obj._asdict()
+  if 'type_alias' not in encoded:
+    encoded = encoded.copy()
+    encoded['type_alias'] = '{}.{}'.format(inspect.getmodule(obj).__name__, type(obj).__name__)
+  return encoded
+
+
+def encode_json(obj, inline=False, **kwargs):
+  """Encode the given object as json.
 
   Supports objects that follow the `_asdict` protocol.  See `parse_json` for more information.
 
   :param obj: A serializable object.
-  :returns: A json encoded blob representing the object.
+  :param bool inline: `True` to inline all resolvable objects as nested JSON objects, `False` to
+                      serialize those objects' addresses instead; `False` by default.
+  :param **kwargs: Any kwargs accepted by :class:`json.JSONEncoder` besides `encoding` and
+                   `default`.
+  :returns: A UTF-8 json encoded blob representing the object.
   :rtype: string
   :raises: :class:`ParseError` if there were any problems encoding the given `obj` in json.
   """
-  # TODO(John Sirois): Support an alias map from type (or from fqcn) -> typename.
+  encoder = JSONEncoder(encoding='UTF-8',
+                        default=functools.partial(_object_encoder, inline=inline),
+                        **kwargs)
   return encoder.encode(obj)
 
 
-def parse_python_assignments(python, symbol_table=None):
-  """Parses the given python code into a list of top-level addressable Serializable objects found.
+def python_assignments_parser(symbol_table=None):
+  """Return a parser that parses the given python code into a list of top-level objects found.
 
   Only Serializable objects assigned to top-level variables will be collected and returned.  These
   objects will be addressable via their top-level variable names in the parsed namespace.
@@ -196,53 +208,78 @@ def parse_python_assignments(python, symbol_table=None):
   :rtype: list
   :raises: :class:`ParseError` if there were any problems encountered parsing the given `python`.
   """
-  def aliased(type_name, object_type, **kwargs):
-    return object_type(typename=type_name, **kwargs)
+  def aliased(type_alias, object_type, **kwargs):
+    return object_type(type_alias=type_alias, **kwargs)
 
   parse_globals = {}
   for alias, symbol in (symbol_table or {}).items():
     parse_globals[alias] = functools.partial(aliased, alias, symbol)
 
-  symbols = {}
-  six.exec_(python, parse_globals, symbols)
-  objects = []
-  for name, obj in symbols.items():
-    if Serializable.is_serializable(obj):
+  def parse(path):
+    symbols = {}
+    with open(path) as fp:
+      six.exec_(fp.read(), parse_globals, symbols)
+
+    objects = []
+    for name, obj in symbols.items():
+      if isinstance(obj, type):
+        # Allow type imports
+        continue
+
+      if not Serializable.is_serializable(obj):
+        raise ParseError('Found a non-serializable top-level object: {}'.format(obj))
+
       attributes = obj._asdict()
-      redundant_name = attributes.pop('name', name)
-      if redundant_name and redundant_name != name:
-        raise ParseError('The object named {!r} is assigned to a mismatching name {!r}'
-                         .format(redundant_name, name))
+      if 'name' in attributes:
+        attributes = attributes.copy()
+        redundant_name = attributes.pop('name', None)
+        if redundant_name and redundant_name != name:
+          raise ParseError('The object named {!r} is assigned to a mismatching name {!r}'
+                           .format(redundant_name, name))
       obj_type = type(obj)
       named_obj = obj_type(name=name, **attributes)
       objects.append(named_obj)
-  return objects
+    return objects
+
+  return parse
 
 
-def parse_python_callbacks(python, symbol_table):
-  """Parses the given python code into a list of top-level addressable Serializable objects found.
+def python_callbacks_parser(symbol_table):
+  """Return a parser that parses the given python code into a list of top-level objects found.
 
   Only Serializable objects with `name`s will be collected and returned.  These objects will be
   addressable via their name in the parsed namespace.
 
-  :param string python: A python build file blob.
-  :returns: A list of decoded addressable, Serializable objects.
-  :rtype: list
-  :raises: :class:`ParseError` if there were any problems encountered parsing the given `python`.
+  :param dict symbol_table: The symbol table to expose to the python file being parsed.
+  :returns: A callable that accepts a string path and returns a list of decoded addressable,
+            Serializable objects.  The callable will raise :class:`ParseError` if there were any
+            problems encountered parsing the python BUILD file at the given path.
+  :rtype: :class:`collections.Callable`
   """
   objects = []
 
   def registered(type_name, object_type, name=None, **kwargs):
     if name:
-      obj = object_type(name=name, typename=type_name, **kwargs)
+      obj = object_type(name=name, type_alias=type_name, **kwargs)
       if Serializable.is_serializable(obj):
         objects.append(obj)
       return obj
     else:
-      return object_type(typename=type_name, **kwargs)
+      return object_type(type_alias=type_name, **kwargs)
 
   parse_globals = {}
   for alias, symbol in symbol_table.items():
     parse_globals[alias] = functools.partial(registered, alias, symbol)
-  six.exec_(python, parse_globals, {})
-  return objects
+
+  lock = threading.Lock()
+
+  def parse(path):
+    with open(path) as fp:
+      python = fp.read()
+
+    with lock:
+      del objects[:]
+      six.exec_(python, parse_globals, {})
+      return list(objects)
+
+  return parse
