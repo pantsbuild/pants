@@ -11,8 +11,8 @@ from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.address import Address
-from pants.base.address_lookup_error import AddressLookupError
+from pants.build_graph.address import Address
+from pants.build_graph.address_lookup_error import AddressLookupError
 
 
 logger = logging.getLogger(__name__)

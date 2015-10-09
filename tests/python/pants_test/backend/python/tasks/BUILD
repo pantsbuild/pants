@@ -14,7 +14,7 @@ python_library(
   sources=['python_task_test_base.py'],
   dependencies=[
     'src/python/pants/backend/python:plugin',
-    'src/python/pants/base:address',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base'
   ]
 )
@@ -63,7 +63,6 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:all_utils',
-    'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:source_root',
     'src/python/pants/build_graph',

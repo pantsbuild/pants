@@ -18,7 +18,6 @@ python_library(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/backend/python:python_requirement',
-    'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',

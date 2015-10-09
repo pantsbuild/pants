@@ -5,6 +5,7 @@
 target(
   name = 'all',
   dependencies = [
+    ':address',
     ':build_configuration',
     ':build_file_aliases',
     ':build_file_parser',
@@ -14,7 +15,18 @@ target(
   ]
 )
 
-
+python_tests(
+  name = 'address',
+  sources = ['test_address.py'],
+  dependencies = [
+    'src/python/pants/base:build_file',
+    'src/python/pants/base:build_root',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:base_test',
+  ]
+)
 
 python_tests(
   name = 'build_configuration',
@@ -31,7 +43,6 @@ python_tests(
   name = 'build_file_aliases',
   sources = ['test_build_file_aliases.py'],
   dependencies = [
-    'src/python/pants/base:address',
     'src/python/pants/build_graph',
   ]
 )
@@ -40,7 +51,6 @@ python_tests(
   name = 'build_file_parser',
   sources = ['test_build_file_parser.py'],
   dependencies = [
-    'src/python/pants/base:address',
     'src/python/pants/base:build_file',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
@@ -51,8 +61,6 @@ python_tests(
   name = 'build_graph',
   sources = ['test_build_graph.py'],
   dependencies = [
-    'src/python/pants/base:address',
-    'src/python/pants/base:address_lookup_error',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test'
   ],

@@ -14,7 +14,7 @@ python_tests(
   name='graph',
   sources=['test_graph.py'],
   dependencies=[
-    'src/python/pants/base:address',
+    'src/python/pants/build_graph',
     'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
@@ -27,7 +27,7 @@ python_tests(
   name='mapper',
   sources=['test_mapper.py'],
   dependencies=[
-    'src/python/pants/base:address',
+    'src/python/pants/build_graph',
     'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
@@ -50,7 +50,7 @@ python_tests(
   name='configuration',
   sources=['test_configuration.py'],
   dependencies=[
-    'src/python/pants/base:address',
+    'src/python/pants/build_graph',
     'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:objects',
   ]

@@ -11,12 +11,12 @@ import subprocess
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.source_root import SourceRoot
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.build_graph.address import Address
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property

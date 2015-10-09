@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import Address, parse_spec
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.build_graph.address import Address, parse_spec
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_parser import BuildFileParser
 
 
@@ -169,10 +169,10 @@ class BuildFileAddressMapper(object):
 
     :param string spec: A spec to lookup in the map.
     :param string relative_to: Path the spec might be relative to
-    :raises :class:`pants.base.address_lookup_error.AddressLookupError` If the BUILD file cannot be
-            found in the path specified by the spec.
+    :raises :class:`pants.build_graph.address_lookup_error.AddressLookupError`
+            If the BUILD file cannot be found in the path specified by the spec.
     :returns: A new Address instance.
-    :rtype: :class:`pants.base.address.Address`
+    :rtype: :class:`pants.build_graph.address.Address`
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     try:

@@ -10,8 +10,8 @@ from textwrap import dedent
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
-from pants.base.address import Address
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
 

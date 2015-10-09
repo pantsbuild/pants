@@ -9,7 +9,7 @@ import os
 from textwrap import dedent
 
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.base.address import Address
+from pants.build_graph.address import Address
 from pants_test.tasks.task_test_base import TaskTestBase
 
 

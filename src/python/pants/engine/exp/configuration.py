@@ -86,7 +86,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     generally embedded objects; ie: attributes values of enclosing named configuration objects.
     Any top-level configuration object, though, will be identifiable via a unique address.
 
-    :rtype: :class:`pants.base.address.Address`
+    :rtype: :class:`pants.build_graph.address.Address`
     """
     return self._kwargs.get('address')
 

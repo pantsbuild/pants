@@ -10,7 +10,7 @@ from abc import abstractproperty
 import six
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.base.address_lookup_error import AddressLookupError
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
 

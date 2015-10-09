@@ -39,8 +39,8 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/backend/core/targets:all',
     'src/python/pants/backend/core/tasks:all',
-    'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
     'src/python/pants/util:dirutil',
     ':wrapped_globs',
   ]
