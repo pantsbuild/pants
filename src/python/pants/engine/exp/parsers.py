@@ -43,6 +43,14 @@ class ParseError(Exception):
   """Indicates an error parsing BUILD configuration."""
 
 
+def _read(path):
+  try:
+    with open(path) as fp:
+      return fp.read()
+  except OSError as e:
+    raise ParseError('Problem reading path {}: {}'.format(path, e))
+
+
 def _object_decoder(obj, symbol_table=None):
   # A magic field will indicate type and this can be used to wrap the object in a type.
   type_alias = obj.get('type_alias', None)
@@ -76,8 +84,7 @@ def parse_json(path, symbol_table=None):
   :rtype: list
   :raises: :class:`ParseError` if there were any problems encountered parsing the given `json`.
   """
-  with open(path) as fp:
-    json = fp.read()
+  json = _read(path)
 
   decoder = _get_decoder(symbol_table)
 
@@ -203,10 +210,11 @@ def python_assignments_parser(symbol_table=None):
   Only Serializable objects assigned to top-level variables will be collected and returned.  These
   objects will be addressable via their top-level variable names in the parsed namespace.
 
-  :param string python: A python build file blob.
-  :returns: A list of decoded addressable, Serializable objects.
-  :rtype: list
-  :raises: :class:`ParseError` if there were any problems encountered parsing the given `python`.
+  :param dict symbol_table: An optional symbol table to expose to the python file being parsed.
+  :returns: A callable that accepts a string path and returns a list of decoded addressable,
+            Serializable objects.  The callable will raise :class:`ParseError` if there were any
+            problems encountered parsing the python BUILD file at the given path.
+  :rtype: :class:`collections.Callable`
   """
   def aliased(type_alias, object_type, **kwargs):
     return object_type(type_alias=type_alias, **kwargs)
@@ -216,9 +224,9 @@ def python_assignments_parser(symbol_table=None):
     parse_globals[alias] = functools.partial(aliased, alias, symbol)
 
   def parse(path):
+    python = _read(path)
     symbols = {}
-    with open(path) as fp:
-      six.exec_(fp.read(), parse_globals, symbols)
+    six.exec_(python, parse_globals, symbols)
 
     objects = []
     for name, obj in symbols.items():
@@ -274,9 +282,7 @@ def python_callbacks_parser(symbol_table):
   lock = threading.Lock()
 
   def parse(path):
-    with open(path) as fp:
-      python = fp.read()
-
+    python = _read(path)
     with lock:
       del objects[:]
       six.exec_(python, parse_globals, {})
