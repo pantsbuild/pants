@@ -51,7 +51,7 @@ class AddressMap(object):
     objects_by_name = {}
     for obj in objects:
       if not Serializable.is_serializable(obj):
-        raise UnaddressableObjectError('Parsed a non-serilizable object: {!r}'.format(obj))
+        raise UnaddressableObjectError('Parsed a non-serializable object: {!r}'.format(obj))
       attributes = obj._asdict()
 
       name = attributes.get('name')
