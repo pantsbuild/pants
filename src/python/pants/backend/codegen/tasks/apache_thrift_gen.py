@@ -82,7 +82,7 @@ class ApacheThriftGen(SimpleCodegenTask):
   @memoized_property
   def _service_deps(self):
     service_dep_addresses = self.get_options().service_deps
-    return list(self.resolve_deps(service_dep_addresses)) if service_deps else self._deps
+    return list(self.resolve_deps(service_dep_addresses)) if service_dep_addresses else self._deps
 
   SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')
 
