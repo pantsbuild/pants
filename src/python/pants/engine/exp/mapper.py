@@ -233,12 +233,17 @@ class AddressMapper(object):
     :rtype: :class:`AddressFamily`
     :raises: :class:`ResolveError` if the address family could not be found.
     """
-    address_maps = []
-    for path in self._find_build_files(namespace):
-      address_maps.append(self._parse(self._normalize_parse_path(path)))
-    if not address_maps:
+    family = self._maybe_family(namespace)
+    if not family:
       raise ResolveError('No addresses registered in namespace {}'.format(namespace))
-    return AddressFamily.create(self._build_root, address_maps)
+    return family
+
+  def _maybe_family(self, namespace):
+    build_files = list(self._find_build_files(namespace))
+    return self._family(build_files) if build_files else None
+
+  def _family(self, build_files):
+    return AddressFamily.create(self._build_root, [self._parse(bf) for bf in build_files])
 
   def resolve(self, address):
     """Resolve the given address to a named Serializable object.
@@ -272,3 +277,28 @@ class AddressMapper(object):
     self._parse.forget(self, normalized_path)
     namespace = os.path.relpath(os.path.dirname(normalized_path), self._build_root)
     self.family.forget(self, namespace)
+
+  def walk_addressables(self, rel_path=None, path_excludes=None):
+    """Return an iterator over all addressable objects found under `rel_path`.
+
+    :param string rel_path: The path relative to the build root to scan beneath; '' by default,
+                            meaning the whole build root will be scanned.
+    :param path_excludes: Directory paths relative to the build root to exclude from the scan.
+    :type path_excludes: list of string
+    :returns: An iterator of (address, addressable object).
+    :rtype: tuple of (:class:`pants.base.address.Address`, object)
+    """
+    path_excludes = [os.path.join(self._build_root, p) for p in (path_excludes or ())]
+    map_root = os.path.join(self._build_root, rel_path or '')
+
+    for root, dirs, files in os.walk(map_root):
+      if path_excludes:
+        for index, directory in enumerate(dirs):
+          dir_path = os.path.join(root, directory)
+          if dir_path in path_excludes:
+            del dirs[index]
+            break
+      build_files = [os.path.join(root, f) for f in files if self._build_pattern.match(f)]
+      if build_files:
+        for item in self._family(build_files).addressables.items():
+          yield item
