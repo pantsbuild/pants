@@ -21,15 +21,15 @@ class ConfigurationTest(unittest.TestCase):
     with self.assertRaises(ValidationError):
       Configuration(name='a', address=Address.parse('a:b'))
 
-  def test_typename(self):
-    self.assertEqual('Configuration', Configuration().typename)
-    self.assertEqual('aliased', Configuration(typename='aliased').typename)
+  def test_type_alias(self):
+    self.assertEqual('Configuration', Configuration().type_alias)
+    self.assertEqual('aliased', Configuration(type_alias='aliased').type_alias)
 
     class Subclass(Configuration):
       pass
 
-    self.assertEqual('Subclass', Subclass().typename)
-    self.assertEqual('aliased_subclass', Subclass(typename='aliased_subclass').typename)
+    self.assertEqual('Subclass', Subclass().type_alias)
+    self.assertEqual('aliased_subclass', Subclass(type_alias='aliased_subclass').type_alias)
 
   def test_extend_and_merge(self):
     # Resolution should be lazy, so - although its invalid to both extend and merge, we should be

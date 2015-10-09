@@ -41,6 +41,7 @@ python_tests(
   name='parsers',
   sources=['test_parsers.py'],
   dependencies=[
+    'src/python/pants/engine/exp:objects',
     'src/python/pants/engine/exp:parsers',
   ]
 )

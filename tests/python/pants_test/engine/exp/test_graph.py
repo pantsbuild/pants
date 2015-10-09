@@ -11,28 +11,34 @@ from functools import partial
 
 from pants.base.address import Address
 from pants.engine.exp.configuration import Configuration
-from pants.engine.exp.graph import CycleError, Graph, ResolvedTypeMismatchError, ResolveError
+from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
+                                    Resolver)
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json, parse_python_assignments, parse_python_callbacks
 from pants.engine.exp.targets import ApacheThriftConfiguration, PublishConfiguration, Target
 
 
-class GraphTest(unittest.TestCase):
+class GraphTestBase(unittest.TestCase):
   def setUp(self):
     self.symbol_table = {'ApacheThriftConfig': ApacheThriftConfiguration,
                          'Config': Configuration,
                          'Target': Target,
                          'PublishConfig': PublishConfiguration}
 
-  def create_graph(self, build_pattern=None, parser=None):
+  def create_graph(self, build_pattern=None, parser=None, inline=False):
     mapper = AddressMapper(build_root=os.path.dirname(__file__),
                            build_pattern=build_pattern,
                            parser=parser)
-    return Graph(mapper)
+    return Graph(mapper, inline=inline)
 
   def create_json_graph(self):
     return self.create_graph(build_pattern=r'.+\.BUILD.json$',
                              parser=partial(parse_json, symbol_table=self.symbol_table))
+
+
+class InlinedGraphTest(GraphTestBase):
+  def create_graph(self, build_pattern=None, parser=None, inline=True):
+    return super(InlinedGraphTest, self).create_graph(build_pattern, parser, inline=inline)
 
   def do_test_codegen_simple(self, graph):
     def address(name):
@@ -141,3 +147,85 @@ class GraphTest(unittest.TestCase):
     graph = self.create_json_graph()
     with self.assertRaises(ResolveError):
       graph.resolve(Address.parse('this/dir/does/not/exist'))
+
+
+class LazyResolvingGraphTest(GraphTestBase):
+  def do_test_codegen_simple(self, graph):
+    def address(name):
+      return Address(spec_path='examples/graph_test', target_name=name)
+
+    def resolver(addr):
+      return Resolver(graph, addr)
+
+    java1_address = address('java1')
+    resolved_java1 = graph.resolve(java1_address)
+
+    nonstrict_address = address('nonstrict')
+    public_address = address('public')
+    thrift2_address = address('thrift2')
+    expected_java1 = Target(address=java1_address,
+                            sources=[],
+                            configurations=[
+                              ApacheThriftConfiguration(version='0.9.2', strict=True, lang='java'),
+                              resolver(nonstrict_address),
+                              PublishConfiguration(
+                                default_repo=resolver(public_address),
+                                repos={
+                                  'jake':
+                                    Configuration(url='https://dl.bintray.com/pantsbuild/maven'),
+                                  'jane': resolver(public_address)
+                                }
+                              )
+                            ],
+                            dependencies=[resolver(thrift2_address)])
+
+    self.assertEqual(expected_java1, resolved_java1)
+
+    expected_nonstrict = ApacheThriftConfiguration(address=nonstrict_address,
+                                                   version='0.9.2',
+                                                   strict=False,
+                                                   lang='java')
+    resolved_nonstrict = graph.resolve(nonstrict_address)
+    self.assertEqual(expected_nonstrict, resolved_nonstrict)
+    self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
+    self.assertIs(expected_java1.configurations[1], resolved_nonstrict)
+
+    expected_public = Configuration(address=public_address,
+                                    url='https://oss.sonatype.org/#stagingRepositories')
+    resolved_public = graph.resolve(public_address)
+    self.assertEqual(expected_public, resolved_public)
+    self.assertEqual(expected_public, expected_java1.configurations[2].default_repo)
+    self.assertEqual(expected_public, expected_java1.configurations[2].repos['jane'])
+    self.assertIs(expected_java1.configurations[2].default_repo, resolved_public)
+    self.assertIs(expected_java1.configurations[2].repos['jane'], resolved_public)
+
+    thrift1_address = address('thrift1')
+    expected_thrift2 = Target(address=thrift2_address,
+                              sources=[],
+                              dependencies=[resolver(thrift1_address)])
+    resolved_thrift2 = graph.resolve(thrift2_address)
+    self.assertEqual(expected_thrift2, resolved_thrift2)
+    self.assertEqual(expected_thrift2, resolved_java1.dependencies[0])
+    self.assertIs(resolved_java1.dependencies[0], resolved_thrift2)
+
+    expected_thrift1 = Target(address=thrift1_address, sources=[])
+    resolved_thrift1 = graph.resolve(thrift1_address)
+    self.assertEqual(expected_thrift1, resolved_thrift1)
+    self.assertEqual(expected_thrift1, resolved_thrift2.dependencies[0])
+    self.assertIs(resolved_thrift2.dependencies[0], resolved_thrift1)
+
+  def test_json(self):
+    graph = self.create_json_graph()
+    self.do_test_codegen_simple(graph)
+
+  def test_python(self):
+    graph = self.create_graph(build_pattern=r'.+\.BUILD.python$',
+                              parser=partial(parse_python_assignments,
+                                             symbol_table=self.symbol_table))
+    self.do_test_codegen_simple(graph)
+
+  def test_python_classic(self):
+    graph = self.create_graph(build_pattern=r'.+\.BUILD$',
+                              parser=partial(parse_python_callbacks,
+                                             symbol_table=self.symbol_table))
+    self.do_test_codegen_simple(graph)
