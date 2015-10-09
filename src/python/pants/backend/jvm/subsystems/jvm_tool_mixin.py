@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 from textwrap import dedent
 
+from pants.base.address import Address
 from pants.base.dep_lookup_error import DepLookupError
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import target_option
@@ -30,8 +31,7 @@ class JvmToolMixin(object):
       :rtype: :class:`pants.base.address.Address`
       """
       option = self.key.replace('-', '_')
-      dep_address = options.for_scope(self.scope)[option]
-      return dep_address
+      return options.for_scope(self.scope)[option]
 
     def is_default(self, options):
       """Return `True` if this option was not set by the user.
@@ -89,10 +89,12 @@ class JvmToolMixin(object):
         return 'Target address spec for specifying the classpath of the {} jvm tool.'.format(key)
     help = help or formulate_help()
 
+    default = Address.parse('//:{}'.format(key) if classpath_spec is None else classpath_spec)
+
     register('--{}'.format(key),
              advanced=True,
              type=target_option,
-             default='//:{}'.format(key) if classpath_spec is None else classpath_spec,
+             default=default,
              help=help,
              fingerprint=fingerprint)
 

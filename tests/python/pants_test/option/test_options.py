@@ -16,7 +16,7 @@ from textwrap import dedent
 from pants.base.deprecated import PastRemovalVersionError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
-from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
+from pants.option.custom_types import dict_option, file_option, list_option, target_option
 from pants.option.errors import ParseError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
@@ -72,7 +72,7 @@ class OptionsTest(unittest.TestCase):
     # Custom types.
     register_global('--dicty', type=dict_option, default='{"a": "b"}')
     register_global('--listy', type=list_option, default='[1, 2, 3]')
-    register_global('--target_listy', type=target_list_option, default=[':a', ':b'])
+    register_global('--target_optiony', type=target_option, default=[':a', ':b'])
     register_global('--filey', type=file_option, default='default.txt')
 
     # For the design doc example test.
@@ -213,9 +213,9 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --dicty=\'{"c": "d"}\'')
     self.assertEqual({'c': 'd'}, options.for_global_scope().dicty)
 
-    # Test target_list-typed option.
-    options = self._parse('./pants --target_listy=\'["//:foo", "//:bar"]\'')
-    self.assertEqual(['//:foo', '//:bar'], options.for_global_scope().target_listy)
+    # Test target_option-typed option.
+    options = self._parse('./pants --target_optiony=//:foo')
+    self.assertEqual(Address.parse('//:foo'), options.for_global_scope().target_optiony)
 
     # Test file-typed option.
     with temporary_file_path() as fp:

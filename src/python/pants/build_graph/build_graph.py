@@ -175,7 +175,6 @@ class BuildGraph(object):
     :param predicate: A target predicate that will be used to filter the targets returned.
     """
     return filter(predicate, self._target_by_address.values())
-    for spec in sorted(specs):
 
   def sorted_targets(self):
     """:return: targets ordered from most dependent to least."""
