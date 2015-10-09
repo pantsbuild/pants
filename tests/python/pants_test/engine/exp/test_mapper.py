@@ -30,7 +30,7 @@ class Thing(object):
     self._kwargs = kwargs
 
   def _asdict(self):
-    return self._kwargs.copy()
+    return self._kwargs
 
   def _key(self):
     return {k: v for k, v in self._kwargs.items() if k != 'type_alias'}
@@ -40,14 +40,14 @@ class Thing(object):
 
 
 class AddressMapTest(unittest.TestCase):
-  _parse = functools.partial(parsers.parse_json, symbol_table={'thing': Thing})
+  _parser = functools.partial(parsers.parse_json, symbol_table={'thing': Thing})
 
   @contextmanager
   def parse_address_map(self, json):
     with temporary_file() as fp:
       fp.write(json)
       fp.close()
-      address_map = AddressMap.parse(fp.name, parse=self._parse)
+      address_map = AddressMap.parse(fp.name, parser=self._parser)
       self.assertEqual(fp.name, address_map.path)
       yield address_map
 

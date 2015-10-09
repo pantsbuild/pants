@@ -30,7 +30,7 @@ class AddressMap(object):
   """Maps addressable Serializable objects from a byte source."""
 
   @classmethod
-  def parse(cls, path, parse=None):
+  def parse(cls, path, parser=None):
     """Parses a source for addressable Serializable objects.
 
     By default an enhanced JSON parser is used.  The parser admits extra blank lines, comment lines
@@ -42,24 +42,28 @@ class AddressMap(object):
     source are left as unresolved pointers.
 
     :param string path: The path to the byte source containing serialized objects.
-    :param parse: The parse function to use; by default a json parser.
-    :type parse: :class:`collection.Callable` that accepts a byte source and returns a list of all
-                 addressable Serializable objects parsed from it.
+    :param parser: The parser to use; by default a json parser.
+    :type parser: :class:`collection.Callable` that accepts a file path and returns a list of all
+                  addressable Serializable objects parsed from it.
     """
-    parse = parse or parsers.parse_json
-    with open(path, 'r') as fp:
-      objects = parse(fp.read())
-      objects_by_name = {}
-      for obj in objects:
-        if not Serializable.is_serializable(obj) or not obj._asdict().get('name'):
-          raise UnaddressableObjectError('Parsed a non-addressable object: {!r}'.format(obj))
-        attributes = obj._asdict()
-        name = attributes['name']
-        if name in objects_by_name:
-          raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
-                                   'map {!r}'.format(path, name, objects_by_name[name], obj))
-        objects_by_name[name] = obj
-      return cls(path, objects_by_name)
+    parse = parser or parsers.parse_json
+    objects = parse(path)
+    objects_by_name = {}
+    for obj in objects:
+      if not Serializable.is_serializable(obj):
+        raise UnaddressableObjectError('Parsed a non-serializable object: {!r}'.format(obj))
+      attributes = obj._asdict()
+
+      name = attributes.get('name')
+      if not name:
+        raise UnaddressableObjectError('Parsed a non-addressable object: {!r}'.format(obj))
+
+      if name in objects_by_name:
+        raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
+                                 'map {!r}'.format(path, name, objects_by_name[name], obj))
+
+      objects_by_name[name] = obj
+    return cls(path, objects_by_name)
 
   def __init__(self, path, objects_by_name):
     """Not intended for direct use, instead see `parse`."""
@@ -218,7 +222,7 @@ class AddressMapper(object):
 
   @memoized_method
   def _parse(self, path):
-    return AddressMap.parse(path, parse=self._parser)
+    return AddressMap.parse(path, parser=self._parser)
 
   @memoized_method
   def family(self, namespace):
