@@ -6,7 +6,7 @@ sudo: false
 
 
 before_cache:
-  # Kill all `.pyc` in out cached venvs.  Some files appear to get
+  # Kill all `.pyc` in our cached venvs.  Some files appear to get
   # bytecode compiled in non-yet-understood circumstances leading to a
   # full cache re-pack due to new `.pyc` files.
   - find build-support -name "*.pyc" -print -delete
