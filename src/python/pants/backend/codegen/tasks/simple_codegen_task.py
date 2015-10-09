@@ -290,11 +290,12 @@ class SimpleCodegenTask(Task):
       if self.artifact_cache_writes_enabled():
         self.update_artifact_cache(vts_artifactfiles_pairs)
 
-  def resolve_deps(self, unresolved_deps):
+  def resolve_deps(self, unresolved_dep_addresses):
+    """Takes a list of target Address objects and resolves them to Targets."""
     deps = OrderedSet()
-    for dep in unresolved_deps:
+    for dep in unresolved_dep_addresses:
       try:
-        deps.update(self.context.resolve(dep))
+        deps.update(self.context.resolve_address(dep))
       except AddressLookupError as e:
         raise DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
     return deps

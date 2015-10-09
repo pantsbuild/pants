@@ -27,6 +27,7 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
+from pants.option.custom_types import target_list_option
 
 
 class ProtobufGen(SimpleCodegenTask):
@@ -63,10 +64,10 @@ class ProtobufGen(SimpleCodegenTask):
              help='Path to use for the protoc binary.  Used as part of the path to lookup the'
                   'tool under --pants-bootstrapdir.',
              default='bin/protobuf')
-    register('--javadeps', advanced=True, action='append',
+    register('--javadeps', advanced=True, action='append', type=target_list_option,
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
-             default=['3rdparty:protobuf-java'])
+             default=[Address.parse('3rdparty:protobuf-java')])
 
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod

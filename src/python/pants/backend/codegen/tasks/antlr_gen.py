@@ -90,8 +90,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
 
   def synthetic_target_extra_dependencies(self, target):
     # Fetch the right java dependency from the target's compiler option
-    compiler_classpath_spec = self.get_options()[target.compiler]
-    return self.resolve_deps([compiler_classpath_spec])
+    compiler_classpath_address = self.get_options()[target.compiler]
+    return self.resolve_deps([compiler_classpath_address])
 
   # This checks to make sure that all of the sources have an identical package source structure, and
   # if they do, uses that as the package. If they are different, then the user will need to set the
