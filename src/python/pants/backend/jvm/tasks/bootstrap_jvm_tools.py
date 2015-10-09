@@ -96,13 +96,13 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     """Indicates an error resolving a required JVM tool classpath."""
 
   @classmethod
-  def _tool_resolve_error(cls, error, dep_spec, jvm_tool):
+  def _tool_resolve_error(cls, error, dep_address, jvm_tool):
     msg = dedent("""
         Failed to resolve target for tool: {tool}. This target was obtained from
         option {option} in scope {scope}. You probably need to add this target to your tools
         BUILD file(s), usually located in BUILD.tools in the workspace root.
         Exception {etype}: {error}
-      """.format(tool=dep_spec,
+      """.format(tool=dep_address.spec,
                  etype=type(error).__name__,
                  error=error,
                  scope=jvm_tool.scope,
@@ -123,7 +123,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
             continue
         except AddressLookupError as e:
           if jvm_tool.classpath is None:
-            raise cls._tool_resolve_error(e, dep_spec, jvm_tool)
+            raise cls._tool_resolve_error(e, dep_address, jvm_tool)
           else:
             if not jvm_tool.is_default(options):
               # The user specified a target spec for this jvm tool that doesn't actually exist.
