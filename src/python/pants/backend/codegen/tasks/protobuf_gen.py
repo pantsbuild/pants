@@ -25,9 +25,9 @@ from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import ZIP
+from pants.option.custom_types import target_list_option
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
-from pants.option.custom_types import target_list_option
 
 
 class ProtobufGen(SimpleCodegenTask):
