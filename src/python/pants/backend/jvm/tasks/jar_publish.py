@@ -23,12 +23,12 @@ from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadat
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
-from pants.base.address import Address
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
+from pants.build_graph.address import Address
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.build_graph import sort_targets
 from pants.ivy.bootstrapper import Bootstrapper

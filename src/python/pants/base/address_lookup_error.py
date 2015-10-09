@@ -1,12 +1,14 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.deprecated import deprecated_module
+from pants.build_graph.address_lookup_error import AddressLookupError
 
-class AddressLookupError(Exception):
-  """Raised by various modules when an address can't be resolved.  Use this common base class so
-   other modules can trap the error at each node along the path and construct a useful diagnostic.
-  """
+
+deprecated_module('0.0.55', hint_message='Use pants.build_graph.address_lookup_error instead.')
+
+AddressLookupError = AddressLookupError

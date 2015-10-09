@@ -14,7 +14,7 @@ from pants.base.payload_field import PrimitiveField
 class JavaTests(JvmTarget):
   """Tests JVM sources with JUnit."""
 
-  def __init__(self, cwd=None, test_platform=None, payload=None, **kwargs):
+  def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None, **kwargs):
     """
     :param str cwd: working directory (relative to the build root) for the tests under this
       target. If unspecified (None), the working directory will be controlled by junit_run's --cwd.
@@ -27,6 +27,7 @@ class JavaTests(JvmTarget):
     payload.add_fields({
       'test_platform': PrimitiveField(test_platform)
     })
+    self._timeout = timeout
     super(JavaTests, self).__init__(payload=payload, **kwargs)
 
     # TODO(John Sirois): These could be scala, clojure, etc.  'jvm' and 'tests' are the only truly
@@ -38,3 +39,7 @@ class JavaTests(JvmTarget):
     if self.payload.test_platform:
       return JvmPlatform.global_instance().get_platform_by_name(self.payload.test_platform)
     return self.platform
+
+  @property
+  def timeout(self):
+    return self._timeout

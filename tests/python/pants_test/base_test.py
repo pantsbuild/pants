@@ -13,12 +13,12 @@ from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.base.address import Address
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases

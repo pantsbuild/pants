@@ -9,10 +9,10 @@ import collections
 
 import six
 
-from pants.base.address import Address
-from pants.engine.exp.addressable import Addressed
+from pants.build_graph.address import Address
+from pants.engine.exp.addressable import AddressableDescriptor, TypeConstraintError
 from pants.engine.exp.mapper import MappingError
-from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable
+from pants.engine.exp.objects import Resolvable, Serializable, SerializableFactory, Validatable
 
 
 class ResolveError(Exception):
@@ -27,19 +27,55 @@ class ResolvedTypeMismatchError(ResolveError):
   """Indicates a resolved object was not of the expected type."""
 
 
+class Resolver(Resolvable):
+  """Lazily resolves addressables using a graph."""
+
+  def __init__(self, graph, address):
+    self._graph = graph
+    self._address = address
+
+  def address(self):
+    return self._address.spec
+
+  def resolve(self):
+    return self._graph.resolve(self._address)
+
+  def __hash__(self):
+    return hash((self._graph, self._address))
+
+  def __eq__(self, other):
+    return (isinstance(other, Resolver) and
+            (self._graph, self._address) == (other._graph, other._address))
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __repr__(self):
+    return 'Graph.Resolver(graph={}, address={!r})'.format(self._graph, self._address)
+
+
 class Graph(object):
   """A lazy, directed acyclic graph of objects. Not necessarily connected."""
 
-  def __init__(self, address_mapper):
+  def __init__(self, address_mapper, inline=False):
     """Creates a build graph composed of addresses resolvable by an address mapper.
 
     :param address_mapper: An address mapper that can resolve the objects addresses point to.
     :type address_mapper: :class:`pants.engine.exp.mapper.AddressMapper`.
+    :param bool inline: If `True`, resolved addressables are inlined in the containing object;
+                        otherwise a resolvable pointer is used that dynamically traverses to the
+                        addressable on every access.
     """
     self._address_mapper = address_mapper
 
+    # TODO(John Sirois): This will need to be eliminated in favor of just using the AddressMapper
+    # caching or else also expose an invalidation interface based on address.spec_path - aka
+    # AddressMapper.namespace.
+    #
     # Our resolution cache.
     self._resolved_by_address = {}
+
+    self._inline = inline
 
   def resolve(self, address):
     """Resolves the object pointed at by the given `address`.
@@ -58,7 +94,7 @@ class Graph(object):
     6. The fully resolved and validated object is cached and returned.
 
     :param address: The BUILD graph address to resolve.
-    :type address: :class:`pants.base.address.Address`
+    :type address: :class:`pants.build_graph.address.Address`
     :returns: The object pointed at by the given `address`.
     :raises: :class:`ResolveError` if no object was found at the given `address`.
     :raises: :class:`pants.engine.exp.objects.ValidationError` if the object was resolvable but
@@ -83,49 +119,42 @@ class Graph(object):
 
     obj = self._address_mapper.resolve(address)
 
+    def parse_addr(a):
+      return Address.parse(a, relative_to=address.spec_path)
+
     def resolve_item(item, addr=None):
       if Serializable.is_serializable(item):
         hydrated_args = {'address': addr} if addr else {}
 
-        # Recurse on the Serializable's values and hydrate any `Addressed` found.  This unwinds from
-        # the leaves thus hydrating item's closure.
+        # Recurse on the Serializable's values and hydrates any addressables found.  This unwinds
+        # from the leaves thus hydrating item's closure in the inline case.
         for key, value in item._asdict().items():
+          is_addressable = AddressableDescriptor.is_addressable(item, key)
+
+          def maybe_addr(x):
+            return parse_addr(x) if is_addressable and isinstance(x, six.string_types) else x
+
           if isinstance(value, collections.MutableMapping):
             container_type = type(value)
             container = container_type()
-            container.update((k, resolve_item(v)) for k, v in value.items())
+            container.update((k, resolve_item(maybe_addr(v))) for k, v in value.items())
             hydrated_args[key] = container
-          elif isinstance(value, collections.Iterable) and not isinstance(value, six.string_types):
+          elif isinstance(value, collections.MutableSequence):
             container_type = type(value)
-            hydrated_args[key] = container_type(resolve_item(v) for v in value)
+            hydrated_args[key] = container_type(resolve_item(maybe_addr(v)) for v in value)
           else:
-            hydrated_args[key] = resolve_item(value)
+            hydrated_args[key] = resolve_item(maybe_addr(value))
 
-        # Re-build the thin Serializable with fully hydrated objects substituted for all Addressed
-        # values; ie: Only ever expose full resolved closures for requested addresses.
-        item_type = type(item)
-        hydrated_item = item_type(**hydrated_args)
-
-        # Let factories replace the hydrated object.
-        if isinstance(hydrated_item, SerializableFactory):
-          hydrated_item = hydrated_item.create()
-
-        # Finally make sure objects that can self-validate get a chance to do so before we cache
-        # them as the pointee of `hydrated_item.address`.
-        if isinstance(hydrated_item, Validatable):
-          hydrated_item.validate()
-
-        return hydrated_item
-      elif isinstance(item, Addressed):
-        referenced_address = Address.parse(spec=item.address_spec, relative_to=address.spec_path)
-        referenced_item = self._resolve_recursively(referenced_address, resolve_path)
-        if not item.type_constraint.satisfied_by(referenced_item):
-          raise ResolvedTypeMismatchError('Found a {} when resolving {} for {}, expected a {!r}'
-                                          .format(type(referenced_item).__name__,
-                                                  referenced_address,
-                                                  address,
-                                                  item.type_constraint))
-        return referenced_item
+        # Re-build the thin Serializable with either fully hydrated objects or Resolvables
+        # substituted for all Address values; ie: Only ever expose fully resolved or resolvable
+        # closures for requested addresses.
+        return self._hydrate(type(item), **hydrated_args)
+      elif isinstance(item, Address):
+        if self._inline:
+          return self._resolve_recursively(item, resolve_path)
+        else:
+          # TODO(John Sirois): Implement lazy cycle checks across Resolver chains.
+          return Resolver(self, address=item)
       else:
         return item
 
@@ -133,3 +162,21 @@ class Graph(object):
     resolve_path.pop(-1)
     self._resolved_by_address[address] = resolved
     return resolved
+
+  @staticmethod
+  def _hydrate(item_type, **kwargs):
+    try:
+      item = item_type(**kwargs)
+    except TypeConstraintError as e:
+      raise ResolvedTypeMismatchError(e)
+
+    # Let factories replace the hydrated object.
+    if isinstance(item, SerializableFactory):
+      item = item.create()
+
+    # Finally make sure objects that can self-validate get a chance to do so before we cache
+    # them as the pointee of `hydrated_item.address`.
+    if isinstance(item, Validatable):
+      item.validate()
+
+    return item

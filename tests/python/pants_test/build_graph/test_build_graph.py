@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import six
 
-from pants.base.address import Address, parse_spec
-from pants.base.address_lookup_error import AddressLookupError
+from pants.build_graph.address import Address, parse_spec
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest

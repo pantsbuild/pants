@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.engine.exp.addressable import (Exactly, SubclassesOf, addressable, addressable_mapping,
-                                          addressables)
+from pants.engine.exp.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
+                                          addressable_list)
 from pants.engine.exp.configuration import Configuration
 
 
@@ -20,20 +20,21 @@ class Target(Configuration):
   # properties later.
 
   def __init__(self, name=None, configurations=None, dependencies=None, **kwargs):
-    super(Target, self).__init__(name=name,
-                                 configurations=addressables(SubclassesOf(Configuration),
-                                                             configurations),
-                                 dependencies=addressables(SubclassesOf(Target), dependencies),
-                                 **kwargs)
+    super(Target, self).__init__(name=name, **kwargs)
+    self.configurations = configurations
+    self.dependencies = dependencies
 
-  # Some convenience properties to give the class more form, but also not strictly needed.
-  @property
+  @addressable_list(SubclassesOf(Configuration))
   def configurations(self):
-    return self._kwargs['configurations']
+    """"""
 
   @property
   def dependencies(self):
-    return self._kwargs['dependencies']
+    """"""
+
+# Since Target.dependencies is recursive on the Target type, we need to post-class-definition
+# re-define dependencies in this way.
+Target.dependencies = addressable_list(SubclassesOf(Target))(Target.dependencies)
 
 
 class ApacheThriftConfiguration(Configuration):
@@ -64,9 +65,14 @@ class PublishConfiguration(Configuration):
   # An example of addressable and addressable_mapping field wrappers.
 
   def __init__(self, default_repo, repos, name=None, **kwargs):
-    super(PublishConfiguration, self).__init__(name=name,
-                                               default_repo=addressable(Exactly(Configuration),
-                                                                        default_repo),
-                                               repos=addressable_mapping(Exactly(Configuration),
-                                                                         repos),
-                                               **kwargs)
+    super(PublishConfiguration, self).__init__(name=name, **kwargs)
+    self.default_repo = default_repo
+    self.repos = repos
+
+  @addressable(Exactly(Configuration))
+  def default_repo(self):
+    """"""
+
+  @addressable_dict(Exactly(Configuration))
+  def repos(self):
+    """"""

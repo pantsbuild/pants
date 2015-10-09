@@ -145,5 +145,6 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/core/tasks:test_task_mixin',
     'tests/python/pants_test/tasks:task_test_base',
+    '3rdparty/python:mock',
   ]
 )

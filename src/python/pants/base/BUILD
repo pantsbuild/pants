@@ -5,14 +5,18 @@ python_library(
   name = 'address',
   sources = ['address.py'],
   dependencies = [
-    ':build_file',
-    'src/python/pants/util:meta',
+    ':deprecated',
+    'src/python/pants/build_graph'
   ]
 )
 
 python_library(
   name = 'address_lookup_error',
   sources = ['address_lookup_error.py'],
+  dependencies = [
+    ':deprecated',
+    'src/python/pants/build_graph'
+  ]
 )
 
 python_library(

@@ -10,6 +10,8 @@ import subprocess
 from collections import defaultdict
 from textwrap import dedent
 
+from mock import patch
+
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
@@ -22,6 +24,7 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.dirutil import safe_file_dump
+from pants.util.timeout import TimeoutReached
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
@@ -88,6 +91,51 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       )
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+
+  def test_junit_runner_timeout_success(self):
+    """When we set a timeout and don't force failure, succeed."""
+
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      self.set_options(timeout_default=1)
+      self.set_options(timeouts=True)
+      self.execute_junit_runner(
+        dedent("""
+          import org.junit.Test;
+          import static org.junit.Assert.assertTrue;
+          public class FooTest {
+            @Test
+            public void testFoo() {
+              assertTrue(5 > 3);
+            }
+          }
+        """)
+      )
+      mock_timeout.assert_called_with(1)
+
+  def test_junit_runner_timeout_fail(self):
+    """When we set a timeout and force a failure, fail."""
+
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      mock_timeout().__exit__.side_effect = TimeoutReached(1)
+
+      self.set_options(timeout_default=1)
+      self.set_options(timeouts=True)
+      with self.assertRaises(TaskError) as cm:
+        self.execute_junit_runner(
+          dedent("""
+            import org.junit.Test;
+            import static org.junit.Assert.assertTrue;
+            public class FooTest {
+              @Test
+              public void testFoo() {
+                assertTrue(5 > 3);
+              }
+            }
+          """)
+        )
+
+      self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+      mock_timeout.assert_called_with(1)
 
   def execute_junit_runner(self, content):
 

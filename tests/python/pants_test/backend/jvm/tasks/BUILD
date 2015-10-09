@@ -102,8 +102,8 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:checkstyle',
-    'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/tasks:task_test_base',
   ]
@@ -244,6 +244,7 @@ python_tests(
   name = 'junit_run',
   sources = ['test_junit_run.py'],
   dependencies = [
+    '3rdparty/python:mock',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',

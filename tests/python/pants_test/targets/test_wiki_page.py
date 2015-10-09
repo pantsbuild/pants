@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 

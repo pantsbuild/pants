@@ -30,7 +30,6 @@ target(
 target(
   name = 'base',
   dependencies = [
-    ':address',
     ':build_environment',
     ':build_file_address_mapper',
     ':build_root',
@@ -47,19 +46,6 @@ target(
     ':source_root',
     ':validation',
     ':worker_pool',
-  ]
-)
-
-python_tests(
-  name = 'address',
-  sources = ['test_address.py'],
-  dependencies = [
-    'src/python/pants/base:address',
-    'src/python/pants/base:build_file',
-    'src/python/pants/base:build_root',
-    'tests/python/pants_test:base_test',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -97,8 +83,6 @@ python_tests(
   name = 'build_file_address_mapper',
   sources = ['test_build_file_address_mapper.py'],
   dependencies = [
-    'src/python/pants/base:address',
-    'src/python/pants/base:address_lookup_error',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
@@ -224,7 +208,6 @@ python_tests(
   sources = ['test_source_root.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:address',
     'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     ]

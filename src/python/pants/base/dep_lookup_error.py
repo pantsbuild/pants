@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address_lookup_error import AddressLookupError
+from pants.build_graph.address_lookup_error import AddressLookupError
 
 
 class DepLookupError(AddressLookupError):
