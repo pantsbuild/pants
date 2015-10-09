@@ -61,14 +61,14 @@ class JarDependency(object):
                                       key_arg='excludes',
                                       allowable=(tuple, list,)))
 
-  @deprecated(removal_version='0.0.53',
+  @deprecated(removal_version='0.0.54',
               hint_message='Pass `ext` to `jar(...)` instead if the dependency has a non-standard '
                            'extension.')
   def _maybe_set_ext(self, type_):
     if not self.ext:
       self.ext = type_
 
-  @deprecated(removal_version='0.0.53',
+  @deprecated(removal_version='0.0.54',
               hint_message='Pass an `excludes=[exclude(...), ...]` list to `jar(...)` '
                            'instead.')
   def exclude(self, org, name=None):
