@@ -44,6 +44,7 @@ python_library(
     'src/python/pants/util:meta',
     'src/python/pants/util:strutil',
     'src/python/pants/util:xml_parser',
+    'src/python/pants/util:timeout',
   ]
 )
 
