@@ -44,11 +44,11 @@ class ParseError(Exception):
 
 def _object_decoder(obj, symbol_table=None):
   # A magic field will indicate type and this can be used to wrap the object in a type.
-  typename = obj.get('typename', None)
-  if not typename:
+  type_alias = obj.get('type_alias', None)
+  if not type_alias:
     return obj
   else:
-    symbol = symbol_table(typename)
+    symbol = symbol_table(type_alias)
     return symbol(**obj)
 
 
@@ -158,7 +158,7 @@ def parse_json(json, symbol_table=None):
   return objects
 
 
-def _object_encoder(obj, inline=True):
+def _object_encoder(obj, inline):
   if isinstance(obj, Resolvable):
     return obj.resolve() if inline else obj.address
 
@@ -167,9 +167,9 @@ def _object_encoder(obj, inline=True):
                      .format(obj, type(obj).__name__))
 
   encoded = obj._asdict()
-  if 'typename' not in encoded:
+  if 'type_alias' not in encoded:
     encoded = encoded.copy()
-    encoded['typename'] = '{}.{}'.format(inspect.getmodule(obj).__name__, type(obj).__name__)
+    encoded['type_alias'] = '{}.{}'.format(inspect.getmodule(obj).__name__, type(obj).__name__)
   return encoded
 
 
@@ -205,7 +205,7 @@ def parse_python_assignments(python, symbol_table=None):
   :raises: :class:`ParseError` if there were any problems encountered parsing the given `python`.
   """
   def aliased(type_name, object_type, **kwargs):
-    return object_type(typename=type_name, **kwargs)
+    return object_type(type_alias=type_name, **kwargs)
 
   parse_globals = {}
   for alias, symbol in (symbol_table or {}).items():
@@ -242,12 +242,12 @@ def parse_python_callbacks(python, symbol_table):
 
   def registered(type_name, object_type, name=None, **kwargs):
     if name:
-      obj = object_type(name=name, typename=type_name, **kwargs)
+      obj = object_type(name=name, type_alias=type_name, **kwargs)
       if Serializable.is_serializable(obj):
         objects.append(obj)
       return obj
     else:
-      return object_type(typename=type_name, **kwargs)
+      return object_type(type_alias=type_name, **kwargs)
 
   parse_globals = {}
   for alias, symbol in symbol_table.items():
