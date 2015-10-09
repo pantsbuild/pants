@@ -13,15 +13,20 @@ from pants.backend.python.targets.python_target import PythonTarget
 class PythonTests(PythonTarget):
   """Tests a Python library."""
 
-  def __init__(self, coverage=None, **kwargs):
+  def __init__(self, coverage=None, timeout=None, **kwargs):
     """
     :param coverage: the module(s) whose coverage should be generated, e.g.
       'twitter.common.log' or ['twitter.common.log', 'twitter.common.http']
     """
     self._coverage = maybe_list(coverage) if coverage is not None else []
+    self._timeout = timeout
     super(PythonTests, self).__init__(**kwargs)
     self.add_labels('python', 'tests')
 
   @property
   def coverage(self):
     return self._coverage
+
+  @property
+  def timeout(self):
+    return self._timeout

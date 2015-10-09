@@ -5,9 +5,22 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from mock import patch
+
 from pants.backend.core.tasks.task import TaskBase
 from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
+from pants.base.exceptions import TestFailedTaskError
+from pants.util.timeout import TimeoutReached
 from pants_test.tasks.task_test_base import TaskTestBase
+
+
+class DummyTestTarget(object):
+  def __init__(self, name, timeout=None):
+    self.name = name
+    self.timeout = timeout
+
+targetA = DummyTestTarget('TargetA')
+targetB = DummyTestTarget('TargetB', timeout=1)
 
 
 class TestTaskMixinTest(TaskTestBase):
@@ -20,12 +33,12 @@ class TestTaskMixinTest(TaskTestBase):
         self.call_list.append(['_execute', all_targets])
 
       def _get_targets(self):
-        return ['TargetA', 'TargetB']
+        return [targetA, targetB]
 
       def _test_target_filter(self):
         def target_filter(target):
           self.call_list.append(['target_filter', target])
-          if target == 'TargetA':
+          if target.name == 'TargetA':
             return False
           else:
             return True
@@ -38,21 +51,89 @@ class TestTaskMixinTest(TaskTestBase):
     return TestTaskMixinTask
 
   def test_execute_normal(self):
-    self.task = self.create_task(self.context())
+    task = self.create_task(self.context())
 
-    self.task.execute()
+    task.execute()
 
     # Confirm that everything ran as expected
-    self.assertIn(['target_filter', 'TargetA'], self.task.call_list)
-    self.assertIn(['target_filter', 'TargetB'], self.task.call_list)
-    self.assertIn(['_validate_target', 'TargetB'], self.task.call_list)
-    self.assertIn(['_execute', ['TargetA', 'TargetB']], self.task.call_list)
+    self.assertIn(['target_filter', targetA], task.call_list)
+    self.assertIn(['target_filter', targetB], task.call_list)
+    self.assertIn(['_validate_target', targetB], task.call_list)
+    self.assertIn(['_execute', [targetA, targetB]], task.call_list)
 
   def test_execute_skip(self):
     # Set the skip option
     self.set_options(skip=True)
-    self.task = self.create_task(self.context())
-    self.task.execute()
+    task = self.create_task(self.context())
+    task.execute()
 
     # Ensure nothing got called
-    self.assertListEqual(self.task.call_list, [])
+    self.assertListEqual(task.call_list, [])
+
+  def test_get_timeouts_no_default(self):
+    """If there is no default and one of the targets has no timeout, then there is no timeout for the entire run."""
+
+    self.set_options(timeouts=True, timeout_default=None)
+    task = self.create_task(self.context())
+
+    self.assertIsNone(task._timeout_for_targets([targetA, targetB]))
+
+  def test_get_timeouts_disabled(self):
+    """If timeouts are disabled, there is no timeout for the entire run."""
+
+    self.set_options(timeouts=False, timeout_default=2)
+    task = self.create_task(self.context())
+
+    self.assertIsNone(task._timeout_for_targets([targetA, targetB]))
+
+  def test_get_timeouts_w_default(self):
+    """If there is a default timeout, use that for targets which have no timeout set."""
+
+    self.set_options(timeouts=True, timeout_default=2)
+    task = self.create_task(self.context())
+
+    self.assertEquals(task._timeout_for_targets([targetA, targetB]), 3)
+
+
+class TestTaskMixinTimeoutTest(TaskTestBase):
+  @classmethod
+  def task_type(cls):
+    class TestTaskMixinTask(TestTaskMixin, TaskBase):
+      call_list = []
+
+      def _execute(self, all_targets):
+        self.call_list.append(['_execute', all_targets])
+
+      def _get_targets(self):
+        return [targetB]
+
+      def _test_target_filter(self):
+        def target_filter(target):
+          return True
+
+        return target_filter
+
+      def _validate_target(self, target):
+        self.call_list.append(['_validate_target', target])
+
+    return TestTaskMixinTask
+
+  def test_timeout(self):
+    self.set_options(timeouts=True)
+    task = self.create_task(self.context())
+
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      mock_timeout().__exit__.side_effect = TimeoutReached(1)
+
+      with self.assertRaises(TestFailedTaskError):
+        task.execute()
+
+      mock_timeout.assert_called_with(1)
+
+  def test_timeout_disabled(self):
+    self.set_options(timeouts=False)
+    task = self.create_task(self.context())
+
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      task.execute()
+      mock_timeout.assert_called_with(None)
