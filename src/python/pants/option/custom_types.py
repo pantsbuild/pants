@@ -29,12 +29,18 @@ def list_option(s):
 
 
 def target_option(s):
-  """Same type as 'str', but indicates a single target spec."""
+  """Same type as 'str', but indicates a single target spec.
+
+  TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
+  """
   return _convert(s, str)
 
 
 def target_list_option(s):
-  """Same type as 'list_option', but indicates list contents are target specs."""
+  """Same type as 'list_option', but indicates list contents are target specs.
+
+  TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
+  """
   return _convert(s, (list, tuple))
 
 
