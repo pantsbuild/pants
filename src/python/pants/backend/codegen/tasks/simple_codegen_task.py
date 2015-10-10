@@ -13,7 +13,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
-from pants.base.dep_lookup_error import DepLookupError
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
@@ -296,7 +295,7 @@ class SimpleCodegenTask(Task):
       try:
         deps.update(self.context.resolve(dep))
       except AddressLookupError as e:
-        raise DepLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
+        raise AddressLookupError('{message}\n  on dependency {dep}'.format(message=e, dep=dep))
     return deps
 
   class CodegenStrategy(AbstractClass):
