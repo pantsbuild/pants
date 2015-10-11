@@ -53,9 +53,6 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       expected_output='Hello World!  Version: 4.5.6',
     )
 
-  # This test passes as of 0.0.51, but fails in subsequent releases with guava being
-  # bundled in the resulting .jar
-  @pytest.mark.xfail
   def test_deploy_excludes(self):
     jar_filename = os.path.join('dist', 'deployexcludes.jar')
     safe_delete(jar_filename)

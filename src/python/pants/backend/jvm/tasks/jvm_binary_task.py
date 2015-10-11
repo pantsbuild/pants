@@ -84,7 +84,7 @@ class JvmBinaryTask(JarBuilderTask):
 
         with self.context.new_workunit(name='add-internal-classes'):
           with self.create_jar_builder(monolithic_jar) as jar_builder:
-            jar_builder.add_target(binary, recursive=True)
+            jar_builder.add_target(binary, recursive=True, exclude_jar_library=True)
 
         if with_external_deps:
           # NB(gmalmquist): Shading each jar dependency with its own prefix would be a nice feature,
