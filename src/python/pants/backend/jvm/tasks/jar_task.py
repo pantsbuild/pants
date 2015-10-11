@@ -15,6 +15,7 @@ from six import binary_type, string_types
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.subsystems.jar_tool import JarTool
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
@@ -176,7 +177,6 @@ class Jar(object):
       files = map(as_cli_entry, self._entries) if self._entries else []
 
       jars = self._jars or []
-
       with safe_args(classpath, options, delimiter=',') as classpath_args:
         with safe_args(files, options, delimiter=',') as files_args:
           with safe_args(jars, options, delimiter=',') as jars_args:
@@ -348,12 +348,13 @@ class JarBuilderTask(JarTask):
       self._jar = jar
       self._manifest = Manifest()
 
-    def add_target(self, target, recursive=False):
+    def add_target(self, target, recursive=False, exclude_jar_library=False):
       """Adds the classes and resources for a target to an open jar.
 
       :param target: The target to add generated classes and resources for.
       :param bool recursive: `True` to add classes and resources for the target's transitive
         internal dependency closure.
+      :param bool exclude_jar_library: don't add any jar_library targets.
       :returns: The list of targets that actually contributed classes or resources or both to the
         jar.
       """
@@ -372,6 +373,8 @@ class JarBuilderTask(JarTask):
           pass
 
       def add_to_jar(tgt):
+        if exclude_jar_library and isinstance(tgt, JarLibrary):
+          return
         # Fetch classpath entries for this target and any associated resource targets.
         tgts = [tgt] + tgt.resources if tgt.has_resources else [tgt]
         target_classpath = ClasspathUtil.classpath_entries(
