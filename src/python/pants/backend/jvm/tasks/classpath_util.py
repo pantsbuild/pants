@@ -16,68 +16,64 @@ from pants.util.dirutil import fast_relpath, safe_walk
 class ClasspathUtil(object):
 
   @classmethod
-  def compute_classpath(cls, targets, classpath_products, extra_classpath_tuples, confs):
-    """Returns the list of jar entries for a classpath covering all the passed targets. Filters and
-    adds paths from extra_classpath_tuples to the end of the resulting list.
+  def compute_classpath_for_target(cls, target, classpath_products, extra_classpath_tuples, confs):
+    """Returns the list of classpath entries for a classpath covering the passed target.
 
-    :param targets: Targets to build a aggregated classpath for
-    :param ClasspathProducts classpath_products: Product containing classpath elements.
-    :param extra_classpath_tuples: Additional (conf, path) pairs to be added to the classpath
-    :param confs: The list of confs for use by this classpath
-    """
-
-    all_targets_classpath_entries = cls.classpath_entries(targets, classpath_products, confs)
-
-    extra_classpath_paths = cls._pluck_paths(extra_classpath_tuples)
-    classpath_paths = OrderedSet(list(all_targets_classpath_entries) + extra_classpath_paths)
-    return list(classpath_paths)
-
-  @classmethod
-  def compute_classpath_for_target(cls, target, classpath_products, extra_classpath_tuples, confs,
-                                   target_closure=None):
-    """Returns the list of jar entries for a classpath covering the passed target. Filters and adds
-    paths from extra_classpath_tuples to the end of the resulting list.
+    Filters and adds paths from extra_classpath_tuples to the end of the resulting list.
 
     :param target: The target to generate a classpath for
     :param ClasspathProducts classpath_products: Product containing classpath elements.
     :param extra_classpath_tuples: Additional classpath entries
     :param confs: The list of confs for use by this classpath
-    :param target_closure: The transitive closure of the target
+    :returns: The classpath as a list of path elements.
+    :rtype: list of string
     """
-
-    classpath_tuples = classpath_products.get_for_target(target)
-
-    filtered_classpath_tuples = cls._filter_classpath_by_confs(classpath_tuples, confs)
-
+    classpath = cls.classpath([target], classpath_products, confs=confs, transitive=True)
     filtered_extra_classpath_tuples = cls._filter_classpath_by_confs(extra_classpath_tuples, confs)
-
-    full_classpath_tuples = filtered_classpath_tuples + filtered_extra_classpath_tuples
-
-    return cls._pluck_paths(full_classpath_tuples)
+    extra_classpath = cls._pluck_entries(filtered_extra_classpath_tuples)
+    return list(OrderedSet(classpath + extra_classpath))
 
   @classmethod
-  def classpath_entries(cls, targets, classpath_products, confs=('default',), transitive=True):
-    """Returns the list of entries for a classpath covering all the passed targets.
+  def classpath(cls, targets, classpath_products, confs=('default',), transitive=True):
+    """Returns the classpath as a list of paths covering all the passed targets.
 
     :param targets: Targets to build a aggregated classpath for
     :param ClasspathProducts classpath_products: Product containing classpath elements.
     :param confs: The list of confs for use by this classpath
     :param transitive: Whether to walk recursively from the given targets
+    :returns: The classpath as a list of path elements.
+    :rtype: list of string
     """
     classpath_tuples = classpath_products.get_for_targets(targets, transitive=transitive)
-
     tuples = cls._filter_classpath_by_confs(classpath_tuples, confs)
+    return cls._pluck_entries(tuples)
 
-    return cls._pluck_paths(tuples)
+  @classmethod
+  def internal_classpath(cls, targets, classpath_products, confs=('default',), transitive=True):
+    """Returns the list of internal classpath entries for a classpath covering all `targets`.
+
+    Any classpath entries contributed by external dependencies will be omitted.
+
+    :param targets: Targets to build a aggregated classpath for
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
+    :param confs: The list of confs for use by this classpath
+    :param transitive: Whether to walk recursively from the given targets
+    :returns: The classpath as a list of path elements.
+    :rtype: list of string
+    """
+    classpath_tuples = classpath_products.get_internal_classpath_entries_for_targets(
+        targets, transitive=transitive)
+    tuples = cls._filter_classpath_by_confs(classpath_tuples, confs)
+    return [entry.path for entry in cls._pluck_entries(tuples)]
 
   @classmethod
   def _filter_classpath_by_confs(cls, classpath_tuples, confs):
     accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
-    return [(conf, path) for conf, path in classpath_tuples if accept(conf)]
+    return [(conf, entry) for conf, entry in classpath_tuples if accept(conf)]
 
   @classmethod
-  def _pluck_paths(cls, classpath):
-    return [path for conf, path in classpath]
+  def _pluck_entries(cls, classpath):
+    return [entry for conf, entry in classpath]
 
   @classmethod
   def classpath_contents(cls, targets, classpath_products, confs=('default',), transitive=True):
@@ -88,7 +84,7 @@ class ClasspathUtil(object):
     :param confs: The list of confs for use by this classpath
     :param transitive: Whether to walk recursively from the given targets
     """
-    classpath_entries = cls.classpath_entries(targets, classpath_products, confs, transitive=transitive)
+    classpath_entries = cls.classpath(targets, classpath_products, confs, transitive=transitive)
     for f in cls.classpath_entries_contents(classpath_entries):
       yield f
 

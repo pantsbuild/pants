@@ -11,7 +11,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.android.targets.android_binary import AndroidBinary
 from pants.backend.android.tasks.android_task import AndroidTask
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
@@ -135,12 +134,10 @@ class DxCompile(AndroidTask, NailgunTask):
     class_files = {}
 
     def get_entries(tgt):
-      # NB: This walk seemed to rely on the assumption that only internal targets had
-      # classes_by_target; that's preserved here by not looking at the classpath entries for
-      # external targets.
-      if not isinstance(tgt, JarLibrary):
-        cp_entries = ClasspathUtil.classpath_entries((tgt,), classpath_products, transitive=False)
-        gathered_entries.update(cp_entries)
+      # We gather just internal classpath elements here.  Unpacked external dependency classpath
+      # elements are gathered just below.
+      cp_entries = ClasspathUtil.internal_classpath((tgt,), classpath_products, transitive=False)
+      gathered_entries.update(cp_entries)
 
       # Gather classes from the contents of unpacked libraries.
       unpacked = unpacked_archives.get(tgt)

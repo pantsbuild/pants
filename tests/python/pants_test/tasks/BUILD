@@ -174,11 +174,14 @@ python_tests(
   name = 'detect_duplicates',
   sources = ['test_detect_duplicates.py'],
   dependencies = [
-    ':task_test_base',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:detect_duplicates',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/jvm:jvm_task_test_base'
   ],
 )
 
@@ -408,7 +411,7 @@ python_tests(
     ':task_test_base',
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:jvm_task',
-    'tests/python/pants_test/jvm:jvm_task_test_mixin'
+    'tests/python/pants_test/jvm:jvm_task_test_base'
   ]
 )
 
@@ -416,10 +419,9 @@ python_tests(
   name = 'jvmdoc_gen',
   sources = ['test_jvmdoc_gen.py'],
   dependencies = [
-    ':task_test_base',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/base:exceptions',
-    'tests/python/pants_test/jvm:jvm_task_test_mixin'
+    'tests/python/pants_test/jvm:jvm_task_test_base'
   ]
 )
 

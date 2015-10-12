@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 
-import pytest
-
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
@@ -53,9 +51,6 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       expected_output='Hello World!  Version: 4.5.6',
     )
 
-  # This test passes as of 0.0.51, but fails in subsequent releases with guava being
-  # bundled in the resulting .jar
-  @pytest.mark.xfail
   def test_deploy_excludes(self):
     jar_filename = os.path.join('dist', 'deployexcludes.jar')
     safe_delete(jar_filename)

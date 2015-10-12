@@ -79,7 +79,7 @@ class JarCreate(JarBuilderTask):
           else:
             with self.create_jar(vt.target, jar_path) as jarfile:
               with self.create_jar_builder(jarfile) as jar_builder:
-                if vt.target in jar_builder.add_target(vt.target):
+                if jar_builder.add_target(vt.target):
                   add_jar_to_products()
 
   @contextmanager

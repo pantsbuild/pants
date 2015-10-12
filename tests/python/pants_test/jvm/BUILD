@@ -15,6 +15,7 @@ python_library(
   name='jvm_tool_task_test_base',
   sources=['jvm_tool_task_test_base.py'],
   dependencies=[
+    ':jvm_task_test_base',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -22,8 +23,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
-    'tests/python/pants_test/jvm:jvm_task_test_mixin',
-    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
@@ -45,10 +44,11 @@ python_library(
 )
 
 python_library(
-  name='jvm_task_test_mixin',
-  sources=['jvm_task_test_mixin.py'],
+  name='jvm_task_test_base',
+  sources=['jvm_task_test_base.py'],
   dependencies=[
     'src/python/pants/backend/jvm/tasks:classpath_products',
-    'src/python/pants/util:dirutil'
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
