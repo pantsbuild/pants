@@ -16,8 +16,8 @@ import six
 
 from pants.base.deprecated import check_deprecated_semver
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.custom_types import list_option
 from pants.option.errors import ParseError, RegistrationError
+from pants.option.option_types import BoolOption, ListOption, StrOption
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
@@ -57,27 +57,8 @@ class Parser(object):
   option from the outer scope.
   """
 
-  class BooleanConversionError(ParseError):
-    """Indicates a value other than 'True' or 'False' when attempting to parse a bool."""
-
   class FromfileError(ParseError):
     """Indicates a problem reading a value @fromfile."""
-
-  @staticmethod
-  def str_to_bool(s):
-    if isinstance(s, six.string_types):
-      if s.lower() == 'true':
-        return True
-      elif s.lower() == 'false':
-        return False
-      else:
-        raise Parser.BooleanConversionError('Got "{0}". Expected "True" or "False".'.format(s))
-    if s is True:
-      return True
-    elif s is False:
-      return False
-    else:
-      raise Parser.BooleanConversionError('Got {0}. Expected True or False.'.format(s))
 
   def __init__(self, env, config, scope_info, parent_parser, option_tracker):
     """Create a Parser instance.
@@ -368,7 +349,7 @@ class Parser(object):
       sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub('_', config_section.upper())
       env_vars = ['PANTS_{0}_{1}'.format(sanitized_env_var_scope, udest)]
 
-    value_type = self.str_to_bool if is_boolean_flag(kwargs) else kwargs.get('type', str)
+    value_type = BoolOption if is_boolean_flag(kwargs) else kwargs.get('type', StrOption)
 
     env_val_str = None
     if self._env:
@@ -395,10 +376,11 @@ class Parser(object):
         return val_str[1:] if is_fromfile and val_str.startswith('@@') else val_str
 
     def parse_typed_list(val_str):
-      return None if val_str is None else [value_type(x) for x in list_option(expand(val_str))]
+      return None if val_str is None else (
+          [value_type.from_untyped(x) for x in ListOption.from_untyped(expand(val_str))])
 
     def parse_typed_item(val_str):
-      return None if val_str is None else value_type(expand(val_str))
+      return None if val_str is None else value_type.from_untyped(expand(val_str))
 
     # Handle the forthcoming conversions argparse will need to do by placing our parse hook - we
     # handle the conversions for env and config ourselves below.  Unlike the env and config

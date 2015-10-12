@@ -20,7 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
-from pants.build_graph.option_types import target_list_option
+from pants.build_graph.option_types import TargetListOption
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
@@ -39,9 +39,9 @@ class ApacheThriftGen(SimpleCodegenTask):
 
     register('--gen-options', advanced=True, fingerprint=True,
              help='Use these apache thrift java gen options.')
-    register('--deps', advanced=True, default=[], type=target_list_option,
+    register('--deps', advanced=True, default=[], type=TargetListOption,
              help='A list of target addresses pointing to dependencies of thrift generated java code.')
-    register('--service-deps', advanced=True, type=target_list_option,
+    register('--service-deps', advanced=True, type=TargetListOption,
              help='A list of target addresses pointing to dependencies of thrift generated java service '
                   'code.  If not supplied, then --deps will be used for service deps.')
 

@@ -7,8 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from six import string_types
+
 from pants.option.errors import ParseError
 from pants.option.option_type import OptionType, PrimitiveOptionType
+
+
+class BooleanConversionError(ParseError):
+  """Indicates a value other than 'True' or 'False' when attempting to parse a bool."""
 
 
 class FileOption(OptionType):
@@ -48,4 +54,30 @@ class ListOption(PrimitiveOptionType):
 
   @classmethod
   def from_untyped(cls, s):
-    return _convert(s, (list, tuple))
+    return cls._convert(s, (list, tuple))
+
+
+class BoolOption(PrimitiveOptionType):
+
+  @classmethod
+  def from_untyped(cls, s):
+    if isinstance(s, string_types):
+      if s.lower() == 'true':
+        return True
+      elif s.lower() == 'false':
+        return False
+      else:
+        raise BooleanConversionError('Got "{0}". Expected "True" or "False".'.format(s))
+    if s is True:
+      return True
+    elif s is False:
+      return False
+    else:
+      raise BooleanConversionError('Got {0}. Expected True or False.'.format(s))
+
+
+class StrOption(PrimitiveOptionType):
+
+  @classmethod
+  def from_untyped(cls, s):
+    return s

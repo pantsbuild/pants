@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.address import Address
 from pants.option.errors import ParseError
+from pants.option.option_type import OptionType
 from pants.util.eval import parse_expression
 
 

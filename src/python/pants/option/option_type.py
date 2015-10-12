@@ -18,10 +18,12 @@ class OptionType(AbstractClass):
   Provides methods to convert user input to the type, and to fingerprint the type.
   """
 
-  def _stable_json_dumps(obj):
+  @classmethod
+  def _stable_json_dumps(cls, obj):
     return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True)
 
-  def _convert(val, acceptable_types):
+  @classmethod
+  def _convert(cls, val, acceptable_types):
     """Ensure that val is one of the acceptable types, converting it if needed.
 
     :param string val: The value we're parsing.
@@ -32,20 +34,20 @@ class OptionType(AbstractClass):
     """
     return parse_expression(val, acceptable_types, raise_type=ParseError)
 
-  @abstractmethod
   @classmethod
+  @abstractmethod
   def from_untyped(cls, s):
     """Converts the given python string to this type, and returns the typed value."""
     pass
 
-  @abstractmethod
   @classmethod
+  @abstractmethod
   def fingerprint(cls, context, hasher, option_val):
     """Hashes the given option_val into the given hasher."""
     pass
 
 
-class PrimitiveOptionType(AbstractClass, OptionType):
+class PrimitiveOptionType(OptionType):
   """An abstract base class for options with primitive values."""
 
   @classmethod

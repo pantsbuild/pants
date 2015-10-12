@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.base.address import Address
 from pants.base.dep_lookup_error import DepLookupError
 from pants.base.exceptions import TaskError
-from pants.build_graph.option_types import target_option
+from pants.build_graph.option_types import TargetOption
 
 
 class JvmToolMixin(object):
@@ -93,7 +93,7 @@ class JvmToolMixin(object):
 
     register('--{}'.format(key),
              advanced=True,
-             type=target_option,
+             type=TargetOption,
              default=default,
              help=help,
              fingerprint=fingerprint)
