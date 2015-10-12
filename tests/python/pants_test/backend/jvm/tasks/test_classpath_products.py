@@ -357,7 +357,7 @@ class ClasspathProductsTest(BaseTest):
                      classpath)
 
   def test_get_internal_classpath_entries_for_targets(self):
-    b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
+    b = self.make_target('b', JvmTarget)
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
     classpath_product = ClasspathProducts()

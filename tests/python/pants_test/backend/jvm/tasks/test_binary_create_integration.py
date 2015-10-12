@@ -69,23 +69,19 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
                           set(jar_file.namelist()))
 
       # This jar should not run by itself, missing symbols
-      java_run = subprocess.Popen(['java', '-jar', jar_filename], stderr=subprocess.PIPE)
-      java_retcode = java_run.wait()
-      java_stderr = java_run.stderr.read()
-      self.assertEquals(java_retcode, 1)
-      self.assertIn("java.lang.NoClassDefFoundError: com/google/common/collect/ImmutableSortedSet",
-                    java_stderr)
+      self.run_java(java_args=['-jar', jar_filename],
+                    expected_returncode=1,
+                    expected_output='java.lang.NoClassDefFoundError: '
+                                    'com/google/common/collect/ImmutableSortedSet')
 
+      # But adding back the deploy_excluded symbols should result in a clean run.
       classpath = [jar_filename,
                    os.path.join(pants_run.workdir,
                                 'ivy/jars/com.google.guava/guava/bundles/guava-18.0.jar')]
-      command = ['java', '-cp', os.pathsep.join(classpath),
-                 'org.pantsbuild.testproject.deployexcludes.DeployExcludesMain']
-      process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      stdout, stderr = process.communicate()
-      self.assertEquals(0, process.returncode, ('Expected success but command failed with {}: {}'
-                                                .format(process.returncode, stderr)))
-      self.assertIn("DeployExcludes Hello World", stdout)
+
+      self.run_java(java_args=['-cp', os.pathsep.join(classpath),
+                               'org.pantsbuild.testproject.deployexcludes.DeployExcludesMain'],
+                    expected_output='DeployExcludes Hello World')
 
   def build_and_run(self, pants_args, rel_out_path, java_args, expected_output):
     self.assert_success(self.run_pants(['clean-all']))
@@ -93,8 +89,23 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     out_path = os.path.join(get_buildroot(), rel_out_path)
-    java_run = subprocess.Popen(['java'] + java_args, stdout=subprocess.PIPE, cwd=out_path)
-    java_retcode = java_run.wait()
-    java_out = java_run.stdout.read()
-    self.assertEquals(java_retcode, 0)
-    self.assertIn(expected_output, java_out)
+    self.run_java(java_args=java_args, expected_output=expected_output, cwd=out_path)
+
+  def run_java(self, java_args, expected_returncode=0, expected_output=None, cwd=None):
+    command = ['java'] + java_args
+    process = subprocess.Popen(command,
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               cwd=cwd)
+    stdout, stderr = process.communicate()
+
+    self.assertEquals(expected_returncode, process.returncode,
+                      ('Expected exit code {} from command `{}` but got {}:\n'
+                       'stdout:\n{}\n'
+                       'stderr:\n{}'
+                       .format(expected_returncode,
+                               ' '.join(command),
+                               process.returncode,
+                               stdout,
+                               stderr)))
+    self.assertIn(expected_output, stdout if expected_returncode == 0 else stderr)
