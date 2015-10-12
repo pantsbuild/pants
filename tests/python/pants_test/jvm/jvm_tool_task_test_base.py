@@ -17,11 +17,10 @@ from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.ivy.bootstrapper import Bootstrapper
-from pants_test.jvm.jvm_task_test_mixin import JvmTaskTestMixin
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
-class JvmToolTaskTestBase(JvmTaskTestMixin, TaskTestBase):
+class JvmToolTaskTestBase(JvmTaskTestBase):
   """Prepares an ephemeral test build root that supports tasks that use jvm tool bootstrapping."""
 
   @property

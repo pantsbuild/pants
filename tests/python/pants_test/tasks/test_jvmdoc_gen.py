@@ -9,8 +9,7 @@ import os
 
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.base.exceptions import TaskError
-from pants_test.jvm.jvm_task_test_mixin import JvmTaskTestMixin
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
 dummydoc = Jvmdoc(tool_name='dummydoc', product_type='dummydoc')
@@ -30,7 +29,7 @@ def create_dummydoc_command(classpath, gendir, *targets):
   pass
 
 
-class JvmdocGenTest(JvmTaskTestMixin, TaskTestBase):
+class JvmdocGenTest(JvmTaskTestBase):
   """Test some base functionality in JvmdocGen."""
 
   @classmethod

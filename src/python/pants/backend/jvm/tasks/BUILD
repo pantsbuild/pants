@@ -265,7 +265,7 @@ python_library(
     ':nailgun_task',
     'src/python/pants/backend/jvm/subsystems:jar_tool',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_environment',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/java/jar:manifest',
@@ -333,9 +333,11 @@ python_library(
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
+    'src/python/pants/java/distribution',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
   ]
 )
 

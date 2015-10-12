@@ -12,11 +12,9 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.task import Task
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_graph import sort_targets
 from pants.java.distribution.distribution import DistributionLocator
@@ -76,7 +74,7 @@ class JvmDependencyAnalyzer(Task):
       # Classpath content.
       files = ClasspathUtil.classpath_contents((target,), runtime_classpath, transitive=False)
       # And jars; for binary deps, zinc doesn't emit precise deps (yet).
-      cp_entries = ClasspathUtil.classpath_entries((target,), runtime_classpath, transitive=False)
+      cp_entries = ClasspathUtil.classpath((target,), runtime_classpath, transitive=False)
       jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
       for coll in [files, jars]:
         for f in coll:

@@ -9,9 +9,10 @@ import os
 
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class JvmTaskTestMixin(object):
+class JvmTaskTestBase(TaskTestBase):
 
   def populate_runtime_classpath(self, context, classpath=None):
     """
@@ -23,13 +24,13 @@ class JvmTaskTestMixin(object):
                       [os.path.join(self.buildroot, 'none')] will be used.
     """
     classpath = classpath or []
-    classpath_products = context.products.get_data('runtime_classpath', init_func=ClasspathProducts)
-    classpath_products.add_for_targets(context.targets(),
-                                       [('default', entry) for entry in classpath])
+    runtime_classpath = self.get_runtime_classpath(context)
+    runtime_classpath.add_for_targets(context.targets(),
+                                      [('default', entry) for entry in classpath])
 
   def add_to_runtime_classpath(self, context, tgt, files_dict):
     """Creates and adds the given files to the classpath for the given target under a temp path."""
-    runtime_classpath = context.products.get_data('runtime_classpath', init_func=ClasspathProducts)
+    runtime_classpath = self.get_runtime_classpath(context)
     # Create a temporary directory under the target id, then dump all files.
     target_dir = os.path.join(self.test_workdir, tgt.id)
     safe_mkdir(target_dir)
@@ -38,3 +39,6 @@ class JvmTaskTestMixin(object):
       safe_file_dump(os.path.join(classpath_dir, rel_path), content)
     # Add to the classpath.
     runtime_classpath.add_for_target(tgt, [('default', classpath_dir)])
+
+  def get_runtime_classpath(self, context):
+    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts)

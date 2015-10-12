@@ -80,6 +80,8 @@ python_tests(
   sources = ['test_binary_create_integration.py'],
   dependencies = [
     'src/python/pants/base:build_environment',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
 )
@@ -130,13 +132,12 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name = 'classpath_util',
   sources = ['test_classpath_util.py'],
   dependencies = [
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:exceptions',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/goal:products',
     'tests/python/pants_test:base_test',
   ]
@@ -278,8 +279,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/jvm:jvm_task_test_mixin',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test/jvm:jvm_task_test_base',
   ]
 )
 
