@@ -10,32 +10,46 @@ from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 
 
-def target_option(s):
-  """An option of type 'Address', which is parsed from a target address spec string."""
-  try:
-    return Address.parse(s)
-  except Exception as e:
-    raise ParseError(
-        'This option expects a single target address spec. Parse failed with: {}'.format(e))
+def _fingerprint_target_addresses(context, hasher, addresses):
+  """Returns a fingerprint of the targets resolved from the given addresses."""
+  for address in addresses:
+    for target in context.resolve_address(address):
+      # Not all targets have hashes; in particular, `Dependencies` targets don't.
+      h = target.compute_invalidation_hash()
+      if h:
+        hasher.update(h)
 
-def target_list_option(s):
-  """An option of type 'list' of 'Address', which is parsed from target address spec strings."""
-  addresses = []
-  for entry in _convert(s, (list, tuple)):
+
+class TargetOption(OptionType):
+  """An option of type 'Address', which is parsed from a target address spec string."""
+
+  @classmethod
+  def from_untyped(cls, s):
     try:
-      addresses.append(Address.parse(entry))
+      return Address.parse(s)
     except Exception as e:
       raise ParseError(
-          'This option expects a list of target address specs. Parse failed with: {}'.format(e))
-  return addresses
+          'This option expects a single target address spec. Parse failed with: {}'.format(e))
 
-def _convert(val, acceptable_types):
-  """Ensure that val is one of the acceptable types, converting it if needed.
+  @classmethod
+  def fingerprint(cls, context, option_val, hasher):
+    _fingerprint_target_addresses(context, hasher, [option_val])
 
-  :param string val: The value we're parsing.
-  :param acceptable_types: A tuple of expected types for val.
-  :returns: The parsed value.
-  :raises :class:`pants.options.errors.ParseError`: if there was a problem parsing the val as an
-                                                    acceptable type.
-  """
-  return parse_expression(val, acceptable_types, raise_type=ParseError)
+
+class TargetListOption(OptionType):
+  """An option of type 'list' of 'Address', which is parsed from target address spec strings."""
+
+  @classmethod
+  def from_untyped(cls, s):
+    addresses = []
+    for entry in _convert(s, (list, tuple)):
+      try:
+        addresses.append(Address.parse(entry))
+      except Exception as e:
+        raise ParseError(
+            'This option expects a list of target address specs. Parse failed with: {}'.format(e))
+    return addresses
+
+  @classmethod
+  def fingerprint(cls, context, option_val, hasher):
+    _fingerprint_target_addresses(context, hasher, option_val)
