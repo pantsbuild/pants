@@ -15,6 +15,7 @@ from six import binary_type, string_types
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.subsystems.jar_tool import JarTool
+from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -357,15 +358,29 @@ class JarBuilderTask(JarTask):
         resource files - to this jar.
       :rtype: bool
       """
-      # TODO(John Sirois): XXX used to return list of contributing targets - is that really needed
-      # or is the fact there were products at all enough?
       products_added = False
 
       classpath_products = self._context.products.get_data('runtime_classpath')
 
+      # TODO(John Sirois): Manifest handling is broken.  We should be tracking state and failing
+      # fast if any duplicate entries are added; ie: if we get a second binary or a second agent.
+
       if isinstance(target, JvmBinary):
         self._add_manifest_entries(target, self._manifest)
         products_added = True
+      elif isinstance(target, JavaAgent):
+        self._add_agent_manifest(target, self._manifest)
+        products_added = True
+      elif recursive:
+        agents = [t for t in target.closure() if isinstance(t, JavaAgent)]
+        if len(agents) > 1:
+          raise TaskError('Only 1 agent can be added to a jar, found {} for {}:\n\t{}'
+                          .format(len(agents),
+                                  target.address.reference(),
+                                  '\n\t'.join(agent.address.reference() for agent in agents)))
+        elif agents:
+          self._add_agent_manifest(agents[0], self._manifest)
+          products_added = True
 
       # In the transitive case we'll gather internal resources naturally as dependencies, but in the
       # non-transitive case we need to manually add these special (in the context of jarring)

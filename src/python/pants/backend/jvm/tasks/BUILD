@@ -264,6 +264,7 @@ python_library(
     ':classpath_util',
     ':nailgun_task',
     'src/python/pants/backend/jvm/subsystems:jar_tool',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
