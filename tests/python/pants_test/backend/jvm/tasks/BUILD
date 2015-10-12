@@ -278,6 +278,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_run',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/jvm:jvm_task_test_mixin',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )

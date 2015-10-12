@@ -9,6 +9,8 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/goal:products',
     'src/python/pants/goal:run_tracker',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',
   ]
 )

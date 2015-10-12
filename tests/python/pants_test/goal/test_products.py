@@ -5,7 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.goal.products import Products
+import os
+from collections import defaultdict
+from contextlib import contextmanager
+
+from pants.goal.products import MultipleRootedProducts, Products
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_open
 from pants_test.base_test import BaseTest
 
 
@@ -68,6 +74,17 @@ class ProductsTest(BaseTest):
     foo_product_mapping = self.products.get('foo')
     self.assertFalse(foo_product_mapping)
 
+  @contextmanager
+  def add_products(self, context_products, product_type, target, *products):
+    product_mapping = context_products.get(product_type)
+    with temporary_dir() as outdir:
+      def create_product(product):
+        with safe_open(os.path.join(outdir, product), mode='w') as fp:
+          fp.write(product)
+        return product
+      product_mapping.add(target, outdir, map(create_product, products))
+      yield temporary_dir
+
   def test_non_empty_products(self):
     target = self.make_target('c')
     with self.add_products(self.products, 'foo', target, 'a.class'):
@@ -77,6 +94,19 @@ class ProductsTest(BaseTest):
   def test_empty_data(self):
     foo_product_mapping = self.products.get_data('foo')
     self.assertFalse(foo_product_mapping)
+
+  @contextmanager
+  def add_data(self, context_products, data_type, target, *products):
+    make_products = lambda: defaultdict(MultipleRootedProducts)
+    data_by_target = context_products.get_data(data_type, make_products)
+    with temporary_dir() as outdir:
+      def create_product(product):
+        abspath = os.path.join(outdir, product)
+        with safe_open(abspath, mode='w') as fp:
+          fp.write(product)
+        return abspath
+      data_by_target[target].add_abs_paths(outdir, map(create_product, products))
+      yield temporary_dir
 
   def test_non_empty_data(self):
     target = self.make_target('c')

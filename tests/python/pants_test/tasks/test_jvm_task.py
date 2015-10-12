@@ -5,8 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_task import JvmTask
-from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants_test.jvm.jvm_task_test_mixin import JvmTaskTestMixin
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -15,7 +18,7 @@ class DummyJvmTask(JvmTask):
     pass
 
 
-class JvmTaskTest(TaskTestBase):
+class JvmTaskTest(JvmTaskTestMixin, TaskTestBase):
   """Test some base functionality in JvmTask."""
 
   @classmethod
@@ -24,7 +27,6 @@ class JvmTaskTest(TaskTestBase):
 
   def setUp(self):
     super(JvmTaskTest, self).setUp()
-    self.workdir = safe_mkdtemp()
 
     self.t1 = self.make_target('t1')
     self.t2 = self.make_target('t2')
@@ -32,10 +34,20 @@ class JvmTaskTest(TaskTestBase):
 
     context = self.context(target_roots=[self.t1, self.t2, self.t3])
 
-    self.populate_runtime_classpath(context)
+    self.classpath = [os.path.join(self.build_root, entry) for entry in 'a', 'b']
+    self.populate_runtime_classpath(context, self.classpath)
 
-    self.task = self.create_task(context, self.workdir)
+    self.task = self.create_task(context)
 
-  def tearDown(self):
-    super(JvmTaskTest, self).tearDown()
-    safe_rmtree(self.workdir)
+  def test_classpath(self):
+    self.assertEqual(self.classpath, self.task.classpath([self.t1]))
+    self.assertEqual(self.classpath, self.task.classpath([self.t2]))
+    self.assertEqual(self.classpath, self.task.classpath([self.t3]))
+    self.assertEqual(self.classpath, self.task.classpath([self.t1, self.t2, self.t3]))
+
+  def test_classpath_prefix(self):
+    self.assertEqual(['first'] + self.classpath,
+                     self.task.classpath([self.t1], classpath_prefix=['first']))
+
+  def test_classpath_custom_product(self):
+    self.assertEqual([], self.task.classpath([self.t1], classpath_product=ClasspathProducts()))

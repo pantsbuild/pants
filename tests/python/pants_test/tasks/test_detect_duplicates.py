@@ -24,10 +24,12 @@ class DuplicateDetectorTest(TaskTestBase):
 
   def setUp(self):
     super(DuplicateDetectorTest, self).setUp()
-    self.base_dir = tempfile.mkdtemp()
+
+    base_dir = tempfile.mkdtemp()
+    self.addCleanup(safe_rmtree, base_dir)
 
     def generate_path(name):
-      return os.path.join(self.base_dir, name)
+      return os.path.join(base_dir, name)
 
     test_class_path = generate_path('com/twitter/Test.class')
     duplicate_class_path = generate_path('com/twitter/commons/Duplicate.class')
@@ -57,48 +59,34 @@ class DuplicateDetectorTest(TaskTestBase):
     with jars() as jars:
       test_jar, jar_with_duplicates, jar_without_duplicates, jar_with_unicode = jars
       self.path_with_duplicates = {
-          'com/twitter/Test.class': set([test_jar]),
-          'com/twitter/commons/Duplicate.class': set([test_jar, jar_with_duplicates]),
-          'org/apache/Unique.class': set([jar_with_duplicates]),
-          'cucumber/api/java/zh_cn/假如.class': set([jar_with_unicode]),
+          'com/twitter/Test.class': {test_jar},
+          'com/twitter/commons/Duplicate.class': {test_jar, jar_with_duplicates},
+          'org/apache/Unique.class': {jar_with_duplicates},
+          'cucumber/api/java/zh_cn/假如.class': {jar_with_unicode},
       }
       self.path_without_duplicates = {
-          'com/twitter/Test.class': set([test_jar]),
-          'com/twitter/commons/Duplicate.class': set([test_jar]),
-          'org/apache/Unique.class': set([jar_without_duplicates]),
-          'cucumber/api/java/zh_cn/假如.class': set([jar_with_unicode]),
+          'com/twitter/Test.class': {test_jar},
+          'com/twitter/commons/Duplicate.class': {test_jar},
+          'org/apache/Unique.class': {jar_without_duplicates},
+          'cucumber/api/java/zh_cn/假如.class': {jar_with_unicode},
       }
 
-  def tearDown(self):
-    safe_rmtree(self.base_dir)
+  def execute_detect_duplicates(self, fail_fast):
+    self.set_options(fail_fast=fail_fast, excludes=[], max_dups=10)
+    context = self.context()
+    task = self.create_task(context)
+    task.execute()
+    return task
 
   def test_duplicate_found(self):
-    context = self.context(
-      options={
-          self.options_scope: {'fail_fast': False, 'excludes': [], 'max_dups': 10}
-      }
-    )
-    task = self.create_task(context, workdir=None)
-    task.execute()
+    task = self.execute_detect_duplicates(fail_fast=False)
     self.assertTrue(task._is_conflicts(self.path_with_duplicates, binary_target=None))
 
   def test_duplicate_not_found(self):
-    context = self.context(
-      options={
-          self.options_scope: {'fail_fast': False, 'excludes': [], 'max_dups': 10}
-      }
-    )
-    task = self.create_task(context, workdir=None)
-    task.execute()
+    task = self.execute_detect_duplicates(fail_fast=False)
     self.assertFalse(task._is_conflicts(self.path_without_duplicates, binary_target=None))
 
   def test_fail_fast_error_raised(self):
-    context = self.context(
-      options={
-          self.options_scope: {'fail_fast': True, 'excludes': [], 'max_dups': 10}
-      }
-    )
-    task = self.create_task(context, workdir=None)
-    task.execute()
+    task = self.execute_detect_duplicates(fail_fast=True)
     with self.assertRaises(TaskError):
       task._is_conflicts(self.path_with_duplicates, binary_target=None)
