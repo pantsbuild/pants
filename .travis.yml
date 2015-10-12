@@ -6,6 +6,10 @@ sudo: false
 
 
 before_cache:
+  # Kill all python bytecode in our cached venvs.  Some files appear to
+  # get bytecode compiled in non-yet-understood circumstances leading to
+  # a full cache re-pack due to new bytecode files.
+  - find build-support -name "*.py[co]" -print -delete
   # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
   # effect on resolution time is in the noise, but they are
   # re-timestamped in internal comments and fields on each run and this

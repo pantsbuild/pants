@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 from hashlib import sha1
 
-from pants.option.custom_types import file_option, target_option
+from pants.option.custom_types import file_option, target_list_option, target_option
 
 
 def stable_json_dumps(obj):
@@ -34,20 +34,23 @@ class OptionsFingerprinter(object):
       return None
 
     if option_type == target_option:
+      return self._fingerprint_target_addresses([option_val])
+    elif option_type == target_list_option:
       return self._fingerprint_target_address(option_val)
     elif option_type == file_option:
       return self._fingerprint_file(option_val)
     else:
       return self._fingerprint_primitive(option_val)
 
-  def _fingerprint_target_address(self, address):
-    """Returns a fingerprint of the targets resolved from the given address."""
+  def _fingerprint_target_addresses(self, addresses):
+    """Returns a fingerprint of the targets resolved from the given addresses."""
     hasher = sha1()
-    for target in self._build_graph.resolve_address(address):
-      # Not all targets have hashes; in particular, `Dependencies` targets don't.
-      h = target.compute_invalidation_hash()
-      if h:
-        hasher.update(h)
+    for address in addresses:
+      for target in self._build_graph.resolve_address(address):
+        # Not all targets have hashes; in particular, `Dependencies` targets don't.
+        h = target.compute_invalidation_hash()
+        if h:
+          hasher.update(h)
     return hasher.hexdigest()
 
   def _fingerprint_file(self, filepath):
