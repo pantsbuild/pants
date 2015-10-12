@@ -118,7 +118,7 @@ class BaseGroupTaskTest(BaseTest):
 
     self.recorded_actions = []
     # NB: GroupTask has a cache of tasks by name... use a distinct name
-    self.group_task = GroupTask.named(name='jvm-compile-%s' % uuid.uuid4().hex,
+    self.group_task = GroupTask.named(name='jvm-compile-{}'.format(uuid.uuid4().hex),
                                       product_type=['runtime_classpath'],
                                       flag_namespace=['test'])
 

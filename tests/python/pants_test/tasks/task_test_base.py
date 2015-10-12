@@ -62,12 +62,7 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
 class TaskTestBase(BaseTest):
   """A baseclass useful for testing a single Task type."""
 
-  options_sope = None
-
-  @classmethod
-  def setUpClass(cls):
-    super(TaskTestBase, cls).setUpClass()
-    cls.options_scope = 'test_scope'
+  options_scope = 'test_scope'
 
   @classmethod
   def task_type(cls):

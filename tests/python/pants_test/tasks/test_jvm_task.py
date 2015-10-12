@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants_test.jvm.jvm_task_test_mixin import JvmTaskTestMixin
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -43,3 +44,10 @@ class JvmTaskTest(JvmTaskTestMixin, TaskTestBase):
     self.assertEqual(self.classpath, self.task.classpath([self.t2]))
     self.assertEqual(self.classpath, self.task.classpath([self.t3]))
     self.assertEqual(self.classpath, self.task.classpath([self.t1, self.t2, self.t3]))
+
+  def test_classpath_prefix(self):
+    self.assertEqual(['first'] + self.classpath,
+                     self.task.classpath([self.t1], classpath_prefix=['first']))
+
+  def test_classpath_custom_product(self):
+    self.assertEqual([], self.task.classpath([self.t1], classpath_product=ClasspathProducts()))

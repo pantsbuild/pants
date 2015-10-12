@@ -406,6 +406,7 @@ python_tests(
   sources = ['test_jvm_task.py'],
   dependencies = [
     ':task_test_base',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:jvm_task',
     'tests/python/pants_test/jvm:jvm_task_test_mixin'
   ]
