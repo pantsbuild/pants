@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 from hashlib import sha1
 
-from pants.option.custom_types import file_option, target_list_option, target_option
+# TODO: cyclic.
+from pants.build_graph.option_types import target_list_option, target_option
+from pants.option.custom_types import file_option
 
 
 def stable_json_dumps(obj):

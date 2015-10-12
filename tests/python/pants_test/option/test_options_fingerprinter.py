@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.option.custom_types import dict_option, file_option, list_option, target_option
+from pants.build_graph.option_types import target_option
+from pants.option.custom_types import dict_option, file_option, list_option
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants_test.base_test import BaseTest
 

@@ -20,7 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
-from pants.option.custom_types import target_list_option
+from pants.build_graph.option_types import target_list_option
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 

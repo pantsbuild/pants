@@ -7,9 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from six import string_types
-
-from pants.base.address import Address
 from pants.option.errors import ParseError
 from pants.util.eval import parse_expression
 
@@ -31,25 +28,18 @@ def list_option(s):
   return _convert(s, (list, tuple))
 
 
+@deprecated(removal_version='0.0.57',
+            hint_message='Use `from pants.build_graph.option_types import target_option`.')
 def target_option(s):
-  """An option of type 'Address', which is parsed from a target address spec string."""
-  try:
-    return Address.parse(s)
-  except Exception as e:
-    raise ParseError(
-        'This option expects a single target address spec. Parse failed with: {}'.format(e))
+  """Same type as 'str', but indicates a single target spec."""
+  return s
 
 
+@deprecated(removal_version='0.0.57',
+            hint_message='Use `from pants.build_graph.option_types import target_list_option`.')
 def target_list_option(s):
-  """An option of type 'list' of 'Address', which is parsed from target address spec strings."""
-  addresses = []
-  for entry in _convert(s, (list, tuple)):
-    try:
-      addresses.append(Address.parse(entry))
-    except Exception as e:
-      raise ParseError(
-          'This option expects a list of target address specs. Parse failed with: {}'.format(e))
-  return addresses
+  """Same type as 'list_option', but indicates list contents are target specs."""
+  return _convert(s, (list, tuple))
 
 
 def file_option(s):

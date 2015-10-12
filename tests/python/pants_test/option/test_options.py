@@ -14,9 +14,10 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.deprecated import PastRemovalVersionError
+from pants.build_graph.option_types import target_option
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
-from pants.option.custom_types import dict_option, file_option, list_option, target_option
+from pants.option.custom_types import dict_option, file_option, list_option
 from pants.option.errors import ParseError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
