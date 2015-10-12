@@ -62,10 +62,12 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
 class TaskTestBase(BaseTest):
   """A baseclass useful for testing a single Task type."""
 
+  options_sope = None
+
   @classmethod
   def setUpClass(cls):
     super(TaskTestBase, cls).setUpClass()
-    TaskTestBase.options_scope = 'test_scope'
+    cls.options_scope = 'test_scope'
 
   @classmethod
   def task_type(cls):
@@ -110,7 +112,7 @@ class TaskTestBase(BaseTest):
     self.set_options_for_scope(self.options_scope, **kwargs)
 
   def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
-              console_outstream=None, workspace=None):
+              console_outstream=None, workspace=None, for_subsystems=None):
     # Add in our task type.
     for_task_types = [self._testing_task_type] + (for_task_types or [])
     return super(TaskTestBase, self).context(for_task_types=for_task_types,
@@ -118,7 +120,8 @@ class TaskTestBase(BaseTest):
                                              passthru_args=passthru_args,
                                              target_roots=target_roots,
                                              console_outstream=console_outstream,
-                                             workspace=workspace)
+                                             workspace=workspace,
+                                             for_subsystems=for_subsystems)
 
   def create_task(self, context, workdir=None):
     return self._testing_task_type(context, workdir or self._test_workdir)

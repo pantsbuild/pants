@@ -9,7 +9,7 @@ import os
 
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.base.exceptions import TaskError
-from pants.util.dirutil import safe_mkdtemp, safe_rmtree
+from pants_test.jvm.jvm_task_test_mixin import JvmTaskTestMixin
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -30,17 +30,7 @@ def create_dummydoc_command(classpath, gendir, *targets):
   pass
 
 
-options = {
-  'DummyJvmdocGen_combined_opt': None,
-  'DummyJvmdocGen_ignore_failure_opt': None,
-  'DummyJvmdocGen_include_codegen_opt': None,
-  'DummyJvmdocGen_open_opt': None,
-  'DummyJvmdocGen_transitive_opt': None,
-  'DummyJvmdocGen_skip_opt': None,
-}
-
-
-class JvmdocGenTest(TaskTestBase):
+class JvmdocGenTest(JvmTaskTestMixin, TaskTestBase):
   """Test some base functionality in JvmdocGen."""
 
   @classmethod
@@ -49,7 +39,6 @@ class JvmdocGenTest(TaskTestBase):
 
   def setUp(self):
     super(JvmdocGenTest, self).setUp()
-    self.workdir = safe_mkdtemp()
 
     self.t1 = self.make_target('t1')
     context = self.context(target_roots=[self.t1])
@@ -58,11 +47,7 @@ class JvmdocGenTest(TaskTestBase):
 
     self.populate_runtime_classpath(context)
 
-    self.task = self.create_task(context, self.workdir)
-
-  def tearDown(self):
-    super(JvmdocGenTest, self).tearDown()
-    safe_rmtree(self.workdir)
+    self.task = self.create_task(context)
 
   def test_classpath(self):
     self.task.execute()

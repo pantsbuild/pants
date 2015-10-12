@@ -118,9 +118,9 @@ class BaseGroupTaskTest(BaseTest):
 
     self.recorded_actions = []
     # NB: GroupTask has a cache of tasks by name... use a distinct name
-    self.group_task = GroupTask.named('jvm-compile-%s' % uuid.uuid4().hex,
-                                      ['classes_by_target', 'classes_by_source'],
-                                      ['test'])
+    self.group_task = GroupTask.named(name='jvm-compile-%s' % uuid.uuid4().hex,
+                                      product_type=['runtime_classpath'],
+                                      flag_namespace=['test'])
 
     javac = self.group_member(name='javac', selector=lambda t: isinstance(t, self.JavaLibrary))
     self.group_task.add_member(javac)
@@ -130,9 +130,7 @@ class BaseGroupTaskTest(BaseTest):
 
     self._context = self.context(target_roots=self.create_targets(),
                                  for_task_types=[self.group_task])
-    self.populate_runtime_classpath(self._context)
     self.group_task._prepare(self.options, round_manager=RoundManager(self._context))
-
 
     self.task = self.group_task(self._context, workdir='/not/real')
     self.task.execute()
