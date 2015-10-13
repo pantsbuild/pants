@@ -81,3 +81,17 @@ class StrOption(PrimitiveOptionType):
   @classmethod
   def from_untyped(cls, s):
     return s
+
+
+class IntOption(PrimitiveOptionType):
+
+  @classmethod
+  def from_untyped(cls, s):
+    return int(s)
+
+
+class FloatOption(PrimitiveOptionType):
+
+  @classmethod
+  def from_untyped(cls, s):
+    return float(s)

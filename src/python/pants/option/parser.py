@@ -14,10 +14,11 @@ from collections import defaultdict
 
 import six
 
-from pants.base.deprecated import check_deprecated_semver
+from pants.base.deprecated import check_deprecated_semver, deprecated
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import ParseError, RegistrationError
-from pants.option.option_types import BoolOption, ListOption, StrOption
+from pants.option.option_type import OptionType
+from pants.option.option_types import BoolOption, FloatOption, IntOption, ListOption, StrOption
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
@@ -173,6 +174,19 @@ class Parser(object):
         dest = self._select_dest(args)
         yield dest, args, kwargs
 
+  @deprecated('0.0.57',
+              hint_message='Directly passing a type constructor to `register` is deprecated. '
+                           'Pass an OptionType subclass instead.')
+  def _constructor_to_option_type(self, name, tpe):
+    if tpe is str:
+      return StrOption
+    elif tpe is int:
+      return IntOption
+    elif tpe is float:
+      return FloatOption
+    raise RegistrationError('The `type` parameter to `register` expects to receive an '
+                            'OptionType subclass. Received {} for {}'.format(tpe, name))
+
   def register(self, *args, **kwargs):
     """Register an option, using argparse params.
 
@@ -200,6 +214,11 @@ class Parser(object):
         raise ParseError('Option {} in scope {} registered as recursive, but subsystem options '
                          'may not set recursive=True.'.format(args[0], self.scope))
       kwargs['recursive_root'] = True  # So we can distinguish the original registrar.
+    # Convert deprecated native type args to OptionTypes
+    tpe = kwargs.get('type')
+    if tpe and not issubclass(tpe, OptionType):
+      kwargs['type'] = self._constructor_to_option_type(args[0], tpe)
+
     if self._scope_info.category == ScopeInfo.SUBSYSTEM:
       kwargs['subsystem'] = True
     self._register(dest, args, kwargs)  # Note: May modify kwargs (to remove recursive_root).

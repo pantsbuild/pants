@@ -57,7 +57,7 @@ class JvmPlatform(Subsystem):
     super(JvmPlatform, cls).register_options(register)
     register('--platforms', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Compile settings that can be referred to by name in jvm_targets.')
-    register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
+    register('--default-platform', advanced=True, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
 
   @classmethod

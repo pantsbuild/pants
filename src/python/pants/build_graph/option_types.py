@@ -33,7 +33,7 @@ class TargetOption(OptionType):
           'This option expects a single target address spec. Parse failed with: {}'.format(e))
 
   @classmethod
-  def fingerprint(cls, context, option_val, hasher):
+  def fingerprint(cls, context, hasher, option_val):
     _fingerprint_target_addresses(context, hasher, [option_val])
 
 
@@ -43,7 +43,7 @@ class TargetListOption(OptionType):
   @classmethod
   def from_untyped(cls, s):
     addresses = []
-    for entry in _convert(s, (list, tuple)):
+    for entry in cls._convert(s, (list, tuple)):
       try:
         addresses.append(Address.parse(entry))
       except Exception as e:
@@ -52,5 +52,5 @@ class TargetListOption(OptionType):
     return addresses
 
   @classmethod
-  def fingerprint(cls, context, option_val, hasher):
+  def fingerprint(cls, context, hasher, option_val):
     _fingerprint_target_addresses(context, hasher, option_val)

@@ -162,10 +162,10 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                                              build_graph=build_graph)
             build_graph.inject_target(tool_classpath_target)
 
-    # We use the trick of not returning alternate roots, but instead just filling the
-    # dep_address.spec holes with a JarLibrary built from a tool's default classpath JarDependency
-    # list if there is no over-riding targets present. This means we do modify the build_graph, but
-    # we at least do it at a time in the engine lifecycle cut out for handling that.
+    # We use the trick of not returning alternate roots, but instead just filling the dep_address
+    # holes with a JarLibrary built from a tool's default classpath JarDependency list if there is
+    # no over-riding targets present. This means we do modify the build_graph, but we at least do
+    # it at a time in the engine lifecycle cut out for handling that.
     return None
 
   def __init__(self, *args, **kwargs):

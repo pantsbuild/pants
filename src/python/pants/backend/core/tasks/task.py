@@ -201,12 +201,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return self._workdir
 
-  def _options_fingerprint(self, scope):
+  def _options_fingerprint(self, scope, hasher):
     pairs = self.context.options.get_fingerprintable_for_scope(scope)
-    hasher = sha1()
     for (option_type, option_val) in pairs:
       option_type.fingerprint(self.context, hasher, option_val)
-    return hasher.hexdigest()
 
   @property
   def fingerprint(self):
@@ -220,9 +218,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     if not self._fingerprint:
       hasher = sha1()
-      hasher.update(self._options_fingerprint(self.options_scope))
+      self._options_fingerprint(self.options_scope, hasher)
       for dep in self.subsystem_dependencies_iter():
-        hasher.update(self._options_fingerprint(dep.options_scope()))
+        self._options_fingerprint(dep.options_scope(), hasher)
       self._fingerprint = str(hasher.hexdigest())
     return self._fingerprint
 
