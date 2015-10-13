@@ -252,16 +252,6 @@ class SourceRoot(object):
     return found_source_root
 
   @classmethod
-  def find_siblings_by_path(cls, path):
-    """
-    :param path: path containing source
-    :return: all source root siblings for this path
-    """
-    if os.path.isabs(path):
-      path = SourceRoot._relative_to_buildroot(path)
-    return cls._SOURCE_ROOT_TREE.get_root_siblings(path)
-
-  @classmethod
   def types(cls, root):
     """:returns: the set of target types rooted at root."""
     return cls._TYPES_BY_ROOT[root]

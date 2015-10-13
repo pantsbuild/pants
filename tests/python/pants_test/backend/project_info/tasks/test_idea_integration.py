@@ -299,8 +299,7 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
           .format(url=url, is_test_source=is_test_source))
       self.assertTrue(found_source_content)
 
-    self._idea_test(['testprojects/maven_layout/resource_collision::', '--idea-use-source-root',
-                     '--idea-infer-test-from-siblings'],
+    self._idea_test(['testprojects/maven_layout/resource_collision::', '--idea-use-source-root'],
                     check_func=do_check)
 
   def _test_idea_language_level(self, targets, expected):
