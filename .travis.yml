@@ -78,5 +78,6 @@ script: |
 #   email: ...
 
 after_success:
-  coveralls
+  # TODO: We haven't been getting coverage data for the last few weeks: collect more info.
+  coveralls --verbose
 
