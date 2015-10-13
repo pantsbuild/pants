@@ -331,7 +331,6 @@ python_library(
   sources = ['roots.py'],
   dependencies = [
     ':console_task',
-    'src/python/pants/backend/core/targets:common',
   ],
 )
 

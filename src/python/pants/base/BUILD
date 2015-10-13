@@ -180,6 +180,9 @@ python_library(
     ':exceptions',
     ':parse_context',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    # TEMPORARY dep during migration to new source roots mechanism.
+    # I've verified that this does not introduce a circular dep.
+    'src/python/pants/source',
   ],
 )
 

@@ -34,6 +34,7 @@ from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.filtering import create_filters, wrap_filters
 
@@ -317,7 +318,7 @@ class GoalRunner(object):
   @classmethod
   def subsystems(cls):
     # Subsystems used outside of any task.
-    return {SourceRootBootstrapper, Reporting, Reproducer, RunTracker}
+    return {SourceRootBootstrapper, SourceRootConfig, Reporting, Reproducer, RunTracker}
 
   def _execute_engine(self):
     unknown_goals = [goal.name for goal in self._goals if not goal.ordered_task_names()]
