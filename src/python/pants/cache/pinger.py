@@ -13,7 +13,7 @@ from six.moves import range
 from pants.util.contextutil import Timer
 
 
-_global_pinger_memo = {}  # netloc -> rt time in secs.
+_global_pinger_memo = {}  # (netloc, timeout, tries) -> rt time in secs.
 
 
 class Pinger(object):
@@ -28,12 +28,18 @@ class Pinger(object):
   def ping(self, netloc):
     """Time a single roundtrip to the netloc.
 
+    :param netloc: string of "host:port"
+    :returns: the fastest ping time for a given netloc and number of tries.
+    or Pinger.UNREACHABLE if ping times out.
+    :rtype: float
+
     Note that we don't use actual ICMP pings, because cmd-line ping is
     inflexible and platform-dependent, so shelling out to it is annoying,
     and the ICMP python lib can only be called by the superuser.
     """
-    if netloc in _global_pinger_memo:
-      return _global_pinger_memo[netloc]
+    netloc_info = (netloc, self._timeout, self._tries)
+    if netloc_info in _global_pinger_memo:
+      return _global_pinger_memo[netloc_info]
 
     host, colon, portstr = netloc.partition(':')
     port = int(portstr) if portstr else None
@@ -48,7 +54,7 @@ class Pinger(object):
       except Exception:
         new_rt_secs = Pinger.UNREACHABLE
       rt_secs = min(rt_secs, new_rt_secs)
-    _global_pinger_memo[netloc] = rt_secs
+    _global_pinger_memo[netloc_info] = rt_secs
     return rt_secs
 
   def pings(self, netlocs):
