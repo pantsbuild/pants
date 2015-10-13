@@ -11,10 +11,10 @@ from contextlib import contextmanager
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.util.contextutil import pushd, temporary_dir
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
-class JvmRunTest(TaskTestBase):
+class JvmRunTest(JvmTaskTestBase):
 
   @classmethod
   def task_type(cls):

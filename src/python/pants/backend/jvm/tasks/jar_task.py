@@ -354,50 +354,57 @@ class JarBuilderTask(JarTask):
       :param target: The target to add generated classes and resources for.
       :param bool recursive: `True` to add classes and resources for the target's transitive
         internal dependency closure.
-      :returns: The list of targets that actually contributed classes or resources or both to the
-        jar.
+      :returns: `True` if the target contributed any files - manifest entries, classfiles or
+        resource files - to this jar.
+      :rtype: bool
       """
+      products_added = False
+
       classpath_products = self._context.products.get_data('runtime_classpath')
 
-      targets_added = []
+      # TODO(John Sirois): Manifest handling is broken.  We should be tracking state and failing
+      # fast if any duplicate entries are added; ie: if we get a second binary or a second agent.
 
-      def add_classpath_entry(entry):
+      if isinstance(target, JvmBinary):
+        self._add_manifest_entries(target, self._manifest)
+        products_added = True
+      elif isinstance(target, JavaAgent):
+        self._add_agent_manifest(target, self._manifest)
+        products_added = True
+      elif recursive:
+        agents = [t for t in target.closure() if isinstance(t, JavaAgent)]
+        if len(agents) > 1:
+          raise TaskError('Only 1 agent can be added to a jar, found {} for {}:\n\t{}'
+                          .format(len(agents),
+                                  target.address.reference(),
+                                  '\n\t'.join(agent.address.reference() for agent in agents)))
+        elif agents:
+          self._add_agent_manifest(agents[0], self._manifest)
+          products_added = True
+
+      # In the transitive case we'll gather internal resources naturally as dependencies, but in the
+      # non-transitive case we need to manually add these special (in the context of jarring)
+      # dependencies.
+      targets = [target]
+      if not recursive and target.has_resources:
+        targets += target.resources
+      # We only gather internal classpath elements per our contract.
+      target_classpath = ClasspathUtil.internal_classpath(targets,
+                                                          classpath_products,
+                                                          transitive=recursive)
+      for entry in target_classpath:
         if ClasspathUtil.is_jar(entry):
           self._jar.writejar(entry)
+          products_added = True
         elif ClasspathUtil.is_dir(entry):
           for rel_file in ClasspathUtil.classpath_entries_contents([entry]):
             self._jar.write(os.path.join(entry, rel_file), rel_file)
+            products_added = True
         else:
           # non-jar and non-directory classpath entries should be ignored
           pass
 
-      def add_to_jar(tgt):
-        # Fetch classpath entries for this target and any associated resource targets.
-        tgts = [tgt] + tgt.resources if tgt.has_resources else [tgt]
-        target_classpath = ClasspathUtil.classpath_entries(
-            tgts,
-            classpath_products,
-            ('default',),
-            transitive=False)
-
-        if target_classpath:
-          targets_added.append(tgt)
-
-          for entry in target_classpath:
-            add_classpath_entry(entry)
-
-          if isinstance(tgt, JavaAgent):
-            self._add_agent_manifest(tgt, self._manifest)
-
-      if isinstance(target, JvmBinary):
-        self._add_manifest_entries(target, self._manifest)
-
-      if recursive:
-        target.walk(add_to_jar)
-      else:
-        add_to_jar(target)
-
-      return targets_added
+      return products_added
 
     def commit_manifest(self, jar):
       """Updates the manifest in the jar being written to.

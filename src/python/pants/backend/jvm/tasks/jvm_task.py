@@ -47,7 +47,6 @@ class JvmTask(Task):
 
     classpath_product = classpath_product or self.context.products.get_data('runtime_classpath')
 
-    classpath_for_targets = ClasspathUtil.classpath_entries(
-      targets, classpath_product, self.confs)
+    classpath_for_targets = ClasspathUtil.classpath(targets, classpath_product, self.confs)
     classpath.extend(classpath_for_targets)
     return classpath

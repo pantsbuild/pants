@@ -9,7 +9,6 @@ from collections import namedtuple
 from textwrap import dedent
 
 from pants.base.address import Address
-from pants.base.dep_lookup_error import DepLookupError
 from pants.base.exceptions import TaskError
 from pants.build_graph.option_types import TargetOption
 

@@ -9,7 +9,6 @@ import functools
 import itertools
 import os
 import shutil
-import sys
 from collections import OrderedDict, defaultdict
 from hashlib import sha1
 
@@ -29,7 +28,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import fast_relpath, safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree, safe_walk
 from pants.util.fileutil import atomic_copy, create_size_estimators
 
 
@@ -593,7 +592,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def classname_for_classfile(self, compile_context, class_file_name):
     assert class_file_name.startswith(compile_context.classes_dir)
-    return ClasspathUtil.classname_for_rel_classfile(class_file_name[len(compile_context.classes_dir) + 1:])
+    rel_classfile_path = class_file_name[len(compile_context.classes_dir) + 1:]
+    return ClasspathUtil.classname_for_rel_classfile(rel_classfile_path)
 
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
@@ -629,14 +629,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       compile_contexts[target] = compile_context
     return compile_contexts
 
-  def _compute_classpath_entries(self, classpath_products,
-                                 target_closure,
+  def _compute_classpath_entries(self,
+                                 classpath_products,
                                  compile_context,
                                  extra_compile_time_classpath):
     # Generate a classpath specific to this compile and target.
     return ClasspathUtil.compute_classpath_for_target(compile_context.target, classpath_products,
-                                                      extra_compile_time_classpath, self._confs,
-                                                      target_closure)
+                                                      extra_compile_time_classpath, self._confs)
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -673,7 +672,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         return False
       cached_vts, uncached_vts = check_vts([vts])
       if not cached_vts:
-        self.context.log.debug('Missed cache during double check for {}'.format(vts.target.address.spec))
+        self.context.log.debug('Missed cache during double check for {}'
+                               .format(vts.target.address.spec))
         return False
       assert cached_vts == [vts], (
           'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
@@ -681,10 +681,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
       return True
 
-    def work_for_vts(vts, compile_context, target_closure):
+    def work_for_vts(vts, compile_context):
       progress_message = compile_context.target.address.spec
       cp_entries = self._compute_classpath_entries(classpath_products,
-                                                   target_closure,
                                                    compile_context,
                                                    extra_compile_time_classpath)
 
@@ -756,7 +755,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       invalid_dependencies = (compile_target_closure & invalid_target_set) - [compile_target]
 
       jobs.append(Job(self.exec_graph_key_for_target(compile_target),
-                      functools.partial(work_for_vts, vts, compile_context, compile_target_closure),
+                      functools.partial(work_for_vts, vts, compile_context),
                       [self.exec_graph_key_for_target(target) for target in invalid_dependencies],
                       self._size_estimator(compile_context.sources),
                       # If compilation and analysis work succeeds, validate the vts.
@@ -799,10 +798,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     artifacts = []
 
     # Intransitive classpath entries.
-    target_classpath = ClasspathUtil.classpath_entries(
+    target_classpath = ClasspathUtil.classpath(
         (compile_context.target,),
         self.context.products.get_data('runtime_classpath'),
-        ('default',),
         transitive=False)
     for entry in target_classpath:
       if ClasspathUtil.is_jar(entry):

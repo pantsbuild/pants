@@ -17,16 +17,12 @@ from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
-from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.option.custom_types import dict_option, list_option
 from pants.util.dirutil import safe_mkdir, safe_open
 from twitter.common.collections import OrderedSet
 
-from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
-  JavaThriftLibraryFingerprintStrategy
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
@@ -38,10 +34,6 @@ _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary, android=JavaL
 class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   DepInfo = namedtuple('DepInfo', ['service', 'structs'])
-
-  class DepLookupError(AddressLookupError):
-    """Thrown when a dependency can't be found."""
-    pass
 
   class PartialCmd(namedtuple('PC', ['language', 'rpc_style', 'namespace_map'])):
 
@@ -61,7 +53,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   def register_options(cls, register):
     super(ScroogeGen, cls).register_options(register)
     register('--verbose', default=False, action='store_true', help='Emit verbose output.')
-    register('--strict', fingerprint=True, default=False, action='store_true', help='Enable strict compilation.')
+    register('--strict', fingerprint=True, default=False, action='store_true',
+             help='Enable strict compilation.')
     register('--jvm-options', default=[], advanced=True, type=list_option,
              help='Use these jvm options when running Scrooge.')
     register('--service-deps', default={}, advanced=True, type=dict_option,
@@ -111,8 +104,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
         try:
           dependencies.update(self.context.resolve(depspec))
         except AddressLookupError as e:
-          raise self.DepLookupError("{message}\n  referenced from [{section}] key: "
-                                    "gen->deps->{category} in pants.ini".format(
+          raise AddressLookupError('{message}\n  referenced from [{section}] key: '
+                                   'gen->deps->{category} in pants.ini'.format(
                                       message=e,
                                       section=_CONFIG_SECTION,
                                       category=category
@@ -196,10 +189,9 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
                                   args=args,
                                   workunit_name='scrooge-gen')
         try:
+          # TODO: This entire block appears to have no effect.
           if 0 == returncode:
-            gen_files_for_source = self.parse_gen_file_map(gen_file_map_path, outdir)
-          else:
-            gen_files_for_source = None
+            self.parse_gen_file_map(gen_file_map_path, outdir)
         finally:
           os.remove(gen_file_map_path)
 
