@@ -154,12 +154,14 @@ class SourceRootConfig(Subsystem):
 
   _DEFAULT_SOURCE_ROOT_PARENTS = [
     'src',
+    'src/main',
     '3rdparty',
   ]
 
   _DEFAULT_TEST_ROOT_PARENTS = [
     'test',
     'tests',
+    'src/test',
   ]
 
   _DEFAULT_SOURCE_ROOT_PATTERNS = {
