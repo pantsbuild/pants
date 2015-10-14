@@ -153,7 +153,7 @@ class LazySourceMapper(SourceMapper):
       address_map = self._address_mapper._address_map_from_spec_path(build_file.spec_path)
       for address, addressable in address_map.values():
         self._build_graph.inject_address_closure(address)
-        target = self._build_graph._target_addressable_to_target(address, addressable)
+        target = self._build_graph.get_target(address)
         if target.has_resources:
           for resource in target.resources:
             for item in resource.sources_relative_to_buildroot():
