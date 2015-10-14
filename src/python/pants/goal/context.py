@@ -22,7 +22,7 @@ from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.reporting.report import Report
-from pants.source.source_root import SourceRootConfig
+from pants.source.source_root import SourceRoots
 
 
 class Context(object):
@@ -71,7 +71,7 @@ class Context(object):
     self._target_base = target_base or Target
     self._products = Products()
     self._buildroot = get_buildroot()
-    self._source_roots = SourceRootConfig.global_instance().get_source_roots()
+    self._source_roots = SourceRoots.instance()
     self._lock = OwnerPrintingPIDLockFile(os.path.join(self._buildroot, '.pants.run'))
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
