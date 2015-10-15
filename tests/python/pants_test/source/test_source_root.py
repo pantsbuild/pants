@@ -11,62 +11,15 @@ from pants_test.subsystem.subsystem_util import create_subsystem
 
 
 class SourceRootTest(BaseTest):
-  def test_generate_source_root_patterns(self):
-    def _do_test(langs=None,
-                 source_root_parents=None, source_root_patterns=None,
-                 test_root_parents=None, test_root_patterns=None,
-                 expected=None):
-      options = {
-        'langs': langs or [],
-        'source_root_parents': source_root_parents or [],
-        'source_root_patterns': source_root_patterns or {},
-        'test_root_parents': test_root_parents or [],
-        'test_root_patterns': test_root_patterns or {},
-      }
-      source_root_config = create_subsystem(SourceRootConfig, **options)
-      actual = dict(source_root_config.generate_source_root_pattern_mappings())
-      self.assertEqual(expected, actual)
-
-    _do_test(expected={})
-
-    _do_test(langs=['java', 'python'],
-             source_root_parents=['src', 'example/src'],
-             expected={
-               'src/java': ('java',), 'src/python': ('python',),
-               'example/src/java': ('java',), 'example/src/python': ('python',)
-             })
-
-    _do_test(source_root_patterns={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
-             expected={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) })
-
-    _do_test(langs=['java', 'python'],
-             source_root_parents=['src', 'example/src'],
-             source_root_patterns={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
-             expected={
-               'src/java': ('java',), 'src/python': ('python',),
-               'example/src/java': ('java',), 'example/src/python': ('python',),
-               'src/jvm': ('java', 'scala'), 'src/py': ('python',)
-             })
-
-    _do_test(langs=['java', 'python'], test_root_parents=['src', 'example/src'],
-             test_root_patterns={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
-             expected={
-               'src/java': ('java',), 'src/python': ('python',),
-               'example/src/java': ('java',), 'example/src/python': ('python',),
-               'src/jvm': ('java', 'scala'), 'src/py': ('python',)
-             })
-
   def test_source_root_trie(self):
-    trie = SourceRootTrie()
+    trie = SourceRootTrie({
+      'jvm': ('java', 'scala'),
+      'py': ('python',)
+    })
     self.assertIsNone(trie.find('src/java/org/pantsbuild/foo/Foo.java'))
 
-    trie.add_pattern('src/java', ('java',))
-    self.assertEquals(('src/java', ('java',)),
-                      trie.find('src/java/org/pantsbuild/foo/Foo.java'))
-    self.assertEquals(('my/project/src/java', ('java',)),
-                      trie.find('my/project/src/java/org/pantsbuild/foo/Foo.java'))
-
-    trie.add_pattern('src/python', ('python',))
+    # Wildcard at the end.
+    trie.add_pattern('src/*')
     self.assertEquals(('src/java', ('java',)),
                       trie.find('src/java/org/pantsbuild/foo/Foo.java'))
     self.assertEquals(('my/project/src/java', ('java',)),
@@ -76,28 +29,55 @@ class SourceRootTest(BaseTest):
     self.assertEquals(('my/project/src/python', ('python',)),
                       trie.find('my/project/src/python/org/pantsbuild/foo/foo.py'))
 
+    # Overlapping pattern.
+    trie.add_pattern('src/main/*')
+    self.assertEquals(('src/main/java', ('java',)),
+                      trie.find('src/main/java/org/pantsbuild/foo/Foo.java'))
+    self.assertEquals(('my/project/src/main/java', ('java',)),
+                      trie.find('my/project/src/main/java/org/pantsbuild/foo/Foo.java'))
+    self.assertEquals(('src/main/python', ('python',)),
+                      trie.find('src/main/python/pantsbuild/foo/foo.py'))
+    self.assertEquals(('my/project/src/main/python', ('python',)),
+                      trie.find('my/project/src/main/python/org/pantsbuild/foo/foo.py'))
+
+    # Wildcard in the middle.
+    trie.add_pattern('src/*/code')
+    self.assertEquals(('src/java/code', ('java',)),
+                      trie.find('src/java/code/org/pantsbuild/foo/Foo.java'))
+    self.assertEquals(('my/project/src/java/code', ('java',)),
+                      trie.find('my/project/src/java/code/org/pantsbuild/foo/Foo.java'))
+    self.assertEquals(('src/python/code', ('python',)),
+                      trie.find('src/python/code/pantsbuild/foo/foo.py'))
+    self.assertEquals(('my/project/src/python/code', ('python',)),
+                      trie.find('my/project/src/python/code/org/pantsbuild/foo/foo.py'))
+
+    # Verify that the now even-more-overlapping pattern still works.
+    self.assertEquals(('src/main/java', ('java',)),
+                      trie.find('src/main/java/org/pantsbuild/foo/Foo.java'))
+    self.assertEquals(('my/project/src/main/java', ('java',)),
+                      trie.find('my/project/src/main/java/org/pantsbuild/foo/Foo.java'))
+    self.assertEquals(('src/main/python', ('python',)),
+                      trie.find('src/main/python/pantsbuild/foo/foo.py'))
+    self.assertEquals(('my/project/src/main/python', ('python',)),
+                      trie.find('my/project/src/main/python/org/pantsbuild/foo/foo.py'))
+
     # Verify that we take the first matching prefix.
     self.assertEquals(('src/java', ('java',)),
                       trie.find('src/java/src/python/Foo.java'))
 
-    # Test fixed patterns.
-    trie.add_fixed('src/scala', ('scala',))
-    self.assertEquals(('src/scala', ('scala',)),
-                      trie.find('src/scala/org/pantsbuild/foo/Foo.scala'))
-    self.assertIsNone(trie.find('my/project/src/scala/org/pantsbuild/foo/Foo.scala'))
-
-    # Test multiple langs.
-    trie.add_pattern('src/jvm', ('java', 'scala'))
-
+    # Test canonicalization.
     self.assertEquals(('src/jvm', ('java', 'scala')),
                       trie.find('src/jvm/org/pantsbuild/foo/Foo.java'))
     self.assertEquals(('src/jvm', ('java', 'scala')),
                       trie.find('src/jvm/org/pantsbuild/foo/Foo.scala'))
+    self.assertEquals(('src/py', ('python',)),
+                      trie.find('src/py/pantsbuild/foo/foo.py'))
 
-    # Test long pattern.
-    trie.add_pattern('src/main/long/path/java', ('java',))
-    self.assertEquals(('my/project/src/main/long/path/java', ('java',)),
-                      trie.find('my/project/src/main/long/path/java/org/pantsbuild/foo/Foo.java'))
+    # Test fixed patterns.
+    trie.add_fixed('mysrc/scalastuff', ('scala',))
+    self.assertEquals(('mysrc/scalastuff', ('scala',)),
+                      trie.find('mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
+    self.assertIsNone(trie.find('my/project/mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
 
   def test_all_roots(self):
     self.create_dir('src/java')
@@ -108,8 +88,7 @@ class SourceRootTest(BaseTest):
     self.create_dir('not/a/srcroot/java')
 
     options = {
-      'langs': ['java', 'python', 'nonexistent'],
-      'source_root_parents': ['src/', 'src/example'],
+      'source_root_patterns': ['src/*', 'src/example/*'],
     }
     options.update(self.options[''])  # We need inherited values for pants_workdir etc.
 

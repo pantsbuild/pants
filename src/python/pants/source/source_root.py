@@ -136,72 +136,40 @@ class SourceRootConfig(Subsystem):
 
   options_scope = 'source'
 
-  _DEFAULT_LANGS = [
-    'android',
-    'antlr',
-    'cpp',
-    'go',
-    'java',
-    'node',
-    'proto',
-    'protobuf',
-    'py',
-    'python',
-    'resources',
-    'scala',
-    'thrift',
-    'wire',
+  _DEFAULT_SOURCE_ROOT_PATTERNS = [
+    '3rdparty/*',
+    'src/*',
+    'src/main/*',
   ]
-
-  _DEFAULT_SOURCE_ROOT_PARENTS = [
-    'src',
-    'src/main',
-    '3rdparty',
-  ]
-
-  _DEFAULT_TEST_ROOT_PARENTS = [
-    'test',
-    'tests',
-    'src/test',
-  ]
-
-  _DEFAULT_SOURCE_ROOT_PATTERNS = {
-    'src/jvm': ('java', 'scala'),
-  }
 
   _DEFAULT_TEST_ROOT_PATTERNS = {
-    'test/jvm': ('java', 'scala'),
-    'tests/jvm': ('java', 'scala'),
+    'test/*',
+    'tests/*',
+    'src/test/*'
+  }
+
+  # TODO: When we have a proper model of the concept of a language, these should really be
+  # gathered from backends.
+  _DEFAULT_LANG_CANONICALIZATIONS = {
+    'jvm': ('java', 'scala'),
+    'protobuf': ('proto',),
+    'py': ('python',)
   }
 
   @classmethod
   def register_options(cls, register):
     super(SourceRootConfig, cls).register_options(register)
-    register('--langs', metavar='<list>', type=list_option,
-             default=cls._DEFAULT_LANGS, advanced=True,
-             help='A list of supported language names to autoconstruct source root patterns from.')
-
-    register('--source-root-parents', metavar='<list>', type=list_option,
-             default=cls._DEFAULT_SOURCE_ROOT_PARENTS, advanced=True,
-             help='A list of parent dirs to autoconstruct source root patterns from. '
-                  'The constructed roots are of the pattern <parent>/<lang>, where <lang> is one '
-                  'of the languages specified by the --langs option.')
-    register('--test-root-parents', metavar='<list>', type=list_option,
-             default=cls._DEFAULT_TEST_ROOT_PARENTS, advanced=True,
-             help='A list of parent dirs to autoconstruct test root patterns from. '
-                  'The constructed roots are of the pattern <parent>/<lang>, where <lang> is one '
-                  'of the languages specified by the --langs option.')
-
-    register('--source-root-patterns', metavar='<map>', type=dict_option,
+    register('--lang-canonicalizations', metavar='<map>', type=dict_option,
+             default=cls._DEFAULT_LANG_CANONICALIZATIONS, advanced=True,
+             help='Map of language aliases to their canonical names.')
+    register('--source-root-patterns', metavar='<list>', type=list_option,
              default=cls._DEFAULT_SOURCE_ROOT_PATTERNS, advanced=True,
-             help='A mapping from source root pattern to list of languages of source code found '
-                  'under paths matching that pattern. Useful when the autoconstructed source root'
-                  'patterns are not sufficient.')
-    register('--test-root-patterns', metavar='<map>', type=dict_option,
-             default=cls._DEFAULT_TEST_ROOT_PATTERNS, advanced=True,
-             help='A mapping from test root pattern to list of languages of test code found '
-                  'under paths matching that pattern. Useful when the autoconstructed test root'
-                  'patterns are not sufficient.')
+             help='A list of source root patterns. Use a "*" wildcard path segment to match the '
+                  'language name, which will be canonicalized.')
+    register('--test-root-patterns', metavar='<list>', type=list_option,
+             default=cls._DEFAULT_SOURCE_ROOT_PATTERNS, advanced=True,
+             help='A list of source root patterns. Use a "*" wildcard path segment to match the '
+                  'language name, which will be canonicalized.')
 
     register('--source-roots', metavar='<map>', type=dict_option, advanced=True,
              help='A map of source roots to list of languages.  Useful when you want to enumerate '
@@ -213,42 +181,22 @@ class SourceRootConfig(Subsystem):
   def get_source_roots(self):
     return SourceRoots(self)
 
-  def generate_source_root_pattern_mappings(self):
-    """Generate source root patterns from options.
-
-    Does not currently distinguish between source (i.e., non-test) and test roots, and yields them
-    both as "source roots", which is correct for our current uses of source roots.
-    TODO: Put the distinction between test and non-test source roots to good use.
-    """
-    options = self.get_options()
-
-    def gen_from_options(prefix):
-      for parent in options['{}_root_parents'.format(prefix)] or []:
-        for lang in options.langs or []:
-          yield os.path.join(parent, lang), (lang,)
-      for pattern, langs in (options['{}_root_patterns'.format(prefix)] or {}).items():
-        yield pattern, tuple(langs)
-
-    for x in gen_from_options('source'):
-      yield x
-    for x in gen_from_options('test'):
-      yield x
-
   def create_trie(self):
     """Create a trie of source root patterns from options."""
-    trie = SourceRootTrie()
+    options = self.get_options()
+    trie = SourceRootTrie(options.lang_canonicalizations)
 
-    # First add all patterns.
-    for pattern, langs in self.generate_source_root_pattern_mappings():
-      trie.add_pattern(pattern, langs)
+    # Add patterns.
+    for pattern in options.source_root_patterns or []:
+      trie.add_pattern(pattern)
+    for pattern in options.test_root_patterns or []:
+      trie.add_pattern(pattern)
 
     # Now add all fixed source roots.
-    def gen_fixed_from_options(prefix):
-      for path, langs in (self.get_options()['{}_roots'.format(prefix)] or {}).items():
-        trie.add_fixed(path, langs)
-
-    gen_fixed_from_options('source')
-    gen_fixed_from_options('test')
+    for path, langs in (options.source_roots or {}).items():
+      trie.add_fixed(path, langs)
+    for path, langs in (options.test_roots or {}).items():
+      trie.add_fixed(path, langs)
 
     return trie
 
@@ -256,8 +204,8 @@ class SourceRootConfig(Subsystem):
 class SourceRootTrie(object):
   """A trie for efficiently finding the source root for a path.
 
-  Finds the first outermost pattern that matches. E.g., my/project/src/python/src/java/java.py
-  will match the pattern src/python, not src/java.
+  Finds the first outermost pattern that matches. E.g., the pattern src/* will match
+  my/project/src/python/src/java/java.py on src/python, not on src/java.
 
   Implements fixed source roots by prepending a '^/' to them, and then prepending a '^' key to
   the path we're matching. E.g., ^/src/java/foo/bar will match both the fixed root ^/src/java and
@@ -266,36 +214,61 @@ class SourceRootTrie(object):
   class Node(object):
     def __init__(self):
       self.children = {}
-      self.langs = tuple()  # Relevant only if this is a leaf node.
+      self.langs = tuple()
+      self.is_terminal = False
+      # We need an explicit terminal flag because not all terminals are leaf nodes,  e.g.,
+      # if we have patterns src/* and src/main/* then the '*' is a terminal (for the first pattern)
+      # but not a leaf.
 
-    def get_child(self, key):
-      return self.children.get(key)
+    def get_child(self, key, langs):
+      # An exact match takes precedence over a wildcard match, to support situations such as
+      # src/* and src/main/*.
+      ret = self.children.get(key)
+      if ret:
+        langs.update(ret.langs)
+      else:
+        ret = self.children.get('*')
+        if ret:
+          langs.add(key)
+      return ret
 
     def new_child(self, key):
       child = SourceRootTrie.Node()
       self.children[key] = child
       return child
 
-    def is_leaf(self):
-      return len(self.children) == 0
-
-  def __init__(self):
+  def __init__(self, lang_canonicalizations):
+    self._lang_canonicalizations = lang_canonicalizations
     self._root = SourceRootTrie.Node()
 
-  def add_pattern(self, pattern, langs=None):
+  def add_pattern(self, pattern):
     """Add a pattern to the trie."""
-    keys = pattern.split(os.path.sep)
-    node = self._root
-    for key in keys:
-      child = node.get_child(key)
-      if not child:
-        child = node.new_child(key)
-      node = child
-    node.langs = tuple(langs or [])
+    self._do_add_pattern(pattern, tuple())
 
   def add_fixed(self, path, langs=None):
     """Add a fixed source root to the trie."""
-    self.add_pattern(os.path.join('^', path), tuple(langs))
+    self._do_add_pattern(os.path.join('^', path), tuple(langs))
+
+  def _do_add_pattern(self, pattern, langs):
+    keys = pattern.split(os.path.sep)
+    node = self._root
+    for key in keys:
+      child = node.children.get(key)  # Can't use get_child, as we don't want to wildcard-match.
+      if not child:
+        child = node.new_child(key)
+      node = child
+    node.langs = langs
+    node.is_terminal = True
+
+  def _canonicalize_langs(self, langs):
+    ret = []
+    for lang in langs or []:
+      canonicalized = self._lang_canonicalizations.get(lang)
+      if canonicalized:
+        ret.extend(canonicalized)
+      else:
+        ret.append(lang)
+    return tuple(ret)
 
   def find(self, path):
     """Find the source root for the given path."""
@@ -304,15 +277,16 @@ class SourceRootTrie(object):
       # See if we have a match at position i.  We have such a match if following the path
       # segments into the trie, from the root, leads us to a leaf.
       node = self._root
-      for j in range(i, len(keys)):
-        child = node.get_child(keys[j])
+      langs = set()
+      j = i
+      while j < len(keys):
+        child = node.get_child(keys[j], langs)
         if child is None:
-          break  # We can't continue.  Try the next value of i.
-        elif child.is_leaf():
-          # We found a leaf, so this source root pattern applies.  Return the entire prefix, up
-          # to the end of the pattern, as the source root.
-          # Note that the range starts from 1, to skip the '^' we added.
-          return os.path.join(*keys[1:j + 1]), child.langs
+          break
         else:
           node = child
+          j += 1
+      if node.is_terminal:
+        return os.path.join(*keys[1:j]), self._canonicalize_langs(langs)
+      # Otherwise, try the next value of i.
     return None
