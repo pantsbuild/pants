@@ -6,13 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.base.source_root import SourceRoot
 
 
 class ListRoots(ConsoleTask):
   """List the registered source roots of the repo."""
 
   def console_output(self, targets):
-    for src_root, targets in SourceRoot.all_roots().items():
-      all_targets = ','.join(sorted([tgt.__name__ for tgt in targets]))
-      yield '{}: {}'.format(src_root, all_targets or '*')
+    for src_root, langs in self.context.source_roots.all_roots():
+      all_langs = ','.join(sorted(langs))
+      yield '{}: {}'.format(src_root, all_langs or '*')

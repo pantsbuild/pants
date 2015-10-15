@@ -147,7 +147,8 @@ class ConsoleTaskTestBase(TaskTestBase):
       task.execute()
       return output.getvalue()
 
-  def execute_console_task(self, targets=None, extra_targets=None, options=None, passthru_args=None, workspace=None):
+  def execute_console_task(self, targets=None, extra_targets=None, options=None,
+                           passthru_args=None, workspace=None):
     """Creates a new task and executes it with the given config, command line args and targets.
 
     :param options: option values.
