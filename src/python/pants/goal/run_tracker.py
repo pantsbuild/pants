@@ -200,19 +200,19 @@ class RunTracker(Subsystem):
     workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels,
                         cmd=cmd, log_config=log_config)
     workunit.start()
+
+    outcome = WorkUnit.FAILURE  # Default to failure we will override if we get success/abort
     try:
       self.report.start_workunit(workunit)
       yield workunit
     except KeyboardInterrupt:
-      workunit.set_outcome(WorkUnit.ABORTED)
+      outcome = WorkUnit.ABORTED
       self._aborted = True
       raise
-    except:
-      workunit.set_outcome(WorkUnit.FAILURE)
-      raise
     else:
-      workunit.set_outcome(WorkUnit.SUCCESS)
+      outcome = WorkUnit.SUCCESS
     finally:
+      workunit.set_outcome(outcome)
       self.end_workunit(workunit)
 
   def log(self, level, *msg_elements):
