@@ -201,7 +201,7 @@ class RunTracker(Subsystem):
                         cmd=cmd, log_config=log_config)
     workunit.start()
 
-    outcome = WorkUnit.FAILURE  # Default to failure we will override if we get success/abort
+    outcome = WorkUnit.FAILURE  # Default to failure we will override if we get success/abort.
     try:
       self.report.start_workunit(workunit)
       yield workunit
