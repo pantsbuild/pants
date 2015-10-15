@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
+from pants.build_graph.option_types import target_option
+from pants.option.custom_types import dict_option, file_option, list_option
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants_test.base_test import BaseTest
 
@@ -42,7 +43,7 @@ class OptionsFingerprinterTest(BaseTest):
       self.make_target(s, payload=p)
     s1, s2, s3 = specs
 
-    fp_specs = lambda specs: self.options_fingerprinter.fingerprint(target_list_option, specs)
+    fp_specs = lambda specs: self.options_fingerprinter.fingerprint(target_option, specs)
     fp1 = fp_specs([s1, s2])
     fp2 = fp_specs([s2, s1])
     fp3 = fp_specs([s1, s3])

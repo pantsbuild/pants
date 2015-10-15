@@ -19,7 +19,7 @@ class WatchmanLauncher(Subsystem):
   @classmethod
   def register_options(cls, register):
     # TODO (kwlzn): this will go away quickly once watchman binary embedding happens.
-    register('--path', type=str, advanced=True, default=None, action='store',
+    register('--path', advanced=True, default=None, action='store',
              help='Watchman binary location (defaults to $PATH discovery).')
 
   def __init__(self, *args, **kwargs):

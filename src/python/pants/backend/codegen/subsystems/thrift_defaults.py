@@ -15,11 +15,11 @@ class ThriftDefaults(Subsystem):
 
   @classmethod
   def register_options(cls, register):
-    register('--compiler', type=str, advanced=True, default='thrift',
+    register('--compiler', advanced=True, default='thrift',
              help='The default compiler to use for java_thrift_library targets.')
-    register('--language', type=str, advanced=True, default='java',
+    register('--language', advanced=True, default='java',
              help='The default language to generate for java_thrift_library targets.')
-    register('--rpc-style', type=str, advanced=True, default='sync',
+    register('--rpc-style', advanced=True, default='sync',
              help='The default rpc-style to generate for java_thrift_library targets.')
 
   def __init__(self, *args, **kwargs):

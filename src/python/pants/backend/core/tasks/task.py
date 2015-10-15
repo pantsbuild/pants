@@ -22,7 +22,6 @@ from pants.cache.cache_setup import CacheSetup
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.invalidation.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.option.optionable import Optionable
-from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
@@ -181,7 +180,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
-    self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
     self._fingerprint = None
 
   def get_options(self):
@@ -203,14 +201,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return self._workdir
 
-  def _options_fingerprint(self, scope):
+  def _options_fingerprint(self, scope, hasher):
     pairs = self.context.options.get_fingerprintable_for_scope(scope)
-    hasher = sha1()
     for (option_type, option_val) in pairs:
-      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
-      if fp is not None:
-        hasher.update(fp)
-    return hasher.hexdigest()
+      option_type.fingerprint(self.context, hasher, option_val)
 
   @property
   def fingerprint(self):
@@ -224,9 +218,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     if not self._fingerprint:
       hasher = sha1()
-      hasher.update(self._options_fingerprint(self.options_scope))
+      self._options_fingerprint(self.options_scope, hasher)
       for dep in self.subsystem_dependencies_iter():
-        hasher.update(self._options_fingerprint(dep.options_scope()))
+        self._options_fingerprint(dep.options_scope(), hasher)
       self._fingerprint = str(hasher.hexdigest())
     return self._fingerprint
 

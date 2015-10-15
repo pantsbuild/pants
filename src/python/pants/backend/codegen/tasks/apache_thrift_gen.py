@@ -20,7 +20,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
-from pants.option.custom_types import list_option
+from pants.build_graph.option_types import TargetListOption
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
@@ -39,10 +39,10 @@ class ApacheThriftGen(SimpleCodegenTask):
 
     register('--gen-options', advanced=True, fingerprint=True,
              help='Use these apache thrift java gen options.')
-    register('--deps', advanced=True, type=list_option,
-             help='A list of specs pointing to dependencies of thrift generated java code.')
-    register('--service-deps', advanced=True, type=list_option,
-             help='A list of specs pointing to dependencies of thrift generated java service '
+    register('--deps', advanced=True, default=[], type=TargetListOption,
+             help='A list of target addresses pointing to dependencies of thrift generated java code.')
+    register('--service-deps', advanced=True, type=TargetListOption,
+             help='A list of target addresses pointing to dependencies of thrift generated java service '
                   'code.  If not supplied, then --deps will be used for service deps.')
 
   @classmethod
@@ -76,13 +76,13 @@ class ApacheThriftGen(SimpleCodegenTask):
 
   @memoized_property
   def _deps(self):
-    deps = self.get_options().deps
-    return list(self.resolve_deps(deps)) if deps else []
+    dep_addresses = self.get_options().deps
+    return list(self.resolve_deps(dep_addresses))
 
   @memoized_property
   def _service_deps(self):
-    service_deps = self.get_options().service_deps
-    return list(self.resolve_deps(service_deps)) if service_deps else self._deps
+    service_dep_addresses = self.get_options().service_deps
+    return list(self.resolve_deps(service_dep_addresses)) if service_dep_addresses else self._deps
 
   SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')
 

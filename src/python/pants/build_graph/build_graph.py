@@ -406,8 +406,11 @@ class BuildGraph(object):
       raise
 
   def resolve(self, spec):
+    """Returns an iterator over the target(s) the given address spec points to."""
+    return self.resolve_address(Address.parse(spec))
+
+  def resolve_address(self, address):
     """Returns an iterator over the target(s) the given address points to."""
-    address = Address.parse(spec)
     # NB: This is an idempotent, short-circuiting call.
     self.inject_address_closure(address)
     return self.transitive_subgraph_of_addresses([address])

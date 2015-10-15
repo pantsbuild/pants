@@ -10,6 +10,7 @@ import sys
 
 from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.option.option_types import BoolOption, StrOption
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, enclosing_scope
 from pants.option.scope import ScopeInfo
@@ -276,7 +277,6 @@ class Options(object):
 
     Fingerprintable options are options registered via a "fingerprint=True" kwarg.
     """
-    pairs = []
     # Note that we iterate over options registered at `scope` and at all enclosing scopes, since
     # option-using code can read those values indirectly via its own OptionValueContainer, so
     # they can affect that code's output.
@@ -292,11 +292,15 @@ class Options(object):
         # scope, to get the right value for recursive options (and because this mirrors what
         # option-using code does).
         val = self.for_scope(scope)[name]
-        val_type = kwargs.get('type', '')
-        pairs.append((val_type, val))
+        val_type = kwargs.get('type')
+        if not val_type:
+          if kwargs.get('action') == 'store_true':
+            val_type = BoolOption
+          else:
+            val_type = StrOption
+        yield (val_type, val)
       registration_scope = (None if registration_scope == ''
                             else enclosing_scope(registration_scope))
-    return pairs
 
   def __getitem__(self, scope):
     # TODO(John Sirois): Mainly supports use of dict<str, dict<str, str>> for mock options in tests,

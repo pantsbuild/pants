@@ -8,8 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 from textwrap import dedent
 
+from pants.base.address import Address
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import target_option
+from pants.build_graph.option_types import TargetOption
 
 
 class JvmToolMixin(object):
@@ -23,22 +24,13 @@ class JvmToolMixin(object):
   class JvmTool(namedtuple('JvmTool', ['scope', 'key', 'classpath', 'main', 'custom_rules'])):
     """Represents a jvm tool classpath request."""
 
-    def dep_spec(self, options):
-      """Returns the target address spec that points to this JVM tool's classpath dependencies.
+    def dep_address(self, options):
+      """Returns the target address that points to this JVM tool's classpath dependencies.
 
-      :rtype: string
+      :rtype: :class:`pants.base.address.Address`
       """
       option = self.key.replace('-', '_')
-      dep_spec = options.for_scope(self.scope)[option]
-      if dep_spec.startswith('['):
-        raise ValueError(dedent("""\
-          JVM tool configuration now expects a single target address, use the
-          following in pants.ini:
-
-          [{scope}]
-          {key}: //tool/classpath:address
-          """.format(scope=self.scope, key=self.key)))
-      return dep_spec
+      return options.for_scope(self.scope)[option]
 
     def is_default(self, options):
       """Return `True` if this option was not set by the user.
@@ -96,10 +88,12 @@ class JvmToolMixin(object):
         return 'Target address spec for specifying the classpath of the {} jvm tool.'.format(key)
     help = help or formulate_help()
 
+    default = Address.parse('//:{}'.format(key) if classpath_spec is None else classpath_spec)
+
     register('--{}'.format(key),
              advanced=True,
-             type=target_option,
-             default='//:{}'.format(key) if classpath_spec is None else classpath_spec,
+             type=TargetOption,
+             default=default,
              help=help,
              fingerprint=fingerprint)
 

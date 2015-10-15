@@ -55,8 +55,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
              help='The method of target size estimation.')
     register('--transitive', default=True, action='store_true',
              help='Score all targets in the build graph transitively.')
-    register('--output-file', type=str,
-             help='Output destination. When unset, outputs to <stdout>.')
+    register('--output-file', help='Output destination. When unset, outputs to <stdout>.')
 
   @classmethod
   def prepare(cls, options, round_manager):

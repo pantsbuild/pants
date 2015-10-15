@@ -96,13 +96,13 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     """Indicates an error resolving a required JVM tool classpath."""
 
   @classmethod
-  def _tool_resolve_error(cls, error, dep_spec, jvm_tool):
+  def _tool_resolve_error(cls, error, dep_address, jvm_tool):
     msg = dedent("""
         Failed to resolve target for tool: {tool}. This target was obtained from
         option {option} in scope {scope}. You probably need to add this target to your tools
         BUILD file(s), usually located in BUILD.tools in the workspace root.
         Exception {etype}: {error}
-      """.format(tool=dep_spec,
+      """.format(tool=dep_address.spec,
                  etype=type(error).__name__,
                  error=error,
                  scope=jvm_tool.scope,
@@ -113,8 +113,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   def _alternate_target_roots(cls, options, address_mapper, build_graph):
     processed = set()
     for jvm_tool in JvmToolMixin.get_registered_tools():
-      dep_spec = jvm_tool.dep_spec(options)
-      dep_address = Address.parse(dep_spec)
+      dep_address = jvm_tool.dep_address(options)
       # Some JVM tools are requested multiple times, we only need to handle them once.
       if dep_address not in processed:
         processed.add(dep_address)
@@ -124,7 +123,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
             continue
         except AddressLookupError as e:
           if jvm_tool.classpath is None:
-            raise cls._tool_resolve_error(e, dep_spec, jvm_tool)
+            raise cls._tool_resolve_error(e, dep_address, jvm_tool)
           else:
             if not jvm_tool.is_default(options):
               # The user specified a target spec for this jvm tool that doesn't actually exist.
@@ -145,7 +144,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                   The default classpath is: {default_classpath}
 
                   Note that tool target addresses in pants.ini should be specified *without* quotes.
-                """).strip().format(tool=dep_spec,
+                """).strip().format(tool=dep_address.spec,
                                     option=jvm_tool.key,
                                     scope=jvm_tool.scope,
                                     default_classpath=':'.join(map(str, jvm_tool.classpath or ()))))
@@ -163,7 +162,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                                              build_graph=build_graph)
             build_graph.inject_target(tool_classpath_target)
 
-    # We use the trick of not returning alternate roots, but instead just filling the dep_spec
+    # We use the trick of not returning alternate roots, but instead just filling the dep_address
     # holes with a JarLibrary built from a tool's default classpath JarDependency list if there is
     # no over-riding targets present. This means we do modify the build_graph, but we at least do
     # it at a time in the engine lifecycle cut out for handling that.
@@ -187,18 +186,18 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       # self.invalidated twice on a Task that does meaningful invalidation on its
       # targets. -pl
       for jvm_tool in registered_tools:
-        dep_spec = jvm_tool.dep_spec(self.context.options)
-        callback = self.cached_bootstrap_classpath_callback(dep_spec, jvm_tool)
+        dep_address = jvm_tool.dep_address(self.context.options)
+        callback = self.cached_bootstrap_classpath_callback(dep_address, jvm_tool)
         callback_product_map[jvm_tool.scope][jvm_tool.key] = callback
 
-  def _resolve_tool_targets(self, dep_spec, jvm_tool):
+  def _resolve_tool_targets(self, dep_address, jvm_tool):
     try:
-      targets = list(self.context.resolve(dep_spec))
+      targets = list(self.context.resolve_address(dep_address))
       if not targets:
         raise KeyError
       return targets
     except (KeyError, AddressLookupError) as e:
-      raise self._tool_resolve_error(e, dep_spec, jvm_tool)
+      raise self._tool_resolve_error(e, dep_address, jvm_tool)
 
   def _bootstrap_classpath(self, jvm_tool, targets):
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
@@ -283,20 +282,20 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     # not divisible by target. So we can only cache it keyed by the entire target set.
     return VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
-  def _bootstrap_jvm_tool(self, dep_spec, jvm_tool):
-    targets = self._resolve_tool_targets(dep_spec, jvm_tool)
+  def _bootstrap_jvm_tool(self, dep_address, jvm_tool):
+    targets = self._resolve_tool_targets(dep_address, jvm_tool)
     if jvm_tool.main is None:
       return self._bootstrap_classpath(jvm_tool, targets)
     else:
       return self._bootstrap_shaded_jvm_tool(jvm_tool, targets)
 
-  def cached_bootstrap_classpath_callback(self, dep_spec, jvm_tool):
+  def cached_bootstrap_classpath_callback(self, dep_address, jvm_tool):
     cache = {}
     cache_lock = threading.Lock()
 
     def bootstrap_classpath():
       with cache_lock:
         if 'classpath' not in cache:
-          cache['classpath'] = self._bootstrap_jvm_tool(dep_spec, jvm_tool)
+          cache['classpath'] = self._bootstrap_jvm_tool(dep_address, jvm_tool)
         return cache['classpath']
     return bootstrap_classpath

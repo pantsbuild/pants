@@ -47,13 +47,13 @@ class PythonCheckStyleTask(PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PythonCheckStyleTask, cls).register_options(register)
-    register('--severity', default='COMMENT', type=str,
+    register('--severity', default='COMMENT',
              help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
     register('--strict', default=False, action='store_true',
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
     register('--skip', default=False, action='store_true',
              help='If enabled, skip this style checker.')
-    register('--suppress', type=str, default=None,
+    register('--suppress', default=None,
              help='Takes a XML file where specific rules on specific files will be skipped.')
     register('--fail', default=True, action='store_true',
              help='Prevent test failure but still produce output for problems.')

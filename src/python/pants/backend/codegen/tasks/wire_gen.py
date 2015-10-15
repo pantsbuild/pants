@@ -82,8 +82,8 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     return genfiles
 
   def synthetic_target_extra_dependencies(self, target):
-    wire_runtime_deps_spec = self.get_options().javadeps
-    return self.resolve_deps([wire_runtime_deps_spec])
+    wire_runtime_dep_address = self.get_options().javadeps
+    return self.resolve_deps([wire_runtime_dep_address])
 
   def format_args_for_target(self, target):
     """Calculate the arguments to pass to the command line for a single target."""
@@ -184,8 +184,8 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   @memoized_property
   def wire_compiler_version(self):
     wire_compiler_jars = set()
-    classpath_spec = self.get_options().wire_compiler
-    for target in self.context.resolve(classpath_spec):
+    classpath_address = self.get_options().wire_compiler
+    for target in self.context.resolve_address(classpath_address):
       if isinstance(target, JarLibrary):
         wire_compiler_jars.update(jar for jar in target.jar_dependencies
                                   if self.is_wire_compiler_jar(jar))

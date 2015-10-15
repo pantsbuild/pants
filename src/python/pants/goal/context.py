@@ -286,8 +286,12 @@ class Context(object):
     return dependees
 
   def resolve(self, spec):
-    """Returns an iterator over the target(s) the given address points to."""
+    """Returns an iterator over the target(s) the given address spec points to."""
     return self.build_graph.resolve(spec)
+
+  def resolve_address(self, address):
+    """Returns an iterator over the target(s) the given address points to."""
+    return self.build_graph.resolve_address(address)
 
   def scan(self, root=None):
     """Scans and parses all BUILD files found under ``root``.
