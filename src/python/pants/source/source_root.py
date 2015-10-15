@@ -143,6 +143,7 @@ class SourceRootConfig(Subsystem):
     'go',
     'java',
     'node',
+    'proto',
     'protobuf',
     'py',
     'python',
@@ -165,12 +166,12 @@ class SourceRootConfig(Subsystem):
   ]
 
   _DEFAULT_SOURCE_ROOT_PATTERNS = {
-    'src/jvm': ['java', 'scala'],
+    'src/jvm': ('java', 'scala'),
   }
 
   _DEFAULT_TEST_ROOT_PATTERNS = {
-    'test/jvm': ['java', 'scala'],
-    'tests/jvm': ['java', 'scala'],
+    'test/jvm': ('java', 'scala'),
+    'tests/jvm': ('java', 'scala'),
   }
 
   @classmethod
@@ -222,10 +223,10 @@ class SourceRootConfig(Subsystem):
     options = self.get_options()
 
     def gen_from_options(prefix):
-      for parent in options[prefix + '_root_parents'] or []:
+      for parent in options['{}_root_parents'.format(prefix)] or []:
         for lang in options.langs or []:
           yield os.path.join(parent, lang), (lang,)
-      for pattern, langs in (options[prefix + '_root_patterns'] or {}).items():
+      for pattern, langs in (options['{}_root_patterns'.format(prefix)] or {}).items():
         yield pattern, tuple(langs)
 
     for x in gen_from_options('source'):
@@ -243,7 +244,7 @@ class SourceRootConfig(Subsystem):
 
     # Now add all fixed source roots.
     def gen_fixed_from_options(prefix):
-      for path, langs in (self.get_options()[prefix + '_roots'] or {}).items():
+      for path, langs in (self.get_options()['{}_roots'.format(prefix)] or {}).items():
         trie.add_fixed(path, langs)
 
     gen_fixed_from_options('source')
@@ -299,7 +300,7 @@ class SourceRootTrie(object):
   def find(self, path):
     """Find the source root for the given path."""
     keys = ['^'] + path.split(os.path.sep)
-    for i in range(0, len(keys)):
+    for i in range(len(keys)):
       # See if we have a match at position i.  We have such a match if following the path
       # segments into the trie, from the root, leads us to a leaf.
       node = self._root

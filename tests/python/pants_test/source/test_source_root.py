@@ -13,15 +13,15 @@ from pants_test.subsystem.subsystem_util import create_subsystem
 class SourceRootTest(BaseTest):
   def test_generate_source_root_patterns(self):
     def _do_test(langs=None,
-                 source_root_parents=None, source_roots=None,
-                 test_root_parents=None, test_roots=None,
+                 source_root_parents=None, source_root_patterns=None,
+                 test_root_parents=None, test_root_patterns=None,
                  expected=None):
       options = {
         'langs': langs or [],
         'source_root_parents': source_root_parents or [],
-        'source_root_patterns': source_roots or {},
+        'source_root_patterns': source_root_patterns or {},
         'test_root_parents': test_root_parents or [],
-        'test_root_patterns': test_roots or {},
+        'test_root_patterns': test_root_patterns or {},
       }
       source_root_config = create_subsystem(SourceRootConfig, **options)
       actual = dict(source_root_config.generate_source_root_pattern_mappings())
@@ -36,12 +36,12 @@ class SourceRootTest(BaseTest):
                'example/src/java': ('java',), 'example/src/python': ('python',)
              })
 
-    _do_test(source_roots={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
+    _do_test(source_root_patterns={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
              expected={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) })
 
     _do_test(langs=['java', 'python'],
              source_root_parents=['src', 'example/src'],
-             source_roots={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
+             source_root_patterns={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
              expected={
                'src/java': ('java',), 'src/python': ('python',),
                'example/src/java': ('java',), 'example/src/python': ('python',),
@@ -49,7 +49,7 @@ class SourceRootTest(BaseTest):
              })
 
     _do_test(langs=['java', 'python'], test_root_parents=['src', 'example/src'],
-             test_roots={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
+             test_root_patterns={ 'src/jvm': ('java', 'scala'), 'src/py': ('python',) },
              expected={
                'src/java': ('java',), 'src/python': ('python',),
                'example/src/java': ('java',), 'example/src/python': ('python',),
