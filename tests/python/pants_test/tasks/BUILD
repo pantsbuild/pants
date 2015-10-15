@@ -316,10 +316,9 @@ python_tests(
   sources = ['test_roots.py'],
   dependencies = [
     ':task_test_base',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:roots',
     'src/python/pants/base:build_environment',
-    'src/python/pants/build_graph',
+    'src/python/pants/source',
   ],
 )
 

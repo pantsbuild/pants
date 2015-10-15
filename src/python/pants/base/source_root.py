@@ -13,6 +13,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
+from pants.source.source_root import SourceRoots as NewSourceRoots
 
 
 class SourceRootTree(object):
