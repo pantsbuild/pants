@@ -30,6 +30,7 @@ from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import SubprocessExecutor
 from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
                                 touch)
 from pants.util.strutil import pluralize, safe_shlex_split
@@ -164,6 +165,8 @@ class _JUnitRunner(object):
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
 
+    self._executor = None
+
   def execute(self, targets):
     # We only run tests within java_tests/junit_tests targets.
     #
@@ -218,8 +221,11 @@ class _JUnitRunner(object):
 
     self._run_tests(tests_and_targets)
 
-  def terminate(self):
-    """Terminates the test run. (I don't know how to do this)"""
+  def kill(self):
+    """Kills the test run."""
+
+    if self._executor is not None:
+      self._executor.kill()
 
   def report(self, targets, tests, tests_failed_exception):
     """Post-processing of any test output.
@@ -351,7 +357,9 @@ class _JUnitRunner(object):
         with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
           self._context.log.debug('CWD = {}'.format(workdir))
           self._context.log.debug('platform = {}'.format(platform))
+          self._executor = SubprocessExecutor(distribution)
           result += abs(distribution.execute_java(
+            executor=self._executor,
             classpath=complete_classpath,
             main=JUnitRun._MAIN,
             jvm_options=self._task_exports.jvm_options + extra_jvm_options,
@@ -591,8 +599,11 @@ class Emma(_Coverage):
       for pattern in patterns:
         args.extend(['-filter', pattern])
       main = 'emma'
-      execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
+      distribution = self.preferred_jvm_distribution_for_targets(targets)
+      execute_java = distribution.execute_java
+      self._executor = SubprocessExecutor(distribution)
       result = execute_java(classpath=self._emma_classpath,
+                            executor=self._executor,
                             main=main,
                             jvm_options=self._coverage_jvm_options,
                             args=args,
@@ -641,8 +652,11 @@ class Emma(_Coverage):
                  '-Dreport.out.encoding=UTF-8'] + sorting)
 
     main = 'emma'
-    execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
+    distribution = self.preferred_jvm_distribution_for_targets(targets)
+    execute_java = distribution.execute_java
+    self._executor = SubprocessExecutor(distribution)
     result = execute_java(classpath=self._emma_classpath,
+                          executor=self._executor,
                           main=main,
                           jvm_options=self._coverage_jvm_options,
                           args=args,
@@ -742,8 +756,11 @@ class Cobertura(_Coverage):
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
         self._context.log.debug(
           "executing cobertura instrumentation with the following args: {}".format(args))
-        execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
+        distribution = self.preferred_jvm_distribution_for_targets(targets)
+        execute_java = distribution.execute_java
+        self._executor = SubprocessExecutor(distribution)
         result = execute_java(classpath=cobertura_cp,
+                              executor=self._executor,
                               main=main,
                               jvm_options=self._coverage_jvm_options,
                               args=args,
@@ -787,8 +804,11 @@ class Cobertura(_Coverage):
         report_format,
         ]
       main = 'net.sourceforge.cobertura.reporting.ReportMain'
-      execute_java = self.preferred_jvm_distribution_for_targets(targets).execute_java
+      distribution = self.preferred_jvm_distribution_for_targets(targets)
+      execute_java = distribution.execute_java
+      self._executor = SubprocessExecutor(distribution)
       result = execute_java(classpath=cobertura_cp,
+                            executor=self._executor,
                             main=main,
                             jvm_options=self._coverage_jvm_options,
                             args=args,
@@ -882,7 +902,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       raise TargetDefinitionException(target, msg)
 
   def _timeout_abort_handler(self):
-    self._runner.terminate()
+    self._runner.kill()
 
   def _execute(self, targets):
     self._runner.execute(targets)

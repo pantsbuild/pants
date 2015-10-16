@@ -113,6 +113,10 @@ class PytestRun(TestTaskMixin, PythonTask):
   def supports_passthru_args(cls):
     return True
 
+  def __init__(self, *args, **kwargs):
+    super(PytestRun, self).__init__(*args, **kwargs)
+    self._process = None
+
   def _test_target_filter(self):
     def target_filter(target):
       return isinstance(target, PythonTests)
@@ -518,7 +522,7 @@ class PytestRun(TestTaskMixin, PythonTask):
           return run_and_analyze(resultlog_path)
 
   def _timeout_abort_handler(self):
-    if getattr(self, '_process', None) is not None:
+    if self._process is not None:
       self._process.kill()
 
   def _pex_run(self, pex, workunit, args, setsid=False):
