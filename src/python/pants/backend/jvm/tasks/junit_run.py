@@ -218,6 +218,9 @@ class _JUnitRunner(object):
 
     self._run_tests(tests_and_targets)
 
+  def terminate(self):
+    """Terminates the test run. (I don't know how to do this)"""
+
   def report(self, targets, tests, tests_failed_exception):
     """Post-processing of any test output.
 
@@ -877,6 +880,9 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
       msg = 'JavaTests target must include a non-empty set of sources.'
       raise TargetDefinitionException(target, msg)
+
+  def _timeout_abort_handler(self):
+    self._runner.terminate()
 
   def _execute(self, targets):
     self._runner.execute(targets)
