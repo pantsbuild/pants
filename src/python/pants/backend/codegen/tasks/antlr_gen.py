@@ -36,10 +36,9 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
 
-  class AntlrIsolatedCodegenStrategy(SimpleCodegenTask.IsolatedCodegenStrategy):
-    def find_sources(self, target):
-      sources = super(AntlrGen.AntlrIsolatedCodegenStrategy, self).find_sources(target)
-      return [source for source in sources if source.endswith('.java')]
+  def find_sources(self, target, target_dirs):
+    sources = super(AntlrGen, self).find_sources(target, target_dirs)
+    return [source for source in sources if source.endswith('.java')]
 
   @classmethod
   def register_options(cls, register):
@@ -57,36 +56,35 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   def supported_strategy_types(cls):
     return [cls.AntlrIsolatedCodegenStrategy]
 
-  def execute_codegen(self, targets):
-    for target in targets:
-      args = ['-o', self.codegen_workdir(target)]
-      compiler = target.compiler
-      if compiler == 'antlr3':
-        if target.package is not None:
-          logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
-        java_main = 'org.antlr.Tool'
-      elif compiler == 'antlr4':
-        args.append('-visitor')  # Generate Parse Tree Visitor As Well
-        # Note that this assumes that there is no package set in the antlr file itself,
-        # which is considered an ANTLR best practice.
-        args.append('-package')
-        if target.package is None:
-          args.append(self._get_sources_package(target))
-        else:
-          args.append(target.package)
-        java_main = 'org.antlr.v4.Tool'
+  def execute_codegen(self, target, target_workdir):
+    args = ['-o', target_workdir]
+    compiler = target.compiler
+    if compiler == 'antlr3':
+      if target.package is not None:
+        logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
+      java_main = 'org.antlr.Tool'
+    elif compiler == 'antlr4':
+      args.append('-visitor')  # Generate Parse Tree Visitor As Well
+      # Note that this assumes that there is no package set in the antlr file itself,
+      # which is considered an ANTLR best practice.
+      args.append('-package')
+      if target.package is None:
+        args.append(self._get_sources_package(target))
+      else:
+        args.append(target.package)
+      java_main = 'org.antlr.v4.Tool'
 
-      antlr_classpath = self.tool_classpath(compiler)
-      sources = self._calculate_sources([target])
-      args.extend(sources)
-      result = self.runjava(classpath=antlr_classpath, main=java_main, args=args,
-                            workunit_name='antlr')
-      if result != 0:
-        raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
+    antlr_classpath = self.tool_classpath(compiler)
+    sources = self._calculate_sources([target])
+    args.extend(sources)
+    result = self.runjava(classpath=antlr_classpath, main=java_main, args=args,
+                          workunit_name='antlr')
+    if result != 0:
+      raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
 
-      if compiler == 'antlr3':
-        for source in list(self.codegen_strategy.find_sources(target)):
-          self._scrub_generated_timestamp(source)
+    if compiler == 'antlr3':
+      for source in list(self.codegen_strategy.find_sources(target)):
+        self._scrub_generated_timestamp(source)
 
   def synthetic_target_extra_dependencies(self, target):
     # Fetch the right java dependency from the target's compiler option
