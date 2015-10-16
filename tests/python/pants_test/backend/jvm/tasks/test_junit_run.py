@@ -110,7 +110,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           }
         """)
       )
-      mock_timeout.assert_called_with(1)
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (1,))
 
   def test_junit_runner_timeout_fail(self):
     """When we set a timeout and force a failure, fail."""
@@ -135,7 +136,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         )
 
       self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
-      mock_timeout.assert_called_with(1)
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (1,))
 
   def execute_junit_runner(self, content):
 
