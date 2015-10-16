@@ -39,10 +39,8 @@ class Timeout(object):
       self._timer = None
 
   def _handle_timeout(self):
-    sys.stderr.flush()  # Python 3 stderr is likely buffered.
     self._triggered = True
     self._abort_handler()
-    thread.interrupt_main()  # Raises KeyboardInterrupt.
 
   def __enter__(self):
     if self._timer is not None:
