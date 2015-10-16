@@ -43,11 +43,15 @@ class TestTaskMixin(object):
         self._validate_target(target)
 
       timeout = self._timeout_for_targets(test_targets)
+
       try:
-        with Timeout(timeout):
+        import time
+        start = time.time()
+        with Timeout(timeout, abort_handler=self._timeout_abort_handler):
           self._execute(all_targets)
       except TimeoutReached:
-        raise TestFailedTaskError(failed_targets=test_targets)
+        end = time.time()
+        raise TestFailedTaskError("Tests timed out after {:0.2f} seconds".format(end - start), failed_targets=test_targets)
 
   def _timeout_for_target(self, target):
     return getattr(target, 'timeout', None)
@@ -97,6 +101,12 @@ class TestTaskMixin(object):
 
     test_targets = list(filter(self._test_target_filter(), self._get_targets()))
     return test_targets
+
+  @abstractmethod
+  def _timeout_abort_handler(self):
+    """This gets called when the timeout is triggered to ensure that the child processes are all
+    immediately killed.
+    """
 
   @abstractmethod
   def _test_target_filter(self):

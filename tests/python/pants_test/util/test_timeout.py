@@ -36,6 +36,10 @@ class TestTimeout(unittest.TestCase):
   def setUp(self):
     super(TestTimeout, self).setUp()
     self._fake_timer = None
+    self._aborted = False
+
+  def _abort_handler(self):
+    self._aborted = True
 
   def _make_fake_timer(self, seconds, handler):
     self._fake_timer = FakeTimer(seconds, handler)
@@ -46,18 +50,26 @@ class TestTimeout(unittest.TestCase):
       self._fake_timer.move_clock_forward(seconds)
 
   def test_timeout_success(self):
-    with Timeout(2, threading_timer=self._make_fake_timer):
+    with Timeout(2, threading_timer=self._make_fake_timer, abort_handler=self._abort_handler):
       self._move_clock_forward(1)
+
+    self.assertFalse(self._aborted)
 
   def test_timeout_failure(self):
     with self.assertRaises(TimeoutReached):
-      with Timeout(2, threading_timer=self._make_fake_timer):
+      with Timeout(2, threading_timer=self._make_fake_timer, abort_handler=self._abort_handler):
         self._move_clock_forward(3)
 
+    self.assertTrue(self._aborted)
+
   def test_timeout_none(self):
-    with Timeout(None, threading_timer=self._make_fake_timer):
+    with Timeout(None, threading_timer=self._make_fake_timer, abort_handler=self._abort_handler):
       self._move_clock_forward(3)
 
+    self.assertFalse(self._aborted)
+
   def test_timeout_zero(self):
-    with Timeout(0, threading_timer=self._make_fake_timer):
+    with Timeout(0, threading_timer=self._make_fake_timer, abort_handler=self._abort_handler):
       self._move_clock_forward(3)
+
+    self.assertFalse(self._aborted)

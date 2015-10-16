@@ -517,12 +517,16 @@ class PytestRun(TestTaskMixin, PythonTask):
           args.insert(0, '--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
+  def _timeout_abort_handler(self):
+    if getattr(self, '_process', None) is not None:
+      self._process.kill()
+
   def _pex_run(self, pex, workunit, args, setsid=False):
     # NB: We don't use pex.run(...) here since it makes a point of running in a clean environment,
     # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
     # task.
-    process = subprocess.Popen(pex.cmdline(args),
+    self._process = subprocess.Popen(pex.cmdline(args),
                                preexec_fn=os.setsid if setsid else None,
                                stdout=workunit.output('stdout'),
                                stderr=workunit.output('stderr'))
-    return process.wait()
+    return self._process.wait()
