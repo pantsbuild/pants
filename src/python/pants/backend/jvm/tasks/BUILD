@@ -125,6 +125,8 @@ python_library(
   sources = ['classpath_util.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -235,8 +237,6 @@ python_library(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:ossrh_publication_metadata',
-    'src/python/pants/base:address',
-    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:exceptions',
@@ -261,10 +261,11 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    ':classpath_util',
     ':nailgun_task',
     'src/python/pants/backend/jvm/subsystems:jar_tool',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_environment',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/java/jar:manifest',
@@ -289,6 +290,7 @@ python_library(
   sources = ['junit_run.py'],
   dependencies = [
     '3rdparty/python:six',
+    ':classpath_util',
     ':jvm_task',
     ':jvm_tool_task_mixin',
     'src/python/pants/backend/core/tasks:task',
@@ -327,12 +329,15 @@ python_library(
   sources = ['jvm_dependency_analyzer.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':classpath_util',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
+    'src/python/pants/java/distribution',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
   ]
 )
 
@@ -359,6 +364,7 @@ python_library(
   name = 'jvm_dependency_usage',
   sources = ['jvm_dependency_usage.py'],
   dependencies = [
+    ':classpath_util',
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
@@ -470,9 +476,9 @@ python_library(
   name = 'resources_task',
   sources = ['resources_task.py'],
   dependencies = [
+    ':classpath_products',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:build_environment',
-    'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/util:dirutil',
   ],

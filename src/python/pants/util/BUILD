@@ -67,3 +67,8 @@ python_library(
   name = 'xml_parser',
   sources = ['xml_parser.py'],
 )
+
+python_library(
+  name = 'timeout',
+  sources = ['timeout.py'],
+)

@@ -17,6 +17,7 @@ from twitter.common.collections import maybe_list
 from pants.backend.jvm.subsystems.jar_tool import JarTool
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import safe_args
@@ -340,8 +341,7 @@ class JarBuilderTask(JarTask):
       Later, in execute context, the `create_jar_builder` method can be called to get back a
       prepared ``JarTask.JarBuilder`` ready for use.
       """
-      round_manager.require_data('resources_by_target')
-      round_manager.require_data('classes_by_target')
+      round_manager.require_data('runtime_classpath')
 
     def __init__(self, context, jar):
       self._context = context
@@ -354,52 +354,57 @@ class JarBuilderTask(JarTask):
       :param target: The target to add generated classes and resources for.
       :param bool recursive: `True` to add classes and resources for the target's transitive
         internal dependency closure.
-      :returns: The list of targets that actually contributed classes or resources or both to the
-        jar.
+      :returns: `True` if the target contributed any files - manifest entries, classfiles or
+        resource files - to this jar.
+      :rtype: bool
       """
-      classes_by_target = self._context.products.get_data('classes_by_target')
-      resources_by_target = self._context.products.get_data('resources_by_target')
+      products_added = False
 
-      targets_added = []
+      classpath_products = self._context.products.get_data('runtime_classpath')
 
-      def add_to_jar(tgt):
-        target_classes = classes_by_target.get(tgt)
-
-        target_resources = []
-
-        # TODO(pl): https://github.com/pantsbuild/pants/issues/206
-        resource_products_on_target = resources_by_target.get(tgt)
-        if resource_products_on_target:
-          target_resources.append(resource_products_on_target)
-
-        if tgt.has_resources:
-          target_resources.extend(resources_by_target.get(r) for r in tgt.resources)
-
-        if target_classes or target_resources:
-          targets_added.append(tgt)
-
-          def add_products(target_products):
-            if target_products:
-              for root, products in target_products.rel_paths():
-                for prod in products:
-                  self._jar.write(os.path.join(root, prod), prod)
-
-          add_products(target_classes)
-          for resources_target in target_resources:
-            add_products(resources_target)
-
-          if isinstance(tgt, JavaAgent):
-            self._add_agent_manifest(tgt, self._manifest)
+      # TODO(John Sirois): Manifest handling is broken.  We should be tracking state and failing
+      # fast if any duplicate entries are added; ie: if we get a second binary or a second agent.
 
       if isinstance(target, JvmBinary):
         self._add_manifest_entries(target, self._manifest)
+        products_added = True
+      elif isinstance(target, JavaAgent):
+        self._add_agent_manifest(target, self._manifest)
+        products_added = True
+      elif recursive:
+        agents = [t for t in target.closure() if isinstance(t, JavaAgent)]
+        if len(agents) > 1:
+          raise TaskError('Only 1 agent can be added to a jar, found {} for {}:\n\t{}'
+                          .format(len(agents),
+                                  target.address.reference(),
+                                  '\n\t'.join(agent.address.reference() for agent in agents)))
+        elif agents:
+          self._add_agent_manifest(agents[0], self._manifest)
+          products_added = True
 
-      if recursive:
-        target.walk(add_to_jar)
-      else:
-        add_to_jar(target)
+      # In the transitive case we'll gather internal resources naturally as dependencies, but in the
+      # non-transitive case we need to manually add these special (in the context of jarring)
+      # dependencies.
+      targets = [target]
+      if not recursive and target.has_resources:
+        targets += target.resources
+      # We only gather internal classpath elements per our contract.
+      target_classpath = ClasspathUtil.internal_classpath(targets,
+                                                          classpath_products,
+                                                          transitive=recursive)
+      for entry in target_classpath:
+        if ClasspathUtil.is_jar(entry):
+          self._jar.writejar(entry)
+          products_added = True
+        elif ClasspathUtil.is_dir(entry):
+          for rel_file in ClasspathUtil.classpath_entries_contents([entry]):
+            self._jar.write(os.path.join(entry, rel_file), rel_file)
+            products_added = True
+        else:
+          # non-jar and non-directory classpath entries should be ignored
+          pass
 
-      return targets_added
+      return products_added
 
     def commit_manifest(self, jar):
       """Updates the manifest in the jar being written to.

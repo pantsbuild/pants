@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.base.address import Address
+from pants.build_graph.address import Address
 from pants.engine.exp import parsers
 from pants.engine.exp.objects import Serializable
 from pants.util.memo import memoized_method, memoized_property
@@ -30,7 +30,7 @@ class AddressMap(object):
   """Maps addressable Serializable objects from a byte source."""
 
   @classmethod
-  def parse(cls, path, parse=None):
+  def parse(cls, path, parser=None):
     """Parses a source for addressable Serializable objects.
 
     By default an enhanced JSON parser is used.  The parser admits extra blank lines, comment lines
@@ -42,24 +42,28 @@ class AddressMap(object):
     source are left as unresolved pointers.
 
     :param string path: The path to the byte source containing serialized objects.
-    :param parse: The parse function to use; by default a json parser.
-    :type parse: :class:`collection.Callable` that accepts a byte source and returns a list of all
-                 addressable Serializable objects parsed from it.
+    :param parser: The parser to use; by default a json parser.
+    :type parser: :class:`collection.Callable` that accepts a file path and returns a list of all
+                  addressable Serializable objects parsed from it.
     """
-    parse = parse or parsers.parse_json
-    with open(path, 'r') as fp:
-      objects = parse(fp.read())
-      objects_by_name = {}
-      for obj in objects:
-        if not Serializable.is_serializable(obj) or not obj._asdict().get('name'):
-          raise UnaddressableObjectError('Parsed a non-addressable object: {!r}'.format(obj))
-        attributes = obj._asdict()
-        name = attributes['name']
-        if name in objects_by_name:
-          raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
-                                   'map {!r}'.format(path, name, objects_by_name[name], obj))
-        objects_by_name[name] = obj
-      return cls(path, objects_by_name)
+    parse = parser or parsers.parse_json
+    objects = parse(path)
+    objects_by_name = {}
+    for obj in objects:
+      if not Serializable.is_serializable(obj):
+        raise UnaddressableObjectError('Parsed a non-serializable object: {!r}'.format(obj))
+      attributes = obj._asdict()
+
+      name = attributes.get('name')
+      if not name:
+        raise UnaddressableObjectError('Parsed a non-addressable object: {!r}'.format(obj))
+
+      if name in objects_by_name:
+        raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
+                                 'map {!r}'.format(path, name, objects_by_name[name], obj))
+
+      objects_by_name[name] = obj
+    return cls(path, objects_by_name)
 
   def __init__(self, path, objects_by_name):
     """Not intended for direct use, instead see `parse`."""
@@ -160,7 +164,7 @@ class AddressFamily(object):
   def addressables(self):
     """Return a mapping from address to thin addressable objects in this namespace.
 
-    :rtype: dict from :class:`pants.base.address.Address` to thin addressable objects.
+    :rtype: dict from :class:`pants.build_graph.address.Address` to thin addressable objects.
     """
     return {Address(spec_path=self._namespace, target_name=name): obj
             for name, obj in self._objects_by_name.items()}
@@ -203,7 +207,7 @@ class AddressMapper(object):
     self._parser = parser
 
   def _find_build_files(self, dir_path):
-    abs_dir_path = os.path.realpath(os.path.join(self._build_root, dir_path))
+    abs_dir_path = os.path.join(self._build_root, dir_path)
     if not os.path.isdir(abs_dir_path):
       raise ResolveError('Expected {} to be a directory containing build files.'.format(dir_path))
     for f in os.listdir(abs_dir_path):
@@ -212,9 +216,13 @@ class AddressMapper(object):
         if os.path.isfile(abs_build_file):
           yield abs_build_file
 
+  @staticmethod
+  def _normalize_parse_path(path):
+    return os.path.realpath(path)
+
   @memoized_method
   def _parse(self, path):
-    return AddressMap.parse(path, parse=self._parser)
+    return AddressMap.parse(path, parser=self._parser)
 
   @memoized_method
   def family(self, namespace):
@@ -225,18 +233,23 @@ class AddressMapper(object):
     :rtype: :class:`AddressFamily`
     :raises: :class:`ResolveError` if the address family could not be found.
     """
-    address_maps = []
-    for path in self._find_build_files(namespace):
-      address_maps.append(self._parse(path))
-    if not address_maps:
+    family = self._maybe_family(namespace)
+    if not family:
       raise ResolveError('No addresses registered in namespace {}'.format(namespace))
-    return AddressFamily.create(self._build_root, address_maps)
+    return family
+
+  def _maybe_family(self, namespace):
+    build_files = list(self._find_build_files(namespace))
+    return self._family(build_files) if build_files else None
+
+  def _family(self, build_files):
+    return AddressFamily.create(self._build_root, [self._parse(bf) for bf in build_files])
 
   def resolve(self, address):
     """Resolve the given address to a named Serializable object.
 
     :param address: The address to resolve to an named Serializable object.
-    :type address: :class:`pants.base.address.Address`
+    :type address: :class:`pants.build_graph.address.Address`
     :returns: The resolved object.
     :raises: :class:`ResolveError` if the object could not be resolved.
     """
@@ -259,6 +272,33 @@ class AddressMapper(object):
     # considering concurrency implications of a seperate thread calling invalidate while other
     # threads access the cache.
     path = path if os.path.isabs(path) else os.path.join(self._build_root, path)
-    self._parse.forget(self, path)
-    namespace = os.path.relpath(os.path.dirname(path), self._build_root)
+    normalized_path = self._normalize_parse_path(path)
+
+    self._parse.forget(self, normalized_path)
+    namespace = os.path.relpath(os.path.dirname(normalized_path), self._build_root)
     self.family.forget(self, namespace)
+
+  def walk_addressables(self, rel_path=None, path_excludes=None):
+    """Return an iterator over all addressable objects found under `rel_path`.
+
+    :param string rel_path: The path relative to the build root to scan beneath; '' by default,
+                            meaning the whole build root will be scanned.
+    :param path_excludes: Directory paths relative to the build root to exclude from the scan.
+    :type path_excludes: list of string
+    :returns: An iterator of (address, addressable object).
+    :rtype: tuple of (:class:`pants.base.address.Address`, object)
+    """
+    path_excludes = [os.path.join(self._build_root, p) for p in (path_excludes or ())]
+    map_root = os.path.join(self._build_root, rel_path or '')
+
+    for root, dirs, files in os.walk(map_root):
+      if path_excludes:
+        for index, directory in enumerate(dirs):
+          dir_path = os.path.join(root, directory)
+          if dir_path in path_excludes:
+            del dirs[index]
+            break
+      build_files = [os.path.join(root, f) for f in files if self._build_pattern.match(f)]
+      if build_files:
+        for item in self._family(build_files).addressables.items():
+          yield item

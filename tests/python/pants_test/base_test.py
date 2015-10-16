@@ -5,19 +5,19 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
 import unittest
 from collections import defaultdict
-from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.base.address import Address
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -25,10 +25,9 @@ from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target
 from pants.goal.goal import Goal
-from pants.goal.products import MultipleRootedProducts, UnionProducts
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
+from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context
 from pants_test.option.util.fakes import create_options_for_optionables
 
@@ -149,6 +148,10 @@ class BaseTest(unittest.TestCase):
       'cache_key_gen_version': '0-test',
     }
 
+    # Many tests need source root functionality, so might as well always set it up.
+    self.options['source'] = {
+    }
+
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)
 
@@ -181,10 +184,11 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None, console_outstream=None,
-              workspace=None, for_subsystems=None):
+  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
+              console_outstream=None, workspace=None, for_subsystems=None):
 
-    optionables = set()
+    # Many tests need source root functionality, so might as well always set it up.
+    optionables = {SourceRootConfig}
     extra_scopes = set()
 
     for_subsystems = for_subsystems or ()
@@ -211,11 +215,11 @@ class BaseTest(unittest.TestCase):
       scoped_opts = options.setdefault(s, {})
       scoped_opts.update(opts)
 
-    option_values = create_options_for_optionables(optionables,
-                                                   extra_scopes=extra_scopes,
-                                                   options=options)
-
-    context = create_context(options=option_values,
+    options = create_options_for_optionables(optionables,
+                                             extra_scopes=extra_scopes,
+                                             options=options)
+    Subsystem._options = options
+    context = create_context(options=options,
                              passthru_args=passthru_args,
                              target_roots=target_roots,
                              build_graph=self.build_graph,
@@ -223,7 +227,6 @@ class BaseTest(unittest.TestCase):
                              address_mapper=self.address_mapper,
                              console_outstream=console_outstream,
                              workspace=workspace)
-    Subsystem._options = context.options
     return context
 
   def tearDown(self):
@@ -308,49 +311,11 @@ class BaseTest(unittest.TestCase):
   def create_resources(self, path, name, *sources):
     return self.create_library(path, 'resources', name, sources)
 
-  @contextmanager
-  def workspace(self, *buildfiles):
-    with temporary_dir() as root_dir:
-      with BuildRoot().temporary(root_dir):
-        with pushd(root_dir):
-          for buildfile in buildfiles:
-            touch(os.path.join(root_dir, buildfile))
-          yield os.path.realpath(root_dir)
+  def assertUnorderedPrefixEqual(self, expected, actual_iter):
+    """Consumes len(expected) items from the given iter, and asserts that they match, unordered."""
+    actual = list(itertools.islice(actual_iter, len(expected)))
+    self.assertEqual(sorted(expected), sorted(actual))
 
-  def populate_compile_classpath(self, context, classpath=None):
-    """
-    Helps actual test cases to populate the 'compile_classpath' products data mapping
-    in the context, which holds the classpath value for targets.
-
-    :param context: The execution context where the products data mapping lives.
-    :param classpath: a list of classpath strings. If not specified,
-                      [os.path.join(self.buildroot, 'none')] will be used.
-    """
-    classpath = classpath or [os.path.join(self.build_root, 'none')]
-    compile_classpaths = context.products.get_data('compile_classpath', lambda: UnionProducts())
-    compile_classpaths.add_for_targets(context.targets(),
-                                       [('default', entry) for entry in classpath])
-
-  @contextmanager
-  def add_data(self, context_products, data_type, target, *products):
-    make_products = lambda: defaultdict(MultipleRootedProducts)
-    data_by_target = context_products.get_data(data_type, make_products)
-    with temporary_dir() as outdir:
-      def create_product(product):
-        abspath = os.path.join(outdir, product)
-        with safe_open(abspath, mode='w') as fp:
-          fp.write(product)
-        return abspath
-      data_by_target[target].add_abs_paths(outdir, map(create_product, products))
-      yield temporary_dir
-
-  @contextmanager
-  def add_products(self, context_products, product_type, target, *products):
-    product_mapping = context_products.get(product_type)
-    with temporary_dir() as outdir:
-      def create_product(product):
-        with safe_open(os.path.join(outdir, product), mode='w') as fp:
-          fp.write(product)
-        return product
-      product_mapping.add(target, outdir, map(create_product, products))
-      yield temporary_dir
+  def assertPrefixEqual(self, expected, actual_iter):
+    """Consumes len(expected) items from the given iter, and asserts that they match, in order."""
+    self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))

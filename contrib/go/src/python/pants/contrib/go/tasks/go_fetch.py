@@ -10,9 +10,9 @@ import os
 import shutil
 from collections import defaultdict
 
-from pants.base.address import Address
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property

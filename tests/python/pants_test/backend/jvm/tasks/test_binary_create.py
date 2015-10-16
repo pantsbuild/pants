@@ -36,23 +36,24 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
                                             conf='default',
                                             resolved_jars=[jar_artifact])
 
-    with self.add_data(context.products, 'classes_by_target', binary_target, 'Bar.class'):
-      with self.add_data(context.products, 'resources_by_target', binary_target, 'bar.txt'):
-        self.execute(context)
-        jvm_binary_products = context.products.get('jvm_binaries')
-        self.assertIsNotNone(jvm_binary_products)
-        product_data = jvm_binary_products.get(binary_target)
-        dist_root = os.path.join(self.build_root, 'dist')
-        self.assertEquals({dist_root: ['bar-binary.jar']}, product_data)
+    self.add_to_runtime_classpath(context, binary_target, {'Bar.class': '', 'bar.txt': ''})
 
-        with open_zip(os.path.join(dist_root, 'bar-binary.jar')) as jar:
-          self.assertEqual(sorted(['META-INF/',
-                                   'META-INF/MANIFEST.MF',
-                                   'foo/',
-                                   'foo/Foo.class',
-                                   'Bar.class',
-                                   'bar.txt']),
-                           sorted(jar.namelist()))
+    self.execute(context)
+
+    jvm_binary_products = context.products.get('jvm_binaries')
+    self.assertIsNotNone(jvm_binary_products)
+    product_data = jvm_binary_products.get(binary_target)
+    dist_root = os.path.join(self.build_root, 'dist')
+    self.assertEquals({dist_root: ['bar-binary.jar']}, product_data)
+
+    with open_zip(os.path.join(dist_root, 'bar-binary.jar')) as jar:
+      self.assertEqual(sorted(['META-INF/',
+                               'META-INF/MANIFEST.MF',
+                               'foo/',
+                               'foo/Foo.class',
+                               'Bar.class',
+                               'bar.txt']),
+                       sorted(jar.namelist()))
 
   def test_jvm_binaries_deploy_excludes(self):
     foo_jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
@@ -79,20 +80,20 @@ class TestBinaryCreate(JvmBinaryTaskTestBase):
                                             conf='default',
                                             resolved_jars=[foo_artifact, baz_artifact])
 
-    with self.add_data(context.products, 'classes_by_target', binary_target, 'Bar.class'):
-      with self.add_data(context.products, 'resources_by_target', binary_target, 'bar.txt'):
-        self.execute(context)
-        jvm_binary_products = context.products.get('jvm_binaries')
-        self.assertIsNotNone(jvm_binary_products)
-        product_data = jvm_binary_products.get(binary_target)
-        dist_root = os.path.join(self.build_root, 'dist')
-        self.assertEquals({dist_root: ['bar-binary.jar']}, product_data)
+    self.add_to_runtime_classpath(context, binary_target, {'Bar.class': '', 'bar.txt': ''})
 
-        with open_zip(os.path.join(dist_root, 'bar-binary.jar')) as jar:
-          self.assertEqual(sorted(['META-INF/',
-                                   'META-INF/MANIFEST.MF',
-                                   'foo/',
-                                   'foo/Foo.class',
-                                   'Bar.class',
-                                   'bar.txt']),
-                           sorted(jar.namelist()))
+    self.execute(context)
+    jvm_binary_products = context.products.get('jvm_binaries')
+    self.assertIsNotNone(jvm_binary_products)
+    product_data = jvm_binary_products.get(binary_target)
+    dist_root = os.path.join(self.build_root, 'dist')
+    self.assertEquals({dist_root: ['bar-binary.jar']}, product_data)
+
+    with open_zip(os.path.join(dist_root, 'bar-binary.jar')) as jar:
+      self.assertEqual(sorted(['META-INF/',
+                               'META-INF/MANIFEST.MF',
+                               'foo/',
+                               'foo/Foo.class',
+                               'Bar.class',
+                               'bar.txt']),
+                       sorted(jar.namelist()))

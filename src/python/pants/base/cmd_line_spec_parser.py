@@ -14,9 +14,9 @@ from collections import defaultdict
 import six
 from twitter.common.collections import OrderedSet, maybe_list
 
-from pants.base.address import Address, parse_spec
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file import BuildFile
+from pants.build_graph.address import Address, parse_spec
+from pants.build_graph.address_lookup_error import AddressLookupError
 
 
 logger = logging.getLogger(__name__)

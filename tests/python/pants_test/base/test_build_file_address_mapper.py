@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.base.address import Address, BuildFileAddress
-from pants.base.address_lookup_error import AddressLookupError
+from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
@@ -49,15 +49,27 @@ class BuildFileAddressMapperTest(BaseTest):
     self.assertEquals({BuildFileAddress(root_build_file, 'foo'),
                        BuildFileAddress(subdir_build_file, 'bar'),
                        BuildFileAddress(subdir_suffix_build_file, 'baz')},
-                      self.address_mapper.scan_addresses(root=self.build_root))
+                      self.address_mapper.scan_addresses())
 
   def test_scan_addresses_with_excludes(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
     self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
     spec_excludes = [os.path.join(self.build_root, 'subdir')]
     self.assertEquals({BuildFileAddress(root_build_file, 'foo')},
-                      self.address_mapper.scan_addresses(root=self.build_root,
-                                                         spec_excludes=spec_excludes))
+                      self.address_mapper.scan_addresses(spec_excludes=spec_excludes))
+
+  def test_scan_addresses_with_root(self):
+    self.add_to_build_file('BUILD', 'target(name="foo")')
+    subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
+    subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
+    subdir = os.path.join(self.build_root, 'subdir')
+    self.assertEquals({BuildFileAddress(subdir_build_file, 'bar'),
+                       BuildFileAddress(subdir_suffix_build_file, 'baz')},
+                      self.address_mapper.scan_addresses(root=subdir))
+
+  def test_scan_addresses_with_invalid_root(self):
+    with self.assertRaises(BuildFileAddressMapper.InvalidRootError):
+      self.address_mapper.scan_addresses(root='subdir')
 
   def test_raises_invalid_build_file_reference(self):
     # reference a BUILD file that doesn't exist

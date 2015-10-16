@@ -13,6 +13,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
+from pants.source.source_root import SourceRoots as NewSourceRoots
 
 
 class SourceRootTree(object):
@@ -250,16 +251,6 @@ class SourceRoot(object):
       path = SourceRoot._relative_to_buildroot(path)
     found_source_root, _ = cls._SOURCE_ROOT_TREE.get_root_and_types(path)
     return found_source_root
-
-  @classmethod
-  def find_siblings_by_path(cls, path):
-    """
-    :param path: path containing source
-    :return: all source root siblings for this path
-    """
-    if os.path.isabs(path):
-      path = SourceRoot._relative_to_buildroot(path)
-    return cls._SOURCE_ROOT_TREE.get_root_siblings(path)
 
   @classmethod
   def types(cls, root):

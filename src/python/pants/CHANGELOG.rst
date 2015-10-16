@@ -1,6 +1,139 @@
 RELEASE HISTORY
 ===============
 
+0.0.53 (10/9/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+Due to the hotfix release on Wednesday, this is a fairly light release. But because it addresses two potential correctness issues related to JVM tooling, it is well worth picking up!
+
+API Changes
+~~~~~~~~~~~
+
+* Move address.py/address_lookup_error.py from base to build_graph
+  `RB #2954 <https://rbcommons.com/s/twitter/r/2954>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add native timeouts to python and junit tests
+  `RB #2919 <https://rbcommons.com/s/twitter/r/2919>`_
+
+* Be more conservative about caching incremental JVM compiles
+  `RB #2940 <https://rbcommons.com/s/twitter/r/2940>`_
+
+Bugfixes
+~~~~~~~~
+
+* Restore deep jvm-tool fingerprinting
+  `RB #2955 <https://rbcommons.com/s/twitter/r/2955>`_
+
+* Handle AccessDenied exception in more cases for daemon process scanning
+  `RB #2951 <https://rbcommons.com/s/twitter/r/2951>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade to pex 1.1.0
+  `RB #2956 <https://rbcommons.com/s/twitter/r/2956>`_
+
+* [exp] Support for scanning addresses, implement `list`
+  `RB #2952 <https://rbcommons.com/s/twitter/r/2952>`_
+
+* [exp] Optimize python parsers
+  `RB #2947 <https://rbcommons.com/s/twitter/r/2947>`_
+
+* [exp] Switch from 'typename' to 'type_alias'.
+  `RB #2945 <https://rbcommons.com/s/twitter/r/2945>`_
+
+* [exp] Support a non-inlined lazy resolve mode in Graph.
+  `RB #2944 <https://rbcommons.com/s/twitter/r/2944>`_
+
+* Emit a nice error message if the compiler used to bootstrap pants isn't functional
+  `RB #2949 <https://rbcommons.com/s/twitter/r/2949>`_
+
+* Eliminate travis-ci cache thrash.
+  `RB #2957 <https://rbcommons.com/s/twitter/r/2957>`_
+
+
+0.0.52 (10/7/2015)
+------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release that unpins pants own six requirement from `==1.9` to `>=1.9,<2` to allow
+folks depending on pantsbuild sdists in their own pants built/tested code to successfully resolve
+six.  The underlying issue is yet to be fixed, but is tracked
+`here <https://github.com/pantsbuild/pex/issues/167>`_.
+
+API Changes
+~~~~~~~~~~~
+
+* Bump the default ivy bootstrap jar to 2.4.0.
+  `RB #2938 <https://rbcommons.com/s/twitter/r/2938>`_
+
+* Remove the classes_by_target and resources_by_target products
+  `RB #2928 <https://rbcommons.com/s/twitter/r/2928>`_
+
+Bugfixes
+~~~~~~~~
+
+* Allow six to float a bit.
+  `RB #2942 <https://rbcommons.com/s/twitter/r/2942>`_
+
+* Add the include and exclude patterns to the payload so they will make it into the fingerprint
+  `RB #2927 <https://rbcommons.com/s/twitter/r/2927>`_
+
+* Ensure GOPATH is always controlled by pants.
+  `RB #2933 <https://rbcommons.com/s/twitter/r/2933>`_
+
+* Stopped ivy from failing if an artifact has a url specified.
+  `RB #2905 <https://rbcommons.com/s/twitter/r/2905>`_
+
+* Test-cases that passed are now properly omitted the junit summary.
+  `RB #2916 <https://rbcommons.com/s/twitter/r/2916>`_
+  `RB #2930 <https://rbcommons.com/s/twitter/r/2930>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Kill the checkstyle jvm tool override in pants.ini.
+  `RB #2941 <https://rbcommons.com/s/twitter/r/2941>`_
+
+* Only request the `classes_by_source` product if it is necessary
+  `RB #2939 <https://rbcommons.com/s/twitter/r/2939>`_
+
+* Fixup android local resolvers.
+  `RB #2934 <https://rbcommons.com/s/twitter/r/2934>`_
+
+* Simplify cobertura source paths for reporting
+  `RB #2918 <https://rbcommons.com/s/twitter/r/2918>`_
+
+* Upgrade the default Go distribution to 1.5.1.
+  `RB #2936 <https://rbcommons.com/s/twitter/r/2936>`_
+
+* Normalize AddressMapper paths for parse/forget.
+  `RB #2935 <https://rbcommons.com/s/twitter/r/2935>`_
+
+* Create test task mixin
+  `RB #2902 <https://rbcommons.com/s/twitter/r/2902>`_
+
+* Make sure tests/python/pants_test:all runs all the tests
+  `RB #2932 <https://rbcommons.com/s/twitter/r/2932>`_
+
+* Seperate out AddressMapper from Graph.
+  `RB #2931 <https://rbcommons.com/s/twitter/r/2931>`_
+
+* Add timeout configuration to Pinger and add unittest.
+  `RB #2912 <https://rbcommons.com/s/twitter/r/2912>`_
+
+* Adding Node examples
+  `RB #2900 <https://rbcommons.com/s/twitter/r/2900>`_
+
+
 0.0.51 (10/2/2015)
 ------------------
 

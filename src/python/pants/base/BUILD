@@ -5,14 +5,18 @@ python_library(
   name = 'address',
   sources = ['address.py'],
   dependencies = [
-    ':build_file',
-    'src/python/pants/util:meta',
+    ':deprecated',
+    'src/python/pants/build_graph'
   ]
 )
 
 python_library(
   name = 'address_lookup_error',
   sources = ['address_lookup_error.py'],
+  dependencies = [
+    ':deprecated',
+    'src/python/pants/build_graph'
+  ]
 )
 
 python_library(
@@ -71,14 +75,6 @@ python_library(
   dependencies = [
     'src/python/pants/util:meta',
   ],
-)
-
-python_library(
-  name = 'dep_lookup_error',
-  dependencies = [
-    ':address_lookup_error',
-  ],
-  sources = ['dep_lookup_error.py'],
 )
 
 python_library(
@@ -184,6 +180,9 @@ python_library(
     ':exceptions',
     ':parse_context',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    # TEMPORARY dep during migration to new source roots mechanism.
+    # I've verified that this does not introduce a circular dep.
+    'src/python/pants/source',
   ],
 )
 

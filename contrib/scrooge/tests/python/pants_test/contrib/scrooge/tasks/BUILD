@@ -30,7 +30,6 @@ python_tests(
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:scrooge_gen',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',

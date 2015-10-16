@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from abc import abstractproperty
 from textwrap import dedent
 
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.source_root import SourceRoot
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.meta import AbstractClass
 from pants_test.base_test import BaseTest
 

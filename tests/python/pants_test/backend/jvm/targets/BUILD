@@ -27,8 +27,8 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/core:wrapped_globs',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:address',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )

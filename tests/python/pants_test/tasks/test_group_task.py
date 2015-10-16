@@ -118,9 +118,9 @@ class BaseGroupTaskTest(BaseTest):
 
     self.recorded_actions = []
     # NB: GroupTask has a cache of tasks by name... use a distinct name
-    self.group_task = GroupTask.named('jvm-compile-%s' % uuid.uuid4().hex,
-                                      ['classes_by_target', 'classes_by_source'],
-                                      ['test'])
+    self.group_task = GroupTask.named(name='jvm-compile-{}'.format(uuid.uuid4().hex),
+                                      product_type=['runtime_classpath'],
+                                      flag_namespace=['test'])
 
     javac = self.group_member(name='javac', selector=lambda t: isinstance(t, self.JavaLibrary))
     self.group_task.add_member(javac)
@@ -130,23 +130,10 @@ class BaseGroupTaskTest(BaseTest):
 
     self._context = self.context(target_roots=self.create_targets(),
                                  for_task_types=[self.group_task])
-    self.populate_compile_classpath(self._context)
     self.group_task._prepare(self.options, round_manager=RoundManager(self._context))
-
 
     self.task = self.group_task(self._context, workdir='/not/real')
     self.task.execute()
-
-  def assertUnorderedPrefixEqual(self, expected, actual_iter):
-    """The ordering of the execution of some of these items isn't guaranteed.
-
-    https://groups.google.com/d/msg/pants-devel/Rer9_ytsyf8/gi8zokWNexYJ
-    """
-    actual = list(itertools.islice(actual_iter, len(expected)))
-    self.assertEqual(sorted(expected), sorted(actual))
-
-  def assertPrefixEqual(self, expected, actual_iter):
-    self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
 
   def prepare_action(self, tag):
     return 'prepare', tag, self._context

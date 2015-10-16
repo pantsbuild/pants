@@ -89,8 +89,8 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_fetch',
-    'src/python/pants/base:address',
     'src/python/pants/base:source_root',
+    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]

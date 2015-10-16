@@ -68,7 +68,7 @@ class Checkstyle(NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(Checkstyle, cls).prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data('runtime_classpath')
 
   def _is_checked(self, target):
     return target.has_sources(self._JAVA_SOURCE_EXTENSION) and not target.is_synthetic
@@ -98,10 +98,10 @@ class Checkstyle(NailgunTask):
     return sources
 
   def checkstyle(self, targets, sources):
-    compile_classpaths = self.context.products.get_data('compile_classpath')
-    compile_classpath = compile_classpaths.get_for_targets(targets)
+    runtime_classpaths = self.context.products.get_data('runtime_classpath')
+    runtime_classpath = runtime_classpaths.get_for_targets(targets)
     union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
-    union_classpath.update(jar for conf, jar in compile_classpath if conf in self.get_options().confs)
+    union_classpath.update(jar for conf, jar in runtime_classpath if conf in self.get_options().confs)
 
     args = [
       '-c', self.get_options().configuration,

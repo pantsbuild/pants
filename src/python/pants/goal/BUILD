@@ -40,6 +40,7 @@ python_library(
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/process',
     'src/python/pants/reporting:report',
+    'src/python/pants/source',
   ],
 )
 

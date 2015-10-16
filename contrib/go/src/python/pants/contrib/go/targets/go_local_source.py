@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.wrapped_globs import Globs
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
+from pants.build_graph.address import Address
 
 from pants.contrib.go.targets.go_target import GoTarget
 
@@ -29,7 +29,7 @@ class GoLocalSource(GoTarget):
 
     :param string source_root: The path of the source root the address is found within.
     :param address: The target address of a GoLocalSource target.
-    :type: :class:`pants.base.address.Address`
+    :type: :class:`pants.build_graph.address.Address`
     :raises: `ValueError` if the address does not reside within the source root.
     """
     return cls.package_path(source_root, address.spec_path)

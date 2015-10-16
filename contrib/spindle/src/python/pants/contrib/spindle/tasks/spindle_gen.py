@@ -13,10 +13,10 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
+from pants.build_graph.address import Address
 from pants.option.custom_types import list_option
 from twitter.common.dirutil import safe_mkdir
 

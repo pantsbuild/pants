@@ -10,6 +10,8 @@ import subprocess
 from collections import defaultdict
 from textwrap import dedent
 
+from mock import patch
+
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
@@ -21,6 +23,8 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.util.dirutil import safe_file_dump
+from pants.util.timeout import TimeoutReached
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
@@ -88,6 +92,51 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
+  def test_junit_runner_timeout_success(self):
+    """When we set a timeout and don't force failure, succeed."""
+
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      self.set_options(timeout_default=1)
+      self.set_options(timeouts=True)
+      self.execute_junit_runner(
+        dedent("""
+          import org.junit.Test;
+          import static org.junit.Assert.assertTrue;
+          public class FooTest {
+            @Test
+            public void testFoo() {
+              assertTrue(5 > 3);
+            }
+          }
+        """)
+      )
+      mock_timeout.assert_called_with(1)
+
+  def test_junit_runner_timeout_fail(self):
+    """When we set a timeout and force a failure, fail."""
+
+    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+      mock_timeout().__exit__.side_effect = TimeoutReached(1)
+
+      self.set_options(timeout_default=1)
+      self.set_options(timeouts=True)
+      with self.assertRaises(TaskError) as cm:
+        self.execute_junit_runner(
+          dedent("""
+            import org.junit.Test;
+            import static org.junit.Assert.assertTrue;
+            public class FooTest {
+              @Test
+              public void testFoo() {
+                assertTrue(5 > 3);
+              }
+            }
+          """)
+        )
+
+      self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+      mock_timeout.assert_called_with(1)
+
   def execute_junit_runner(self, content):
 
     # Create the temporary base test directory
@@ -130,20 +179,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # in that bug, the resources target must be the first one in the list.
     context = self.context(target_roots=[resources, java_tests])
 
-    # Before we run the task, we need to inject the "classes_by_target" with
+    # Before we run the task, we need to inject the "runtime_classpath" with
     # the compiled test java classes that JUnitRun will know which test
-    # classes to execute. In a normal run, this "classes_by_target" will be
-    # populated by java compiling step.
-    class_products = context.products.get_data(
-      'classes_by_target', lambda: defaultdict(MultipleRootedProducts))
-    java_tests_products = MultipleRootedProducts()
-    java_tests_products.add_rel_paths(test_abs_path, ['FooTest.class'])
-    class_products[java_tests] = java_tests_products
-
-    # Also we need to add the FooTest.class's classpath to the compile_classpath
-    # products data mapping so JUnitRun will be able to add that into the final
-    # classpath under which the junit will be executed.
-    self.populate_compile_classpath(context=context, classpath=[test_abs_path])
+    # classes to execute. In a normal run, this "runtime_classpath" will be
+    # populated by java compilation step.
+    self.populate_runtime_classpath(context=context, classpath=[test_abs_path])
 
     # Finally execute the task.
     self.execute(context)
@@ -185,5 +225,19 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         '''
     ))
     self.set_options(allow_empty_sources=True)
-    task = self.create_task(self.context(target_roots=[self.target('foo:empty')]))
-    task.execute()
+    context = self.context(target_roots=[self.target('foo:empty')])
+    self.populate_runtime_classpath(context=context)
+    self.create_task(context).execute()
+
+  def test_request_classes_by_source(self):
+    """`classes_by_source` is expensive to compute: confirm that it is only computed when needed."""
+
+    # Class names (with and without a method name) should not trigger.
+    self.assertFalse(JUnitRun.request_classes_by_source(['com.goo.ber']))
+    self.assertFalse(JUnitRun.request_classes_by_source(['com.goo.ber#method']))
+
+    # Existing files (with and without the method name) should trigger.
+    srcfile = os.path.join(self.test_workdir, 'this.is.a.source.file.scala')
+    safe_file_dump(srcfile, 'content!')
+    self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
+    self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))

@@ -18,11 +18,11 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.address import BuildFileAddress
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.binaries import binary_util
+from pants.build_graph.address import BuildFileAddress
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -78,6 +78,8 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                   'which paths are used for tests.  This is usually what you want if your repo '
                   ' uses a maven style directory layout.')
     register('--infer-test-from-siblings', action='store_true',
+             deprecated_version='0.0.57',
+             deprecated_hint='Setting test attribute on paths is now handled automatically.',
              help='When determining if a path should be added to the IDE, check to see if any of '
                   'its sibling source_root() entries define test targets.  This is usually what '
                   'you want so that resource directories under test source roots are picked up as '

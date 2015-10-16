@@ -5,13 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
-
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
+from pants_test.base_test import BaseTest
 
 
-class EngineTestBase(unittest.TestCase):
+class EngineTestBase(BaseTest):
 
   @classmethod
   def as_goal(cls, goal_name):

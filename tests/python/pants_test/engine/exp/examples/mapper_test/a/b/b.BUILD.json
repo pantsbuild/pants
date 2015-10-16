@@ -1,11 +1,11 @@
 {
-  "typename": "target",
+  "type_alias": "target",
   "name": "b",
   "dependencies": ["//d:e"],
   "configurations": [
     "//a",
     {
-      "typename": "configuration",
+      "type_alias": "configuration",
       "embedded": "yes"
     }
   ]

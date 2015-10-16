@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.source_root import SourceRoot
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants_test.base_test import BaseTest
 
 from pants.contrib.go.register import build_file_aliases

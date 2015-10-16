@@ -25,7 +25,6 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
-    'src/python/pants/base:address',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
@@ -33,9 +32,8 @@ python_library(
     'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'src/python/pants/goal:goal',
-    'src/python/pants/goal:products',
+    'src/python/pants/source',
     'src/python/pants/subsystem',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',
     'tests/python/pants_test/option/util',

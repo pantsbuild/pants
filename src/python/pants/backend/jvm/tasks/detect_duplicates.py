@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from pex.compatibility import to_bytes
 
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
@@ -42,8 +43,7 @@ class DuplicateDetector(JvmBinaryTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(DuplicateDetector, cls).prepare(options, round_manager)
-    round_manager.require_data('resources_by_target')
-    round_manager.require_data('classes_by_target')
+    round_manager.require_data('runtime_classpath')
 
   def __init__(self, *args, **kwargs):
     super(DuplicateDetector, self).__init__(*args, **kwargs)
@@ -53,51 +53,51 @@ class DuplicateDetector(JvmBinaryTask):
     self._max_dups = int(self.get_options().max_dups)
 
   def execute(self):
+    conflicts_by_binary = {}
     for binary_target in filter(self.is_binary, self.context.targets()):
-      self.detect_duplicates_for_target(binary_target)
+      conflicts_by_artifacts = self.detect_duplicates_for_target(binary_target)
+      if conflicts_by_artifacts:
+        conflicts_by_binary[binary_target] = conflicts_by_artifacts
+
+    # Conflict structure returned for tests.
+    return conflicts_by_binary
 
   def detect_duplicates_for_target(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
 
     # Extract external dependencies on libraries (jars)
     external_deps = self._get_external_dependencies(binary_target)
-    for (file_name, targets) in external_deps.items():
-      artifacts_by_file_name[file_name].update(targets)
+    for (file_name, jar_names) in external_deps.items():
+      artifacts_by_file_name[file_name].update(jar_names)
 
     # Extract internal dependencies on classes and resources
     internal_deps = self._get_internal_dependencies(binary_target)
-    for (file_name, targets) in internal_deps.items():
-      artifacts_by_file_name[file_name].update(targets)
+    for (file_name, target_specs) in internal_deps.items():
+      artifacts_by_file_name[file_name].update(target_specs)
 
-    self._is_conflicts(artifacts_by_file_name, binary_target)
+    return self._check_conflicts(artifacts_by_file_name, binary_target)
 
-  def _is_conflicts(self, artifacts_by_file_name, binary_target):
+  def _check_conflicts(self, artifacts_by_file_name, binary_target):
     conflicts_by_artifacts = self._get_conflicts_by_artifacts(artifacts_by_file_name)
-
     if len(conflicts_by_artifacts) > 0:
       self._log_conflicts(conflicts_by_artifacts, binary_target)
       if self._fail_fast:
         raise TaskError('Failing build for target {}.'.format(binary_target))
-      return True
-    return False
+    return conflicts_by_artifacts
 
   def _get_internal_dependencies(self, binary_target):
     artifacts_by_file_name = defaultdict(set)
-    classes_by_target = self.context.products.get_data('classes_by_target')
-    resources_by_target = self.context.products.get_data('resources_by_target')
+    classpath_products = self.context.products.get_data('runtime_classpath')
 
-    target_products = classes_by_target.get(binary_target)
-    if target_products:  # Will be None if binary_target has no sources.
-      for _, classes in target_products.rel_paths():
-        for cls in classes:
-          artifacts_by_file_name[cls].add(binary_target)
+    # Select classfiles from the classpath - we want all the direct products of internal targets,
+    # no external JarLibrary products.
+    def record_file_ownership(target):
+      entries = ClasspathUtil.internal_classpath([target], classpath_products, transitive=False)
+      for f in ClasspathUtil.classpath_entries_contents(entries):
+        if not f.endswith('/'):
+          artifacts_by_file_name[f].add(target.address.reference())
 
-    target_resources = []
-    if binary_target.has_resources:
-      target_resources.extend(resources_by_target.get(r) for r in binary_target.resources)
-
-    for r in target_resources:
-      artifacts_by_file_name[r].add(binary_target)
+    binary_target.walk(record_file_ownership)
     return artifacts_by_file_name
 
   def _get_external_dependencies(self, binary_target):
@@ -113,24 +113,25 @@ class DuplicateDetector(JvmBinaryTask):
           decoded_file_name = to_bytes(qualified_file_name).decode('utf-8')
           if os.path.basename(decoded_file_name).lower() in self._excludes:
             continue
-          jar_name = os.path.basename(external_dep)
           if (not self._isdir(decoded_file_name)) and Manifest.PATH != decoded_file_name:
-            artifacts_by_file_name[decoded_file_name].add(jar_name)
+            artifacts_by_file_name[decoded_file_name].add(coordinate.artifact_filename)
     return artifacts_by_file_name
 
   def _get_conflicts_by_artifacts(self, artifacts_by_file_name):
     conflicts_by_artifacts = defaultdict(set)
     for (file_name, artifacts) in artifacts_by_file_name.items():
-      if (not artifacts) or len(artifacts) < 2: continue
-      conflicts_by_artifacts[tuple(sorted(artifacts))].add(file_name)
+      if (not artifacts) or len(artifacts) < 2:
+        continue
+      conflicts_by_artifacts[tuple(sorted(str(a) for a in artifacts))].add(file_name)
     return conflicts_by_artifacts
 
   def _log_conflicts(self, conflicts_by_artifacts, target):
     self.context.log.warn('\n ===== For target {}:'.format(target))
     for artifacts, duplicate_files in conflicts_by_artifacts.items():
-      if len(artifacts) < 2: continue
+      if len(artifacts) < 2:
+        continue
       self.context.log.warn(
-          'Duplicate classes and/or resources detected in artifacts: {}'.format(artifacts))
+        'Duplicate classes and/or resources detected in artifacts: {}'.format(artifacts))
       dup_list = list(duplicate_files)
       for duplicate_file in dup_list[:self._max_dups]:
         self.context.log.warn('     {}'.format(duplicate_file))

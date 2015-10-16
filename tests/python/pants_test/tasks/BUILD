@@ -1,17 +1,12 @@
-  # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/core/tasks:console_task',
-    'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
     'src/python/pants/goal:context',
-    'src/python/pants/goal',
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
@@ -179,11 +174,14 @@ python_tests(
   name = 'detect_duplicates',
   sources = ['test_detect_duplicates.py'],
   dependencies = [
-    ':task_test_base',
-    'src/python/pants/base:exceptions',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:detect_duplicates',
+    'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/jvm:jvm_task_test_base'
   ],
 )
 
@@ -318,10 +316,9 @@ python_tests(
   sources = ['test_roots.py'],
   dependencies = [
     ':task_test_base',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:roots',
     'src/python/pants/base:build_environment',
-    'src/python/pants/build_graph',
+    'src/python/pants/source',
   ],
 )
 
@@ -411,8 +408,9 @@ python_tests(
   sources = ['test_jvm_task.py'],
   dependencies = [
     ':task_test_base',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:jvm_task',
-    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/jvm:jvm_task_test_base'
   ]
 )
 
@@ -420,9 +418,9 @@ python_tests(
   name = 'jvmdoc_gen',
   sources = ['test_jvmdoc_gen.py'],
   dependencies = [
-    ':task_test_base',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
-    'src/python/pants/util:dirutil',
+    'src/python/pants/base:exceptions',
+    'tests/python/pants_test/jvm:jvm_task_test_base'
   ]
 )
 

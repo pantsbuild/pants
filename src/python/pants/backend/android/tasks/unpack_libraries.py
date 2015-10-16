@@ -15,9 +15,9 @@ from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
+from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
 
 
@@ -153,8 +153,8 @@ class UnpackLibraries(Task):
     address = Address(self.workdir, '{}-android_library'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidLibrary,
                                              manifest=manifest,
-                                             include_patterns=target.include_patterns,
-                                             exclude_patterns=target.exclude_patterns,
+                                             include_patterns=target.payload.include_patterns,
+                                             exclude_patterns=target.payload.exclude_patterns,
                                              dependencies=deps,
                                              derived_from=target)
     return new_target

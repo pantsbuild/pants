@@ -17,10 +17,10 @@ from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.ivy.bootstrapper import Bootstrapper
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
-class JvmToolTaskTestBase(TaskTestBase):
+class JvmToolTaskTestBase(JvmTaskTestBase):
   """Prepares an ephemeral test build root that supports tasks that use jvm tool bootstrapping."""
 
   @property
@@ -73,15 +73,17 @@ class JvmToolTaskTestBase(TaskTestBase):
 
     Bootstrapper.reset_instance()
 
-  def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None):
+  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
+              console_outstream=None, workspace=None, for_subsystems=None):
     # Add in the bootstrapper task type, so its options get registered and set.
     for_task_types = [self.bootstrap_task_type] + (for_task_types or [])
     return super(JvmToolTaskTestBase, self).context(for_task_types=for_task_types,
                                                     options=options,
+                                                    passthru_args=passthru_args,
                                                     target_roots=target_roots,
                                                     console_outstream=console_outstream,
-                                                    workspace=workspace)
+                                                    workspace=workspace,
+                                                    for_subsystems=for_subsystems)
 
   def prepare_execute(self, context):
     """Prepares a jvm tool-using task for execution, first bootstrapping any required jvm tools.

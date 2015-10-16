@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
+    'tests/python/pants_test:base_test',
   ]
 )
 

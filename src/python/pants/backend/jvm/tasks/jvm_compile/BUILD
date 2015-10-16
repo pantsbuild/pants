@@ -67,23 +67,21 @@ python_library(
   name = 'jvm_compile',
   sources = ['jvm_compile.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':compile_context',
     ':execution_graph',
-    ':resource_mapping',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:worker_pool',
-    'src/python/pants/build_graph',
+    'src/python/pants/base:workunit',
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
   ],
@@ -95,11 +93,6 @@ python_library(
   dependencies = [
     'src/python/pants/base:worker_pool',
   ],
-)
-
-python_library(
-  name = 'resource_mapping',
-  sources = ['resource_mapping.py'],
 )
 
 python_library(

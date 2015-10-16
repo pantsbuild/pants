@@ -9,8 +9,8 @@ import os
 import shutil
 from collections import defaultdict
 
-from pants.base.address import Address
 from pants.base.source_root import SourceRoot
+from pants.build_graph.address import Address
 from pants.util.contextutil import temporary_dir
 from pants_test.tasks.task_test_base import TaskTestBase
 

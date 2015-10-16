@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.resources_task import ResourcesTask
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField, stable_json_sha1
 from pants.build_graph.target import Target
-from pants.goal.products import UnionProducts
 from pants.util.dirutil import touch
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -44,25 +44,25 @@ class ResourcesTaskTestBase(TaskTestBase):
   def create_resources_task(self, target_roots=None, **options):
     self.set_options(**options)
     context = self.context(target_roots=target_roots)
-    context.products.safe_create_data('compile_classpath', init_func=UnionProducts)
+    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
     return self.create_task(context)
 
   def create_target(self, spec, contents=None, **kwargs):
     return self.make_target(spec, target_type=self.TestTarget, contents=contents, **kwargs)
 
   def assert_no_products(self, task, target):
-    compile_classpath = task.context.products.get_data('compile_classpath')
-    resources_by_target = task.context.products.get_data('resources_by_target')
+    classpath_products = task.context.products.get_data('runtime_classpath')
+    self.assertEqual(0, len(classpath_products.get_for_target(target)))
 
-    self.assertEqual(0, len(compile_classpath.get_for_target(target)))
-    self.assertFalse(resources_by_target[target])
+  def assert_empty_products(self, task, target):
+    classpath_products = task.context.products.get_data('runtime_classpath')
+    self.assertEqual(0, len(classpath_products.get_for_target(target)))
 
   def assert_products(self, task, target, count, expected_confs=None):
-    compile_classpath = task.context.products.get_data('compile_classpath')
-    resources_by_target = task.context.products.get_data('resources_by_target')
+    classpath_products = task.context.products.get_data('runtime_classpath')
 
     expected_confs = expected_confs or ('default',)
-    products = compile_classpath.get_for_target(target)
+    products = classpath_products.get_for_target(target)
     self.assertEqual(len(expected_confs), len(products))
 
     confs = []
@@ -74,18 +74,9 @@ class ResourcesTaskTestBase(TaskTestBase):
     self.assertEqual(1, len(chroots))
     chroot = chroots.pop()
 
-    resource_rel_paths = []
-    for root, rel_paths in resources_by_target[target].rel_paths():
-      self.assertEqual(chroot, root)
-      resource_rel_paths.extend(rel_paths)
-
     classpath_rel_paths = []
     for root, dirs, files in os.walk(chroot):
       classpath_rel_paths.extend(os.path.relpath(os.path.join(root, f), chroot) for f in files)
-
-    self.assertEqual(sorted(resource_rel_paths), sorted(classpath_rel_paths))
-    self.assertEqual(sorted(os.path.join(target.id, str(i)) for i in range(count)),
-                     sorted(resource_rel_paths))
 
 
 class MinimalImplResourcesTaskTest(ResourcesTaskTestBase):
@@ -208,40 +199,3 @@ class CustomInvalidationStrategtResourcesTaskTest(ResourcesTaskTestBase):
     self.assertEqual([self.target('b:1')], processed_targets)
     self.assert_products(task, self.target('a:1'), 1)
     self.assert_products(task, self.target('b:1'), 1)
-
-
-class CustomRelativeResourcePathsResourcesTaskTest(ResourcesTaskTestBase):
-  class CustomRelativeResourcePathsResourcesTask(ResourcesTaskTestBase.MinimalImplResourcesTask):
-    def relative_resource_paths(self, target, chroot):
-      return list(target.tags)
-
-  @classmethod
-  def task_type(cls):
-    return cls.CustomRelativeResourcePathsResourcesTask
-
-  def test_products(self):
-    task = self.create_resources_task(target_roots=[self.create_target('a:1', tags=['red', 'blue']),
-                                                    self.create_target('b:1')])
-    processed_targets = task.execute()
-
-    self.assertEqual(sorted([self.target('a:1'), self.target('b:1')]), sorted(processed_targets))
-
-    compile_classpath = task.context.products.get_data('compile_classpath')
-    resources_by_target = task.context.products.get_data('resources_by_target')
-
-    # a:1 should generate products since it reports 2 tag-files.
-    products = compile_classpath.get_for_target(self.target('a:1'))
-    self.assertEqual(1, len(products))
-    conf, chroot = products.pop()
-    self.assertEqual('default', conf)
-
-    resource_rel_paths = []
-    for root, rel_paths in resources_by_target[self.target('a:1')].rel_paths():
-      self.assertEqual(chroot, root)
-      resource_rel_paths.extend(rel_paths)
-    self.assertEqual(sorted(['red', 'blue']), sorted(resource_rel_paths))
-
-    # b:1 should not generate products since it has no tag-files.
-    products = compile_classpath.get_for_target(self.target('b:1'))
-    self.assertEqual(0, len(products))
-    self.assertFalse(resources_by_target[self.target('b:1')])
