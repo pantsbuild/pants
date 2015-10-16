@@ -142,8 +142,14 @@ class GoBuildgenTest(TaskTestBase):
     task.execute()
     self.assertEqual(expected, context.targets())
 
-  def stitch_deps_local(self):
+  def stitch_deps_local(self, materialize):
+    self.set_options(materialize=materialize)
+
+    if materialize:
+      # We need physical directories on disk for `--materialize` since it does scans.
+      self.create_dir('src/go')
     SourceRoot.register('src/go', GoBinary, GoLibrary)
+
     self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
         package jane
 
@@ -161,9 +167,16 @@ class GoBuildgenTest(TaskTestBase):
                 fmt.Printf("Hello %s!", jane.PublicConstant)
         }
       """))
-    fred = self.make_target('src/go/fred', GoBinary)
-    context = self.context(target_roots=[fred])
-    self.assertEqual([fred], context.target_roots)
+    if materialize:
+      # We need physical BUILD files on disk for `--materialize` since it does scans.
+      self.add_to_build_file('src/go/fred', 'go_binary()')
+      fred = self.target('src/go/fred')
+      target_roots = None
+    else:
+      fred = self.make_target('src/go/fred', GoBinary)
+      target_roots = [fred]
+
+    context = self.context(target_roots=target_roots)
     pre_execute_files = self.buildroot_files()
     task = self.create_task(context)
     task.execute()
@@ -171,35 +184,39 @@ class GoBuildgenTest(TaskTestBase):
     jane = self.target('src/go/jane')
     self.assertIsNotNone(jane)
     self.assertEqual([jane], fred.dependencies)
-    self.assertEqual({jane, fred}, set(context.targets()))
+    self.assertEqual({jane, fred}, set(self.build_graph.targets()))
 
     return pre_execute_files
 
   def test_stitch_deps(self):
-    self.set_options(materialize=False)
-    pre_execute_files = self.stitch_deps_local()
+    pre_execute_files = self.stitch_deps_local(materialize=False)
     self.assertEqual(pre_execute_files, self.buildroot_files())
 
   def test_stitch_deps_generate_builds(self):
-    self.set_options(materialize=True)
-    pre_execute_files = self.stitch_deps_local()
-    self.assertEqual({'src/go/fred/BUILD', 'src/go/jane/BUILD'},
-                     self.buildroot_files() - pre_execute_files)
+    pre_execute_files = self.stitch_deps_local(materialize=True)
+    self.assertEqual({'src/go/jane/BUILD'}, self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_generate_builds_custom_extension(self):
-    self.set_options(materialize=True, extension='.gen')
-    pre_execute_files = self.stitch_deps_local()
+    self.set_options(extension='.gen')
+    pre_execute_files = self.stitch_deps_local(materialize=True)
+    # NB: The src/go/fred/BUILD file on disk was deleted and replaced with src/go/fred/BUILD.gen.
     self.assertEqual({'src/go/fred/BUILD.gen', 'src/go/jane/BUILD.gen'},
                      self.buildroot_files() - pre_execute_files)
 
-  def stitch_deps_remote(self):
+  def stitch_deps_remote(self, remote=True, materialize=False):
+    self.set_options(remote=remote, materialize=materialize)
     self.set_options_for_scope(Fetchers.options_scope,
                                mapping={r'pantsbuild.org/.*':
                                         '{}.{}'.format(FakeFetcher.__module__,
                                                        FakeFetcher.__name__)})
 
+    if materialize:
+      # We need physical directories on disk for `--materialize` since it does scans.
+      self.create_dir('3rdparty/go')
+      self.create_dir('src/go')
     SourceRoot.register('3rdparty/go', GoRemoteLibrary)
     SourceRoot.register('src/go', GoBinary, GoLibrary)
+
     self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
         package jane
 
@@ -219,9 +236,16 @@ class GoBuildgenTest(TaskTestBase):
                 fmt.Printf("Hello %s!", jane.PublicConstant)
         }
       """))
-    fred = self.make_target('src/go/fred', GoBinary)
-    context = self.context(target_roots=[fred])
-    self.assertEqual([fred], context.target_roots)
+    if materialize:
+      # We need physical BUILD files on disk for `--materialize` since it does a scan.
+      self.add_to_build_file('src/go/fred', 'go_binary()')
+      fred = self.target('src/go/fred')
+      target_roots = None
+    else:
+      fred = self.make_target('src/go/fred', GoBinary)
+      target_roots = [fred]
+
+    context = self.context(target_roots=target_roots)
     pre_execute_files = self.buildroot_files()
     task = self.create_task(context)
     task.execute()
@@ -234,39 +258,43 @@ class GoBuildgenTest(TaskTestBase):
     self.assertIsNotNone(prod)
     self.assertEqual([prod], jane.dependencies)
 
-    self.assertEqual({prod, jane, fred}, set(context.targets()))
+    self.assertEqual({prod, jane, fred}, set(self.build_graph.targets()))
 
     return pre_execute_files
 
   def test_stitch_deps_remote(self):
-    self.set_options(remote=True, materialize=False)
-    pre_execute_files = self.stitch_deps_remote()
+    pre_execute_files = self.stitch_deps_remote(materialize=False)
+    self.assertEqual(pre_execute_files, self.buildroot_files())
+
+  def test_stitch_deps_remote_unused(self):
+    # An unused remote lib
+    self.add_to_build_file('3rdparty/go/github.com/user/repo', 'go_remote_library()')
+
+    pre_execute_files = self.stitch_deps_remote(materialize=False)
+
+    # Check the unused remote lib was not deleted since we can't know if it was actually unused or
+    # a transitive dep of a used remote_lib.
+    self.assertIn('3rdparty/go/github.com/user/repo/BUILD', self.buildroot_files())
     self.assertEqual(pre_execute_files, self.buildroot_files())
 
   def test_stitch_deps_remote_existing_rev_respected(self):
-    self.set_options(remote=True, materialize=True)
     self.make_target('3rdparty/go/pantsbuild.org/fake:prod',
                      GoRemoteLibrary,
                      pkg='prod',
                      rev='v1.2.3')
-    pre_execute_files = self.stitch_deps_remote()
+    pre_execute_files = self.stitch_deps_remote(materialize=True)
     self.build_graph.reset()  # Force targets to be loaded off disk
     self.assertEqual('v1.2.3', self.target('3rdparty/go/pantsbuild.org/fake:prod').rev)
-    self.assertEqual({'src/go/fred/BUILD',
-                      'src/go/jane/BUILD',
-                      '3rdparty/go/pantsbuild.org/fake/BUILD'},
+    self.assertEqual({'src/go/jane/BUILD', '3rdparty/go/pantsbuild.org/fake/BUILD'},
                      self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_remote_generate_builds(self):
-    self.set_options(remote=True, materialize=True)
-    pre_execute_files = self.stitch_deps_remote()
-    self.assertEqual({'src/go/fred/BUILD',
-                      'src/go/jane/BUILD',
-                      '3rdparty/go/pantsbuild.org/fake/BUILD'},
+    pre_execute_files = self.stitch_deps_remote(materialize=True)
+    self.assertEqual({'src/go/jane/BUILD', '3rdparty/go/pantsbuild.org/fake/BUILD'},
                      self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_remote_disabled_fails(self):
     with self.assertRaises(GoBuildgen.GenerationError) as exc:
-      self.stitch_deps_remote()
+      self.stitch_deps_remote(remote=False)
     self.assertEqual(GoTargetGenerator.NewRemoteEncounteredButRemotesNotAllowedError,
                      type(exc.exception.cause))
