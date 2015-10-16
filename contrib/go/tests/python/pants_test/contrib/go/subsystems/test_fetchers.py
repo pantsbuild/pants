@@ -51,6 +51,12 @@ class FetchersTest(unittest.TestCase):
     self.check_default('github.com/docker/docker/daemon/events',
                        expected_root='github.com/docker/docker')
 
+  def test_default_golang(self):
+    self.check_default('golang.org/x/oauth2',
+                       expected_root='github.com/golang/oauth2')
+    self.check_default('golang.org/x/net/context',
+                       expected_root='github.com/golang/net')
+
   def test_default_gopkg(self):
     self.check_default('gopkg.in/check.v1', expected_root='gopkg.in/check.v1')
 
