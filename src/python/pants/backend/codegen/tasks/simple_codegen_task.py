@@ -153,60 +153,71 @@ class SimpleCodegenTask(Task):
                           fingerprint_strategy=self.get_fingerprint_strategy()) as invalidation_check:
       target_workdirs = {vt.target: vt.results_dir for vt in invalidation_check.all_vts}
       for vt in invalidation_check.all_vts:
-        target = vt.target
+        # Build the target.
         if not vt.valid:
-          with self.context.new_workunit(name=target.address.spec):
-            self.execute_codegen(target, vt.results_dir)
+          with self.context.new_workunit(name=vt.target.address.spec):
+            self.execute_codegen(vt.target, vt.results_dir)
+          vt.update()
+        # And inject a synthetic target to represent it.
+        self._inject_synthetic_target(vt.target, target_workdirs)
 
-        target_workdir = vt.results_dir
-        raw_generated_sources = list(self.find_sources(target, target_workdirs))
-        # Make the sources robust regardless of whether subclasses return relative paths, or
-        # absolute paths that are subclasses of the workdir.
-        generated_sources = [src if src.startswith(target_workdir)
-                             else os.path.join(target_workdir, src)
-                             for src in raw_generated_sources]
-        relative_generated_sources = [os.path.relpath(src, target_workdir)
-                                      for src in generated_sources]
+  def _inject_synthetic_target(self, target, target_workdirs):
+    """Create, inject, and return a synthetic target for the given target and workdir.
 
-        synthetic_target = self.context.add_new_target(
-          address=self.get_synthetic_address(target, target_workdir),
-          target_type=self.synthetic_target_type(target),
-          dependencies=self.synthetic_target_extra_dependencies(target, target_workdir),
-          sources=relative_generated_sources,
-          derived_from=target,
+    :param target: The target to inject a synthetic target for.
+    :param target_workdirs: The work directories containing generated code for this context. All
+                            deps of the given target will already have been generated.
+    """
+    target_workdir = target_workdirs[target]
+    raw_generated_sources = list(self.find_sources(target, target_workdirs))
+    # Make the sources robust regardless of whether subclasses return relative paths, or
+    # absolute paths that are subclasses of the workdir.
+    generated_sources = [src if src.startswith(target_workdir)
+                         else os.path.join(target_workdir, src)
+                         for src in raw_generated_sources]
+    relative_generated_sources = [os.path.relpath(src, target_workdir)
+                                  for src in generated_sources]
 
-          # TODO(John Sirois): This assumes - currently, a JvmTarget or PythonTarget which both
-          # happen to have this attribute for carrying publish metadata but share no interface
-          # that defines this canonical property.  Lift up an interface and check for it or else
-          # add a way for SimpleCodeGen subclasses to specify extra attribute names that should be
-          # copied over from the target to its derived target.
-          provides=target.provides,
-        )
+    synthetic_target = self.context.add_new_target(
+      address=self.get_synthetic_address(target, target_workdir),
+      target_type=self.synthetic_target_type(target),
+      dependencies=self.synthetic_target_extra_dependencies(target, target_workdir),
+      sources=relative_generated_sources,
+      derived_from=target,
 
-        build_graph = self.context.build_graph
+      # TODO(John Sirois): This assumes - currently, a JvmTarget or PythonTarget which both
+      # happen to have this attribute for carrying publish metadata but share no interface
+      # that defines this canonical property.  Lift up an interface and check for it or else
+      # add a way for SimpleCodeGen subclasses to specify extra attribute names that should be
+      # copied over from the target to its derived target.
+      provides=target.provides,
+    )
 
-        # NB(pl): This bypasses the convenience function (Target.inject_dependency) in order
-        # to improve performance.  Note that we can walk the transitive dependee subgraph once
-        # for transitive invalidation rather than walking a smaller subgraph for every single
-        # dependency injected.
-        for dependent_address in build_graph.dependents_of(target.address):
-          build_graph.inject_dependency(
-            dependent=dependent_address,
-            dependency=synthetic_target.address,
-          )
-        # NB(pl): See the above comment.  The same note applies.
-        for concrete_dependency_address in build_graph.dependencies_of(target.address):
-          build_graph.inject_dependency(
-            dependent=synthetic_target.address,
-            dependency=concrete_dependency_address,
-          )
-        build_graph.walk_transitive_dependee_graph(
-          build_graph.dependencies_of(target.address),
-          work=lambda t: t.mark_transitive_invalidation_hash_dirty(),
-        )
+    build_graph = self.context.build_graph
+    # NB(pl): This bypasses the convenience function (Target.inject_dependency) in order
+    # to improve performance.  Note that we can walk the transitive dependee subgraph once
+    # for transitive invalidation rather than walking a smaller subgraph for every single
+    # dependency injected.
+    for dependent_address in build_graph.dependents_of(target.address):
+      build_graph.inject_dependency(
+        dependent=dependent_address,
+        dependency=synthetic_target.address,
+      )
+    # NB(pl): See the above comment.  The same note applies.
+    for concrete_dependency_address in build_graph.dependencies_of(target.address):
+      build_graph.inject_dependency(
+        dependent=synthetic_target.address,
+        dependency=concrete_dependency_address,
+      )
+    build_graph.walk_transitive_dependee_graph(
+      build_graph.dependencies_of(target.address),
+      work=lambda t: t.mark_transitive_invalidation_hash_dirty(),
+    )
 
-        if target in self.context.target_roots:
-          self.context.target_roots.append(synthetic_target)
+    if target in self.context.target_roots:
+      self.context.target_roots.append(synthetic_target)
+
+    return synthetic_target
 
   def resolve_deps(self, unresolved_deps):
     deps = OrderedSet()
