@@ -18,11 +18,11 @@ from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
 from pants.base.payload_field import DeferredSourcesField, SourcesField
-from pants.base.source_root import SourceRoot
 from pants.base.validation import assert_list
 from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -181,7 +181,11 @@ class Target(AbstractTarget):
   @property
   def target_base(self):
     """:returns: the source root path for this target."""
-    return SourceRoot.find(self)
+    # TODO: It's a shame that we have to access the singleton directly here, instead of getting
+    # the SourceRoots instance from context, as tasks do.  In the new engine we could inject
+    # this into the target, rather than have it reach out for global singletons.
+    source_root = SourceRootConfig.global_instance().get_source_roots().find(self)
+    return source_root.path if source_root else None
 
   @classmethod
   def identify(cls, targets):

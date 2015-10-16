@@ -43,7 +43,6 @@ target(
     ':payload_field',
     ':revision',
     ':run_info',
-    ':source_root',
     ':validation',
     ':worker_pool',
   ]
@@ -201,16 +200,6 @@ python_tests(
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
   ]
-)
-
-python_tests(
-  name = 'source_root',
-  sources = ['test_source_root.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:source_root',
-    'src/python/pants/build_graph',
-    ]
 )
 
 python_tests(

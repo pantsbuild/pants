@@ -9,7 +9,6 @@ import logging
 
 from pants.backend.core.tasks.task import Task
 from pants.base.payload_field import DeferredSourcesField
-from pants.base.source_root import SourceRoot
 from pants.build_graph.address_lookup_error import AddressLookupError
 
 
@@ -17,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 class DeferredSourcesMapper(Task):
-  """Map DeferredSorucesFields to files that produce product 'unpacked_archives', like UnpackJars
+  """Map DeferredSourcesFields to files that produce product 'unpacked_archives', like UnpackJars.
 
-  If you want a task to be able to map sources like this, make it require the  'deferred_sources'
+  If you want a task to be able to map sources like this, make it require the 'deferred_sources'
   product.
   """
 
@@ -68,5 +67,7 @@ class DeferredSourcesMapper(Task):
           "Target {sources_spec} referenced from {target} field {name} did not unpack any sources"
           .format(spec=sources_target.address.spec, target=target.address.spec, name=name))
       sources, rel_unpack_dir = unpacked_sources[sources_target]
-      SourceRoot.register_mutable(rel_unpack_dir)
+      # We have no idea of rel_unpack_dir matches any of our source root patterns, so
+      # we explicitly register it here.
+      self.context.source_roots.add_source_root(rel_unpack_dir)
       payload_field.populate(sources, rel_unpack_dir)

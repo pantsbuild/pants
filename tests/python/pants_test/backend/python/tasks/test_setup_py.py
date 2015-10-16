@@ -21,10 +21,8 @@ from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibr
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
@@ -361,7 +359,6 @@ class TestSetupPy(PythonTaskTestBase):
       yield all_py_files, as_full_path
 
   def test_resources(self):
-    SourceRoot.register('src/python', PythonLibrary, Resources)
     self.create_file(relpath='src/python/monster/j-function.res', contents='196884')
     self.create_file(relpath='src/python/monster/group.res', contents='196883')
     self.create_file(relpath='src/python/monster/__init__.py', contents='')
@@ -411,7 +408,6 @@ class TestSetupPy(PythonTaskTestBase):
           self.assertEqual('196884', fp.read())
 
   def test_exported_antlr(self):
-    SourceRoot.register('src/antlr', PythonThriftLibrary)
     self.create_file(relpath='src/antlr/exported/exported.g', contents=dedent("""
       grammar exported;
 
@@ -439,7 +435,6 @@ class TestSetupPy(PythonTaskTestBase):
         self.assertEqual([target], created.keys())
 
   def test_exported_thrift(self):
-    SourceRoot.register('src/thrift', PythonThriftLibrary)
     self.create_file(relpath='src/thrift/exported/exported.thrift', contents=dedent("""
       namespace py pants.constants_only
 
@@ -458,7 +453,6 @@ class TestSetupPy(PythonTaskTestBase):
     # We test here to ensure that independently published PythonThriftLibraries each only own their
     # own thrift stubs and the proper dependency links exist between the distributions.
 
-    SourceRoot.register('src/thrift', PythonThriftLibrary)
     self.create_file(relpath='src/thrift/exported/exported.thrift', contents=dedent("""
       namespace py exported
 

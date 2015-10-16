@@ -60,7 +60,7 @@ class TargetTest(BaseTest):
 
   def test_unknown_kwargs(self):
     options = {Target.UnknownArguments.options_scope: {'ignored': {'Target': ['foobar']}}}
-    with subsystem_instance(Target.UnknownArguments, options=options):
+    with subsystem_instance(Target.UnknownArguments, **options):
       target = self.make_target('foo:bar', Target, foobar='barfoo')
       self.assertFalse(hasattr(target, 'foobar'))
 

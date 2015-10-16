@@ -21,7 +21,6 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
@@ -196,11 +195,11 @@ class ProtobufGen(SimpleCodegenTask):
     # to get the correct source root for paths outside the current BUILD tree.
     for target in gentargets:
       for source in target.sources_relative_to_buildroot():
-        base = SourceRoot.find_by_path(source)
+        src_root = self.context.source_roots.find_by_path(source)
+        base = src_root.path if src_root else None
         if not base:
           base, _ = target.target_base, target.sources_relative_to_buildroot()
-          self.context.log.debug('Could not find source root for {source}.'
-                                 ' Missing call to SourceRoot.register()?  Fell back to {base}.'
+          self.context.log.debug('Could not find source root for {source}. Fell back to {base}.'
                                  .format(source=source, base=base))
         if base not in sources_by_base:
           sources_by_base[base] = OrderedSet()
