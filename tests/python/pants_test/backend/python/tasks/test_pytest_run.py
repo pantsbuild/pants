@@ -233,6 +233,8 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
       self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
+
+      # Ensures that Timeout is instantiated with no timeout.
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (None,))
 
@@ -243,6 +245,8 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
       mock_timeout().__exit__.side_effect = TimeoutReached(1)
       self.run_failing_tests(targets=[self.sleep_timeout],
                              failed_targets=[self.sleep_timeout])
+
+      # Ensures that Timeout is instantiated with a 1 second timeout.
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (1,))
 

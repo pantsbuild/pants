@@ -110,6 +110,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           }
         """)
       )
+
+      # Ensures that Timeout is instantiated with a 1 second timeout.
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (1,))
 
@@ -136,6 +138,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         )
 
       self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
+
+      # Ensures that Timeout is instantiated with a 1 second timeout.
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (1,))
 
