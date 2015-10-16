@@ -59,11 +59,6 @@ from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
-@deprecated(removal_version='0.0.54', hint_message="Replace 'Repository' with 'repository'.")
-def Repository(*args, **kwargs):
-  return repo(*args, **kwargs)
-
-
 def build_file_aliases():
   return BuildFileAliases(
     targets={
@@ -95,7 +90,6 @@ def build_file_aliases():
       'jar': JarDependency,
       'scala_jar': ScalaJarDependency,
       'jar_rules': JarRules,
-      'Repository': Repository,
       'repository': repo,
       'Skip': Skip,
       'shading_relocate': Shading.Relocate.new,

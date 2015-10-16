@@ -56,7 +56,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             java_library(
               name='b',
               dependencies=[':a'],
-              provides=artifact('{org}', '{name}', repo=Repository()),
+              provides=artifact('{org}', '{name}', repo=repository()),
               sources=['z.java'],
             )
         """.format(org=self.b_org, name=self.b_name)))
