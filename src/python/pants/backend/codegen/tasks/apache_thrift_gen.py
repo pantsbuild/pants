@@ -116,16 +116,14 @@ class ApacheThriftGen(SimpleCodegenTask):
       cmd.append('-verbose')
     return cmd
 
-  def _generate_thrift(self, target):
+  def _generate_thrift(self, target, target_workdir):
     target_cmd = self._thrift_cmd[:]
 
     bases = OrderedSet(tgt.target_base for tgt in target.closure() if self.is_gentarget(tgt))
     for base in bases:
       target_cmd.extend(('-I', base))
 
-    work_dir = self.codegen_workdir(target)
-    safe_mkdir(work_dir, clean=True)
-    target_cmd.extend(('-o', work_dir))
+    target_cmd.extend(('-o', target_workdir))
 
     for source in target.sources_relative_to_buildroot():
       cmd = target_cmd[:]
@@ -140,13 +138,12 @@ class ApacheThriftGen(SimpleCodegenTask):
           raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary, result))
 
     # The thrift compiler generates sources to a gen-[lang] subdir of the `-o` argument.  We
-    # relocate the generated java sources to the root of the `work_dir` so that our base class
+    # relocate the generated java sources to the root of the `target_workdir` so that our base class
     # maps them properly for source jars and the like.
-    gen_dir = os.path.join(work_dir, 'gen-java')
+    gen_dir = os.path.join(target_workdir, 'gen-java')
     for path in os.listdir(gen_dir):
-      shutil.move(os.path.join(gen_dir, path), work_dir)
+      shutil.move(os.path.join(gen_dir, path), target_workdir)
     os.rmdir(gen_dir)
 
-  def execute_codegen(self, invalid_targets):
-    for target in invalid_targets:
-      self._generate_thrift(target)
+  def execute_codegen(self, target, target_workdir):
+    self._generate_thrift(target, target_workdir)

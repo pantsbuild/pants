@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_walk
 
 
 logger = logging.getLogger(__name__)
@@ -83,10 +84,9 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
       raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
 
     if compiler == 'antlr3':
-      for source in list(self.codegen_strategy.find_sources(target)):
-        self._scrub_generated_timestamp(source)
+      self._scrub_generated_timestamps(target_workdir)
 
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     # Fetch the right java dependency from the target's compiler option
     compiler_classpath_spec = self.get_options()[target.compiler]
     return self.resolve_deps([compiler_classpath_spec])
@@ -113,14 +113,18 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
 
   _COMMENT_WITH_TIMESTAMP_RE = re.compile('^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
 
-  def _scrub_generated_timestamp(self, source):
-    # Removes the first line of comment if it contains a timestamp.
-    with open(source) as f:
-      lines = f.readlines()
-    if len(lines) < 1:
-      return
-    with open(source, 'w') as f:
-      if not self._COMMENT_WITH_TIMESTAMP_RE.match(lines[0]):
-        f.write(lines[0])
-      for line in lines[1:]:
-        f.write(line)
+  def _scrub_generated_timestamps(self, target_workdir):
+    """Remove the first line of comment from each file if it contains a timestamp."""
+    for root, _, filenames in safe_walk(target_workdir):
+      for filename in filenames:
+        source = os.path.join(root, filename)
+
+        with open(source) as f:
+          lines = f.readlines()
+        if len(lines) < 1:
+          return
+        with open(source, 'w') as f:
+          if not self._COMMENT_WITH_TIMESTAMP_RE.match(lines[0]):
+            f.write(lines[0])
+          for line in lines[1:]:
+            f.write(line)

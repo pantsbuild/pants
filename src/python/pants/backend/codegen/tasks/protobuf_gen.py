@@ -152,7 +152,7 @@ class ProtobufGen(SimpleCodegenTask):
       raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
-    assert (len(targets) == 1, "TODO: This target now only ever receives one target. Simplify.")
+    assert len(targets) == 1, ("TODO: This target now only ever receives one target. Simplify.")
     gentargets = OrderedSet()
 
     def add_to_gentargets(target):
