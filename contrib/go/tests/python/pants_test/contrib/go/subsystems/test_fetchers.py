@@ -64,8 +64,6 @@ class FetchersTest(unittest.TestCase):
 class GolangOrgFetcherTest(unittest.TestCase):
 
   def do_fetch(self, import_path, expected_url, rev=None):
-    # Simulate a series of github api calls to list refs for the given import paths.
-    # Optionally asserts an expected fetch call to the underlying fetcher.
     with subsystem_instance(ArchiveFetcher) as fetcher:
       fetcher._fetch = mock.MagicMock(spec=fetcher._fetch)
       with temporary_dir() as dest:
