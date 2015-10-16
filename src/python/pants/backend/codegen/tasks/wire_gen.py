@@ -81,7 +81,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
         target.payload.service_writer))
     return genfiles
 
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     wire_runtime_deps_spec = self.get_options().javadeps
     return self.resolve_deps([wire_runtime_deps_spec])
 

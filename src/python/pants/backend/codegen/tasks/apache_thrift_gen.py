@@ -90,7 +90,7 @@ class ApacheThriftGen(SimpleCodegenTask):
     with open(source) as thrift:
       return any(line for line in thrift if self.SERVICE_PARSER.search(line))
 
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     for source in target.sources_relative_to_buildroot():
       if self._declares_service(os.path.join(get_buildroot(), source)):
         return self._service_deps

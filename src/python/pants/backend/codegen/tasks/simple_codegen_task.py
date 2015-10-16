@@ -74,7 +74,7 @@ class SimpleCodegenTask(Task):
   def cache_target_dirs(self):
     return True
 
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     """Gets any extra dependencies generated synthetic targets should have.
 
     This method is optional for subclasses to implement, because some code generators may have no
@@ -171,7 +171,7 @@ class SimpleCodegenTask(Task):
         synthetic_target = self.context.add_new_target(
           address=self.get_synthetic_address(target, target_workdir),
           target_type=self.synthetic_target_type(target),
-          dependencies=self.synthetic_target_extra_dependencies(target),
+          dependencies=self.synthetic_target_extra_dependencies(target, target_workdir),
           sources=relative_generated_sources,
           derived_from=target,
 
@@ -250,8 +250,8 @@ class SimpleCodegenTask(Task):
     sources = OrderedSet()
 
     def add_sources(dep):
-      dep_workdir = target_workdirs[dep]
-      if dep is not target:
+      if dep is not target and dep in target_workdirs:
+        dep_workdir = target_workdirs[dep]
         dep_sources = self._find_sources_generated_by_target(dep, dep_workdir)
         dep_sources = [fast_relpath(source, dep_workdir) for source in dep_sources]
         sources.update(dep_sources)

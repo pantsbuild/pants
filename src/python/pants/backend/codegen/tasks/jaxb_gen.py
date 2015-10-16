@@ -44,40 +44,26 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
   def is_gentarget(self, target):
     return isinstance(target, JaxbLibrary)
 
-  def execute_codegen(self, targets):
-    cache = []
+  def execute_codegen(self, target, target_workdir):
+    if not isinstance(target, JaxbLibrary):
+      raise TaskError('Invalid target type "{class_type}" (expected JaxbLibrary)'
+                      .format(class_type=type(target).__name__))
 
-    for target in targets:
-      output_dir = self.codegen_workdir(target)
-      safe_mkdir(output_dir)
-      if not isinstance(target, JaxbLibrary):
-        raise TaskError('Invalid target type "{class_type}" (expected JaxbLibrary)'
-                        .format(class_type=type(target).__name__))
+    target_files = []
+    for source in target.sources_relative_to_buildroot():
+      path_to_xsd = source
+      output_package = target.package
 
-      target_files = []
-      for source in target.sources_relative_to_buildroot():
-        path_to_xsd = source
-        output_package = target.package
+      if output_package is None:
+        output_package = self._guess_package(source)
+      output_package = self._correct_package(output_package)
 
-        if output_package is None:
-          output_package = self._guess_package(source)
-        output_package = self._correct_package(output_package)
+      args = ['-p', output_package, '-d', target_workdir, path_to_xsd]
+      result = self._compile_schema(args)
 
-        output_directory = output_dir
-        safe_mkdir(output_directory)
-        args = ['-p', output_package, '-d', output_directory, path_to_xsd]
-        result = self._compile_schema(args)
-
-        if result != 0:
-          raise TaskError('xjc ... exited non-zero ({code})'.format(code=result))
-        target_files.append(self._sources_to_be_generated(target.package, path_to_xsd))
-      cache.append((target, target_files))
-
-    return cache
-
-  @classmethod
-  def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy]
+      if result != 0:
+        raise TaskError('xjc ... exited non-zero ({code})'.format(code=result))
+      target_files.append(self._sources_to_be_generated(target.package, path_to_xsd))
 
   @classmethod
   def _guess_package(self, path):
