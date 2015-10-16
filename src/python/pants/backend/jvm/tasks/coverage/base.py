@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod, abstractproperty
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.util.dirutil import safe_mkdir
@@ -16,6 +16,7 @@ from pants.util.strutil import safe_shlex_split
 
 class Coverage(object):
   """Base class for emma-like coverage processors. Do not instantiate."""
+  __metaclass__ = ABCMeta
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
@@ -63,6 +64,18 @@ class Coverage(object):
 
   @abstractmethod
   def report(self, targets, tests, execute_java_for_targets, tests_failed_exception):
+    pass
+
+  @abstractproperty
+  def classpath_prepend(self):
+    pass
+
+  @abstractproperty
+  def classpath_append(self):
+    pass
+
+  @abstractproperty
+  def extra_jvm_options(self):
     pass
 
   # Utility methods, called from subclasses

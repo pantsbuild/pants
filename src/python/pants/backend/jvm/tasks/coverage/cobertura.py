@@ -113,12 +113,15 @@ class Cobertura(Coverage):
           raise TaskError("java {0} ... exited non-zero ({1})"
                           " 'failed to instrument'".format(main, result))
 
+  @property
   def classpath_append(self):
     return ()
 
+  @property
   def classpath_prepend(self):
     return self._task_exports.tool_classpath('cobertura-run')
 
+  @property
   def extra_jvm_options(self):
     return ['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile]
 

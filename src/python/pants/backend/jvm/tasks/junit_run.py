@@ -31,9 +31,7 @@ from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.dirutil import (relativize_paths, safe_delete, safe_mkdir, safe_open, safe_rmtree,
-                                touch)
-from pants.util.strutil import pluralize, safe_shlex_split
+from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
 
@@ -194,6 +192,7 @@ class _JUnitRunner(object):
       if self._coverage:
         self._coverage.report(
           targets, tests_and_targets.keys(), self.execute_java_for_targets, tests_failed_exception=exception)
+
     try:
       self.run(tests_and_targets)
       _do_report(exception=None)
@@ -307,13 +306,13 @@ class _JUnitRunner(object):
   def _run_tests(self, tests_to_targets):
 
     if self._coverage:
-      extra_jvm_options = self._coverage.extra_jvm_options()
-      classpath_prepend = self._coverage.classpath_prepend()
-      classpath_append = self._coverage.classpath_append()
+      extra_jvm_options = self._coverage.extra_jvm_options
+      classpath_prepend = self._coverage.classpath_prepend
+      classpath_append = self._coverage.classpath_append
     else:
-      extra_jvm_options=[]
-      classpath_prepend=()
-      classpath_append=()
+      extra_jvm_options = []
+      classpath_prepend = ()
+      classpath_append = ()
 
     tests_by_properties = self._tests_by_properties(tests_to_targets,
                                                     self._infer_workdir,

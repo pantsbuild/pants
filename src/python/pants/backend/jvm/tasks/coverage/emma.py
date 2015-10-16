@@ -53,12 +53,15 @@ class Emma(Coverage):
         raise TaskError("java {0} ... exited non-zero ({1})"
                         " 'failed to instrument'".format(main, result))
 
+  @property
   def classpath_prepend(self):
     return [self._coverage_instrument_dir]
 
+  @property
   def classpath_append(self):
     return self._emma_classpath
 
+  @property
   def extra_jvm_options(self):
     return ['-Demma.coverage.out.file={0}'.format(self._coverage_file)]
 
