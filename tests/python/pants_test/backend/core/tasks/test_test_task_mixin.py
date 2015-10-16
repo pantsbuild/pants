@@ -48,6 +48,9 @@ class TestTaskMixinTest(TaskTestBase):
       def _validate_target(self, target):
         self.call_list.append(['_validate_target', target])
 
+      def _timeout_abort_handler(self):
+        self.call_list.append(['_timeout_abort_handler'])
+
     return TestTaskMixinTask
 
   def test_execute_normal(self):
@@ -128,7 +131,8 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
       with self.assertRaises(TestFailedTaskError):
         task.execute()
 
-      mock_timeout.assert_called_with(1)
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (1,))
 
   def test_timeout_disabled(self):
     self.set_options(timeouts=False)
@@ -136,4 +140,5 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
 
     with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
       task.execute()
-      mock_timeout.assert_called_with(None)
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (None,))
