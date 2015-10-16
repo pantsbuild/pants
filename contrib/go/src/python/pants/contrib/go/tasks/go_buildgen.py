@@ -339,7 +339,7 @@ class GoBuildgen(GoTask):
       unrooted_locals = {t for t in local_go_targets if t.target_base != local_root}
       if unrooted_locals:
         raise self.UnrootedLocalSourceError('Cannot BUILD gen until the following targets are '
-                                            'relocated to the build root at {}:\n\t{}'
+                                            'relocated to the source root at {}:\n\t{}'
                                             .format(local_root,
                                                     '\n\t'.join(sorted(t.address.reference()
                                                                        for t in unrooted_locals))))
