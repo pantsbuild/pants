@@ -77,13 +77,7 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
 
   @classmethod
   def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy, cls.JaxbGlobalCodegenStrategy]
-
-  def sources_generated_by_target(self, target):
-    to_generate = []
-    for source in target.sources_relative_to_buildroot():
-      to_generate.extend(self._sources_to_be_generated(target.package, source))
-    return to_generate
+    return [cls.IsolatedCodegenStrategy]
 
   @classmethod
   def _guess_package(self, path):
@@ -139,8 +133,3 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     names.append('ObjectFactory')
     outdir = package.replace('.', '/')
     return [os.path.join(outdir, '{}.java'.format(name)) for name in names]
-
-  class JaxbGlobalCodegenStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
-
-    def find_sources(self, target):
-      return self._task.sources_generated_by_target(target)

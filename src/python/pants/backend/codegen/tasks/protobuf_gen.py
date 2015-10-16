@@ -115,14 +115,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy, cls.ProtobufGlobalCodegenStrategy]
-
-  def sources_generated_by_target(self, target):
-    genfiles = []
-    for source in target.sources_relative_to_source_root():
-      path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(path, source))
-    return genfiles
+    return [cls.IsolatedCodegenStrategy]
 
   def execute_codegen(self, targets):
     if not targets:
@@ -252,11 +245,6 @@ class ProtobufGen(SimpleCodegenTask):
 
     for classname in classnames:
       yield os.path.join(basepath, '{0}.java'.format(classname))
-
-  class ProtobufGlobalCodegenStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
-
-    def find_sources(self, target):
-      return self._task.sources_generated_by_target(target)
 
 
 def _same_contents(a, b):

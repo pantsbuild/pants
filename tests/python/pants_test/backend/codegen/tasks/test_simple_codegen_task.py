@@ -48,19 +48,9 @@ class SimpleCodegenTaskTest(TaskTestBase):
     return set([self.target(spec) for spec in target_specs])
 
   def test_codegen_strategy(self):
-    self.set_options(strategy='global')
-    task = self.create_task(self.context())
-    self.assertEqual('global', task.get_options().strategy)
-    self.assertEqual('global', task.codegen_strategy.name())
-
     self.set_options(strategy='isolated')
     task = self.create_task(self.context())
     self.assertEqual('isolated', task.codegen_strategy.name())
-
-    task = self._create_dummy_task(strategy='global', forced_codegen_strategy='global')
-    self.assertEqual('global', task.codegen_strategy.name())
-    task = self._create_dummy_task(strategy='isolated', forced_codegen_strategy='global')
-    self.assertEqual('global', task.codegen_strategy.name())
 
   def test_codegen_workdir_suffix(self):
     targets = self._create_dummy_library_targets([
@@ -76,25 +66,21 @@ class SimpleCodegenTaskTest(TaskTestBase):
       return task._codegen_strategy_for_name(strategy).codegen_workdir_suffix(target)
 
     for target in targets:
-      self.assertEqual('global', get_suffix(target, 'global'))
       self.assertTrue('isolated' in get_suffix(target, 'isolated'))
 
-    global_dirs = set(get_suffix(target, 'global') for target in targets)
     isolated_dirs = set(get_suffix(target, 'isolated') for target in targets)
 
-    self.assertEqual(1, len(global_dirs), 'There should only be one global directory suffix!')
     self.assertEqual(len(targets), len(isolated_dirs),
                      'There should be exactly one directory suffix per unique target!')
 
   def test_codegen_workdir_suffix_stability(self):
     specs = ['project/src/main/foogen/foo-lib:foo-target-a']
     for target in self._create_dummy_library_targets(specs):
-      for strategy in (SimpleCodegenTask.IsolatedCodegenStrategy(None),
-                       SimpleCodegenTaskTest.DummyGen.DummyGlobalStrategy(None)):
-        self.assertEqual(strategy.codegen_workdir_suffix(target),
-                         strategy.codegen_workdir_suffix(target),
-                         'Codegen workdir suffix should be stable given the same target!\n'
-                         '  target: {}'.format(target.address.spec))
+      strategy = SimpleCodegenTask.IsolatedCodegenStrategy(None)
+      self.assertEqual(strategy.codegen_workdir_suffix(target),
+                        strategy.codegen_workdir_suffix(target),
+                        'Codegen workdir suffix should be stable given the same target!\n'
+                        '  target: {}'.format(target.address.spec))
 
   def _test_execute_strategy(self, strategy, expected_execution_count):
     dummy_suffixes = ['a', 'b', 'c']
@@ -121,9 +107,6 @@ class SimpleCodegenTaskTest(TaskTestBase):
     self.assertEqual(expected_execution_count, task.execution_counts,
                      '{} strategy had the wrong number of executions!\n  expected: {}\n  got: {}'
                      .format(strategy, expected_execution_count, task.execution_counts))
-
-  def test_execute_global(self):
-    self._test_execute_strategy('global', 1)
 
   def test_execute_isolated(self):
     self._test_execute_strategy('isolated', 3)
@@ -269,9 +252,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
     @classmethod
     def supported_strategy_types(cls):
       if cls._forced_codegen_strategy is None or cls._hard_forced_codegen_strategy:
-        return [cls.IsolatedCodegenStrategy, cls.DummyGlobalStrategy]
-      elif cls._forced_codegen_strategy == 'global':
-        return [cls.DummyGlobalStrategy]
+        return [cls.IsolatedCodegenStrategy]
       elif cls._forced_codegen_strategy == 'isolated':
         return [cls.IsolatedCodegenStrategy]
       raise ValueError('Unrecognized _forced_codegen_strategy for test ({}).'
@@ -286,12 +267,6 @@ class SimpleCodegenTaskTest(TaskTestBase):
       if self.codegen_strategy.name() == 'isolated':
         self._test_case.assertEqual(1, len(invalid_targets),
                                     'Codegen should execute individually in isolated mode.')
-      elif self.codegen_strategy.name() == 'global':
-        self._test_case.assertEqual(len(self._all_targets), len(invalid_targets),
-                                    'Codegen should execute all together in global mode.'
-                                    '\n all_targets={0}\n gen_targets={1}\n targets: '
-                                    .format(len(self._all_targets), len(invalid_targets),
-                                            ', '.join(t.address.spec for t in invalid_targets)))
       else:
         raise ValueError('Unknown codegen strategy "{}".'.format(self.codegen_strategy.name()))
 
@@ -307,12 +282,6 @@ class SimpleCodegenTaskTest(TaskTestBase):
             f.write('package {0};\n\n'.format(package_name))
             f.write('public class {0} '.format(class_name))
             f.write('{\n\\\\ ... nothing ... \n}\n')
-
-    def sources_generated_by_target(self, target):
-      self._test_case.assertEqual('global', self.codegen_strategy.name(),
-                            'sources_generated_by_target should only be called for '
-                            'strategy=global.')
-      return self._dummy_sources_to_generate(target)
 
     def _dummy_sources_to_generate(self, target):
       for source in target.sources_relative_to_buildroot():
@@ -334,8 +303,3 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     def synthetic_target_type(self, target):
       return JavaLibrary
-
-    class DummyGlobalStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
-
-      def find_sources(self, target):
-        return self._task.sources_generated_by_target(target)

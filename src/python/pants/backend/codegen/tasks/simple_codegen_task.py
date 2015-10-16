@@ -125,8 +125,7 @@ class SimpleCodegenTask(Task):
     This list is used to generate the options for the --strategy flag. The first item in the list
     is used as the default value.
 
-    By default, this only supports the IsolatedCodegenStrategy. Subclasses which desire global
-    generation should subclass the GlobalCodegenStrategy.
+    By default, this only supports the IsolatedCodegenStrategy.
     :return: the list of types (classes, not instances) that extend from CodegenStrategy.
     :rtype: list
     """
@@ -339,33 +338,6 @@ class SimpleCodegenTask(Task):
       """The working directory suffix for the given target's generated code."""
 
     def __str__(self):
-      return self.name()
-
-  class GlobalCodegenStrategy(CodegenStrategy):
-    """Code generation strategy which generates all code together, in base directory."""
-
-    def __init__(self, task):
-      self._task = task
-
-    @classmethod
-    def name(cls):
-      return 'global'
-
-    def execute_codegen(self, targets):
-      with self._task.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
-        self._do_execute_codegen(targets)
-
-    @abstractmethod
-    def find_sources(self, target):
-      """Predicts what sources the codegen target will generate.
-
-      The exact implementation of this is left to the GlobalCodegenStrategy subclass.
-      :param Target target: the target for which to find generated sources.
-      :return: a set of relative filepaths.
-      :rtype: OrderedSet
-      """
-
-    def codegen_workdir_suffix(self, target):
       return self.name()
 
   class IsolatedCodegenStrategy(CodegenStrategy):
