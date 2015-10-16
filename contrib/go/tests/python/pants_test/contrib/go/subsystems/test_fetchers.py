@@ -13,7 +13,7 @@ import requests
 from pants.util.contextutil import temporary_dir
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
-from pants.contrib.go.subsystems.fetchers import Fetchers, GopkgInFetcher
+from pants.contrib.go.subsystems.fetchers import ArchiveFetcher, Fetchers, GopkgInFetcher
 
 
 class FetchersTest(unittest.TestCase):
@@ -53,12 +53,50 @@ class FetchersTest(unittest.TestCase):
 
   def test_default_golang(self):
     self.check_default('golang.org/x/oauth2',
-                       expected_root='github.com/golang/oauth2')
+                       expected_root='golang.org/x/oauth2')
     self.check_default('golang.org/x/net/context',
-                       expected_root='github.com/golang/net')
+                       expected_root='golang.org/x/net')
 
   def test_default_gopkg(self):
     self.check_default('gopkg.in/check.v1', expected_root='gopkg.in/check.v1')
+
+
+class GolangOrgFetcherTest(unittest.TestCase):
+
+  def do_fetch(self, import_path, expected_url, rev=None):
+    # Simulate a series of github api calls to list refs for the given import paths.
+    # Optionally asserts an expected fetch call to the underlying fetcher.
+    with subsystem_instance(ArchiveFetcher) as fetcher:
+      fetcher._fetch = mock.MagicMock(spec=fetcher._fetch)
+      with temporary_dir() as dest:
+        fetcher.fetch(import_path, dest, rev=rev)
+
+      # For some reason using `assert_called_once_with` like so:
+      #   fetcher._fetch.assert_called_once_with(expected_url)
+      #
+      # Yields this error:
+      # E       AssertionError:
+      #           Expected call: mock(u'https://github.com/golang/oauth2/archive/master.tar.gz')
+      # E       Actual call: mock(u'https://github.com/golang/oauth2/archive/master.tar.gz')
+      # E       too many positional arguments
+      #
+      # So we manually check called once with in 2 steps.
+      self.assertEqual(1, fetcher._fetch.call_count)
+      self.assertEqual(mock.call(expected_url), fetcher._fetch.call_args)
+
+  def test_fetch(self):
+    self.do_fetch(import_path='golang.org/x/oauth2',
+                  expected_url='https://github.com/golang/oauth2/archive/master.tar.gz')
+    self.do_fetch(import_path='golang.org/x/net/context',
+                  expected_url='https://github.com/golang/net/archive/master.tar.gz')
+
+  def test_fetch_rev(self):
+    self.do_fetch(import_path='golang.org/x/oauth2',
+                  rev='abc123',
+                  expected_url='https://github.com/golang/oauth2/archive/abc123.tar.gz')
+    self.do_fetch(import_path='golang.org/x/net/context',
+                  rev='def456',
+                  expected_url='https://github.com/golang/net/archive/def456.tar.gz')
 
 
 class GopkgInFetcherTest(unittest.TestCase):
