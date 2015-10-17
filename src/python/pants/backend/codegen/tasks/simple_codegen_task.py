@@ -255,11 +255,11 @@ class SimpleCodegenTask(Task):
     # Compute the sources generated directly by this target.
     by_target = OrderedSet(self._find_sources_in_workdir(target_workdir))
 
-    # Walk dependency targets and record any sources owned by those targets that are also
+    # Walk dependency gentargets and record any sources owned by those targets that are also
     # owned by this target.
     duplicates_by_target = OrderedDict()
     def record_duplicates(dep):
-      if dep == target:
+      if dep == target or not self.is_gentarget(dep.concrete_derived_from):
         return
       duped_sources = [s for s in dep.sources_relative_to_source_root() if s in by_target]
       if duped_sources:
@@ -273,7 +273,7 @@ class SimpleCodegenTask(Task):
       for dep, duped_sources in duplicates_by_target.items():
         for duped_source in duped_sources:
           by_target.pop(duped_source)
-        messages.append('\t{} also generated:'.format(dep.address.spec))
+        messages.append('\t{} also generated:'.format(dep.concrete_derived_from.address.spec))
         messages.extend(['\t\t{}'.format(source) for source in duped_sources])
       message = '\n'.join(messages)
       if self.get_options().allow_dups:
