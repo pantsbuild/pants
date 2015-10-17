@@ -37,8 +37,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
 
-  def find_sources(self, target, target_dirs):
-    sources = super(AntlrGen, self).find_sources(target, target_dirs)
+  def find_sources(self, target, target_dir):
+    sources = super(AntlrGen, self).find_sources(target, target_dir)
     return [source for source in sources if source.endswith('.java')]
 
   @classmethod

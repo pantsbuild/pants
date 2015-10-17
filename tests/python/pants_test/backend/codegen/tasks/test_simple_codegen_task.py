@@ -185,33 +185,42 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     return self.target('gen-parent'), self.target('gen-child:good'), self.target('gen-child:bad')
 
-  def test_duplicated_code_generation(self):
+  def _do_test_duplicated_code_generation(self, targets, allow_dups, should_fail):
+    task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=allow_dups)
+    target_workdirs = {t: safe_mkdtemp(dir=task.workdir) for t in targets}
+
+    # Generate and inject code for each target.
+    def execute():
+      for target in targets:
+        target_workdir = target_workdirs[target]
+        task.execute_codegen(target, target_workdir)
+        task._inject_synthetic_target(target, target_workdir)
+
+    if should_fail:
+      # If we're expected to fail, validate the resulting message.
+      with self.assertRaises(SimpleCodegenTask.DuplicateSourceError) as cm:
+        execute()
+      should_contain = ['org/pantsbuild/example/ParentClass']
+      should_not_contain = ['org/pantsbuild/example/ChildClass']
+      message = str(cm.exception)
+      for item in should_contain:
+        self.assertTrue(item in message, 'Error message should contain "{}".'.format(item))
+      for item in should_not_contain:
+        self.assertFalse(item in message, 'Error message should not contain "{}".'.format(item))
+    else:
+      # Execute successfully.
+      execute()
+
+  def test_duplicated_code_generation_fail(self):
     targets = self._get_duplication_test_targets()
-    parent, good, bad = targets
-    task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=False)
-    target_workdirs = {t: safe_mkdtemp() for t in targets}
-    for target in targets:
-      task.execute_codegen(target, target_workdirs[target])
+    self._do_test_duplicated_code_generation(targets, allow_dups=False, should_fail=True)
 
-    task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=False)
-    with self.assertRaises(SimpleCodegenTask.DuplicateSourceError) as cm:
-      task.find_sources(bad, target_workdirs)
-    should_contain = ['org/pantsbuild/example/ParentClass']
-    should_not_contain = ['org/pantsbuild/example/ChildClass']
-    message = str(cm.exception)
-    for item in should_contain:
-      self.assertTrue(item in message, 'Error message should contain "{}".'.format(item))
-    for item in should_not_contain:
-      self.assertFalse(item in message, 'Error message should not contain "{}".'.format(item))
+  def test_duplicated_code_generation_pass(self):
+    targets = self._get_duplication_test_targets()
+    self._do_test_duplicated_code_generation(targets, allow_dups=True, should_fail=False)
 
-    # Should error same as above. Just to make sure the flag exists when the codegen strategy
-    # is forced.
-    task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=False)
-    with self.assertRaises(SimpleCodegenTask.DuplicateSourceError):
-      task.find_sources(bad, target_workdirs)
-
-    task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=True)
-    task.find_sources(bad, target_workdirs)  # Should not raise error, only warning.
-
-    task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=False)
-    task.find_sources(good, target_workdirs)  # Should be completely fine.
+  def test_duplicated_code_generation_nodupes(self):
+    # Without the duplicated target, either mode is fine.
+    targets = self._get_duplication_test_targets()[:-1]
+    self._do_test_duplicated_code_generation(targets, allow_dups=False, should_fail=False)
+    self._do_test_duplicated_code_generation(targets, allow_dups=True, should_fail=False)
