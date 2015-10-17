@@ -117,9 +117,6 @@ class ProtobufGen(SimpleCodegenTask):
     sources_by_base = self._calculate_sources([target])
     sources = target.sources_relative_to_buildroot()
 
-    if not self.validate_sources_present(sources, [target]):
-      return
-
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports([target]))
     check_duplicate_conflicting_protos(self, sources_by_base, sources, self.context.log)

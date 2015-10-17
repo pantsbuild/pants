@@ -89,8 +89,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     """Calculate the arguments to pass to the command line for a single target."""
     sources_by_base = self._calculate_sources([target])
     sources = OrderedSet(target.sources_relative_to_buildroot())
-    if not self.validate_sources_present(sources, [target]):
-      return None
+
     relative_sources = OrderedSet()
     for source in sources:
       source_root = SourceRoot.find_by_path(source)

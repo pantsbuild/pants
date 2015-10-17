@@ -76,12 +76,6 @@ class SimpleCodegenTaskTest(TaskTestBase):
   def test_execute_isolated(self):
     self._test_execute_strategy('isolated', 3)
 
-  def test_execute_fail(self):
-    dummy = self.make_target(spec='dummy', target_type=self.DummyLibrary)
-    task = self._create_dummy_task(target_roots=[dummy])
-    task.should_fail = True
-    self.assertRaisesRegexp(TaskError, r'Failed to generate target\(s\)', task.execute)
-
   def _get_duplication_test_targets(self):
     self.add_to_build_file('gen-parent', dedent('''
       dummy_library(name='gen-parent',
@@ -175,7 +169,6 @@ class SimpleCodegenTaskTest(TaskTestBase):
       self._test_case = None
       self._all_targets = None
       self.setup_for_testing(None, None)
-      self.should_fail = False
       self.execution_counts = 0
 
     def setup_for_testing(self, test_case, all_targets):
@@ -194,7 +187,6 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     def execute_codegen(self, target, target_workdir):
       self.execution_counts += 1
-      if self.should_fail: raise TaskError('Failed to generate target(s)')
 
       for path in self._dummy_sources_to_generate(target, target_workdir):
         class_name = os.path.basename(path).split('.')[0]
