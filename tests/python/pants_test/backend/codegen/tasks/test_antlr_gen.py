@@ -64,18 +64,19 @@ class AntlrGenTest(NailgunTaskTestBase):
         fragment LETTER : 'a'..'z' | 'A'..'Z' ;
       """.format(**self.PARTS)))
 
-  def create_context(self, workspace=None):
+  def create_context(self):
     # generate a context to contain the build graph for the input target.
-    return self.context(target_roots=[self.get_antlr_target()], workspace=workspace)
+    return self.context(target_roots=[self.get_antlr_target()])
 
   def get_antlr_target(self):
     return self.target('{srcroot}/{dir}:{name}'.format(**self.PARTS))
 
-  def execute_antlr_test(self, expected_package, context=None, target_workdir=None):
+  def execute_antlr_test(self, expected_package, target_workdir_fun=None):
     target = self.get_antlr_target()
-    context = context or self.create_context()
+    context = self.create_context()
     task = self.prepare_execute(context)
-    target_workdir = target_workdir or safe_mkdtemp(dir=task.workdir)
+    target_workdir_fun = target_workdir_fun or (lambda x: safe_mkdtemp(dir=x))
+    target_workdir = target_workdir_fun(task.workdir)
 
     # Generate code, then create a synthetic target.
     task.execute_codegen(target, target_workdir)
@@ -156,16 +157,14 @@ class AntlrGenTest(NailgunTaskTestBase):
       self.execute(self.create_context())
 
   def test_generated_target_fingerprint_stable_v3(self):
-    self._test_generated_target_fingerprint_stable('3')
+    self._test_generated_target_fingerprint_stable('3', None)
 
   def test_generated_target_fingerprint_stable_v4(self):
-    self._test_generated_target_fingerprint_stable('4')
+    self._test_generated_target_fingerprint_stable('4', self.PARTS['dir'].replace('/', '.'))
 
-  def _test_generated_target_fingerprint_stable(self, version):
+  def _test_generated_target_fingerprint_stable(self, version, package):
     # Use a stable workdir for both builds.
-    workspace = safe_mkdtemp(dir=self.test_workdir)
-    context = self.create_context(workspace=workspace)
-    target_workdir = safe_mkdtemp(dir=workspace)
+    target_workdir_fun = lambda root: os.path.join(root, 'stable')
 
     def execute_and_get_synthetic_target_hash():
       # Rerun setUp() to clear up the build graph of injected synthetic targets.
@@ -177,7 +176,7 @@ class AntlrGenTest(NailgunTaskTestBase):
           sources=['{prefix}.g{version}'],
         )
       """.format(version=version, **self.PARTS)))
-      syn_target = self.execute_antlr_test(None, context=context, target_workdir=target_workdir)
+      syn_target = self.execute_antlr_test(package, target_workdir_fun=target_workdir_fun)
       return syn_target.transitive_invalidation_hash()
 
     fp1 = execute_and_get_synthetic_target_hash()
