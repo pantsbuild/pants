@@ -16,19 +16,96 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.util.dirutil import safe_mkdtemp
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+
+
+class DummyLibrary(JvmTarget):
+  """Library of .dummy files, which are just text files which generate empty java files.
+
+  As the name implies, this is purely for testing the behavior of the simple_codegen_task.
+
+  For example, a .dummy file with the contents:
+  org.company.package Main
+  org.company.package Foobar
+  org.company.other Barfoo
+
+  Would generate the files:
+  org/company/package/Main.java,
+  org/company/package/Foobar.java,
+  org/company/other/Barfoo.java,
+
+  Which would compile, but do nothing.
+  """
+
+
+class DummyGen(SimpleCodegenTask):
+  """Task which generates .java files for DummyLibraries.
+
+  In addition to fulfilling the bare-minimum requirements of being a SimpleCodegenTask subclass,
+  the methods in this class perform some validation to ensure that they are being called correctly
+  by SimpleCodegenTask.
+  """
+
+  def __init__(self, *vargs, **kwargs):
+    super(DummyGen, self).__init__(*vargs, **kwargs)
+    self._test_case = None
+    self._all_targets = None
+    self.setup_for_testing(None, None)
+    self.execution_counts = 0
+
+  def setup_for_testing(self, test_case, all_targets):
+    """Gets this dummy generator class ready for testing.
+
+    :param TaskTestBase test_case: the 'parent' test-case using this task. Used for asserts, etc.
+    :param set all_targets: the set of all valid code-gen targets for this task, for validating
+      the correctness of the chosen strategy.
+    """
+    self._test_case = test_case
+    self._all_targets = all_targets
+    cls = type(self)
+
+  def is_gentarget(self, target):
+    return isinstance(target, DummyLibrary)
+
+  def execute_codegen(self, target, target_workdir):
+    self.execution_counts += 1
+
+    for path in self._dummy_sources_to_generate(target, target_workdir):
+      class_name = os.path.basename(path).split('.')[0]
+      package_name = os.path.relpath(os.path.dirname(path),
+                                      target_workdir).replace(os.path.sep, '.')
+      if not os.path.exists(os.path.join(self._test_case.build_root, os.path.basename(path))):
+        self._test_case.create_dir(os.path.basename(path))
+      self._test_case.create_file(path)
+      with open(path, 'w') as f:
+        f.write('package {0};\n\n'.format(package_name))
+        f.write('public class {0} '.format(class_name))
+        f.write('{\n\\\\ ... nothing ... \n}\n')
+
+  def _dummy_sources_to_generate(self, target, target_workdir):
+    for source in target.sources_relative_to_buildroot():
+      source = os.path.join(self._test_case.build_root, source)
+      with open(source, 'r') as f:
+        for line in f:
+          line = line.strip()
+          if line:
+            package_name, class_name = line.split(' ')
+            yield os.path.join(target_workdir, os.path.join(*package_name.split('.')), class_name)
+
+  def synthetic_target_type(self, target):
+    return JavaLibrary
 
 
 class SimpleCodegenTaskTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return cls.DummyGen
+    return DummyGen
 
   @property
   def alias_groups(self):
     return register_core().merge(register_codegen()).merge(BuildFileAliases({
-      'dummy_library': SimpleCodegenTaskTest.DummyLibrary
+      'dummy_library': DummyLibrary
     }))
 
   def _create_dummy_task(self, target_roots=None, **options):
@@ -73,6 +150,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
                      '{} strategy had the wrong number of executions!\n  expected: {}\n  got: {}'
                      .format(strategy, expected_execution_count, task.execution_counts))
 
+  @ensure_cached(DummyGen)
   def test_execute_isolated(self):
     self._test_execute_strategy('isolated', 3)
 
@@ -137,78 +215,3 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=False)
     task.find_sources(good, target_workdirs)  # Should be completely fine.
-
-  class DummyLibrary(JvmTarget):
-    """Library of .dummy files, which are just text files which generate empty java files.
-
-    As the name implies, this is purely for testing the behavior of the simple_codegen_task.
-
-    For example, a .dummy file with the contents:
-    org.company.package Main
-    org.company.package Foobar
-    org.company.other Barfoo
-
-    Would generate the files:
-    org/company/package/Main.java,
-    org/company/package/Foobar.java,
-    org/company/other/Barfoo.java,
-
-    Which would compile, but do nothing.
-    """
-
-  class DummyGen(SimpleCodegenTask):
-    """Task which generates .java files for DummyLibraries.
-
-    In addition to fulfilling the bare-minimum requirements of being a SimpleCodegenTask subclass,
-    the methods in this class perform some validation to ensure that they are being called correctly
-    by SimpleCodegenTask.
-    """
-
-    def __init__(self, *vargs, **kwargs):
-      super(SimpleCodegenTaskTest.DummyGen, self).__init__(*vargs, **kwargs)
-      self._test_case = None
-      self._all_targets = None
-      self.setup_for_testing(None, None)
-      self.execution_counts = 0
-
-    def setup_for_testing(self, test_case, all_targets):
-      """Gets this dummy generator class ready for testing.
-
-      :param TaskTestBase test_case: the 'parent' test-case using this task. Used for asserts, etc.
-      :param set all_targets: the set of all valid code-gen targets for this task, for validating
-        the correctness of the chosen strategy.
-      """
-      self._test_case = test_case
-      self._all_targets = all_targets
-      cls = type(self)
-
-    def is_gentarget(self, target):
-      return isinstance(target, SimpleCodegenTaskTest.DummyLibrary)
-
-    def execute_codegen(self, target, target_workdir):
-      self.execution_counts += 1
-
-      for path in self._dummy_sources_to_generate(target, target_workdir):
-        class_name = os.path.basename(path).split('.')[0]
-        package_name = os.path.relpath(os.path.dirname(path),
-                                       target_workdir).replace(os.path.sep, '.')
-        if not os.path.exists(os.path.join(self._test_case.build_root, os.path.basename(path))):
-          self._test_case.create_dir(os.path.basename(path))
-        self._test_case.create_file(path)
-        with open(path, 'w') as f:
-          f.write('package {0};\n\n'.format(package_name))
-          f.write('public class {0} '.format(class_name))
-          f.write('{\n\\\\ ... nothing ... \n}\n')
-
-    def _dummy_sources_to_generate(self, target, target_workdir):
-      for source in target.sources_relative_to_buildroot():
-        source = os.path.join(self._test_case.build_root, source)
-        with open(source, 'r') as f:
-          for line in f:
-            line = line.strip()
-            if line:
-              package_name, class_name = line.split(' ')
-              yield os.path.join(target_workdir, os.path.join(*package_name.split('.')), class_name)
-
-    def synthetic_target_type(self, target):
-      return JavaLibrary
