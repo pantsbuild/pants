@@ -185,16 +185,18 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     return self.target('gen-parent'), self.target('gen-child:good'), self.target('gen-child:bad')
 
-  def _do_test_duplicated_code_generation(self, targets, allow_dups, should_fail):
+  def _do_test_duplication(self, targets, allow_dups, should_fail):
     task = self._create_dummy_task(target_roots=targets, strategy='isolated', allow_dups=allow_dups)
     target_workdirs = {t: safe_mkdtemp(dir=task.workdir) for t in targets}
+    syn_targets = []
 
     # Generate and inject code for each target.
     def execute():
       for target in targets:
         target_workdir = target_workdirs[target]
         task.execute_codegen(target, target_workdir)
-        task._inject_synthetic_target(target, target_workdir)
+        task._handle_duplicate_sources(target, target_workdir)
+        syn_targets.append(task._inject_synthetic_target(target, target_workdir))
 
     if should_fail:
       # If we're expected to fail, validate the resulting message.
@@ -211,16 +213,22 @@ class SimpleCodegenTaskTest(TaskTestBase):
       # Execute successfully.
       execute()
 
+    return tuple(syn_targets)
+
   def test_duplicated_code_generation_fail(self):
     targets = self._get_duplication_test_targets()
-    self._do_test_duplicated_code_generation(targets, allow_dups=False, should_fail=True)
+    self._do_test_duplication(targets, allow_dups=False, should_fail=True)
 
   def test_duplicated_code_generation_pass(self):
+    # Allow dupes.
     targets = self._get_duplication_test_targets()
-    self._do_test_duplicated_code_generation(targets, allow_dups=True, should_fail=False)
+    parent, good, bad = self._do_test_duplication(targets, allow_dups=True, should_fail=False)
+    # Confirm that the duped sources were removed.
+    for source in bad.sources_relative_to_source_root():
+      self.assertNotIn(source, parent.sources_relative_to_source_root())
 
   def test_duplicated_code_generation_nodupes(self):
     # Without the duplicated target, either mode is fine.
     targets = self._get_duplication_test_targets()[:-1]
-    self._do_test_duplicated_code_generation(targets, allow_dups=False, should_fail=False)
-    self._do_test_duplicated_code_generation(targets, allow_dups=True, should_fail=False)
+    self._do_test_duplication(targets, allow_dups=False, should_fail=False)
+    self._do_test_duplication(targets, allow_dups=True, should_fail=False)
