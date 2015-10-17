@@ -57,8 +57,7 @@ class SpecSourceMapper(SourceMapper):
 
   def _find_targets_for_source(self, source, build_files):
     for build_file in build_files:
-      address_map = self._address_mapper._address_map_from_spec_path(build_file.spec_path)
-      for address, addressable in address_map.values():
+      for address in self._address_mapper.addresses_in_spec_path(build_file.spec_path):
         self._build_graph.inject_address_closure(address)
         target = self._build_graph.get_target(address)
         sources = target.payload.get_field('sources')
@@ -150,8 +149,7 @@ class LazySourceMapper(SourceMapper):
     :param iterable<BuildFile> build_files: a family of BUILD files from which to map sources.
     """
     for build_file in build_files:
-      address_map = self._address_mapper._address_map_from_spec_path(build_file.spec_path)
-      for address, addressable in address_map.values():
+      for address in self._address_mapper.addresses_in_spec_path(build_file.spec_path):
         self._build_graph.inject_address_closure(address)
         target = self._build_graph.get_target(address)
         if target.has_resources:
