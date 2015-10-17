@@ -150,15 +150,16 @@ class SimpleCodegenTask(Task):
                           invalidate_dependents=True,
                           fingerprint_strategy=self.get_fingerprint_strategy()) as invalidation_check:
       target_workdirs = {vt.target: vt.results_dir for vt in invalidation_check.all_vts}
-      for vt in invalidation_check.all_vts:
-        # Build the target.
-        if not vt.valid:
-          with self.context.new_workunit(name=vt.target.address.spec):
-            if self._validate_sources_present(vt.target):
-              self.execute_codegen(vt.target, vt.results_dir)
-          vt.update()
-        # And inject a synthetic target to represent it.
-        self._inject_synthetic_target(vt.target, target_workdirs)
+      with self.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
+        for vt in invalidation_check.all_vts:
+          # Build the target.
+          if not vt.valid:
+            with self.context.new_workunit(name=vt.target.address.spec):
+              if self._validate_sources_present(vt.target):
+                self.execute_codegen(vt.target, vt.results_dir)
+            vt.update()
+          # And inject a synthetic target to represent it.
+          self._inject_synthetic_target(vt.target, target_workdirs)
 
   def _inject_synthetic_target(self, target, target_workdirs):
     """Create, inject, and return a synthetic target for the given target and workdir.
