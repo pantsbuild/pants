@@ -43,9 +43,9 @@ class SimpleCodegenTask(Task):
     register('--allow-empty', action='store_true', default=True, fingerprint=True,
              help='Skip targets with no sources defined.',
              advanced=True)
-    register('--strategy', fingerprint=True, default=None,
+    register('--strategy', fingerprint=True, choices=['isolated', 'global'], default=None,
               deprecated_version='0.0.57',
-              deprecated_hint='Only isolated codegen is supported.',
+              deprecated_hint='Only isolated codegen is supported; this flag is ignored.',
               help='Selects the compilation strategy to use. The "global" strategy uses a shared '
                   'global directory for all generated code, and the "isolated" strategy uses '
                   'per-target codegen directories.',
