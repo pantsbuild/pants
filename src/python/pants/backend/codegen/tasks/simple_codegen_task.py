@@ -117,7 +117,7 @@ class SimpleCodegenTask(Task):
     """
     return self.context.targets(self.is_gentarget)
 
-  def validate_sources_present(self, target):
+  def _validate_sources_present(self, target):
     """Checks whether sources is empty, and either raises a TaskError or just returns False.
 
     The specifics of this behavior are defined by whether the user sets --allow-empty to True/False:
@@ -154,7 +154,7 @@ class SimpleCodegenTask(Task):
         # Build the target.
         if not vt.valid:
           with self.context.new_workunit(name=vt.target.address.spec):
-            if self.validate_sources_present(vt.target):
+            if self._validate_sources_present(vt.target):
               self.execute_codegen(vt.target, vt.results_dir)
           vt.update()
         # And inject a synthetic target to represent it.

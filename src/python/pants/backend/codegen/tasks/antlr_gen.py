@@ -53,10 +53,6 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   def synthetic_target_type(self, target):
     return JavaLibrary
 
-  @classmethod
-  def supported_strategy_types(cls):
-    return [cls.AntlrIsolatedCodegenStrategy]
-
   def execute_codegen(self, target, target_workdir):
     args = ['-o', target_workdir]
     compiler = target.compiler

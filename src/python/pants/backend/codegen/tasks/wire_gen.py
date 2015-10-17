@@ -67,10 +67,6 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   def is_gentarget(self, target):
     return isinstance(target, JavaWireLibrary)
 
-  @classmethod
-  def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy]
-
   def sources_generated_by_target(self, target):
     genfiles = []
     for source in target.sources_relative_to_source_root():
