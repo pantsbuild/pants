@@ -18,8 +18,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.source_root import SourceRoot
 from pants.build_graph.address import Address
-from pants.util.dirutil import safe_mkdtemp
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.util.dirutil import safe_mkdtemp
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
