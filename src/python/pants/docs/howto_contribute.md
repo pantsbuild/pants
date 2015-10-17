@@ -193,7 +193,8 @@ To make sure it gets seen by the appropriate people and that they have
 the appropriate context, add:
 
 - `pants-reviews` to the Groups field
-- Any specific reviewers to the People field
+- Any specific [pants committers](https://www.rbcommons.com/s/twitter/users/) 
+  who should review your change to the People field
 - The pull request number from your Github pull request in the Bug field
 - Your git branch name in the Branch field.
 
@@ -203,6 +204,10 @@ your first review, double-check that the mail got sent; rbcommons tries
 to "spoof" mail from you and it doesn't work for everybody's email
 address. If your address doesn't work, you might want to use another
 one.)
+
+Note that while only committers are available to add in the People field,
+users with an rbcommons account may still post reviews if you provide
+them with a link manually or they see it in the google group.
 
 #### Iterating
 

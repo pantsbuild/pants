@@ -280,12 +280,16 @@ class ArchiveFetcher(Fetcher, Subsystem):
   options_scope = 'archive-fetcher'
 
   _DEFAULT_MATCHERS = {
-    r'bitbucket.org/(?P<user>[^/]+)/(?P<repo>[^/]+)':
+    r'bitbucket\.org/(?P<user>[^/]+)/(?P<repo>[^/]+)':
       UrlInfo(url_format='https://bitbucket.org/\g<user>/\g<repo>/get/{rev}.tar.gz',
               default_rev='tip',
               strip_level=1),
-    r'github.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':
+    r'github\.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':
       UrlInfo(url_format='https://github.com/\g<user>/\g<repo>/archive/{rev}.tar.gz',
+              default_rev='master',
+              strip_level=1),
+    r'golang\.org/x/(?P<repo>[^/]+)':
+      UrlInfo(url_format='https://github.com/golang/\g<repo>/archive/{rev}.tar.gz',
               default_rev='master',
               strip_level=1),
   }
@@ -569,3 +573,4 @@ Fetchers._register_default(r'^gopkg\.in/.*$', GopkgInFetcher)
 Fetchers.advertise(ArchiveFetcher, namespace='')
 Fetchers._register_default(r'^bitbucket\.org/.*$', ArchiveFetcher)
 Fetchers._register_default(r'^github\.com/.*$', ArchiveFetcher)
+Fetchers._register_default(r'^golang\.org/x/.*$', ArchiveFetcher)
