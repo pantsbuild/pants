@@ -183,7 +183,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     return True
 
   def _validate_compiler_configs(self, targets):
-    assert len(targets) == 1, ("TODO: This target now only ever receives one target. Simplify.")
+    assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")
     ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
 
     def compiler_config(tgt):
