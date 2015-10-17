@@ -126,36 +126,6 @@ class IdeaGen(IdeGen):
         excludes.append(os.path.join(os.path.relpath(dirpath, start=repo_root), "target"))
     return excludes
 
-  @staticmethod
-  def _sibling_is_test(source_set):
-    """Determine if a SourceSet represents a test path.
-
-    Non test targets that otherwise live in test target roots (say a java_library), must
-    be marked as test for IDEA to correctly link the targets with the test code that uses
-    them. Therefore we check to see if the source root registered to the path or any of its sibling
-    source roots are defined with a test type.
-
-    :param source_set: SourceSet to analyze
-    :returns: True if the SourceSet represents a path containing tests
-    """
-
-    def has_test_type(types):
-      for target_type in types:
-        # TODO(Eric Ayers) Find a way for a target to identify itself instead of a hard coded list
-        if target_type in (JavaTests, PythonTests):
-          return True
-      return False
-
-    if source_set.path:
-      path = os.path.join(source_set.source_base, source_set.path)
-    else:
-      path = source_set.source_base
-    sibling_paths = SourceRoot.find_siblings_by_path(path)
-    for sibling_path in sibling_paths:
-      if has_test_type(SourceRoot.types(sibling_path)):
-        return True
-    return False
-
   @property
   def annotation_processing_template(self):
     return TemplateData(
@@ -178,12 +148,6 @@ class IdeaGen(IdeGen):
     def create_content_root(source_set):
       root_relative_path = os.path.join(source_set.source_base, source_set.path) \
                            if source_set.path else source_set.source_base
-
-      if self.get_options().infer_test_from_siblings:
-        is_test = IdeaGen._sibling_is_test(source_set)
-      else:
-        is_test = source_set.is_test
-
       if source_set.resources_only:
         if source_set.is_test:
           content_type = 'java-test-resource'
@@ -195,7 +159,7 @@ class IdeaGen(IdeGen):
       sources = TemplateData(
         path=root_relative_path,
         package_prefix=source_set.path.replace('/', '.') if source_set.path else None,
-        is_test=is_test,
+        is_test=source_set.is_test,
         content_type=content_type
       )
 

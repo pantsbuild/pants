@@ -25,6 +25,7 @@ from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target
 from pants.goal.goal import Goal
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context
@@ -147,6 +148,10 @@ class BaseTest(unittest.TestCase):
       'cache_key_gen_version': '0-test',
     }
 
+    # Many tests need source root functionality, so might as well always set it up.
+    self.options['source'] = {
+    }
+
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)
 
@@ -182,7 +187,8 @@ class BaseTest(unittest.TestCase):
   def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
               console_outstream=None, workspace=None, for_subsystems=None):
 
-    optionables = set()
+    # Many tests need source root functionality, so might as well always set it up.
+    optionables = {SourceRootConfig}
     extra_scopes = set()
 
     for_subsystems = for_subsystems or ()
@@ -209,11 +215,11 @@ class BaseTest(unittest.TestCase):
       scoped_opts = options.setdefault(s, {})
       scoped_opts.update(opts)
 
-    option_values = create_options_for_optionables(optionables,
-                                                   extra_scopes=extra_scopes,
-                                                   options=options)
-
-    context = create_context(options=option_values,
+    options = create_options_for_optionables(optionables,
+                                             extra_scopes=extra_scopes,
+                                             options=options)
+    Subsystem._options = options
+    context = create_context(options=options,
                              passthru_args=passthru_args,
                              target_roots=target_roots,
                              build_graph=self.build_graph,
@@ -221,7 +227,6 @@ class BaseTest(unittest.TestCase):
                              address_mapper=self.address_mapper,
                              console_outstream=console_outstream,
                              workspace=workspace)
-    Subsystem._options = context.options
     return context
 
   def tearDown(self):

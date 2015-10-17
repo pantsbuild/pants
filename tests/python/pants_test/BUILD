@@ -32,6 +32,7 @@ python_library(
     'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'src/python/pants/goal:goal',
+    'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',

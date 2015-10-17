@@ -30,6 +30,7 @@ python_library(
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
+    'contrib/go/src/python/pants/contrib/go/targets:go_target',
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',

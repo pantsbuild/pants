@@ -1,6 +1,83 @@
 RELEASE HISTORY
 ===============
 
+0.0.54 (10/16/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release features several improvements to Go support and a refactored SourceRoot API, as well as several bug fixes and small refactors.
+
+API Changes
+~~~~~~~~~~~
+
+* Move address.py/address_lookup_error.py from base to build_graph
+  `RB #2954 <https://rbcommons.com/s/twitter/r/2954>`_
+
+* Deprecate --infer-test-from-sibling argument to ide_gen.py.
+  `RB #2966 <https://rbcommons.com/s/twitter/r/2966>`_
+
+* Several deprecated methods and modules were removed:
+  `src/python/pants/base/target.py`
+  `src/python/pants/base/build_file_aliases.py`
+  `JarDependency._maybe_set_ext`
+  `JarDependency.exclude`
+  The `Repository` build file alias
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for golang.org/x remote libs.
+  `Issue #2378 <https://github.com/pantsbuild/pants/issues/2378>`_
+  `Issue #2379 <https://github.com/pantsbuild/pants/issues/2379>`_
+  `Issue #2378 <https://github.com/pantsbuild/pants/issues/2378>`_
+  `Issue #2379 <https://github.com/pantsbuild/pants/issues/2379>`_
+  `RB #2976 <https://rbcommons.com/s/twitter/r/2976>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `buildgen.go --materialize` to act globally.
+  `RB #2977 <https://rbcommons.com/s/twitter/r/2977>`_
+
+* Fix `BuildFileAddressMapper.scan_addresses`.
+  `RB #2974 <https://rbcommons.com/s/twitter/r/2974>`_
+
+* Fix catchall except statments
+  `RB #2971 <https://rbcommons.com/s/twitter/r/2971>`_
+
+* Fix pinger cache bug and add test.
+  `RB #2948 <https://rbcommons.com/s/twitter/r/2948>`_
+
+* Fix mixed classpaths where internal-only is needed.
+  `Issue #2358 <https://github.com/pantsbuild/pants/issues/2358>`_
+  `Issue #2359 <https://github.com/pantsbuild/pants/issues/2359>`_
+  `RB #2964 <https://rbcommons.com/s/twitter/r/2964>`_
+
+* Reproduces problem with deploy_excludes()
+  `RB #2961 <https://rbcommons.com/s/twitter/r/2961>`_
+
+* Add missing BUILD dep introduced by d724e2414.
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A new implementation of SourceRoots.
+  `RB #2970 <https://rbcommons.com/s/twitter/r/2970>`_
+
+* Restructured the Export task to make the json blob reusable.
+  `RB #2946 <https://rbcommons.com/s/twitter/r/2946>`_
+
+* Make 'changed' faster by not instantiating already injected targets
+  `RB #2967 <https://rbcommons.com/s/twitter/r/2967>`_
+
+* Add some more badge bling.
+  `RB #2965 <https://rbcommons.com/s/twitter/r/2965>`_
+
+* Cleanup BaseTest.
+  `RB #2963 <https://rbcommons.com/s/twitter/r/2963>`_
+
 0.0.53 (10/9/2015)
 ------------------
 
