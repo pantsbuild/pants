@@ -150,7 +150,7 @@ class LazySourceMapper(SourceMapper):
     """
     for build_file in build_files:
       for address in self._address_mapper.addresses_in_spec_path(build_file.spec_path):
-        self. _build_graph.inject_address_closure(address)
+        self._build_graph.inject_address_closure(address)
         target = self._build_graph.get_target(address)
         if target.has_resources:
           for resource in target.resources:
