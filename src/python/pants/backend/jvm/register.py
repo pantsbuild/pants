@@ -40,7 +40,6 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
@@ -144,7 +143,6 @@ def register_goals():
   # It's important we add AptCompile before other java-compiling tasks since the first selector wins,
   # and apt code is a subset of java code.
   jvm_compile.add_member(AptCompile)
-  jvm_compile.add_member(JmakeCompile)
   jvm_compile.add_member(ZincCompile)
 
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')

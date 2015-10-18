@@ -15,7 +15,7 @@ from pants.util.contextutil import temporary_dir
 
 
 class JvmPlatformIntegrationMixin(object):
-  """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, jmake)."""
+  """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, zinc)."""
 
   def get_pants_compile_args(self):
     """List of arguments to pants that determine what compiler to use.
@@ -217,6 +217,6 @@ class JvmPlatformIntegrationMixin(object):
         self.assert_failure(compile_diamond('java6'), 'Diamond.java erroneously compiled in java6,'
                                                       ' which means that either compilation was'
                                                       ' skipped due to bad fingerprinting/caching,'
-                                                      ' or the compiler (probably jmake) failed to'
-                                                      ' clean up the previous class from the java7'
+                                                      ' or the compiler failed to clean up the'
+                                                      ' previous class from the java7'
                                                       ' compile.')

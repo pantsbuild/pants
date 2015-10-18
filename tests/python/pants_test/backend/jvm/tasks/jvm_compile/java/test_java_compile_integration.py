@@ -142,15 +142,6 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # run succeeded as expected
       pass
 
-  def test_java_compile_missing_direct_dep_analysis_whitelist_jmake(self):
-    self._whitelist_test(
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      '--compile-jvm-dep-check-missing-direct-deps=fatal',
-      # Use jmake.
-      args=['--compile-java-use-jmake']
-    )
-
   def test_java_compile_missing_direct_dep_analysis_whitelist_zinc(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
@@ -163,8 +154,6 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
       '--compile-jvm-dep-check-missing-direct-deps=fatal',
-      # Use zinc.
-      args=['--no-compile-java-use-jmake']
     )
 
   def test_java_compile_with_different_resolved_jars_produce_different_artifacts(self):

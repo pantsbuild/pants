@@ -11,13 +11,8 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class ZincCompileIntegrationTest(BaseCompileIT):
 
-  def test_java_src_zinc_compile(self):
-    with self.do_test_compile('examples/src/java/::', extra_args=['--no-compile-java-use-jmake']):
-      # run succeeded as expected
-      pass
-
-  def test_java_tests_zinc_compile(self):
-    with self.do_test_compile('examples/tests/java/::', extra_args=['--no-compile-java-use-jmake']):
+  def test_java_zinc_compile(self):
+    with self.do_test_compile('examples/{src,tests}/java/::'):
       # run succeeded as expected
       pass
 
@@ -26,7 +21,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
         pants_run = self.run_test_compile(
           workdir, cachedir, 'examples/src/java/org/pantsbuild/example/hello/main',
-          extra_args=['--no-compile-java-use-jmake', '-ldebug'], clean_all=True
+          extra_args=['-ldebug'], clean_all=True
         )
         self.assertIn('Attempting to call com.sun.tools.javac.api.JavacTool', pants_run.stdout_data)
         self.assertNotIn('Forking javac', pants_run.stdout_data)
@@ -37,7 +32,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
         pants_run = self.run_test_compile(
           workdir, cachedir, target,
-          extra_args=['--no-compile-java-use-jmake', '--no-color'], clean_all=True
+          extra_args=['--no-color'], clean_all=True
         )
         self.assertIn('[warn] import sun.security.x509.X500Name;', pants_run.stdout_data)
         self.assertIn('[error]     System2.out.println("Hello World!");', pants_run.stdout_data)
