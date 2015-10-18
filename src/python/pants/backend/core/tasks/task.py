@@ -236,15 +236,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def artifact_cache_writes_enabled(self):
     return self._cache_factory.write_cache_available()
 
-  def invalidate_for_files(self):
-    """Provides extra files that participate in invalidation.
-
-    Subclasses can override and return a list of full paths to extra, non-source files that should
-    be checked for changes when managing target invalidation. This is useful for tracking
-    changes to pre-built build tools, e.g., the thrift compiler.
-    """
-    return []
-
   def invalidate(self):
     """Invalidates all targets for this task."""
     BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
@@ -467,12 +458,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       - vts is single VersionedTargetSet.
       - artifactfiles is a list of absolute paths to artifacts for the VersionedTargetSet.
     """
-    update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
+    update_artifact_cache_work = self._get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
       self.context.submit_background_work_chain([update_artifact_cache_work],
                                                 parent_workunit_name='cache')
 
-  def get_update_artifact_cache_work(self, vts_artifactfiles_pairs):
+  def _get_update_artifact_cache_work(self, vts_artifactfiles_pairs):
     """Create a Work instance to update an artifact cache, if we're configured to.
 
     vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where
