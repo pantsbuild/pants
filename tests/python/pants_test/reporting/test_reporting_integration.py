@@ -78,7 +78,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_color_enabled(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-java-colors']
+               '--compile-zinc-colors']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG + '\x1b[0m' in pants_run.stdout_data)
