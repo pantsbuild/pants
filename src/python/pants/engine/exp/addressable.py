@@ -34,6 +34,14 @@ class TypeConstraint(AbstractClass):
       raise ValueError('Must supply at least one type')
     self._types = types
 
+  @property
+  def types(self):
+    """Return the subject types of this type constraint.
+
+    :type: tuple of type
+    """
+    return self._types
+
   @abstractmethod
   def satisfied_by(self, obj):
     """Return `True` if the given object satisfies this type constraint.
@@ -187,8 +195,7 @@ class AddressableDescriptor(object):
                                                   instance_dict[self._name],
                                                   value))
 
-    if value is not None:
-      self._check_value(instance, value)
+    value = self._checked_value(instance, value)
 
     self._register(instance, self)
 
@@ -207,22 +214,43 @@ class AddressableDescriptor(object):
     else:
       return self._type_constraint
 
-  def _check_value(self, instance, value):
-    # We allow three forms of value:
+  def _checked_value(self, instance, value):
+    # We allow four forms of value:
     # 1. An opaque (to us) string address pointing to a value that can be resolved by external
     #    means.
     # 2. A `Resolvable` value that we can lazily resolve and type-check in `__get__`.
     # 3. A concrete instance that meets our type constraint.
-    if isinstance(value, (six.string_types, Resolvable)):
-      return
+    # 4. A dict when our type constraint has exactly one Serializable subject type - we convert the
+    #    dict into an instance of that type.
+    if value is None:
+      return None
 
-    if not self._get_type_constraint(instance).satisfied_by(value):
+    if isinstance(value, (six.string_types, Resolvable)):
+      return value
+
+    # Support untyped dicts that we deserialize on-demand here into the required type.
+    # This feature allows for more brevity in the JSON form (local type inference) and an alternate
+    # construction style in the python forms.
+    type_constraint = self._get_type_constraint(instance)
+    if (isinstance(value, dict) and
+        len(type_constraint.types) == 1 and
+        Serializable.is_serializable_type(type_constraint.types[0])):
+      if not value:
+        # TODO(John Sirois): Is this the right thing to do?  Or should an empty serializable_type
+        # be constructed?
+        return None  # {} -> None.
+      else:
+        serializable_type = type_constraint.types[0]
+        return serializable_type(**value)
+
+    if not type_constraint.satisfied_by(value):
       raise TypeConstraintError('Got {} of type {} for {} attribute of {} but expected {!r}'
                                 .format(value,
                                         type(value).__name__,
                                         self._name,
                                         instance,
-                                        self._type_constraint))
+                                        type_constraint))
+    return value
 
   def _resolve_value(self, instance, value):
     if not isinstance(value, Resolvable):
@@ -296,12 +324,14 @@ def addressable(type_constraint):
 
 
 class AddressableList(AddressableDescriptor):
-  def _check_value(self, instance, value):
+  def _checked_value(self, instance, value):
+    if value is None:
+      return None
+
     if not isinstance(value, collections.MutableSequence):
       raise TypeError('The {} property of {} must be a list, given {} of type {}'
                       .format(self._name, instance, value, type(value).__name__))
-    for item in value:
-      super(AddressableList, self)._check_value(instance, item)
+    return [super(AddressableList, self)._checked_value(instance, v) for v in value]
 
   def _resolve_value(self, instance, value):
     return [super(AddressableList, self)._resolve_value(instance, v)
@@ -323,12 +353,14 @@ def addressable_list(type_constraint):
 
 
 class AddressableDict(AddressableDescriptor):
-  def _check_value(self, instance, value):
+  def _checked_value(self, instance, value):
+    if value is None:
+      return None
+
     if not isinstance(value, collections.MutableMapping):
       raise TypeError('The {} property of {} must be a dict, given {} of type {}'
                       .format(self._name, instance, value, type(value).__name__))
-    for item in value.values():
-      super(AddressableDict, self)._check_value(instance, item)
+    return {k: super(AddressableDict, self)._checked_value(instance, v) for k, v in value.items()}
 
   def _resolve_value(self, instance, value):
     return {k: super(AddressableDict, self)._resolve_value(instance, v)
