@@ -355,9 +355,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       invalidation_check = \
         InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint, colors)
 
-    if self.cache_target_dirs:
-      for vt in invalidation_check.all_vts:
-        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.hash))
+    self._maybe_create_results_dirs(invalidation_check.all_vts)
 
     if not silent:
       targets = []
@@ -398,6 +396,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
       self.update_artifact_cache(pairs)
 
+  def _maybe_create_results_dirs(self, vts):
+    """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
+    if self.cache_target_dirs:
+      for vt in vts:
+        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.hash))
+
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
 
@@ -425,6 +429,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     if not vts:
       return [], []
+
+    self._maybe_create_results_dirs(vts)
 
     cached_vts = []
     uncached_vts = OrderedSet(vts)

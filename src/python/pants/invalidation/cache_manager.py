@@ -84,6 +84,8 @@ class VersionedTarget(VersionedTargetSet):
 
   @property
   def results_dir(self):
+    if not self._results_dir:
+      raise ValueError('No results_dir was created for {}'.format(self))
     return self._results_dir
 
   def __repr__(self):
