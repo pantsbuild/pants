@@ -11,8 +11,11 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class ZincCompileIntegrationTest(BaseCompileIT):
 
-  def test_java_zinc_compile(self):
-    with self.do_test_compile('examples/{src,tests}/java/::'):
+  def test_java_src_zinc_compile(self):
+    with self.do_test_compile('examples/src/java/::'):
+      # run succeeded as expected
+      pass
+    with self.do_test_compile('examples/tests/java/::'):
       # run succeeded as expected
       pass
 

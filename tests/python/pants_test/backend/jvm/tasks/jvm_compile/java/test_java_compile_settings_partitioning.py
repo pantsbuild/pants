@@ -9,7 +9,7 @@ from collections import defaultdict
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatformSettings
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jvm_compile.zinc import ZincCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.revision import Revision
 from pants.util.memo import memoized_method
 from pants_test.tasks.task_test_base import TaskTestBase

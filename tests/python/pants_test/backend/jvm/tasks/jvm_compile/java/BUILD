@@ -43,14 +43,6 @@ python_tests(
 )
 
 python_tests(
-  name='java_compile_jvm_platform_integration',
-  sources=['test_java_compile_jvm_platform_integration.py'],
-  dependencies=[
-    ':jvm_platform_integration_mixin',
-  ]
-)
-
-python_tests(
   name='zinc_compile_jvm_platform_integration',
   sources=['test_zinc_compile_jvm_platform_integration.py'],
   dependencies=[
