@@ -410,6 +410,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def _should_cache(self, vt):
     """Return true if the given vt should be written to a cache (if configured)."""
+    if vt.target.has_label('no_cache'):
+      return False
     if not self.incremental:
       return True
     elif self.cache_incremental or vt.previous_cache_key is None:

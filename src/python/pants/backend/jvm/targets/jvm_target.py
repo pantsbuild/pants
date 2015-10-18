@@ -32,7 +32,6 @@ class JvmTarget(Target, Jarable):
                provides=None,
                excludes=None,
                resources=None,
-               no_cache=False,
                services=None,
                platform=None,
                **kwargs):
@@ -42,7 +41,6 @@ class JvmTarget(Target, Jarable):
     :param sources: Source code files to build. Paths are relative to the BUILD
        file's directory.
     :type sources: ``Fileset`` (from globs or rglobs) or list of strings
-    :param no_cache: If True, this should not be stored in the artifact cache
     :param services: A dict mapping service interface names to the classes owned by this target
                      that implement them.  Keys are fully qualified service class names, values are
                      lists of strings, each string the fully qualified class name of a class owned
@@ -74,8 +72,6 @@ class JvmTarget(Target, Jarable):
     self._services = services or {}
 
     self.add_labels('jvm')
-    if no_cache:
-      self.add_labels('no_cache')
 
   @property
   def platform(self):
