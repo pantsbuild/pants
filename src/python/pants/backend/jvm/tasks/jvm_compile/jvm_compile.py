@@ -126,14 +126,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
 
-    # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
-    #  https://github.com/sbt/sbt/pull/2085
-    #  https://github.com/sbt/sbt/pull/2160
-    register('--incremental-caching', advanced=True, action='store_true', default=False,
-             help='When set, the results of incremental compiles will be written to the cache. '
-                  'This is unset by default, because it is generally a good precaution to cache '
-                  'only clean/cold builds.')
-
   @classmethod
   def product_types(cls):
     raise TaskError('Expected to be installed in GroupTask, which has its own '
@@ -449,10 +441,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     def post_process(cached_vts):
       for vt in cached_vts:
         cc = self._compile_context(vt.target, vt.results_dir)
-        if os.path.exists(cc.portable_analysis_file):
-          self._analysis_tools.localize(cc.portable_analysis_file, cc.analysis_file)
-    return self.do_check_artifact_cache(vts,
-                                        post_process_cached_vts=post_process)
+        safe_delete(cc.analysis_file)
+        self._analysis_tools.localize(cc.portable_analysis_file, cc.analysis_file)
+    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process)
 
   def _create_empty_products(self):
     if self.context.products.is_required_data('classes_by_source'):
@@ -588,15 +579,12 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
       # Double check the cache before beginning compilation
       hit_cache = check_cache(vts)
-      incremental = False
 
       if not hit_cache:
         # Write analysis to a temporary file, and move it to the final location on success.
         tmp_analysis_file = "{}.tmp".format(compile_context.analysis_file)
         safe_delete(tmp_analysis_file)
-        # If the analysis exists for this context, it is an incremental compile.
         if os.path.exists(compile_context.analysis_file):
-          incremental = True
           shutil.copy(compile_context.analysis_file, tmp_analysis_file)
         target, = vts.targets
         self._compile_vts(vts,
@@ -609,6 +597,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                     progress_message,
                     target.platform)
         os.rename(tmp_analysis_file, compile_context.analysis_file)
+        self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.
         self.write_extra_resources(compile_context)
@@ -618,21 +607,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
       # Update the products with the latest classes.
       self._register_vts([compile_context])
-
-      # We write to the cache only if we didn't hit during the double check, and optionally
-      # only for clean builds.
-      is_cacheable = not hit_cache and (self.get_options().incremental_caching or not incremental)
-      self.context.log.debug(
-          'Completed compile for {}. '
-          'Hit cache: {}, was incremental: {}, is cacheable: {}, cache writes enabled: {}.'.format(
-            compile_context.target.address.spec,
-            hit_cache,
-            incremental,
-            is_cacheable,
-            self.artifact_cache_writes_enabled()))
-      if is_cacheable and self.artifact_cache_writes_enabled():
-        # TODO: Move incrementalism configuration up to the task.
-        self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
 
     jobs = []
     invalid_target_set = set(invalid_targets)

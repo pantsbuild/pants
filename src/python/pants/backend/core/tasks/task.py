@@ -395,7 +395,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     if write_to_cache:
       def result_files(vt):
         return [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
-      pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+      pairs = []
+      for vt in invalidation_check.invalid_vts:
+        if self.incremental_caching or not vt.previous_cache_key:
+          pairs.append((vt, result_files(vt)))
       self.update_artifact_cache(pairs)
 
   def _maybe_create_results_dirs(self, vts):

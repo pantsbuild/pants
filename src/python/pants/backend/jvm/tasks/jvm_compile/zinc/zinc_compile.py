@@ -114,6 +114,14 @@ class ZincCompile(JvmCompile):
                   'Options not listed here are subject to change/removal. The value of the dict '
                   'indicates that an option accepts an argument.')
 
+    # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
+    #  https://github.com/sbt/sbt/pull/2085
+    #  https://github.com/sbt/sbt/pull/2160
+    register('--incremental-caching', advanced=True, action='store_true', default=False,
+             help='When set, the results of incremental compiles will be written to the cache. '
+                  'This is unset by default, because it is generally a good precaution to cache '
+                  'only clean/cold builds.')
+
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
@@ -168,6 +176,11 @@ class ZincCompile(JvmCompile):
     results_dir for a target into the new results_dir for a target.
     """
     return True
+
+  @property
+  def incremental_caching(self):
+    """Optionally write the results of incremental compiles to the cache."""
+    return self.get_options().incremental_caching
 
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')
