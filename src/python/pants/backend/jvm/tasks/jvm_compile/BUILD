@@ -8,7 +8,6 @@ target(
     ':analysis_parser',
     ':analysis_tools',
     ':anonymizer',
-    ':java',
     ':jvm_compile',
     ':zinc',
   ],
