@@ -528,6 +528,12 @@ notes = {
   ('compile.zinc', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
   ('compile.zinc', 'partition-size-hint'): jvm_global_strategy_removal,
   ('compile.zinc', 'strategy'): jvm_global_strategy_removal,
+
+  # Jmake and Apt removal.
+  ('compile.apt', 'args'): ('compile.zinc', 'args'),
+  ('compile.apt', 'jvm-options'): ('compile.zinc', 'jvm-options'),
+  ('compile.java', 'args'): ('compile.zinc', 'args'),
+  ('compile.java', 'jvm-options'): ('compile.zinc', 'jvm-options'),
 }
 
 
