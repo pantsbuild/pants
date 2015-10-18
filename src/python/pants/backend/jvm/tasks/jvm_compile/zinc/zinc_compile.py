@@ -178,7 +178,7 @@ class ZincCompile(JvmCompile):
     return True
 
   @property
-  def incremental_caching(self):
+  def cache_incremental(self):
     """Optionally write the results of incremental compiles to the cache."""
     return self.get_options().incremental_caching
 

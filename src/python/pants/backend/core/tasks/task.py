@@ -281,6 +281,15 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return False
 
+  @property
+  def cache_incremental(self):
+    """For incremental tasks, indicates whether the results of incremental builds should be cached.
+
+    Deterministic per-target incremental compilation is a relatively difficult thing to implement,
+    so this property provides an escape hatch to avoid caching things in that riskier case.
+    """
+    return True
+
   @contextmanager
   def invalidated(self,
                   targets,
@@ -393,19 +402,26 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                       and self.artifact_cache_writes_enabled()
                       and invalidation_check.invalid_vts)
     if write_to_cache:
-      def result_files(vt):
-        return [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
       pairs = []
       for vt in invalidation_check.invalid_vts:
-        if self.incremental_caching or not vt.previous_cache_key:
-          pairs.append((vt, result_files(vt)))
+        if self._should_cache(vt):
+          pairs.append((vt, [vt.results_dir]))
       self.update_artifact_cache(pairs)
+
+  def _should_cache(self, vt):
+    """Return true if the given vt should be written to a cache (if configured)."""
+    if not self.incremental:
+      return True
+    elif self.cache_incremental or vt.previous_cache_key is None:
+      return True
+    else:
+      return False
 
   def _maybe_create_results_dirs(self, vts):
     """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
     if self.cache_target_dirs:
       for vt in vts:
-        vt.create_results_dir(self.workdir, copy_on_write=self.incremental)
+        vt.create_results_dir(self.workdir, allow_incremental=self.incremental)
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.

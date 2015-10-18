@@ -4,18 +4,7 @@
 target(
   name='jvm_compile',
   dependencies=[
-    ':cache_hit_callback',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile/java',
-  ],
-)
-
-python_tests(
-  name='cache_hit_callback',
-  sources=['test_cache_hit_callback.py'],
-  dependencies=[
-    'src/python/pants/backend/jvm/tasks/jvm_compile',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
   ],
 )
 

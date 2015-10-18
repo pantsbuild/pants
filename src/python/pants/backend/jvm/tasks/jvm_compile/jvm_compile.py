@@ -583,9 +583,15 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       if not hit_cache:
         # Write analysis to a temporary file, and move it to the final location on success.
         tmp_analysis_file = "{}.tmp".format(compile_context.analysis_file)
-        safe_delete(tmp_analysis_file)
-        if os.path.exists(compile_context.analysis_file):
-          shutil.copy(compile_context.analysis_file, tmp_analysis_file)
+        if vts.is_incremental:
+          # If this is an incremental compile, rebase the analysis to our new classes directory.
+          self._analysis_tools.rebase_from_path(compile_context.analysis_file,
+                                                tmp_analysis_file,
+                                                vts.previous_results_dir,
+                                                vts.results_dir)
+        else:
+          # Otherwise, simply ensure that it is empty.
+          safe_delete(tmp_analysis_file)
         target, = vts.targets
         self._compile_vts(vts,
                     compile_context.sources,

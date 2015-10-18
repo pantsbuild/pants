@@ -51,6 +51,9 @@ class AnalysisTools(object):
     merged_analysis = self._analysis_cls.merge(analyses)
     merged_analysis.write_to_path(merged_analysis_path)
 
+  def rebase_from_path(self, infile_path, outfile_path, old_base, new_base):
+    self.parser.rebase_from_path(infile_path, outfile_path, old_base, new_base, java_home=None)
+
   def relativize(self, src_analysis, relativized_analysis):
     with temporary_dir() as tmp_analysis_dir:
       tmp_analysis_file = os.path.join(tmp_analysis_dir, 'analysis.relativized')
