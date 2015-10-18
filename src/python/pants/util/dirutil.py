@@ -23,15 +23,20 @@ def fast_relpath(path, start):
   if not path.startswith(start):
     raise ValueError('{} is not a prefix of {}'.format(start, path))
 
-  # Confirm that the split occurs on a directory boundary.
-  if start[-1] == '/':
-    slash_offset = 0
+  if len(path) == len(start):
+    # Items are identical: the relative path is empty.
+    return ''
+  elif len(start) == 0:
+    # Empty prefix.
+    return path
+  elif start[-1] == '/':
+    # The prefix indicates that it is a directory.
+    return path[len(start):]
   elif path[len(start)] == '/':
-    slash_offset = 1
+    # The suffix indicates that the prefix is a directory.
+    return path[len(start)+1:]
   else:
     raise ValueError('{} is not a directory containing {}'.format(start, path))
-
-  return path[len(start)+slash_offset:]
 
 
 def safe_mkdir(directory, clean=False):

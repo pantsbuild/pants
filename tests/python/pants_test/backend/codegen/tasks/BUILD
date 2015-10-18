@@ -94,6 +94,7 @@ python_tests(
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
