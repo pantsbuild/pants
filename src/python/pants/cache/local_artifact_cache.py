@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache, UnreadableArtifact
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree
 
 
 logger = logging.getLogger(__name__)
@@ -46,9 +46,8 @@ class BaseLocalArtifactCache(ArtifactCache):
       self._artifact(tmp.name).collect(paths)
       yield self._store_tarball(cache_key, tmp.name)
 
-  def store_and_use_artifact(self, cache_key, src, hit_callback):
-    """Read the contents of an tarball from an iterator and return an artifact stored in the cache
-    """
+  def store_and_use_artifact(self, cache_key, src, results_dir=None):
+    """Read the contents of a tarball from an iterator and return an artifact stored in the cache"""
     with self._tmpfile(cache_key, 'read') as tmp:
       for chunk in src:
         tmp.write(chunk)
@@ -56,8 +55,8 @@ class BaseLocalArtifactCache(ArtifactCache):
       tarball = self._store_tarball(cache_key, tmp.name)
       artifact = self._artifact(tarball)
 
-      if hit_callback:
-        hit_callback(cache_key)
+      if results_dir is not None:
+        safe_rmtree(results_dir)
 
       artifact.extract()
       return True
@@ -110,12 +109,12 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   def _artifact_for(self, cache_key):
     return self._artifact(self._cache_file_for_key(cache_key))
 
-  def use_cached_files(self, cache_key, hit_callback=None):
+  def use_cached_files(self, cache_key, results_dir=None):
     try:
       artifact = self._artifact_for(cache_key)
       if artifact.exists():
-        if hit_callback:
-          hit_callback(cache_key)
+        if results_dir is not None:
+          safe_rmtree(results_dir)
         artifact.extract()
         return True
     except Exception as e:
@@ -164,7 +163,7 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
   def has(self, cache_key):
     return False
 
-  def use_cached_files(self, cache_key, hit_callback=None):
+  def use_cached_files(self, cache_key, results_dir=None):
     return False
 
   def delete(self, cache_key):

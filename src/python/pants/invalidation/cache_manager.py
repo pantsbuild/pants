@@ -58,11 +58,39 @@ class VersionedTargetSet(object):
       cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key,
                                                 self.valid, phase='init')
 
+    self._results_dir = None
+    self._previous_results_dir = None
+    # True if the results_dir for this VT was created incrementally via clone of the
+    # previous results_dir.
+    self.is_incremental = False
+
   def update(self):
     self._cache_manager.update(self)
 
   def force_invalidate(self):
     self._cache_manager.force_invalidate(self)
+
+  @property
+  def has_results_dir(self):
+    return self._results_dir is not None
+
+  @property
+  def results_dir(self):
+    """The directory that stores results for this version of this target."""
+    if self._results_dir is None:
+      raise ValueError('No results_dir was created for {}'.format(self))
+    return self._results_dir
+
+  @property
+  def previous_results_dir(self):
+    """If is_incremental, the directory that stores results for the previous version of this target.
+
+    TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
+    mutate them.
+    """
+    if self._previous_results_dir is None:
+      raise ValueError('There is no previous_results_dir for: {}'.format(self))
+    return self._previous_results_dir
 
   def __repr__(self):
     return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
@@ -83,11 +111,6 @@ class VersionedTarget(VersionedTargetSet):
     # Must come after the assignments above, as they are used in the parent's __init__.
     VersionedTargetSet.__init__(self, cache_manager, [self])
     self.id = target.id
-    self._results_dir = None
-    self._previous_results_dir = None
-    # True if the results_dir for this VT was created incrementally via clone of the
-    # previous results_dir.
-    self.is_incremental = False
 
   def create_results_dir(self, root_dir, allow_incremental):
     """Ensures that a results_dir exists under the given root_dir for this versioned target.
@@ -111,25 +134,6 @@ class VersionedTarget(VersionedTargetSet):
         shutil.copytree(old_dir, new_dir)
     else:
       safe_mkdir(new_dir)
-
-  @property
-  def results_dir(self):
-    """Return the directory into which to store results for this version of this target."""
-    if not self._results_dir:
-      raise ValueError('No results_dir was created for {}'.format(self))
-    return self._results_dir
-
-  @property
-  def previous_results_dir(self):
-    """Return the directory which holds the results for the previous version of this target.
-
-    TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
-    mutate them.
-    """
-    if not self._previous_results_dir:
-      raise ValueError('There was no results_dir for: {}; is_incremental: {}'.format(
-        self, self.is_incremental))
-    return self._previous_results_dir
 
   def __repr__(self):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')

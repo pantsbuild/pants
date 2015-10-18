@@ -439,14 +439,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return self.do_check_artifact_cache(vts)
 
-  def do_check_artifact_cache(self, vts, post_process_cached_vts=None, cache_hit_callback=None):
+  def do_check_artifact_cache(self, vts, post_process_cached_vts=None):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
     Returns a pair (cached, uncached) of VersionedTargets that were
     satisfied/unsatisfied from the cache.
-
-    :param cache_hit_callback: A serializable function that expects a CacheKey as an argument.
-      Called after a cache hit, but before the cached artifact is extracted.
     """
     if not vts:
       return [], []
@@ -455,7 +452,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     uncached_vts = OrderedSet(vts)
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key, cache_hit_callback) for vt in vts]
+    items = [(read_cache, vt.cache_key, vt.results_dir if vt.has_results_dir else None)
+             for vt in vts]
 
     res = self.context.subproc_map(call_use_cached_files, items)
 
@@ -466,7 +464,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       elif isinstance(was_in_cache, UnreadableArtifact):
         self._cache_key_errors.update(was_in_cache.key)
 
-    # TODO: The `self.invalidated` block on tasks should already have initialized this?
     self._maybe_create_results_dirs(vts)
 
     # Note that while the input vts may represent multiple targets (for tasks that overrride
