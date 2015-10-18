@@ -45,14 +45,6 @@ python_library(
 )
 
 python_library(
-  name = 'java',
-  sources = globs('java/*.py'),
-  dependencies = [
-    'src/python/pants/backend/core/tasks:task',
-  ],
-)
-
-python_library(
   name = 'jvm_compile',
   sources = ['jvm_compile.py'],
   dependencies = [
@@ -102,7 +94,7 @@ python_library(
     ':jvm_compile',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',

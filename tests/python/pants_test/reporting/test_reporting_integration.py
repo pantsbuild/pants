@@ -45,14 +45,13 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
             post = True
         self.assertTrue(init and pre and post)
 
-  INFO_LEVEL_COMPILE_MSG='Compiling 1 java source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
+  INFO_LEVEL_COMPILE_MSG='Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
   DEBUG_LEVEL_COMPILE_MSG='compile(examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
 
   def test_ouput_level_warn(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-java-use-jmake',
-               '--compile-java-level=warn']
+               '--compile-zinc-level=warn']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertFalse(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -61,8 +60,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_level_info(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-java-use-jmake',
-               '--compile-java-level=info']
+               '--compile-zinc-level=info']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -71,8 +69,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_level_debug(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-java-use-jmake',
-               '--compile-java-level=debug']
+               '--compile-zinc-level=debug']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertTrue(self.INFO_LEVEL_COMPILE_MSG in pants_run.stdout_data)
@@ -81,7 +78,6 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_output_color_enabled(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-java-use-jmake',
                '--compile-java-colors']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
@@ -91,7 +87,6 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     """Set level with the scope 'compile' and see that it propagates to the task level."""
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
-               '--compile-java-use-jmake',
                '--compile-level=debug']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
@@ -100,25 +95,22 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
   def test_default_console(self):
     command = ['compile',
-               'examples/src/java/org/pantsbuild/example/hello::',
-               '--compile-java-use-jmake']
+               'examples/src/java/org/pantsbuild/example/hello::']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
-    self.assertIn('Compiling 1 java source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
+    self.assertIn('Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
                   pants_run.stdout_data)
-    # Check jmake's label and stdout
-    self.assertIn('Writing project database...  Done.', pants_run.stdout_data)
-    self.assertIn('[jmake]\n', pants_run.stdout_data)
+    # Check zinc's label
+    self.assertIn('[zinc]\n', pants_run.stdout_data)
 
   def test_suppress_compiler_output(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello::',
                '--reporting-console-label-format={ "COMPILER" : "SUPPRESS" }',
-               '--reporting-console-tool-output-format={ "COMPILER" : "CHILD_SUPPRESS"}',
-               '--compile-java-use-jmake']
+               '--reporting-console-tool-output-format={ "COMPILER" : "CHILD_SUPPRESS"}']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
-    self.assertIn('Compiling 1 java source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
+    self.assertIn('Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
                   pants_run.stdout_data)
     # jmake's stdout should be suppressed
     self.assertNotIn('Writing project database...  Done.', pants_run.stdout_data)
@@ -129,8 +121,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello::',
                '--reporting-console-label-format={ "FOO" : "BAR" }',
-               '--reporting-console-tool-output-format={ "BAZ" : "QUX"}',
-               '--compile-java-use-jmake']
+               '--reporting-console-tool-output-format={ "BAZ" : "QUX"}']
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     self.assertIn('*** Got invalid key FOO for --reporting-console-label-format. Expected one of [', pants_run.stdout_data)

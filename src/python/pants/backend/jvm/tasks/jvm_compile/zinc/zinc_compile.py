@@ -13,6 +13,7 @@ from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
@@ -22,6 +23,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
@@ -30,6 +32,8 @@ from pants.util.dirutil import relativize_paths, safe_open
 
 # Well known metadata file required to register scalac plugins with nsc.
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
+# Well known metadata file to register annotation processors with a java 1.6+ compiler
+_PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 
 class ZincCompile(JvmCompile):
@@ -170,6 +174,9 @@ class ZincCompile(JvmCompile):
     self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
     self._lazy_plugin_args = None
 
+    # A directory to contain per-target subdirectories with apt processor info files.
+    self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
+
     # Validate zinc options
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
 
@@ -252,7 +259,7 @@ class ZincCompile(JvmCompile):
     return plugins
 
   def extra_products(self, target):
-    """Override extra_products to produce a plugin information file."""
+    """Override extra_products to produce a plugin and annotation processor files."""
     ret = []
     if target.is_scalac_plugin and target.classname:
       # NB: We don't yet support explicit in-line compilation of scala compiler plugins from
@@ -260,7 +267,17 @@ class ZincCompile(JvmCompile):
       # with javac. This would require another GroupTask similar to AptCompile, but for scala.
       root, plugin_info_file = self.write_plugin_info(self._plugin_info_dir, target)
       ret.append((root, [plugin_info_file]))
+    elif isinstance(target, AnnotationProcessor) and target.processors:
+      root = os.path.join(self._processor_info_dir, Target.maybe_readable_identify([target]))
+      processor_info_file = os.path.join(root, _PROCESSOR_INFO_FILE)
+      self._write_processor_info(processor_info_file, target.processors)
+      ret.append((root, [processor_info_file]))
     return ret
+
+  def _write_processor_info(self, processor_info_file, processors):
+    with safe_open(processor_info_file, 'w') as f:
+      for processor in processors:
+        f.write('{}\n'.format(processor.strip()))
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
               log_file, settings):
