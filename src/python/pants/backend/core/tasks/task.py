@@ -400,7 +400,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
     if self.cache_target_dirs:
       for vt in vts:
-        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.hash))
+        # TODO: Shorten cache_key hashes in general?
+        short_hash = sha1(vt.cache_key.hash).hexdigest()[:12]
+        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.id, short_hash))
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.

@@ -28,7 +28,7 @@ from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree, safe_walk
-from pants.util.fileutil import atomic_copy, create_size_estimators
+from pants.util.fileutil import create_size_estimators
 
 
 class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
@@ -296,27 +296,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def _fingerprint_strategy(self, classpath_products):
     return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
 
-  def ensure_analysis_tmpdir(self):
-    """Work in a tmpdir so we don't stomp the main analysis files on error.
-
-    A temporary, but well-known, dir in which to munge analysis/dependency files in before
-    caching. It must be well-known so we know where to find the files when we retrieve them from
-    the cache. The tmpdir is cleaned up in a shutdown hook, because background work
-    may need to access files we create there even after this method returns
-    :return: path of temporary analysis directory
-    """
-    analysis_tmpdir = os.path.join(self._workdir, 'analysis_tmpdir')
-    if self._delete_scratch:
-      self.context.background_worker_pool().add_shutdown_hook(
-        lambda: safe_rmtree(analysis_tmpdir))
-    safe_mkdir(analysis_tmpdir)
-    return analysis_tmpdir
-
   def pre_execute(self):
-    # Only create these working dirs during execution phase, otherwise, they
-    # would be wiped out by clean-all goal/task if it's specified.
-    self.analysis_tmpdir = self.ensure_analysis_tmpdir()
-
     # In case we have no relevant targets and return early create the requested product maps.
     self._create_empty_products()
 
@@ -611,12 +591,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       incremental = False
 
       if not hit_cache:
-        # Mutate analysis within a temporary directory, and move it to the final location
-        # on success.
-        tmpdir = os.path.join(self.analysis_tmpdir, compile_context.target.id)
-        safe_mkdir(tmpdir)
-        tmp_analysis_file = self._analysis_for_target(
-            tmpdir, compile_context.target)
+        # Write analysis to a temporary file, and move it to the final location on success.
+        tmp_analysis_file = "{}.tmp".format(compile_context.analysis_file)
+        safe_delete(tmp_analysis_file)
         # If the analysis exists for this context, it is an incremental compile.
         if os.path.exists(compile_context.analysis_file):
           incremental = True
@@ -631,9 +608,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                     log_file,
                     progress_message,
                     target.platform)
-        atomic_copy(tmp_analysis_file, compile_context.analysis_file)
+        os.rename(tmp_analysis_file, compile_context.analysis_file)
 
-        # Write any additional resources for this target to the workdir.
+        # Write any additional resources for this target to the target workdir.
         self.write_extra_resources(compile_context)
 
         # Jar the compiled output.

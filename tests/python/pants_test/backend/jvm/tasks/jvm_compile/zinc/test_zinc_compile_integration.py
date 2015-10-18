@@ -18,9 +18,7 @@ SHAPELESS_TARGET = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/sh
 class ZincCompileIntegrationTest(BaseCompileIT):
 
   def test_scala_compile_jar(self):
-    # NB: generated with:
-    #   hashlib.sha1('testprojects.src.scala.org.pantsbuild.testproject.unicode.shapeless.shapeless').hexdigest()[:12]
-    jar_suffix = 'fd9f49e1153b.jar'
+    jar_suffix = 'z.jar'
     with self.do_test_compile(SHAPELESS_TARGET,
                               expected_files=[jar_suffix]) as found:
       with open_zip(self.get_only(found, jar_suffix), 'r') as jar:
