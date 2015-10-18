@@ -160,6 +160,15 @@ class ZincCompile(JvmCompile):
     super(ZincCompile, cls).prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
 
+  @property
+  def incremental(self):
+    """Zinc implements incremental compilation.
+
+    Setting this property causes the task infrastructure to clone the previous
+    results_dir for a target into the new results_dir for a target.
+    """
+    return True
+
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')
 

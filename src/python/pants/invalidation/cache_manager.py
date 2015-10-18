@@ -5,7 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import shutil
 import sys
+from hashlib import sha1
 
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
@@ -42,11 +45,15 @@ class VersionedTargetSet(object):
     self._cache_manager = cache_manager
     self.versioned_targets = versioned_targets
     self.targets = [vt.target for vt in versioned_targets]
+
     # The following line is a no-op if cache_key was set in the VersionedTarget __init__ method.
     self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key
                                                            for vt in versioned_targets])
+    # NB: previous_cache_key may be None on the first build of a target.
+    self.previous_cache_key = cache_manager.previous_key(self.cache_key)
+    self.valid = self.previous_cache_key == self.cache_key
+
     self.num_chunking_units = self.cache_key.num_chunking_units
-    self.valid = not cache_manager.needs_update(self.cache_key)
     if cache_manager.invalidation_report:
       cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key,
                                                 self.valid, phase='init')
@@ -78,9 +85,26 @@ class VersionedTarget(VersionedTargetSet):
     self.id = target.id
     self._results_dir = None
 
-  def create_results_dir(self, dir):
-    safe_mkdir(dir)
-    self._results_dir = dir
+  def create_results_dir(self, root_dir, copy_on_write):
+    """Ensures that a results_dir exists under the given root_dir for this versioned target.
+
+    If copy_on_write=True, clones the results_dir for the previous version of this target
+    to the new results dir. Otherwise, simply ensures that the results dir exists.
+    """
+    def dirname(key):
+      # TODO: Shorten cache_key hashes in general?
+      return os.path.join(root_dir, key.id, sha1(key.hash).hexdigest()[:12])
+    new_dir = dirname(self.cache_key)
+    self._results_dir = new_dir
+    if self.valid:
+      return
+
+    if copy_on_write and self.previous_cache_key:
+      old_dir = dirname(self.previous_cache_key)
+      if os.path.isdir(old_dir) and not os.path.isdir(new_dir):
+        shutil.copytree(old_dir, new_dir)
+    else:
+      safe_mkdir(new_dir)
 
   @property
   def results_dir(self):
@@ -273,8 +297,8 @@ class InvalidationCacheManager(object):
           yield VersionedTarget(self, target, target_key)
     return list(vt_iter())
 
-  def needs_update(self, cache_key):
-    return self._invalidator.needs_update(cache_key)
+  def previous_key(self, cache_key):
+    return self._invalidator.previous_key(cache_key)
 
   def _key_for(self, target):
     try:

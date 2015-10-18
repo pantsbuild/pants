@@ -270,6 +270,17 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return False
 
+  @property
+  def incremental(self):
+    """Whether this Task implements incremental building of individual targets.
+
+    Incremental tasks with `cache_target_dirs` set will have the results_dir of the previous build
+    for a target cloned into the results_dir for the current build (where possible). This
+    copy-on-write behaviour allows for immutability of the results_dir once a target has been
+    marked valid.
+    """
+    return False
+
   @contextmanager
   def invalidated(self,
                   targets,
@@ -391,9 +402,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
     if self.cache_target_dirs:
       for vt in vts:
-        # TODO: Shorten cache_key hashes in general?
-        short_hash = sha1(vt.cache_key.hash).hexdigest()[:12]
-        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.id, short_hash))
+        vt.create_results_dir(self.workdir, copy_on_write=self.incremental)
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
@@ -423,8 +432,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     if not vts:
       return [], []
 
-    self._maybe_create_results_dirs(vts)
-
     cached_vts = []
     uncached_vts = OrderedSet(vts)
 
@@ -439,6 +446,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         uncached_vts.discard(vt)
       elif isinstance(was_in_cache, UnreadableArtifact):
         self._cache_key_errors.update(was_in_cache.key)
+
+    # TODO: The `self.invalidated` block on tasks should already have initialized this?
+    self._maybe_create_results_dirs(vts)
 
     # Note that while the input vts may represent multiple targets (for tasks that overrride
     # check_artifact_cache_for), the ones we return must represent single targets.
