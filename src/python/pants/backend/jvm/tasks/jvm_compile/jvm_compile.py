@@ -243,14 +243,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     return []
 
-  def extra_products(self, target):
-    """Any extra, out-of-band resources created for a target.
+  def write_extra_resources(self, compile_context):
+    """Writes any extra, out-of-band resources for a target to its classes directory.
 
     E.g., targets that produce scala compiler plugins or annotation processor files
     produce an info file. The resources will be added to the runtime_classpath.
     Returns a list of pairs (root, [absolute paths of files under root]).
     """
-    return []
+    pass
 
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
@@ -538,14 +538,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           classes = computed_classes_by_source.get(source, [])
           classes_by_source[source].add_abs_paths(classes_dir, classes)
 
-    # Register resource products.
-    for compile_context in compile_contexts:
-      extra_resources = self.extra_products(compile_context.target)
-      entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
-      runtime_classpath.add_for_target(compile_context.target, entries)
-
-      # And classfile product dependencies (if requested).
-      if product_deps_by_src is not None:
+    # Register classfile product dependencies (if requested).
+    if product_deps_by_src is not None:
+      for compile_context in compile_contexts:
         product_deps_by_src[compile_context.target] = \
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
 
@@ -637,6 +632,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                     progress_message,
                     target.platform)
         atomic_copy(tmp_analysis_file, compile_context.analysis_file)
+
+        # Write any additional resources for this target to the workdir.
+        self.write_extra_resources(compile_context)
 
         # Jar the compiled output.
         self._create_context_jar(compile_context)

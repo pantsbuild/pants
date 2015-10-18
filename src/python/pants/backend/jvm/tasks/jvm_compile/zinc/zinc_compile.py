@@ -169,13 +169,7 @@ class ZincCompile(JvmCompile):
   def __init__(self, *args, **kwargs):
     super(ZincCompile, self).__init__(*args, **kwargs)
 
-    # A directory independent of any other classpath which can contain per-target
-    # plugin resource files.
-    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
     self._lazy_plugin_args = None
-
-    # A directory to contain per-target subdirectories with apt processor info files.
-    self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
     # Validate zinc options
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
@@ -258,21 +252,14 @@ class ZincCompile(JvmCompile):
       raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
     return plugins
 
-  def extra_products(self, target):
-    """Override extra_products to produce a plugin and annotation processor files."""
-    ret = []
+  def write_extra_resources(self, compile_context):
+    """Override write_extra_resources to produce plugin and annotation processor files."""
+    target = compile_context.target
     if target.is_scalac_plugin and target.classname:
-      # NB: We don't yet support explicit in-line compilation of scala compiler plugins from
-      # the workspace to be used in subsequent compile rounds like we do for annotation processors
-      # with javac. This would require another GroupTask similar to AptCompile, but for scala.
-      root, plugin_info_file = self.write_plugin_info(self._plugin_info_dir, target)
-      ret.append((root, [plugin_info_file]))
+      self.write_plugin_info(compile_context.classes_dir, target)
     elif isinstance(target, AnnotationProcessor) and target.processors:
-      root = os.path.join(self._processor_info_dir, Target.maybe_readable_identify([target]))
-      processor_info_file = os.path.join(root, _PROCESSOR_INFO_FILE)
+      processor_info_file = os.path.join(compile_context.classes_dir, _PROCESSOR_INFO_FILE)
       self._write_processor_info(processor_info_file, target.processors)
-      ret.append((root, [processor_info_file]))
-    return ret
 
   def _write_processor_info(self, processor_info_file, processors):
     with safe_open(processor_info_file, 'w') as f:
