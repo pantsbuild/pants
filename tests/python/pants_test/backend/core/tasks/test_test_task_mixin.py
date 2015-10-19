@@ -142,6 +142,6 @@ class TestTaskMixinTimeoutTest(TaskTestBase):
     with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
       task.execute()
 
-      # Ensures that Timeoutis instantiated with no timeout.
+      # Ensures that Timeout is instantiated with no timeout.
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (None,))

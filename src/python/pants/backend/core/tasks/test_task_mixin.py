@@ -51,7 +51,7 @@ class TestTaskMixin(object):
           self._execute(all_targets)
       except TimeoutReached as e:
         end = time.time()
-        raise TestFailedTaskError("After {:0.2f} seconds: {}".format(end - start, str(e)), failed_targets=test_targets)
+        raise TestFailedTaskError("After {} seconds: {}".format(round(end - start), str(e)), failed_targets=test_targets)
 
   def _timeout_for_target(self, target):
     return getattr(target, 'timeout', None)
@@ -104,9 +104,7 @@ class TestTaskMixin(object):
 
   @abstractmethod
   def _timeout_abort_handler(self):
-    """This gets called when the timeout is triggered to ensure that the child processes are all
-    immediately killed.
-    """
+    """Abort the test process when it has been timed out."""
 
   @abstractmethod
   def _test_target_filter(self):
