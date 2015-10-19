@@ -211,8 +211,12 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     :raises: :class:`pants.engine.exp.objects.ValidationError`
     """
 
-  def __getattr__(self, item):
-    return self._kwargs[item]
+  # TODO(John Sirois): Investigate __getnewargs__, __getstate__, __setstate__, see if they can
+  # be used to re-enable __getattr__ convenience.
+  # def __getattr__(self, item):
+  #   return self._kwargs[item]
+  def field(self, name):
+    return self._kwargs[name]
 
   def _key(self):
     if self._hashable_key is None:
