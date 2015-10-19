@@ -69,9 +69,10 @@ class BinaryUtilTest(BaseTest):
     """Tests exception handling if build support urls are improperly specified."""
     binary_util = BinaryUtil(baseurls=[], timeout_secs=30, bootstrapdir='/tmp')
     with self.assertRaises(binary_util.NoBaseUrlsError):
-      with binary_util._select_binary_stream(supportdir='bin/protobuf',
-                                             version='2.4.1',
-                                             name='protoc'):
+      binary_path = binary_util._select_binary_base_path(supportdir='bin/protobuf',
+                                                         version='2.4.1',
+                                                         name='protoc')
+      with binary_util._select_binary_stream(name='protoc', binary_path=binary_path):
         self.fail('Expected acquisition of the stream to raise.')
 
   def test_support_url_multi(self):
@@ -87,9 +88,10 @@ class BinaryUtilTest(BaseTest):
       ],
       timeout_secs=30,
       bootstrapdir='/tmp')
-    with binary_util._select_binary_stream(supportdir='bin/protobuf',
-                                           version='2.4.1',
-                                           name='protoc') as stream:
+    binary_path = binary_util._select_binary_base_path(supportdir='bin/protobuf',
+                                                       version='2.4.1',
+                                                       name='protoc')
+    with binary_util._select_binary_stream(name='protoc', binary_path=binary_path) as stream:
       stream()
       count += 1
     self.assertEqual(count, 1)
@@ -118,9 +120,11 @@ class BinaryUtilTest(BaseTest):
 
     unseen = [item for item in reader.values() if item.startswith('SEEN ')]
     for supportdir, version, name in binaries.values():
-      with binary_util._select_binary_stream(supportdir=supportdir,
-                                             version=version,
-                                             name=name,
+      binary_path = binary_util._select_binary_base_path(supportdir=supportdir,
+                                                         version=version,
+                                                         name=name)
+      with binary_util._select_binary_stream(name=name,
+                                             binary_path=binary_path,
                                              url_opener=reader) as stream:
         self.assertEqual(stream(), 'SEEN ' + name.upper())
         unseen.remove(stream())
