@@ -8,7 +8,6 @@ target(
     ':analysis_parser',
     ':analysis_tools',
     ':anonymizer',
-    ':java',
     ':jvm_compile',
     ':zinc',
   ],
@@ -42,25 +41,6 @@ python_library(
   dependencies = [
     'src/python/pants/util:contextutil',
   ]
-)
-
-# TODO(Eric Ayers) Create a BUILD file in the java/ subdirectory?
-python_library(
-  name = 'java',
-  sources = globs('java/*.py'),
-  dependencies = [
-    '3rdparty/python:six',
-    ':analysis',
-    ':analysis_parser',
-    ':analysis_tools',
-    ':jvm_compile',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
-    'src/python/pants/build_graph',
-    'src/python/pants/util:dirutil',
-  ],
 )
 
 python_library(
@@ -113,7 +93,7 @@ python_library(
     ':jvm_compile',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:hash_utils',

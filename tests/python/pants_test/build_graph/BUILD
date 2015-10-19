@@ -7,6 +7,7 @@ target(
   dependencies = [
     ':address',
     ':build_configuration',
+    ':build_file_address_mapper',
     ':build_file_aliases',
     ':build_file_parser',
     ':build_graph',
@@ -36,6 +37,15 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name = 'build_file_address_mapper',
+  sources = ['test_build_file_address_mapper.py'],
+  dependencies = [
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:base_test',
   ]
 )
 

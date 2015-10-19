@@ -286,6 +286,18 @@ python_library(
 )
 
 python_library(
+  name = 'coverage',
+  sources = globs('coverage/*.py'),
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    ':classpath_util',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:strutil',
+  ],
+)
+
+python_library(
   name = 'junit_run',
   sources = ['junit_run.py'],
   dependencies = [
@@ -297,6 +309,7 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:coverage',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',

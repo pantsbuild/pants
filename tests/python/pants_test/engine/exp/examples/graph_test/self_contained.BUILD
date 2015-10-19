@@ -3,12 +3,10 @@
 
 Target(
   name='thrift1',
-  sources=[]
 )
 
 Target(
   name='thrift2',
-  sources=[],
   dependencies=[
     ':thrift1',
   ]
@@ -19,7 +17,7 @@ Target(
 Target(
   name='java1',
   merges=':production_thrift_configs',
-  sources=[],
+  sources={},
   dependencies=[
     ':thrift2',
   ],

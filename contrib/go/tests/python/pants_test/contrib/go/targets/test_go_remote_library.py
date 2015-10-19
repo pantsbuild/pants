@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.base.source_root import SourceRoot
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants_test.base_test import BaseTest
 
@@ -18,12 +17,16 @@ from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 class GoRemoteLibraryTest(BaseTest):
   # NB: We use  aliases and BUILD files to test proper registration of anonymous targets and macros.
 
+  def setUp(self):
+    super(GoRemoteLibraryTest, self).setUp()
+    # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
+    self.context()
+
   @property
   def alias_groups(self):
     return build_file_aliases()
 
   def test_default_package(self):
-    SourceRoot.register('3rdparty/go', GoRemoteLibrary)
     self.add_to_build_file('3rdparty/go/github.com/foo/bar', dedent("""
         go_remote_library()
       """))
@@ -35,7 +38,6 @@ class GoRemoteLibraryTest(BaseTest):
     self.assertEqual('', go_remote_library.pkg)
 
   def test_sub_package(self):
-    SourceRoot.register('3rdparty/go', GoRemoteLibrary)
     self.add_to_build_file('3rdparty/go/github.com/foo/bar', dedent("""
         go_remote_library(pkg='baz')
       """))
@@ -47,7 +49,6 @@ class GoRemoteLibraryTest(BaseTest):
     self.assertEqual('baz', go_remote_library.pkg)
 
   def test_multiple_packages(self):
-    SourceRoot.register('3rdparty/go', GoRemoteLibrary)
     self.add_to_build_file('3rdparty/go/github.com/foo/bar', dedent("""
         go_remote_libraries(
           rev='v42',
@@ -88,7 +89,6 @@ class GoRemoteLibraryTest(BaseTest):
     self.assertEqual('bee/bop', bee_bop.pkg)
 
   def test_cannot_name(self):
-    SourceRoot.register('3rdparty/go', GoRemoteLibrary)
     self.add_to_build_file('3rdparty/go/github.com/foo/bar', dedent("""
         go_remote_library(name='bob')
       """))
@@ -97,7 +97,6 @@ class GoRemoteLibraryTest(BaseTest):
       self.target('3rdparty/go/github.com/foo/bar')
 
   def test_cannot_sources(self):
-    SourceRoot.register('3rdparty/go', GoRemoteLibrary)
     self.add_to_build_file('3rdparty/go/github.com/foo/bar', dedent("""
         go_remote_library(dependencies=[])
       """))

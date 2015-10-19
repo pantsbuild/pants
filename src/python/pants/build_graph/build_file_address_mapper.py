@@ -5,13 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_parser import BuildFileParser
+from pants.util.dirutil import fast_relpath
 
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
@@ -206,14 +205,18 @@ class BuildFileAddressMapper(object):
     :rtype: set of :class:`pants.build_graph.address.Address`
     :raises AddressLookupError: if there is a problem parsing a BUILD file
     """
-    if root and os.path.commonprefix([get_buildroot(), root]) != get_buildroot():
-      raise self.InvalidRootError('The given root_dir is not an absolute sub-directory of the '
-                                  'build root: {}'.format(root))
-    base_path = os.path.relpath(root, get_buildroot()) if root else None
+    root_dir = get_buildroot()
+    base_path = None
+
+    if root:
+      try:
+        base_path = fast_relpath(root, root_dir)
+      except ValueError as e:
+        raise self.InvalidRootError(e)
 
     addresses = set()
     try:
-      for build_file in self._build_file_type.scan_buildfiles(root_dir=get_buildroot(),
+      for build_file in self._build_file_type.scan_buildfiles(root_dir=root_dir,
                                                               base_path=base_path,
                                                               spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):

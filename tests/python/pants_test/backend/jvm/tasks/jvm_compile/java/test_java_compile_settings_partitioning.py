@@ -9,7 +9,7 @@ from collections import defaultdict
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatformSettings
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.revision import Revision
 from pants.util.memo import memoized_method
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -19,7 +19,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return JmakeCompile
+    return ZincCompile
 
   def _java(self, name, platform=None, deps=None, sources=None):
     return self.make_target(spec='java:{}'.format(name),

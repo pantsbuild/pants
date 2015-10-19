@@ -57,7 +57,19 @@ python_library(
   dependencies=[
     '3rdparty/python:six',
     ':objects',
+    'src/python/pants/build_graph',
     'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
+  name='scheduler',
+  sources=['scheduler.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    'src/python/pants/engine/exp:objects',
+    'src/python/pants/util:meta',
   ]
 )
 
