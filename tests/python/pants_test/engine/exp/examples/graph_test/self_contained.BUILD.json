@@ -4,13 +4,12 @@
 {
   "type_alias": "Target",
   "name": "thrift1",
-  "sources": []
+  "sources": null
 }
 
 {
   "type_alias": "Target",
   "name": "thrift2",
-  "sources": [],
   "dependencies": [
     ":thrift1"
   ]
@@ -19,7 +18,7 @@
 {
   "type_alias": "Target",
   "name": "java1",
-  "sources": [],
+  "sources": {},
   "dependencies": [
     ":thrift2"
   ],

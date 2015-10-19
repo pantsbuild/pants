@@ -1,0 +1,6 @@
+{
+  "type_alias": "jar",
+  "org": "com.google.guava",
+  "name": "guava",
+  "rev": "18.0"
+}

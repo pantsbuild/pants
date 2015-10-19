@@ -57,6 +57,7 @@ python_library(
   dependencies=[
     '3rdparty/python:six',
     ':objects',
+    'src/python/pants/build_graph',
     'src/python/pants/util:memo',
   ]
 )
