@@ -130,16 +130,17 @@ class ScroogeGenTest(TaskTestBase):
 
     saved_add_new_target = Context.add_new_target
     try:
-      Context.add_new_target = MagicMock()
+      mock = MagicMock()
+      Context.add_new_target = mock
       task.execute()
-      address = task.get_synthetic_address(target)
 
-      Context.add_new_target.assert_called_once_with(address=address,
-                                                     target_type=library_type,
-                                                     dependencies=OrderedSet(),
-                                                     provides=None,
-                                                     sources=[],
-                                                     derived_from=target)
+      self.assertEquals(1, mock.call_count)
+      _, call_kwargs = mock.call_args
+      self.assertEquals(call_kwargs['target_type'], library_type)
+      self.assertEquals(call_kwargs['dependencies'], OrderedSet())
+      self.assertEquals(call_kwargs['provides'], None)
+      self.assertEquals(call_kwargs['sources'], [])
+      self.assertEquals(call_kwargs['derived_from'], target)
 
     finally:
       Context.add_new_target = saved_add_new_target

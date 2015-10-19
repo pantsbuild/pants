@@ -33,16 +33,20 @@ class SuperclassesOfTest(TypeConstraintTestBase):
       SubclassesOf()
 
   def test_single(self):
-    self.assertTrue(SuperclassesOf(self.B).satisfied_by(self.A()))
-    self.assertTrue(SuperclassesOf(self.B).satisfied_by(self.B()))
-    self.assertFalse(SuperclassesOf(self.B).satisfied_by(self.BPrime()))
-    self.assertFalse(SuperclassesOf(self.B).satisfied_by(self.C()))
+    superclasses_of_b = SuperclassesOf(self.B)
+    self.assertEqual((self.B,), superclasses_of_b.types)
+    self.assertTrue(superclasses_of_b.satisfied_by(self.A()))
+    self.assertTrue(superclasses_of_b.satisfied_by(self.B()))
+    self.assertFalse(superclasses_of_b.satisfied_by(self.BPrime()))
+    self.assertFalse(superclasses_of_b.satisfied_by(self.C()))
 
   def test_multiple(self):
-    self.assertTrue(SuperclassesOf(self.A, self.B).satisfied_by(self.A()))
-    self.assertTrue(SuperclassesOf(self.A, self.B).satisfied_by(self.B()))
-    self.assertFalse(SuperclassesOf(self.A, self.B).satisfied_by(self.BPrime()))
-    self.assertFalse(SuperclassesOf(self.A, self.B).satisfied_by(self.C()))
+    superclasses_of_a_or_b = SuperclassesOf(self.A, self.B)
+    self.assertEqual((self.A, self.B), superclasses_of_a_or_b.types)
+    self.assertTrue(superclasses_of_a_or_b.satisfied_by(self.A()))
+    self.assertTrue(superclasses_of_a_or_b.satisfied_by(self.B()))
+    self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.BPrime()))
+    self.assertFalse(superclasses_of_a_or_b.satisfied_by(self.C()))
 
 
 class ExactlyTest(TypeConstraintTestBase):
@@ -51,16 +55,20 @@ class ExactlyTest(TypeConstraintTestBase):
       Exactly()
 
   def test_single(self):
-    self.assertFalse(Exactly(self.B).satisfied_by(self.A()))
-    self.assertTrue(Exactly(self.B).satisfied_by(self.B()))
-    self.assertFalse(Exactly(self.B).satisfied_by(self.BPrime()))
-    self.assertFalse(Exactly(self.B).satisfied_by(self.C()))
+    exactly_b = Exactly(self.B)
+    self.assertEqual((self.B,), exactly_b.types)
+    self.assertFalse(exactly_b.satisfied_by(self.A()))
+    self.assertTrue(exactly_b.satisfied_by(self.B()))
+    self.assertFalse(exactly_b.satisfied_by(self.BPrime()))
+    self.assertFalse(exactly_b.satisfied_by(self.C()))
 
   def test_multiple(self):
-    self.assertTrue(Exactly(self.A, self.B).satisfied_by(self.A()))
-    self.assertTrue(Exactly(self.A, self.B).satisfied_by(self.B()))
-    self.assertFalse(Exactly(self.A, self.B).satisfied_by(self.BPrime()))
-    self.assertFalse(Exactly(self.A, self.B).satisfied_by(self.C()))
+    exactly_a_or_b = Exactly(self.A, self.B)
+    self.assertEqual((self.A, self.B), exactly_a_or_b.types)
+    self.assertTrue(exactly_a_or_b.satisfied_by(self.A()))
+    self.assertTrue(exactly_a_or_b.satisfied_by(self.B()))
+    self.assertFalse(exactly_a_or_b.satisfied_by(self.BPrime()))
+    self.assertFalse(exactly_a_or_b.satisfied_by(self.C()))
 
 
 class SubclassesOfTest(TypeConstraintTestBase):
@@ -69,16 +77,20 @@ class SubclassesOfTest(TypeConstraintTestBase):
       SubclassesOf()
 
   def test_single(self):
-    self.assertFalse(SubclassesOf(self.B).satisfied_by(self.A()))
-    self.assertTrue(SubclassesOf(self.B).satisfied_by(self.B()))
-    self.assertFalse(SubclassesOf(self.B).satisfied_by(self.BPrime()))
-    self.assertTrue(SubclassesOf(self.B).satisfied_by(self.C()))
+    subclasses_of_b = SubclassesOf(self.B)
+    self.assertEqual((self.B,), subclasses_of_b.types)
+    self.assertFalse(subclasses_of_b.satisfied_by(self.A()))
+    self.assertTrue(subclasses_of_b.satisfied_by(self.B()))
+    self.assertFalse(subclasses_of_b.satisfied_by(self.BPrime()))
+    self.assertTrue(subclasses_of_b.satisfied_by(self.C()))
 
   def test_multiple(self):
-    self.assertTrue(SubclassesOf(self.B, self.C).satisfied_by(self.B()))
-    self.assertTrue(SubclassesOf(self.B, self.C).satisfied_by(self.C()))
-    self.assertFalse(SubclassesOf(self.B, self.C).satisfied_by(self.BPrime()))
-    self.assertFalse(SubclassesOf(self.B, self.C).satisfied_by(self.A()))
+    subclasses_of_b_or_c = SubclassesOf(self.B, self.C)
+    self.assertEqual((self.B, self.C), subclasses_of_b_or_c.types)
+    self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.B()))
+    self.assertTrue(subclasses_of_b_or_c.satisfied_by(self.C()))
+    self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.BPrime()))
+    self.assertFalse(subclasses_of_b_or_c.satisfied_by(self.A()))
 
 
 class SimpleSerializable(Serializable):

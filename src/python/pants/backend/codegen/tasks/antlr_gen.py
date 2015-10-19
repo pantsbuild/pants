@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.util.dirutil import safe_walk
 
 
 logger = logging.getLogger(__name__)
@@ -36,10 +37,9 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
 
-  class AntlrIsolatedCodegenStrategy(SimpleCodegenTask.IsolatedCodegenStrategy):
-    def find_sources(self, target):
-      sources = super(AntlrGen.AntlrIsolatedCodegenStrategy, self).find_sources(target)
-      return [source for source in sources if source.endswith('.java')]
+  def find_sources(self, target, target_dir):
+    sources = super(AntlrGen, self).find_sources(target, target_dir)
+    return [source for source in sources if source.endswith('.java')]
 
   @classmethod
   def register_options(cls, register):
@@ -53,42 +53,36 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   def synthetic_target_type(self, target):
     return JavaLibrary
 
-  @classmethod
-  def supported_strategy_types(cls):
-    return [cls.AntlrIsolatedCodegenStrategy]
+  def execute_codegen(self, target, target_workdir):
+    args = ['-o', target_workdir]
+    compiler = target.compiler
+    if compiler == 'antlr3':
+      if target.package is not None:
+        logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
+      java_main = 'org.antlr.Tool'
+    elif compiler == 'antlr4':
+      args.append('-visitor')  # Generate Parse Tree Visitor As Well
+      # Note that this assumes that there is no package set in the antlr file itself,
+      # which is considered an ANTLR best practice.
+      args.append('-package')
+      if target.package is None:
+        args.append(self._get_sources_package(target))
+      else:
+        args.append(target.package)
+      java_main = 'org.antlr.v4.Tool'
 
-  def execute_codegen(self, targets):
-    for target in targets:
-      args = ['-o', self.codegen_workdir(target)]
-      compiler = target.compiler
-      if compiler == 'antlr3':
-        if target.package is not None:
-          logger.warn("The 'package' attribute is not supported for antlr3 and will be ignored.")
-        java_main = 'org.antlr.Tool'
-      elif compiler == 'antlr4':
-        args.append('-visitor')  # Generate Parse Tree Visitor As Well
-        # Note that this assumes that there is no package set in the antlr file itself,
-        # which is considered an ANTLR best practice.
-        args.append('-package')
-        if target.package is None:
-          args.append(self._get_sources_package(target))
-        else:
-          args.append(target.package)
-        java_main = 'org.antlr.v4.Tool'
+    antlr_classpath = self.tool_classpath(compiler)
+    sources = self._calculate_sources([target])
+    args.extend(sources)
+    result = self.runjava(classpath=antlr_classpath, main=java_main, args=args,
+                          workunit_name='antlr')
+    if result != 0:
+      raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
 
-      antlr_classpath = self.tool_classpath(compiler)
-      sources = self._calculate_sources([target])
-      args.extend(sources)
-      result = self.runjava(classpath=antlr_classpath, main=java_main, args=args,
-                            workunit_name='antlr')
-      if result != 0:
-        raise TaskError('java {} ... exited non-zero ({})'.format(java_main, result))
+    if compiler == 'antlr3':
+      self._scrub_generated_timestamps(target_workdir)
 
-      if compiler == 'antlr3':
-        for source in list(self.codegen_strategy.find_sources(target)):
-          self._scrub_generated_timestamp(source)
-
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     # Fetch the right java dependency from the target's compiler option
     compiler_classpath_spec = self.get_options()[target.compiler]
     return self.resolve_deps([compiler_classpath_spec])
@@ -115,14 +109,18 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
 
   _COMMENT_WITH_TIMESTAMP_RE = re.compile('^//.*\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d')
 
-  def _scrub_generated_timestamp(self, source):
-    # Removes the first line of comment if it contains a timestamp.
-    with open(source) as f:
-      lines = f.readlines()
-    if len(lines) < 1:
-      return
-    with open(source, 'w') as f:
-      if not self._COMMENT_WITH_TIMESTAMP_RE.match(lines[0]):
-        f.write(lines[0])
-      for line in lines[1:]:
-        f.write(line)
+  def _scrub_generated_timestamps(self, target_workdir):
+    """Remove the first line of comment from each file if it contains a timestamp."""
+    for root, _, filenames in safe_walk(target_workdir):
+      for filename in filenames:
+        source = os.path.join(root, filename)
+
+        with open(source) as f:
+          lines = f.readlines()
+        if len(lines) < 1:
+          return
+        with open(source, 'w') as f:
+          if not self._COMMENT_WITH_TIMESTAMP_RE.match(lines[0]):
+            f.write(lines[0])
+          for line in lines[1:]:
+            f.write(line)
