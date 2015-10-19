@@ -16,7 +16,7 @@ from pants.cache.artifact_cache import call_insert, call_use_cached_files
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
 from pants.invalidation.build_invalidator import CacheKey
-from pants.util.contextutil import pushd, temporary_dir, temporary_file
+from pants.util.contextutil import pushd, temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir
 
 
@@ -72,13 +72,8 @@ class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     return self._return_failed()
 
 
-CALLBACK_CALLED = Exception("callback")
 TEST_CONTENT1 = 'muppet'
 TEST_CONTENT2 = 'kermit'
-
-
-def raising_callback(cache_key):
-  raise CALLBACK_CALLED
 
 
 class TestArtifactCache(unittest.TestCase):
@@ -230,29 +225,36 @@ class TestArtifactCache(unittest.TestCase):
         map(call_insert, [(cache, key, [path], False)])
       self.assertFalse(map(call_use_cached_files, [(cache, key, None)])[0])
 
-  def test_successful_request_calls_hit_callback(self):
+  def test_successful_request_cleans_result_dir(self):
     key = CacheKey('muppet_key', 'fake_hash', 42)
 
     with self.setup_local_cache() as cache:
-      self._do_test_successful_request_runs_callback(cache, key)
+      self._do_test_successful_request_cleans_result_dir(cache, key)
 
     with self.setup_rest_cache() as cache:
-      self._do_test_successful_request_runs_callback(cache, key)
+      self._do_test_successful_request_cleans_result_dir(cache, key)
 
-  def _do_test_successful_request_runs_callback(self, cache, key):
+  def _do_test_successful_request_cleans_result_dir(self, cache, key):
     with self.setup_test_file(cache.artifact_root) as path:
-      map(call_insert, [(cache, key, [path], False)])
-      results = map(call_use_cached_files, [(cache, key, raising_callback)])
-      self.assertEquals(CALLBACK_CALLED, results[0].err)
+      with temporary_dir() as results_dir:
+        with temporary_file_path(root_dir=results_dir) as canary:
+          map(call_insert, [(cache, key, [path], False)])
+          results = map(call_use_cached_files, [(cache, key, results_dir)])
+          # Results content should have been deleted.
+          self.assertFalse(os.path.exists(canary))
 
-  def test_failed_request_doesnt_call_hit_callback(self):
+  def test_failed_request_doesnt_clean_result_dir(self):
     key = CacheKey('muppet_key', 'fake_hash', 55)
-    with self.setup_local_cache() as cache:
-      self.assertEquals(
-        map(call_use_cached_files, [(cache, key, raising_callback)]),
-        [False])
+    with temporary_dir() as results_dir:
+      with temporary_file_path(root_dir=results_dir) as canary:
+        with self.setup_local_cache() as cache:
+          self.assertEquals(
+            map(call_use_cached_files, [(cache, key, results_dir)]),
+            [False])
+          self.assertTrue(os.path.exists(canary))
 
-    with self.setup_rest_cache() as cache:
-      self.assertEquals(
-        map(call_use_cached_files, [(cache, key, raising_callback)]),
-        [False])
+        with self.setup_rest_cache() as cache:
+          self.assertEquals(
+            map(call_use_cached_files, [(cache, key, results_dir)]),
+            [False])
+          self.assertTrue(os.path.exists(canary))
