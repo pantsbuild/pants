@@ -67,10 +67,6 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   def is_gentarget(self, target):
     return isinstance(target, JavaWireLibrary)
 
-  @classmethod
-  def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy]
-
   def sources_generated_by_target(self, target):
     genfiles = []
     for source in target.sources_relative_to_source_root():
@@ -81,19 +77,15 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
         target.payload.service_writer))
     return genfiles
 
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     wire_runtime_deps_spec = self.get_options().javadeps
     return self.resolve_deps([wire_runtime_deps_spec])
 
-  def format_args_for_target(self, target):
+  def format_args_for_target(self, target, target_workdir):
     """Calculate the arguments to pass to the command line for a single target."""
     sources_by_base = self._calculate_sources([target])
-    if self.codegen_strategy.name() == 'isolated':
-      sources = OrderedSet(target.sources_relative_to_buildroot())
-    else:
-      sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
-    if not self.validate_sources_present(sources, [target]):
-      return None
+    sources = OrderedSet(target.sources_relative_to_buildroot())
+
     relative_sources = OrderedSet()
     for source in sources:
       source_root = SourceRoot.find_by_path(source)
@@ -103,7 +95,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
       relative_sources.add(relative_source)
     check_duplicate_conflicting_protos(self, sources_by_base, relative_sources, self.context.log)
 
-    args = ['--java_out={0}'.format(self.codegen_workdir(target))]
+    args = ['--java_out={0}'.format(target_workdir)]
 
     # Add all params in payload to args
 
@@ -164,19 +156,15 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     args.extend(relative_sources)
     return args
 
-  def execute_codegen(self, targets):
-    # Invoke the generator once per target.  Because the wire compiler has flags that try to reduce
-    # the amount of code emitted, Invoking them all together will break if one target specifies a
-    # service_writer and another does not, or if one specifies roots and another does not.
+  def execute_codegen(self, target, target_workdir):
     execute_java = DistributionLocator.cached().execute_java
-    for target in targets:
-      args = self.format_args_for_target(target)
-      if args:
-        result = execute_java(classpath=self.tool_classpath('wire-compiler'),
-                              main='com.squareup.wire.WireCompiler',
-                              args=args)
-        if result != 0:
-          raise TaskError('Wire compiler exited non-zero ({0})'.format(result))
+    args = self.format_args_for_target(target, target_workdir)
+    if args:
+      result = execute_java(classpath=self.tool_classpath('wire-compiler'),
+                            main='com.squareup.wire.WireCompiler',
+                            args=args)
+      if result != 0:
+        raise TaskError('Wire compiler exited non-zero ({0})'.format(result))
 
   class WireCompilerVersionError(TaskError):
     """Indicates the wire compiler version could not be determined."""

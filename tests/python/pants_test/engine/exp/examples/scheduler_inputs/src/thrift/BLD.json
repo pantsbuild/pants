@@ -1,0 +1,33 @@
+{
+  "type_alias": "target",
+  "abstract": true,
+  "name": "java_thrift_base",
+  "configurations": [
+    {
+      "type_alias": "apache_thrift_configuration",
+      "rev": "0.9.2",
+      "strict": true,
+      "gen": "java",
+      "deps": [
+        {
+          "type_alias": "jar",
+          "org": "org.apache.thrift",
+          "name": "libthrift",
+          "rev": "0.9.2"
+        },
+        {
+          "type_alias": "jar",
+          "org": "commons-lang",
+          "name": "commons-lang",
+          "rev": "2.5"
+        },
+        {
+          "type_alias": "jar",
+          "org": "org.slf4j",
+          "name": "slf4j-api",
+          "rev": "1.6.1"
+        }
+      ]
+    }
+  ]
+}

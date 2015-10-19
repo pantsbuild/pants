@@ -36,7 +36,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
       pants_run = self.run_pants(self.create_platform_args(6) +
-                                 ['compile.java',
+                                 ['compile.zinc',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                   '--cache-max-entries-per-target=1'],
                                  config=config)
@@ -47,7 +47,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
 
       # Rerun for java 7
       pants_run = self.run_pants(self.create_platform_args(7) +
-                                 ['compile.java',
+                                 ['compile.zinc',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                   '--cache-max-entries-per-target=1'],
                                  config)
@@ -76,7 +76,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
       pants_run = self.run_pants(self.create_platform_args(6) +
-                                 ['compile.java',
+                                 ['compile.zinc',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                   '--cache-max-entries-per-target=0'],
                                  config=config)
@@ -88,7 +88,7 @@ class CacheCleanupTest(PantsRunIntegrationTest):
 
       # Rerun for java 7
       pants_run = self.run_pants(self.create_platform_args(7) +
-                                 ['compile.java',
+                                 ['compile.zinc',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                   '--cache-max-entries-per-target=0'],
                                  config)

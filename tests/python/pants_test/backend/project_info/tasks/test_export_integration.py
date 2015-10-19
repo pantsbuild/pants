@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
+import re
 
 from twitter.common.collections import maybe_list
 
@@ -67,9 +68,10 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       json_data = self.run_export(test_target, workdir, load_libs=True)
       thrift_target_name = ('examples.src.thrift.org.pantsbuild.example.precipitation'
                             '.precipitation-java')
-      codegen_target = os.path.join(os.path.relpath(workdir, get_buildroot()),
-                                    'gen/thrift/isolated/{0}:{0}'.format(thrift_target_name))
-      self.assertIn(codegen_target, json_data.get('targets').keys())
+      codegen_target_regex = os.path.join(os.path.relpath(workdir, get_buildroot()),
+                                          'gen/thrift/[^/:]*:{0}'.format(thrift_target_name))
+      p = re.compile(codegen_target_regex)
+      self.assertTrue(any(p.match(target) for target in json_data.get('targets').keys()))
 
   def test_export_json_transitive_jar(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:

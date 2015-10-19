@@ -117,7 +117,7 @@ Option values are available via `self.get_options()`:
 
 Every task has an options *scope*: If the task is registered as `my-task` in goal `my-goal`, then its
 scope is `my-goal.my-task`, unless goal and task are the same string, in which case the scope is simply
-that string. For example, the `JavaCompile` task has scope `compile.java`, and the `filemap`
+that string. For example, the `ZincCompile` task has scope `compile.zinc`, and the `filemap`
 task has the scope `filemap`.
 
 The scope is used to set options values. E.g., the value of `self.get_options().my_option` for a
@@ -155,7 +155,7 @@ will affect the behaviour of the registered option. The most common parameters a
 GroupTask
 ---------
 
-Some `Task`s are grouped together under a parent `GroupTask`.
+`Task`s may be grouped together under a parent `GroupTask`.
 Specifically, the JVM compile tasks:
 
     :::python
@@ -164,9 +164,8 @@ Specifically, the JVM compile tasks:
     product_type=['compile_classpath', 'classes_by_source'],
     flag_namespace=['compile'])
 
-    jvm_compile.add_member(ScalaCompile)
     jvm_compile.add_member(AptCompile)
-    jvm_compile.add_member(JavaCompile)
+    jvm_compile.add_member(ZincCompile)
 
 A `GroupTask` allows its constituent tasks to 'claim' targets for
 processing, and can iterate between those tasks until all work is done.
