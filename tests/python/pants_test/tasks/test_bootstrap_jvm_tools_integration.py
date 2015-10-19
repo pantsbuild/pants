@@ -30,7 +30,6 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants(bootstrap_args +
                                  ['clean-all',
                                   'compile',
-                                  'examples/src/java/org/pantsbuild/example/hello/simple',
-                                  '--no-compile-java-use-jmake'])
+                                  'examples/src/java/org/pantsbuild/example/hello/simple'])
       self.assert_success(pants_run)
       self.assertFalse('[shade-zinc]' in pants_run.stdout_data)

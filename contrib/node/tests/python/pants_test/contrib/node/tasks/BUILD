@@ -62,7 +62,6 @@ python_tests(
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
     'contrib/node/src/python/pants/contrib/node/tasks:node_paths',
     'contrib/node/src/python/pants/contrib/node/tasks:npm_resolve',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]

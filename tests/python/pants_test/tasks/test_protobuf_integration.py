@@ -66,41 +66,41 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_source_ordering(self):
     expected_blocks = {
-      'global': 1,
       'isolated': 3,
     }
-    for gen_strategy in ('global', 'isolated',):
-      # force a compile to happen, we count on compile output in this test
-      self.assert_success(self.run_pants(['clean-all']))
 
-      # TODO(John Sirois): We should not have to pass `--no-colors` since the pants subprocess
-      # has no terminal attached - ie: colors should be turned off by default in this case.
-      pants_run = self.run_pants(['gen.protoc',
-                                  'testprojects/src/java/org/pantsbuild/testproject/proto-ordering',
-                                  '--level=debug',
-                                  '--no-colors',
-                                  '--gen-protoc-strategy={0}'.format(gen_strategy)])
-      self.assert_success(pants_run)
+    gen_strategy = 'isolated'
+    # force a compile to happen, we count on compile output in this test
+    self.assert_success(self.run_pants(['clean-all']))
 
-      def pairs(iterable):
-        return [(iterable[i], iterable[i + 1]) for i in range(len(iterable) - 1)]
+    # TODO(John Sirois): We should not have to pass `--no-colors` since the pants subprocess
+    # has no terminal attached - ie: colors should be turned off by default in this case.
+    pants_run = self.run_pants(['gen.protoc',
+                                'testprojects/src/java/org/pantsbuild/testproject/proto-ordering',
+                                '--level=debug',
+                                '--no-colors',
+                                '--gen-protoc-strategy={0}'.format(gen_strategy)])
+    self.assert_success(pants_run)
 
-      def find_protoc_blocks(lines):
-        split_pattern = re.compile(r'Executing: .*?\bprotoc')
-        split_points = [index for index, line in enumerate(lines)
-                        if split_pattern.search(line) or not line]
-        return [lines[start:end] for start, end in pairs(split_points + [-1, ]) if lines[start]]
+    def pairs(iterable):
+      return [(iterable[i], iterable[i + 1]) for i in range(len(iterable) - 1)]
 
-      # Scraping debug statements for protoc compilation.
-      all_blocks = list(find_protoc_blocks([l.strip() for l in pants_run.stdout_data.split('\n')]))
-      block_text = '\n\n'.join('[block {0}]\n{1}'.format(index, '\n'.join(block))
-                               for index, block in enumerate(all_blocks))
-      self.assertEquals(len(all_blocks), expected_blocks[gen_strategy],
-          'Expected there to be exactly {expected} protoc compilation group! (Were {count}.)'
-          '\n{out}\n\nBLOCKS:\n{blocks}'
-          .format(expected=expected_blocks[gen_strategy], count=len(all_blocks),
-                  out=pants_run.stderr_data,
-                  blocks=block_text))
+    def find_protoc_blocks(lines):
+      split_pattern = re.compile(r'Executing: .*?\bprotoc')
+      split_points = [index for index, line in enumerate(lines)
+                      if split_pattern.search(line) or not line]
+      return [lines[start:end] for start, end in pairs(split_points + [-1, ]) if lines[start]]
+
+    # Scraping debug statements for protoc compilation.
+    all_blocks = list(find_protoc_blocks([l.strip() for l in pants_run.stdout_data.split('\n')]))
+    block_text = '\n\n'.join('[block {0}]\n{1}'.format(index, '\n'.join(block))
+                              for index, block in enumerate(all_blocks))
+    self.assertEquals(len(all_blocks), expected_blocks[gen_strategy],
+        'Expected there to be exactly {expected} protoc compilation group! (Were {count}.)'
+        '\n{out}\n\nBLOCKS:\n{blocks}'
+        .format(expected=expected_blocks[gen_strategy], count=len(all_blocks),
+                out=pants_run.stderr_data,
+                blocks=block_text))
 
     biggest_proto = -1
     for block in all_blocks:

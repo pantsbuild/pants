@@ -18,11 +18,11 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
   def test_basic_binary(self):
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.java': {'write_to': [cache_dir]}}
+      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
-          ['compile', 'compile.java',
+          ['compile',
            'testprojects/src/java/org/pantsbuild/testproject/publish/hello/main:',
          ],
           workdir, config)
@@ -38,7 +38,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
           'testprojects.src.java.org.pantsbuild.testproject.nocache.cache_me')
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile.java',
+      pants_run = self.run_pants(['compile',
                                   'testprojects/src/java/org/pantsbuild/testproject/nocache::'],
                                  config)
       self.assert_success(pants_run)
@@ -66,7 +66,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
       pants_run = self.run_pants(self.create_platform_args(6) +
-                                 ['compile.java',
+                                 ['compile',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
@@ -76,7 +76,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
       # Rerun for java 7
       pants_run = self.run_pants(self.create_platform_args(7) +
-                                 ['compile.java',
+                                 ['compile',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
@@ -142,15 +142,6 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # run succeeded as expected
       pass
 
-  def test_java_compile_missing_direct_dep_analysis_whitelist_jmake(self):
-    self._whitelist_test(
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      '--compile-jvm-dep-check-missing-direct-deps=fatal',
-      # Use jmake.
-      args=['--compile-java-use-jmake']
-    )
-
   def test_java_compile_missing_direct_dep_analysis_whitelist_zinc(self):
     self._whitelist_test(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
@@ -163,8 +154,6 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
       '--compile-jvm-dep-check-missing-direct-deps=fatal',
-      # Use zinc.
-      args=['--no-compile-java-use-jmake']
     )
 
   def test_java_compile_with_different_resolved_jars_produce_different_artifacts(self):
@@ -187,7 +176,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
           },
       }
 
-      pants_run = self.run_pants_with_workdir(['compile.java',
+      pants_run = self.run_pants_with_workdir(['compile',
                                                ('{}:only-15-directly'.format(path_prefix))],
                                               workdir,
                                               config)
@@ -197,7 +186,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
       # Rerun for guava 16
-      pants_run = self.run_pants_with_workdir(['compile.java',
+      pants_run = self.run_pants_with_workdir(['compile',
                                                (u'{}:alongside-16'.format(path_prefix))],
                                               workdir,
                                               config)
