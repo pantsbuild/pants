@@ -24,11 +24,9 @@ Contrib plugins should generally follow 3 basic setup steps:
    The only hard requirement though is the `register.py` entry point file in the main src dir -
    in this example: `contrib/example/src/python/pants/contrib/example/register.py`.
 
-   Source roots for this layout would be added to contrib/example/BUILD:
-   ```
-   source_root('src/python', page, python_library, resources)
-   source_root('tests/python', page, python_library, python_tests, resources)
-   ```
+   Source roots for this layout should match your source root patterns.  The default patterns
+   are typically sufficient.
+
    **NB: python code should be in the pants/contrib and pants_test/contrib namespaces and the
    `__init__.py` files for these shared root namespaces should contain a namespace declaration
    like so:**
