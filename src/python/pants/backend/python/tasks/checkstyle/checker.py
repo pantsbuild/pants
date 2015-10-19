@@ -67,12 +67,12 @@ class PythonCheckStyleTask(PythonTask):
 
   @classmethod
   def clear_plugins(cls):
-    """Clear all current plugins registered"""
+    """Clear all current plugins registered."""
     cls._plugins = []
 
   @classmethod
   def register_plugin(cls, name, checker):
-    """Register plugin to be used run as part of Python Style checks
+    """Register plugin to be used run as part of Python Style checks.
 
     :param name: (string) Name of the method plugin
     :param checker: (CheckstylePlugin) Plugin subclass
@@ -82,7 +82,7 @@ class PythonCheckStyleTask(PythonTask):
     cls._subsystems += (plugin.checker.subsystem, )
 
   def get_nits(self, python_file):
-    """Iterate over the instances style checker and yield Nits
+    """Iterate over the instances style checker and yield Nits.
 
     :param python_file: PythonFile Object
     """
@@ -112,6 +112,7 @@ class PythonCheckStyleTask(PythonTask):
 
   def check_file(self, filename):
     """Process python file looking for indications of problems.
+
     :param filename: (str) Python source filename
     :return: (bool) flag indicating failure
     """
@@ -121,7 +122,7 @@ class PythonCheckStyleTask(PythonTask):
       print('{filename}:SyntaxError: {error}'.format(filename=filename, error=e))
       return True
 
-    # If the user specifies an invalid severity use comment
+    # If the user specifies an invalid severity use comment.
     severity = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
 
     should_fail = False
@@ -129,17 +130,18 @@ class PythonCheckStyleTask(PythonTask):
 
     for i, nit in enumerate(self.get_nits(python_file)):
       if i == 0:
-        print()  # add an extra newline to clean up the output only if we have nits
+        print()  # Add an extra newline to clean up the output only if we have nits.
       if nit.severity >= severity:
         print('{nit}\n'.format(nit=nit))
       should_fail |= (nit.severity >= fail_threshold)
     return should_fail
 
   def checkstyle(self, sources):
-    """ Iterate over sources and run checker on each file
+    """Iterate over sources and run checker on each file.
 
     Files can be suppressed with a --suppress option which takes an xml file containing
     file paths that have exceptions and the plugins they need to ignore.
+
     :param sources: iterable containing source file names.
     :return: Boolean indicating problems found
     """
@@ -151,18 +153,17 @@ class PythonCheckStyleTask(PythonTask):
       raise TaskError('Python Style issues found', exit_code=should_fail)
 
   def execute(self):
-    """Run Checkstyle on all found source files"""
+    """Run Checkstyle on all found source files."""
     if self.options.skip:
       return
 
-    targets = self.context.targets(self._is_checked)
-    sources = self.calculate_sources(targets)
-
-    if sources:
-      return self.checkstyle(sources)
+    with self.invalidated(self.context.targets(self._is_checked)) as invalidation_check:
+      sources = self.calculate_sources([vt.target for vt in invalidation_check.invalid_vts])
+      if sources:
+        return self.checkstyle(sources)
 
   def calculate_sources(self, targets):
-    """Generate a set of source files from the given targets"""
+    """Generate a set of source files from the given targets."""
     sources = set()
     for target in targets:
       sources.update(
