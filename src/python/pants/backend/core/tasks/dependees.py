@@ -5,17 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 from collections import defaultdict
-from textwrap import dedent
-
-from twitter.common.collections import OrderedSet
 
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 
 
 class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
@@ -29,6 +23,9 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
     register('--closed', default=False, action='store_true',
              help='Include the input targets in the output along with the dependees.')
     register('--type', default=[], action='append',
+             deprecated_version='0.0.59',
+             deprecated_hint='This never worked anyway. Do not use for now. May be reimplemented '
+                             'in the future.',
              help="Identifies target types to include. Multiple type inclusions "
                   "can be specified at once in a comma separated list or else by "
                   "using multiple instances of this flag.")
@@ -38,46 +35,12 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
 
     self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed
-    self._dependees_types = self.get_options().type
     self._spec_excludes = self.get_options().spec_excludes
 
   def console_output(self, _):
-    buildfiles = OrderedSet()
     address_mapper = self.context.address_mapper
-    if self._dependees_types:
-      base_paths = OrderedSet()
-      for dependees_type in self._dependees_types:
-        target_types = self.target_types_for_alias(dependees_type)
-        # Try to find the SourceRoots for the given input type alias
-        for target_type in target_types:
-          try:
-            roots = SourceRoot.roots(target_type)
-            base_paths.update(roots)
-          except KeyError:
-            pass
-
-      # TODO(John Sirois): BUG: This should not cause a failure, it should just force a slower full
-      # scan.
-      # TODO(John Sirois): BUG: The --type argument only limited the scn bases, it does no limit the
-      # types of targets found under those bases, ie: we may have just limited our scan to roots
-      # containing java_library, but those same roots likely also contain jvm_binary targets that
-      # we do not wish to have in the results.  So the --type filtering needs to apply to the final
-      # dependees_by_target map as well below.
-      if not base_paths:
-        raise TaskError(dedent("""\
-                        No SourceRoot set for any of these target types: {}.
-                        Please define a source root in BUILD file as:
-                          source_root('<src-folder>', {})
-                        """.format(' '.join(self._dependees_types),
-                                   ', '.join(self._dependees_types))).strip())
-      for base_path in base_paths:
-        scanned = address_mapper.scan_buildfiles(get_buildroot(),
-                                                 os.path.join(get_buildroot(), base_path),
-                                                 spec_excludes=self._spec_excludes)
-        buildfiles.update(scanned)
-    else:
-      buildfiles = address_mapper.scan_buildfiles(get_buildroot(),
-                                                  spec_excludes=self._spec_excludes)
+    buildfiles = address_mapper.scan_buildfiles(get_buildroot(),
+                                                spec_excludes=self._spec_excludes)
 
     build_graph = self.context.build_graph
     build_file_parser = self.context.build_file_parser
@@ -101,20 +64,20 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
       for root in roots:
         yield root.address.spec
 
-    for dependant in self.get_dependants(dependees_by_target, roots):
-      yield dependant.address.spec
+    for dependent in self.get_dependents(dependees_by_target, roots):
+      yield dependent.address.spec
 
-  def get_dependants(self, dependees_by_target, roots):
+  def get_dependents(self, dependees_by_target, roots):
     check = set(roots)
-    known_dependants = set()
+    known_dependents = set()
     while True:
-      dependants = set(known_dependants)
+      dependents = set(known_dependents)
       for target in check:
-        dependants.update(dependees_by_target[target])
-      check = dependants - known_dependants
+        dependents.update(dependees_by_target[target])
+      check = dependents - known_dependents
       if not check or not self._transitive:
-        return dependants - set(roots)
-      known_dependants = dependants
+        return dependents - set(roots)
+      known_dependents = dependents
 
   def get_concrete_target(self, target):
     return target.concrete_derived_from

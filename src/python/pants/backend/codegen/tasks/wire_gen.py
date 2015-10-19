@@ -23,7 +23,6 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
-from pants.base.source_root import SourceRoot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.memo import memoized_property
 
@@ -88,10 +87,10 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
 
     relative_sources = OrderedSet()
     for source in sources:
-      source_root = SourceRoot.find_by_path(source)
+      source_root = self.context.source_roots.find_by_path(source)
       if not source_root:
-        source_root = SourceRoot.find(target)
-      relative_source = os.path.relpath(source, source_root)
+        source_root = self.context.source_roots.find(target)
+      relative_source = os.path.relpath(source, source_root.path)
       relative_sources.add(relative_source)
     check_duplicate_conflicting_protos(self, sources_by_base, relative_sources, self.context.log)
 
@@ -147,7 +146,7 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
 
     if self.wire_compiler_version < Revision(2, 0):
       args.append('--proto_path={0}'.format(os.path.join(get_buildroot(),
-                                                         SourceRoot.find(target))))
+          self.context.source_roots.find(target).path)))
     else:
       # NB(gmalmquist): Support for multiple --proto_paths was introduced in Wire 2.0.
       for path in self._calculate_proto_paths(target):
@@ -196,16 +195,16 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     :return: an ordered set of directories to pass along to wire.
     """
     proto_paths = OrderedSet()
-    proto_paths.add(os.path.join(get_buildroot(), SourceRoot.find(target)))
+    proto_paths.add(os.path.join(get_buildroot(), self.context.source_roots.find(target).path))
 
     def collect_proto_paths(dep):
       if not dep.has_sources():
         return
       for source in dep.sources_relative_to_buildroot():
         if source.endswith('.proto'):
-          root = SourceRoot.find_by_path(source)
+          root = self.context.source_roots.find_by_path(source)
           if root:
-            proto_paths.add(os.path.join(get_buildroot(), root))
+            proto_paths.add(os.path.join(get_buildroot(), root.path))
 
     collect_proto_paths(target)
     target.walk(collect_proto_paths)

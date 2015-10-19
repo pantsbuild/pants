@@ -22,7 +22,6 @@ python_tests(
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/tasks:apache_thrift_gen',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:source_root',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
@@ -35,7 +34,6 @@ python_tests(
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/tasks:antlr_gen',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
   ],
@@ -111,7 +109,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',
-    'src/python/pants/base:source_root',
     'src/python/pants/base:validation',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',

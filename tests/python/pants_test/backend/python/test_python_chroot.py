@@ -25,10 +25,10 @@ from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.base.source_root import SourceRoot
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.source.source_root import SourceRootConfig
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import create_subsystem, subsystem_instance
@@ -45,7 +45,6 @@ class PythonChrootTest(BaseTest):
     # Capture PythonSetup with the real BUILD_ROOT before that is reset to a tmpdir by super.
     with subsystem_instance(PythonSetup) as python_setup:
       self.python_setup = python_setup
-
     super(PythonChrootTest, self).setUp()
 
   @contextmanager
@@ -81,7 +80,6 @@ class PythonChrootTest(BaseTest):
             python_chroot.delete()
 
   def test_antlr(self):
-    SourceRoot.register('src/antlr', PythonThriftLibrary)
     self.create_file(relpath='src/antlr/word/word.g', contents=dedent("""
       grammar word;
 
@@ -100,7 +98,6 @@ class PythonChrootTest(BaseTest):
                                     sources=['word.g'],
                                     module='word')
 
-    SourceRoot.register('src/python', PythonBinary)
     antlr3 = self.make_target(spec='3rdparty/python:antlr3',
                               target_type=PythonRequirementLibrary,
                               requirements=[PythonRequirement('antlr_python_runtime==3.1.3')])
@@ -132,8 +129,65 @@ class PythonChrootTest(BaseTest):
     # https://rbcommons.com/s/twitter/r/2657
     # Remove this once proper Subsystem dependency chains are re-established.
     with subsystem_instance(JVM):
+      # TODO(benjy): This hacks around PythonChroot's dependency on source roots.
+      # See do_test_thrift() for more details. Remove this when we have a better way.
+      with subsystem_instance(SourceRootConfig):
+        with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
+          pex_builder.set_entry_point('test.main:word_up')
+          pex_builder.freeze()
+          pex = python_chroot.pex()
+
+          process = pex.run(blocking=False, stdout=subprocess.PIPE)
+          stdout, _ = process.communicate()
+
+          self.assertEqual(0, process.returncode)
+          self.assertEqual(['Hello', ' ', 'World!'], stdout.splitlines())
+
+  @contextmanager
+  def do_test_thrift(self, inspect_chroot=None):
+    # TODO(benjy): This hacks around PythonChroot's dependency on source roots.
+    # Most tests get SourceRoot functionality set up for them by their test context.
+    # However PythonChroot isn't a task and doesn't use context. Rather it accesses source roots
+    # directly via Target.target_base.  Remove this when we have a better way.
+    with subsystem_instance(SourceRootConfig):
+      self.create_file(relpath='src/thrift/core/identifiers.thrift', contents=dedent("""
+        namespace py core
+
+        const string HELLO = "Hello"
+        const string WORLD = "World!"
+      """))
+      core_const = self.make_target(spec='src/thrift/core',
+                                    target_type=PythonThriftLibrary,
+                                    sources=['identifiers.thrift'])
+
+      self.create_file(relpath='src/thrift/test/const.thrift', contents=dedent("""
+        namespace py test
+
+        include "core/identifiers.thrift"
+
+        const list<string> MESSAGE = [identifiers.HELLO, identifiers.WORLD]
+      """))
+      test_const = self.make_target(spec='src/thrift/test',
+                                    target_type=PythonThriftLibrary,
+                                    sources=['const.thrift'],
+                                    dependencies=[core_const])
+
+      self.create_file(relpath='src/python/test/main.py', contents=dedent("""
+        from test.constants import MESSAGE
+
+
+        def say_hello():
+          print(' '.join(MESSAGE))
+      """))
+      binary = self.make_target(spec='src/python/test',
+                                target_type=PythonBinary,
+                                source='main.py',
+                                dependencies=[test_const])
+
+      yield binary, test_const
+
       with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
-        pex_builder.set_entry_point('test.main:word_up')
+        pex_builder.set_entry_point('test.main:say_hello')
         pex_builder.freeze()
         pex = python_chroot.pex()
 
@@ -141,63 +195,10 @@ class PythonChrootTest(BaseTest):
         stdout, _ = process.communicate()
 
         self.assertEqual(0, process.returncode)
-        self.assertEqual(['Hello', ' ', 'World!'], stdout.splitlines())
+        self.assertEqual('Hello World!', stdout.strip())
 
-  @contextmanager
-  def do_test_thrift(self, inspect_chroot=None):
-    SourceRoot.register('src/thrift', PythonThriftLibrary)
-
-    self.create_file(relpath='src/thrift/core/identifiers.thrift', contents=dedent("""
-      namespace py core
-
-      const string HELLO = "Hello"
-      const string WORLD = "World!"
-    """))
-    core_const = self.make_target(spec='src/thrift/core',
-                                  target_type=PythonThriftLibrary,
-                                  sources=['identifiers.thrift'])
-
-    self.create_file(relpath='src/thrift/test/const.thrift', contents=dedent("""
-      namespace py test
-
-      include "core/identifiers.thrift"
-
-      const list<string> MESSAGE = [identifiers.HELLO, identifiers.WORLD]
-    """))
-    test_const = self.make_target(spec='src/thrift/test',
-                                  target_type=PythonThriftLibrary,
-                                  sources=['const.thrift'],
-                                  dependencies=[core_const])
-
-    SourceRoot.register('src/python', PythonBinary)
-
-    self.create_file(relpath='src/python/test/main.py', contents=dedent("""
-      from test.constants import MESSAGE
-
-
-      def say_hello():
-        print(' '.join(MESSAGE))
-    """))
-    binary = self.make_target(spec='src/python/test',
-                              target_type=PythonBinary,
-                              source='main.py',
-                              dependencies=[test_const])
-
-    yield binary, test_const
-
-    with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
-      pex_builder.set_entry_point('test.main:say_hello')
-      pex_builder.freeze()
-      pex = python_chroot.pex()
-
-      process = pex.run(blocking=False, stdout=subprocess.PIPE)
-      stdout, _ = process.communicate()
-
-      self.assertEqual(0, process.returncode)
-      self.assertEqual('Hello World!', stdout.strip())
-
-      if inspect_chroot:
-        inspect_chroot(python_chroot)
+        if inspect_chroot:
+          inspect_chroot(python_chroot)
 
   def test_thrift(self):
     with self.do_test_thrift():
@@ -213,12 +214,11 @@ class PythonChrootTest(BaseTest):
     # codegened '.py' files, leading to import of those files (and errors) instead of the
     # PythonChroot/PythonThriftBuilder generated files (packaged as deps in the PythonChroot).
     with self.do_test_thrift() as (binary, thrift_target):
-      SourceRoot.register('.synthetic', PythonLibrary)
-      self.create_file(relpath='.synthetic/test/__init__.py')
-      self.create_file(relpath='.synthetic/test/constants.py', contents=dedent("""
+      self.create_file(relpath='.synthetic/test/python/__init__.py')
+      self.create_file(relpath='.synthetic/test/python/constants.py', contents=dedent("""
         VALID_IDENTIFIERS = ['generated', 'by', 'upstream', 'and', 'different!']
       """))
-      synthetic_pythrift_codegen_target = self.make_target(spec='.synthetic/test:constants',
+      synthetic_pythrift_codegen_target = self.make_target(spec='.synthetic/test/python:constants',
                                                            target_type=PythonLibrary,
                                                            sources=['__init__.py', 'constants.py'],
                                                            derived_from=thrift_target)
