@@ -47,7 +47,7 @@ class BaseLocalArtifactCache(ArtifactCache):
       yield self._store_tarball(cache_key, tmp.name)
 
   def store_and_use_artifact(self, cache_key, src, results_dir=None):
-    """Read the contents of a tarball from an iterator and return an artifact stored in the cache"""
+    """Read the content of a tarball from an iterator and return an artifact stored in the cache."""
     with self._tmpfile(cache_key, 'read') as tmp:
       for chunk in src:
         tmp.write(chunk)

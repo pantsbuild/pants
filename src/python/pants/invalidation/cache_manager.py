@@ -76,14 +76,16 @@ class VersionedTargetSet(object):
 
   @property
   def results_dir(self):
-    """The directory that stores results for this version of this target."""
+    """The directory that stores results for this version of these targets."""
     if self._results_dir is None:
       raise ValueError('No results_dir was created for {}'.format(self))
     return self._results_dir
 
   @property
   def previous_results_dir(self):
-    """If is_incremental, the directory that stores results for the previous version of this target.
+    """The directory that stores results for the previous version of these targets.
+
+    Only valid if is_incremental is true.
 
     TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
     mutate them.

@@ -288,7 +288,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     Deterministic per-target incremental compilation is a relatively difficult thing to implement,
     so this property provides an escape hatch to avoid caching things in that riskier case.
     """
-    return True
+    return False
 
   @contextmanager
   def invalidated(self,
