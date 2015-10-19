@@ -51,7 +51,7 @@ class TestTaskMixin(object):
           self._execute(all_targets)
       except TimeoutReached as e:
         end = time.time()
-        raise TestFailedTaskError("After {} seconds: {}".format(round(end - start), str(e)), failed_targets=test_targets)
+        raise TestFailedTaskError("After {} seconds: {}".format(int(round(end - start)), str(e)), failed_targets=test_targets)
 
   def _timeout_for_target(self, target):
     return getattr(target, 'timeout', None)
