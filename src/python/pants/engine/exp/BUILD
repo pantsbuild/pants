@@ -63,6 +63,17 @@ python_library(
 )
 
 python_library(
+  name='scheduler',
+  sources=['scheduler.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    'src/python/pants/engine/exp:objects',
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
   name='targets',
   sources=['targets.py'],
   dependencies=[
