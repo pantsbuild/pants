@@ -318,11 +318,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     portable_analysis_file = JvmCompile._portable_analysis_for_target(target_workdir, target)
     classes_dir = os.path.join(target_workdir, 'classes')
     jar_file = os.path.join(target_workdir, 'z.jar')
+    log_file = os.path.join(target_workdir, 'debug.log')
     return CompileContext(target,
                           analysis_file,
                           portable_analysis_file,
                           classes_dir,
                           jar_file,
+                          log_file,
                           self._sources_for_target(target))
 
   def execute_chunk(self, relevant_targets):
@@ -538,11 +540,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         else:
           yield compile_context.classes_dir, compile_context.analysis_file
 
-  def _capture_log_file(self, target):
-    if self._capture_log:
-      return os.path.join(self._logs_dir, "{}.log".format(target.id))
-    return None
-
   def exec_graph_key_for_target(self, compile_target):
     return "compile({})".format(compile_target.address.spec)
 
@@ -575,7 +572,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
       # Capture a compilation log if requested.
-      log_file = self._capture_log_file(compile_context.target)
+      log_file = compile_context.log_file if self._capture_log else None
 
       # Double check the cache before beginning compilation
       hit_cache = check_cache(vts)
