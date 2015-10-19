@@ -185,7 +185,9 @@ class Target(AbstractTarget):
     # the SourceRoots instance from context, as tasks do.  In the new engine we could inject
     # this into the target, rather than have it reach out for global singletons.
     source_root = SourceRootConfig.global_instance().get_source_roots().find(self)
-    return source_root.path if source_root else None
+    if not source_root:
+      raise TargetDefinitionException(self, 'Not under any configured source root.')
+    return source_root.path
 
   @classmethod
   def identify(cls, targets):

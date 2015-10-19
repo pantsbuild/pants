@@ -67,7 +67,7 @@ class DeferredSourcesMapper(Task):
           "Target {sources_spec} referenced from {target} field {name} did not unpack any sources"
           .format(spec=sources_target.address.spec, target=target.address.spec, name=name))
       sources, rel_unpack_dir = unpacked_sources[sources_target]
-      # We have no idea of rel_unpack_dir matches any of our source root patterns, so
+      # We have no idea if rel_unpack_dir matches any of our source root patterns, so
       # we explicitly register it here.
       self.context.source_roots.add_source_root(rel_unpack_dir)
       payload_field.populate(sources, rel_unpack_dir)
