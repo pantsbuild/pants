@@ -9,10 +9,19 @@ import os
 import sys
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.tasks.coverage.base import Coverage
+from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
 from pants.util.dirutil import safe_mkdir, safe_open
+
+
+class EmmaTaskSettings(CoverageTaskSettings):
+  """A class that holds task settings for emma coverage."""
+
+  def __init__(self, task):
+    super(EmmaTaskSettings, self).__init__(task)
+    self.coverage_metadata_file = os.path.join(self.coverage_dir, 'coverage.em')
+    self.coverage_file = os.path.join(self.coverage_dir, 'coverage.ec')
 
 
 class Emma(Coverage):
@@ -28,14 +37,14 @@ class Emma(Coverage):
 
   def instrument(self, targets, tests, compute_junit_classpath, execute_java_for_targets):
     junit_classpath = compute_junit_classpath()
-    safe_mkdir(self._coverage_instrument_dir, clean=True)
-    self._emma_classpath = self._task_exports.tool_classpath('emma')
+    safe_mkdir(self._settings.coverage_instrument_dir, clean=True)
+    self._emma_classpath = self._settings.tool_classpath('emma')
     with binary_util.safe_args(self.get_coverage_patterns(targets),
-                               self._task_exports.task_options) as patterns:
+                               self._settings.options) as patterns:
       args = [
         'instr',
-        '-out', self._coverage_metadata_file,
-        '-d', self._coverage_instrument_dir,
+        '-out', self._settings.coverage_metadata_file,
+        '-d', self._settings.coverage_instrument_dir,
         '-cp', os.pathsep.join(junit_classpath),
         '-exit'
       ]
@@ -55,7 +64,7 @@ class Emma(Coverage):
 
   @property
   def classpath_prepend(self):
-    return [self._coverage_instrument_dir]
+    return [self._settings.coverage_instrument_dir]
 
   @property
   def classpath_append(self):
@@ -63,7 +72,7 @@ class Emma(Coverage):
 
   @property
   def extra_jvm_options(self):
-    return ['-Demma.coverage.out.file={0}'.format(self._coverage_file)]
+    return ['-Demma.coverage.out.file={0}'.format(self._settings.coverage_file)]
 
   def report(self, targets, tests, execute_java_for_targets, tests_failed_exception=None):
     if tests_failed_exception:
@@ -74,8 +83,8 @@ class Emma(Coverage):
         return
     args = [
       'report',
-      '-in', self._coverage_metadata_file,
-      '-in', self._coverage_file,
+      '-in', self._settings.coverage_metadata_file,
+      '-in', self._settings.coverage_file,
       '-exit'
     ]
     source_bases = set()
@@ -91,10 +100,10 @@ class Emma(Coverage):
 
     sorting = ['-Dreport.sort', '+name,+class,+method,+block']
     args.extend(['-r', 'txt',
-                 '-Dreport.txt.out.file={0}'.format(self._coverage_console_file)] + sorting)
-    args.extend(['-r', 'xml', '-Dreport.xml.out.file={0}'.format(self._coverage_xml_file)])
+                 '-Dreport.txt.out.file={0}'.format(self._settings.coverage_console_file)] + sorting)
+    args.extend(['-r', 'xml', '-Dreport.xml.out.file={0}'.format(self._settings.coverage_xml_file)])
     args.extend(['-r', 'html',
-                 '-Dreport.html.out.file={0}'.format(self._coverage_html_file),
+                 '-Dreport.html.out.file={0}'.format(self._settings.coverage_html_file),
                  '-Dreport.out.encoding=UTF-8'] + sorting)
 
     main = 'emma'
@@ -109,7 +118,7 @@ class Emma(Coverage):
       raise TaskError("java {0} ... exited non-zero ({1})"
                       " 'failed to generate code coverage reports'".format(main, result))
 
-    with safe_open(self._coverage_console_file) as console_report:
+    with safe_open(self._settings.coverage_console_file) as console_report:
       sys.stdout.write(console_report.read())
     if self._coverage_open:
-      binary_util.ui_open(self._coverage_html_file)
+      binary_util.ui_open(self._settings.coverage_html_file)
