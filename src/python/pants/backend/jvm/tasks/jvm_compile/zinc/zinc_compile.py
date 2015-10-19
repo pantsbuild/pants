@@ -32,6 +32,8 @@ from pants.util.dirutil import relativize_paths, safe_open
 
 # Well known metadata file required to register scalac plugins with nsc.
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
+
+
 # Well known metadata file to register annotation processors with a java 1.6+ compiler
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
