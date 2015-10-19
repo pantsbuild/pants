@@ -114,7 +114,7 @@ class Target(Configuration):
     :rtype list of :class:`pants.engine.exp.configuration.Configuration`
     """
 
-  @property
+  @addressable_list(SubclassesOf(Configuration))
   def dependencies(self):
     """The direct dependencies of this target.
 
@@ -150,7 +150,3 @@ class Target(Configuration):
 
     :rtype: :class:`Sources`
     """
-
-# Since Target.dependencies is recursive on the Target type, we need to post-class-definition
-# re-define dependencies in this way.
-Target.dependencies = addressable_list(SubclassesOf(Configuration))(Target.dependencies)

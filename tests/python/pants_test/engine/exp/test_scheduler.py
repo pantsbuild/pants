@@ -183,11 +183,11 @@ class JavacPlanner(TaskPlanner):
 
     sources = list(subject.sources.iter_paths(base_path=subject.address.spec_path, ext='.java'))
     if not sources:
-      # TODO(John Sirois): Abstract ~SourcesConsumerPlanner that can grab sources of given types
+      # TODO(John Sirois): Abstract a ~SourcesConsumerPlanner that can grab sources of given types
       # or else defer to a code generator like we do here.  As it stands, the planner must
-      # explicitly allow for code generators like we do here and this repeated code / foresight can
-      # easily be missed in new compilers, and other source using tasks.  Once done though, code gen
-      # can be introduced to any nesting depth, ie: code gen '.thrift' files.
+      # explicitly allow for code generators and this repeated code / foresight can easily be
+      # missed in new compilers, and other source-using tasks.  Once done though, code gen can be
+      # introduced to any nesting depth, ie: code gen '.thrift' files.
 
       # This is a dep graph "hole", we depend on the thing but don't know what it is.  Either it
       # could be something that gets transformed in to java or transformed into a `Classpath`

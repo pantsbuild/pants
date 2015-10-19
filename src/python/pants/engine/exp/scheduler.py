@@ -125,7 +125,7 @@ class Plan(Serializable):
 
     :rtype: :class:`collections.Iterator` of :class:`Promise`
     """
-    # TODO(John Sirois): Ask other if this is sane.  The idea of **inputs is to allow for natural
+    # TODO(John Sirois): Ask others if this is sane.  The idea of **inputs is to allow for natural
     # Task.execute functions with standard parameter lists.  In fact s/Task/function/ will work
     # just fine.  The engine backend just needs to replace plan **inputs promises with resolved
     # products and then splat inputs to the Task execution function.
@@ -264,7 +264,7 @@ class Task(object):
   Tasks form the atoms of work done by pants and when executed generally produce artifacts as a
   side effect whether these be files on disk (for example compilation outputs) or characters output
   to the terminal (for example dependency graph metadata).  These outputs are always represented
-  by a product type - sometimes `None`.  The product type instaces the task returns can often be
+  by a product type - sometimes `None`.  The product type instances the task returns can often be
   used to access the contents side-effect outputs.
   """
 
@@ -273,7 +273,13 @@ class Task(object):
 
 
 class Planners(object):
+  """A registry of task planners indexed by both product type and goal name."""
+
   def __init__(self, planners):
+    """
+    :param planners: All the task planners registered in the system.
+    :type planners: :class:`collections.Iterable` of :class:`TaskPlanner`
+    """
     self._planners_by_goal_name = defaultdict(set)
     self._planners_by_product_type = defaultdict(set)
     for planner in planners:
@@ -282,23 +288,49 @@ class Planners(object):
         self._planners_by_product_type[product_type].add(planner)
 
   def for_goal(self, goal_name):
+    """Return the set of task planners installed in the given goal.
+
+    :param string goal_name:
+    :rtype: set of :class:`TaskPlanner`
+    """
     return self._planners_by_goal_name[goal_name]
 
   def for_product_type(self, product_type):
+    """Return the set of task planners that can produce the given product type.
+
+    :param type product_type: The product type the returned planners are capable of producing.
+    :rtype: set of :class:`TaskPlanner`
+    """
     return self._planners_by_product_type[product_type]
 
 
 class BuildRequest(object):
+  """Describes the user-requested build."""
+
   def __init__(self, goals, addressable_roots):
+    """
+    :param goals: The list of goal names supplied on the command line.
+    :type goals: list of string
+    :param addressable_roots: The list of addresses supplied on the command line.
+    :type addressable_roots: list of :class:`pants.build_graph.address.Address`
+    """
     self._goals = goals
     self._addressable_roots = addressable_roots
 
   @property
   def goals(self):
+    """Return the list of goal names supplied on the command line.
+
+    :rtype: list of string
+    """
     return self._goals
 
   @property
   def addressable_roots(self):
+    """Return the list of addresses supplied on the command line.
+
+    :rtype: list of :class:`pants.build_graph.address.Address`
+    """
     return self._addressable_roots
 
   def __repr__(self):
@@ -460,7 +492,6 @@ class LocalScheduler(Scheduler):
     self._planners = planners
     self._product_mapper = ProductMapper()
     self._plans_by_product_type_by_planner = defaultdict(lambda: defaultdict(OrderedSet))
-    self._planner_stack = []
 
   def formulate_graph(self, goals, subjects):
     """Formulate the execution graph that satisfies the given `build_request`.
@@ -512,11 +543,9 @@ class LocalScheduler(Scheduler):
 
     plans = []
     for planner in planners:
-      self._planner_stack.append(planner)
       plan = planner.plan(self, product_type, subject)
       if plan:
         plans.append((planner, plan))
-      self._planner_stack.pop(-1)
 
     if len(plans) > 1:
       planners = [planner for planner, plan in plans]
