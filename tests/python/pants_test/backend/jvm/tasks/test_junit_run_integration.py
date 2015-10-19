@@ -66,3 +66,14 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest_BAD_CLASS', 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])
     self.assert_failure(pants_run)
     self.assertIn("No target found for test specifier", pants_run.stdout_data)
+
+  def test_junit_run_timeout_succeeds(self):
+    pants_run = self.run_pants(['clean-all', 'test.junit',  'testprojects/tests/java/org/pantsbuild/testproject/timeout:passing_target'])
+    self.assert_success(pants_run)
+
+  def test_junit_run_timeout_fails(self):
+    pants_run = self.run_pants(['clean-all', 'test.junit',  'testprojects/tests/java/org/pantsbuild/testproject/timeout:failing_target'])
+    self.assert_failure(pants_run)
+
+    # Make sure that the failure took only 1 second to run
+    self.assertIn("FAILURE: After 1 seconds: Timeout of 1 seconds reached", pants_run.stdout_data)
