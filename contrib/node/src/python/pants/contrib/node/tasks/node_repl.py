@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
+from pants.util.contextutil import pushd
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
@@ -23,22 +24,21 @@ class NodeRepl(ReplTaskMixin, NodeTask):
 
   @classmethod
   def select_targets(cls, target):
-    return cls.is_npm_package(target)
+    return cls.is_node_module(target)
 
   @classmethod
   def supports_passthru_args(cls):
     return True
 
   def setup_repl_session(self, targets):
+    # Return the path of the first product - the target on which "./pants repl was invoked"
     node_paths = self.context.products.get_data(NodePaths)
-    return [node_paths.node_path(target) for target in targets]
+    return node_paths.node_path(targets[0])
 
   def launch_repl(self, node_path):
     args = self.get_passthru_args()
     node_repl = self.node_distribution.node_command(args=args)
 
-    env = os.environ.copy()
-    env.update(NODE_PATH=os.pathsep.join(node_path))
-    repl_session = node_repl.run(env=env)
-
-    repl_session.wait()
+    with pushd(node_path):
+      repl_session = node_repl.run()
+      repl_session.wait()

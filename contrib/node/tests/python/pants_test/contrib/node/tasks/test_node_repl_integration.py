@@ -15,7 +15,7 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
   def test_run_repl(self):
     command = ['-q',
                'repl',
-               'contrib/node/examples/3rdparty/node/react']
+               'contrib/node/examples/src/node/web-component-button']
     program = dedent("""
         var React = require('react');
         var HelloWorldClass = React.createClass({
@@ -37,7 +37,7 @@ class NodeReplIntegrationTest(PantsRunIntegrationTest):
     )
     command = ['-q',
                'repl',
-               'contrib/node/examples/3rdparty/node/react',
+               'contrib/node/examples/src/node/web-component-button',
                '--',
                '--eval',
                eval_string]

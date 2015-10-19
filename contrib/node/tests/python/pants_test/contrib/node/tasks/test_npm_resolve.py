@@ -34,22 +34,6 @@ class NpmResolveTest(TaskTestBase):
     task = self.create_task(self.context(target_roots=[target]))
     task.execute()
 
-  def test_resolve_remote(self):
-    SourceRoot.register('3rdparty/node', NodeRemoteModule)
-    typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
-
-    context = self.context(target_roots=[typ])
-    task = self.create_task(context)
-    task.execute()
-
-    node_paths = context.products.get_data(NodePaths)
-    node_path = node_paths.node_path(typ)
-    self.assertIsNotNone(node_path)
-
-    script = 'var typ = require("typ"); console.log("type of boolean is: " + typ.BOOLEAN)'
-    out = task.node_distribution.node_command(args=['--eval', script]).check_output(cwd=node_path)
-    self.assertIn('type of boolean is: boolean', out)
-
   def test_resolve_simple(self):
     SourceRoot.register('3rdparty/node', NodeRemoteModule)
     typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
