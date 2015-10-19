@@ -15,7 +15,6 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
-from pants.base.source_root import SourceRoot
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
@@ -84,14 +83,6 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
     def test_path(path):
       return os.path.join(self.__class__.__name__, path)
-
-    def get_source_root_fs_path(path):
-      return os.path.realpath(os.path.join(self.build_root, test_path(path)))
-
-    SourceRoot.register(get_source_root_fs_path('src/resources'), Resources)
-    SourceRoot.register(get_source_root_fs_path('src/java'), JavaLibrary, JvmBinary)
-    SourceRoot.register(get_source_root_fs_path('src/scala'), ScalaLibrary)
-    SourceRoot.register(get_source_root_fs_path('src/thrift'), JavaThriftLibrary)
 
     # This is hacky: Creating a scala_library below requires Subsystem initialization,
     # which we must force by this call to the superclass context() (note that can't call our own

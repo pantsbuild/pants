@@ -10,20 +10,62 @@ import unittest
 from functools import partial
 
 from pants.build_graph.address import Address
+from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
 from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
                                     Resolver)
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json, python_assignments_parser, python_callbacks_parser
-from pants.engine.exp.targets import ApacheThriftConfiguration, PublishConfiguration, Target
+from pants.engine.exp.targets import Target
+
+
+class ApacheThriftConfiguration(Configuration):
+  # An example of a mixed-mode object - can be directly embedded without a name or else referenced
+  # via address if both top-level and carrying a name.
+  #
+  # Also an example of a more constrained config object that has an explicit set of allowed fields
+  # and that can have pydoc hung directly off the constructor to convey a fully accurate BUILD
+  # dictionary entry.
+
+  def __init__(self, name=None, version=None, strict=None, lang=None, options=None, **kwargs):
+    super(ApacheThriftConfiguration, self).__init__(name=name,
+                                                    version=version,
+                                                    strict=strict,
+                                                    lang=lang,
+                                                    options=options,
+                                                    **kwargs)
+
+  # An example of a validatable bit of config.
+  def validate_concrete(self):
+    if not self.version:
+      self.report_validation_error('A thrift `version` is required.')
+    if not self.lang:
+      self.report_validation_error('A thrift gen `lang` is required.')
+
+
+class PublishConfiguration(Configuration):
+  # An example of addressable and addressable_mapping field wrappers.
+
+  def __init__(self, default_repo, repos, name=None, **kwargs):
+    super(PublishConfiguration, self).__init__(name=name, **kwargs)
+    self.default_repo = default_repo
+    self.repos = repos
+
+  @addressable(Exactly(Configuration))
+  def default_repo(self):
+    """"""
+
+  @addressable_dict(Exactly(Configuration))
+  def repos(self):
+    """"""
 
 
 class GraphTestBase(unittest.TestCase):
   def setUp(self):
     self.symbol_table = {'ApacheThriftConfig': ApacheThriftConfiguration,
                          'Config': Configuration,
-                         'Target': Target,
-                         'PublishConfig': PublishConfiguration}
+                         'PublishConfig': PublishConfiguration,
+                         'Target': Target}
 
   def create_graph(self, build_pattern=None, parser=None, inline=False):
     mapper = AddressMapper(build_root=os.path.dirname(__file__),
@@ -52,10 +94,9 @@ class InlinedGraphTest(GraphTestBase):
                                           lang='java')
     public = Configuration(address=address('public'),
                            url='https://oss.sonatype.org/#stagingRepositories')
-    thrift1 = Target(address=address('thrift1'), sources=[])
-    thrift2 = Target(address=address('thrift2'), sources=[], dependencies=[thrift1])
+    thrift1 = Target(address=address('thrift1'))
+    thrift2 = Target(address=address('thrift2'), dependencies=[thrift1])
     expected_java1 = Target(address=address('java1'),
-                            sources=[],
                             configurations=[
                               ApacheThriftConfiguration(version='0.9.2', strict=True, lang='java'),
                               nonstrict,
@@ -162,7 +203,7 @@ class LazyResolvingGraphTest(GraphTestBase):
     public_address = address('public')
     thrift2_address = address('thrift2')
     expected_java1 = Target(address=java1_address,
-                            sources=[],
+                            sources={},
                             configurations=[
                               ApacheThriftConfiguration(version='0.9.2', strict=True, lang='java'),
                               resolver(nonstrict_address),
@@ -198,15 +239,13 @@ class LazyResolvingGraphTest(GraphTestBase):
     self.assertIs(expected_java1.configurations[2].repos['jane'], resolved_public)
 
     thrift1_address = address('thrift1')
-    expected_thrift2 = Target(address=thrift2_address,
-                              sources=[],
-                              dependencies=[resolver(thrift1_address)])
+    expected_thrift2 = Target(address=thrift2_address, dependencies=[resolver(thrift1_address)])
     resolved_thrift2 = graph.resolve(thrift2_address)
     self.assertEqual(expected_thrift2, resolved_thrift2)
     self.assertEqual(expected_thrift2, resolved_java1.dependencies[0])
     self.assertIs(resolved_java1.dependencies[0], resolved_thrift2)
 
-    expected_thrift1 = Target(address=thrift1_address, sources=[])
+    expected_thrift1 = Target(address=thrift1_address)
     resolved_thrift1 = graph.resolve(thrift1_address)
     self.assertEqual(expected_thrift1, resolved_thrift1)
     self.assertEqual(expected_thrift1, resolved_thrift2.dependencies[0])

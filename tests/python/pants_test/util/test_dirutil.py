@@ -38,6 +38,10 @@ class DirutilTest(unittest.TestCase):
     assertRelpath('c', 'b/c', 'b/')
     assertRelpath('c/', 'b/c/', 'b')
     assertRelpath('c/', 'b/c/', 'b/')
+    assertRelpath('', 'c/', 'c/')
+    assertRelpath('', 'c', 'c')
+    assertRelpath('c/', 'c/', '')
+    assertRelpath('c', 'c', '')
 
   def test_fast_relpath_invalid(self):
     with self.assertRaises(ValueError):

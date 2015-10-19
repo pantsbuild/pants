@@ -9,7 +9,6 @@ import json
 import os
 from textwrap import dedent
 
-from pants.base.source_root import SourceRoot
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -35,10 +34,8 @@ class NpmResolveTest(TaskTestBase):
     task.execute()
 
   def test_resolve_simple(self):
-    SourceRoot.register('3rdparty/node', NodeRemoteModule)
     typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
 
-    SourceRoot.register('src/node', NodeModule)
     self.create_file('src/node/util/util.js', contents=dedent("""
       var typ = require('typ');
       console.log("type of boolean is: " + typ.BOOLEAN);
@@ -61,7 +58,6 @@ class NpmResolveTest(TaskTestBase):
     self.assertIn('type of boolean is: boolean', out)
 
   def test_resolve_simple_graph(self):
-    SourceRoot.register('3rdparty/node', NodeRemoteModule)
     typ1 = self.make_target(spec='3rdparty/node:typ1',
                             target_type=NodeRemoteModule,
                             package_name='typ',
@@ -71,7 +67,6 @@ class NpmResolveTest(TaskTestBase):
                             package_name='typ',
                             version='0.6.x')
 
-    SourceRoot.register('src/node', NodeModule)
     self.create_file('src/node/util/typ.js', contents=dedent("""
       var typ = require('typ');
       module.exports = {
@@ -123,8 +118,6 @@ class NpmResolveTest(TaskTestBase):
     self.assertIn('type of bool is: boolean', lines)
 
   def test_resolve_preserves_package_json(self):
-    SourceRoot.register('src/node', NodeModule)
-
     util = self.make_target(spec='src/node/util',
                             target_type=NodeModule,
                             sources=[],

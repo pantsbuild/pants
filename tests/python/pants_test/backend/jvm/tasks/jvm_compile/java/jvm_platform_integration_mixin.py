@@ -15,12 +15,12 @@ from pants.util.contextutil import temporary_dir
 
 
 class JvmPlatformIntegrationMixin(object):
-  """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, jmake)."""
+  """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, zinc)."""
 
   def get_pants_compile_args(self):
     """List of arguments to pants that determine what compiler to use.
 
-    The compiling task must be the last argument (eg, compile.java, compile.zinc-java).
+    The compiling task must be the last argument (eg, compile.zinc).
     """
     raise NotImplementedError
 
@@ -64,7 +64,7 @@ class JvmPlatformIntegrationMixin(object):
     if ':' in jar_name:
       jar_name = jar_name[jar_name.find(':') + 1:]
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.java': {'write_to': [cache_dir]}}
+      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
       with temporary_dir(root_dir=self.workdir_root()) as workdir:
         pants_run = self.run_pants_with_workdir(
           ['binary'] + self.get_pants_compile_args()
@@ -217,6 +217,6 @@ class JvmPlatformIntegrationMixin(object):
         self.assert_failure(compile_diamond('java6'), 'Diamond.java erroneously compiled in java6,'
                                                       ' which means that either compilation was'
                                                       ' skipped due to bad fingerprinting/caching,'
-                                                      ' or the compiler (probably jmake) failed to'
-                                                      ' clean up the previous class from the java7'
+                                                      ' or the compiler failed to clean up the'
+                                                      ' previous class from the java7'
                                                       ' compile.')
