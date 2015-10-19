@@ -164,70 +164,18 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       self._args.append('-fail-fast')
     self._args.append('-outdir')
     self._args.append(self.workdir)
-  
+
     if options.per_test_timer:
       self._args.append('-per-test-timer')
     if options.default_parallel:
       self._args.append('-default-parallel')
     self._args.append('-parallel-threads')
     self._args.append(str(options.parallel_threads))
-  
+
     if options.test_shard:
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
 
-  @deprecated('0.0.55', 'emma support will be removed in future versions.')
-  def _build_emma_coverage_engine(self):
-    settings = EmmaTaskSettings(self)
-    return Emma(settings)
-
-  def _test_target_filter(self):
-    def target_filter(target):
-      return isinstance(target, junit_tests)
-    return target_filter
-
-  def _validate_target(self, target):
-    # TODO: move this check to an optional phase in goal_runner, so
-    # that missing sources can be detected early.
-    if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
-      msg = 'JavaTests target must include a non-empty set of sources.'
-      raise TargetDefinitionException(target, msg)
-
-  def _execute(self, targets):
-    # We only run tests within java_tests/junit_tests targets.
-    #
-    # But if coverage options are specified, we want to instrument
-    # and report on all the original targets, not just the test targets.
-    #
-    # We've already filtered out the non-test targets in the
-    # TestTaskMixin, so the mixin passes to us both the test
-    # targets and the unfiltered list of targets
-    tests_and_targets = self._collect_test_targets(self._get_test_targets())
-  
-    if not tests_and_targets:
-      return
-  
-    bootstrapped_cp = self.tool_classpath('junit')
-  
-    def compute_complete_classpath():
-      return self.classpath(targets, classpath_prefix=bootstrapped_cp)
-  
-    self.context.release_lock()
-    if self._coverage:
-      self._coverage.instrument(
-        targets, tests_and_targets.keys(), compute_complete_classpath, self.execute_java_for_targets)
-  
-    def _do_report(exception=None):
-      if self._coverage:
-        self._coverage.report(
-          targets, tests_and_targets.keys(), self.execute_java_for_targets, tests_failed_exception=exception)
-  
-    try:
-      self._run_tests(tests_and_targets)
-      _do_report(exception=None)
-    except TaskError as e:
-      _do_report(exception=e)
-      raise
 
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
@@ -249,9 +197,9 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     are included in targets. If self._tests_to_run is set, return {test: None}
     for these tests instead.
     """
-  
+
     tests_from_targets = dict(list(self._calculate_tests_from_targets(targets)))
-  
+
     if targets and self._tests_to_run:
       # If there are some junit_test targets in the graph, find ones that match the requested
       # test(s).
@@ -265,12 +213,12 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
           unknown_tests.append(test)
         else:
           tests_with_targets[test] = target
-    
+
       if len(unknown_tests) > 0:
         raise TaskError("No target found for test specifier(s):\n\n  '{}'\n\nPlease change " \
                         "specifier or bring in the proper target(s)."
                         .format("'\n  '".join(unknown_tests)))
-    
+
       return tests_with_targets
     else:
       return tests_from_targets
@@ -286,27 +234,27 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
 
     :tests_and_targets: {test: target} mapping.
     """
-  
+
     def get_test_filename(test):
       return os.path.join(self.workdir, 'TEST-{0}.xml'.format(test))
-  
+
     failed_targets = defaultdict(set)
-  
+
     for test, target in tests_and_targets.items():
       if target is None:
         self.context.log.warn('Unknown target for test %{0}'.format(test))
-    
+
       filename = get_test_filename(test)
-    
+
       if os.path.exists(filename):
         try:
           xml = XmlParser.from_file(filename)
           str_failures = xml.get_attribute('testsuite', 'failures')
           int_failures = int(str_failures)
-        
+
           str_errors = xml.get_attribute('testsuite', 'errors')
           int_errors = int(str_errors)
-        
+
           if target and (int_failures or int_errors):
             for testcase in xml.parsed.getElementsByTagName('testcase'):
               test_failed = testcase.getElementsByTagName('failure')
@@ -318,11 +266,11 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
                 ))
         except (XmlParser.XmlError, ValueError) as e:
           self.context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
-  
+
     return dict(failed_targets)
 
   def _run_tests(self, tests_to_targets):
-  
+
     if self._coverage:
       extra_jvm_options = self._coverage.extra_jvm_options
       classpath_prepend = self._coverage.classpath_prepend
@@ -331,22 +279,22 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       extra_jvm_options = []
       classpath_prepend = ()
       classpath_append = ()
-  
+
     tests_by_properties = self._tests_by_properties(tests_to_targets,
                                                     self._infer_workdir,
                                                     lambda target: target.test_platform)
-  
+
     # the below will be None if not set, and we'll default back to runtime_classpath
     classpath_product = self.context.products.get_data('instrument_classpath')
-  
+
     result = 0
     for (workdir, platform), tests in tests_by_properties.items():
       for batch in self._partition(tests):
         # Batches of test classes will likely exist within the same targets: dedupe them.
         relevant_targets = set(map(tests_to_targets.get, batch))
         classpath = self.classpath(relevant_targets,
-                                                 classpath_prefix=self.tool_classpath('junit'),
-                                                 classpath_product=classpath_product)
+                                   classpath_prefix=self.tool_classpath('junit'),
+                                   classpath_product=classpath_product)
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
         complete_classpath.update(classpath)
@@ -365,10 +313,10 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
             workunit_labels=[WorkUnitLabel.TEST],
             cwd=workdir,
           ))
-        
+
           if result != 0 and self._fail_fast:
             break
-  
+
     if result != 0:
       failed_targets_and_tests = self._get_failed_targets(tests_to_targets)
       failed_targets = sorted(failed_targets_and_tests, key=lambda target: target.address.spec)
@@ -399,7 +347,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   def _tests_by_properties(self, tests_to_targets, *properties):
     def combined_property(target):
       return tuple(prop(target) for prop in properties)
-  
+
     return self._tests_by_property(tests_to_targets, combined_property)
 
   def _partition(self, tests):
@@ -448,3 +396,56 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       for _, classes in source_products.rel_paths():
         for cls in classes:
           yield _classfile_to_classname(cls)
+
+  @deprecated('0.0.55', 'emma support will be removed in future versions.')
+  def _build_emma_coverage_engine(self):
+    settings = EmmaTaskSettings(self)
+    return Emma(settings)
+
+  def _test_target_filter(self):
+    def target_filter(target):
+      return isinstance(target, junit_tests)
+    return target_filter
+
+  def _validate_target(self, target):
+    # TODO: move this check to an optional phase in goal_runner, so
+    # that missing sources can be detected early.
+    if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
+      msg = 'JavaTests target must include a non-empty set of sources.'
+      raise TargetDefinitionException(target, msg)
+
+  def _execute(self, targets):
+    # We only run tests within java_tests/junit_tests targets.
+    #
+    # But if coverage options are specified, we want to instrument
+    # and report on all the original targets, not just the test targets.
+    #
+    # We've already filtered out the non-test targets in the
+    # TestTaskMixin, so the mixin passes to us both the test
+    # targets and the unfiltered list of targets
+    tests_and_targets = self._collect_test_targets(self._get_test_targets())
+
+    if not tests_and_targets:
+      return
+
+    bootstrapped_cp = self.tool_classpath('junit')
+
+    def compute_complete_classpath():
+      return self.classpath(targets, classpath_prefix=bootstrapped_cp)
+
+    self.context.release_lock()
+    if self._coverage:
+      self._coverage.instrument(
+        targets, tests_and_targets.keys(), compute_complete_classpath, self.execute_java_for_targets)
+
+    def _do_report(exception=None):
+      if self._coverage:
+        self._coverage.report(
+          targets, tests_and_targets.keys(), self.execute_java_for_targets, tests_failed_exception=exception)
+
+    try:
+      self._run_tests(tests_and_targets)
+      _do_report(exception=None)
+    except TaskError as e:
+      _do_report(exception=e)
+      raise
