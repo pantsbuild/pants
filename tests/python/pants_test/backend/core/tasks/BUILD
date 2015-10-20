@@ -138,6 +138,16 @@ python_tests(
 )
 
 python_tests(
+  name='task',
+  sources=['test_task.py'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
   name='test_task_mixin',
   sources=['test_test_task_mixin.py'],
   dependencies=[

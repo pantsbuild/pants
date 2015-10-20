@@ -308,10 +308,18 @@ class Target(AbstractTarget):
   def mark_extra_invalidation_hash_dirty(self):
     pass
 
-  def mark_invalidation_hash_dirty(self):
+  def mark_invalidation_hash_dirty(self, payload=True):
+    """Invalidates memoized fingerprints for this target.
+
+    If payload=True, additionally invalidates memoized payload fingerprints.
+
+    Exposed for testing.
+    """
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
     self.mark_extra_invalidation_hash_dirty()
+    if payload:
+      self.payload.mark_dirty()
 
   def transitive_invalidation_hash(self, fingerprint_strategy=None):
     """

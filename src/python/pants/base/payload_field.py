@@ -48,6 +48,13 @@ class PayloadField(AbstractClass):
       self._fingerprint_memo = self._compute_fingerprint()
     return self._fingerprint_memo
 
+  def mark_dirty(self):
+    """Invalidates the memoized fingerprint for this field.
+
+    Exposed for testing.
+    """
+    self._fingerprint_memo = None
+
   @abstractmethod
   def _compute_fingerprint(self):
     """This method will be called and the result memoized for ``PayloadField.fingerprint``."""
