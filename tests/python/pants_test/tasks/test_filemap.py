@@ -10,7 +10,6 @@ from textwrap import dedent
 
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.source_root import SourceRoot
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
@@ -22,9 +21,6 @@ class FilemapTest(ConsoleTaskTestBase):
       targets={
         'python_library': PythonLibrary,
       },
-      context_aware_object_factories={
-        'source_root': SourceRoot.factory,
-      }
     )
 
   @classmethod
@@ -44,31 +40,32 @@ class FilemapTest(ConsoleTaskTestBase):
           )
           """.format(name=name, sources=','.join(repr(f) for f in files))))
 
-    self.add_to_build_file('common', 'source_root.here(python_library)')
-    add_to_build_file('common/a', 'a', 'one.py')
-    add_to_build_file('common/b', 'b', 'two.py', 'three.py')
-    add_to_build_file('common/c', 'c', 'four.py')
+    add_to_build_file('common/src/py/a', 'a', 'one.py')
+    add_to_build_file('common/src/py/b', 'b', 'two.py', 'three.py')
+    add_to_build_file('common/src/py/c', 'c', 'four.py')
     add_to_build_file('common', 'dummy')
-    self.target('common/b')
+    self.target('common/src/py/b')
 
   def test_all(self):
     self.assert_console_output(
-      'common/a/one.py common/a:a',
-      'common/b/two.py common/b:b',
-      'common/b/three.py common/b:b',
-      'common/c/four.py common/c:c',
+      'common/src/py/a/one.py common/src/py/a:a',
+      'common/src/py/b/two.py common/src/py/b:b',
+      'common/src/py/b/three.py common/src/py/b:b',
+      'common/src/py/c/four.py common/src/py/c:c',
     )
 
   def test_one(self):
     self.assert_console_output(
-      'common/b/two.py common/b:b',
-      'common/b/three.py common/b:b',
-      targets=[self.target('common/b')]
+      'common/src/py/b/two.py common/src/py/b:b',
+      'common/src/py/b/three.py common/src/py/b:b',
+      targets=[self.target('common/src/py/b')]
     )
 
   def test_dup(self):
     self.assert_console_output(
-      'common/a/one.py common/a:a',
-      'common/c/four.py common/c:c',
-      targets=[self.target('common/a'), self.target('common/c'), self.target('common/a')]
+      'common/src/py/a/one.py common/src/py/a:a',
+      'common/src/py/c/four.py common/src/py/c:c',
+      targets=[self.target('common/src/py/a'),
+               self.target('common/src/py/c'),
+               self.target('common/src/py/a')]
     )

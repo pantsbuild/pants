@@ -14,7 +14,6 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
-from pants.base.source_root import SourceRoot
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.util.contextutil import temporary_dir
@@ -26,7 +25,6 @@ from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
-from pants.contrib.go.targets.go_target import GoTarget
 from pants.contrib.go.tasks.go_task import GoTask
 
 
@@ -308,32 +306,17 @@ class GoBuildgen(GoTask):
     # The GOPATH's 1st element is read-write, the rest are read-only; ie: their sources build to
     # the 1st element's pkg/ and bin/ dirs.
 
-    def check_go_only_root(root):
-      non_go_types = [target_type for target_type in SourceRoot.types(root)
-                      if not issubclass(target_type, GoTarget)]
-      if non_go_types:
-        raise self.MixedRootError('The source root at {} cannot allow non-Go targets, allows: {}'
-                                  .format(root,
-                                          ', '.join(non_go_type.__name__
-                                                    for non_go_type in non_go_types)))
-
-    all_rooted_types = set()
-    for types in SourceRoot.all_roots().values():
-      all_rooted_types.update(types)
-
-    def safe_get_source_roots(target_type):
-      return set(SourceRoot.roots(target_type)) if target_type in all_rooted_types else set()
-
-    local_roots = safe_get_source_roots(GoBinary) | safe_get_source_roots(GoLibrary)
+    # TODO: Add "find source roots for lang" functionality to SourceRoots and use that instead.
+    all_roots = list(self.context.source_roots.all_roots())
+    local_roots = [sr.path for sr in all_roots if 'go' in sr.langs]
     if not local_roots:
-      raise self.NoLocalRootsError('Can only BUILD gen if a Go local sources source root is'
+      raise self.NoLocalRootsError('Can only BUILD gen if a Go local sources source root is '
                                    'defined.')
     if len(local_roots) > 1:
       raise self.InvalidLocalRootsError('Can only BUILD gen for a single Go local sources source '
                                         'root, found:\n\t{}'
                                         .format('\n\t'.join(sorted(local_roots))))
     local_root = local_roots.pop()
-    check_go_only_root(local_root)
 
     if local_go_targets:
       unrooted_locals = {t for t in local_go_targets if t.target_base != local_root}
@@ -349,14 +332,12 @@ class GoBuildgen(GoTask):
       if not local_go_targets:
         return None
 
-    remote_roots = set(safe_get_source_roots(GoRemoteLibrary))
+    remote_roots = [sr.path for sr in all_roots if 'go_remote' in sr.langs]
     if len(remote_roots) > 1:
       raise self.InvalidRemoteRootsError('Can only BUILD gen for a single Go remote library source '
                                          'root, found:\n\t{}'
                                          .format('\n\t'.join(sorted(remote_roots))))
     remote_root = remote_roots.pop() if remote_roots else None
-    if remote_root:
-      check_go_only_root(remote_root)
 
     generator = GoTargetGenerator(self.context.new_workunit,
                                   self.go_dist,

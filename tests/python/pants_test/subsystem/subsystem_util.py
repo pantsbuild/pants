@@ -31,7 +31,7 @@ def create_subsystem(subsystem_type, scope='test-scope', **options):
 
 
 @contextmanager
-def subsystem_instance(subsystem_type, scope=None, options=None):
+def subsystem_instance(subsystem_type, scope=None, **options):
   """Creates a Subsystem instance for test.
 
   :param type subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
@@ -44,7 +44,11 @@ def subsystem_instance(subsystem_type, scope=None, options=None):
                     .format(subsystem_type))
 
   optionables = Subsystem.closure([subsystem_type])
-  Subsystem._options = create_options_for_optionables(optionables, options=options)
+  updated_options = dict(Subsystem._options.items()) if Subsystem._options else {}
+  if options:
+    updated_options.update(options)
+
+  Subsystem._options = create_options_for_optionables(optionables, options=updated_options)
   try:
     if scope is None:
       yield subsystem_type.global_instance()

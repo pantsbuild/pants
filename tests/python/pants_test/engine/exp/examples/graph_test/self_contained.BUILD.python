@@ -2,18 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 thrift1 = Target(
-  sources=[]
+  sources=None,
 )
 
 thrift2 = Target(
-  sources=[],
+  sources={},
   dependencies=[
     ':thrift1',
   ]
 )
 
 java1 = Target(
-  sources=[],
   dependencies=[
     ':thrift2',
   ],
