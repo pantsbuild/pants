@@ -35,6 +35,18 @@ class ApacheThriftConfiguration(Configuration):
                                                     options=options,
                                                     **kwargs)
 
+  @property
+  def version(self):
+    return self.field('version')
+
+  @property
+  def strict(self):
+    return self.field('strict')
+
+  @property
+  def lang(self):
+    return self.field('lang')
+
   # An example of a validatable bit of config.
   def validate_concrete(self):
     if not self.version:

@@ -47,6 +47,22 @@ class Sources(Configuration):
     :rtype: :class:`Sources`
     """
 
+  @property
+  def _files(self):
+    return self.field('files')
+
+  @property
+  def _globs(self):
+    return self.field('globs')
+
+  @property
+  def _rglobs(self):
+    return self.field('rglobs')
+
+  @property
+  def _zglobs(self):
+    return self.field('zglobs')
+
   def iter_paths(self, base_path=None, ext=None):
     """Return an iterator over this collection of sources file paths.
 
@@ -71,11 +87,11 @@ class Sources(Configuration):
     excluded_files = frozenset(self.excludes.iter_paths(base_path)) if self.excludes else ()
 
     def file_sources():
-      if self.files:
-        yield self.files
-      for spec, fileset_wrapper_type in ((self.globs, Globs),
-                                         (self.rglobs, RGlobs),
-                                         (self.zglobs, ZGlobs)):
+      if self._files:
+        yield self._files
+      for spec, fileset_wrapper_type in ((self._globs, Globs),
+                                         (self._rglobs, RGlobs),
+                                         (self._zglobs, ZGlobs)):
         if spec:
           fileset = fileset_wrapper_type(base_path)(spec)
           yield fileset
