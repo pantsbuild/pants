@@ -5,17 +5,32 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import time
+
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class PytestRunIntegrationTest(PantsRunIntegrationTest):
   def test_pytest_run_timeout_succeeds(self):
-    pants_run = self.run_pants(['clean-all', 'test.pytest',  'testprojects/tests/python/pants/timeout:passing_target'])
+    pants_run = self.run_pants(['clean-all',
+                                'test.pytest',
+                                '--test-pytest-options="-k sleep_short"',
+                                '--timeout-default=2',
+                                'testprojects/tests/python/pants/timeout:sleeping_target'])
     self.assert_success(pants_run)
 
   def test_pytest_run_timeout_fails(self):
-    pants_run = self.run_pants(['clean-all', 'test.pytest',  'testprojects/tests/python/pants/timeout:failing_target'])
+    start = time.time()
+    pants_run = self.run_pants(['clean-all',
+                                'test.pytest',
+                                '--test-pytest-options="-k sleep_long"',
+                                '--timeout-default=1',
+                                'testprojects/tests/python/pants/timeout:sleeping_target'])
+    end = time.time()
     self.assert_failure(pants_run)
 
-    # Make sure that the failure took only 1 second to run
-    self.assertIn("FAILURE: After 1 seconds: Timeout of 1 seconds reached", pants_run.stdout_data)
+    # Ensure that the failure took less than 120 seconds to run.
+    self.assertLess(end - start, 120)
+
+    # Ensure that the timeout message triggered.
+    self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)

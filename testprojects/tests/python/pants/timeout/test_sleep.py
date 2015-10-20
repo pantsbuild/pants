@@ -4,5 +4,9 @@
 import time
 
 
-def test_sleep():
-  time.sleep(2)
+def test_sleep_short():
+  time.sleep(1)
+
+
+def test_sleep_long():
+  time.sleep(120)
