@@ -73,14 +73,14 @@ class IdeGen(IvyTaskMixin, NailgunTask):
              help='Includes scala sources in the project; otherwise compiles them and adds them '
                   'to the project classpath.')
     register('--use-source-root', action='store_true', default=False,
-             help='Use source_root() settings to collapse sourcepaths in project and determine '
+             help='Use source roots to collapse sourcepaths in project and determine '
                   'which paths are used for tests.  This is usually what you want if your repo '
                   ' uses a maven style directory layout.')
     register('--infer-test-from-siblings', action='store_true',
              deprecated_version='0.0.57',
              deprecated_hint='Setting test attribute on paths is now handled automatically.',
              help='When determining if a path should be added to the IDE, check to see if any of '
-                  'its sibling source_root() entries define test targets.  This is usually what '
+                  'its sibling source roots define test targets.  This is usually what '
                   'you want so that resource directories under test source roots are picked up as '
                   'test paths.')
     register('--debug_port', type=int, default=5005,
