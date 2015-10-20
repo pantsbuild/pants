@@ -36,9 +36,9 @@ from pants.util.xml_parser import XmlParser
 
 
 # TODO(ji): Add unit tests.
-
 def _classfile_to_classname(cls):
   return ClasspathUtil.classname_for_rel_classfile(cls)
+
 
 def interpret_test_spec(test_spec):
   """Parses a test spec string.
