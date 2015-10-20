@@ -85,6 +85,18 @@ class StackTask(Task):
     return yaml
 
   def stack_task(self, command, extra_args = []):
+    """
+    This function provides shared logic for all `StackTask` sub-classes, which
+    consists of:
+
+    * creating a temporary directory
+    * creating the `stack.yaml` file within that directory
+    * invoking `stack` from within that directory
+
+    This also yields the temporary directory where `stack` was invoked, which can
+    be used to access any relative files that `stack` generates (such as the `bin`
+    directory where output executables are stored by default)
+    """
     for target in self.context.target_roots:
       if isinstance(target, HaskellPackage):
         yaml = StackTask.make_stack_yaml(target)
