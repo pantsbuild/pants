@@ -29,8 +29,20 @@ class StackTask(Task):
     return isinstance(target, Cabal)
 
   @staticmethod
+  def is_haskell_package(target):
+    return isinstance(target, HaskellPackage)
+
+  @staticmethod
   def make_stack_yaml(target):
-    for dependency in target.dependencies:
+    """
+    Build a `stack.yaml` file from a root target's dependency graph:
+
+    * Every `stackage` target is currently ignored since they are already covered
+      by the `resolver` field
+    * Every `hackage` target translates to an `extra-deps` entry
+    * Every `cabal` target translates to a `package` entry
+    """
+    for dependency in filter(StackTask.is_haskell_package, target.closure()):
       if target.resolver != dependency.resolver:
         raise TaskError(
           "Every package in a Haskell build graph must use the same resolver\n"
