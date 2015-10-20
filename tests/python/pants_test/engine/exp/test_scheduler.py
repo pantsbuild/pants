@@ -6,8 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
+import multiprocessing
 import os
 import unittest
+from contextlib import closing
 
 from twitter.common.collections.orderedset import OrderedSet
 
@@ -17,11 +19,21 @@ from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
-from pants.engine.exp.scheduler import (BuildRequest, GlobalScheduler, Plan, Planners, Promise,
-                                        Subject, Task, TaskPlanner)
+from pants.engine.exp.scheduler import (BuildRequest, GlobalScheduler, LocalMultiprocessEngine,
+                                        LocalSerialEngine, Plan, Planners, Promise, Subject, Task,
+                                        TaskPlanner)
 from pants.engine.exp.targets import Sources as AddressableSources
 from pants.engine.exp.targets import Target
-from pants.util.memo import memoized
+
+
+class PrintingTask(Task):
+  @classmethod
+  def fake_product(cls):
+    return '<<<Fake{}Product>>>'.format(cls.__name__)
+
+  def execute(self, **inputs):
+    print('{} being executed with inputs: {}'.format(type(self).__name__, inputs))
+    return self.fake_product()
 
 
 class Requirement(Configuration):
@@ -78,20 +90,26 @@ class GlobalIvyResolvePlanner(TaskPlanner):
     return [global_plan]
 
 
-class IvyResolve(Task):
+class IvyResolve(PrintingTask):
   def execute(self, jars):
-    pass
+    return super(IvyResolve, self).execute(jars=jars)
 
 
 class Sources(object):
-  @staticmethod
-  @memoized
-  def of(ext):
-    return type(b'Sources({!r})'.format(ext), (Sources,), dict(ext=ext))
+  def __init__(self, ext):
+    self.ext = ext
 
-  @classmethod
-  def ext(cls):
-    raise NotImplementedError()
+  def __hash__(self):
+    return hash(self.ext)
+
+  def __eq__(self, other):
+    return isinstance(other, Sources) and self.ext == other.ext
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __repr__(self):
+    return 'Sources(ext={!r})'.format(self.ext)
 
 
 class ApacheThriftConfiguration(Configuration):
@@ -107,6 +125,18 @@ class ApacheThriftConfiguration(Configuration):
     super(ApacheThriftConfiguration, self).__init__(rev=rev, gen=gen, strict=strict, **kwargs)
     self.deps = deps
 
+  @property
+  def rev(self):
+    return self.field('rev')
+
+  @property
+  def gen(self):
+    return self.field('gen')
+
+  @property
+  def strict(self):
+    return self.field('strict')
+
   # Could be Jars, PythonRequirements, ... we simply don't know a-priori - depends on --gen lang.
   @addressable_list(SubclassesOf(Configuration))
   def deps(self):
@@ -118,7 +148,7 @@ class ApacheThriftPlanner(TaskPlanner):
   def __init__(self):
     # This will come via an option default.
     # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
-    self._product_type_by_lang = {'java': Sources.of('.java'), 'py': Sources.of('.py')}
+    self._product_type_by_lang = {'java': Sources('.java'), 'py': Sources('.py')}
 
   @property
   def goal_name(self):
@@ -160,14 +190,14 @@ class ApacheThriftPlanner(TaskPlanner):
                 strict=config.strict)
 
 
-class ApacheThrift(Task):
+class ApacheThrift(PrintingTask):
   def execute(self, sources, rev, gen, strict):
-    pass
+    return super(ApacheThrift, self).execute(sources=sources, rev=rev, gen=gen, strict=strict)
 
 
 class JavacPlanner(TaskPlanner):
   # Product type
-  JavaSources = Sources.of('.java')
+  JavaSources = Sources('.java')
 
   @property
   def goal_name(self):
@@ -215,9 +245,9 @@ class JavacPlanner(TaskPlanner):
                 classpath=classpath_promises)
 
 
-class JavacTask(Task):
+class JavacTask(PrintingTask):
   def execute(self, sources, classpath):
-    pass
+    return super(JavacTask, self).execute(sources=sources, classpath=classpath)
 
 
 class SchedulerTest(unittest.TestCase):
@@ -247,7 +277,8 @@ class SchedulerTest(unittest.TestCase):
 
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
-    self.assertEqual(Plan(task_type=IvyResolve, subjects=jars, jars=list(jars)), plans[0])
+    self.assertEqual((Classpath, Plan(task_type=IvyResolve, subjects=jars, jars=list(jars))),
+                     plans[0])
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
@@ -277,12 +308,13 @@ class SchedulerTest(unittest.TestCase):
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
 
-    self.assertEqual(Plan(task_type=ApacheThrift,
-                          subjects=[self.thrift],
-                          strict=True,
-                          rev='0.9.2',
-                          gen='java',
-                          sources=['src/thrift/codegen/simple/simple.thrift']),
+    self.assertEqual((Sources('.java'),
+                      Plan(task_type=ApacheThrift,
+                           subjects=[self.thrift],
+                           strict=True,
+                           rev='0.9.2',
+                           gen='java',
+                           sources=['src/thrift/codegen/simple/simple.thrift'])),
                      plans[0])
 
   def test_codegen_simple(self):
@@ -299,25 +331,42 @@ class SchedulerTest(unittest.TestCase):
     jars = [self.guava] + thrift_jars
 
     # Independent leaves 1st
-    self.assertEqual({Plan(task_type=ApacheThrift,
-                           subjects=[self.thrift],
-                           strict=True,
-                           rev='0.9.2',
-                           gen='java',
-                           sources=['src/thrift/codegen/simple/simple.thrift']),
-                      Plan(task_type=IvyResolve, subjects=jars, jars=jars)},
+    self.assertEqual({(Sources('.java'),
+                       Plan(task_type=ApacheThrift,
+                            subjects=[self.thrift],
+                            strict=True,
+                            rev='0.9.2',
+                            gen='java',
+                            sources=['src/thrift/codegen/simple/simple.thrift'])),
+                      (Classpath, Plan(task_type=IvyResolve, subjects=jars, jars=jars))},
                      set(plans[0:2]))
 
     # The rest is linked.
-    self.assertEqual(Plan(task_type=JavacTask,
-                          subjects=[self.thrift],
-                          sources=Promise(Sources.of('.java'), self.thrift),
-                          classpath=[Promise(Classpath, jar) for jar in thrift_jars]),
+    self.assertEqual((Classpath,
+                      Plan(task_type=JavacTask,
+                           subjects=[self.thrift],
+                           sources=Promise(Sources('.java'), self.thrift),
+                           classpath=[Promise(Classpath, jar) for jar in thrift_jars])),
                      plans[2])
 
-    self.assertEqual(Plan(task_type=JavacTask,
-                          subjects=[self.java],
-                          sources=['src/java/codegen/simple/Simple.java'],
-                          classpath=[Promise(Classpath, self.guava),
-                                     Promise(Classpath, self.thrift)]),
+    self.assertEqual((Classpath,
+                      Plan(task_type=JavacTask,
+                           subjects=[self.java],
+                           sources=['src/java/codegen/simple/Simple.java'],
+                           classpath=[Promise(Classpath, self.guava),
+                                      Promise(Classpath, self.thrift)])),
                      plans[3])
+
+  def assert_engine(self, engine):
+    build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])
+    result = engine.execute(build_request)
+    self.assertEqual({Promise(Classpath, self.java): JavacTask.fake_product()},
+                     result.root_products)
+
+  def test_serial_engine(self):
+    engine = LocalSerialEngine(self.global_scheduler)
+    self.assert_engine(engine)
+
+  def test_multiprocess_engine(self):
+    with closing(LocalMultiprocessEngine(self.global_scheduler)) as engine:
+      self.assert_engine(engine)

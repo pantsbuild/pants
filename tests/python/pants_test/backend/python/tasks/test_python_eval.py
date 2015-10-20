@@ -7,10 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks.python_eval import PythonEval
-from pants.base.source_root import SourceRoot
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -22,17 +19,12 @@ class PythonEvalTest(PythonTaskTestBase):
 
   def setUp(self):
     super(PythonEvalTest, self).setUp()
-    SourceRoot.register('src', PythonBinary, PythonLibrary)
     self._create_graph(broken_b_library=True)
-
-  def tearDown(self):
-    super(PythonEvalTest, self).tearDown()
-    SourceRoot.reset()
 
   def _create_graph(self, broken_b_library):
     self.reset_build_graph()
 
-    self.a_library = self.create_python_library('src/a', 'a', {'a.py': dedent("""
+    self.a_library = self.create_python_library('src/python/a', 'a', {'a.py': dedent("""
     import inspect
 
 
@@ -42,7 +34,7 @@ class PythonEvalTest(PythonTaskTestBase):
       return cls
     """)})
 
-    self.b_library = self.create_python_library('src/b', 'b', {'b.py': dedent("""
+    self.b_library = self.create_python_library('src/python/b', 'b', {'b.py': dedent("""
     from a.a import compile_time_check_decorator
 
 
@@ -52,7 +44,7 @@ class PythonEvalTest(PythonTaskTestBase):
     """)})
 
     # TODO: Presumably this was supposed to be c_library, not override b_library. Unravel and fix.
-    self.b_library = self.create_python_library('src/c', 'c', {'c.py': dedent("""
+    self.b_library = self.create_python_library('src/python/c', 'c', {'c.py': dedent("""
     from a.a import compile_time_check_decorator
 
 
@@ -60,23 +52,25 @@ class PythonEvalTest(PythonTaskTestBase):
     {}:
       pass
     """.format('def baz_c()' if broken_b_library else 'class BazC(object)')
-    )}, dependencies=['//src/a'])
+    )}, dependencies=['//src/python/a'])
 
-    self.d_library = self.create_python_library('src/d', 'd', { 'd.py': dedent("""
+    self.d_library = self.create_python_library('src/python/d', 'd', { 'd.py': dedent("""
     from a.a import compile_time_check_decorator
 
 
     @compile_time_check_decorator
     class BazD(object):
       pass
-    """)}, dependencies=['//src/a'])
+    """)}, dependencies=['//src/python/a'])
 
-    self.e_binary = self.create_python_binary('src/e', 'e', 'a.a', dependencies=['//src/a'])
-    self.f_binary = self.create_python_binary('src/f', 'f', 'a.a:compile_time_check_decorator',
-                                              dependencies=['//src/a'])
-    self.g_binary = self.create_python_binary('src/g', 'g', 'a.a:does_not_exist',
-                                              dependencies=['//src/a'])
-    self.h_binary = self.create_python_binary('src/h', 'h', 'a.a')
+    self.e_binary = self.create_python_binary('src/python/e', 'e', 'a.a',
+                                              dependencies=['//src/python/a'])
+    self.f_binary = self.create_python_binary('src/python/f', 'f',
+                                              'a.a:compile_time_check_decorator',
+                                              dependencies=['//src/python/a'])
+    self.g_binary = self.create_python_binary('src/python/g', 'g', 'a.a:does_not_exist',
+                                              dependencies=['//src/python/a'])
+    self.h_binary = self.create_python_binary('src/python/h', 'h', 'a.a')
 
   def _create_task(self, target_roots, options=None):
     if options:

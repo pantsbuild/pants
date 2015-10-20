@@ -168,6 +168,7 @@ python_library(
     ':build_environment',
     ':build_file_target_factory',
     ':build_manual',
+    ':deprecated',
     ':exceptions',
     ':parse_context',
     '3rdparty/python/twitter/commons:twitter.common.collections',

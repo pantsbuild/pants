@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.base.source_root import SourceRoot
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -59,30 +58,30 @@ class GoBuildgenTest(TaskTestBase):
       task.execute()
 
   def test_multiple_local_roots_failure(self):
-    SourceRoot.register('src/go', GoBinary)
-    SourceRoot.register('src2/go', GoLibrary)
+    self.create_dir('src/go')
+    self.create_dir('src/main/go')
     context = self.context(target_roots=[self.make_target('src/go/fred', GoBinary)])
     task = self.create_task(context)
     with self.assertRaises(task.InvalidLocalRootsError):
       task.execute()
 
   def test_unrooted_failure(self):
-    SourceRoot.register('src/go', GoBinary)
+    self.create_dir('src/go')
     context = self.context(target_roots=[self.make_target('src2/go/fred', GoBinary)])
     task = self.create_task(context)
     with self.assertRaises(task.UnrootedLocalSourceError):
       task.execute()
 
   def test_multiple_remote_roots_failure(self):
-    SourceRoot.register('3rdparty/go', GoRemoteLibrary)
-    SourceRoot.register('src/go', GoLibrary, GoRemoteLibrary)
+    self.create_dir('3rdparty/go')
+    self.create_dir('src/go')
+    self.create_dir('src/go_remote')
     context = self.context(target_roots=[self.make_target('src/go/fred', GoLibrary)])
     task = self.create_task(context)
     with self.assertRaises(task.InvalidRemoteRootsError):
       task.execute()
 
   def test_existing_targets_wrong_type(self):
-    SourceRoot.register('src/go', GoBinary, GoLibrary)
     self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
       package main
 
@@ -99,7 +98,6 @@ class GoBuildgenTest(TaskTestBase):
     self.assertEqual(GoTargetGenerator.WrongLocalSourceTargetTypeError, type(exc.exception.cause))
 
   def test_noop_applicable_targets_simple(self):
-    SourceRoot.register('src/go', GoBinary)
     self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
       package main
 
@@ -116,7 +114,6 @@ class GoBuildgenTest(TaskTestBase):
     self.assertEqual(expected, context.targets())
 
   def test_noop_applicable_targets_complete_graph(self):
-    SourceRoot.register('src/go', GoBinary, GoLibrary)
     self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
       package jane
 
@@ -148,7 +145,6 @@ class GoBuildgenTest(TaskTestBase):
     if materialize:
       # We need physical directories on disk for `--materialize` since it does scans.
       self.create_dir('src/go')
-    SourceRoot.register('src/go', GoBinary, GoLibrary)
 
     self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
         package jane
@@ -214,8 +210,6 @@ class GoBuildgenTest(TaskTestBase):
       # We need physical directories on disk for `--materialize` since it does scans.
       self.create_dir('3rdparty/go')
       self.create_dir('src/go')
-    SourceRoot.register('3rdparty/go', GoRemoteLibrary)
-    SourceRoot.register('src/go', GoBinary, GoLibrary)
 
     self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
         package jane
@@ -263,6 +257,7 @@ class GoBuildgenTest(TaskTestBase):
     return pre_execute_files
 
   def test_stitch_deps_remote(self):
+    self.create_dir('3rdparty/go')
     pre_execute_files = self.stitch_deps_remote(materialize=False)
     self.assertEqual(pre_execute_files, self.buildroot_files())
 
@@ -294,6 +289,7 @@ class GoBuildgenTest(TaskTestBase):
                      self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_remote_disabled_fails(self):
+    self.create_dir('3rdparty/go')
     with self.assertRaises(GoBuildgen.GenerationError) as exc:
       self.stitch_deps_remote(remote=False)
     self.assertEqual(GoTargetGenerator.NewRemoteEncounteredButRemotesNotAllowedError,

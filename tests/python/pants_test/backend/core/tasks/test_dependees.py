@@ -17,8 +17,6 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
@@ -217,21 +215,6 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
     self.assert_console_output(
       'overlaps:five',
       targets=[self.target('overlaps:four')]
-    )
-
-  def test_dependees_type(self):
-    SourceRoot.register('tests', PythonTests)
-    self.assert_console_output(
-      'tests/d:d',
-      targets=[self.target('common/d')],
-      options={'type': ['python_tests']}
-    )
-
-  def test_empty_dependees_type(self):
-    self.assert_console_raises(
-      TaskError,
-      targets=[self.target('common/d')],
-      options={'spec_excludes': [], 'type': ['target']}
     )
 
   def test_compile_idls(self):

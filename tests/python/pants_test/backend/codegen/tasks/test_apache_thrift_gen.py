@@ -10,7 +10,6 @@ from textwrap import dedent
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.tasks.apache_thrift_gen import ApacheThriftGen
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.base.source_root import SourceRoot
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -22,8 +21,6 @@ class ApacheThriftGenTest(TaskTestBase):
 
   def setUp(self):
     super(ApacheThriftGenTest, self).setUp()
-
-    SourceRoot.register('src/thrift', JavaThriftLibrary)
 
   def generate_single_thrift_target(self, java_thrift_library):
     context = self.context(target_roots=[java_thrift_library])

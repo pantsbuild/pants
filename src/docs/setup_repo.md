@@ -66,66 +66,17 @@ perhaps change some version numbers to fit your situation.
 it uses; so, if the version you specify does not match either of those expectations, pants will
 fail when it tries to call the tool.
 
-Configure Code Layout with `source_root`, `maven_layout`
---------------------------------------------------------
+Set up source roots
+-------------------
 
-Maybe someday all the world's programmers will agree on the one true
-directory structure for source code. Until then, you'll want some
-<a pantsref="bdict_source_root">`source_root`</a>
-rules to specify which directories hold your code. A
-typical programming language has a notion of *base paths* for imports;
-you configure pants to tell it those base paths.
+Maybe some day all the world's programmers will agree on the one true directory structure for
+source code. Until then, Pants must deduce where the 'root' of a source tree is, so it can
+correctly set up import paths, correctly bundle code etc.
 
-If your project's source tree is laid out for Maven, there's a shortcut
-function
-<a pantsref="bdict_maven_layout">`maven_layout`</a>
-that configures source roots for Maven's expected
-source code tree structure. See
-[`testprojects/maven_layout`](https://github.com/pantsbuild/pants/tree/master/testprojects/maven_layout)
-for examples of using this style source tree.
-
-### Organized by Language
-
-If your top-level `BUILD` file is `top/BUILD` and your main Java code is
-in `top/src/java/com/foo/` and your Java tests are in
-`top/src/javatest/com/foo/`, then your top-level `BUILD` file might look
-like:
-
-    :::python
-    # top/BUILD
-    source_root('src/java')
-    source_root('src/javatest')
-    ...
-
-Pants can optionally enforce that only certain target types are allowed
-under each source root:
-
-    :::python
-    # top/BUILD
-    source_root('src/java', annotation_processor, doc, jvm_binary, java_library, page)
-    source_root('src/javatest', doc, java_library, java_tests, page)
-    ...
-
-### Organized by Project
-
-If your top-level `BUILD` file is `top/BUILD` and the Java code for your
-Theodore and Hank projects live in `top/theodore/src/java/com/foo/`,
-then your top-level `BUILD` file might not contain any `source_root`
-statements. Instead, `theodore/BUILD` and `hank/BUILD` might look like:
-
-    :::python
-    # top/(project)/BUILD
-    source_root('src/java')
-    source_root('src/javatest')
-    ...
-
-Or:
-
-    :::python
-    # top/(project)/BUILD
-    source_root('src/java', annotation_processor, doc, jvm_binary, java_library, page)
-    source_root('src/javatest', doc, java_library, java_tests, page)
-    ...
+In all typical cases, Pants can deduce the source roots automatically based on naming conventions.
+E.g., `src/<lang>`, `src/main/<lang>`, `test/<lang>`, `src/test/<lang>`, `3rdparty/lang` and so on.
+However if your source roots don't conform to any of the default patterns, you can add your own
+patterns.  See ` ./pants help-advanced source` for details.
 
 Setting up `BUILD` files
 ------------------------

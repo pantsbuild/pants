@@ -20,7 +20,6 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.binaries import binary_util
 from pants.build_graph.address import BuildFileAddress
 from pants.util.dirutil import safe_mkdir, safe_walk
@@ -74,14 +73,14 @@ class IdeGen(IvyTaskMixin, NailgunTask):
              help='Includes scala sources in the project; otherwise compiles them and adds them '
                   'to the project classpath.')
     register('--use-source-root', action='store_true', default=False,
-             help='Use source_root() settings to collapse sourcepaths in project and determine '
+             help='Use source roots to collapse sourcepaths in project and determine '
                   'which paths are used for tests.  This is usually what you want if your repo '
                   ' uses a maven style directory layout.')
     register('--infer-test-from-siblings', action='store_true',
              deprecated_version='0.0.57',
              deprecated_hint='Setting test attribute on paths is now handled automatically.',
              help='When determining if a path should be added to the IDE, check to see if any of '
-                  'its sibling source_root() entries define test targets.  This is usually what '
+                  'its sibling source roots define test targets.  This is usually what '
                   'you want so that resource directories under test source roots are picked up as '
                   'test paths.')
     register('--debug_port', type=int, default=5005,
@@ -198,6 +197,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                       self.use_source_root,
                       get_buildroot(),
                       debug_port,
+                      self.context,
                       jvm_targets,
                       not self.intransitive,
                       self.TargetUtil(self.context),
@@ -433,7 +433,7 @@ class Project(object):
         yield ext
 
   @staticmethod
-  def _collapse_by_source_root(source_sets):
+  def _collapse_by_source_root(source_roots, source_sets):
     """Collapse SourceSets with common source roots into one SourceSet instance.
 
     Use the registered source roots to collapse all source paths under a root.
@@ -447,20 +447,20 @@ class Project(object):
     collapsed_source_sets = []
     for source in source_sets:
       query = os.path.join(source.source_base, source.path)
-      source_root = SourceRoot.find_by_path(query)
+      source_root = source_roots.find_by_path(query)
       if not source_root:
         collapsed_source_sets.append(source)
       else:
-        collapsed_source_sets.append(SourceSet(source.root_dir, source_root, "",
+        collapsed_source_sets.append(SourceSet(source.root_dir, source_root.path, "",
                                                is_test=source.is_test,
                                                resources_only=source.resources_only))
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               debug_port, targets, transitive, target_util, spec_excludes):
+               debug_port, context, targets, transitive, target_util, spec_excludes):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
-
+    self.context = context
     self.target_util = target_util
     self.name = name
     self.root_dir = root_dir
@@ -485,10 +485,10 @@ class Project(object):
     self.external_jars = OrderedSet()
     self.spec_excludes = spec_excludes
 
-  def configure_python(self, source_roots, test_roots, lib_roots):
-    self.py_sources.extend(SourceSet(get_buildroot(), root, None) for root in source_roots)
-    self.py_sources.extend(SourceSet(get_buildroot(), root, None, is_test=True) for root in test_roots)
-    for root in lib_roots:
+  def configure_python(self, source_paths, test_paths, lib_paths):
+    self.py_sources.extend(SourceSet(get_buildroot(), root, None) for root in source_paths)
+    self.py_sources.extend(SourceSet(get_buildroot(), root, None, is_test=True) for root in test_paths)
+    for root in lib_paths:
       for path in os.listdir(os.path.join(get_buildroot(), root)):
         if os.path.isdir(os.path.join(get_buildroot(), root, path)) or path.endswith('.egg'):
           self.py_libs.append(SourceSet(get_buildroot(), root, path, is_test=False))
@@ -682,7 +682,7 @@ class Project(object):
     self.sources.extend(SourceSet(get_buildroot(), p, None, is_test=False) for p in extra_source_paths)
     self.sources.extend(SourceSet(get_buildroot(), p, None, is_test=True) for p in extra_test_paths)
     if self.use_source_root:
-      self.sources = Project._collapse_by_source_root(self.sources)
+      self.sources = Project._collapse_by_source_root(self.context.source_roots, self.sources)
     self.sources = self.dedup_sources(self.sources)
 
     return targets

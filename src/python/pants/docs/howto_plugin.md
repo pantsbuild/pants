@@ -24,6 +24,8 @@ there.
 Simple Configuration
 --------------------
 
+TODO: Come up with another example. `maven_layout()` is deprecated and will soon be gone.
+
 If you want to extend Pants without adding any 3rd Party libraries that aren't already referenced by
 Pants, you can use the following technique using sources stored directly
 in your repo.  All you need to do is add the directory where your plugin sources are stored

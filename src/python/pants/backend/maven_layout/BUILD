@@ -15,13 +15,6 @@ python_library(
   name = 'maven_layout',
   sources = ['maven_layout.py'],
   dependencies = [
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/targets:python',
-    'src/python/pants/backend/core/targets:all',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/python/targets:python',
-    'src/python/pants/base:source_root',
+    'src/python/pants/base:deprecated',
   ],
 )

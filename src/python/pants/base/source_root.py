@@ -12,8 +12,9 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.build_manual import manual
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
-from pants.source.source_root import SourceRoots as NewSourceRoots
+from pants.source.source_root import SourceRootConfig
 
 
 class SourceRootTree(object):
@@ -219,6 +220,8 @@ class SourceRoot(object):
     cls._SOURCE_ROOT_TREE = SourceRootTree()
 
   @classmethod
+  @deprecated('0.0.59', 'use context.source_roots.find() or '
+                        'SourceRootConfig.global_instance().get_source_roots().find().')
   def find(cls, target):
     """Finds the source root for the given target.
 
@@ -240,6 +243,8 @@ class SourceRoot(object):
     return found_source_root
 
   @classmethod
+  @deprecated('0.0.59', 'use context.source_roots.find_by_path() or '
+                        'SourceRootConfig.global_instance().get_source_roots().find_by_path().')
   def find_by_path(cls, path):
     """Finds a registered source root for a given path
 
@@ -308,6 +313,9 @@ class SourceRoot(object):
     :param list allowed_target_types: Optional list of target types. If specified, we enforce that
                           only targets of those types appear under this source root.
     """
+    # Temporary delegation to the new implementation, until this entire file goes away.
+    SourceRootConfig.global_instance().get_source_roots().add_source_root(source_root_dir)
+
     source_root_dir = SourceRoot._relative_to_buildroot(source_root_dir)
 
     types = cls._TYPES_BY_ROOT.get(source_root_dir)

@@ -29,7 +29,6 @@ python_library(
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'src/python/pants/goal:goal',
     'src/python/pants/source',
@@ -57,8 +56,9 @@ python_tests(
   sources = ['test_maven_layout.py'],
   dependencies = [
     ':base_test',
-    'src/python/pants/backend/maven_layout',
     'src/python/pants/build_graph',
+    'src/python/pants/source',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
