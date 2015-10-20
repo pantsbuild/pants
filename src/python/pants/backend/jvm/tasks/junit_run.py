@@ -40,7 +40,6 @@ from pants.util.xml_parser import XmlParser
 def _classfile_to_classname(cls):
   return ClasspathUtil.classname_for_rel_classfile(cls)
 
-
 def interpret_test_spec(test_spec):
   """Parses a test spec string.
 
@@ -175,7 +174,6 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.test_shard:
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
-
 
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
