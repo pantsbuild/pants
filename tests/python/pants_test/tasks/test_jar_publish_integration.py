@@ -38,11 +38,6 @@ def publish_extra_config(unique_config):
         'pants.backend.android',  # There are android target source roots defined in examples/BUILD
       ],
     },
-    'goals': {
-      'bootstrap_buildfiles': [
-        'examples/BUILD'
-      ]
-    },
     'publish.jar': {
       'publish_extras': {
         'extra_test_jar_example': unique_config,

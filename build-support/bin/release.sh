@@ -85,12 +85,6 @@ function run_local_pants() {
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
 function execute_packaged_pants_with_internal_backends() {
-  local extra_bootstrap_buildfiles
-  if [[ "$1" =~ "extra_bootstrap_buildfiles" ]]; then
-    extra_bootstrap_buildfiles=${1#*=}
-    shift
-  fi
-
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
@@ -100,10 +94,6 @@ function execute_packaged_pants_with_internal_backends() {
         'internal_backend.repositories', \
         'internal_backend.sitegen', \
         'internal_backend.utilities', \
-      ]" \
-    --goals-bootstrap-buildfiles="[ \
-        '${ROOT}/BUILD', \
-        ${extra_bootstrap_buildfiles}
       ]" \
     "$@"
 }
