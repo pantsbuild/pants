@@ -82,12 +82,12 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     If --no-use-nailgun is specified then the java main is run in a freshly spawned subprocess,
     otherwise a persistent nailgun server dedicated to this Task subclass is used to speed up
     amortized run times.
-
-    Creating synthetic jar to work around system arg length limit is not necessary
-    when `NailgunExecutor` is used because args are passed through socket, therefore turning off
-    creating synthetic jar if nailgun is used.
     """
     executor = self.create_java_executor()
+
+    # Creating synthetic jar to work around system arg length limit is not necessary
+    # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
+    # creating synthetic jar if nailgun is used.
     create_synthetic_jar= not self.get_options().use_nailgun
     try:
       return util.execute_java(classpath=classpath,
