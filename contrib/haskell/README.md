@@ -169,15 +169,16 @@ others in increasing order of diligence:
 
 * The simplest approach is to provide a source distribution of your package
 * You can also upload the package to Hackage under a name and version number
-* If you are diligent you can optionally add any package on Hackage to Stackage
+* If you are thrice diligent you can optionally add any package on Hackage to
+  Stackage
 
 The more diligent you are the more easily others can depend on your package.
 
-If you choose to only provide source distributions (perhaps hosted on Github)
-then users can only depend on your package at the project level.  At the package
-level you can only depend on something that has been uploaded to Hackage.
+By default, all dependencies are downloaded from Hackage unless you explicitly
+override them to point to other non-Hackage sources
 
-Here is an example of such a Github-only source package named `pipes-tar`:
+One example of a non-Hackage source is a package hosted only on Github such as
+the following `pipes-tar` package:
 
 [https://github.com/ocharles/pipes-tar](https://github.com/ocharles/pipes-tar)
 
@@ -416,9 +417,11 @@ For the `hackage` target, you must also specify a package version.
 For the `cabal` target you specify a path to the source distribution which
 can be a local directory or a remote tarball.
 
-`stackage` targets are not necessary as dependencies since they are already
-implicitly specified by the resolver field.  The only reason to have a
-`stackage` target is if you want to directly `bench`/`test`/`repl` a 3rdparty
+`stackage` targets are not (yet) necessary as dependencies since they are
+already implicitly specified by the resolver field.  Right now the only reason
+to have a `stackage` target is if you want to directly `bench`/`test`/`repl` a
+3rdparty package.  Later when we add support for generating `*.cabal` files then
+these dependencies will be used to complete the `build-depends` section of the
 package.
 
 The next logical progression for this plugin would be to add support for
