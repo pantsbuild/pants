@@ -35,8 +35,8 @@ Contrib plugins should generally follow 3 basic setup steps:
    ```
 
 2. Make the local pants aware of your plugin
-   This involves 3 edits to `pants.ini`.  You'll need to add one entry in each of the
-   `pythonpath`, `backend_packages` and `bootstrap_buildfiles` lists:
+   This involves 2 edits to `pants.ini`.  You'll need to add one entry in each of the
+   `pythonpath` and `backend_packages` lists:
    ```ini
    [DEFAULT]
    # Enable our own custom loose-source plugins as well as contribs.
@@ -55,16 +55,6 @@ Contrib plugins should generally follow 3 basic setup steps:
        ...
        "pants.contrib.example",  # 2
        ...
-     ]
-   ...
-   [goals]
-   bootstrap_buildfiles: [
-       "%(buildroot)s/BUILD",
-       ...
-       "%(buildroot)s/contrib/example/BUILD",  # 3
-       ...
-       "%(buildroot)s/examples/BUILD",
-       "%(buildroot)s/testprojects/BUILD",
      ]
    ```
 
