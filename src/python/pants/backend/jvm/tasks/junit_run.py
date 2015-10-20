@@ -217,6 +217,10 @@ class _JUnitRunner(object):
   def kill(self):
     """Kills the test run."""
 
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process.
     if self._executor is not None:
       self._executor.kill()
 

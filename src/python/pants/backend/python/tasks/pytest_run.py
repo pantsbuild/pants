@@ -522,6 +522,10 @@ class PytestRun(TestTaskMixin, PythonTask):
           return run_and_analyze(resultlog_path)
 
   def _timeout_abort_handler(self):
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process.
     if self._process is not None:
       self._process.kill()
 
@@ -529,6 +533,11 @@ class PytestRun(TestTaskMixin, PythonTask):
     # NB: We don't use pex.run(...) here since it makes a point of running in a clean environment,
     # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
     # task.
+
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process
     self._process = subprocess.Popen(pex.cmdline(args),
                                preexec_fn=os.setsid if setsid else None,
                                stdout=workunit.output('stdout'),
