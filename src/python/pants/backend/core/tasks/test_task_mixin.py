@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import time
 from abc import abstractmethod
 
 from pants.base.exceptions import TestFailedTaskError
@@ -45,13 +44,11 @@ class TestTaskMixin(object):
 
       timeout = self._timeout_for_targets(test_targets)
 
-      start = time.time()
       try:
         with Timeout(timeout, abort_handler=self._timeout_abort_handler):
           self._execute(all_targets)
       except TimeoutReached as e:
-        end = time.time()
-        raise TestFailedTaskError("After {} seconds: {}".format(int(round(end - start)), str(e)), failed_targets=test_targets)
+        raise TestFailedTaskError(str(e), failed_targets=test_targets)
 
   def _timeout_for_target(self, target):
     return getattr(target, 'timeout', None)
