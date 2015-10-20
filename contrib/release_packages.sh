@@ -57,7 +57,6 @@ PKG_GO=(
 )
 function pkg_go_install_test() {
   execute_packaged_pants_with_internal_backends \
-    "extra_bootstrap_buildfiles='${ROOT}/contrib/go/BUILD'" \
       --plugins="['pantsbuild.pants.contrib.go==$(local_version)']" \
       test.go contrib/go/examples::
 }
@@ -74,7 +73,6 @@ console.log("type of boolean is: " + typ.BOOLEAN);
 EOF
   ) | \
   execute_packaged_pants_with_internal_backends \
-    "extra_bootstrap_buildfiles='${ROOT}/contrib/node/BUILD'" \
       --plugins="['pantsbuild.pants.contrib.node==$(local_version)']" \
       repl.node contrib/node/examples::
 }
