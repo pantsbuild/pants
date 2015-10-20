@@ -88,6 +88,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     creating synthetic jar if nailgun is used.
     """
     executor = self.create_java_executor()
+    create_synthetic_jar= not self.get_options().use_nailgun
     try:
       return util.execute_java(classpath=classpath,
                                main=main,
@@ -98,7 +99,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                workunit_name=workunit_name,
                                workunit_labels=workunit_labels,
                                workunit_log_config=workunit_log_config,
-                               create_synthetic_jar= not self.get_options().use_nailgun,
+                               create_synthetic_jar=create_synthetic_jar,
                                synthetic_jar_dir=self._executor_workdir)
     except executor.Error as e:
       raise TaskError(e)
