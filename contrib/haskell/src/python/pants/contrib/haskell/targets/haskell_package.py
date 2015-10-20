@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 from pants.base.target import Target
 
 
@@ -17,4 +19,10 @@ class HaskellPackage(Target):
 
     self.package  = package
     self.resolver = resolver
+
+    payload = Payload()
+    payload.add_fields({
+      'package': PrimitiveField(self.package),
+      'resolver': PrimitiveField(self.resolver),
+    })
     super(HaskellPackage, self).__init__(**kwargs)
