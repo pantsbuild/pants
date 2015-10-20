@@ -82,6 +82,7 @@ class JarDependency(object):
                         ext=self.ext)
 
   def cache_key(self):
+    excludes = [(e.org, e.name) for e in self.excludes]
     return stable_json_sha1(dict(org=self.org,
                                  name=self.name,
                                  rev=self.rev,
@@ -90,4 +91,5 @@ class JarDependency(object):
                                  url=self.url,
                                  classifier=self.classifier,
                                  transitive=self.transitive,
-                                 mutable=self.mutable))
+                                 mutable=self.mutable,
+                                 excludes=excludes,))
