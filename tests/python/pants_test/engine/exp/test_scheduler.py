@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
-import multiprocessing
 import os
 import unittest
 from contextlib import closing
@@ -124,18 +123,6 @@ class ApacheThriftConfiguration(Configuration):
     """
     super(ApacheThriftConfiguration, self).__init__(rev=rev, gen=gen, strict=strict, **kwargs)
     self.deps = deps
-
-  @property
-  def rev(self):
-    return self.field('rev')
-
-  @property
-  def gen(self):
-    return self.field('gen')
-
-  @property
-  def strict(self):
-    return self.field('strict')
 
   # Could be Jars, PythonRequirements, ... we simply don't know a-priori - depends on --gen lang.
   @addressable_list(SubclassesOf(Configuration))

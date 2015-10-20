@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import inspect
 from abc import abstractmethod, abstractproperty
+from collections import namedtuple
 
 from pants.util.meta import AbstractClass
 
@@ -23,8 +24,29 @@ class Resolvable(AbstractClass):
     """Resolve and return the resolvable object."""
 
 
+def _unpickle_serializable(serializable_class, kwargs):
+  # A pickle-compatible top-level function for custom unpickling of Serializables.
+  return serializable_class(**kwargs)
+
+
+class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
+  """A named tuple to help the readability of the __reduce__ protocol.
+
+  See: https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-extension-types
+  """
+
+  @classmethod
+  def create(cls, serializable_instance):
+    """Return a tuple that implements the __reduce__ pickle protocol for serializable_instance."""
+    return cls(unpickle_func=_unpickle_serializable,
+               args=(type(serializable_instance), serializable_instance._asdict()))
+
+
 class Serializable(AbstractClass):
-  """Marks a class that can be serialized into and reconstituted from python builtin values."""
+  """Marks a class that can be serialized into and reconstituted from python builtin values.
+
+  Also provides support for the pickling protocol out of the box.
+  """
 
   @staticmethod
   def is_serializable(obj):
@@ -59,6 +81,15 @@ class Serializable(AbstractClass):
     Any :class:`collections.namedtuple` satisfies the Serializable contract automatically via duck
     typing if it is composed of only primitive python values or Serializable values.
     """
+
+  def __reduce__(self):
+    # We implement __reduce__ to steer the pickling process away from __getattr__ scans.  This is
+    # both more direct - we know where our instance data lives - and it notably allows __getattr__
+    # implementations by Serializable subclasses.  Without the __reduce__, __getattr__ is rendered
+    # unworkable since it causes pickle failures.
+    # See the note at the bottom of this section:
+    # https://docs.python.org/2.7/library/pickle.html#pickling-and-unpickling-normal-class-instances
+    return SerializablePickle.create(self)
 
 
 class SerializableFactory(AbstractClass):
