@@ -101,8 +101,8 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
-                          # Clearly both tests and the runner need access to the same @Test, 
-                          # @Before, as well as other annotations, but there is also the Assert 
+                          # Clearly both tests and the runner need access to the same @Test,
+                          # @Before, as well as other annotations, but there is also the Assert
                           # class and some subset of the @Rules, @Theories and @RunWith APIs.
                           custom_rules=[
                             Shader.exclude_package('org.junit', recursive=True),
@@ -415,6 +415,9 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       raise TargetDefinitionException(target, msg)
 
   def _execute(self, targets):
+    """Implements the primary junit test execution. This method is called by the TestTaskMixin,
+    which contains the primary Task.execute function."""
+
     # We only run tests within java_tests/junit_tests targets.
     #
     # But if coverage options are specified, we want to instrument
