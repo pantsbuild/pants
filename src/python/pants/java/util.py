@@ -108,7 +108,7 @@ def safe_classpath(classpath, synthetic_jar_dir):
   """Bundles classpath into one synthetic jar that includes original classpath in its manifest.
 
   This is to ensure classpath length never exceeds platform ARG_MAX. Original classpath are
-  converted to URLs relative to synthetic jar path and saved as its manifest attribute
+  converted to URLs relative to synthetic jar path and saved in its manifest as attribute
   `Class-Path`. See
   https://docs.oracle.com/javase/7/docs/technotes/guides/extensions/spec.html#bundled
 

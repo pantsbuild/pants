@@ -83,10 +83,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     otherwise a persistent nailgun server dedicated to this Task subclass is used to speed up
     amortized run times.
 
-    `execute_java` by default will create a synthetic jar that holds classpath to work around
-    system arg length limit but this is not necessary when `NailgunExecutor` is used because
-    args are passed through socket, therefore turning off creating synthetic jar only if
-    nailgun is not used.
+    Creating synthetic jar to work around system arg length limit is not necessary
+    when `NailgunExecutor` is used because args are passed through socket, therefore turning off
+    creating synthetic jar if nailgun is used.
     """
     executor = self.create_java_executor()
     try:
