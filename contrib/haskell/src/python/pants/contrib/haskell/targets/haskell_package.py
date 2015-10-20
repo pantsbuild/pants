@@ -11,13 +11,13 @@ from pants.base.target import Target
 
 
 class HaskellPackage(Target):
-  def __init__(self, package, resolver, **kwargs):
+  def __init__(self, resolver, package=None, **kwargs):
     """
     :param str package : The name of the package (i.e. "network" or "containers")
     :param str resolver: The `stack` resolver (i.e. "lts-3.1" or "nightly-2015-08-29")
     """
 
-    self.package  = package
+    self.package  = package or self.name
     self.resolver = resolver
 
     payload = Payload()
