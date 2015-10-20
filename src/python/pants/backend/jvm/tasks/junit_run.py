@@ -416,7 +416,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
 
   def _execute(self, targets):
     """Implements the primary junit test execution. This method is called by the TestTaskMixin,
-    which contains the primary Task.execute function."""
+    which contains the primary Task.execute function and wraps this method in timeouts."""
 
     # We only run tests within java_tests/junit_tests targets.
     #
