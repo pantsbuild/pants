@@ -537,7 +537,7 @@ class PytestRun(TestTaskMixin, PythonTask):
     # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
     #   storing the process handle here, the test mixin class will call the start_test() fn
     #   on the language specific class which will return an object that can kill/monitor/etc
-    #   the test process
+    #   the test process.
     self._process = subprocess.Popen(pex.cmdline(args),
                                preexec_fn=os.setsid if setsid else None,
                                stdout=workunit.output('stdout'),
