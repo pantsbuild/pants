@@ -22,6 +22,7 @@ class CoberturaTaskSettings(CoverageTaskSettings):
   """A class that holds task settings for cobertura coverage."""
   pass
 
+
 class Cobertura(Coverage):
   """Class to run coverage tests with cobertura."""
 

@@ -36,7 +36,6 @@ from pants.util.xml_parser import XmlParser
 
 
 # TODO(ji): Add unit tests.
-
 def _classfile_to_classname(cls):
   return ClasspathUtil.classname_for_rel_classfile(cls)
 
@@ -175,7 +174,6 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.test_shard:
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
-
 
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
