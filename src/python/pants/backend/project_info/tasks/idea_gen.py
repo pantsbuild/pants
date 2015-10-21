@@ -11,13 +11,10 @@ import shutil
 import tempfile
 from xml.dom import minidom
 
-from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.project_info.tasks.ide_gen import IdeGen, Project
-from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData
-from pants.base.source_root import SourceRoot
 from pants.scm.git import Git
 from pants.util.dirutil import safe_mkdir, safe_walk
 

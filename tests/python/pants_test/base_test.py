@@ -16,7 +16,6 @@ from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -148,10 +147,6 @@ class BaseTest(unittest.TestCase):
       'cache_key_gen_version': '0-test',
     }
 
-    # Many tests need source root functionality, so might as well always set it up.
-    self.options['source'] = {
-    }
-
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)
 
@@ -187,7 +182,8 @@ class BaseTest(unittest.TestCase):
   def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
               console_outstream=None, workspace=None, for_subsystems=None):
 
-    # Many tests need source root functionality, so might as well always set it up.
+    # Many tests use source root functionality via the SourceRootConfig.global_instance()
+    # (typically accessed via Target.target_base), so we always set it up, for convenience.
     optionables = {SourceRootConfig}
     extra_scopes = set()
 
@@ -230,7 +226,7 @@ class BaseTest(unittest.TestCase):
     return context
 
   def tearDown(self):
-    SourceRoot.reset()
+    super(BaseTest, self).tearDown()
     FilesystemBuildFile.clear_cache()
     Subsystem.reset()
 

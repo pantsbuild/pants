@@ -13,6 +13,11 @@ from pants_test.base_test import BaseTest
 
 
 class TestPythonBinary(BaseTest):
+  def setUp(self):
+    super(TestPythonBinary, self).setUp()
+    # Force creation of SourceRootConfig global instance. PythonBinary uses source roots
+    # when computing entry points.
+    self.context()
 
   def test_python_binary_must_have_some_entry_point(self):
     with pytest.raises(TargetDefinitionException):

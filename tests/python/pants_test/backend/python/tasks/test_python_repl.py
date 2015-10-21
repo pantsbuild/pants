@@ -11,12 +11,8 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
@@ -48,30 +44,26 @@ class PythonReplTest(PythonTaskTestBase):
 
   def setUp(self):
     super(PythonReplTest, self).setUp()
-
-    SourceRoot.register('3rdparty', PythonRequirementLibrary)
-    SourceRoot.register('src', PythonBinary, PythonLibrary)
-
-    self.six = self.create_python_requirement_library('3rdparty/six', 'six',
+    self.six = self.create_python_requirement_library('3rdparty/python/six', 'six',
                                                       requirements=['six==1.9.0'])
-    self.requests = self.create_python_requirement_library('3rdparty/requests', 'requests',
+    self.requests = self.create_python_requirement_library('3rdparty/python/requests', 'requests',
                                                            requirements=['requests==2.6.0'])
 
-    self.library = self.create_python_library('src/lib', 'lib', {'lib.py': dedent("""
+    self.library = self.create_python_library('src/python/lib', 'lib', {'lib.py': dedent("""
     import six
 
 
     def go():
       six.print_('go', 'go', 'go!', sep='')
-    """)}, dependencies=['//3rdparty/six'])
+    """)}, dependencies=['//3rdparty/python/six'])
 
-    self.binary = self.create_python_binary('src/bin', 'bin', 'lib.go', dependencies=['//src/lib'])
+    self.binary = self.create_python_binary('src/python/bin', 'bin', 'lib.go',
+                                            dependencies=['//src/python/lib'])
 
-    self.non_python_target = self.create_non_python_target('src/java', 'java')
+    self.non_python_target = self.create_non_python_target('src/python/java', 'java')
 
   def tearDown(self):
     super(PythonReplTest, self).tearDown()
-    SourceRoot.reset()
     ReplTaskMixin.reset_implementations()
 
   @contextmanager

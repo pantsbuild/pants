@@ -20,7 +20,6 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.source_root import SourceRoot
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.workspace import Workspace
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
@@ -42,7 +41,6 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
         'python_thrift_library': PythonThriftLibrary,
       },
       context_aware_object_factories={
-        'source_root': SourceRoot.factory,
         'globs': Globs.factory,
         'rglobs': RGlobs.factory,
         'from_target': FromTarget,
@@ -101,11 +99,6 @@ class WhatChangedTest(BaseWhatChangedTest):
   def setUp(self):
     super(WhatChangedTest, self).setUp()
 
-    self.add_to_build_file('root', dedent("""
-      source_root('src/py', python_library, resources)
-      source_root('resources/a1', resources)
-    """))
-
     self.add_to_build_file('root/src/py/a', dedent("""
       python_library(
         name='alpha',
@@ -163,7 +156,7 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     """))
 
-    self.add_to_build_file('root/resources/a', dedent("""
+    self.add_to_build_file('root/src/resources/a', dedent("""
       resources(
         name='a_resources',
         sources=['a.resources']
@@ -247,8 +240,8 @@ class WhatChangedTest(BaseWhatChangedTest):
 
   def test_resource_changed_for_java_lib(self):
     self.assert_console_output(
-      'root/resources/a:a_resources',
-      workspace=self.workspace(files=['root/resources/a/a.resources'])
+      'root/src/resources/a:a_resources',
+      workspace=self.workspace(files=['root/src/resources/a/a.resources'])
     )
 
   def test_build_sibling(self):
@@ -258,7 +251,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     )
 
   def test_resource_type_error(self):
-    self.add_to_build_file('root/resources/a1', dedent("""
+    self.add_to_build_file('root/src/resources/a1', dedent("""
       java_library(
         name='a1',
         sources=['a1.test'],
@@ -267,7 +260,7 @@ class WhatChangedTest(BaseWhatChangedTest):
     """))
     self.assert_console_raises(
       Exception,
-      workspace=self.workspace(files=['root/resources/a1/a1.test'])
+      workspace=self.workspace(files=['root/src/resources/a1/a1.test'])
     )
 
   def test_build_directory(self):

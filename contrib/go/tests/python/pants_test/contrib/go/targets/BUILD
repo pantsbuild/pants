@@ -34,7 +34,6 @@ python_library(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/targets:go_binary',
     'contrib/go/src/python/pants/contrib/go:plugin',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'src/python/pants/util:meta',
     'tests/python/pants_test:base_test',
@@ -47,7 +46,6 @@ python_tests(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go:plugin',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]

@@ -39,6 +39,19 @@ python_tests(
 )
 
 python_tests(
+  name='cloc',
+  sources=['test_cloc.py'],
+  coverage=['pants.backend.core.tasks.cloc'],
+  dependencies=[
+    'src/python/pants/backend/core/tasks:cloc',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:build_environment',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
   name = 'dependees',
   sources = ['test_dependees.py'],
   dependencies = [
@@ -48,8 +61,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]

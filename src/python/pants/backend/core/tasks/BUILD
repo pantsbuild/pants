@@ -8,6 +8,7 @@ target(
     ':builddictionary',
     ':changed_target_goals',
     ':clean',
+    ':cloc',
     ':common',
     ':confluence_publish',
     ':console_task',
@@ -111,6 +112,19 @@ python_library(
 )
 
 python_library(
+  name = 'cloc',
+  sources = ['cloc.py'],
+  dependencies = [
+    ':console_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/util:contextutil',
+  ],
+)
+
+python_library(
   name = 'confluence_publish',
   sources = ['confluence_publish.py'],
   dependencies = [
@@ -136,7 +150,9 @@ python_library(
   name = 'deferred_sources_mapper',
   sources= ['deferred_sources_mapper.py'],
   dependencies = [
-    ':common',
+    ':task',
+    'src/python/pants/base:payload_field',
+    'src/python/pants/build_graph',
   ],
 )
 
@@ -144,13 +160,9 @@ python_library(
   name = 'dependees',
   sources = ['dependees.py'],
   dependencies = [
-    ':common',
     ':console_task',
     ':target_filter_task_mixin',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:build_environment',
-    'src/python/pants/build_graph',
   ],
 )
 

@@ -51,15 +51,11 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       workdir = os.path.abspath(tempdir)
       javadir = os.path.join(tempdir, 'src', 'java')
       os.makedirs(javadir)
-      with open(os.path.join(workdir, 'BUILD'), 'w') as f:
-        f.write(dedent('''
-          source_root('src/java', java_library)
-        '''))
       yield self.JavaSandbox(self, os.path.join(workdir, '.pants.d'), javadir)
 
   @property
   def _good_one_two(self):
-    return dedent('''
+    return dedent("""
       java_library(name='one',
         platform='1.7',
       )
@@ -67,11 +63,11 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       java_library(name='two',
         platform='1.8',
       )
-    ''')
+    """)
 
   @property
   def _bad_one_two(self):
-    return dedent('''
+    return dedent("""
       java_library(name='one',
         platform='1.7',
         dependencies=[':two'],
@@ -80,7 +76,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       java_library(name='two',
         platform='1.8',
       )
-    ''')
+    """)
 
   def test_good_targets_works_fresh(self):
     with self.setup_sandbox() as sandbox:
@@ -101,14 +97,6 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(sandbox.jvm_platform_validate('one', 'two'))
       sandbox.write_build_file(self._bad_one_two)
       self.assert_failure(sandbox.jvm_platform_validate('one', 'two'))
-
-  def test_bad_then_good(self):
-    with self.setup_sandbox() as sandbox:
-      sandbox.write_build_file(self._bad_one_two)
-      self.assert_success(sandbox.clean_all())
-      self.assert_failure(sandbox.jvm_platform_validate('one', 'two'))
-      sandbox.write_build_file(self._good_one_two)
-      self.assert_success(sandbox.jvm_platform_validate('one', 'two'))
 
   def test_bad_then_good(self):
     with self.setup_sandbox() as sandbox:

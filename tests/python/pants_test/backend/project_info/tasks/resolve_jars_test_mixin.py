@@ -30,32 +30,28 @@ class ResolveJarsTestMixin(object):
       with temporary_dir(root_dir=self.workdir_root()) as source_dir:
         with temporary_dir(root_dir=self.workdir_root()) as dist_dir:
           os.makedirs(os.path.join(source_dir, 'src'))
-          with open(os.path.join(source_dir, 'BUILD'), 'w+') as f:
-            f.write(dedent('''
-              source_root('src')
-            '''))
           with open(os.path.join(source_dir, 'src', 'BUILD.one'), 'w+') as f:
-            f.write(dedent('''
+            f.write(dedent("""
               jvm_binary(name='synthetic',
                 source='Main.java',
               )
-            '''))
+            """))
           with open(os.path.join(source_dir, 'src', 'Main.java'), 'w+') as f:
-            f.write(dedent('''
+            f.write(dedent("""
               public class Main {
                 public static void main(String[] args) {
                   System.out.println("Hello.");
                 }
               }
-            '''))
+            """))
           with open(os.path.join(source_dir, 'src', 'Foo.java'), 'w+') as f:
-            f.write(dedent('''
+            f.write(dedent("""
               public class Foo {
                 public static void main(String[] args) {
                   Main.main(args);
                 }
               }
-            '''))
+            """))
 
           binary_target = '{}:synthetic'.format(os.path.join(source_dir, 'src'))
           pants_run = self.run_pants_with_workdir(['binary', binary_target,
@@ -66,7 +62,7 @@ class ResolveJarsTestMixin(object):
           jar_url = 'file://{}'.format(os.path.abspath(jar_path))
 
           with open(os.path.join(source_dir, 'src', 'BUILD.two'), 'w+') as f:
-            f.write(dedent('''
+            f.write(dedent("""
               jar_library(name='lib_with_url',
                 jars=[
                   jar(org='org.pantsbuild', name='synthetic-test-jar', rev='1.2.3',
@@ -78,7 +74,7 @@ class ResolveJarsTestMixin(object):
                 sources=['Foo.java'],
                 dependencies=[':lib_with_url'],
               )
-            ''').format(jar_url=jar_url))
+            """).format(jar_url=jar_url))
 
           spec_names = ['lib_with_url', 'src']
 

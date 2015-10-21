@@ -34,22 +34,22 @@ class SpindleGenTest(JvmToolTaskTestBase):
       })
 
   def test_smoke(self):
-    contents = dedent('''namespace java org.pantsbuild.example
+    contents = dedent("""namespace java org.pantsbuild.example
       struct Example {
       1: optional i64 number
       }
-    ''')
+    """)
 
     self.create_file(relpath='test_smoke/a.thrift', contents=contents)
 
-    self.add_to_build_file('3rdparty', dedent('''
+    self.add_to_build_file('3rdparty', dedent("""
       jar_library(
         name = 'spindle-runtime',
         jars = [
           jar(org = 'com.foursquare', name = 'spindle-runtime_2.10', rev = '3.0.0-M7'),
         ],
       )
-      '''
+      """
     ))
 
     self.make_target(spec='test_smoke:a',
@@ -62,7 +62,8 @@ class SpindleGenTest(JvmToolTaskTestBase):
     task = self.execute(context)
 
     build_path = os.path.join(task.workdir,
-                              'scala_record',
+                              'src',
+                              'jvm',
                               'org',
                               'pantsbuild',
                               'example')
