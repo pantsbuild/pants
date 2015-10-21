@@ -313,7 +313,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
         complete_classpath.update(classpath)
         complete_classpath.update(classpath_append)
         distribution = self.preferred_jvm_distribution([platform])
-        with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
+        with binary_util.safe_args(batch, self.get_options()) as batch_tests:
           self._context.log.debug('CWD = {}'.format(workdir))
           self._context.log.debug('platform = {}'.format(platform))
           self._executor = SubprocessExecutor(distribution)
