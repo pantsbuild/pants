@@ -8,7 +8,7 @@ import org.junit.Test;
 public class SleeperTestShort {
     @Test
     public void testSleep() throws InterruptedException {
-        Thread.sleep(500);
+        Thread.sleep(1);
     }
 }
 
