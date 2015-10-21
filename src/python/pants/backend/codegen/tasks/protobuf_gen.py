@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import os
 import subprocess
 from collections import OrderedDict
@@ -24,7 +23,6 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
 

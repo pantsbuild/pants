@@ -17,6 +17,7 @@ from pants.backend.core.tasks.bash_completion import BashCompletionTask
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
+from pants.backend.core.tasks.cloc import CountLinesOfCode
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
 from pants.backend.core.tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.backend.core.tasks.dependees import ReverseDepmap
@@ -150,11 +151,15 @@ def register_goals():
   task(name='sort', action=SortTargets).install().with_description(
       'Topologically sort the targets.')
 
-  task(name='roots', action=ListRoots).install('roots').with_description(
-      "Print the workspace's source roots and associated target types.")
-
   task(name='run_prep_command', action=RunPrepCommand).install('test', first=True).with_description(
       "Run a command before tests")
+
+  # Source tree information.
+  task(name='roots', action=ListRoots).install('roots').with_description(
+    "Print the workspace's source roots and associated target types.")
+
+  task(name='cloc', action=CountLinesOfCode).install('cloc').with_description(
+    "Print counts of lines of code.")
 
   task(name='changed', action=WhatChanged).install().with_description(
       'Print the targets changed since some prior commit.')

@@ -8,6 +8,7 @@ target(
     ':builddictionary',
     ':changed_target_goals',
     ':clean',
+    ':cloc',
     ':common',
     ':confluence_publish',
     ':console_task',
@@ -107,6 +108,19 @@ python_library(
     ':task',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'cloc',
+  sources = ['cloc.py'],
+  dependencies = [
+    ':console_task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/util:contextutil',
   ],
 )
 
