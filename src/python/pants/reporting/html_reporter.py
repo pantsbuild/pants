@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import cgi
 import os
 import re
+import time
 import uuid
 from collections import defaultdict, namedtuple
 
@@ -54,6 +55,11 @@ class HtmlReporter(Reporter):
     # We redirect stdout, stderr etc. of tool invocations to these files.
     self._output_files = defaultdict(dict)  # workunit_id -> {path -> fileobj}.
     self._linkify_memo = {}
+
+    # Map from filename to timestamp (ms since the epoch) of when we last overwrote that file.
+    # Useful for preventing too-frequent overwrites of, e.g., timing stats,
+    # which can noticeably slow down short pants runs with many workunits.
+    self._last_overwrite_time = {}
 
   def report_path(self):
     """The path to the main report file."""
@@ -138,6 +144,9 @@ class HtmlReporter(Reporter):
     s += self._renderer.render_name('workunit_end', args)
     self._emit(s)
 
+    # If we're a root workunit, force an overwrite, as we may be the last ever write in this run.
+    force_overwrite = workunit.parent is None
+
     # Update the timings.
     def render_timings(timings):
       timings_dict = timings.get_all()
@@ -148,8 +157,12 @@ class HtmlReporter(Reporter):
       }
       return self._renderer.render_name('aggregated_timings', args)
 
-    self._overwrite('cumulative_timings', render_timings(self.run_tracker.cumulative_timings))
-    self._overwrite('self_timings', render_timings(self.run_tracker.self_timings))
+    self._overwrite('cumulative_timings',
+                    lambda: render_timings(self.run_tracker.cumulative_timings),
+                    force=force_overwrite)
+    self._overwrite('self_timings',
+                    lambda: render_timings(self.run_tracker.self_timings),
+                    force=force_overwrite)
 
     # Update the artifact cache stats.
     def render_cache_stats(artifact_cache_stats):
@@ -171,7 +184,8 @@ class HtmlReporter(Reporter):
       return self._render_message(*msg_elements)
 
     self._overwrite('artifact_cache_stats',
-                    render_cache_stats(self.run_tracker.artifact_cache_stats))
+                    lambda: render_cache_stats(self.run_tracker.artifact_cache_stats),
+                    force=force_overwrite)
 
     for f in self._output_files[workunit.id].values():
       f.close()
@@ -259,11 +273,23 @@ class HtmlReporter(Reporter):
       self._report_file.write(s)
       self._report_file.flush()  # We must flush in the same thread as the write.
 
-  def _overwrite(self, filename, s):
-    """Overwrite a file with the specified contents."""
-    if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
-      with open(os.path.join(self._html_dir, filename), 'w') as f:
-        f.write(s)
+  def _overwrite(self, filename, func, force=False):
+    """Overwrite a file with the specified contents.
+
+    Write times are tracked, too-frequent overwrites are skipped, for performance reasons.
+
+    :param filename: The path under the html dir to write to.
+    :param func: A no-arg function that returns the contents to write.
+    :param force: Whether to force a write now, regardless of the last overwrite time.
+    """
+    now = int(time.time() * 1000)
+    last_overwrite_time = self._last_overwrite_time.get(filename) or now
+    # Overwrite only once per second.
+    if (now - last_overwrite_time >= 1000) or force:
+      if os.path.exists(self._html_dir):  # Make sure we're not immediately after a clean-all.
+        with open(os.path.join(self._html_dir, filename), 'w') as f:
+          f.write(func())
+      self._last_overwrite_time[filename] = now
 
   def _htmlify_text(self, s):
     """Make text HTML-friendly."""
