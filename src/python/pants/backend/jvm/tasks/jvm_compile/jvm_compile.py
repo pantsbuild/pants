@@ -111,6 +111,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
+    register('--debug-symbol', default=False, action='store_true',
+             help='Compile with all configured warnings enabled.')
+
+    register('--debug-symbol-args', advanced=True, action='append',
+             default=list(cls.get_debug_symbol_args_default()),
+             help='Extra args to enable debug symbols.')
+
     register('--delete-scratch', advanced=True, default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
@@ -185,6 +192,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """Override to set default for --no-warning-args option."""
     return ()
 
+  @classmethod
+  def get_debug_symbol_args_default(cls):
+    return ()
+
   @property
   def cache_target_dirs(self):
     return True
@@ -256,6 +267,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       self._args.extend(self.get_options().warning_args)
     else:
       self._args.extend(self.get_options().no_warning_args)
+
+    if self.get_options().debug_symbol:
+      self._args.extend(self.get_options().debug_symbol_args)
 
     # The ivy confs for which we're building.
     self._confs = self.get_options().confs
