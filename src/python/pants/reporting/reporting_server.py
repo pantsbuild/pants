@@ -17,6 +17,7 @@ import urllib
 import urlparse
 from collections import namedtuple
 from datetime import date, datetime
+from textwrap import dedent
 
 import pystache
 from six.moves import range
@@ -86,6 +87,22 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     args['runs_by_day'] = runs_by_day
     self._send_content(self._renderer.render_name('base', args), 'text/html')
 
+
+
+  _collapsible_fmt_string = dedent("""
+    <div class="{class_prefix}" id="{id}">
+      <div class="{class_prefix}-header toggle-header" id="{id}-header">
+        <div class="{class_prefix}-header-icon toggle-header-icon" onclick="pants.collapsible.toggle('{id}')">
+          <i id="{id}-icon" class="visibility-icon icon-large icon-caret-right hidden"></i>
+        </div>
+        <div class="{class_prefix}-header-text toggle-header-text">
+          [<span id="{id}-header-text">{title}</span>]
+        </div>
+      </div>
+      <div class="{class_prefix}-content toggle-content nodisplay" id="{id}-content"></div>
+    </div>
+  """)
+
   def _handle_run(self, relpath, params):
     """Show the report for a single pants run."""
     args = self._default_template_args('run')
@@ -104,16 +121,25 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       artifact_cache_stats_path = os.path.join(report_dir, 'artifact_cache_stats')
       run_info['timestamp_text'] = \
         datetime.fromtimestamp(float(run_info['timestamp'])).strftime('%H:%M:%S on %A, %B %d %Y')
+
+      timings_and_stats = '\n'.join([
+        self._collapsible_fmt_string.format(id='cumulative-timings-collapsible',
+                                            title='Cumulative timings', class_prefix='aggregated-timings'),
+        self._collapsible_fmt_string.format(id='self-timings-collapsible',
+                                            title='Self timings', class_prefix='aggregated-timings'),
+        self._collapsible_fmt_string.format(id='artifact-cache-stats-collapsible',
+                                            title='Artifact cache stats', class_prefix='artifact-cache-stats')
+      ])
+
       args.update({'run_info': run_info,
                    'report_path': report_relpath,
                    'self_timings_path': self_timings_path,
                    'cumulative_timings_path': cumulative_timings_path,
-                   'artifact_cache_stats_path': artifact_cache_stats_path})
+                   'artifact_cache_stats_path': artifact_cache_stats_path,
+                   'timings_and_stats': timings_and_stats})
       if run_id == 'latest':
         args['is_latest'] = run_info['id']
-      args.update({
-        'collapsible': lambda x: self._renderer.render_callable('collapsible', x, args)
-      })
+
     self._send_content(self._renderer.render_name('base', args), 'text/html')
 
   def _handle_stats(self, relpath, params):
