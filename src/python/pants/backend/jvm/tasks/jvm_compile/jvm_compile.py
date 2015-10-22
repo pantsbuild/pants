@@ -112,11 +112,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='Extra compiler args to use when warnings are disabled.')
 
     register('--debug-symbol', default=False, action='store_true',
-             help='Compile with all configured warnings enabled.')
+             help='Compile with debug symbol enabled.')
 
     register('--debug-symbol-args', advanced=True, action='append',
-             default=list(cls.get_debug_symbol_args_default()),
-             help='Extra args to enable debug symbols.')
+             default=['-C-g:lines,source,vars'],
+             help='Extra args to enable debug symbol.')
 
     register('--delete-scratch', advanced=True, default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
@@ -190,10 +190,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   @classmethod
   def get_no_warning_args_default(cls):
     """Override to set default for --no-warning-args option."""
-    return ()
-
-  @classmethod
-  def get_debug_symbol_args_default(cls):
     return ()
 
   @property
