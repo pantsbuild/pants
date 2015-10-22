@@ -66,27 +66,12 @@ class NpmResolve(NodeTask):
           if not vt.valid:
             safe_mkdir(chroot, clean=True)
             self._resolve(target, chroot, node_paths)
-          node_path = chroot if self.is_node_module(target) else os.path.join(chroot,
-                                                                              'node_modules')
-          node_paths.resolved(target, node_path)
+          node_paths.resolved(target, chroot)
 
   def _resolve(self, target, node_path, node_paths):
-    if self.is_node_remote_module(target):
-      self._resolve_remote_module(node_path, target)
-    else:
+    # Only resolve local targets, while we don't have a way to cache 3rd party targets individually
+    if self.is_node_module(target):
       self._resolve_local_module(node_path, node_paths, target)
-
-  def _resolve_remote_module(self, node_path, node_remote_module):
-    with pushd(node_path):
-      package = '{}@{}'.format(node_remote_module.package_name, node_remote_module.version)
-      result, npm_install = self.execute_npm(args=['install', package],
-                                             workunit_name=node_remote_module.address.reference())
-      if result != 0:
-        raise TaskError('Failed to resolve package {} for {}:\n\t{} failed with exit code {}'
-                        .format(node_remote_module.address.reference(),
-                                package,
-                                npm_install,
-                                result))
 
   def _resolve_local_module(self, node_path, node_paths, node_module):
     _copy_sources(buildroot=get_buildroot(), node_module=node_module, dest_dir=node_path)
@@ -99,19 +84,7 @@ class NpmResolve(NodeTask):
         raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
                         .format(node_module.address.reference(), npm_install, result))
 
-      # TODO(John Sirois): This will be part of install in npm 3.x, detect or control the npm
-      # version we use and only conditionally execute this.
-      result, npm_dedupe = self.execute_npm(args=['dedupe'],
-                                            workunit_name=node_module.address.reference())
-      if result != 0:
-        raise TaskError('Failed to dedupe dependencies for {}:\n\t{} failed with exit code {}'
-                        .format(node_module.address.reference(), npm_dedupe, result))
-
   def _emit_package_descriptor(self, npm_package, node_path, node_paths):
-    def render_dep(target):
-      return node_paths.node_path(target) if self.is_node_module(target) else target.version
-    dependencies = {dep.package_name: render_dep(dep) for dep in npm_package.dependencies}
-
     package_json_path = os.path.join(node_path, 'package.json')
 
     if os.path.isfile(package_json_path):
@@ -129,19 +102,43 @@ class NpmResolve(NodeTask):
     if not package.has_key('version'):
       package['version'] = '0.0.0'
 
-    # TODO(Chris Pesto): Preserve compatibility with normal package.json files by dropping existing
-    # dependency fields. This lets Pants accept working package.json files from standalone projects
-    # that can be "npm install"ed without Pants. Taking advantage of this means expressing
-    # dependencies in package.json and BUILD, though. In the future, work to make
-    # Pants more compatible with package.json to eliminate duplication if you still want your
-    # project to "npm install" through NPM by itself.
-    dependenciesToRemove = [
+    # Preserve compatibility with normal package.json files. Update any
+    # local dependencies in the package.json to reflect their paths under .pants.d
+    # by using the corresponding Pants BUILD file target. Use any node_remote_module BUILD file
+    # targets to check the versions of 3rd party dependencies declared in package.json, but don't
+    # require them to be present. Finally, allow dependencies to be specified in BUILD file targets
+    # and not in package.json at all. Fill in the package.json with any BUILD file targets it
+    # doesn't have.
+    # TODO(Chris Pesto): We should require all local targets in a package.json to be present in
+    # a BUILD file node_module target. This isn't checking that, which is a loophole.
+    target_deps_by_name = {dep.package_name: dep for dep in npm_package.dependencies}
+    all_package_deps = set()
+
+    dependency_types_to_check = [
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
-    for dependencyType in dependenciesToRemove:
-      package.pop(dependencyType, None)
+    for dependency_type in dependency_types_to_check:
+      package_deps_of_type = package.get(dependency_type, {})
+      all_package_deps.update(package_deps_of_type.keys())
+      for package_name, package_version in package_deps_of_type.items()[:]:
+        package_dep_target = target_deps_by_name.get(package_name, None)
+        if self.is_node_module(package_dep_target):
+          package[package_deps_of_type][package_name] = node_paths.node_path(package_dep_target)
+        elif self.is_node_remote_module(package_dep_target):
+          if package_dep_target.version != package_version:
+            raise TaskError('BUILD files specify that the target {} depends on {} version {}, '
+                            'but its package.json specifies a dependency on version {}'
+                            .format(npm_package.address.reference(), package_name,
+                                    package_dep_target.version, package_version))
 
-    package['dependencies'] = dependencies
+    target_deps_not_in_package = set(target_deps_by_name.keys()) - all_package_deps
+    if target_deps_not_in_package:
+      package_normal_deps = package.setdefault('dependencies', {})
+      for package_name in target_deps_not_in_package:
+        target_dep = target_deps_by_name[package_name]
+        package_normal_deps[package_name] = (node_paths.node_path(target_dep)
+                                             if self.is_node_module(target_dep)
+                                             else target_dep.version)
 
     with open(package_json_path, 'wb') as fp:
       json.dump(package, fp, indent=2)
