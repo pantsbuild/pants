@@ -6,8 +6,8 @@ package org.pantsbuild.tools.junit.impl;
 import junit.framework.TestCase;
 
 public class SimpleTestCase extends TestCase {
-    public void testDummy() {
-        TestRegistry.registerTestCall("testDummy");
-        assertTrue(true);
-    }
+  public void testDummy() {
+    TestRegistry.registerTestCall("testDummy");
+    assertTrue(true);
+  }
 }
