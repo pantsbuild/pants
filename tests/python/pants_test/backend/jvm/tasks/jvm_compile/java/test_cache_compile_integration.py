@@ -76,16 +76,13 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Two workdirs.
       self.assertEqual(len(target_workdirs), 2)
 
-      # One workdir should contain NotMain, and the other should contain Main.
       def classfiles(d):
         cd = os.path.join(target_workdir_root, d, 'classes', 'org', 'pantsbuild', 'cachetest')
         return sorted(os.listdir(cd))
-      if 'Main.class' in  classfiles(target_workdirs[0]):
-        withmain, withoutmain = target_workdirs
-      else:
-        withoutmain, withmain = target_workdirs
-      self.assertEqual(classfiles(withmain), sorted(['A.class', 'Main.class']))
-      self.assertEqual(classfiles(withoutmain), sorted(['A.class', 'NotMain.class']))
+
+      # One workdir should contain NotMain, and the other should contain Main.
+      self.assertEquals(sorted(classfiles(w) for w in target_workdirs),
+                        sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
   def test_incremental_caching(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""

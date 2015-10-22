@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -48,51 +48,68 @@ class DummyTask(Task):
 
 
 class TaskTest(TaskTestBase):
+
+  _filename = 'f'
+
   @classmethod
   def task_type(cls):
     return DummyTask
 
-  def assertContent(self, vt, filename, content):
-    with open(os.path.join(vt.results_dir, filename), 'r') as f:
+  def assertContent(self, vt, content):
+    with open(os.path.join(vt.results_dir, self._filename), 'r') as f:
       self.assertEquals(f.read(), content)
 
-  def _fixture(self, filename, incremental):
-    target = self.make_target(':t', target_type=DummyLibrary, source=filename)
+  def _fixture(self, incremental):
+    target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
     context = self.context(target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
     return target, task
 
+  def _create_clean_file(self, target, content):
+    self.create_file(self._filename, content)
+    target.mark_invalidation_hash_dirty()
+
   def test_incremental(self):
-    f = 'f'
-    target, task = self._fixture(f, incremental=True)
+    one = '1\n'
+    two = '2\n'
+    target, task = self._fixture(incremental=True)
 
-    # Run twice.
-    self.create_file(f, '1\n')
-    vt1 = task.execute()
-    self.assertContent(vt1, f, '1\n')
-    self.create_file(f, '2\n')
-    target.mark_invalidation_hash_dirty(payload=True)
-    vt2 = task.execute()
+    # Run three times with two unique fingerprints.
+    self._create_clean_file(target, one)
+    vtA = task.execute()
+    # Clean.
+    self.assertContent(vtA, one)
+    self._create_clean_file(target, two)
+    vtB = task.execute()
+    # Cloned from vtA.
+    self.assertContent(vtB, one + two)
+    self._create_clean_file(target, one)
+    vtC = task.execute()
+    # Incremental atop existing directory.
+    self.assertContent(vtC, one + one)
 
-    # Confirm that there were two results dirs, and that the second was cloned
-    self.assertContent(vt1, f, '1\n')
-    self.assertContent(vt2, f, '1\n2\n')
-    self.assertNotEqual(vt1.results_dir, vt2.results_dir)
+    # Confirm that there were two results dirs, and that the second was cloned.
+    self.assertContent(vtA, one + one)
+    self.assertContent(vtB, one + two)
+    self.assertContent(vtC, one + one)
+    self.assertNotEqual(vtA.results_dir, vtB.results_dir)
+    self.assertEqual(vtA.results_dir, vtC.results_dir)
 
   def test_non_incremental(self):
     f = 'f'
-    target, task = self._fixture(f, incremental=False)
+    one = '1\n'
+    two = '2\n'
+    target, task = self._fixture(incremental=False)
 
     # Run twice.
-    self.create_file(f, '1\n')
-    vt1 = task.execute()
-    self.assertContent(vt1, f, '1\n')
-    self.create_file(f, '2\n')
-    target.mark_invalidation_hash_dirty(payload=True)
-    vt2 = task.execute()
+    self._create_clean_file(target, one)
+    vtA = task.execute()
+    self.assertContent(vtA, one)
+    self._create_clean_file(target, two)
+    vtB = task.execute()
 
     # Confirm two unassociated directories.
-    self.assertContent(vt1, f, '1\n')
-    self.assertContent(vt2, f, '2\n')
-    self.assertNotEqual(vt1.results_dir, vt2.results_dir)
+    self.assertContent(vtA, one)
+    self.assertContent(vtB, two)
+    self.assertNotEqual(vtA.results_dir, vtB.results_dir)
