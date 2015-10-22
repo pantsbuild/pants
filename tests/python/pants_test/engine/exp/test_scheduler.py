@@ -9,9 +9,9 @@ import os
 import unittest
 
 from pants.build_graph.address import Address
+from pants.engine.exp.examples.planners import (ApacheThrift, Classpath, IvyResolve, Jar, JavacTask,
+                                                Sources, setup_json_scheduler)
 from pants.engine.exp.scheduler import BuildRequest, Plan, Promise
-from pants_test.engine.exp.example_planners import (ApacheThrift, Classpath, IvyResolve, Jar,
-                                                    JavacTask, Sources, setup_json_scheduler)
 
 
 class SchedulerTest(unittest.TestCase):

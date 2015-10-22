@@ -24,25 +24,10 @@ python_tests(
   name='engine',
   sources=['test_engine.py'],
   dependencies=[
-    ':example_planners',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:engine',
     'src/python/pants/engine/exp:scheduler',
-  ]
-)
-
-python_tests(
-  name='example_planners',
-  sources=['example_planners.py'],
-  dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/engine/exp:addressable',
-    'src/python/pants/engine/exp:configuration',
-    'src/python/pants/engine/exp:graph',
-    'src/python/pants/engine/exp:mapper',
-    'src/python/pants/engine/exp:parsers',
-    'src/python/pants/engine/exp:scheduler',
-    'src/python/pants/engine/exp:targets',
+    'src/python/pants/engine/exp/examples:planners',
   ]
 )
 
@@ -86,8 +71,8 @@ python_tests(
   name='scheduler',
   sources=['test_scheduler.py'],
   dependencies=[
-    ':example_planners',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:scheduler',
+    'src/python/pants/engine/exp/examples:planners',
   ]
 )
