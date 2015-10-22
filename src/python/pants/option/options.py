@@ -253,7 +253,7 @@ class Options(object):
     if scope == GLOBAL_SCOPE:
       values = OptionValueContainer()
     else:
-      values = copy.deepcopy(self.for_scope(enclosing_scope(scope)))
+      values = copy.copy(self.for_scope(enclosing_scope(scope)))
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
