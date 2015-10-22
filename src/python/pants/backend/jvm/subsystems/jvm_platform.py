@@ -51,7 +51,6 @@ class JvmPlatform(Subsystem):
 
   options_scope = 'jvm-platform'
 
-  # Mapping to keep version numbering consistent for ease of comparison.
   @classmethod
   def register_options(cls, register):
     super(JvmPlatform, cls).register_options(register)
@@ -59,6 +58,8 @@ class JvmPlatform(Subsystem):
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
+    register('--strict-deps', advanced=True, default=False, action='store_true',
+             help='The default for the "strict_deps" argument for targets for this language.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -82,6 +83,15 @@ class JvmPlatform(Subsystem):
     target_level = source_level
     platform_name = '(DistributionLocator.cached().version {})'.format(source_level)
     return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
+
+  def get_strict_deps_for_target(self, target):
+    """Whether to limit compile time deps for the given target to those that are directly declared.
+
+    :param JvmTarget target: target to query.
+    :rtype: bool
+    """
+    value = target.payload.strict_deps.value
+    return value if value is not None else self.get_options().strict_deps
 
   @memoized_property
   def default_platform(self):
