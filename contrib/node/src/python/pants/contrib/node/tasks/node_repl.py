@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import os
 
 from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
 from pants.util.contextutil import pushd
+from pants.util.dirutil import safe_mkdtemp
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
@@ -17,6 +19,8 @@ from pants.contrib.node.tasks.node_task import NodeTask
 class NodeRepl(ReplTaskMixin, NodeTask):
   """Launches a Node.js REPL session."""
 
+  SYNTHETIC_NODE_TARGET_NAME = 'synthetic-node-repl-module'
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(NodeRepl, cls).prepare(options, round_manager)
@@ -24,21 +28,45 @@ class NodeRepl(ReplTaskMixin, NodeTask):
 
   @classmethod
   def select_targets(cls, target):
-    return cls.is_node_module(target)
+    return cls.is_npm_package(target)
 
   @classmethod
   def supports_passthru_args(cls):
     return True
 
   def setup_repl_session(self, targets):
-    # Return the path of the first product - the target on which "./pants repl was invoked"
-    node_paths = self.context.products.get_data(NodePaths)
-    return node_paths.node_path(targets[0])
+    # Let MutexTaskMixin (base of ReplTaskMixin) do its normal filtering/validation logic on all
+    # targets, but for NodeRepl we only want the subset in target_roots, since we don't need to
+    # construct a classpath with transitive deps. NPM will install all the transitive deps
+    # under the synthetic target we create below in launch_repl - we just need to put the
+    # target_roots in the synthetic target's package.json dependencies.
+    return [target for target in targets if target in self.context.target_roots]
 
-  def launch_repl(self, node_path):
+  def launch_repl(self, targets):
+    temp_dir = safe_mkdtemp()
+
+    node_paths = self.context.products.get_data(NodePaths)
+
+    package_json_path = os.path.join(temp_dir, 'package.json')
+    package = {
+      'name': self.SYNTHETIC_NODE_TARGET_NAME,
+      'version': '0.0.0',
+      'dependencies': {
+        dep.package_name: self.render_npm_package_dependency(node_paths, dep) for dep in targets
+      }
+    }
+    with open(package_json_path, 'wb') as fp:
+      json.dump(package, fp, indent=2)
+
     args = self.get_passthru_args()
     node_repl = self.node_distribution.node_command(args=args)
 
-    with pushd(node_path):
+    with pushd(temp_dir):
+      result, npm_install = self.execute_npm(args=['install'],
+                                             workunit_name=self.SYNTHETIC_NODE_TARGET_NAME)
+      if result != 0:
+        raise TaskError('npm install of synthetic REPL module failed:\n'
+                        '\t{} failed with exit code {}'.format(npm_install, result))
+
       repl_session = node_repl.run()
       repl_session.wait()

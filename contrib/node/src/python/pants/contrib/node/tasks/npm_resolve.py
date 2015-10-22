@@ -79,18 +79,11 @@ class NpmResolve(NodeTask):
         raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
                         .format(node_module.address.reference(), npm_install, result))
 
-      # TODO(John Sirois): This will be part of install in npm 3.x, detect or control the npm
-      # version we use and only conditionally execute this.
-      result, npm_dedupe = self.execute_npm(args=['dedupe'],
-                                            workunit_name=node_module.address.reference())
-      if result != 0:
-        raise TaskError('Failed to dedupe dependencies for {}:\n\t{} failed with exit code {}'
-                        .format(node_module.address.reference(), npm_dedupe, result))
-
   def _emit_package_descriptor(self, npm_package, node_path, node_paths):
-    def render_dep(target):
-      return node_paths.node_path(target) if self.is_node_module(target) else target.version
-    dependencies = {dep.package_name: render_dep(dep) for dep in npm_package.dependencies}
+    dependencies = {
+      dep.package_name: self.render_npm_package_dependency(node_paths, dep)
+                        for dep in npm_package.dependencies
+    }
 
     package_json_path = os.path.join(node_path, 'package.json')
 

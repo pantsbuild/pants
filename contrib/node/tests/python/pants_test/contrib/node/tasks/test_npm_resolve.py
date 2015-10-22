@@ -61,11 +61,11 @@ class NpmResolveTest(TaskTestBase):
     typ1 = self.make_target(spec='3rdparty/node:typ1',
                             target_type=NodeRemoteModule,
                             package_name='typ',
-                            version='0.6.1')
+                            version='0.6.x')
     typ2 = self.make_target(spec='3rdparty/node:typ2',
                             target_type=NodeRemoteModule,
                             package_name='typ',
-                            version='0.6.x')
+                            version='0.6.1')
 
     self.create_file('src/node/util/typ.js', contents=dedent("""
       var typ = require('typ');
@@ -98,7 +98,14 @@ class NpmResolveTest(TaskTestBase):
     node_path = node_paths.node_path(leaf)
     self.assertIsNotNone(node_paths.node_path(leaf))
 
-    # Verify dependencies are de-duped
+    # Verify the 'typ' package is not duplicated under leaf. The target dependency tree is:
+    # leaf
+    #   typ2 (0.6.1)
+    #   util
+    #     typ1 (0.6.x)
+    # If we install leaf normally, NPM will install the typ2 target (typ version 0.6.1) at the top
+    # level under leaf, and then not install the typ1 target (typ version 0.6.x) under util
+    # because the dependency is already satisfied.
     typ_packages = []
     for root, _, files in os.walk(node_path):
       for f in files:
@@ -107,9 +114,9 @@ class NpmResolveTest(TaskTestBase):
             package = json.load(fp)
             if 'typ' == package['name']:
               typ_packages.append(os.path.relpath(os.path.join(root, f), node_path))
-    self.assertEqual(1, len(typ_packages),
-                     'Expected to find exactly 1 de-duped `typ` package, but found these:\n\t{}'
-                     .format('\n\t'.join(sorted(typ_packages))))
+              self.assertEqual(1, len(typ_packages),
+                              'Expected to find exactly 1 de-duped `typ` package, but found these:'
+                              '\n\t{}'.format('\n\t'.join(sorted(typ_packages))))
 
     script_path = os.path.join(node_path, 'leaf.js')
     out = task.node_distribution.node_command(args=[script_path]).check_output()
