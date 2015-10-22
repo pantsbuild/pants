@@ -11,8 +11,8 @@ from contextlib import closing
 
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalMultiprocessEngine, LocalSerialEngine
+from pants.engine.exp.examples.planners import Classpath, JavacTask, setup_json_scheduler
 from pants.engine.exp.scheduler import BuildRequest, Promise
-from pants_test.engine.exp.example_planners import Classpath, JavacTask, setup_json_scheduler
 
 
 class EngineTest(unittest.TestCase):
