@@ -10,7 +10,6 @@ import itertools
 import os
 import shutil
 from collections import OrderedDict, defaultdict
-from hashlib import sha1
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -29,23 +28,7 @@ from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree, safe_walk
-from pants.util.fileutil import atomic_copy, create_size_estimators
-
-
-class CacheHitCallback(object):
-  """A serializable cache hit callback that cleans the class directory prior to cache extraction.
-
-  This class holds onto class directories rather than CompileContexts because CompileContexts
-  aren't picklable.
-  """
-
-  def __init__(self, cache_key_to_class_dir):
-    self._key_to_classes_dir = cache_key_to_class_dir
-
-  def __call__(self, cache_key):
-    class_dir = self._key_to_classes_dir.get(cache_key)
-    if class_dir:
-      safe_mkdir(class_dir, clean=True)
+from pants.util.fileutil import create_size_estimators
 
 
 class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
@@ -143,14 +126,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
 
-    # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
-    #  https://github.com/sbt/sbt/pull/2085
-    #  https://github.com/sbt/sbt/pull/2160
-    register('--incremental-caching', advanced=True, action='store_true', default=False,
-             help='When set, the results of incremental compiles will be written to the cache. '
-                  'This is unset by default, because it is generally a good precaution to cache '
-                  'only clean/cold builds.')
-
   @classmethod
   def product_types(cls):
     raise TaskError('Expected to be installed in GroupTask, which has its own '
@@ -211,8 +186,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     return ()
 
   @property
-  def config_section(self):
-    return self.options_scope
+  def cache_target_dirs(self):
+    return True
 
   def select(self, target):
     return target.has_sources(self._file_suffix)
@@ -260,14 +235,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     return []
 
-  def extra_products(self, target):
-    """Any extra, out-of-band resources created for a target.
+  def write_extra_resources(self, compile_context):
+    """Writes any extra, out-of-band resources for a target to its classes directory.
 
     E.g., targets that produce scala compiler plugins or annotation processor files
     produce an info file. The resources will be added to the runtime_classpath.
     Returns a list of pairs (root, [absolute paths of files under root]).
     """
-    return []
+    pass
 
   def __init__(self, *args, **kwargs):
     super(JvmCompile, self).__init__(*args, **kwargs)
@@ -285,18 +260,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # The ivy confs for which we're building.
     self._confs = self.get_options().confs
 
-    # Maps CompileContext --> dict of upstream class to paths.
-    self._upstream_class_to_paths = {}
-
     # Mapping of relevant (as selected by the predicate) sources by target.
     self._sources_by_target = None
     self._sources_predicate = self.select_source
-
-    # Various working directories.
-    self._analysis_dir = os.path.join(self.workdir, 'isolated-analysis')
-    self._classes_dir = os.path.join(self.workdir, 'isolated-classes')
-    self._logs_dir = os.path.join(self.workdir, 'isolated-logs')
-    self._jars_dir = os.path.join(self.workdir, 'jars')
 
     self._capture_log = self.get_options().capture_log
     self._delete_scratch = self.get_options().delete_scratch
@@ -322,34 +288,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def _fingerprint_strategy(self, classpath_products):
     return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
 
-  def ensure_analysis_tmpdir(self):
-    """Work in a tmpdir so we don't stomp the main analysis files on error.
-
-    A temporary, but well-known, dir in which to munge analysis/dependency files in before
-    caching. It must be well-known so we know where to find the files when we retrieve them from
-    the cache. The tmpdir is cleaned up in a shutdown hook, because background work
-    may need to access files we create there even after this method returns
-    :return: path of temporary analysis directory
-    """
-    analysis_tmpdir = os.path.join(self._workdir, 'analysis_tmpdir')
-    if self._delete_scratch:
-      self.context.background_worker_pool().add_shutdown_hook(
-        lambda: safe_rmtree(analysis_tmpdir))
-    safe_mkdir(analysis_tmpdir)
-    return analysis_tmpdir
-
   def pre_execute(self):
-    # Only create these working dirs during execution phase, otherwise, they
-    # would be wiped out by clean-all goal/task if it's specified.
-    self.analysis_tmpdir = self.ensure_analysis_tmpdir()
-    safe_mkdir(self._analysis_dir)
-    safe_mkdir(self._classes_dir)
-    safe_mkdir(self._logs_dir)
-    safe_mkdir(self._jars_dir)
-
-    # TODO(John Sirois): Ensuring requested product maps are available - if empty - should probably
-    # be lifted to Task infra.
-
     # In case we have no relevant targets and return early create the requested product maps.
     self._create_empty_products()
 
@@ -360,16 +299,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # TODO(benjy): Should sources_by_target be available in all Tasks?
     self._sources_by_target = self._compute_sources_by_target(relevant_targets)
 
-    # Update the classpath by adding relevant target's classes directories to its classpath.
+    # Clone the compile_classpath to the runtime_classpath.
     compile_classpath = self.context.products.get_data('compile_classpath')
     runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
-
-    with self.context.new_workunit('validate-{}-analysis'.format(self._name)):
-      for target in relevant_targets:
-        cc = self.compile_context(target)
-        safe_mkdir(cc.classes_dir)
-        runtime_classpath.add_for_target(target, [(conf, cc.classes_dir) for conf in self._confs])
-        self.validate_analysis(cc.analysis_file)
 
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
@@ -381,16 +313,18 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                      self.context.run_tracker,
                                      self._worker_count)
 
-  def compile_context(self, target):
-    analysis_file = JvmCompile._analysis_for_target(self._analysis_dir, target)
-    classes_dir = os.path.join(self._classes_dir, target.id)
-    # Generate a short unique path for the jar to allow for shorter classpaths.
-    #   TODO: likely unnecessary after https://github.com/pantsbuild/pants/issues/1988
-    jar_file = os.path.join(self._jars_dir, '{}.jar'.format(sha1(target.id).hexdigest()[:12]))
+  def _compile_context(self, target, target_workdir):
+    analysis_file = JvmCompile._analysis_for_target(target_workdir, target)
+    portable_analysis_file = JvmCompile._portable_analysis_for_target(target_workdir, target)
+    classes_dir = os.path.join(target_workdir, 'classes')
+    jar_file = os.path.join(target_workdir, 'z.jar')
+    log_file = os.path.join(target_workdir, 'debug.log')
     return CompileContext(target,
                           analysis_file,
+                          portable_analysis_file,
                           classes_dir,
                           jar_file,
+                          log_file,
                           self._sources_for_target(target))
 
   def execute_chunk(self, relevant_targets):
@@ -401,87 +335,72 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     fingerprint_strategy = self._fingerprint_strategy(classpath_product)
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
-    partition_size_hint, locally_changed_targets = (0, None)
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
-                          partition_size_hint=partition_size_hint,
-                          locally_changed_targets=locally_changed_targets,
+                          partition_size_hint=0,
                           fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
+
+      # Initialize the classpath for all targets
+      compile_contexts = {vt.target: self._compile_context(vt.target, vt.results_dir)
+                          for vt in invalidation_check.all_vts}
+      for cc in compile_contexts.values():
+        classpath_product.add_for_target(cc.target,
+                                         [(conf, cc.classes_dir) for conf in self._confs])
+
+      # Register products for valid targets.
+      valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
+      self._register_vts(compile_contexts[t] for t in valid_targets)
+
+      # Build any invalid targets (which will register products in the background).
       if invalidation_check.invalid_vts:
-        # Find the invalid targets for this chunk.
         invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
 
-        # Register products for all the valid targets.
-        # We register as we go, so dependency checking code can use this data.
-        valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
-        valid_compile_contexts = [self.compile_context(t) for t in valid_targets]
-        self._register_vts(valid_compile_contexts)
-
-        # Execute compilations for invalid targets.
-        check_vts = (self.check_artifact_cache
-            if self.artifact_cache_reads_enabled() else None)
-        update_artifact_cache_vts_work = (self.get_update_artifact_cache_work
-            if self.artifact_cache_writes_enabled() else None)
         self.compile_chunk(invalidation_check,
-                           self.context.targets(),
-                           relevant_targets,
+                           compile_contexts,
                            invalid_targets,
-                           self.extra_compile_time_classpath_elements(),
-                           check_vts,
-                           self._compile_vts,
-                           self._register_vts,
-                           update_artifact_cache_vts_work)
-      else:
-        # Nothing to build. Register products for all the targets in one go.
-        self._register_vts([self.compile_context(t) for t in relevant_targets])
+                           self.extra_compile_time_classpath_elements())
+
+      # Once compilation has completed, replace the classpath entry for each target with
+      # its jar'd representation.
+      classpath_products = self.context.products.get_data('runtime_classpath')
+      for cc in compile_contexts.values():
+        for conf in self._confs:
+          classpath_products.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+          classpath_products.add_for_target(cc.target, [(conf, cc.jar_file)])
 
   def compile_chunk(self,
                     invalidation_check,
-                    all_targets,
-                    relevant_targets,
+                    compile_contexts,
                     invalid_targets,
-                    extra_compile_time_classpath_elements,
-                    check_vts,
-                    compile_vts,
-                    register_vts,
-                    update_artifact_cache_vts_work):
+                    extra_compile_time_classpath_elements):
     """Executes compilations for the invalid targets contained in a single chunk."""
     assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
+
+    # Prepare the output directory for each invalid target, and confirm that analysis is valid.
+    for target in invalid_targets:
+      cc = compile_contexts[target]
+      safe_mkdir(cc.classes_dir)
+      self.validate_analysis(cc.analysis_file)
+
     # Get the classpath generated by upstream JVM tasks and our own prepare_compile().
     classpath_products = self.context.products.get_data('runtime_classpath')
 
     extra_compile_time_classpath = self._compute_extra_classpath(
         extra_compile_time_classpath_elements)
 
-    compile_contexts = self._create_compile_contexts_for_targets(all_targets)
-
     # Now create compile jobs for each invalid target one by one.
     jobs = self._create_compile_jobs(classpath_products,
                                      compile_contexts,
                                      extra_compile_time_classpath,
                                      invalid_targets,
-                                     invalidation_check.invalid_vts_partitioned,
-                                     check_vts,
-                                     compile_vts,
-                                     register_vts,
-                                     update_artifact_cache_vts_work)
+                                     invalidation_check.invalid_vts_partitioned)
 
     exec_graph = ExecutionGraph(jobs)
     try:
       exec_graph.execute(self._worker_pool, self.context.log)
     except ExecutionFailure as e:
       raise TaskError("Compilation failure: {}".format(e))
-
-  def finalize_execute(self, chunks):
-    targets = list(itertools.chain(*chunks))
-    # Replace the classpath entry for each target with its jar'd representation.
-    classpath_products = self.context.products.get_data('runtime_classpath')
-    for target in targets:
-      cc = self.compile_context(target)
-      for conf in self._confs:
-        classpath_products.remove_for_target(target, [(conf, cc.classes_dir)])
-        classpath_products.add_for_target(target, [(conf, cc.jar_file)])
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
                    log_file, progress_message, settings):
@@ -520,32 +439,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                      log_file, settings)
 
   def check_artifact_cache(self, vts):
-    post_process_cached_vts = lambda cvts: self.post_process_cached_vts(cvts)
-    cache_hit_callback = self.create_cache_hit_callback(vts)
-    return self.do_check_artifact_cache(vts,
-                                        post_process_cached_vts=post_process_cached_vts,
-                                        cache_hit_callback=cache_hit_callback)
-
-  def create_cache_hit_callback(self, vts):
-    cache_key_to_classes_dir = {v.cache_key: self.compile_context(v.target).classes_dir
-                                for v in vts}
-    return CacheHitCallback(cache_key_to_classes_dir)
-
-  def post_process_cached_vts(self, cached_vts):
-    """Localizes the fetched analysis for targets we found in the cache.
-
-    This is the complement of `_write_to_artifact_cache`.
-    """
-    compile_contexts = []
-    for vt in cached_vts:
-      for target in vt.targets:
-        compile_contexts.append(self.compile_context(target))
-
-    for compile_context in compile_contexts:
-      portable_analysis_file = JvmCompile._portable_analysis_for_target(
-          self._analysis_dir, compile_context.target)
-      if os.path.exists(portable_analysis_file):
-        self._analysis_tools.localize(portable_analysis_file, compile_context.analysis_file)
+    """Localizes the fetched analysis for targets we found in the cache."""
+    def post_process(cached_vts):
+      for vt in cached_vts:
+        cc = self._compile_context(vt.target, vt.results_dir)
+        safe_delete(cc.analysis_file)
+        self._analysis_tools.localize(cc.portable_analysis_file, cc.analysis_file)
+    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process)
 
   def _create_empty_products(self):
     if self.context.products.is_required_data('classes_by_source'):
@@ -611,23 +511,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           classes = computed_classes_by_source.get(source, [])
           classes_by_source[source].add_abs_paths(classes_dir, classes)
 
-    # Register resource products.
-    for compile_context in compile_contexts:
-      extra_resources = self.extra_products(compile_context.target)
-      entries = [(conf, root) for conf in self._confs for root, _ in extra_resources]
-      runtime_classpath.add_for_target(compile_context.target, entries)
-
-      # And classfile product dependencies (if requested).
-      if product_deps_by_src is not None:
+    # Register classfile product dependencies (if requested).
+    if product_deps_by_src is not None:
+      for compile_context in compile_contexts:
         product_deps_by_src[compile_context.target] = \
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
-
-  def _create_compile_contexts_for_targets(self, targets):
-    compile_contexts = OrderedDict()
-    for target in targets:
-      compile_context = self.compile_context(target)
-      compile_contexts[target] = compile_context
-    return compile_contexts
 
   def _compute_classpath_entries(self,
                                  classpath_products,
@@ -652,25 +540,19 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         else:
           yield compile_context.classes_dir, compile_context.analysis_file
 
-  def _capture_log_file(self, target):
-    if self._capture_log:
-      return os.path.join(self._logs_dir, "{}.log".format(target.id))
-    return None
-
   def exec_graph_key_for_target(self, compile_target):
     return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, classpath_products, compile_contexts, extra_compile_time_classpath,
-                           invalid_targets, invalid_vts_partitioned, check_vts, compile_vts,
-                           register_vts, update_artifact_cache_vts_work):
+                           invalid_targets, invalid_vts_partitioned):
     def check_cache(vts):
       """Manually checks the artifact cache (usually immediately before compilation.)
 
       Returns true if the cache was hit successfully, indicating that no compilation is necessary.
       """
-      if not check_vts:
+      if not self.artifact_cache_reads_enabled():
         return False
-      cached_vts, uncached_vts = check_vts([vts])
+      cached_vts, uncached_vts = self.check_artifact_cache([vts])
       if not cached_vts:
         self.context.log.debug('Missed cache during double check for {}'
                                .format(vts.target.address.spec))
@@ -690,25 +572,25 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
       # Capture a compilation log if requested.
-      log_file = self._capture_log_file(compile_context.target)
+      log_file = compile_context.log_file if self._capture_log else None
 
       # Double check the cache before beginning compilation
       hit_cache = check_cache(vts)
-      incremental = False
 
       if not hit_cache:
-        # Mutate analysis within a temporary directory, and move it to the final location
-        # on success.
-        tmpdir = os.path.join(self.analysis_tmpdir, compile_context.target.id)
-        safe_mkdir(tmpdir)
-        tmp_analysis_file = self._analysis_for_target(
-            tmpdir, compile_context.target)
-        # If the analysis exists for this context, it is an incremental compile.
-        if os.path.exists(compile_context.analysis_file):
-          incremental = True
-          shutil.copy(compile_context.analysis_file, tmp_analysis_file)
+        # Write analysis to a temporary file, and move it to the final location on success.
+        tmp_analysis_file = "{}.tmp".format(compile_context.analysis_file)
+        if vts.is_incremental:
+          # If this is an incremental compile, rebase the analysis to our new classes directory.
+          self._analysis_tools.rebase_from_path(compile_context.analysis_file,
+                                                tmp_analysis_file,
+                                                vts.previous_results_dir,
+                                                vts.results_dir)
+        else:
+          # Otherwise, simply ensure that it is empty.
+          safe_delete(tmp_analysis_file)
         target, = vts.targets
-        compile_vts(vts,
+        self._compile_vts(vts,
                     compile_context.sources,
                     tmp_analysis_file,
                     upstream_analysis,
@@ -717,29 +599,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                     log_file,
                     progress_message,
                     target.platform)
-        atomic_copy(tmp_analysis_file, compile_context.analysis_file)
+        os.rename(tmp_analysis_file, compile_context.analysis_file)
+        self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
+
+        # Write any additional resources for this target to the target workdir.
+        self.write_extra_resources(compile_context)
 
         # Jar the compiled output.
         self._create_context_jar(compile_context)
 
       # Update the products with the latest classes.
-      register_vts([compile_context])
-
-      # We write to the cache only if we didn't hit during the double check, and optionally
-      # only for clean builds.
-      is_cacheable = not hit_cache and (self.get_options().incremental_caching or not incremental)
-      self.context.log.debug(
-          'Completed compile for {}. '
-          'Hit cache: {}, was incremental: {}, is cacheable: {}, cache writes enabled: {}.'.format(
-            compile_context.target.address.spec,
-            hit_cache,
-            incremental,
-            is_cacheable,
-            update_artifact_cache_vts_work is not None
-            ))
-      if is_cacheable and update_artifact_cache_vts_work:
-        # Kick off the background artifact cache write.
-        self._write_to_artifact_cache(vts, compile_context, update_artifact_cache_vts_work)
+      self._register_vts([compile_context])
 
     jobs = []
     invalid_target_set = set(invalid_targets)
@@ -779,59 +649,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           abs_filename = os.path.join(abs_sub_dir, name)
           arcname = fast_relpath(abs_filename, root)
           jar.write(abs_filename, arcname)
-
-  def _write_to_artifact_cache(self, vts, compile_context, get_update_artifact_cache_work):
-    assert len(vts.targets) == 1
-    assert vts.targets[0] == compile_context.target
-
-    # Noop if the target is uncacheable.
-    if (compile_context.target.has_label('no_cache')):
-      return
-    vt = vts.versioned_targets[0]
-
-    # Set up args to relativize analysis in the background.
-    portable_analysis_file = self._portable_analysis_for_target(
-        self._analysis_dir, compile_context.target)
-    relativize_args_tuple = (compile_context.analysis_file, portable_analysis_file)
-
-    # Collect the artifacts for this target.
-    artifacts = []
-
-    # Intransitive classpath entries.
-    target_classpath = ClasspathUtil.classpath(
-        (compile_context.target,),
-        self.context.products.get_data('runtime_classpath'),
-        transitive=False)
-    for entry in target_classpath:
-      if ClasspathUtil.is_jar(entry):
-        artifacts.append(entry)
-      elif ClasspathUtil.is_dir(entry):
-        for rel_file in ClasspathUtil.classpath_entries_contents([entry]):
-          artifacts.append(os.path.join(entry, rel_file))
-      else:
-        # non-jar and non-directory classpath entries should be ignored
-        pass
-
-    # Log file.
-    log_file = self._capture_log_file(compile_context.target)
-    if log_file and os.path.exists(log_file):
-      artifacts.append(log_file)
-
-    # Jar.
-    artifacts.append(compile_context.jar_file)
-
-    # Get the 'work' that will publish these artifacts to the cache.
-    # NB: the portable analysis_file won't exist until we finish.
-    vts_artifactfiles_pair = (vt, artifacts + [portable_analysis_file])
-    update_artifact_cache_work = get_update_artifact_cache_work([vts_artifactfiles_pair])
-
-    # And execute it.
-    if update_artifact_cache_work:
-      work_chain = [
-          Work(self._analysis_tools.relativize, [relativize_args_tuple], 'relativize'),
-          update_artifact_cache_work
-      ]
-      self.context.submit_background_work_chain(work_chain, parent_workunit_name='cache')
 
   def validate_analysis(self, path):
     """Throws a TaskError for invalid analysis files."""

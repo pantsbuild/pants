@@ -27,7 +27,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     expected_patterns = [
-      '/gen/wire/[^/]*/org/pantsbuild/example/temperature/Temperature.java',
+      '/gen/wire/[^/]*/[^/]*/org/pantsbuild/example/temperature/Temperature.java',
     ]
     expected_outputs = [
       'Compiling proto source file',

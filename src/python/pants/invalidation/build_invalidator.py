@@ -100,6 +100,17 @@ class BuildInvalidator(object):
     self._root = os.path.join(root, GLOBAL_CACHE_KEY_GEN_VERSION)
     safe_mkdir(self._root)
 
+  def previous_key(self, cache_key):
+    """If there was a previous successful build for the given key, return the previous key.
+
+    :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
+    :returns: The previous cache_key, or None if there was not a previous build.
+    """
+    previous_hash = self._read_sha(cache_key)
+    if not previous_hash:
+      return None
+    return CacheKey(cache_key.id, previous_hash, cache_key.num_chunking_units)
+
   def needs_update(self, cache_key):
     """Check if the given cached item is invalid.
 
@@ -126,13 +137,6 @@ class BuildInvalidator(object):
     except OSError as e:
       if e.errno != errno.ENOENT:
         raise
-
-  def existing_hash(self, id):
-    """Returns the existing hash for the specified id.
-
-    Returns None if there is no existing hash for this id.
-    """
-    return self._read_sha_by_id(id)
 
   def _sha_file(self, cache_key):
     return self._sha_file_by_id(cache_key.id)
