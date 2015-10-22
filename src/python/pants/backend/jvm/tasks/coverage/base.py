@@ -9,7 +9,6 @@ import os
 import shutil
 from abc import ABCMeta, abstractmethod, abstractproperty
 
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
@@ -31,7 +30,7 @@ class CoverageTaskSettings(object):
 
 
 class Coverage(object):
-  """Base class for emma-like coverage processors. Do not instantiate."""
+  """Base class for coverage processors. Do not instantiate."""
   __metaclass__ = ABCMeta
 
   @classmethod
@@ -39,12 +38,6 @@ class Coverage(object):
     register('--coverage', action='store_true', help='Collect code coverage data.')
     register('--coverage-processor', advanced=True, default='cobertura',
              help='Which coverage subsystem to use.')
-    register('--coverage-patterns', advanced=True, action='append',
-             help='Restrict coverage measurement. Values are class name prefixes in dotted form '
-                  'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
-                  'example, to include all code in org.pantsbuild.raven except claws and the eye '
-                  'you would use: {flag}=org.pantsbuild.raven.* {flag}=-org.pantsbuild.raven.claw '
-                  '{flag}=-org.pantsbuild.raven.Eye.'.format(flag='--coverage_patterns'))
     register('--coverage-jvm-options', advanced=True, action='append',
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
@@ -59,7 +52,6 @@ class Coverage(object):
     options = settings.options
     self._context = settings.context
     self._coverage = options.coverage
-    self._coverage_filters = options.coverage_patterns or []
 
     self._coverage_jvm_options = []
     for jvm_option in options.coverage_jvm_options:
@@ -91,29 +83,6 @@ class Coverage(object):
   # Utility methods, called from subclasses
   def is_coverage_target(self, tgt):
     return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_codegen
-
-  def get_coverage_patterns(self, targets):
-    if self._coverage_filters:
-      return self._coverage_filters
-    else:
-      classes_under_test = set()
-      classpath_products = self._context.products.get_data('runtime_classpath')
-
-      def add_sources_under_test(tgt):
-        if self.is_coverage_target(tgt):
-          contents = ClasspathUtil.classpath_contents(
-            (tgt,),
-            classpath_products,
-            confs=self._settings.confs,
-            transitive=False)
-          for f in contents:
-            clsname = ClasspathUtil.classname_for_rel_classfile(f)
-            if clsname:
-              classes_under_test.add(clsname)
-
-      for target in targets:
-        target.walk(add_sources_under_test)
-      return classes_under_test
 
   def initialize_instrument_classpath(self, targets):
     """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific

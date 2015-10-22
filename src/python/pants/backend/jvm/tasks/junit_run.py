@@ -21,11 +21,9 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.coverage.base import Coverage
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura, CoberturaTaskSettings
-from pants.backend.jvm.tasks.coverage.emma import Emma, EmmaTaskSettings
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
@@ -108,7 +106,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
                             Shader.exclude_package('org.hamcrest', recursive=True)
                           ])
     # TODO: Yuck, but will improve once coverage steps are in their own tasks.
-    for c in [Coverage, Emma, Cobertura]:
+    for c in [Coverage, Cobertura]:
       c.register_options(register, cls.register_jvm_tool)
 
   @classmethod
@@ -142,9 +140,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     self._coverage = None
     if options.coverage or options.is_flagged('coverage_open'):
       coverage_processor = options.coverage_processor
-      if coverage_processor == 'emma':
-        self._coverage = self._build_emma_coverage_engine()
-      elif coverage_processor == 'cobertura':
+      if coverage_processor == 'cobertura':
         settings = CoberturaTaskSettings(self)
         self._coverage = Cobertura(settings)
       else:
@@ -395,11 +391,6 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
         for cls in classes:
           yield _classfile_to_classname(cls)
 
-  @deprecated('0.0.55', 'emma support will be removed in future versions.')
-  def _build_emma_coverage_engine(self):
-    settings = EmmaTaskSettings(self)
-    return Emma(settings)
-
   def _test_target_filter(self):
     def target_filter(target):
       return isinstance(target, junit_tests)
@@ -413,6 +404,11 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       raise TargetDefinitionException(target, msg)
 
   def _execute(self, targets):
+    """
+    Implements the primary junit test execution. This method is called by the TestTaskMixin,
+    which contains the primary Task.execute function and wraps this method in timeouts.
+    """
+
     # We only run tests within java_tests/junit_tests targets.
     #
     # But if coverage options are specified, we want to instrument
