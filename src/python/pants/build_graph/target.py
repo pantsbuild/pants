@@ -13,6 +13,7 @@ from six import string_types
 
 from pants.backend.core.wrapped_globs import FilesetWithSpec
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -213,7 +214,7 @@ class Target(AbstractTarget):
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
   def __init__(self, name, address, build_graph, type_alias=None, payload=None, tags=None,
-               description=None, **kwargs):
+               description=None, no_cache=False, **kwargs):
     """
     :param string name: The name of this target, which combined with this build file defines the
                         target address.
@@ -233,6 +234,7 @@ class Target(AbstractTarget):
                  fingerprinting, thus not suitable for anything that affects how a particular
                  target is built.
     :type tags: :class:`collections.Iterable` of strings
+    :param no_cache: If True, results for this target should not be stored in the artifact cache.
     :param string description: Human-readable description of this target.
     """
     # NB: dependencies are in the pydoc above as a BUILD dictionary hack only; implementation hides
@@ -250,8 +252,16 @@ class Target(AbstractTarget):
 
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
+    if no_cache:
+      self.add_labels('no_cache')
     if kwargs:
       self.UnknownArguments.check(self, kwargs)
+
+  @deprecated('0.0.59',
+              'The `no_cache` property is generally ambiguous, and is no longer necessary '
+              'for jvm compiles.')
+  def _set_no_cache(self):
+    self.add_labels('no_cache')
 
   @property
   def type_alias(self):
@@ -299,9 +309,14 @@ class Target(AbstractTarget):
     pass
 
   def mark_invalidation_hash_dirty(self):
+    """Invalidates memoized fingerprints for this target, including those in payloads.
+
+    Exposed for testing.
+    """
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
     self.mark_extra_invalidation_hash_dirty()
+    self.payload.mark_dirty()
 
   def transitive_invalidation_hash(self, fingerprint_strategy=None):
     """

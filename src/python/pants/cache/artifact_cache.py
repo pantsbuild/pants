@@ -114,7 +114,7 @@ class ArtifactCache(object):
   def has(self, cache_key):
     pass
 
-  def use_cached_files(self, cache_key, hit_callback=None):
+  def use_cached_files(self, cache_key, results_dir=None):
     """Use the files cached for the given key.
 
     Returned result indicates whether or not an artifact was successfully found
@@ -155,8 +155,8 @@ def call_use_cached_files(tup):
   """
 
   try:
-    cache, key, callback = tup
-    res = cache.use_cached_files(key, callback)
+    cache, key, results_dir = tup
+    res = cache.use_cached_files(key, results_dir)
     if res:
       sys.stderr.write('.')
     else:
