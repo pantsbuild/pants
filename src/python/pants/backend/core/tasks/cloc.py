@@ -17,7 +17,7 @@ from pants.util.contextutil import temporary_dir
 
 
 class CountLinesOfCode(ConsoleTask):
-  """Counts lines of code."""
+  """Counts lines of code for specified targets and their dependencies."""
 
   @classmethod
   def global_subsystems(cls):
@@ -27,6 +27,9 @@ class CountLinesOfCode(ConsoleTask):
   def register_options(cls, register):
     super(CountLinesOfCode, cls).register_options(register)
     register('--version', advanced=True, fingerprint=True, default='1.64', help='Version of cloc.')
+    register('--transitive', action='store_true', fingerprint=True, default=True,
+             help='Operate on the transitive dependencies of the specified targets.  '
+                  'Unset to operate only on the specified targets.')
     register('--ignored', action='store_true', fingerprint=True,
              help='Show information about files ignored by cloc.')
 
@@ -35,6 +38,9 @@ class CountLinesOfCode(ConsoleTask):
     return binary_util.select_script('scripts/cloc', self.get_options().version, 'cloc')
 
   def console_output(self, targets):
+    if not self.get_options().transitive:
+      targets = self.context.target_roots
+
     buildroot = get_buildroot()
     with temporary_dir() as tmpdir:
       # Write the paths of all files we want cloc to process to the so-called 'list file'.

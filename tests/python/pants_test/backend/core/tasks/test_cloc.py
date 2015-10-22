@@ -18,15 +18,17 @@ class ClocTest(ConsoleTaskTestBase):
     return CountLinesOfCode
 
   def test_counts(self):
-    py_tgt = self.make_target('src/py/foo', PythonLibrary, sources=['foo.py', 'bar.py'])
+    dep_py_tgt = self.make_target('src/py/dep', PythonLibrary, sources=['dep.py'])
+    py_tgt = self.make_target('src/py/foo', PythonLibrary, dependencies=[dep_py_tgt],
+                              sources=['foo.py', 'bar.py'])
     java_tgt = self.make_target('src/java/foo', JavaLibrary, sources=['Foo.java'])
     self.create_file('src/py/foo/foo.py', '# A comment.\n\nprint("some code")\n# Another comment.')
     self.create_file('src/py/foo/bar.py', '# A comment.\n\nprint("some more code")')
+    self.create_file('src/py/dep/dep.py', 'print("a dependency")')
     self.create_file('src/java/foo/Foo.java', '// A comment. \n class Foo(){}\n')
     self.create_file('src/java/foo/Bar.java', '// We do not expect this file to appear in counts.')
 
-    res = self.execute_console_task(targets=[py_tgt, java_tgt])
-    def assert_counts(lang, files, blank, comment, code):
+    def assert_counts(res, lang, files, blank, comment, code):
       for line in res:
         fields = line.split()
         if len(fields) >= 5:
@@ -38,8 +40,13 @@ class ClocTest(ConsoleTaskTestBase):
             return
       self.fail('Found no output line for {}'.format(lang))
 
-    assert_counts('Python', files=2, blank=2, comment=3, code=2)
-    assert_counts('Java', files=1, blank=0, comment=1, code=1)
+    res = self.execute_console_task(targets=[py_tgt, java_tgt], options={'dependencies': True})
+    assert_counts(res, 'Python', files=3, blank=2, comment=3, code=3)
+    assert_counts(res, 'Java', files=1, blank=0, comment=1, code=1)
+
+    res = self.execute_console_task(targets=[py_tgt, java_tgt], options={'dependencies': False})
+    assert_counts(res, 'Python', files=2, blank=2, comment=3, code=2)
+    assert_counts(res, 'Java', files=1, blank=0, comment=1, code=1)
 
   def test_ignored(self):
     py_tgt = self.make_target('src/py/foo', PythonLibrary, sources=['foo.py', 'empty.py'])
