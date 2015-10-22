@@ -11,16 +11,14 @@ from collections import namedtuple
 from colors import red
 from six import string_types
 
+from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
 
 
-class QuietReporter(Reporter):
-  """Squelched plaintext reporting, only prints errors."""
-  Settings = namedtuple('Settings', Reporter.Settings._fields + ('color', ))
-
-  def __init__(self, run_tracker, settings):
-    Reporter.__init__(self, run_tracker, settings)
+class QuietReporter(PlainTextReporterBase):
+  """Squelched plaintext reporting, only prints errors and timing/cache stats (if requested)."""
+  Settings = namedtuple('Settings', Reporter.Settings._fields + ('color', 'timing', 'cache_stats'))
 
   def open(self):
     """Implementation of Reporter callback."""
@@ -28,7 +26,7 @@ class QuietReporter(Reporter):
 
   def close(self):
     """Implementation of Reporter callback."""
-    pass
+    self._emit(self.generate_epilog(self.settings))
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""

@@ -11,7 +11,7 @@ import sys
 from six import StringIO
 
 from pants.base.workunit import WorkUnitLabel
-from pants.option.custom_types import dict_option, list_option
+from pants.option.custom_types import dict_option
 from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
@@ -114,7 +114,8 @@ class Reporting(Subsystem):
 
     if global_options.quiet or is_quiet_task:
       console_reporter = QuietReporter(run_tracker,
-                                       QuietReporter.Settings(log_level=log_level, color=color))
+                                       QuietReporter.Settings(log_level=log_level, color=color,
+                                                              timing=timing, cache_stats=cache_stats))
     else:
       # Set up the new console reporter.
       settings = PlainTextReporter.Settings(log_level=log_level, outfile=sys.stdout, color=color,

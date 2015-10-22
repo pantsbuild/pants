@@ -11,6 +11,7 @@ import six
 from colors import cyan, green, red, yellow
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
 from pants.util.memo import memoized_method
@@ -44,7 +45,7 @@ class LabelFormat(object):
     return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
 
 
-class PlainTextReporter(Reporter):
+class PlainTextReporter(PlainTextReporterBase):
   """Plain-text reporting to stdout.
 
   We only report progress for things under the default work root. It gets too
@@ -89,7 +90,7 @@ class PlainTextReporter(Reporter):
   }
 
   def __init__(self, run_tracker, settings):
-    Reporter.__init__(self, run_tracker, settings)
+    super(PlainTextReporter, self).__init__(run_tracker, settings)
     for key, value in settings.label_format.items():
       if key not in WorkUnitLabel.keys():
         self.emit('*** Got invalid key {} for --reporting-console-label-format. Expected one of {}\n'
@@ -115,24 +116,7 @@ class PlainTextReporter(Reporter):
 
   def close(self):
     """Implementation of Reporter callback."""
-    if self.settings.timing:
-      self.emit(b'\n')
-      self.emit(b'\nCumulative Timings')
-      self.emit(b'\n==================')
-      self.emit(b'\n')
-      self.emit(self._format_aggregated_timings(self.run_tracker.cumulative_timings))
-      self.emit(b'\n')
-      self.emit(b'\nSelf Timings')
-      self.emit(b'\n============')
-      self.emit(b'\n')
-      self.emit(self._format_aggregated_timings(self.run_tracker.self_timings))
-    if self.settings.cache_stats:
-      self.emit(b'\n')
-      self.emit(b'\nArtifact Cache Stats')
-      self.emit(b'\n====================')
-      self.emit(b'\n')
-      self.emit(self._format_artifact_cache_stats(self.run_tracker.artifact_cache_stats))
-    self.emit(b'\n')
+    self.emit(self.generate_epilog(self.settings))
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
