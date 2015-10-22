@@ -21,7 +21,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.custom_types import list_option
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
 

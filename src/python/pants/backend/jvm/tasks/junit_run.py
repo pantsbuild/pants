@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 import os
 import sys
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 
 from six.moves import range
 from twitter.common.collections import OrderedSet
@@ -20,12 +20,10 @@ from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.coverage.base import Coverage
-from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
-from pants.backend.jvm.tasks.coverage.emma import Emma
+from pants.backend.jvm.tasks.coverage.cobertura import Cobertura, CoberturaTaskSettings
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
@@ -36,31 +34,6 @@ from pants.util.xml_parser import XmlParser
 
 
 # TODO(ji): Add unit tests.
-
-# The helper classes (_JUnitRunner and its subclasses) need to use
-# methods inherited by JUnitRun from Task. Rather than pass a reference
-# to the entire Task instance, we isolate the methods that are used
-# in a named tuple and pass that one around.
-
-# TODO(benjy): Why? This seems unnecessarily clunky. The runners only exist because we can't
-# (yet?) pick a Task type based on cmd-line flags. But they act "as-if" they were Task types,
-# so it seems prefectly reasonable for them to have a reference to the task.
-# This trick just makes debugging harder, and requires extra work when a runner implementation
-# needs some new thing from the task.
-# TODO(ji): (responding to benjy's) IIRC, I was carrying the reference to the Task in very early
-# versions, and jsirois suggested that I switch to the current form.
-_TaskExports = namedtuple('_TaskExports',
-                          ['classpath',
-                           'task_options',
-                           'jvm_options',
-                           'args',
-                           'confs',
-                           'register_jvm_tool',
-                           'tool_classpath',
-                           'workdir',
-                           'test_targets'])
-
-
 def _classfile_to_classname(cls):
   return ClasspathUtil.classname_for_rel_classfile(cls)
 
@@ -82,13 +55,12 @@ def interpret_test_spec(test_spec):
     return (None, (classname_or_srcfile, methodname))
 
 
-class _JUnitRunner(object):
-  """Helper class to run JUnit tests with or without coverage.
-
-  The default behavior is to just run JUnit tests."""
+class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
+  _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
-  def register_options(cls, register, register_jvm_tool):
+  def register_options(cls, register):
+    super(JUnitRun, cls).register_options(register)
     register('--fail-fast', action='store_true',
              help='Fail fast on the first test failure in a suite.')
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
@@ -119,39 +91,74 @@ class _JUnitRunner(object):
     register('--allow-empty-sources', action='store_true', default=False, advanced=True,
              help='Allows a junit_tests() target to be defined with no sources.  Otherwise,'
                   'such a target will raise an error during the test run.')
-    register_jvm_tool(register,
-                      'junit',
-                      classpath=[
-                        JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.10'),
-                      ],
-                      main=JUnitRun._MAIN,
-                      # TODO(John Sirois): Investigate how much less we can get away with.
-                      # Clearly both tests and the runner need access to the same @Test, @Before,
-                      # as well as other annotations, but there is also the Assert class and some
-                      # subset of the @Rules, @Theories and @RunWith APIs.
-                      custom_rules=[
-                        Shader.exclude_package('org.junit', recursive=True),
-                        Shader.exclude_package('org.hamcrest', recursive=True)
-                      ])
+    cls.register_jvm_tool(register,
+                          'junit',
+                          classpath=[
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.10'),
+                          ],
+                          main=JUnitRun._MAIN,
+                          # TODO(John Sirois): Investigate how much less we can get away with.
+                          # Clearly both tests and the runner need access to the same @Test, 
+                          # @Before, as well as other annotations, but there is also the Assert 
+                          # class and some subset of the @Rules, @Theories and @RunWith APIs.
+                          custom_rules=[
+                            Shader.exclude_package('org.junit', recursive=True),
+                            Shader.exclude_package('org.hamcrest', recursive=True)
+                          ])
+    # TODO: Yuck, but will improve once coverage steps are in their own tasks.
+    for c in [Coverage, Cobertura]:
+      c.register_options(register, cls.register_jvm_tool)
 
-  def __init__(self, task_exports, context, coverage=None):
-    self._task_exports = task_exports
-    self._context = context
-    self._coverage = coverage
-    options = task_exports.task_options
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator,)
+
+  @classmethod
+  def request_classes_by_source(cls, test_specs):
+    """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
+    for test_spec in test_specs:
+      src_spec, _ = interpret_test_spec(test_spec)
+      if src_spec:
+        return True
+    return False
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JUnitRun, cls).prepare(options, round_manager)
+
+    # Compilation and resource preparation must have completed.
+    round_manager.require_data('runtime_classpath')
+
+    # If the given test specs require the classes_by_source product, request it.
+    if cls.request_classes_by_source(options.test or []):
+      round_manager.require_data('classes_by_source')
+
+  def __init__(self, *args, **kwargs):
+    super(JUnitRun, self).__init__(*args, **kwargs)
+
+    options = self.get_options()
+    self._coverage = None
+    if options.coverage or options.is_flagged('coverage_open'):
+      coverage_processor = options.coverage_processor
+      if coverage_processor == 'cobertura':
+        settings = CoberturaTaskSettings(self)
+        self._coverage = Cobertura(settings)
+      else:
+        raise TaskError('unknown coverage processor {0}'.format(coverage_processor))
+
     self._tests_to_run = options.test
     self._batch_size = options.batch_size
     self._fail_fast = options.fail_fast
     self._working_dir = options.cwd or get_buildroot()
     self._strict_jvm_version = options.strict_jvm_version
-    self._args = copy.copy(task_exports.args)
+    self._args = copy.copy(self.args)
     self._failure_summary = options.failure_summary
     if options.suppress_output:
       self._args.append('-suppress-output')
     if self._fail_fast:
       self._args.append('-fail-fast')
     self._args.append('-outdir')
-    self._args.append(task_exports.workdir)
+    self._args.append(self.workdir)
 
     if options.per_test_timer:
       self._args.append('-per-test-timer')
@@ -163,53 +170,6 @@ class _JUnitRunner(object):
     if options.test_shard:
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
-
-  def execute(self, targets):
-    # We only run tests within java_tests/junit_tests targets.
-    #
-    # But if coverage options are specified, we want to instrument
-    # and report on all the original targets, not just the test targets.
-    #
-    # We've already filtered out the non-test targets in the
-    # TestTaskMixin, so the mixin passes to us both the test
-    # targets and the unfiltered list of targets
-    tests_and_targets = self._collect_test_targets(self._task_exports.test_targets)
-
-    if not tests_and_targets:
-      return
-
-    bootstrapped_cp = self._task_exports.tool_classpath('junit')
-
-    def compute_complete_classpath():
-      return self._task_exports.classpath(targets, classpath_prefix=bootstrapped_cp)
-
-    self._context.release_lock()
-    if self._coverage:
-      self._coverage.instrument(
-        targets, tests_and_targets.keys(), compute_complete_classpath, self.execute_java_for_targets)
-
-    def _do_report(exception=None):
-      if self._coverage:
-        self._coverage.report(
-          targets, tests_and_targets.keys(), self.execute_java_for_targets, tests_failed_exception=exception)
-
-    try:
-      self.run(tests_and_targets)
-      _do_report(exception=None)
-    except TaskError as e:
-      _do_report(exception=e)
-      raise
-
-  def run(self, tests_and_targets):
-    """Run the tests in the appropriate environment.
-
-    Subclasses should override this if they need more work done.
-
-    :param tests_and_targets: a dict that contains all the test class names
-      mapped to their targets extracted from the testing targets.
-    """
-
-    self._run_tests(tests_and_targets)
 
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
@@ -270,13 +230,13 @@ class _JUnitRunner(object):
     """
 
     def get_test_filename(test):
-      return os.path.join(self._task_exports.workdir, 'TEST-{0}.xml'.format(test))
+      return os.path.join(self.workdir, 'TEST-{0}.xml'.format(test))
 
     failed_targets = defaultdict(set)
 
     for test, target in tests_and_targets.items():
       if target is None:
-        self._context.log.warn('Unknown target for test %{0}'.format(test))
+        self.context.log.warn('Unknown target for test %{0}'.format(test))
 
       filename = get_test_filename(test)
 
@@ -299,7 +259,7 @@ class _JUnitRunner(object):
                   testname=testcase.getAttribute('name'),
                 ))
         except (XmlParser.XmlError, ValueError) as e:
-          self._context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
+          self.context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
 
     return dict(failed_targets)
 
@@ -319,30 +279,30 @@ class _JUnitRunner(object):
                                                     lambda target: target.test_platform)
 
     # the below will be None if not set, and we'll default back to runtime_classpath
-    classpath_product = self._context.products.get_data('instrument_classpath')
+    classpath_product = self.context.products.get_data('instrument_classpath')
 
     result = 0
     for (workdir, platform), tests in tests_by_properties.items():
       for batch in self._partition(tests):
         # Batches of test classes will likely exist within the same targets: dedupe them.
         relevant_targets = set(map(tests_to_targets.get, batch))
-        classpath = self._task_exports.classpath(relevant_targets,
-                                                 classpath_prefix=self._task_exports.tool_classpath('junit'),
-                                                 classpath_product=classpath_product)
+        classpath = self.classpath(relevant_targets,
+                                   classpath_prefix=self.tool_classpath('junit'),
+                                   classpath_product=classpath_product)
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
         complete_classpath.update(classpath)
         complete_classpath.update(classpath_append)
         distribution = self.preferred_jvm_distribution([platform])
-        with binary_util.safe_args(batch, self._task_exports.task_options) as batch_tests:
-          self._context.log.debug('CWD = {}'.format(workdir))
-          self._context.log.debug('platform = {}'.format(platform))
+        with binary_util.safe_args(batch, self.get_options()) as batch_tests:
+          self.context.log.debug('CWD = {}'.format(workdir))
+          self.context.log.debug('platform = {}'.format(platform))
           result += abs(distribution.execute_java(
             classpath=complete_classpath,
             main=JUnitRun._MAIN,
-            jvm_options=self._task_exports.jvm_options + extra_jvm_options,
+            jvm_options=self.jvm_options + extra_jvm_options,
             args=self._args + batch_tests + [u'-xmlreport'],
-            workunit_factory=self._context.new_workunit,
+            workunit_factory=self.context.new_workunit,
             workunit_name='run',
             workunit_labels=[WorkUnitLabel.TEST],
             cwd=workdir,
@@ -362,8 +322,8 @@ class _JUnitRunner(object):
             error_message_lines.append('{0}{1}'.format(' '*8, test))
       error_message_lines.append(
         '\njava {main} ... exited non-zero ({code}); {failed} failed {targets}.'
-        .format(main=JUnitRun._MAIN, code=result, failed=len(failed_targets),
-                targets=pluralize(len(failed_targets), 'target'))
+          .format(main=JUnitRun._MAIN, code=result, failed=len(failed_targets),
+                  targets=pluralize(len(failed_targets), 'target'))
       )
       raise TestFailedTaskError('\n'.join(error_message_lines), failed_targets=list(failed_targets))
 
@@ -407,13 +367,13 @@ class _JUnitRunner(object):
     :param list targets: list of targets to calculate test classes for.
     generates tuples (class_name, target).
     """
-    classpath_products = self._context.products.get_data('runtime_classpath')
+    classpath_products = self.context.products.get_data('runtime_classpath')
     for target in targets:
       contents = ClasspathUtil.classpath_contents(
-          (target,),
-          classpath_products,
-          confs=self._task_exports.confs,
-          transitive=False)
+        (target,),
+        classpath_products,
+        confs=self.confs,
+        transitive=False)
       for f in contents:
         classname = ClasspathUtil.classname_for_rel_classfile(f)
         if classname:
@@ -421,83 +381,15 @@ class _JUnitRunner(object):
 
   def _classnames_from_source_file(self, srcfile):
     relsrc = os.path.relpath(srcfile, get_buildroot())
-    source_products = self._context.products.get_data('classes_by_source').get(relsrc)
+    source_products = self.context.products.get_data('classes_by_source').get(relsrc)
     if not source_products:
       # It's valid - if questionable - to have a source file with no classes when, for
       # example, the source file has all its code commented out.
-      self._context.log.warn('Source file {0} generated no classes'.format(srcfile))
+      self.context.log.warn('Source file {0} generated no classes'.format(srcfile))
     else:
       for _, classes in source_products.rel_paths():
         for cls in classes:
           yield _classfile_to_classname(cls)
-
-
-class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
-  _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
-
-  @classmethod
-  def register_options(cls, register):
-    super(JUnitRun, cls).register_options(register)
-    # TODO: Yuck, but can't be helped until we refactor the _JUnitRunner/_TaskExports mechanism.
-    for c in [_JUnitRunner, Coverage, Emma, Cobertura]:
-      c.register_options(register, cls.register_jvm_tool)
-    register('--coverage', action='store_true', help='Collect code coverage data.')
-    register('--coverage-processor', advanced=True, default='cobertura',
-             help='Which coverage subsystem to use.')
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(JUnitRun, cls).subsystem_dependencies() + (DistributionLocator,)
-
-  @classmethod
-  def request_classes_by_source(cls, test_specs):
-    """Returns true if the given test specs require the `classes_by_source` product to satisfy."""
-    for test_spec in test_specs:
-      src_spec, _ = interpret_test_spec(test_spec)
-      if src_spec:
-        return True
-    return False
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(JUnitRun, cls).prepare(options, round_manager)
-
-    # Compilation and resource preparation must have completed.
-    round_manager.require_data('runtime_classpath')
-
-    # If the given test specs require the classes_by_source product, request it.
-    if cls.request_classes_by_source(options.test or []):
-      round_manager.require_data('classes_by_source')
-
-  def __init__(self, *args, **kwargs):
-    super(JUnitRun, self).__init__(*args, **kwargs)
-
-    task_exports = _TaskExports(classpath=self.classpath,
-                                task_options=self.get_options(),
-                                jvm_options=self.jvm_options,
-                                args=self.args,
-                                confs=self.confs,
-                                register_jvm_tool=self.register_jvm_tool,
-                                tool_classpath=self.tool_classpath,
-                                workdir=self.workdir,
-                                test_targets=self._get_test_targets())
-
-    options = self.get_options()
-    coverage = None
-    if options.coverage or options.is_flagged('coverage_open'):
-      coverage_processor = options.coverage_processor
-      if coverage_processor == 'emma':
-        coverage = self._build_emma_coverage_engine(task_exports)
-      elif coverage_processor == 'cobertura':
-        coverage = Cobertura(task_exports, self.context)
-      else:
-        raise TaskError('unknown coverage processor {0}'.format(coverage_processor))
-
-    self._runner = _JUnitRunner(task_exports, self.context, coverage)
-
-  @deprecated('0.0.55', 'emma support will be removed in future versions.')
-  def _build_emma_coverage_engine(self, task_exports):
-    return Emma(task_exports, self.context)
 
   def _test_target_filter(self):
     def target_filter(target):
@@ -512,4 +404,42 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       raise TargetDefinitionException(target, msg)
 
   def _execute(self, targets):
-    self._runner.execute(targets)
+    """
+    Implements the primary junit test execution. This method is called by the TestTaskMixin,
+    which contains the primary Task.execute function and wraps this method in timeouts.
+    """
+
+    # We only run tests within java_tests/junit_tests targets.
+    #
+    # But if coverage options are specified, we want to instrument
+    # and report on all the original targets, not just the test targets.
+    #
+    # We've already filtered out the non-test targets in the
+    # TestTaskMixin, so the mixin passes to us both the test
+    # targets and the unfiltered list of targets
+    tests_and_targets = self._collect_test_targets(self._get_test_targets())
+
+    if not tests_and_targets:
+      return
+
+    bootstrapped_cp = self.tool_classpath('junit')
+
+    def compute_complete_classpath():
+      return self.classpath(targets, classpath_prefix=bootstrapped_cp)
+
+    self.context.release_lock()
+    if self._coverage:
+      self._coverage.instrument(
+        targets, tests_and_targets.keys(), compute_complete_classpath, self.execute_java_for_targets)
+
+    def _do_report(exception=None):
+      if self._coverage:
+        self._coverage.report(
+          targets, tests_and_targets.keys(), self.execute_java_for_targets, tests_failed_exception=exception)
+
+    try:
+      self._run_tests(tests_and_targets)
+      _do_report(exception=None)
+    except TaskError as e:
+      _do_report(exception=e)
+      raise

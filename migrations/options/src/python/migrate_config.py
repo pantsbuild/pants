@@ -17,7 +17,6 @@ from pants.option.errors import ParseError
 migrations = {
   ('backends', 'packages'): ('DEFAULT', 'backend_packages'),
   ('backends', 'plugins'): ('DEFAULT', 'plugins'),
-  ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
 
   ('jvm', 'missing_deps_target_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
   ('jvm', 'jdk_paths'): ('jvm-distributions', 'paths'),
@@ -450,6 +449,8 @@ notes = {
                                             'is now a list. Values also now include the dot, e.g.,'
                                             'it\'s now .cpp, not cpp.',
 
+  ('test.junit', 'coverage-patterns'): 'Option no longer exists. Only applied to emma coverage, '
+                                       'which was removed.',
   ('test.junit', 'coverage-processor'): 'The default value for this option has changed from "emma" '
                                         'to "cobertura".',
 

@@ -6,13 +6,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
+import inspect
 from abc import abstractmethod, abstractproperty
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 import six
 from twitter.common.collections import OrderedSet
 
 from pants.engine.exp.objects import Serializable
+from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
@@ -64,6 +66,25 @@ class Subject(object):
 
   def __repr__(self):
     return 'Subject(primary={!r}, alternate={!r})'.format(self._primary, self._alternate)
+
+
+class Binding(namedtuple('Binding', ['func', 'args', 'kwargs'])):
+  """A binding for a plan that can be executed."""
+
+  def execute(self):
+    """Execute this binding and return the result."""
+    return self.func(*self.args, **self.kwargs)
+
+
+def _execute_binding(func_or_task_type, **kwargs):
+  # A picklable top-level function to help support local multiprocessing uses.
+  if inspect.isclass(func_or_task_type):
+    if not issubclass(func_or_task_type, Task):
+      raise ValueError()  # TODO(John Sirois): XXX fixme
+    function = func_or_task_type().execute
+  else:
+    function = func_or_task_type
+  return function(**kwargs)
 
 
 class Plan(Serializable):
@@ -118,35 +139,54 @@ class Plan(Serializable):
   def _is_iterable(value):
     return isinstance(value, collections.Iterable) and not isinstance(value, six.string_types)
 
-  def iter_promises(self):
+  @memoized_property
+  def promises(self):
     """Return an iterator over the unique promises in this plan's inputs.
 
     A plan's promises indicate its dependency edges on other plans.
 
     :rtype: :class:`collections.Iterator` of :class:`Promise`
     """
-    # TODO(John Sirois): Ask others if this is sane.  The idea of **inputs is to allow for natural
-    # Task.execute functions with standard parameter lists.  In fact s/Task/function/ will work
-    # just fine.  The engine backend just needs to replace plan **inputs promises with resolved
-    # products and then splat inputs to the Task execution function.
-    promises = set()
-
-    def _iter_promises(item):
-      if isinstance(item, Promise) and item not in promises:
-        promises.add(item)
+    def iter_promises(item):
+      if isinstance(item, Promise):
         yield item
       elif self._is_mapping(item):
         for _, v in item.items():
-          for p in _iter_promises(v):
+          for p in iter_promises(v):
             yield p
       elif self._is_iterable(item):
         for i in item:
-          for p in _iter_promises(i):
+          for p in iter_promises(i):
             yield p
 
+    promises = set()
     for _, value in self._inputs.items():
-      for promise in _iter_promises(value):
-        yield promise
+      promises.update(iter_promises(value))
+    return promises
+
+  def bind(self, products_by_promise):
+    """Bind this plans inputs to functions arguments.
+
+    :param products_by_promise: A mapping containing this plan's satisfied promises.
+    :type products_by_promise: dict of (:class:`Promise`, product)
+    :returns: A binding for this plan to the given satisfied promises.
+    :rtype: :class:`Binding`
+    """
+    def bind_products(item):
+      if isinstance(item, Promise):
+        return products_by_promise[item]
+      elif self._is_mapping(item):
+        return {k: bind_products(v) for k, v in item.items()}
+      elif self._is_iterable(item):
+        return [bind_products(i) for i in item]
+      else:
+        return item
+
+    inputs = {}
+    for key, value in self._inputs.items():
+      inputs[key] = bind_products(value)
+
+    return Binding(_execute_binding, args=(self._task_type,), kwargs=inputs)
 
   def _asdict(self):
     d = self._inputs.copy()
@@ -354,24 +394,37 @@ class ExecutionGraph(object):
     self._root_promises = root_promises
     self._product_mapper = product_mapper
 
+  @property
+  def root_promises(self):
+    """Return the root promises in the graph.
+
+    These represent the final products requested to satisfy a build request.
+
+    :rtype: :class:`collections.Iterable` of :class:`Promise`
+    """
+    return self._root_promises
+
   def walk(self):
     """Performs a depth first post-order walk of the graph of execution plans.
 
     All plans are visited exactly once.
+
+    :returns: A tuple of the product type the plan will produce when executed and the plan itself.
+    :rtype tuple of (type, :class:`Plan`)
     """
     plans = set()
     for promise in self._root_promises:
       for plan in self._walk_plan(promise, plans):
         yield plan
 
-  def _walk_plan(self, pr, plans):
-    plan = self._product_mapper.promised(pr)
+  def _walk_plan(self, promise, plans):
+    plan = self._product_mapper.promised(promise)
     if plan not in plans:
       plans.add(plan)
-      for pr in plan.iter_promises():
+      for pr in plan.promises:
         for pl in self._walk_plan(pr, plans):
           yield pl
-      yield plan
+      yield promise._product_type, plan
 
 
 class Promise(object):
