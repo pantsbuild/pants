@@ -61,7 +61,7 @@ class SchedulerTest(unittest.TestCase):
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
 
-    self.assertEqual((Sources('.java'),
+    self.assertEqual((Sources.of('.java'),
                       Plan(task_type=ApacheThrift,
                            subjects=[self.thrift],
                            strict=True,
@@ -84,7 +84,7 @@ class SchedulerTest(unittest.TestCase):
     jars = [self.guava] + thrift_jars
 
     # Independent leaves 1st
-    self.assertEqual({(Sources('.java'),
+    self.assertEqual({(Sources.of('.java'),
                        Plan(task_type=ApacheThrift,
                             subjects=[self.thrift],
                             strict=True,
@@ -98,7 +98,7 @@ class SchedulerTest(unittest.TestCase):
     self.assertEqual((Classpath,
                       Plan(task_type=JavacTask,
                            subjects=[self.thrift],
-                           sources=Promise(Sources('.java'), self.thrift),
+                           sources=Promise(Sources.of('.java'), self.thrift),
                            classpath=[Promise(Classpath, jar) for jar in thrift_jars])),
                      plans[2])
 

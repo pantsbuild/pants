@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import inspect
 import os
 import subprocess
 import sys
@@ -19,18 +18,14 @@ from pants.util.contextutil import temporary_file, temporary_file_path
 
 
 def create_digraph(execution_graph):
-  def product_type_name(product_type):
-    return product_type.__name__ if inspect.isclass(product_type) else type(product_type).__name__
-
   def format_subject(subject):
     return subject.primary.address.spec if subject.primary.address else repr(subject.primary)
 
   def format_promise(promise):
-    return '{}({})'.format(product_type_name(promise._product_type),
-                           format_subject(promise.subject))
+    return '{}({})'.format(promise._product_type.__name__, format_subject(promise.subject))
 
   def format_label(product_type, plan):
-    return '{}:{}'.format(plan._task_type.__name__, product_type_name(product_type))
+    return '{}:{}'.format(plan._task_type.__name__, product_type.__name__)
 
   colorscheme = 'set312'
   colors = {}

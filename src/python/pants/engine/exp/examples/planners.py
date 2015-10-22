@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
+import sys
 
 from twitter.common.collections import OrderedSet
 
@@ -17,6 +18,7 @@ from pants.engine.exp.parsers import parse_json
 from pants.engine.exp.scheduler import GlobalScheduler, Plan, Planners, Subject, Task, TaskPlanner
 from pants.engine.exp.targets import Sources as AddressableSources
 from pants.engine.exp.targets import Target
+from pants.util.memo import memoized
 
 
 class PrintingTask(Task):
@@ -88,18 +90,31 @@ class IvyResolve(PrintingTask):
     return super(IvyResolve, self).execute(jars=jars)
 
 
+def _create_sources(ext):
+  # A pickle-compatible top-level function for custom unpickling of Sources per-extension types.
+  return Sources.of(ext)
+
+
 class Sources(object):
-  def __init__(self, ext):
-    self.ext = ext
+  @classmethod
+  @memoized
+  def of(cls, ext):
+    type_name = b'Sources({!r})'.format(ext)
 
-  def __hash__(self):
-    return hash(self.ext)
+    class_dict = {'ext': ext,
+                  # We need custom serialization for the dynamic class type.
+                  '__reduce__': lambda self: (_create_sources, ext)}
 
-  def __eq__(self, other):
-    return isinstance(other, Sources) and self.ext == other.ext
+    ext_type = type(type_name, (cls,), class_dict)
 
-  def __ne__(self, other):
-    return not (self == other)
+    # Expose the custom class type at the module level to be pickle compatible.
+    setattr(sys.modules[cls.__module__], type_name, ext_type)
+
+    return ext_type
+
+  @classmethod
+  def ext(cls):
+    raise NotImplementedError()
 
   def __repr__(self):
     return 'Sources(ext={!r})'.format(self.ext)
@@ -129,7 +144,7 @@ class ApacheThriftPlanner(TaskPlanner):
   def __init__(self):
     # This will come via an option default.
     # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
-    self._product_type_by_lang = {'java': Sources('.java'), 'py': Sources('.py')}
+    self._product_type_by_lang = {'java': Sources.of('.java'), 'py': Sources.of('.py')}
 
   @property
   def goal_name(self):
@@ -178,7 +193,7 @@ class ApacheThrift(PrintingTask):
 
 class JavacPlanner(TaskPlanner):
   # Product type
-  JavaSources = Sources('.java')
+  JavaSources = Sources.of('.java')
 
   @property
   def goal_name(self):
