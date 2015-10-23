@@ -390,8 +390,7 @@ class JarBuilderTask(JarTask):
         targets += target.resources
       # We only gather internal classpath elements per our contract.
       target_classpath = ClasspathUtil.internal_classpath(targets,
-                                                          classpath_products,
-                                                          transitive=False)
+                                                          classpath_products)
       for entry in target_classpath:
         if ClasspathUtil.is_jar(entry):
           self._jar.writejar(entry)

@@ -301,7 +301,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
 
     classpath_products = self.resolve_jars(targets) or ClasspathProducts()
     cp_entry_by_classifier_by_orgname = defaultdict(lambda: defaultdict(dict))
-    for conf, jar_entry in classpath_products.get_artifact_classpath_entries_for_targets(targets, transitive=False):
+    for conf, jar_entry in classpath_products.get_artifact_classpath_entries_for_targets(targets):
       coord = (jar_entry.coordinate.org, jar_entry.coordinate.name)
       classifier = jar_entry.coordinate.classifier
       cp_entry_by_classifier_by_orgname[coord][classifier] = jar_entry

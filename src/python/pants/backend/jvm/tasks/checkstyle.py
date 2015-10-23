@@ -101,8 +101,7 @@ class Checkstyle(NailgunTask):
     runtime_classpaths = self.context.products.get_data('runtime_classpath')
     union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
     for target in targets:
-      runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True),
-                                                             transitive=False)
+      runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True))
       union_classpath.update(jar for conf, jar in runtime_classpath
                              if conf in self.get_options().confs)
 

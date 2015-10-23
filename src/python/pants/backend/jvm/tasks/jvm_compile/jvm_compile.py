@@ -47,7 +47,7 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
       # changes between versions, that you won't get runtime errors due to using an artifact built
       # against a binary incompatible version resolved for a previous compile.
       classpath_entries = self._classpath_products.get_artifact_classpath_entries_for_targets(
-        [target], transitive=False)
+        [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
     return hasher

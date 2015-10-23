@@ -20,11 +20,6 @@ class ProductError(Exception): pass
 class UnionProducts(object):
   """Here, products for a target are the ordered union of the products for its deps."""
 
-  @classmethod
-  def _nope(cls, transitive, value):
-    if transitive is value:
-      raise Exception('Nope!: {} vs {}'.format(transitive, value))
-
   def __init__(self, products_by_target=None):
     # A map of target to OrderedSet of product members.
     self._products_by_target = products_by_target or defaultdict(OrderedSet)
@@ -58,26 +53,15 @@ class UnionProducts(object):
     for product in products:
       self._products_by_target[target].discard(product)
 
-  def get_for_target(self, target, transitive=True):
-    """Gets the transitive product deps for the given target."""
-    self._nope(transitive, True)
-    return self.get_for_targets([target], transitive=transitive)
+  def get_for_target(self, target):
+    """Gets the product deps for the given target."""
+    return self.get_for_targets([target])
 
-  def get_for_targets(self, targets, transitive=True):
-    """Gets the transitive product deps for the given targets, in order."""
-    self._nope(transitive, True)
+  def get_for_targets(self, targets):
+    """Gets the product deps for the given targets, preserving the input order."""
     products = OrderedSet()
-    visited = set()
-    # Walk the targets transitively to aggregate their products. We do a breadth-first
     for target in targets:
-      if transitive:
-        deps = target.closure(bfs=True)
-      else:
-        deps = [target]
-      for dep in deps:
-        if dep not in visited:
-          products.update(self._products_by_target[dep])
-          visited.add(dep)
+      products.update(self._products_by_target[target])
     return products
 
   def target_for_product(self, product):

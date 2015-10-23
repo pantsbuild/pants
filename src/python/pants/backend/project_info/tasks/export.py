@@ -211,7 +211,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
                 :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
         """
         if classpath_products:
-          jar_products = classpath_products.get_artifact_classpath_entries_for_targets((jar_lib,), transitive=False)
+          jar_products = classpath_products.get_artifact_classpath_entries_for_targets((jar_lib,))
           for _, jar_entry in jar_products:
             coordinate = jar_entry.coordinate
             # We drop classifier and type_ since those fields are represented in the global

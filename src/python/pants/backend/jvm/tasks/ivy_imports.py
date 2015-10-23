@@ -49,8 +49,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
                  invalidate_dependents=True)
 
     for target in targets:
-      cp_entries = imports_classpath.get_classpath_entries_for_targets(target.closure(bfs=True),
-                                                                       transitive=False)
+      cp_entries = imports_classpath.get_classpath_entries_for_targets(target.closure(bfs=True))
       for conf, cp_entry in cp_entries:
         if isinstance(cp_entry, ArtifactClasspathEntry):
           jar_import_products.imported(target, cp_entry.coordinate, cp_entry.path)

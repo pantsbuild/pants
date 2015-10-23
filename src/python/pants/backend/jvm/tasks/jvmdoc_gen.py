@@ -135,7 +135,7 @@ class JvmdocGen(JvmTask):
     if targets:
       classpath = OrderedSet()
       for target in targets:
-        classpath.update(self.classpath(target.closure(bfs=True), transitive=False))
+        classpath.update(self.classpath(target.closure(bfs=True)))
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
       if command:
@@ -149,7 +149,7 @@ class JvmdocGen(JvmTask):
     jobs = {}
     for target in targets:
       gendir = self._gendir(target)
-      classpath = self.classpath(target.closure(bfs=True), transitive=False)
+      classpath = self.classpath(target.closure(bfs=True))
       command = create_jvmdoc_command(classpath, gendir, target)
       if command:
         jobs[gendir] = (target, command)

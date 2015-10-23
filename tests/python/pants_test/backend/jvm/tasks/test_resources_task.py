@@ -52,13 +52,13 @@ class ResourcesTaskTestBase(TaskTestBase):
 
   def assert_no_products(self, task, target):
     classpath_products = task.context.products.get_data('runtime_classpath')
-    self.assertEqual(0, len(classpath_products.get_for_target(target, transitive=False)))
+    self.assertEqual(0, len(classpath_products.get_for_target(target)))
 
   def assert_products(self, task, target, count, expected_confs=None):
     classpath_products = task.context.products.get_data('runtime_classpath')
 
     expected_confs = expected_confs or ('default',)
-    products = classpath_products.get_for_target(target, transitive=False)
+    products = classpath_products.get_for_target(target)
     self.assertEqual(len(expected_confs), len(products))
 
     confs = []

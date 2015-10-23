@@ -39,14 +39,14 @@ class JvmTaskTest(JvmTaskTestBase):
     self.task = self.create_task(context)
 
   def test_classpath(self):
-    self.assertEqual(self.classpath, self.task.classpath([self.t1], transitive=False))
-    self.assertEqual(self.classpath, self.task.classpath([self.t2], transitive=False))
-    self.assertEqual(self.classpath, self.task.classpath([self.t3], transitive=False))
-    self.assertEqual(self.classpath, self.task.classpath([self.t1, self.t2, self.t3], transitive=False))
+    self.assertEqual(self.classpath, self.task.classpath([self.t1]))
+    self.assertEqual(self.classpath, self.task.classpath([self.t2]))
+    self.assertEqual(self.classpath, self.task.classpath([self.t3]))
+    self.assertEqual(self.classpath, self.task.classpath([self.t1, self.t2, self.t3]))
 
   def test_classpath_prefix(self):
     self.assertEqual(['first'] + self.classpath,
-                     self.task.classpath([self.t1], classpath_prefix=['first'], transitive=False))
+                     self.task.classpath([self.t1], classpath_prefix=['first']))
 
   def test_classpath_custom_product(self):
     self.assertEqual([], self.task.classpath([self.t1],

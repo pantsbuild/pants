@@ -34,7 +34,7 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
   def setup_repl_session(self, targets):
     classpath = OrderedSet(self.tool_classpath('scala-repl'))
     for target in targets:
-      classpath.update(self.classpath(target.closure(bfs=True), transitive=False))
+      classpath.update(self.classpath(target.closure(bfs=True)))
     return classpath
 
   def launch_repl(self, classpath):

@@ -291,8 +291,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
         complete_classpath.update(self.tool_classpath('junit'))
         for relevant_target in relevant_targets:
           complete_classpath.update(self.classpath(relevant_target.closure(bfs=True),
-                                                   classpath_product=classpath_product,
-                                                   transitive=False))
+                                                   classpath_product=classpath_product))
         complete_classpath.update(classpath_append)
         distribution = self.preferred_jvm_distribution([platform])
         with binary_util.safe_args(batch, self.get_options()) as batch_tests:
@@ -370,11 +369,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     """
     classpath_products = self.context.products.get_data('runtime_classpath')
     for target in targets:
-      contents = ClasspathUtil.classpath_contents(
-        (target,),
-        classpath_products,
-        confs=self.confs,
-        transitive=False)
+      contents = ClasspathUtil.classpath_contents((target,), classpath_products, confs=self.confs)
       for f in contents:
         classname = ClasspathUtil.classname_for_rel_classfile(f)
         if classname:
@@ -428,8 +423,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     def compute_complete_classpath():
       classpath = OrderedSet(bootstrapped_cp)
       for target in targets:
-        classpath.update(self.classpath(target.closure(bfs=True),
-                                        transitive=False))
+        classpath.update(self.classpath(target.closure(bfs=True)))
       return classpath
 
     self.context.release_lock()
