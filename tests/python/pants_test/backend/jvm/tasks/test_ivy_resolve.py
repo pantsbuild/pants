@@ -50,8 +50,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     scala_lib = self.make_target('//:b', JavaLibrary)
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
-    self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
-    self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+    self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib, transitive=False)))
+    self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib, transitive=False)))
 
   def test_resolve_conflicted(self):
     # Create jar_libraries with different versions of the same dep: this will cause
@@ -124,8 +124,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     task._parse_report = mock_parse_report
     task.execute()
     compile_classpath = context.products.get_data('compile_classpath', None)
-    losing_cp = compile_classpath.get_for_target(losing_lib)
-    winning_cp = compile_classpath.get_for_target(winning_lib)
+    losing_cp = compile_classpath.get_for_target(losing_lib, transitive=False)
+    winning_cp = compile_classpath.get_for_target(winning_lib, transitive=False)
     self.assertEquals(losing_cp, winning_cp)
     self.assertEquals(OrderedSet([(u'default', artifact_path(u'bogus0')),
                                   (u'default', artifact_path(u'bogus1'))]),
@@ -143,10 +143,10 @@ class IvyResolveTest(JvmToolTaskTestBase):
     compile_classpath = self.resolve([no_classifier_lib,
                                       classifier_lib,
                                       classifier_and_no_classifier_lib])
-    no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
-    classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
+    no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib], transitive=False)
+    classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib], transitive=False)
     classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
-      [classifier_and_no_classifier_lib])
+      classifier_and_no_classifier_lib.closure(bfs=True), transitive=False)
 
     self.assertIn(no_classifier.coordinate,
                   {resolved_jar.coordinate
@@ -172,8 +172,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
     excluding_target = self.make_target('//:b', JavaLibrary, excludes=[Exclude('junit', 'junit')])
     compile_classpath = self.resolve([junit_jar_lib, excluding_target])
 
-    junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
-    excluding_cp = compile_classpath.get_for_target(excluding_target)
+    junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib, transitive=False)
+    excluding_cp = compile_classpath.get_for_target(excluding_target, transitive=False)
 
     self.assertEquals(0, len(junit_jar_cp))
     self.assertEquals(0, len(excluding_cp))
@@ -201,4 +201,4 @@ class IvyResolveTest(JvmToolTaskTestBase):
         jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
         # Confirm that the deps were added to the appropriate targets.
         compile_classpath = self.resolve([jar_lib])
-        self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
+        self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib, transitive=False)))
