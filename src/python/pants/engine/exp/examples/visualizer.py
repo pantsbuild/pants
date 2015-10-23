@@ -22,10 +22,10 @@ def create_digraph(execution_graph):
     return subject.primary.address.spec if subject.primary.address else repr(subject.primary)
 
   def format_promise(promise):
-    return '{}({})'.format(promise._product_type.__name__, format_subject(promise.subject))
+    return '{}({})'.format(promise.product_type.__name__, format_subject(promise.subject))
 
   def format_label(product_type, plan):
-    return '{}:{}'.format(plan._task_type.__name__, product_type.__name__)
+    return '{}:{}'.format(plan.func_or_task_type.value.__name__, product_type.__name__)
 
   colorscheme = 'set312'
   colors = {}
@@ -36,22 +36,22 @@ def create_digraph(execution_graph):
   yield 'digraph plans {'
   yield '  node[colorscheme={}];'.format(colorscheme)
   yield '  concentrate=true;'
-  yield '  splines=polyline;'
+  yield '  rankdir=LR;'
 
   for product_type, plan in execution_graph.walk():
     label = format_label(product_type, plan)
-    color = color_index(plan._task_type)
+    color = color_index(plan.func_or_task_type)
     if len(plan.subjects) > 1:
       # NB: naming a subgraph cluster* triggers drawing of a box around the subgraph.  We levarge
       # this to highlight plans that chunk or are fully global.
       # See: http://www.graphviz.org/pdf/dot.1.pdf
-      yield '  subgraph "cluster_{}" {{'.format(plan._task_type.__name__)
+      yield '  subgraph "cluster_{}" {{'.format(plan.func_or_task_type.value.__name__)
       yield '    colorscheme={};'.format(colorscheme)
       yield '    style=filled;'
       yield '    fillcolor={};'.format(color)
       yield '    label="{}";'.format(label)
 
-      subgraph_node_color = color_index((plan._task_type, plan.subjects))
+      subgraph_node_color = color_index((plan.func_or_task_type, plan.subjects))
       for subject in plan.subjects:
         yield ('    node [style=filled, fillcolor={color}, label="{label}"] "{node}";'
                .format(color=subgraph_node_color,

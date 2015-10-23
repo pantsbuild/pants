@@ -221,7 +221,9 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     """
 
   def __getattr__(self, item):
-    return self._kwargs[item]
+    if item in self._kwargs:
+      return self._kwargs[item]
+    raise AttributeError('{} does not have attribute {!r}'.format(self, item))
 
   def _key(self):
     if self._hashable_key is None:

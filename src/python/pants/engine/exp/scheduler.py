@@ -78,14 +78,44 @@ class Binding(namedtuple('Binding', ['func', 'args', 'kwargs'])):
     return self.func(*self.args, **self.kwargs)
 
 
-def _execute_binding(func_or_task_type, **kwargs):
-  # A picklable top-level function to help support local multiprocessing uses.
-  if inspect.isclass(func_or_task_type):
+class TaskCategorization(namedtuple('TaskCategorization', ['func', 'task_type'])):
+  """An Either type for a function or `Task` type."""
+
+  @classmethod
+  def of_func(cls, func):
+    return cls(func=func, task_type=None)
+
+  @classmethod
+  def of_task_type(cls, task_type):
+    return cls(func=None, task_type=task_type)
+
+  @property
+  def value(self):
+    """Return the underlying func or task type.
+
+    :rtype: function|type
+    """
+    return self.func or self.task_type
+
+
+def _categorize(func_or_task_type):
+  if isinstance(func_or_task_type, TaskCategorization):
+    return func_or_task_type
+  elif inspect.isclass(func_or_task_type):
     if not issubclass(func_or_task_type, Task):
-      raise ValueError()  # TODO(John Sirois): XXX fixme
-    function = func_or_task_type().execute
+      raise ValueError('A task must be a function or else a subclass of Task, given type {}'
+                       .format(func_or_task_type.__name__))
+    return TaskCategorization.of_task_type(func_or_task_type)
   else:
-    function = func_or_task_type
+    return TaskCategorization.of_func(func_or_task_type)
+
+
+def _execute_binding(categorization, **kwargs):
+  # A picklable top-level function to help support local multiprocessing uses.
+  # TODO(John Sirois): Plumb (context, workdir) or equivalents to the task_type constructor if
+  # maintaining Task as a bridge to convert old style tasks makes sense.  Otherwise, simplify
+  # things and only accept a func.
+  function = categorization.func if categorization.func else categorization.task_type().execute
   return function(**kwargs)
 
 
@@ -107,18 +137,25 @@ class Plan(Serializable):
   # toolchain).  For example, pants can intrinsically fetch the Go toolchain in a Task today but it
   # cannot do the same for the jdk and instead only asserts its presence.
 
-  def __init__(self, task_type, subjects, **inputs):
+  def __init__(self, func_or_task_type, subjects, **inputs):
     """
-    :param type task_type: The type of :class:`Task` that will execute this plan.
+    :param type func_or_task_type: The function that will execute this plan or else a :class:`Task`
+                                   subclass.
     :param subjects: The subjects the plan will generate products for.
     :type subjects: :class:`collections.Iterable` of :class:`Subject` or else objects that will
                     be converted to the primary of a `Subject`.
     """
-    # TODO(John Sirois): There's no reason this couldn't also just be a function.
-    self._task_type = task_type
-
+    self._func_or_task_type = _categorize(func_or_task_type)
     self._subjects = frozenset(Subject.as_subject(subject) for subject in subjects)
     self._inputs = inputs
+
+  @property
+  def func_or_task_type(self):
+    """Return the function or `Task` type that will execute this plan.
+
+    :rtype: :class:`TaskCategorization`
+    """
+    return self._func_or_task_type
 
   @property
   def subjects(self):
@@ -131,7 +168,9 @@ class Plan(Serializable):
     return self._subjects
 
   def __getattr__(self, item):
-    return self._inputs[item]
+    if item in self._inputs:
+      return self._inputs[item]
+    raise AttributeError('{} does not have attribute {!r}'.format(self, item))
 
   @staticmethod
   def _is_mapping(value):
@@ -188,11 +227,11 @@ class Plan(Serializable):
     for key, value in self._inputs.items():
       inputs[key] = bind_products(value)
 
-    return Binding(_execute_binding, args=(self._task_type,), kwargs=inputs)
+    return Binding(_execute_binding, args=(self._func_or_task_type,), kwargs=inputs)
 
   def _asdict(self):
     d = self._inputs.copy()
-    d.update(task_type=self._task_type, subjects=tuple(self._subjects))
+    d.update(func_or_task_type=self._func_or_task_type, subjects=tuple(self._subjects))
     return d
 
   def _key(self):
@@ -203,7 +242,7 @@ class Plan(Serializable):
         return tuple(hashable(v) for v in value)
       else:
         return value
-    return self._task_type, self._subjects, hashable(self._inputs)
+    return self._func_or_task_type, self._subjects, hashable(self._inputs)
 
   def __hash__(self):
     return hash(self._key())
@@ -215,17 +254,18 @@ class Plan(Serializable):
     return not (self == other)
 
   def __repr__(self):
-    return ('Plan(task_type={!r}, subjects={!r}, inputs={!r})'
-            .format(self._task_type, self._subjects, self._inputs))
+    return ('Plan(func_or_task_type={!r}, subjects={!r}, inputs={!r})'
+            .format(self._func_or_task_type, self._subjects, self._inputs))
 
 
 class SchedulingError(Exception):
   """Indicates inability to make a required scheduling promise."""
 
 
-class Scheduler(object):
+class Scheduler(AbstractClass):
   """Schedule the creation of products."""
 
+  @abstractmethod
   def promise(self, subject, product_type, configuration=None, required=True):
     """Return an promise for a product of the given `product_type` for the given `subject`.
 
@@ -248,21 +288,6 @@ class Scheduler(object):
     :raises: :class:`SchedulerError` if the promise was required and no production plans could be
              made.
     """
-    # TODO(John Sirois): Get to the bottom of this when using an AbstractClass base and
-    # @abstractmethod:
-    #  ERROR collecting tests/python/pants_test/engine/exp/test_scheduler.py
-    # tests/python/pants_test/engine/exp/test_scheduler.py:20: in <module>
-    #     from pants.engine.exp.scheduler import (BuildRequest, GlobalScheduler, Plan, Planners, Promise,
-    #                                             src/python/pants/engine/exp/scheduler.py:418: in <module>
-    #     class LocalScheduler(Scheduler):
-    #   ../jsirois-pants3/build-support/pants_dev_deps.venv/lib/python2.7/abc.py:90: in __new__
-    #   for name, value in namespace.items()
-    # ../jsirois-pants3/build-support/pants_dev_deps.venv/lib/python2.7/abc.py:91: in <genexpr>
-    # if getattr(value, "__isabstractmethod__", False))
-    # src/python/pants/engine/exp/scheduler.py:111: in __getattr__
-    # return self._inputs[item]
-    # E   KeyError: '__isabstractmethod__'
-    raise NotImplementedError()
 
 
 class TaskPlanner(AbstractClass):
@@ -495,6 +520,14 @@ class Promise(object):
     self._configuration = configuration
 
   @property
+  def product_type(self):
+    """Return the type of product promised.
+
+    :rtype: type
+    """
+    return self._product_type
+
+  @property
   def subject(self):
     """Return the subject of this promise.
 
@@ -637,7 +670,7 @@ class LocalScheduler(Scheduler):
 
   # A sentinel that denotes a `None` planning result that was accepted.  This can happen for
   # promise requests that are not required.
-  NO_PLAN = Plan(task_type=None, subjects=())
+  NO_PLAN = Plan(func_or_task_type=None, subjects=())
 
   def promise(self, subject, product_type, configuration=None, required=True):
     if isinstance(subject, Address):
