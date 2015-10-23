@@ -385,13 +385,13 @@ class JarBuilderTask(JarTask):
       # In the transitive case we'll gather internal resources naturally as dependencies, but in the
       # non-transitive case we need to manually add these special (in the context of jarring)
       # dependencies.
-      targets = [target]
+      targets = target.closure(bfs=True) if recursive else [target]
       if not recursive and target.has_resources:
         targets += target.resources
       # We only gather internal classpath elements per our contract.
       target_classpath = ClasspathUtil.internal_classpath(targets,
                                                           classpath_products,
-                                                          transitive=recursive)
+                                                          transitive=False)
       for entry in target_classpath:
         if ClasspathUtil.is_jar(entry):
           self._jar.writejar(entry)

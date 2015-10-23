@@ -426,7 +426,11 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     bootstrapped_cp = self.tool_classpath('junit')
 
     def compute_complete_classpath():
-      return self.classpath(targets, classpath_prefix=bootstrapped_cp)
+      classpath = OrderedSet(bootstrapped_cp)
+      for target in targets:
+        classpath.update(self.classpath(target.closure(bfs=True),
+                                        transitive=False))
+      return classpath
 
     self.context.release_lock()
     if self._coverage:
