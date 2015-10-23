@@ -522,10 +522,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                  compile_context,
                                  extra_compile_time_classpath):
     # Generate a classpath specific to this compile and target.
-    if compile_context.target.strict_deps:
-      classpath_targets = compile_context.target.dependencies
+    target = compile_context.target
+    if target.strict_deps:
+      classpath_targets = [target] + target.dependencies
+      self.context.log.info(
+          'Using strict compile classpath, which prunes the following dependencies:\n  {}'.format(
+            [t.address.spec for t in target.closure(bfs=True) if t not in classpath_targets]))
     else:
-      classpath_targets = compile_context.target.closure(bfs=True)
+      classpath_targets = target.closure(bfs=True)
     return ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
                                            extra_compile_time_classpath, self._confs)
 
