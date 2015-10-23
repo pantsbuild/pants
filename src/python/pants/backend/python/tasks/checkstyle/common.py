@@ -79,7 +79,7 @@ class PythonFile(object):
     """
     # Remove the # coding=utf-8 to avoid AST erroneous parse errors
     #   https://bugs.python.org/issue22221
-    lines = [x.decode('utf-8', errors='replace') for x in blob.splitlines()]
+    lines = [x.decode('utf-8', errors='replace') for x in blob.split('\n')]
     if lines and 'coding=utf-8' in lines[0]:
       lines[0] = '#remove coding'
     return '\n'.join(lines).encode('ascii', errors='replace')
@@ -87,7 +87,7 @@ class PythonFile(object):
   def __init__(self, blob, filename='<expr>'):
     self._blob = self._remove_coding_header(blob)
     self.tree = ast.parse(self._blob, filename)
-    self.lines = OffByOneList(self._blob.splitlines())
+    self.lines = OffByOneList(self._blob.split('\n'))
     self.filename = filename
     self.logical_lines = dict((start, (start, stop, indent))
         for start, stop, indent in self.iter_logical_lines(self._blob))
@@ -113,7 +113,7 @@ class PythonFile(object):
     :param statement: Python file contents
     :return: Instance of PythonFile
     """
-    return cls('\n'.join(textwrap.dedent(statement).splitlines()[1:]))
+    return cls('\n'.join(textwrap.dedent(statement).split('\n')[1:]))
 
   @classmethod
   def iter_tokens(cls, blob):
