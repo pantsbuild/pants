@@ -78,6 +78,7 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    'src/python/pants/engine/exp:addressable',
     'src/python/pants/engine/exp:objects',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',

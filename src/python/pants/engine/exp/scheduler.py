@@ -13,6 +13,7 @@ from collections import defaultdict, namedtuple
 import six
 from twitter.common.collections import OrderedSet
 
+from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -224,7 +225,7 @@ class SchedulingError(Exception):
 class Scheduler(object):
   """Schedule the creation of products."""
 
-  def promise(self, subject, product_type, required=True):
+  def promise(self, subject, product_type, configuration=None, required=True):
     """Return an promise for a product of the given `product_type` for the given `subject`.
 
     If the promise is required and no production plans can be made a
@@ -262,6 +263,47 @@ class TaskPlanner(AbstractClass):
   class Error(Exception):
     """Indicates an error creating a product plan for a subject."""
 
+  @classmethod
+  def iter_configured_dependencies(cls, subject):
+    """Return an iterator of the given subject's dependencies including any selected configurations.
+
+    If no configuration is selected by a dependency (there is no `@[config-name]` specifier suffix),
+    then `None` is returned for the paired configuration object; otherwise the `[config-name]` is
+    looked for in the subject `configurations` list and returned if found or else an error is
+    raised.
+
+    :returns: An iterator over subjects dependencies as pairs of (dependency, configuration).
+    :rtype: :class:`collections.Iterator` of (object, string)
+    :raises: :class:`TaskPlanner.Error` if a dependency configuration was selected by subject but
+             could not be found or was not unique.
+    """
+    for derivation in Subject.as_subject(subject).iter_derivations:
+      if derivation.dependencies:
+        for dep in derivation.dependencies:
+          configuration = None
+          if dep.address:
+            config_specifier = extract_config_selector(dep.address)
+            if config_specifier:
+              if not dep.configurations:
+                raise cls.Error('The dependency of {dependee} on {dependency} selects '
+                                'configuration {config} but {dependency} has no configurations.'
+                                .format(dependee=derivation,
+                                        dependency=dep,
+                                        config=config_specifier))
+              configs = tuple(config for config in dep.configurations
+                              if config.name == config_specifier)
+              if len(configs) != 1:
+                configurations = ('{} -> {!r}'.format(repr(c.name) if c.name else '<anonymous>', c)
+                                  for c in configs)
+                raise cls.Error('Failed to find config named {config} selected by {dependee} '
+                                'amongst these configurations in {dependency}:\n\t{configurations}'
+                                .format(config=config_specifier,
+                                        dependee=derivation,
+                                        dependency=dep,
+                                        configurations='\n\t'.join(configurations)))
+              configuration = configs[0]
+          yield dep, configuration
+
   @abstractproperty
   def goal_name(self):
     """Return the name of the goal this planner's task should run from.
@@ -277,7 +319,7 @@ class TaskPlanner(AbstractClass):
     """Return an iterator over the product types this planner's task can produce."""
 
   @abstractmethod
-  def plan(self, scheduler, product_type, subject):
+  def plan(self, scheduler, product_type, subject, configuration=None):
     """
     :param scheduler: A scheduler that can supply promises for any inputs needed that the planner
                       cannot supply on its own to its associated task.
@@ -430,7 +472,7 @@ class ExecutionGraph(object):
 class Promise(object):
   """Represents a promise to produce a given product type for a given subject."""
 
-  def __init__(self, product_type, subject):
+  def __init__(self, product_type, subject, configuration=None):
     """
     :param type product_type: The type of product promised.
     :param subject: The subject the product will be produced for; ie: a java library would be a
@@ -440,6 +482,7 @@ class Promise(object):
     """
     self._product_type = product_type
     self._subject = Subject.as_subject(subject)
+    self._configuration = configuration
 
   @property
   def subject(self):
@@ -452,7 +495,7 @@ class Promise(object):
   def _key(self):
     # We promise the product_type for the primary subject, the alternate does not affect consume
     # side identity.
-    return self._product_type, self._subject.primary
+    return self._product_type, self._subject.primary, self._configuration
 
   def __hash__(self):
     return hash(self._key())
@@ -464,7 +507,8 @@ class Promise(object):
     return not (self == other)
 
   def __repr__(self):
-    return 'Promise(product_type={!r}, subject={!r})'.format(self._product_type, self._subject)
+    return ('Promise(product_type={!r}, subject={!r}, configuration={!r})'
+            .format(self._product_type, self._subject, self._configuration))
 
 
 class ProductMapper(object):
@@ -476,7 +520,7 @@ class ProductMapper(object):
   def __init__(self):
     self._promises = {}
 
-  def register_promises(self, product_type, plan, primary_subject=None):
+  def register_promises(self, product_type, plan, primary_subject=None, configuration=None):
     """Registers the promises the given plan will satisfy when executed.
 
     :param type product_type: The product type the plan will produce when executed.
@@ -492,7 +536,7 @@ class ProductMapper(object):
     # products from tasks that act globally in the extreme.
     primary_promise = None
     for subject in plan.subjects:
-      promise = Promise(product_type, subject)
+      promise = Promise(product_type, subject, configuration=configuration)
       if primary_subject == subject.primary:
         primary_promise = promise
       self._promises[promise] = plan
@@ -581,8 +625,8 @@ class LocalScheduler(Scheduler):
   # promise requests that are not required.
   NO_PLAN = Plan(task_type=None, subjects=())
 
-  def promise(self, subject, product_type, required=True):
-    promise = Promise(product_type, subject)
+  def promise(self, subject, product_type, configuration=None, required=True):
+    promise = Promise(product_type, subject, configuration=configuration)
     plan = self._product_mapper.promised(promise)
     if plan is not None:
       # The `NO_PLAN` plan may have been decided in a non-required round.
@@ -596,7 +640,7 @@ class LocalScheduler(Scheduler):
 
     plans = []
     for planner in planners:
-      plan = planner.plan(self, product_type, subject)
+      plan = planner.plan(self, product_type, subject, configuration=configuration)
       if plan:
         plans.append((planner, plan))
 
@@ -612,7 +656,8 @@ class LocalScheduler(Scheduler):
     planner, plan = plans[0]
     try:
       primary_promise = self._product_mapper.register_promises(product_type, plan,
-                                                               primary_subject=subject)
+                                                               primary_subject=subject,
+                                                               configuration=configuration)
       self._plans_by_product_type_by_planner[planner][product_type].add(plan)
       return primary_promise
     except ProductMapper.InvalidRegistrationError:
