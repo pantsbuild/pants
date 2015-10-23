@@ -83,7 +83,7 @@ def visualize_execution_graph(execution_graph):
       fp.write('\n')
     fp.close()
     with temporary_file_path(cleanup=False) as image_file:
-      subprocess.check_call('dot -Tpng -o{} {}'.format(image_file, fp.name), shell=True)
+      subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, fp.name), shell=True)
       binary_util.ui_open(image_file)
 
 

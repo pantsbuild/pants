@@ -12,6 +12,7 @@ from functools import update_wrapper
 
 import six
 
+from pants.build_graph.address import Address
 from pants.engine.exp.objects import Resolvable, Serializable
 from pants.util.meta import AbstractClass
 
@@ -379,3 +380,31 @@ def addressable_dict(type_constraint):
   :type type_constraint: :class:`TypeConstraint`
   """
   return _addressable_wrapper(AddressableDict, type_constraint)
+
+
+# TODO(John Sirois): Move config_selector into Address 1st class as part of merging the engine/exp
+# into the mainline if the config selectors survive.
+def strip_config_selector(address):
+  """Return a copy of the given address with the config selector (if any) stripped from the name.
+
+  :rtype: :class:`pants.build_graph.address.Address`
+  """
+  address, _ = _parse_config(address)
+  return address
+
+
+def extract_config_selector(address):
+  """Return a the config selector (if any) stripped from the given address' name.
+
+  :returns: The config selector or else `None` if there is none.
+  :rtype: string
+  """
+  _, config_specifier = _parse_config(address)
+  return config_specifier
+
+
+def _parse_config(address):
+  target_name, _, config_specifier = address.target_name.partition('@')
+  config_specifier = config_specifier or None
+  normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
+  return normalized_address, config_specifier

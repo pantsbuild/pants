@@ -9,7 +9,7 @@ import os
 import unittest
 
 from pants.build_graph.address import Address
-from pants.engine.exp.examples.planners import (ApacheThrift, Classpath, IvyResolve, Jar, JavacTask,
+from pants.engine.exp.examples.planners import (ApacheThrift, Classpath, IvyResolve, Jar, Javac,
                                                 Sources, setup_json_scheduler)
 from pants.engine.exp.scheduler import BuildRequest, Plan, Promise
 
@@ -79,7 +79,7 @@ class SchedulerTest(unittest.TestCase):
 
     thrift_jars = [Jar(org='org.apache.thrift', name='libthrift', rev='0.9.2'),
                    Jar(org='commons-lang', name='commons-lang', rev='2.5'),
-                   Jar(org='org.slf4j', name='slf4j-api', rev='1.6.1')]
+                   self.graph.resolve(Address.parse('src/thrift:slf4j-api'))]
 
     jars = [self.guava] + thrift_jars
 
@@ -96,14 +96,14 @@ class SchedulerTest(unittest.TestCase):
 
     # The rest is linked.
     self.assertEqual((Classpath,
-                      Plan(task_type=JavacTask,
+                      Plan(task_type=Javac,
                            subjects=[self.thrift],
                            sources=Promise(Sources.of('.java'), self.thrift),
                            classpath=[Promise(Classpath, jar) for jar in thrift_jars])),
                      plans[2])
 
     self.assertEqual((Classpath,
-                      Plan(task_type=JavacTask,
+                      Plan(task_type=Javac,
                            subjects=[self.java],
                            sources=['src/java/codegen/simple/Simple.java'],
                            classpath=[Promise(Classpath, self.guava),
