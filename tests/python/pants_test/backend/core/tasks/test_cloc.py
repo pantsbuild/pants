@@ -40,11 +40,11 @@ class ClocTest(ConsoleTaskTestBase):
             return
       self.fail('Found no output line for {}'.format(lang))
 
-    res = self.execute_console_task(targets=[py_tgt, java_tgt], options={'dependencies': True})
+    res = self.execute_console_task(targets=[py_tgt, java_tgt], options={'transitive': True})
     assert_counts(res, 'Python', files=3, blank=2, comment=3, code=3)
     assert_counts(res, 'Java', files=1, blank=0, comment=1, code=1)
 
-    res = self.execute_console_task(targets=[py_tgt, java_tgt], options={'dependencies': False})
+    res = self.execute_console_task(targets=[py_tgt, java_tgt], options={'transitive': False})
     assert_counts(res, 'Python', files=2, blank=2, comment=3, code=2)
     assert_counts(res, 'Java', files=1, blank=0, comment=1, code=1)
 
