@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import MutableMapping, MutableSequence
 
-from pants.engine.exp.addressable import SuperclassesOf, addressable
+from pants.engine.exp.addressable import SuperclassesOf, addressable, addressable_list
 from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable, ValidationError
 
 
@@ -28,10 +28,18 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     By default configurations are anonymous (un-named), concrete (not `abstract`), and they neither
     inherit nor merge another configuration.
 
-    Inheritance is only allowed via one of the `extends` or `merges` channels, it is an error to
-    specify both.  A configuration can be semantically abstract without setting `abstract=True`.
-    The `abstract` value can serve as documentation, or, for subclasses that provide an
-    implementation for `validate_concrete`, it allows skipping validation for abstract instances.
+    Inheritance is allowed via the `extends` and `merges` channels.  An object inherits all
+    attributes from the object it extends, overwriting any attributes in common with the extended
+    object with its own.  The relationship is an "overlay".  For the merges, the same rules apply
+    for as for extends working left to right such that the rightmost merges attribute will overwrite
+    any similar attribute from merges to its left where the main object does not itself define the
+    attribute.  The primary difference is in handling of lists and dicts.  These are merged and not
+    over-written; again working from left to right with the main object's collection serving as the
+    seed when present.
+
+    A configuration can be semantically abstract without setting `abstract=True`. The `abstract`
+    value can serve as documentation, or, for subclasses that provide an implementation for
+    `validate_concrete`, it allows skipping validation for abstract instances.
 
     :param bool abstract: `True` to mark this configuration item as abstract, in which case no
                           validation is performed (see `validate_concrete`); `False` by default.
@@ -39,10 +47,10 @@ class Configuration(Serializable, SerializableFactory, Validatable):
                     over-written with this instances values.
     :type extends: An addressed or concrete configuration instance that is a type compatible with
                    this configuration or this configurations superclasses.
-    :param merges: The configuration instance to merge this instances field values with.  Merging is
-                   like extension except for containers, which are extended instead of replaced; ie:
-                   any `dict` values are updated with this instances items and any `list` values are
-                   extended with this instances items.
+    :param merges: The configuration instances to merge this instances field values with.  Merging
+                   is like extension except for containers, which are extended instead of replaced;
+                   ie: any `dict` values are updated with this instances items and any `list` values
+                   are extended with this instances items.
     :type merges: An addressed or concrete configuration instance that is a type compatible with
                   this configuration or this configurations superclasses.
     :param **kwargs: The configuration parameters.
@@ -58,10 +66,11 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     # address directly assigned (vs. inferred from name + source file location) and we only require
     # that if they do, their name - if also assigned, matches the address.
     if self.address:
-      if self.name and self.name != self.address.target_name:
+      target_name, _, config_specifier = self.address.target_name.partition('@')
+      if self.name and self.name != target_name:
         self.report_validation_error('Address and name do not match! address: {}, name: {}'
                                      .format(self.address, self.name))
-      self._kwargs['name'] = self.address.target_name
+      self._kwargs['name'] = target_name
 
     self._hashable_key = None
 
@@ -132,14 +141,14 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   def extends(self):
     """Return the object this object extends, if any.
 
-    :rtype: Serializable
+    :rtype: :class:`Serializable`
     """
 
-  @addressable(SuperclassesOf)
+  @addressable_list(SuperclassesOf)
   def merges(self):
-    """Return the object this object merges in, if any.
+    """Return the objects this object merges in, if any.
 
-    :rtype: Serializable
+    :rtype: list of :class:`Serializable`
     """
 
   def _asdict(self):
@@ -148,8 +157,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   def _extract_inheritable_attributes(self, serializable):
     attributes = serializable._asdict().copy()
 
-    # Allow for un-named (embedded) objects inheriting from named objects
-    attributes.pop('name', None)
+    # Allow for embedded objects inheriting from addressable objects - they should never inherit an
+    # address and any top-level object inheriting will have its own address.
     attributes.pop('address', None)
 
     # We should never inherit special fields - these are for local book-keeping only.
@@ -159,35 +168,35 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     return attributes
 
   def create(self):
-    if self.extends and self.merges:
-      self.report_validation_error('Can only inherit from one object.  Both extension of {} and '
-                                   'merging with {} were requested.'
-                                   .format(self.extends.address, self.merges.address))
+    if not (self.extends or self.merges):
+      return self
+
+    attributes = {k: v for k, v in self._asdict().items()
+                  if k not in self._SPECIAL_FIELDS and v is not None}
 
     if self.extends:
-      attributes = self._extract_inheritable_attributes(self.extends)
-      attributes.update((k, v) for k, v in self._asdict().items()
-                        if k not in self._SPECIAL_FIELDS and v is not None)
-      configuration_type = type(self)
-      return configuration_type(**attributes)
-    elif self.merges:
-      attributes = self._extract_inheritable_attributes(self.merges)
-      for k, v in self._asdict().items():
-        if k not in self._SPECIAL_FIELDS:
+      for k, v in self._extract_inheritable_attributes(self.extends).items():
+        attributes.setdefault(k, v)
+
+    if self.merges:
+      def merge(attrs):
+        for k, v in attrs.items():
           if isinstance(v, MutableMapping):
-            mapping = attributes.get(k) or {}
+            mapping = attributes.get(k, {})
             mapping.update(v)
             attributes[k] = mapping
           elif isinstance(v, MutableSequence):
-            sequence = attributes.get(k) or []
+            sequence = attributes.get(k, [])
             sequence.extend(v)
             attributes[k] = sequence
-          elif v is not None:
-            attributes[k] = v
-      configuration_type = type(self)
-      return configuration_type(**attributes)
-    else:
-      return self
+          else:
+            attributes.setdefault(k, v)
+
+      for merged in self.merges:
+        merge(self._extract_inheritable_attributes(merged))
+
+    configuration_type = type(self)
+    return configuration_type(**attributes)
 
   def validate(self):
     if not self.abstract:
