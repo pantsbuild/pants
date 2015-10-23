@@ -80,12 +80,16 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                        root.find('classname').text)
 
   def test_scalac_debug_symbol(self):
-    pants_run = self.run_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
-                                      expected_files=['HelloScalac.class', 'scalac-plugin.xml'],
-                                      extra_args=[
-                                        '--compile-zinc-debug-symbol',
-                                      ])
-    self.assert_success(pants_run)
+    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with temporary_dir(root_dir=self.workdir_root()) as cachedir:
+        pants_run = self.run_test_compile(
+            workdir,
+            cachedir,
+            'testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
+            extra_args=[
+                '--compile-zinc-debug-symbol',
+            ])
+        self.assert_success(pants_run)
 
   def test_zinc_unsupported_option(self):
     with temporary_dir(root_dir=self.workdir_root()) as workdir:
