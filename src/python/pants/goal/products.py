@@ -18,7 +18,12 @@ class ProductError(Exception): pass
 
 
 class UnionProducts(object):
-  """Here, products for a target are the ordered union of the products for its transitive deps."""
+  """Here, products for a target are the ordered union of the products for its deps."""
+
+  @classmethod
+  def _nope(cls, transitive, value):
+    if transitive is value:
+      raise Exception('Nope!: {} vs {}'.format(transitive, value))
 
   def __init__(self, products_by_target=None):
     # A map of target to OrderedSet of product members.
@@ -55,10 +60,12 @@ class UnionProducts(object):
 
   def get_for_target(self, target, transitive=True):
     """Gets the transitive product deps for the given target."""
+    self._nope(transitive, True)
     return self.get_for_targets([target], transitive=transitive)
 
   def get_for_targets(self, targets, transitive=True):
     """Gets the transitive product deps for the given targets, in order."""
+    self._nope(transitive, True)
     products = OrderedSet()
     visited = set()
     # Walk the targets transitively to aggregate their products. We do a breadth-first

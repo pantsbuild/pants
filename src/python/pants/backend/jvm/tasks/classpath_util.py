@@ -16,19 +16,24 @@ from pants.util.dirutil import fast_relpath, safe_walk
 class ClasspathUtil(object):
 
   @classmethod
-  def compute_classpath_for_target(cls, target, classpath_products, extra_classpath_tuples, confs):
-    """Return the list of classpath entries for a classpath covering the passed target.
+  def _nope(cls, transitive, value):
+    if transitive is value:
+      raise Exception('Nope!: {} vs {}'.format(transitive, value))
+
+  @classmethod
+  def compute_classpath(cls, targets, classpath_products, extra_classpath_tuples, confs):
+    """Return the list of classpath entries for a classpath covering the passed targets.
 
     Filters and adds paths from extra_classpath_tuples to the end of the resulting list.
 
-    :param target: The target to generate a classpath for.
+    :param targets: The targets to generate a classpath for.
     :param ClasspathProducts classpath_products: Product containing classpath elements.
     :param extra_classpath_tuples: Additional classpath entries.
     :param confs: The list of confs for use by this classpath.
     :returns: The classpath as a list of path elements.
     :rtype: list of string
     """
-    classpath_iter = cls._classpath_iter([target], classpath_products, confs=confs, transitive=True)
+    classpath_iter = cls._classpath_iter(targets, classpath_products, confs=confs, transitive=False)
     total_classpath = OrderedSet(classpath_iter)
 
     filtered_extra_classpath_iter = cls._filtered_classpath_by_confs_iter(extra_classpath_tuples,
@@ -48,12 +53,13 @@ class ClasspathUtil(object):
     :returns: The classpath as a list of path elements.
     :rtype: list of string
     """
-    classpath_iter = cls._classpath_iter(targets, classpath_products, confs=confs,
-                                         transitive=transitive)
+    cls._nope(transitive, True)
+    classpath_iter = cls._classpath_iter(targets, classpath_products, confs=confs, transitive=transitive)
     return list(classpath_iter)
 
   @classmethod
   def _classpath_iter(cls, targets, classpath_products, confs=('default',), transitive=True):
+    cls._nope(transitive, True)
     classpath_tuples = classpath_products.get_for_targets(targets, transitive=transitive)
     filtered_tuples_iter = cls._filtered_classpath_by_confs_iter(classpath_tuples, confs)
     return cls._entries_iter(filtered_tuples_iter)
@@ -71,6 +77,7 @@ class ClasspathUtil(object):
     :returns: The classpath as a list of path elements.
     :rtype: list of string
     """
+    cls._nope(transitive, True)
     classpath_tuples = classpath_products.get_internal_classpath_entries_for_targets(
         targets, transitive=transitive)
     filtered_tuples_iter = cls._filtered_classpath_by_confs_iter(classpath_tuples, confs)
@@ -100,6 +107,7 @@ class ClasspathUtil(object):
               path per iteration step.
     :rtype: :class:`collections.Iterator` of string
     """
+    cls._nope(transitive, True)
     classpath_iter = cls._classpath_iter(targets, classpath_products, confs=confs,
                                          transitive=transitive)
     for f in cls.classpath_entries_contents(classpath_iter):

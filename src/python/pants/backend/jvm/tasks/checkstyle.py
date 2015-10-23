@@ -85,7 +85,7 @@ class Checkstyle(NailgunTask):
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       sources = self.calculate_sources(invalid_targets)
       if sources:
-        result = self.checkstyle(targets, sources)
+        result = self.checkstyle(invalid_targets, sources)
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._CHECKSTYLE_MAIN, result=result))
@@ -99,9 +99,12 @@ class Checkstyle(NailgunTask):
 
   def checkstyle(self, targets, sources):
     runtime_classpaths = self.context.products.get_data('runtime_classpath')
-    runtime_classpath = runtime_classpaths.get_for_targets(targets)
     union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
-    union_classpath.update(jar for conf, jar in runtime_classpath if conf in self.get_options().confs)
+    for target in targets:
+      runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True),
+                                                             transitive=False)
+      union_classpath.update(jar for conf, jar in runtime_classpath
+                             if conf in self.get_options().confs)
 
     args = [
       '-c', self.get_options().configuration,

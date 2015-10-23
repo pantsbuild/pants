@@ -33,7 +33,7 @@ class JvmTask(Task):
     self.args = self.jvm.get_program_args()
     self.confs = self.get_options().confs
 
-  def classpath(self, targets, classpath_prefix=None, classpath_product=None):
+  def classpath(self, targets, classpath_prefix=None, classpath_product=None, transitive=True):
     """Builds a classpath for the current task and given targets, optionally including a classpath
     prefix or building from a non-default classpath product.
 
@@ -47,6 +47,6 @@ class JvmTask(Task):
 
     classpath_product = classpath_product or self.context.products.get_data('runtime_classpath')
 
-    classpath_for_targets = ClasspathUtil.classpath(targets, classpath_product, self.confs)
+    classpath_for_targets = ClasspathUtil.classpath(targets, classpath_product, self.confs, transitive=transitive)
     classpath.extend(classpath_for_targets)
     return classpath

@@ -121,6 +121,12 @@ def _not_excluded_filter(excludes):
 
 
 class ClasspathProducts(object):
+
+  @classmethod
+  def _nope(cls, transitive, value):
+    if transitive is value:
+      raise Exception('Nope!: {} vs {}'.format(transitive, value))
+
   def __init__(self, classpaths=None, excludes=None):
     self._classpaths = classpaths or UnionProducts()
     self._excludes = excludes or UnionProducts()
@@ -190,6 +196,7 @@ class ClasspathProducts(object):
               jars.
     :rtype: list of (string, string)
     """
+    self._nope(transitive, True)
     return self.get_for_targets([target], transitive=transitive)
 
   def get_for_targets(self, targets, transitive=True):
@@ -205,6 +212,7 @@ class ClasspathProducts(object):
               jars.
     :rtype: list of (string, string)
     """
+    self._nope(transitive, True)
     cp_entries = self.get_classpath_entries_for_targets(targets, transitive=transitive)
     return [(conf, cp_entry.path) for conf, cp_entry in cp_entries]
 
@@ -221,6 +229,7 @@ class ClasspathProducts(object):
     :returns: The ordered (conf, classpath entry) tuples.
     :rtype: list of (string, :class:`ClasspathEntry`)
     """
+    self._nope(transitive, True)
     classpath_tuples = self._classpaths.get_for_targets(targets, transitive)
     if respect_excludes:
       return self._filter_by_excludes(classpath_tuples, targets, transitive)
@@ -242,6 +251,7 @@ class ClasspathProducts(object):
     :returns: The ordered (conf, classpath entry) tuples.
     :rtype: list of (string, :class:`ArtifactClasspathEntry`)
     """
+    self._nope(transitive, True)
     classpath_tuples = self.get_classpath_entries_for_targets(targets,
                                                               transitive=transitive,
                                                               respect_excludes=respect_excludes)
@@ -263,6 +273,7 @@ class ClasspathProducts(object):
     :returns: The ordered (conf, classpath entry) tuples.
     :rtype: list of (string, :class:`ClasspathEntry`)
     """
+    self._nope(transitive, True)
     classpath_tuples = self.get_classpath_entries_for_targets(targets,
                                                               transitive=transitive,
                                                               respect_excludes=respect_excludes)

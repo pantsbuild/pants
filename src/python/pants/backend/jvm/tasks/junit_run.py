@@ -286,12 +286,13 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       for batch in self._partition(tests):
         # Batches of test classes will likely exist within the same targets: dedupe them.
         relevant_targets = set(map(tests_to_targets.get, batch))
-        classpath = self.classpath(relevant_targets,
-                                   classpath_prefix=self.tool_classpath('junit'),
-                                   classpath_product=classpath_product)
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
-        complete_classpath.update(classpath)
+        complete_classpath.update(self.tool_classpath('junit'))
+        for relevant_target in relevant_targets:
+          complete_classpath.update(self.classpath(relevant_target.closure(bfs=True),
+                                                   classpath_product=classpath_product,
+                                                   transitive=False))
         complete_classpath.update(classpath_append)
         distribution = self.preferred_jvm_distribution([platform])
         with binary_util.safe_args(batch, self.get_options()) as batch_tests:
