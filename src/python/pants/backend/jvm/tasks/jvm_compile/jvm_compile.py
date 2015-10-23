@@ -522,8 +522,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                  compile_context,
                                  extra_compile_time_classpath):
     # Generate a classpath specific to this compile and target.
-    target_closure = compile_context.target.closure(bfs=True)
-    return ClasspathUtil.compute_classpath(target_closure, classpath_products,
+    if compile_context.target.strict_deps:
+      classpath_targets = compile_context.target.dependencies
+    else:
+      classpath_targets = compile_context.target.closure(bfs=True)
+    return ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
                                            extra_compile_time_classpath, self._confs)
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):

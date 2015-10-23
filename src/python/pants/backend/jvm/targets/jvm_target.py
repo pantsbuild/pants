@@ -63,6 +63,8 @@ class JvmTarget(Target, Jarable):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
+    strict_deps = JvmPlatform.global_instance().strict_deps if strict_deps is None else strict_deps
+
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
@@ -85,10 +87,10 @@ class JvmTarget(Target, Jarable):
   def strict_deps(self):
     """Whether to limit compile time deps for this target to those that are directly declared.
 
-    :return: See the constructor.
+    :return: See constructor.
     :rtype: bool
     """
-    return JvmPlatform.global_instance().get_strict_deps_for_target(self)
+    return self.payload.strict_deps
 
   @property
   def platform(self):

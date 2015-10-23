@@ -84,14 +84,12 @@ class JvmPlatform(Subsystem):
     platform_name = '(DistributionLocator.cached().version {})'.format(source_level)
     return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
 
-  def get_strict_deps_for_target(self, target):
-    """Whether to limit compile time deps for the given target to those that are directly declared.
-
-    :param JvmTarget target: target to query.
+  @property
+  def strict_deps(self):
+    """Whether to limit compile time deps by default to those that are directly declared.
     :rtype: bool
     """
-    value = target.payload.strict_deps.value
-    return value if value is not None else self.get_options().strict_deps
+    return self.get_options().strict_deps
 
   @memoized_property
   def default_platform(self):
