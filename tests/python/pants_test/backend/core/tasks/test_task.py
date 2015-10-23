@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
+import pytest
+
 from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
