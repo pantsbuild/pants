@@ -80,6 +80,8 @@ class SourceRootTest(BaseTest):
     self.assertIsNone(trie.find('my/project/mysrc/scalastuff/org/pantsbuild/foo/Foo.scala'))
 
   def test_all_roots(self):
+    self.create_dir('contrib/go/examples/3rdparty/go')
+    self.create_dir('contrib/go/examples/src/go')
     self.create_dir('src/java')
     self.create_dir('src/python')
     self.create_dir('src/example/java')
@@ -89,11 +91,16 @@ class SourceRootTest(BaseTest):
 
     options = {
       'source_root_patterns': ['src/*', 'src/example/*'],
+      # Test that our 'go_remote' hack works.
+      # TODO: This will be redundant once we have proper "3rdparty"/"remote" support.
+      'source_roots': { 'contrib/go/examples/3rdparty/go': ['go_remote'] }
     }
     options.update(self.options[''])  # We need inherited values for pants_workdir etc.
 
     source_roots = create_subsystem(SourceRootConfig, **options).get_source_roots()
-    self.assertEquals({SourceRoot('src/java', ('java',)),
+    self.assertEquals({SourceRoot('contrib/go/examples/3rdparty/go', ('go_remote',)),
+                       SourceRoot('contrib/go/examples/src/go', ('go',)),
+                       SourceRoot('src/java', ('java',)),
                        SourceRoot('src/python', ('python',)),
                        SourceRoot('src/example/java', ('java',)),
                        SourceRoot('src/example/python', ('python',)),
