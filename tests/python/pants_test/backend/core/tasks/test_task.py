@@ -105,6 +105,8 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(vtA.results_dir, vtB.results_dir)
     self.assertEqual(vtA.results_dir, vtC.results_dir)
 
+  # See https://github.com/pantsbuild/pants/issues/2446
+  @pytest.mark.xfail
   def test_incremental_transitive_invalidation(self):
     """Run twice, with an upstream fingerprint change.
 
