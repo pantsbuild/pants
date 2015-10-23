@@ -35,7 +35,8 @@ def create_digraph(execution_graph):
 
   yield 'digraph plans {'
   yield '  node[colorscheme={}];'.format(colorscheme)
-  yield '  rankdir=LR;'
+  yield '  concentrate=true;'
+  yield '  splines=polyline;'
 
   for product_type, plan in execution_graph.walk():
     label = format_label(product_type, plan)
@@ -88,8 +89,8 @@ def visualize_execution_graph(execution_graph):
 
 
 def visualize_build_request(build_root, build_request):
-  _, global_scheduler = setup_json_scheduler(build_root)
-  execution_graph = global_scheduler.execution_graph(build_request)
+  _, scheduler = setup_json_scheduler(build_root)
+  execution_graph = scheduler.execution_graph(build_request)
   visualize_execution_graph(execution_graph)
 
 
