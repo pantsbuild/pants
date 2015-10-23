@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.build_environment import get_buildroot
@@ -252,9 +254,12 @@ class ClasspathProducts(object):
             if not isinstance(cp_entry, ArtifactClasspathEntry)]
 
   def _filter_by_excludes(self, classpath_tuples, root_targets):
-    excludes = self._excludes.get_for_targets(root_targets)
-    return filter(_not_excluded_filter(excludes),
-                  classpath_tuples)
+    # Excludes are always applied transitively, so regardless of whether a transitive
+    # set of targets was included here, their closure must be included.
+    excludes = OrderedSet()
+    for root_target in root_targets:
+      excludes.update(self._excludes.get_for_targets(root_target.closure(bfs=True)))
+    return filter(_not_excluded_filter(excludes), classpath_tuples)
 
   def _add_excludes_for_target(self, target):
     if target.is_exported:
