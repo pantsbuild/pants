@@ -155,13 +155,13 @@ def register_goals():
   task(name='scaladoc', action=ScaladocGen).install('doc')
 
   # Bundling.
-  task(name='jar', action=JarCreate).install('jar')
+  task(name='create', action=JarCreate).install('jar')
   detect_duplicates = task(name='dup', action=DuplicateDetector)
 
-  task(name='binary', action=BinaryCreate).install().with_description('Create a runnable binary.')
+  task(name='jvm', action=BinaryCreate).install('binary').with_description('Create a runnable binary.')
   detect_duplicates.install('binary')
 
-  task(name='bundle', action=BundleCreate).install().with_description(
+  task(name='jvm', action=BundleCreate).install('bundle').with_description(
       'Create an application bundle from binary targets.')
   detect_duplicates.install('bundle')
 

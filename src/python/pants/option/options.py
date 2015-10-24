@@ -12,6 +12,7 @@ from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, enclosing_scope
+from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
 
 

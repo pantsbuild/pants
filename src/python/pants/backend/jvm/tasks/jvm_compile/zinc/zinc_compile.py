@@ -96,9 +96,9 @@ class ZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--plugins', advanced=True, action='append', fingerprint=True,
+    register('--scalac-plugins', advanced=True, action='append', fingerprint=True,
              help='Use these scalac plugins.')
-    register('--plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
+    register('--scalac-plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')
     # TODO: disable by default because it breaks dependency parsing:
     #   https://github.com/pantsbuild/pants/issues/2224
