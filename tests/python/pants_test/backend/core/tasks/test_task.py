@@ -39,6 +39,8 @@ class DummyTask(Task):
     with self.invalidated(self.context.targets()) as invalidation:
       assert len(invalidation.invalid_vts) == 1
       vt = invalidation.invalid_vts[0]
+      if vt.is_incremental:
+        assert os.path.isdir(vt.previous_results_dir)
       with open(os.path.join(get_buildroot(), vt.target.source), 'r') as infile:
         outfile_name = os.path.join(vt.results_dir, os.path.basename(vt.target.source))
         with open(outfile_name, 'a') as outfile:
