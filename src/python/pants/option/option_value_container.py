@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
+
 from pants.option.ranked_value import RankedValue
 
 
@@ -32,6 +34,8 @@ class OptionValueContainer(object):
 
      Note that only reads are forwarded. The target of the forward must be written to directly.
      If the source attribute is set directly, this overrides any forwarding.
+
+     TODO: Does this functionality justify the complexity (and runtime cost)? Probably not.
 
   2) Value ranking.
 
@@ -110,6 +114,13 @@ class OptionValueContainer(object):
       return getattr(self, key)
     else:
       return default
+
+  def __copy__(self):
+    # Ensure that shallow copying correctly copies the forwardings.
+    ret = type(self)()
+    ret.__dict__ = self.__dict__.copy()
+    ret._forwardings = self._forwardings.copy()
+    return ret
 
   def __setattr__(self, key, value):
     if key == '_forwardings':
