@@ -42,8 +42,7 @@ def no_qa_line(request):
   """Py Test fixture to create a testing file for single line filters"""
   request.cls.no_qa_line = PythonFile.from_statement(textwrap.dedent("""
     print('This is not fine')
-    print('This is fine')  # noqa
-  """))
+    print('This is fine')  # noqa"""))
 
 
 @pytest.fixture()
@@ -52,8 +51,7 @@ def no_qa_file(request):
   request.cls.no_qa_file = PythonFile.from_statement(textwrap.dedent("""
       # checkstyle: noqa
       print('This is not fine')
-      print('This is fine')
-  """))
+      print('This is fine')"""))
 
 
 @pytest.mark.usefixtures('no_qa_file', 'no_qa_line')
