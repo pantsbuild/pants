@@ -170,6 +170,8 @@ class NailgunProtocol(object):
     except cls.TruncatedRead as e:
       raise cls.TruncatedPayloadError('Failed to read nailgun chunk payload ({!r}).'.format(e))
 
+    # In the case we get an otherwise well-formed chunk, check the chunk_type for validity _after_
+    # we've drained the payload from the socket to avoid subsequent reads of a stale payload.
     if chunk_type not in ChunkType.VALID_TYPES:
       raise cls.ProtocolError('invalid chunk type: {}'.format(chunk_type))
 

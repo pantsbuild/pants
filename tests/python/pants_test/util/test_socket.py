@@ -34,9 +34,6 @@ class TestRecvBufferedSocket(unittest.TestCase):
     self.assertFalse(inspect.isbuiltin(self.buf_sock.recv))
     self.assertTrue(inspect.isbuiltin(self.buf_sock.connect))
 
-  def test_from_sock(self):
-    self.assertIsInstance(self.buf_sock, RecvBufferedSocket)
-
   def test_recv(self):
     self.server_sock.sendall(b'A' * 300)
     self.assertEquals(self.buf_sock.recv(1), b'A')

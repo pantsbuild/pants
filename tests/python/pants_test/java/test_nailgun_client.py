@@ -50,7 +50,7 @@ class TestInputReader(unittest.TestCase):
     self.assertFalse(self.input_reader.is_stopped)
     self.input_reader.stop()
     self.assertTrue(self.input_reader.is_stopped)
-    self.assertIsNone(self.input_reader.run())
+    self.input_reader.run()
 
   def test_startable(self):
     self.assertTrue(inspect.ismethod(self.input_reader.start))
@@ -210,13 +210,6 @@ class TestNailgunClient(unittest.TestCase):
 
     with self.assertRaises(NailgunClient.NailgunError):
       self.nailgun_client.execute('test')
-
-  def test_exception_handling(self):
-    """Ensure catching NailgunError also catches NailgunConnectionError."""
-    try:
-      raise NailgunClient.NailgunConnectionError
-    except NailgunClient.NailgunError:
-      pass
 
   def test_repr(self):
     self.assertIsNotNone(repr(self.nailgun_client))

@@ -135,35 +135,6 @@ class TestNailgunProtocol(unittest.TestCase):
     with self.assertRaises(NailgunProtocol.TruncatedPayloadError):
       NailgunProtocol.read_chunk(self.client_sock)
 
-  def test_truncatedread_exception_handling(self):
-    """Ensure catching TruncatedRead catches TruncatedHeaderError and TruncatedPayloadError."""
-    try:
-      raise NailgunProtocol.TruncatedHeaderError('oops')
-    except NailgunProtocol.TruncatedRead:
-      pass
-
-    try:
-      raise NailgunProtocol.TruncatedPayloadError('oops')
-    except NailgunProtocol.TruncatedRead:
-      pass
-
-  def test_protocolerror_exception_handling(self):
-    """Ensure catching ProtocolError catches all Truncated* exceptions."""
-    try:
-      raise NailgunProtocol.TruncatedRead('oops')
-    except NailgunProtocol.ProtocolError:
-      pass
-
-    try:
-      raise NailgunProtocol.TruncatedHeaderError('oops')
-    except NailgunProtocol.ProtocolError:
-      pass
-
-    try:
-      raise NailgunProtocol.TruncatedPayloadError('oops')
-    except NailgunProtocol.ProtocolError:
-      pass
-
   def test_send_start_reading_input(self):
     NailgunProtocol.send_start_reading_input(self.server_sock)
     chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock)

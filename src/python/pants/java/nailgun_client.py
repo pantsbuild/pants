@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class InputReader(threading.Thread):
   def __init__(self, in_fd, sock, chunk_writer, buf_size):
-    threading.Thread.__init__(self)
+    super(InputReader, self).__init__()
     self.daemon = True
     self._stdin = in_fd
     self._sock = sock
