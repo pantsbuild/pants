@@ -41,7 +41,11 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
       jvm_options.append('-Dscala.usejavacp=true')
 
     # NOTE: We execute with no workunit, as capturing REPL output makes it very sluggish.
+    #
+    # NOTE: Disable creating synthetic jar here because the classLoader used by REPL
+    # does not load Class-Path from manifest.
     DistributionLocator.cached().execute_java(classpath=classpath,
                                               main=self.get_options().main,
                                               jvm_options=jvm_options,
-                                              args=self.args)
+                                              args=self.args,
+                                              create_synthetic_jar=False)

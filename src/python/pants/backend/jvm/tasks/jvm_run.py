@@ -98,6 +98,7 @@ class JvmRun(JvmTask):
         workunit_name='run',
         workunit_labels=[WorkUnitLabel.RUN],
         cwd=working_dir,
+        synthetic_jar_dir=self.workdir,
       )
 
       if self.only_write_cmd_line:

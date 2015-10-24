@@ -5,27 +5,25 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
 import unittest
 from contextlib import contextmanager
 
-from mock import Mock, call, patch
+from mock import Mock, patch
 
 from pants.java.executor import Executor
 from pants.java.jar.manifest import Manifest
-from pants.java.util import bundled_classpath, execute_java
+from pants.java.util import execute_java, safe_classpath
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree, touch
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, touch
 
 
 class ExecuteJavaTest(unittest.TestCase):
-  TOO_BIG = OSError(errno.E2BIG, os.strerror(errno.E2BIG))
-  OTHER_OS_ERROR = OSError(errno.EIO, os.strerror(errno.EIO))
-  OTHER_ERROR = RuntimeError()
+  EXECUTOR_ERROR = Executor.Error()
   TEST_MAIN = 'foo.bar.main'
   TEST_CLASSPATH = ['A.jar', 'B.jar']
-  BUNDLED_CLASSPATH = ['C.jar']
+  SAFE_CLASSPATH = ['C.jar']
+  SYNTHETIC_JAR_DIR = 'somewhere'
 
   def setUp(self):
     self.executor = Mock(spec=Executor)
@@ -34,103 +32,85 @@ class ExecuteJavaTest(unittest.TestCase):
     self.runner.run = Mock(return_value=0)
 
   @contextmanager
-  def mock_bundled_classpath_helper(self, argument_list_too_long=False):
-    with patch('pants.java.util.bundled_classpath') as mock_bundled_classpath:
-      yield mock_bundled_classpath
+  def mock_safe_classpath_helper(self, create_synthetic_jar=True):
+    with patch('pants.java.util.safe_classpath') as mock_safe_classpath:
+      mock_safe_classpath.side_effect = fake_safe_classpath
+      yield mock_safe_classpath
 
-    if not argument_list_too_long:
-      self.executor.runner.assert_called_once_with(self.TEST_CLASSPATH, self.TEST_MAIN,
-                                                   args=None, jvm_options=None, cwd=None)
-      self.runner.run.assert_called_once_with()
-      mock_bundled_classpath.assert_not_called()
+    self.runner.run.assert_called_once_with()
+    if create_synthetic_jar:
+      self.executor.runner.assert_called_once_with(self.SAFE_CLASSPATH, self.TEST_MAIN,
+                                                    args=None, jvm_options=None, cwd=None)
+      mock_safe_classpath.assert_called_once_with(self.TEST_CLASSPATH, self.SYNTHETIC_JAR_DIR)
     else:
-      self.executor.runner.assert_has_calls([
-        call(self.TEST_CLASSPATH, self.TEST_MAIN, args=None, jvm_options=None, cwd=None),
-        call(self.BUNDLED_CLASSPATH, self.TEST_MAIN, args=None, jvm_options=None, cwd=None)
-      ])
-      self.runner.run.assert_has_calls([call(), call()])
-      mock_bundled_classpath.assert_called_once_with(self.TEST_CLASSPATH)
+      self.executor.runner.assert_called_once_with(self.TEST_CLASSPATH, self.TEST_MAIN,
+                                                    args=None, jvm_options=None, cwd=None)
+      mock_safe_classpath.assert_not_called()
 
   def test_execute_java_no_error(self):
-    with self.mock_bundled_classpath_helper():
+    with self.mock_safe_classpath_helper():
       self.assertEquals(0, execute_java(self.TEST_CLASSPATH, self.TEST_MAIN,
-                                        executor=self.executor))
+                                        executor=self.executor,
+                                        synthetic_jar_dir=self.SYNTHETIC_JAR_DIR))
 
-  def test_execute_java_other_os_error(self):
-    self.runner.run.side_effect = self.OTHER_OS_ERROR
+  def test_execute_java_executor_error(self):
+    with self.mock_safe_classpath_helper():
+      self.runner.run.side_effect = self.EXECUTOR_ERROR
 
-    with self.mock_bundled_classpath_helper():
-      with self.assertRaises(type(self.OTHER_OS_ERROR)):
-        execute_java(self.TEST_CLASSPATH, self.TEST_MAIN, executor=self.executor)
+      with self.assertRaises(type(self.EXECUTOR_ERROR)):
+        execute_java(self.TEST_CLASSPATH, self.TEST_MAIN, executor=self.executor,
+                     synthetic_jar_dir=self.SYNTHETIC_JAR_DIR)
 
-  def test_execute_java_other_error(self):
-    self.runner.run.side_effect = self.OTHER_ERROR
-
-    with self.mock_bundled_classpath_helper():
-      with self.assertRaises(type(self.OTHER_ERROR)):
-        execute_java(self.TEST_CLASSPATH, self.TEST_MAIN, executor=self.executor)
-
-  def test_execute_java_argument_list_too_long(self):
-    with self.mock_bundled_classpath_helper(argument_list_too_long=True) as mock_bundled_classpath:
-      mock_bundled_classpath.side_effect = fake_bundled_classpath
-      self.runner.run.side_effect = [self.TOO_BIG, 0]
+  def test_execute_java_no_synthentic_jar(self):
+    with self.mock_safe_classpath_helper(create_synthetic_jar=False):
       self.assertEquals(0, execute_java(self.TEST_CLASSPATH, self.TEST_MAIN,
-                                        executor=self.executor))
-
-  def test_execute_java_argument_list_too_long_still_fail(self):
-    with self.mock_bundled_classpath_helper(argument_list_too_long=True) as mock_bundled_classpath:
-      mock_bundled_classpath.side_effect = fake_bundled_classpath
-
-      # still may fail with OTHER_ERROR error
-      self.runner.run.side_effect = [self.TOO_BIG, self.OTHER_ERROR]
-      with self.assertRaises(type(self.OTHER_ERROR)):
-        execute_java(self.TEST_CLASSPATH, self.TEST_MAIN, executor=self.executor)
-
-  def test_execute_java_argument_list_too_long_still_fail_still_too_long(self):
-    with self.mock_bundled_classpath_helper(argument_list_too_long=True) as mock_bundled_classpath:
-      mock_bundled_classpath.side_effect = fake_bundled_classpath
-
-      # very unlikely but still may fail with TOO_BIG error
-      self.runner.run.side_effect = [self.TOO_BIG, self.TOO_BIG]
-      with self.assertRaises(type(self.TOO_BIG)):
-        execute_java(self.TEST_CLASSPATH, self.TEST_MAIN, executor=self.executor)
+                                        executor=self.executor,
+                                        create_synthetic_jar=False))
 
 
-@contextmanager
-def fake_bundled_classpath(classpath):
-  yield ExecuteJavaTest.BUNDLED_CLASSPATH
+def fake_safe_classpath(classpath, synthetic_jar_dir):
+  return ExecuteJavaTest.SAFE_CLASSPATH
 
 
-class BundledClasspathTest(unittest.TestCase):
-  def test_bundled_classpath(self):
-    """This creates the following classpath
-      basedir/libs/A.jar:basedir/resources
+class SafeClasspathTest(unittest.TestCase):
+  def test_safe_classpath(self):
+    """For directory structure like:
+
+       ./
+       ./libs/A.jar
+       ./libs/resources/
+       ./synthetic_jar_dir
+
+       Verify a synthetic jar with the following classpath in manifest is created:
+
+        Class-Path: ../libs/A.jar:../libs/resources/
     """
     RESOURCES = 'resources'
     LIB_DIR = 'libs'
     JAR_FILE = 'A.jar'
+    SYNTHENTIC_JAR_DIR = 'synthetic_jar_dir'
 
     basedir = safe_mkdtemp()
     lib_dir = os.path.join(basedir, LIB_DIR)
+    synthetic_jar_dir = os.path.join(basedir, SYNTHENTIC_JAR_DIR)
     resource_dir = os.path.join(lib_dir, RESOURCES)
     jar_file = os.path.join(lib_dir, JAR_FILE)
 
-    for dir in (lib_dir, resource_dir):
+    for dir in (lib_dir, resource_dir, synthetic_jar_dir):
       safe_mkdir(dir)
     touch(jar_file)
 
     classpath = [jar_file, resource_dir]
 
-    with bundled_classpath(classpath) as bundled_cp:
-      self.assertEquals(1, len(bundled_cp))
-      bundled_jar = bundled_cp[0]
-      self.assertTrue(os.path.exists(bundled_jar))
+    safe_cp = safe_classpath(classpath, synthetic_jar_dir)
+    self.assertEquals(1, len(safe_cp))
+    safe_jar = safe_cp[0]
+    self.assertTrue(os.path.exists(safe_jar))
+    self.assertEquals(synthetic_jar_dir, os.path.dirname(safe_jar))
 
-      with open_zip(bundled_jar) as synthetic_jar:
-        self.assertListEqual([Manifest.PATH], synthetic_jar.namelist())
-        # manifest should contain the absolute path of both jar and resource directory
-        self.assertEquals('{}: {} {}/\n'.format(Manifest.CLASS_PATH, os.path.realpath(jar_file),
-                                                os.path.realpath(resource_dir)),
-                          synthetic_jar.read(Manifest.PATH).replace('\n ', ''))
-
-    safe_rmtree(resource_dir)
+    with open_zip(safe_jar) as synthetic_jar:
+      self.assertListEqual([Manifest.PATH], synthetic_jar.namelist())
+      # manifest should contain the absolute path of both jar and resource directory
+      self.assertEquals('{}: ../{}/{} ../{}/{}/\n'.format(Manifest.CLASS_PATH, LIB_DIR, JAR_FILE,
+                                                          LIB_DIR, RESOURCES),
+                        synthetic_jar.read(Manifest.PATH).replace('\n ', ''))
