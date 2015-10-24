@@ -82,7 +82,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
   def test_scalac_debug_symbol(self):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
                          expected_files=['HelloScalac.class', 'scalac-plugin.xml'],
-                         extra_args=['--compile-zinc-debug-symbol']) as found:
+                         extra_args=['--compile-zinc-debug-symbols']) as found:
       pass
 
   def test_zinc_unsupported_option(self):

@@ -111,7 +111,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
-    register('--debug-symbol', default=False, action='store_true', fingerprint=True,
+    register('--debug-symbols', default=False, action='store_true', fingerprint=True,
              help='Compile with debug symbol enabled.')
 
     register('--debug-symbol-args', advanced=True, action='append', fingerprint=True,
@@ -264,7 +264,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     else:
       self._args.extend(self.get_options().no_warning_args)
 
-    if self.get_options().debug_symbol:
+    if self.get_options().debug_symbols:
       self._args.extend(self.get_options().debug_symbol_args)
 
     # The ivy confs for which we're building.
