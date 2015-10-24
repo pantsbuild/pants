@@ -109,6 +109,15 @@ class Payload(object):
     else:
       return hasher.hexdigest()
 
+  def mark_dirty(self):
+    """Invalidates memoized fingerprints for this payload.
+
+    Exposed for testing.
+    """
+    self._fingerprint_memo_map = {}
+    for field in self._fields.values():
+      field.mark_dirty()
+
   def __getattr__(self, attr):
     field = self._fields[attr]
     if field is not None:

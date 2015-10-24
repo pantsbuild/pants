@@ -81,44 +81,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
 
-  def test_junit_test_with_emma(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'test',
-          'examples/tests/java//org/pantsbuild/example/hello/greet',
-          'examples/tests/scala/org/pantsbuild/example/hello/welcome',
-          '--interpreter=CPython>=2.6,<3',
-          '--interpreter=CPython>=3.3',
-          '--test-junit-coverage-processor=emma',
-          '--test-junit-coverage',
-          '--test-junit-coverage-jvm-options=-Xmx1g',
-          '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
-          workdir)
-      self.assert_success(pants_run)
-      self._assert_junit_output(workdir)
-      # TODO(Eric Ayers): Why does  emma puts coverage.xml in a different directory from cobertura?
-      self.assertTrue(os.path.exists(
-        os.path.join(workdir, 'test', 'junit', 'coverage', 'coverage.xml')))
-      self.assertTrue(os.path.exists(
-        os.path.join(workdir, 'test', 'junit', 'coverage', 'html', 'index.html')))
-
-    # Look for emma report in stdout_data:
-    # 23:20:21 00:02       [emma-report][EMMA v2.1.5320 (stable) report, generated Mon Oct 13 ...
-    self.assertIn('[emma-report]', pants_run.stdout_data)
-
-    # See if the two test classes ended up generating data in the coverage report.
-    lines = pants_run.stdout_data.split('\n')
-    in_package_report = False
-    package_report = ""
-    for line in lines:
-      if 'COVERAGE BREAKDOWN BY PACKAGE:' in line:
-        in_package_report = True
-      if in_package_report:
-        package_report += line
-
-    self.assertIn('org.pantsbuild.example.hello.welcome', package_report)
-    self.assertIn('org.pantsbuild.example.hello.greet', package_report)
-
   def test_junit_test_requiring_cwd_fails_without_option_specified(self):
     pants_run = self.run_pants([
         'test',

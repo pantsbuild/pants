@@ -38,7 +38,6 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:thrift_util',
     'src/python/pants/option',
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
 )
@@ -93,7 +92,6 @@ python_library(
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
 )

@@ -354,7 +354,6 @@ class GoalRunner(object):
       self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
       raise
     finally:
-      self._run_tracker.end()
       # Must kill nailguns only after run_tracker.end() is called, otherwise there may still
       # be pending background work that needs a nailgun.
       if should_kill_nailguns:

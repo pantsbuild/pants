@@ -151,9 +151,11 @@ class SourceRootConfig(Subsystem):
     # Go requires some special-case handling of source roots.  In particular, go buildgen assumes
     # that there's a single source root for local code and (optionally) a single source root
     # for remote code.  This fixed source root shows how to capture that distinction.
+    # Go repos may need to add their own appropriate special cases in their pants.ini, until we fix this hack.
     # TODO: Treat third-party/remote code as a separate category (akin to 'source' and 'test').
     # Then this hack won't be necessary.
-    '3rdparty/go': ['go_remote']
+    '3rdparty/go': ('go_remote', ),
+    'contrib/go/examples/3rdparty/go': ('go_remote', )
   }
 
   _DEFAULT_TEST_ROOTS = {

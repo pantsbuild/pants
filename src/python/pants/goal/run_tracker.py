@@ -273,7 +273,6 @@ class RunTracker(Subsystem):
 
     Note: If end() has been called once, subsequent calls are no-ops.
     """
-
     if self._background_worker_pool:
       if self._aborted:
         self.log(Report.INFO, "Aborting background workers.")

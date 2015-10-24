@@ -2,24 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'address',
-  sources = ['address.py'],
-  dependencies = [
-    ':deprecated',
-    'src/python/pants/build_graph'
-  ]
-)
-
-python_library(
-  name = 'address_lookup_error',
-  sources = ['address_lookup_error.py'],
-  dependencies = [
-    ':deprecated',
-    'src/python/pants/build_graph'
-  ]
-)
-
-python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
@@ -155,9 +137,8 @@ python_library(
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':address',
-    ':address_lookup_error',
     ':build_file',
+    'src/python/pants/build_graph',
   ],
 )
 

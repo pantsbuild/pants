@@ -41,6 +41,16 @@ class NodeTask(Task):
     """Returns `True` if the given target is a `NodeRemoteModule`."""
     return isinstance(target, NodeRemoteModule)
 
+  @classmethod
+  def render_npm_package_dependency(cls, node_paths, target):
+    """Return representation string of an NpmPackage target for a package.json dependencies hash.
+
+    :param node_paths: A NodePaths object
+    :param target: An NpmPackage target
+    :return: String to be used as the value for the NpmPackage in a package.json dependencies hash
+    """
+    return node_paths.node_path(target) if cls.is_node_module(target) else target.version
+
   def execute_node(self, args, workunit_name=None, workunit_labels=None, **kwargs):
     """Executes node passing the given args.
 

@@ -21,6 +21,16 @@ python_library(
 )
 
 python_library(
+  name='engine',
+  sources=['engine.py'],
+  dependencies=[
+    'src/python/pants/base:exceptions',
+    'src/python/pants/engine/exp:scheduler',
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
@@ -68,7 +78,10 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/exp:addressable',
     'src/python/pants/engine/exp:objects',
+    'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ]
 )

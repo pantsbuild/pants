@@ -1,7 +1,0 @@
-{{! Finalize reporting for a finished tool invocation. }}
-<script>
-  $('#{{workunit.id}}-header-text').addClass('{{status}}'); $('#{{workunit.id}}-spinner').hide()
-  pants.poller.stopTailing('{{workunit.id}}_stdout');
-  pants.poller.stopTailing('{{workunit.id}}_stderr');
-</script>
-
