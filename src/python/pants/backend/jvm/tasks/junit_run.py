@@ -104,7 +104,8 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
                           custom_rules=[
                             Shader.exclude_package('junit.framework', recursive=True),
                             Shader.exclude_package('org.junit', recursive=True),
-                            Shader.exclude_package('org.hamcrest', recursive=True)
+                            Shader.exclude_package('org.hamcrest', recursive=True),
+                            Shader.exclude_package('org.pantsbuild.junit.annotations', recursive=True),
                           ])
     # TODO: Yuck, but will improve once coverage steps are in their own tasks.
     for c in [Coverage, Cobertura]:
