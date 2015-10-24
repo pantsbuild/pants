@@ -393,7 +393,7 @@ def setup_json_scheduler(build_root):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
   :rtype tuple of (:class:`pants.engine.exp.graph.Graph`,
-                   :class:`pants.engine.exp.scheduler.GlobalScheduler`)
+                   :class:`pants.engine.exp.scheduler.LocalScheduler`)
   """
   symbol_table = {'apache_thrift_configuration': ApacheThriftConfiguration,
                   'jar': Jar,
