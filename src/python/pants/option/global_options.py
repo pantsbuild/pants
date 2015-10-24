@@ -42,8 +42,8 @@ class GlobalOptionsRegistrar(Optionable):
     logging.addLevelName(logging.WARNING, 'WARN')
     register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
              help='Set the logging level.')
-    register('-q', '--quiet', action='store_true',
-             help='Squelches all console output apart from errors.')
+    register('-q', '--quiet', action='store_true', recursive=True,
+             help='Squelches most console output.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
     register('--colors', action='store_true', default=True, recursive=True,
@@ -55,9 +55,7 @@ class GlobalOptionsRegistrar(Optionable):
     # registration serves in part as documentation of the dependency.
     # TODO(John Sirois): Move pantsbuild.pants bootstrapping into pants itself and have it use this
     # version option directly.
-    register('-V', '--pants-version', '--version',  # NB: pants_version is the 1st long option
-                                                    # since that's the one read from pants.ini;
-                                                    # the version form only works from the CLI.
+    register('-V', '--pants-version',
              nargs='?',  # Allows using the flag with no args on the CLI to print version as well
                          # as setting the version in pants.ini
              default=pants_version(),  # Displays the current version correctly in `./pants -h`.
@@ -139,9 +137,9 @@ class GlobalOptionsRegistrar(Optionable):
              default=[register.bootstrap.pants_workdir],
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
-    register('--fail-fast', advanced=True, action='store_true',
-             help='When parsing specs, will stop on the first erronous BUILD file encountered. '
-                  'Otherwise, will parse all builds in a spec and then display an error.')
+    register('--fail-fast', advanced=True, action='store_true', recursive=True,
+             help='Exit as quickly as possible on error, rather than attempting to continue '
+                  'to process the non-erroneous subset of the input.')
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,

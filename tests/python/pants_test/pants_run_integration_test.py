@@ -149,7 +149,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param args: optional arguments to pass to executable
     :return: stdout as a string on success, raises an Exception on error
     """
-    pants_run = self.run_pants(['bundle', '--archive=zip', target])
+    pants_run = self.run_pants(['bundle.jvm', '--archive=zip', target])
     self.assert_success(pants_run)
 
     # TODO(John Sirois): We need a zip here to suck in external library classpath elements
