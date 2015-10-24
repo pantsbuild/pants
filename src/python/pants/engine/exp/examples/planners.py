@@ -11,12 +11,13 @@ from abc import abstractmethod, abstractproperty
 
 from twitter.common.collections import OrderedSet
 
+from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
-from pants.engine.exp.scheduler import GlobalScheduler, Plan, Planners, Subject, Task, TaskPlanner
+from pants.engine.exp.scheduler import LocalScheduler, Plan, Planners, Subject, Task, TaskPlanner
 from pants.engine.exp.targets import Sources as AddressableSources
 from pants.engine.exp.targets import Target
 from pants.util.memo import memoized, memoized_property
@@ -156,8 +157,8 @@ class ThriftPlanner(TaskPlanner):
     """
 
   @abstractmethod
-  def plan_parameters(self, config):
-    """Return a dict of any extra parameters besides sources needed to execute the code gen plan.
+  def plan_parameters(self, scheduler, product_type, subject, config):
+    """Return a dict of any extra parameters besides `sources` needed to execute the code gen plan.
 
     :rtype: dict
     """
@@ -176,10 +177,8 @@ class ThriftPlanner(TaskPlanner):
       return None
 
     subject = Subject(subject, alternate=Target(dependencies=config.deps))
-    return Plan(task_type=self.gen_task_type,
-                subjects=(subject,),
-                sources=thrift_sources,
-                **self.plan_parameters(config))
+    inputs = self.plan_parameters(scheduler, product_type, subject, config)
+    return Plan(task_type=self.gen_task_type, subjects=(subject,), sources=thrift_sources, **inputs)
 
 
 class ApacheThriftConfiguration(ThriftConfiguration):
@@ -225,7 +224,7 @@ class ApacheThriftPlanner(ThriftPlanner):
                        .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
     return configs[0]
 
-  def plan_parameters(self, apache_thrift_config):
+  def plan_parameters(self, scheduler, product_type, subject, apache_thrift_config):
     return dict(rev=apache_thrift_config.rev,
                 gen=apache_thrift_config.gen,
                 strict=apache_thrift_config.strict)
@@ -274,13 +273,19 @@ class ScroogePlanner(ThriftPlanner):
                        .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
     return configs[0]
 
-  def plan_parameters(self, scrooge_config):
-    return dict(rev=scrooge_config.rev, lang=scrooge_config.lang, strict=scrooge_config.strict)
+  def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
+    scrooge_classpath = scheduler.promise(Address.parse('src/scala/scrooge'), Classpath)
+    return dict(scrooge_classpath=scrooge_classpath,
+                lang=scrooge_config.lang,
+                strict=scrooge_config.strict)
 
 
 class Scrooge(PrintingTask):
-  def execute(self, sources, rev, lang, strict):
-    return super(Scrooge, self).execute(sources=sources, rev=rev, lang=lang, strict=strict)
+  def execute(self, sources, scrooge_classpath, lang, strict):
+    return super(Scrooge, self).execute(sources=sources,
+                                        scrooge_classpath=scrooge_classpath,
+                                        lang=lang,
+                                        strict=strict)
 
 
 class JvmCompilerPlanner(TaskPlanner):
@@ -337,9 +342,8 @@ class JvmCompilerPlanner(TaskPlanner):
     for dep, dep_config in self.iter_configured_dependencies(subject):
       # This could recurse to us (or be satisfied by IvyResolve, another jvm compiler, etc.
       # depending on the dep type).
-      internal_cp_promise = scheduler.promise(dep, Classpath, configuration=dep_config)
-      if internal_cp_promise:
-        classpath_promises.append(internal_cp_promise)
+      classpath = scheduler.promise(dep, Classpath, configuration=dep_config, required=True)
+      classpath_promises.append(classpath)
 
     return Plan(task_type=self.compile_task_type,
                 subjects=(subject,),
@@ -394,10 +398,10 @@ def setup_json_scheduler(build_root):
                               build_pattern=r'^BLD.json$',
                               parser=json_parser))
 
-  planners = [ApacheThriftPlanner(),
-              GlobalIvyResolvePlanner(),
-              JavacPlanner(),
-              ScalacPlanner(),
-              ScroogePlanner()]
-  global_scheduler = GlobalScheduler(graph, Planners(planners))
-  return graph, global_scheduler
+  planners = Planners([ApacheThriftPlanner(),
+                       GlobalIvyResolvePlanner(),
+                       JavacPlanner(),
+                       ScalacPlanner(),
+                       ScroogePlanner()])
+  scheduler = LocalScheduler(graph, planners)
+  return graph, scheduler

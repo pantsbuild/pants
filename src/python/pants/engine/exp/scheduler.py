@@ -13,6 +13,7 @@ from collections import defaultdict, namedtuple
 import six
 from twitter.common.collections import OrderedSet
 
+from pants.build_graph.address import Address
 from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable
 from pants.util.memo import memoized_property
@@ -228,11 +229,18 @@ class Scheduler(object):
   def promise(self, subject, product_type, configuration=None, required=True):
     """Return an promise for a product of the given `product_type` for the given `subject`.
 
+    The subject can either be a :class:`pants.engine.exp.objects.Serializable` object or else an
+    :class:`Address`, in which case the promise subject is the addressable, serializable object it
+    points to.
+
+    If a configuration is supplied, the promise is for the requested product in that configuration.
+
     If the promise is required and no production plans can be made a
     :class:`Scheduler.SchedulingError` is raised.
 
-    :param subject: The subject that the product type should be created for.
-    :param product_type: The type of product to promise production of for the given subject.
+    :param object subject: The subject that the product type should be created for.
+    :param type product_type: The type of product to promise production of for the given subject.
+    :param object configuration: An optional requested configuration for the product.
     :param bool required: `False` if the product is not required; `True` by default.
     :returns: A promise to make the given product type available for subject at task execution time
               or None if the promise was not required and no production plans could be made.
@@ -327,6 +335,7 @@ class TaskPlanner(AbstractClass):
     :param type product_type: The type of product this plan should produce given subject when
                               executed.
     :param object subject: The subject of the plan.  Any products produced will be for the subject.
+    :param object configuration: An optional requested configuration for the product.
     """
 
   def finalize_plans(self, plans):
@@ -479,6 +488,7 @@ class Promise(object):
                     natural subject for a request for classfile products.
     :type subject: :class:`Subject` or else any object that will be the primary of the stored
                    `Subject`.
+    :param object configuration: An optional promised configuration for the product.
     """
     self._product_type = product_type
     self._subject = Subject.as_subject(subject)
@@ -493,8 +503,8 @@ class Promise(object):
     return self._subject
 
   def _key(self):
-    # We promise the product_type for the primary subject, the alternate does not affect consume
-    # side identity.
+    # We promise the product_type for the primary subject, the alternate does not affect
+    # consume-side identity.
     return self._product_type, self._subject.primary, self._configuration
 
   def __hash__(self):
@@ -528,9 +538,11 @@ class ProductMapper(object):
     :type plan: :class:`Plan`
     :param primary_subject: An optional primary subject.  If supplied, the registered promise for
                             this subject will be returned.
+    :param object configuration: An optional promised configuration.
     :returns: The promise for the primary subject of one was supplied.
     :rtype: :class:`Promise`
-    :raises:
+    :raises: :class:`ProductMapper.InvalidRegistrationError` if a primary subject was supplied but
+             not a member of the given plan's subjects.
     """
     # Index by all subjects.  This allows dependencies on products from "chunking" tasks, even
     # products from tasks that act globally in the extreme.
@@ -558,10 +570,7 @@ class ProductMapper(object):
 
 
 class LocalScheduler(Scheduler):
-  """A scheduler that formulates an execution graph locally.
-
-  This implementation is synchronous in addition to being local.
-  """
+  """A scheduler that formulates an execution graph locally."""
 
   class NoProducersError(SchedulingError):
     """Indicates no planners were able to promise a required product for a given subject."""
@@ -581,25 +590,30 @@ class LocalScheduler(Scheduler):
                      '\n\t'.join(type(p).__name__ for p in planners)))
       super(LocalScheduler.ConflictingProducersError, self).__init__(msg)
 
-  def __init__(self, planners):
+  def __init__(self, graph, planners):
     """
-    :param planners: All the planners installed in the system.
+    :param graph: The BUILD graph build requests will execute against.
+    :type graph: :class:`pants.engine.exp.graph.Graph`
+    :param planners: All the task planners known to the system.
     :type planners: :class:`Planners`
     """
+    self._graph = graph
     self._planners = planners
     self._product_mapper = ProductMapper()
     self._plans_by_product_type_by_planner = defaultdict(lambda: defaultdict(OrderedSet))
 
-  def formulate_graph(self, goals, subjects):
-    """Formulate the execution graph that satisfies the given `build_request`.
+  def execution_graph(self, build_request):
+    """Create an execution graph that can satisfy the given build request.
 
-    :param goals: The names of the goals to achieve.
-    :type goals: :class:`collections.Iterable` of string
-    :param list subjects: The subjects to attempt the given goals for.
-    :returns: An execution graph of plans, that when reduced
+    :param build_request: The description of the goals to achieve.
+    :type build_request: :class:`BuildRequest`
     :returns: An execution graph of plans that, when reduced, can satisfy the given build request.
+    :rtype: :class:`ExecutionGraph`
     :raises: :class:`LocalScheduler.SchedulingError` if no execution graph solution could be found.
     """
+    goals = build_request.goals
+    subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
+
     root_promises = []
     for goal in goals:
       for planner in self._planners.for_goal(goal):
@@ -626,13 +640,16 @@ class LocalScheduler(Scheduler):
   NO_PLAN = Plan(task_type=None, subjects=())
 
   def promise(self, subject, product_type, configuration=None, required=True):
+    if isinstance(subject, Address):
+      subject = self._graph.resolve(subject)
+
     promise = Promise(product_type, subject, configuration=configuration)
     plan = self._product_mapper.promised(promise)
     if plan is not None:
       # The `NO_PLAN` plan may have been decided in a non-required round.
       if required and promise is self.NO_PLAN:
         raise self.NoProducersError(product_type, subject)
-      return None
+      return None if promise is self.NO_PLAN else promise
 
     planners = self._planners.for_product_type(product_type)
     if required and not planners:
@@ -665,33 +682,3 @@ class LocalScheduler(Scheduler):
                             '{subject!r}:\n\t{plan!r}'.format(subject=subject,
                                                               planner=type(planner).__name__,
                                                               plan=plan))
-
-
-class GlobalScheduler(object):
-  """Generates execution graphs for build requests.
-
-  This is the front-end of the new pants execution engine.
-  """
-
-  def __init__(self, graph, planners):
-    """
-    :param graph: The BUILD graph build requests will execute against.
-    :type graph: :class:`pants.engine.exp.graph.Graph`
-    :param planners: All the task planners known to the system.
-    :type planners: :class:`Planners`
-    """
-    self._graph = graph
-    self._planners = planners
-
-  def execution_graph(self, build_request):
-    """Create an execution graph that can satisfy the given build request.
-
-    :param build_request: The description of the goals to achieve.
-    :type build_request: :class:`BuildRequest`
-    :returns: An execution graph of plans that, when reduced, can satisfy the given build request.
-    :rtype: :class:`ExecutionGraph`
-    """
-    scheduler = LocalScheduler(planners=self._planners)
-    goals = build_request.goals
-    subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
-    return scheduler.formulate_graph(goals, subjects)

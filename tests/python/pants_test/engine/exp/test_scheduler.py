@@ -17,7 +17,7 @@ from pants.engine.exp.scheduler import BuildRequest, Plan, Promise
 class SchedulerTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
-    self.graph, self.global_scheduler = setup_json_scheduler(build_root)
+    self.graph, self.scheduler = setup_json_scheduler(build_root)
 
     self.guava = self.graph.resolve(Address.parse('3rdparty/jvm:guava'))
     self.thrift = self.graph.resolve(Address.parse('src/thrift/codegen/simple'))
@@ -26,7 +26,7 @@ class SchedulerTest(unittest.TestCase):
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = BuildRequest(goals=goals,
                                  addressable_roots=[Address.parse(spec) for spec in root_specs])
-    execution_graph = self.global_scheduler.execution_graph(build_request)
+    execution_graph = self.scheduler.execution_graph(build_request)
 
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
@@ -49,14 +49,14 @@ class SchedulerTest(unittest.TestCase):
     # the scheduler 'pull-seeding' has ApacheThriftPlanner stopping short since the subject it's
     # handed is not thrift.
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.java.address])
-    execution_graph = self.global_scheduler.execution_graph(build_request)
+    execution_graph = self.scheduler.execution_graph(build_request)
 
     plans = list(execution_graph.walk())
     self.assertEqual(0, len(plans))
 
   def test_gen(self):
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.thrift.address])
-    execution_graph = self.global_scheduler.execution_graph(build_request)
+    execution_graph = self.scheduler.execution_graph(build_request)
 
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
@@ -72,7 +72,7 @@ class SchedulerTest(unittest.TestCase):
 
   def test_codegen_simple(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])
-    execution_graph = self.global_scheduler.execution_graph(build_request)
+    execution_graph = self.scheduler.execution_graph(build_request)
 
     plans = list(execution_graph.walk())
     self.assertEqual(4, len(plans))
