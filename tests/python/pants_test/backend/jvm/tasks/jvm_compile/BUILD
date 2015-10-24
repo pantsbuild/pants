@@ -16,3 +16,11 @@ python_library(
     'tests/python/pants_test:int-test',
   ]
 )
+
+python_tests(
+  name='declared_deps_integration',
+  sources=['test_declared_deps_integration.py'],
+  dependencies=[
+    ':base_compile_integration_test',
+  ]
+)

@@ -65,3 +65,15 @@ class BaseCompileIT(PantsRunIntegrationTest):
     files = found[name]
     self.assertEqual(1, len(files))
     return files.pop()
+
+  def do_test_success_and_failure(self, target, success_args, failure_args, shared_args=None):
+    """Ensure that a target fails to build when one arg set is passed, and succeeds for another."""
+    shared_args = shared_args if shared_args else []
+
+    # Check that fatal_args fail.
+    with self.do_test_compile(target, extra_args=(shared_args + failure_args), expect_failure=True):
+      pass
+
+    # Check that args succeed.
+    with self.do_test_compile(target, extra_args=(shared_args + success_args)):
+      pass
