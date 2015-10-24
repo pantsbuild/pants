@@ -208,8 +208,8 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def _emit_indented_workunit_label(self, workunit):
     self.emit(b'\n{} {} {}[{}]'.format(
-      workunit.start_time_string(),
-      workunit.start_delta_string(),
+      workunit.start_time_string,
+      workunit.start_delta_string,
       self._indent(workunit),
       workunit.name if self.settings.indent else workunit.path()))
 
