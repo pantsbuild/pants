@@ -1,6 +1,125 @@
 RELEASE HISTORY
 ===============
 
+0.0.55 (10/23/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+This release has many experimental engine features, as well as general bug fixes and performance improvements.
+
+
+API Changes
+~~~~~~~~~~~
+
+* Remove the deprecated modules, `pants.base.address` and `pants.base.address_lookup_error`.
+
+New Features
+~~~~~~~~~~~~
+
+* Add a --dependencies option to cloc.
+  `RB #3008 <https://rbcommons.com/s/twitter/r/3008>`_
+
+* Add native support for incremental caching, and use it in jvm_compile
+  `RB #2991 <https://rbcommons.com/s/twitter/r/2991>`_
+
+* A CountLinesOfCode task.
+  `RB #3005 <https://rbcommons.com/s/twitter/r/3005>`_
+
+Bugfixes
+~~~~~~~~
+
+* Include JarDependency.excludes when creating cache_key. Add unittest.
+  `RB #3001 <https://rbcommons.com/s/twitter/r/3001>`_
+
+* Added junit.framework to excludes for shading
+  `RB #3017 <https://rbcommons.com/s/twitter/r/3017>`_
+
+* fix failure in test_global_pinger_memo
+  `RB #3007 <https://rbcommons.com/s/twitter/r/3007>`_
+
+* Handle case where only transitive dependencies have changed during an incremental build
+  `Issue #2446 <https://github.com/pantsbuild/pants/issues/2446>`_
+  `RB #3028 <https://rbcommons.com/s/twitter/r/3028>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Add support for config selectors in dep addresses.
+  `RB #3025 <https://rbcommons.com/s/twitter/r/3025>`_
+
+* Support Configurations extending one, merging N.
+  `RB #3023 <https://rbcommons.com/s/twitter/r/3023>`_
+
+* Refactor engine experiment module organization.
+  `RB #3004 <https://rbcommons.com/s/twitter/r/3004>`_
+
+* Implement a custom pickle for Serializables.
+  `RB #3002 <https://rbcommons.com/s/twitter/r/3002>`_
+
+* Introduce the new engine and two implementations.
+  `RB #3000 <https://rbcommons.com/s/twitter/r/3000>`_
+
+* Introduce the 1st cut at the new engine frontend.
+  `RB #2989 <https://rbcommons.com/s/twitter/r/2989>`_
+
+* Prepare the 1st test for the new engine front end.
+  `RB #2988 <https://rbcommons.com/s/twitter/r/2988>`_
+
+* Add a visualization tool for execution plans.
+  `RB #3010 <https://rbcommons.com/s/twitter/r/3010>`_
+
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Overwrite timing stat report files less frequently.
+  `RB #3021 <https://rbcommons.com/s/twitter/r/3021>`_
+
+* Make sure we emit the timing/stats epilog even for quiet tasks.
+  `RB #3019 <https://rbcommons.com/s/twitter/r/3019>`_
+
+* Add a fixed source root for the go_remote dir in contrib/go.
+  `RB #3027 <https://rbcommons.com/s/twitter/r/3027>`_
+
+* Restore Sources custom types per extension.
+  `RB #3010 <https://rbcommons.com/s/twitter/r/3010>`_
+  `RB #3011 <https://rbcommons.com/s/twitter/r/3011>`_
+
+* [coverage] Removing emma after its deprecation cycle.
+  `RB #3009 <https://rbcommons.com/s/twitter/r/3009>`_
+
+* Kill _JUnitRunner and move code to the JUnitRun task
+  `RB #2994 <https://rbcommons.com/s/twitter/r/2994>`_
+
+* Make 'list-owners' faster by not instantiating already injected targets
+  `RB #2967 <https://rbcommons.com/s/twitter/r/2967>`_
+  `RB #2968 <https://rbcommons.com/s/twitter/r/2968>`_
+
+* Get rid of all bootstrap BUILD files in our repo.
+  `RB #2996 <https://rbcommons.com/s/twitter/r/2996>`_
+
+* Run python checkstyle only on invalidated targets.
+  `RB #2995 <https://rbcommons.com/s/twitter/r/2995>`_
+
+* Switch all internal code to use the new source roots mechanism.
+  `RB #2987 <https://rbcommons.com/s/twitter/r/2987>`_
+
+* Remove jmake and apt members from JvmCompile
+  `RB #2990 <https://rbcommons.com/s/twitter/r/2990>`_
+
+* Leverage fast_relpath in `BuildFileAddressMapper`.
+  `RB #2981 <https://rbcommons.com/s/twitter/r/2981>`_
+
+* Simplify fetcher regexes; doc the '^' assumption.
+  `RB #2980 <https://rbcommons.com/s/twitter/r/2980>`_
+
+* Remove the global codegen strategy from simple_codegen_task
+  `RB #2985 <https://rbcommons.com/s/twitter/r/2985>`_
+
+* Added an explanation to the docs re: who can be added to a review.
+  `RB #2983 <https://rbcommons.com/s/twitter/r/2983>`_
+
 0.0.54 (10/16/2015)
 -------------------
 
@@ -141,7 +260,7 @@ Small improvements, Refactoring and Tooling
 Release Notes
 ~~~~~~~~~~~~~
 
-This is a hotfix release that unpins pants own six requirement from `==1.9` to `>=1.9,<2` to allow
+This is a hotfix release that unpins pants own six requirement from '==1.9' to '>=1.9,<2' to allow
 folks depending on pantsbuild sdists in their own pants built/tested code to successfully resolve
 six.  The underlying issue is yet to be fixed, but is tracked
 `here <https://github.com/pantsbuild/pex/issues/167>`_.

@@ -131,8 +131,8 @@ class VersionedTarget(VersionedTargetSet):
     if allow_incremental and self.previous_cache_key:
       self.is_incremental = True
       old_dir = dirname(self.previous_cache_key)
+      self._previous_results_dir = old_dir
       if os.path.isdir(old_dir) and not os.path.isdir(new_dir):
-        self._previous_results_dir = old_dir
         shutil.copytree(old_dir, new_dir)
     else:
       safe_mkdir(new_dir)

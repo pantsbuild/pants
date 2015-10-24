@@ -72,39 +72,25 @@ def _run(exiter):
   # Launch RunTracker as early as possible (just after Subsystem options are initialized).
   run_tracker, reporting = ReportingInitializer().setup()
 
-  # Determine the build root dir.
-  root_dir = get_buildroot()
+  try:
+    # Determine the build root dir.
+    root_dir = get_buildroot()
 
-  # Capture a repro of the 'before' state for this build, if needed.
-  repro = Reproducer.global_instance().create_repro()
-  if repro:
-    repro.capture(run_tracker.run_info.get_as_dict())
+    # Capture a repro of the 'before' state for this build, if needed.
+    repro = Reproducer.global_instance().create_repro()
+    if repro:
+      repro.capture(run_tracker.run_info.get_as_dict())
 
-  # Set up and run GoalRunner.
-  def run():
+    # Set up and run GoalRunner.
     goal_runner = GoalRunner.Factory(root_dir, options, build_config,
                                      run_tracker, reporting).setup()
-    return goal_runner.run()
+    result = goal_runner.run()
 
-  # Run with profiling, if requested.
-  profile_path = os.environ.get('PANTS_PROFILE')
-  if profile_path:
-    import cProfile
-    profiler = cProfile.Profile()
-    try:
-      result = profiler.runcall(run)
-    finally:
-      profiler.dump_stats(profile_path)
-      print('Dumped profile data to {}'.format(profile_path))
-      view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && '
-                       'open {path}.png'.format(path=profile_path))
-      print('Use, e.g., {} to render and view.'.format(view_cmd))
-  else:
-    result = run()
-
-  if repro:
-    # TODO: Have Repro capture the 'after' state (as a diff) as well?
-    repro.log_location_of_repro_file()
+    if repro:
+      # TODO: Have Repro capture the 'after' state (as a diff) as well?
+      repro.log_location_of_repro_file()
+  finally:
+    run_tracker.end()
 
   exiter.do_exit(result)
 
@@ -113,8 +99,25 @@ def main():
   exiter = _Exiter()
   exiter.set_except_hook()
 
-  try:
+  def do_run():
     _run(exiter)
+
+  try:
+    # Run with profiling, if requested.
+    profile_path = os.environ.get('PANTS_PROFILE')
+    if profile_path:
+      import cProfile
+      profiler = cProfile.Profile()
+      try:
+        profiler.runcall(do_run)
+      finally:
+        profiler.dump_stats(profile_path)
+        print('Dumped profile data to {}'.format(profile_path))
+        view_cmd = green('gprof2dot -f pstats {path} | dot -Tpng -o {path}.png && '
+                         'open {path}.png'.format(path=profile_path))
+        print('Use, e.g., {} to render and view.'.format(view_cmd))
+    else:
+      do_run()
   except KeyboardInterrupt:
     exiter.exit_and_fail('Interrupted by user.')
 

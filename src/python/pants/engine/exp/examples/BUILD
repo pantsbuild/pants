@@ -6,6 +6,7 @@ python_library(
   sources=['planners.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/build_graph',
     'src/python/pants/engine/exp:addressable',
     'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:graph',

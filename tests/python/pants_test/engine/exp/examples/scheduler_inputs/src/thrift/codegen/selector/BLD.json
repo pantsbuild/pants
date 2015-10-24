@@ -1,0 +1,8 @@
+{
+  "type_alias": "target",
+  "extends": "src/thrift:all_jvm_thrift_base",
+  "name": "selector",
+  "sources": {
+    "files": ["selector.thrift"]
+  }
+}
