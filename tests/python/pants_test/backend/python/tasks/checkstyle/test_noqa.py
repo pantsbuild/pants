@@ -78,7 +78,6 @@ class TestPyStyleTask(PythonTaskTestBase):
   def test_noqa_line_filter_length(self):
     """Verify the number of lines filtered is what we expect"""
     nits = list(self.style_check.get_nits(self.no_qa_line))
-    map(print, nits)
     assert len(nits) == 1, ('Actually got nits: {}'.format(
       ' '.join('{}:{}'.format(nit._line_number, nit) for nit in nits)
     ))
