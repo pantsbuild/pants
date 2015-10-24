@@ -51,9 +51,9 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
     path = os.path.join('dist', 'shading.jar')
     with subsystem_instance(DistributionLocator):
       execute_java = DistributionLocator.cached(minimum_version='1.6').execute_java
-      self.assertEquals(0, execute_java(classpath=[path],
+      self.assertEquals(0, execute_java(classpath=path,
                                         main='org.pantsbuild.testproject.shading.Main'))
-      self.assertEquals(0, execute_java(classpath=[path],
+      self.assertEquals(0, execute_java(classpath=path,
                                         main='org.pantsbuild.testproject.foo.bar.MyNameIsDifferentNow'))
 
     received_classes = set()

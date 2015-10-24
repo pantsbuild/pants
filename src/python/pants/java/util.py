@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
 import logging
 import os
+from contextlib import contextmanager
 from zipfile import ZIP_STORED
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -14,7 +16,6 @@ from pants.java.executor import Executor, SubprocessExecutor
 from pants.java.jar.manifest import Manifest
 from pants.java.nailgun_executor import NailgunExecutor
 from pants.util.contextutil import open_zip, temporary_file
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp
 
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,7 @@ logger = logging.getLogger(__name__)
 
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                  workunit_factory=None, workunit_name=None, workunit_labels=None,
-                 cwd=None, workunit_log_config=None, distribution=None,
-                 create_synthetic_jar=True, synthetic_jar_dir=None):
+                 cwd=None, workunit_log_config=None, distribution=None):
   """Executes the java program defined by the classpath and main.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -39,10 +39,6 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
   :param list workunit_labels: an optional sequence of labels for the work unit
   :param string cwd: optionally set the working directory
   :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
-  :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
-    classpath in its manifest.
-  :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
-    a temporary directory will be provided and cleaned up upon process exit.
 
   Returns the exit code of the java program.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
@@ -52,20 +48,25 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     raise ValueError('The executor argument must be a java Executor instance, give {} of type {}'
                      .format(executor, type(executor)))
 
+  runner = executor.runner(classpath, main, args=args, jvm_options=jvm_options, cwd=cwd)
   workunit_name = workunit_name or main
-
-  safe_cp = classpath
-  if create_synthetic_jar:
-    safe_cp = safe_classpath(classpath, synthetic_jar_dir)
-    logger.debug('Bundling classpath {} into {}'.format(':'.join(classpath), safe_cp))
-
-  runner = executor.runner(safe_cp, main, args=args, jvm_options=jvm_options, cwd=cwd)
-  return execute_runner(runner,
-                        workunit_factory=workunit_factory,
-                        workunit_name=workunit_name,
-                        workunit_labels=workunit_labels,
-                        cwd=cwd,
-                        workunit_log_config=workunit_log_config)
+  try:
+    return execute_runner(runner,
+                          workunit_factory=workunit_factory,
+                          workunit_name=workunit_name,
+                          workunit_labels=workunit_labels,
+                          cwd=cwd,
+                          workunit_log_config=workunit_log_config)
+  except OSError as e:
+    if errno.E2BIG == e.errno and len(classpath) > 1:
+      with bundled_classpath(classpath) as bundled_cp:
+        logger.debug('failed with argument list too long error, now bundling classpath {} into {}'
+                     .format(':'.join(classpath), bundled_cp))
+        return execute_java(bundled_cp, main, jvm_options, args, executor,
+                            workunit_factory, workunit_name, workunit_labels,
+                            cwd, workunit_log_config, distribution)
+    else:
+      raise e
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
@@ -103,40 +104,30 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
       return ret
 
 
-# VisibleForTesting
-def safe_classpath(classpath, synthetic_jar_dir):
+@contextmanager
+def bundled_classpath(classpath):
   """Bundles classpath into one synthetic jar that includes original classpath in its manifest.
 
-  This is to ensure classpath length never exceeds platform ARG_MAX. Original classpath are
-  converted to URLs relative to synthetic jar path and saved in its manifest as attribute
-  `Class-Path`. See
-  https://docs.oracle.com/javase/7/docs/technotes/guides/extensions/spec.html#bundled
+  See https://docs.oracle.com/javase/7/docs/technotes/guides/extensions/spec.html#bundled
 
   :param list classpath: Classpath to be bundled.
-  :param string synthetic_jar_dir: directory to store the synthetic jar, if `None`
-    a temp directory will be provided and cleaned up upon process exit. Otherwise synthetic
-    jar will remain in the supplied directory, only for debugging purpose.
 
   :returns: A classpath (singleton list with just the synthetic jar).
   :rtype: list of strings
   """
-  def prepare_url(url, root_dir):
-    url_in_bundle = os.path.relpath(os.path.realpath(url), os.path.realpath(root_dir))
+  def prepare_url(url):
+    url_in_bundle = os.path.realpath(url)
     # append '/' for directories, those not ending with '/' are assumed to be jars
     if os.path.isdir(url):
       url_in_bundle += '/'
     return url_in_bundle
 
-  if synthetic_jar_dir:
-    safe_mkdir(synthetic_jar_dir)
-  else:
-    synthetic_jar_dir = safe_mkdtemp()
-  bundled_classpath = [prepare_url(url, synthetic_jar_dir) for url in classpath]
+  bundled_classpath = [prepare_url(url) for url in classpath]
 
   manifest = Manifest()
   manifest.addentry(Manifest.CLASS_PATH, ' '.join(bundled_classpath))
 
-  with temporary_file(root_dir=synthetic_jar_dir, cleanup=False, suffix='.jar') as jar_file:
+  with temporary_file(cleanup=False, suffix='.jar') as jar_file:
     with open_zip(jar_file, mode='w', compression=ZIP_STORED) as jar:
       jar.writestr(Manifest.PATH, manifest.contents())
-    return [jar_file.name]
+    yield [jar_file.name]
