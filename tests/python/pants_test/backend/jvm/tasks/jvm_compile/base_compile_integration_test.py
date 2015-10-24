@@ -70,10 +70,10 @@ class BaseCompileIT(PantsRunIntegrationTest):
     """Ensure that a target fails to build when one arg set is passed, and succeeds for another."""
     shared_args = shared_args if shared_args else []
 
-    # Check that fatal_args fail.
-    with self.do_test_compile(target, extra_args=(shared_args + failure_args), expect_failure=True):
+    # Check that success_args succeed.
+    with self.do_test_compile(target, extra_args=(shared_args + success_args)):
       pass
 
-    # Check that args succeed.
-    with self.do_test_compile(target, extra_args=(shared_args + success_args)):
+    # Check that failure_args fail.
+    with self.do_test_compile(target, extra_args=(shared_args + failure_args), expect_failure=True):
       pass

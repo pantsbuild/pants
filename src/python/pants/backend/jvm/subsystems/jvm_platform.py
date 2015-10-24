@@ -59,7 +59,7 @@ class JvmPlatform(Subsystem):
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
     register('--strict-deps', advanced=True, default=False, action='store_true',
-             help='The default for the "strict_deps" argument for targets for this language.')
+             help='The default for the "strict_deps" argument for jvm targets.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -86,7 +86,7 @@ class JvmPlatform(Subsystem):
 
   @property
   def strict_deps(self):
-    """Whether to limit compile time deps by default to those that are directly declared.
+    """Whether to limit compile time deps to those that are directly declared by a target.
     :rtype: bool
     """
     return self.get_options().strict_deps
