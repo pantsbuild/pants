@@ -33,21 +33,6 @@ class NpmResolveTest(TaskTestBase):
     task = self.create_task(self.context(target_roots=[target]))
     task.execute()
 
-  def test_resolve_remote(self):
-    typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
-
-    context = self.context(target_roots=[typ])
-    task = self.create_task(context)
-    task.execute()
-
-    node_paths = context.products.get_data(NodePaths)
-    node_path = node_paths.node_path(typ)
-    self.assertIsNotNone(node_path)
-
-    script = 'var typ = require("typ"); console.log("type of boolean is: " + typ.BOOLEAN)'
-    out = task.node_distribution.node_command(args=['--eval', script]).check_output(cwd=node_path)
-    self.assertIn('type of boolean is: boolean', out)
-
   def test_resolve_simple(self):
     typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
 
@@ -76,11 +61,11 @@ class NpmResolveTest(TaskTestBase):
     typ1 = self.make_target(spec='3rdparty/node:typ1',
                             target_type=NodeRemoteModule,
                             package_name='typ',
-                            version='0.6.1')
+                            version='0.6.x')
     typ2 = self.make_target(spec='3rdparty/node:typ2',
                             target_type=NodeRemoteModule,
                             package_name='typ',
-                            version='0.6.x')
+                            version='0.6.1')
 
     self.create_file('src/node/util/typ.js', contents=dedent("""
       var typ = require('typ');
@@ -113,7 +98,14 @@ class NpmResolveTest(TaskTestBase):
     node_path = node_paths.node_path(leaf)
     self.assertIsNotNone(node_paths.node_path(leaf))
 
-    # Verify dependencies are de-duped
+    # Verify the 'typ' package is not duplicated under leaf. The target dependency tree is:
+    # leaf
+    #   typ2 (0.6.1)
+    #   util
+    #     typ1 (0.6.x)
+    # If we install leaf normally, NPM will install the typ2 target (typ version 0.6.1) at the top
+    # level under leaf, and then not install the typ1 target (typ version 0.6.x) under util
+    # because the dependency is already satisfied.
     typ_packages = []
     for root, _, files in os.walk(node_path):
       for f in files:
@@ -122,9 +114,9 @@ class NpmResolveTest(TaskTestBase):
             package = json.load(fp)
             if 'typ' == package['name']:
               typ_packages.append(os.path.relpath(os.path.join(root, f), node_path))
-    self.assertEqual(1, len(typ_packages),
-                     'Expected to find exactly 1 de-duped `typ` package, but found these:\n\t{}'
-                     .format('\n\t'.join(sorted(typ_packages))))
+              self.assertEqual(1, len(typ_packages),
+                              'Expected to find exactly 1 de-duped `typ` package, but found these:'
+                              '\n\t{}'.format('\n\t'.join(sorted(typ_packages))))
 
     script_path = os.path.join(node_path, 'leaf.js')
     out = task.node_distribution.node_command(args=[script_path]).check_output()

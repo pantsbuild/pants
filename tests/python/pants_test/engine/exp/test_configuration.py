@@ -31,14 +31,6 @@ class ConfigurationTest(unittest.TestCase):
     self.assertEqual('Subclass', Subclass().type_alias)
     self.assertEqual('aliased_subclass', Subclass(type_alias='aliased_subclass').type_alias)
 
-  def test_extend_and_merge(self):
-    # Resolution should be lazy, so - although its invalid to both extend and merge, we should be
-    # able to create the config.
-    config = Configuration(extends=Configuration(), merges=Configuration())
-    with self.assertRaises(ValidationError):
-      # But we should fail when we go to actually inherit.
-      config.create()
-
   def test_extend(self):
     extends = Configuration(age=32, label='green', items=[],
                             extends=Configuration(age=42, other=True, items=[1, 2]))
@@ -51,10 +43,10 @@ class ConfigurationTest(unittest.TestCase):
 
   def test_merge(self):
     merges = Configuration(age=32, items=[3], knobs={'b': False},
-                           merges=Configuration(age=42,
-                                                other=True,
-                                                items=[1, 2],
-                                                knobs={'a': True, 'b': True}))
+                           merges=[Configuration(age=42,
+                                                 other=True,
+                                                 items=[1, 2],
+                                                 knobs={'a': True, 'b': True})])
 
     # Merging is lazy, so we don't pick up the other field yet.
     self.assertNotEqual(Configuration(age=32,
@@ -65,10 +57,28 @@ class ConfigurationTest(unittest.TestCase):
 
     # But we do pick it up now.
     self.assertEqual(Configuration(age=32,
-                                   items=[1, 2, 3],
-                                   knobs={'a': True, 'b': False},
+                                   items=[3, 1, 2],
+                                   knobs={'a': True, 'b': True},
                                    other=True),
                      merges.create())
+
+  def test_extend_and_merge(self):
+    extends_and_merges = Configuration(age=32, label='green', items=[5],
+                                       extends=Configuration(age=42,
+                                                             other=True,
+                                                             knobs={'a': True},
+                                                             items=[1, 2]),
+                                       merges=[Configuration(age=52,
+                                                             other=False,
+                                                             items=[1, 3, 4],
+                                                             knobs={'a': False, 'b': True}),
+                                               Configuration(items=[2])])
+    self.assertEqual(Configuration(age=32,
+                                   label='green',
+                                   other=True,
+                                   items=[5, 1, 3, 4, 2],
+                                   knobs={'a': False, 'b': True}),
+                     extends_and_merges.create())
 
   def test_validate_concrete(self):
     class Subclass(Configuration):

@@ -16,7 +16,7 @@ Target(
 # can always be built up via a sequence of objects extending or merging others.
 Target(
   name='java1',
-  merges=':production_thrift_configs',
+  merges=[':production_thrift_configs'],
   sources={},
   dependencies=[
     ':thrift2',

@@ -99,7 +99,7 @@
 {
   "type_alias": "Target",
   "name": "indirect_cycle",
-  "merges": ":one"
+  "merges": [":one"]
 }
 
 {

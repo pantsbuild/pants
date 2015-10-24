@@ -102,8 +102,10 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
                           # @Before, as well as other annotations, but there is also the Assert 
                           # class and some subset of the @Rules, @Theories and @RunWith APIs.
                           custom_rules=[
+                            Shader.exclude_package('junit.framework', recursive=True),
                             Shader.exclude_package('org.junit', recursive=True),
-                            Shader.exclude_package('org.hamcrest', recursive=True)
+                            Shader.exclude_package('org.hamcrest', recursive=True),
+                            Shader.exclude_package('org.pantsbuild.junit.annotations', recursive=True),
                           ])
     # TODO: Yuck, but will improve once coverage steps are in their own tasks.
     for c in [Coverage, Cobertura]:
@@ -306,6 +308,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
             workunit_name='run',
             workunit_labels=[WorkUnitLabel.TEST],
             cwd=workdir,
+            synthetic_jar_dir=self.workdir,
           ))
 
           if result != 0 and self._fail_fast:
