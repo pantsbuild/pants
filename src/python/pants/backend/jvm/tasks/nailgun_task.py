@@ -88,7 +88,7 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     # Creating synthetic jar to work around system arg length limit is not necessary
     # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
     # creating synthetic jar if nailgun is used.
-    create_synthetic_jar= not self.get_options().use_nailgun
+    create_synthetic_jar = not self.get_options().use_nailgun
     try:
       return util.execute_java(classpath=classpath,
                                main=main,
