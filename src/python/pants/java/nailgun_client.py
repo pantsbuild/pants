@@ -21,25 +21,40 @@ logger = logging.getLogger(__name__)
 
 
 class InputReader(threading.Thread):
-  def __init__(self, in_fd, sock, chunk_writer, buf_size):
+  """Reads input from stdin and emits Nailgun 'stdin' chunks over a socket."""
+
+  SELECT_TIMEOUT = 1
+
+  def __init__(self, in_fd, sock, chunk_writer, buf_size, select_timeout=SELECT_TIMEOUT):
+    """
+    :param file in_fd: the input file descriptor (e.g. sys.stdin) to read from.
+    :param socket sock: the socket to emit nailgun protocol chunks over.
+    :param func chunk_writer: a callable to be used for writing the chunks to the socket.
+    :param int buf_size: the buffer size for reads from the file descriptor.
+    :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
+    """
     super(InputReader, self).__init__()
     self.daemon = True
     self._stdin = in_fd
     self._sock = sock
     self._chunk_writer = chunk_writer
     self._buf_size = buf_size
+    self._select_timeout = select_timeout
+    # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._stopped = threading.Event()
 
   @property
   def is_stopped(self):
+    """Indicates whether or not the InputReader is stopped."""
     return self._stopped.is_set()
 
   def stop(self):
+    """Stops the InputReader."""
     self._stopped.set()
 
   def run(self):
     while not self.is_stopped:
-      readable, _, errored = select.select([self._stdin], [], [self._stdin])
+      readable, _, errored = select.select([self._stdin], [], [self._stdin], self._select_timeout)
 
       if self._stdin in errored:
         self.stop()
@@ -168,7 +183,7 @@ class NailgunClient(object):
     environment = dict(self.ENV_DEFAULTS.items() + environment.items())
     cwd = cwd or self._workdir
 
-    # N.B. This can throw NailgunConnectionError (and catchable via NailgunError).
+    # N.B. This can throw NailgunConnectionError (catchable via NailgunError).
     sock = self.try_connect()
 
     session = NailgunClientSession(sock, self._stdin, self._stdout, self._stderr)

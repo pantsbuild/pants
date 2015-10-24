@@ -17,7 +17,7 @@ class RecvBufferedSocket(object):
   def __init__(self, socket, chunk_size=DEFAULT_CHUNK_BYTES, select_timeout=None):
     """
     :param socket socket: The socket.socket object to wrap.
-    :param int chunk_size: The smallest max read size for calls to recv() in bytes (default: 8192).
+    :param int chunk_size: The smallest max read size for calls to recv() in bytes.
     :param float select_timeout: The select timeout for a socket read in seconds. An integer value
                                  effectively makes self.recv non-blocking (default: None, blocking).
     """
@@ -27,7 +27,7 @@ class RecvBufferedSocket(object):
     self._select_timeout = select_timeout
 
   def recv(self, bufsize):
-    """Buffers up to _chunk_size bytes when the internal buffer has less than `bufsize` of data."""
+    """Buffers up to _chunk_size bytes when the internal buffer has less than `bufsize` bytes."""
     assert bufsize > 0, 'a positive bufsize is required'
 
     if len(self._buffer) < bufsize:

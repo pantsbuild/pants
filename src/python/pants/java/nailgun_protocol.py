@@ -183,7 +183,8 @@ class NailgunProtocol(object):
     while 1:
       chunk_type, payload = cls.read_chunk(sock)
       yield chunk_type, payload
-      if chunk_type == ChunkType.EXIT: break
+      if chunk_type == ChunkType.EXIT:
+        break
 
   @classmethod
   def send_start_reading_input(cls, sock):
