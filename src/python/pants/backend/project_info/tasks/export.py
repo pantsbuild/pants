@@ -309,7 +309,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
     """
     mapping = defaultdict(dict)
     jar_products = classpath_products.get_artifact_classpath_entries_for_targets(
-      targets, respect_excludes=False, transitive=False)
+      targets, respect_excludes=False)
     for conf, jar_entry in jar_products:
       conf = jar_entry.coordinate.classifier or 'default'
       mapping[self._jar_id(jar_entry.coordinate)][conf] = jar_entry.cache_path
