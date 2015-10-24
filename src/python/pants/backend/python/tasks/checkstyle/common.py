@@ -79,7 +79,7 @@ class PythonFile(object):
     """
     # Remove the # coding=utf-8 to avoid AST erroneous parse errors
     #   https://bugs.python.org/issue22221
-    lines = [x.decode('utf-8', errors='replace') for x in blob.split('\n')]
+    lines = blob.split('\n')
     if lines and 'coding=utf-8' in lines[0]:
       lines[0] = '#remove coding'
     return '\n'.join(lines).encode('ascii', errors='replace')
@@ -103,7 +103,7 @@ class PythonFile(object):
 
   @classmethod
   def parse(cls, filename):
-    with codecs.open(filename) as fp:
+    with codecs.open(filename, encoding='utf-8') as fp:
       blob = fp.read()
     return cls(blob, filename)
 
