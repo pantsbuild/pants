@@ -33,6 +33,14 @@ class PrintingTask(Task):
     return self.fake_product()
 
 
+def printing_func(func):
+  @functools.wraps(func)
+  def wrapper(**inputs):
+    print('{} being executed with inputs: {}'.format(func.__name__, inputs))
+    return '<<<Fake{}Product>>>'.format(func.__name__)
+  return wrapper
+
+
 class Requirement(Configuration):
   """A setuptools requirement."""
 
@@ -75,7 +83,7 @@ class GlobalIvyResolvePlanner(TaskPlanner):
     if isinstance(subject, Jar):
       # This plan is only used internally, the finalized plan will s/jar/jars/ for a single global
       # resolve.
-      return Plan(task_type=IvyResolve, subjects=(subject,), jar=subject)
+      return Plan(func_or_task_type=IvyResolve, subjects=(subject,), jar=subject)
 
   def finalize_plans(self, plans):
     subjects = set()
@@ -83,7 +91,7 @@ class GlobalIvyResolvePlanner(TaskPlanner):
     for plan in plans:
       subjects.update(plan.subjects)
       jars.add(plan.jar)
-    global_plan = Plan(task_type=IvyResolve, subjects=subjects, jars=list(jars))
+    global_plan = Plan(func_or_task_type=IvyResolve, subjects=subjects, jars=list(jars))
     return [global_plan]
 
 
@@ -150,10 +158,10 @@ class ThriftPlanner(TaskPlanner):
     """
 
   @abstractproperty
-  def gen_task_type(self):
-    """Return the type of the code gen task.
+  def gen_func(self):
+    """Return the code gen function.
 
-    :rtype: type
+    :rtype: function
     """
 
   @abstractmethod
@@ -178,7 +186,7 @@ class ThriftPlanner(TaskPlanner):
 
     subject = Subject(subject, alternate=Target(dependencies=config.deps))
     inputs = self.plan_parameters(scheduler, product_type, subject, config)
-    return Plan(task_type=self.gen_task_type, subjects=(subject,), sources=thrift_sources, **inputs)
+    return Plan(func_or_task_type=self.gen_func, subjects=(subject,), sources=thrift_sources, **inputs)
 
 
 class ApacheThriftConfiguration(ThriftConfiguration):
@@ -194,8 +202,8 @@ class ApacheThriftConfiguration(ThriftConfiguration):
 
 class ApacheThriftPlanner(ThriftPlanner):
   @property
-  def gen_task_type(self):
-    return ApacheThrift
+  def gen_func(self):
+    return gen_apache_thrift
 
   @memoized_property
   def _product_type_by_lang(self):
@@ -230,9 +238,9 @@ class ApacheThriftPlanner(ThriftPlanner):
                 strict=apache_thrift_config.strict)
 
 
-class ApacheThrift(PrintingTask):
-  def execute(self, sources, rev, gen, strict):
-    return super(ApacheThrift, self).execute(sources=sources, rev=rev, gen=gen, strict=strict)
+@printing_func
+def gen_apache_thrift(sources, rev, gen, strict):
+  pass
 
 
 class ScroogeConfiguration(ThriftConfiguration):
@@ -247,8 +255,8 @@ class ScroogeConfiguration(ThriftConfiguration):
 
 class ScroogePlanner(ThriftPlanner):
   @property
-  def gen_task_type(self):
-    return Scrooge
+  def gen_func(self):
+    return gen_scrooge_thrift
 
   @memoized_property
   def _product_type_by_lang(self):
@@ -274,18 +282,18 @@ class ScroogePlanner(ThriftPlanner):
     return configs[0]
 
   def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
+    # This will come via an option default.
+    # TODO(John Sirois): once the options system is plumbed, make the tool spec configurable.
+    # It could also just be pointed at the scrooge jar at that point.
     scrooge_classpath = scheduler.promise(Address.parse('src/scala/scrooge'), Classpath)
     return dict(scrooge_classpath=scrooge_classpath,
                 lang=scrooge_config.lang,
                 strict=scrooge_config.strict)
 
 
-class Scrooge(PrintingTask):
-  def execute(self, sources, scrooge_classpath, lang, strict):
-    return super(Scrooge, self).execute(sources=sources,
-                                        scrooge_classpath=scrooge_classpath,
-                                        lang=lang,
-                                        strict=strict)
+@printing_func
+def gen_scrooge_thrift(sources, scrooge_classpath, lang, strict):
+  pass
 
 
 class JvmCompilerPlanner(TaskPlanner):
@@ -345,7 +353,7 @@ class JvmCompilerPlanner(TaskPlanner):
       classpath = scheduler.promise(dep, Classpath, configuration=dep_config, required=True)
       classpath_promises.append(classpath)
 
-    return Plan(task_type=self.compile_task_type,
+    return Plan(func_or_task_type=self.compile_task_type,
                 subjects=(subject,),
                 sources=sources,
                 classpath=classpath_promises)
@@ -385,7 +393,7 @@ def setup_json_scheduler(build_root):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
   :rtype tuple of (:class:`pants.engine.exp.graph.Graph`,
-                   :class:`pants.engine.exp.scheduler.GlobalScheduler`)
+                   :class:`pants.engine.exp.scheduler.LocalScheduler`)
   """
   symbol_table = {'apache_thrift_configuration': ApacheThriftConfiguration,
                   'jar': Jar,

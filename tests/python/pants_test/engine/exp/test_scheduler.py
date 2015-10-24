@@ -9,8 +9,8 @@ import os
 import unittest
 
 from pants.build_graph.address import Address
-from pants.engine.exp.examples.planners import (ApacheThrift, Classpath, IvyResolve, Jar, Javac,
-                                                Sources, setup_json_scheduler)
+from pants.engine.exp.examples.planners import (Classpath, IvyResolve, Jar, Javac, Sources,
+                                                gen_apache_thrift, setup_json_scheduler)
 from pants.engine.exp.scheduler import BuildRequest, Plan, Promise
 
 
@@ -30,7 +30,7 @@ class SchedulerTest(unittest.TestCase):
 
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
-    self.assertEqual((Classpath, Plan(task_type=IvyResolve, subjects=jars, jars=list(jars))),
+    self.assertEqual((Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=list(jars))),
                      plans[0])
 
   def test_resolve(self):
@@ -62,7 +62,7 @@ class SchedulerTest(unittest.TestCase):
     self.assertEqual(1, len(plans))
 
     self.assertEqual((Sources.of('.java'),
-                      Plan(task_type=ApacheThrift,
+                      Plan(func_or_task_type=gen_apache_thrift,
                            subjects=[self.thrift],
                            strict=True,
                            rev='0.9.2',
@@ -85,25 +85,25 @@ class SchedulerTest(unittest.TestCase):
 
     # Independent leaves 1st
     self.assertEqual({(Sources.of('.java'),
-                       Plan(task_type=ApacheThrift,
+                       Plan(func_or_task_type=gen_apache_thrift,
                             subjects=[self.thrift],
                             strict=True,
                             rev='0.9.2',
                             gen='java',
                             sources=['src/thrift/codegen/simple/simple.thrift'])),
-                      (Classpath, Plan(task_type=IvyResolve, subjects=jars, jars=jars))},
+                      (Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=jars))},
                      set(plans[0:2]))
 
     # The rest is linked.
     self.assertEqual((Classpath,
-                      Plan(task_type=Javac,
+                      Plan(func_or_task_type=Javac,
                            subjects=[self.thrift],
                            sources=Promise(Sources.of('.java'), self.thrift),
                            classpath=[Promise(Classpath, jar) for jar in thrift_jars])),
                      plans[2])
 
     self.assertEqual((Classpath,
-                      Plan(task_type=Javac,
+                      Plan(func_or_task_type=Javac,
                            subjects=[self.java],
                            sources=['src/java/codegen/simple/Simple.java'],
                            classpath=[Promise(Classpath, self.guava),

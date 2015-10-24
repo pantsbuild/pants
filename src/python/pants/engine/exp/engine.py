@@ -31,12 +31,12 @@ class Engine(AbstractClass):
     def failure(cls, exit_code):
       return cls(exit_code=exit_code, root_products=None)
 
-  def __init__(self, global_scheduler):
+  def __init__(self, local_scheduler):
     """
-    :param global_scheduler: The global scheduler for creating execution graphs.
-    :type global_scheduler: :class:`GlobalScheduler`
+    :param local_scheduler: The local scheduler for creating execution graphs.
+    :type local_scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
     """
-    self._global_scheduler = global_scheduler
+    self._local_scheduler = local_scheduler
 
   def execute(self, build_request):
     """Executes the the requested build.
@@ -46,7 +46,7 @@ class Engine(AbstractClass):
     :returns: The result of the run.
     :rtype: :class:`Engine.Result`
     """
-    execution_graph = self._global_scheduler.execution_graph(build_request)
+    execution_graph = self._local_scheduler.execution_graph(build_request)
     try:
       root_products = self.reduce(execution_graph)
       return self.Result.success(root_products)
@@ -96,14 +96,14 @@ def _execute_plan(func, product_type, subjects, *args, **kwargs):
 class LocalMultiprocessEngine(Engine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, global_scheduler, pool_size=0):
+  def __init__(self, local_scheduler, pool_size=0):
     """
-    :param global_scheduler: The global scheduler for creating execution graphs.
-    :type global_scheduler: :class:`GlobalScheduler`
+    :param local_scheduler: The local scheduler for creating execution graphs.
+    :type local_scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
     :param pool: A multiprocessing process pool.
     :type pool: :class:`multiprocessing.Pool`
     """
-    super(LocalMultiprocessEngine, self).__init__(global_scheduler)
+    super(LocalMultiprocessEngine, self).__init__(local_scheduler)
     self._pool_size = pool_size if pool_size > 0 else multiprocessing.cpu_count()
     self._pool = multiprocessing.Pool(self._pool_size)
 
