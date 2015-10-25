@@ -19,6 +19,7 @@ GLOBAL_SCOPE = ''
 
 
 class ArgSplitterError(Exception):
+  """ArgSplitter Exception subclass"""
   pass
 
 
@@ -43,6 +44,8 @@ class HelpRequest(AbstractClass):
 
 
 class OptionsHelp(HelpRequest):
+  """User requested help."""
+
   def __init__(self, advanced=False, all_scopes=False):
     """The user requested help for cmd-line options.
 
@@ -58,6 +61,10 @@ class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
 
   def __init__(self, unknown_goals):
+    """Handle unknown goals specifed by user.
+
+    :param unknown_goals: goals provided by the user that we were unable to match
+    """
     super(UnknownGoalHelp, self).__init__()
     self.unknown_goals = unknown_goals
 
@@ -85,18 +92,28 @@ class ArgSplitter(object):
   _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS
 
   def __init__(self, known_scope_infos):
-    self._known_scope_infos = known_scope_infos
+    """Handle splitting command line args into sets of scoped flags and targets
+
+    Arguments are stored in a reverse order in self._unconsummed args in order
+    to be able to efficiently pop arguments off.
+    """
+    # Note: For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
+    #   cmd line, as an alternative to ... scope --flag-name.
+    #
     # TODO: Get rid of our reliance on known scopes here. We don't really need it now
-    # that we heuristically identify target specs based on it containing /, : or being
-    # a top-level directory.
+    #   that we heuristically identify target specs based on it containing /, : or being
+    #   a top-level directory.
+    self._known_scope_infos = known_scope_infos
     self._known_scopes = (set([si.scope for si in known_scope_infos]) |
                           {'help', 'help-advanced', 'help-all'})
-    self._unknown_scopes = []
-    self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
-    self._help_request = None  # Will be set if we encounter any help flags.
 
-    # For convenience, and for historical reasons, we allow --scope-flag-name anywhere on the
-    # cmd line, as an alternative to ... scope --flag-name.
+    self._goals = OrderedSet()
+    self._passthru = []
+    self._scope_to_flags = {}
+    self._targets = []
+    self._unconsumed_args = []  # In reverse order, for efficient popping off the end.
+    self._unknown_scopes = []
+    self.help_request = None  # Will be set if we encounter any help flags.
 
     # We check for prefixes in reverse order, so we match the longest prefix first.
     sorted_scope_infos = sorted(filter(lambda si: si.scope, self._known_scope_infos),
@@ -106,22 +123,71 @@ class ArgSplitter(object):
     self._known_scoping_prefixes = [('{0}-'.format(si.scope.replace('.', '-')), si)
                                     for si in sorted_scope_infos]
 
-  @property
-  def help_request(self):
-    return self._help_request
-
   def _check_for_help_request(self, arg):
-    if not arg in self._HELP_ARGS:
-      return False
-    # First ensure that we have a basic OptionsHelp.
-    if not self._help_request:
-      self._help_request = OptionsHelp()
+    """Check if arg is help request or not"""
+    return arg in self._HELP_ARGS
+
+  def _setup_help_request(self, arg):
+    """Setup help request to have an instance of OptionsHelp"""
+
+    def is_advanced(arg):
+      return self.help_request.advanced or arg in self._HELP_ADVANCED_ARGS
+
+    def is_all_scopes(arg):
+      return self.help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
+
+    # Setup base instance if it doesn't exist
+    if not self.help_request:
+      self.help_request = OptionsHelp()
     # Now see if we need to enhance it.
-    if isinstance(self._help_request, OptionsHelp):
-      advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
-      all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
-      self._help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
-    return True
+    if isinstance(self.help_request, OptionsHelp):
+      advanced = is_advanced(arg)
+      all_scopes = is_all_scopes(arg)
+      self.help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
+
+  def _initialize_scope(self, scope):
+    """Create empty scope if not in scope to flags"""
+    if scope not in self._scope_to_flags:
+      self._scope_to_flags[scope] = []
+
+  def _assign_flag_to_scope(self, flag, default_scope):
+    """Assign flag to the scope specified"""
+    flag_scope, descoped_flag = self._descope_flag(flag, default_scope=default_scope)
+    if flag_scope not in self._scope_to_flags:
+      self._scope_to_flags[flag_scope] = []
+    self._scope_to_flags[flag_scope].append(descoped_flag)
+
+  def _assign_flags_to_scope(self, flags, scope):
+    """Assign all flags to the scope specified"""
+    for flag in flags:
+      self._assign_flag_to_scope(flag, scope)
+
+  def _consume_scoped_args(self):
+    """Process with scoped args"""
+    passthru_owner = None
+    for scope, flags in self._consume_scope():
+      if not self._check_for_help_request(scope.lower()):
+        self._initialize_scope(scope)
+        self._goals.add(scope.partition('.')[0])
+        passthru_owner = scope
+        self._assign_flags_to_scope(flags, scope)
+      else:
+        self._setup_help_request(scope.lower())
+    return passthru_owner
+
+  def _consume_global_args(self):
+    "Process global args and stop"
+    while self._unconsumed_args and not self._at_double_dash():
+      arg = self._next_unconsumed
+      if arg.startswith(b'-'):
+        if self._check_for_help_request(arg):
+          self._setup_help_request(arg)
+        else:
+          self._assign_flag_to_scope(arg, GLOBAL_SCOPE)  # We assume args in global scope
+      elif os.path.sep in arg or ':' in arg or os.path.isdir(arg):
+        self._targets.append(arg)
+      elif arg not in self._known_scopes:
+        self._unknown_scopes.append(arg)
 
   def split_args(self, args=None):
     """Split the specified arg list (or sys.argv if unspecified).
@@ -130,72 +196,45 @@ class ArgSplitter(object):
 
     Returns a SplitArgs tuple.
     """
-    goals = OrderedSet()
-    scope_to_flags = {}
-
-    def add_scope(s):
-      # Force the scope to appear, even if empty.
-      if s not in scope_to_flags:
-        scope_to_flags[s] = []
-
-    targets = []
-    passthru = []
-    passthru_owner = None
 
     self._unconsumed_args = list(reversed(sys.argv if args is None else args))
     # In regular use the first token is the binary name, so skip it. However tests may
     # pass just a list of flags, so don't skip it in that case.
     if not self._at_flag() and self._unconsumed_args:
-      self._unconsumed_args.pop()
+      self._next_unconsumed
     if self._unconsumed_args and self._unconsumed_args[-1] == 'goal':
       # TODO: Temporary warning. Eventually specifying 'goal' will be an error.
       print("WARNING: Specifying 'goal' explicitly is no longer necessary, and deprecated.",
             file=sys.stderr)
-      self._unconsumed_args.pop()
-
-    def assign_flag_to_scope(flag, default_scope):
-      flag_scope, descoped_flag = self._descope_flag(flag, default_scope=default_scope)
-      if flag_scope not in scope_to_flags:
-        scope_to_flags[flag_scope] = []
-      scope_to_flags[flag_scope].append(descoped_flag)
+      self._next_unconsumed
 
     global_flags = self._consume_flags()
 
-    add_scope(GLOBAL_SCOPE)
-    for flag in global_flags:
-      assign_flag_to_scope(flag, GLOBAL_SCOPE)
-    scope, flags = self._consume_scope()
-    while scope:
-      if not self._check_for_help_request(scope.lower()):
-        add_scope(scope)
-        goals.add(scope.partition('.')[0])
-        passthru_owner = scope
-        for flag in flags:
-          assign_flag_to_scope(flag, scope)
-      scope, flags = self._consume_scope()
+    self._initialize_scope(GLOBAL_SCOPE)
+    self._assign_flags_to_scope(global_flags, GLOBAL_SCOPE)
+    passthru_owner = self._consume_scoped_args()
+    self._consume_global_args()
 
-    while self._unconsumed_args and not self._at_double_dash():
-      arg = self._unconsumed_args.pop()
-      if arg.startswith(b'-'):
-        # We assume any args here are in global scope.
-        if not self._check_for_help_request(arg):
-          assign_flag_to_scope(arg, GLOBAL_SCOPE)
-      elif os.path.sep in arg or ':' in arg or os.path.isdir(arg):
-        targets.append(arg)
-      elif arg not in self._known_scopes:
-        self._unknown_scopes.append(arg)
-
+    # Double dash pass through to underlying command.
     if self._at_double_dash():
-      self._unconsumed_args.pop()
-      passthru = list(reversed(self._unconsumed_args))
+      self._next_unconsumed
+      self._passthru = list(reversed(self._unconsumed_args))
 
+    # Set appropriate help request if needed.
     if self._unknown_scopes:
-      self._help_request = UnknownGoalHelp(self._unknown_scopes)
+      self.help_request = UnknownGoalHelp(self._unknown_scopes)
 
-    if not goals and not self._help_request:
-      self._help_request = NoGoalHelp()
+    if not self._goals and not self.help_request:
+      self.help_request = NoGoalHelp()
 
-    return SplitArgs(goals, scope_to_flags, targets, passthru, passthru_owner if passthru else None)
+    passthru_owner = passthru_owner if self._passthru else None
+    return SplitArgs(
+      self._goals,
+      self._scope_to_flags,
+      self._targets,
+      self._passthru,
+      passthru_owner
+    )
 
   def _consume_scope(self):
     """Returns a pair (scope, list of flags encountered in that scope).
@@ -209,18 +248,21 @@ class ArgSplitter(object):
     --compile-java-partition-size-hint should be treated as if it were --partition-size-hint=100
     in the compile.java scope.
     """
-    if not self._at_scope():
-      return None, []
-    scope = self._unconsumed_args.pop()
-    flags = self._consume_flags()
-    return scope, flags
+    while self._at_scope():
+      scope = self._next_unconsumed
+      if not scope:
+        return
+      else:
+        yield scope, self._consume_flags()
 
   def _consume_flags(self):
     """Read flags until we encounter the first token that isn't a flag."""
     flags = []
     while self._at_flag():
-      flag = self._unconsumed_args.pop()
-      if not self._check_for_help_request(flag):
+      flag = self._next_unconsumed
+      if self._check_for_help_request(flag):
+        self._setup_help_request(flag)
+      else:
         flags.append(flag)
     return flags
 
@@ -248,13 +290,24 @@ class ArgSplitter(object):
           return scope, flag_prefix + flag[len(prefix):]
     return default_scope, flag
 
+  @property
+  def _next_unconsumed(self):
+    """Fetch the next unconsumed arg"""
+    return self._unconsumed_args.pop()
+
+  @property
+  def _peek(self):
+    """Safely retrieve the next arg"""
+    return self._unconsumed_args[-1] or ''
+
   def _at_flag(self):
-    return (self._unconsumed_args and
-            self._unconsumed_args[-1].startswith(b'-') and
-            not self._at_double_dash())
+    """Determine if the currently next argument is a flag"""
+    return (self._unconsumed_args and self._peek.startswith(b'-') and not self._at_double_dash())
 
   def _at_scope(self):
-    return self._unconsumed_args and self._unconsumed_args[-1] in self._known_scopes
+    """Determine if the next arg is a scope identifier"""
+    return self._unconsumed_args and self._peek in self._known_scopes
 
   def _at_double_dash(self):
-    return self._unconsumed_args and self._unconsumed_args[-1] == b'--'
+    """Determine if the next arg is a double dash"""
+    return self._unconsumed_args and self._peek == b'--'
