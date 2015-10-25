@@ -61,8 +61,6 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   @classmethod
   def register_options(cls, register):
     super(JUnitRun, cls).register_options(register)
-    register('--fail-fast', action='store_true',
-             help='Fail fast on the first test failure in a suite.')
     register('--batch-size', advanced=True, type=int, default=sys.maxint,
              help='Run at most this many tests in a single test process.')
     register('--test', action='append',

@@ -11,29 +11,7 @@ from pants.option.ranked_value import RankedValue
 class OptionValueContainer(object):
   """A container for option values.
 
-  Implements the following functionality:
-
-  1) Attribute forwarding.
-
-     An attribute can be registered as forwarding to another attribute, and attempts
-     to read the source attribute's value will be read from the target attribute.
-
-     This is necessary so we can qualify registered options by the scope that registered them,
-     to allow re-registration in inner scopes. This is best explained by example:
-
-     Say that in global scope we register an option with two names: [-f, --foo], which writes its
-     value to the attribute foo. Then in the compile scope we re-register --foo but leave -f alone.
-     The re-registered --foo will also write to attribute foo. So now -f, which in the compile
-     scope is unrelated to --foo, can still stomp on its value.
-
-     With attribute forwarding we can have the global scope option write to _DEFAULT_foo__, and
-     the re-registered option to _COMPILE_foo__, and then have the 'f' and 'foo' attributes
-     forward, appropriately.
-
-     Note that only reads are forwarded. The target of the forward must be written to directly.
-     If the source attribute is set directly, this overrides any forwarding.
-
-  2) Value ranking.
+  Implements "value ranking":
 
      Attribute values can be ranked, so that a given attribute's value can only be changed if
      the new value has at least as high a rank as the old value. This allows an option value in
@@ -48,25 +26,14 @@ class OptionValueContainer(object):
   """
 
   def __init__(self):
-    self._forwardings = {}  # src attribute name -> target attribute name.
-
-  def add_forwardings(self, forwardings):
-    """Add attribute forwardings.
-
-    Will overwrite existing forwardings with the same source attributes.
-
-    :param forwardings: A map of source attribute name -> attribute to read source's value from.
-    """
-    self._forwardings.update(forwardings)
+    self._value_map = {}  # key -> either raw value or RankedValue wrapping the raw value.
 
   def get_rank(self, key):
     """Returns the rank of the value at the specified key.
 
     Returns one of the constants in RankedValue.
     """
-    if key not in self._forwardings:
-      raise AttributeError('No such forwarded attribute: {}'.format(key))
-    val = getattr(self, self._forwardings[key])
+    val = self._value_map.get(key)
     if isinstance(val, RankedValue):
       return val.rank
     else:  # Values without rank are assumed to be flag values set by argparse.
@@ -102,21 +69,29 @@ class OptionValueContainer(object):
   def update(self, attrs):
     """Set attr values on this object from the data in the attrs dict."""
     for k, v in attrs.items():
-      setattr(self, k, v)
+      self._set(k, v)
 
   def get(self, key, default=None):
     # Support dict-like dynamic access.  See also __getitem__ below.
-    if hasattr(self, key):
-      return getattr(self, key)
+    if key in self._value_map:
+      return self._get_underlying_value(key)
     else:
       return default
 
-  def __setattr__(self, key, value):
-    if key == '_forwardings':
-      return super(OptionValueContainer, self).__setattr__(key, value)
+  def _get_underlying_value(self, key):
+    # Note that the key may exist with a value of None, so we can't just
+    # test self._value_map.get() for None.
+    if key not in self._value_map:
+      raise AttributeError(key)
+    val = self._value_map[key]
+    if isinstance(val, RankedValue):
+      return val.value
+    else:
+      return val
 
-    if hasattr(self, key):
-      existing_value = getattr(self, key)
+  def _set(self, key, value):
+    if key in self._value_map:
+      existing_value = self._value_map[key]
       if isinstance(existing_value, RankedValue):
         existing_rank = existing_value.rank
       else:
@@ -134,37 +109,29 @@ class OptionValueContainer(object):
     if new_rank >= existing_rank:
       # We set values from outer scopes before values from inner scopes, so
       # in case of equal rank we overwrite. That way that the inner scope value wins.
-      super(OptionValueContainer, self).__setattr__(key, value)
+      self._value_map[key] = value
 
+  # Support natural dynamic access, e.g., opts[foo] is more idiomatic than getattr(opts, 'foo').
   def __getitem__(self, key):
-    # Support natural dynamic access, options[key_var] is more idiomatic than
-    # getattr(option, key_var).
     return getattr(self, key)
 
-  def __getattr__(self, key):
-    # Note: Called only if regular attribute lookup fails, so accesses
-    # to non-forwarded attributes will be handled the normal way.
+  # Support attribute setting, e.g., opts.foo = 42.
+  # This is necessary so that we can be used as an argparse namespace.
+  def __setattr__(self, key, value):
+    if key == '_value_map':
+      return super(OptionValueContainer, self).__setattr__(key, value)
+    self._set(key, value)
 
-    if key == '_forwardings':
+  # Support attribute getting, e.g., foo = opts.foo.
+  # Note: Called only if regular attribute lookup fails,
+  # so method and member access will be handled the normal way.
+  def __getattr__(self, key):
+    if key == '_value_map':
       # In case we get called in copy/deepcopy, which don't invoke the ctor.
-      raise AttributeError
-    if key not in self._forwardings:
-      raise AttributeError('No such forwarded attribute: {}'.format(key))
-    val = getattr(self, self._forwardings[key])
-    if isinstance(val, RankedValue):
-      return val.value
-    else:
-      return val
+      raise AttributeError(key)
+    return self._get_underlying_value(key)
 
   def __iter__(self):
-    """Returns an iterator over all option names, in lexicographical order.
-
-    In the rare (for us) case of an option with multiple names, we pick the
-    lexicographically smallest one, for consistency.
-    """
-    inverse_forwardings = {}  # internal attribute -> external attribute.
-    for k, v in self._forwardings.items():
-      if v not in inverse_forwardings or inverse_forwardings[v] > k:
-        inverse_forwardings[v] = k
-    for name in sorted(inverse_forwardings.values()):
+    """Returns an iterator over all option names, in lexicographical order."""
+    for name in sorted(self._value_map.keys()):
       yield name
