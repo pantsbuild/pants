@@ -191,21 +191,4 @@ aggregation for ivy resolves and tool bootstrapping.
 3. Validate configurations specified in the target graph, ie: a target with java sources should
    probably not be allowed to list a python interpreter configuration.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 [tuple-design]: https://docs.google.com/a/twitter.com/document/d/1MQLmVGHLnA2xlVgnFjwQQeFZRonTbxM1FyBS5sYwyr8/edit?usp=sharing "Tuple Engine Design Doc"
