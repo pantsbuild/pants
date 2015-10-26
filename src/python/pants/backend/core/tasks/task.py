@@ -236,15 +236,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def artifact_cache_writes_enabled(self):
     return self._cache_factory.write_cache_available()
 
-  def invalidate_for_files(self):
-    """Provides extra files that participate in invalidation.
-
-    Subclasses can override and return a list of full paths to extra, non-source files that should
-    be checked for changes when managing target invalidation. This is useful for tracking
-    changes to pre-built build tools, e.g., the thrift compiler.
-    """
-    return []
-
   def invalidate(self):
     """Invalidates all targets for this task."""
     BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
@@ -276,6 +267,26 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     which will automatically be uploaded to the cache. Tasks should place the output files
     for each VersionedTarget in said results directory. It is highly suggested to follow this
     schema for caching, rather than manually making updates to the artifact cache.
+    """
+    return False
+
+  @property
+  def incremental(self):
+    """Whether this Task implements incremental building of individual targets.
+
+    Incremental tasks with `cache_target_dirs` set will have the results_dir of the previous build
+    for a target cloned into the results_dir for the current build (where possible). This
+    copy-on-write behaviour allows for immutability of the results_dir once a target has been
+    marked valid.
+    """
+    return False
+
+  @property
+  def cache_incremental(self):
+    """For incremental tasks, indicates whether the results of incremental builds should be cached.
+
+    Deterministic per-target incremental compilation is a relatively difficult thing to implement,
+    so this property provides an escape hatch to avoid caching things in that riskier case.
     """
     return False
 
@@ -355,9 +366,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       invalidation_check = \
         InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint, colors)
 
-    if self.cache_target_dirs:
-      for vt in invalidation_check.all_vts:
-        vt.create_results_dir(os.path.join(self.workdir, vt.cache_key.hash))
+    self._maybe_create_results_dirs(invalidation_check.all_vts)
 
     if not silent:
       targets = []
@@ -393,10 +402,26 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                       and self.artifact_cache_writes_enabled()
                       and invalidation_check.invalid_vts)
     if write_to_cache:
-      def result_files(vt):
-        return [os.path.join(vt.results_dir, f) for f in os.listdir(vt.results_dir)]
-      pairs = [(vt, result_files(vt)) for vt in invalidation_check.invalid_vts]
+      pairs = []
+      for vt in invalidation_check.invalid_vts:
+        if self._should_cache(vt):
+          pairs.append((vt, [vt.results_dir]))
       self.update_artifact_cache(pairs)
+
+  def _should_cache(self, vt):
+    """Return true if the given vt should be written to a cache (if configured)."""
+    if vt.target.has_label('no_cache'):
+      return False
+    elif not vt.is_incremental or self.cache_incremental:
+      return True
+    else:
+      return False
+
+  def _maybe_create_results_dirs(self, vts):
+    """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
+    if self.cache_target_dirs:
+      for vt in vts:
+        vt.create_results_dir(self.workdir, allow_incremental=self.incremental)
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
@@ -414,14 +439,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return self.do_check_artifact_cache(vts)
 
-  def do_check_artifact_cache(self, vts, post_process_cached_vts=None, cache_hit_callback=None):
+  def do_check_artifact_cache(self, vts, post_process_cached_vts=None):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
     Returns a pair (cached, uncached) of VersionedTargets that were
     satisfied/unsatisfied from the cache.
-
-    :param cache_hit_callback: A serializable function that expects a CacheKey as an argument.
-      Called after a cache hit, but before the cached artifact is extracted.
     """
     if not vts:
       return [], []
@@ -430,7 +452,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     uncached_vts = OrderedSet(vts)
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key, cache_hit_callback) for vt in vts]
+    items = [(read_cache, vt.cache_key, vt.results_dir if vt.has_results_dir else None)
+             for vt in vts]
 
     res = self.context.subproc_map(call_use_cached_files, items)
 
@@ -440,6 +463,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         uncached_vts.discard(vt)
       elif isinstance(was_in_cache, UnreadableArtifact):
         self._cache_key_errors.update(was_in_cache.key)
+
+    self._maybe_create_results_dirs(vts)
 
     # Note that while the input vts may represent multiple targets (for tasks that overrride
     # check_artifact_cache_for), the ones we return must represent single targets.
@@ -459,12 +484,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       - vts is single VersionedTargetSet.
       - artifactfiles is a list of absolute paths to artifacts for the VersionedTargetSet.
     """
-    update_artifact_cache_work = self.get_update_artifact_cache_work(vts_artifactfiles_pairs)
+    update_artifact_cache_work = self._get_update_artifact_cache_work(vts_artifactfiles_pairs)
     if update_artifact_cache_work:
       self.context.submit_background_work_chain([update_artifact_cache_work],
                                                 parent_workunit_name='cache')
 
-  def get_update_artifact_cache_work(self, vts_artifactfiles_pairs):
+  def _get_update_artifact_cache_work(self, vts_artifactfiles_pairs):
     """Create a Work instance to update an artifact cache, if we're configured to.
 
     vts_artifactfiles_pairs - a list of pairs (vts, artifactfiles) where

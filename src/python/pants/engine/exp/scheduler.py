@@ -6,13 +6,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
+import inspect
 from abc import abstractmethod, abstractproperty
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 
 import six
 from twitter.common.collections import OrderedSet
 
+from pants.build_graph.address import Address
+from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable
+from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
@@ -66,6 +70,55 @@ class Subject(object):
     return 'Subject(primary={!r}, alternate={!r})'.format(self._primary, self._alternate)
 
 
+class Binding(namedtuple('Binding', ['func', 'args', 'kwargs'])):
+  """A binding for a plan that can be executed."""
+
+  def execute(self):
+    """Execute this binding and return the result."""
+    return self.func(*self.args, **self.kwargs)
+
+
+class TaskCategorization(namedtuple('TaskCategorization', ['func', 'task_type'])):
+  """An Either type for a function or `Task` type."""
+
+  @classmethod
+  def of_func(cls, func):
+    return cls(func=func, task_type=None)
+
+  @classmethod
+  def of_task_type(cls, task_type):
+    return cls(func=None, task_type=task_type)
+
+  @property
+  def value(self):
+    """Return the underlying func or task type.
+
+    :rtype: function|type
+    """
+    return self.func or self.task_type
+
+
+def _categorize(func_or_task_type):
+  if isinstance(func_or_task_type, TaskCategorization):
+    return func_or_task_type
+  elif inspect.isclass(func_or_task_type):
+    if not issubclass(func_or_task_type, Task):
+      raise ValueError('A task must be a function or else a subclass of Task, given type {}'
+                       .format(func_or_task_type.__name__))
+    return TaskCategorization.of_task_type(func_or_task_type)
+  else:
+    return TaskCategorization.of_func(func_or_task_type)
+
+
+def _execute_binding(categorization, **kwargs):
+  # A picklable top-level function to help support local multiprocessing uses.
+  # TODO(John Sirois): Plumb (context, workdir) or equivalents to the task_type constructor if
+  # maintaining Task as a bridge to convert old style tasks makes sense.  Otherwise, simplify
+  # things and only accept a func.
+  function = categorization.func if categorization.func else categorization.task_type().execute
+  return function(**kwargs)
+
+
 class Plan(Serializable):
   """Represents an production plan that will yield a given product type for one or more subjects.
 
@@ -84,18 +137,25 @@ class Plan(Serializable):
   # toolchain).  For example, pants can intrinsically fetch the Go toolchain in a Task today but it
   # cannot do the same for the jdk and instead only asserts its presence.
 
-  def __init__(self, task_type, subjects, **inputs):
+  def __init__(self, func_or_task_type, subjects, **inputs):
     """
-    :param type task_type: The type of :class:`Task` that will execute this plan.
+    :param type func_or_task_type: The function that will execute this plan or else a :class:`Task`
+                                   subclass.
     :param subjects: The subjects the plan will generate products for.
     :type subjects: :class:`collections.Iterable` of :class:`Subject` or else objects that will
                     be converted to the primary of a `Subject`.
     """
-    # TODO(John Sirois): There's no reason this couldn't also just be a function.
-    self._task_type = task_type
-
+    self._func_or_task_type = _categorize(func_or_task_type)
     self._subjects = frozenset(Subject.as_subject(subject) for subject in subjects)
     self._inputs = inputs
+
+  @property
+  def func_or_task_type(self):
+    """Return the function or `Task` type that will execute this plan.
+
+    :rtype: :class:`TaskCategorization`
+    """
+    return self._func_or_task_type
 
   @property
   def subjects(self):
@@ -108,7 +168,9 @@ class Plan(Serializable):
     return self._subjects
 
   def __getattr__(self, item):
-    return self._inputs[item]
+    if item in self._inputs:
+      return self._inputs[item]
+    raise AttributeError('{} does not have attribute {!r}'.format(self, item))
 
   @staticmethod
   def _is_mapping(value):
@@ -118,39 +180,58 @@ class Plan(Serializable):
   def _is_iterable(value):
     return isinstance(value, collections.Iterable) and not isinstance(value, six.string_types)
 
-  def iter_promises(self):
+  @memoized_property
+  def promises(self):
     """Return an iterator over the unique promises in this plan's inputs.
 
     A plan's promises indicate its dependency edges on other plans.
 
     :rtype: :class:`collections.Iterator` of :class:`Promise`
     """
-    # TODO(John Sirois): Ask others if this is sane.  The idea of **inputs is to allow for natural
-    # Task.execute functions with standard parameter lists.  In fact s/Task/function/ will work
-    # just fine.  The engine backend just needs to replace plan **inputs promises with resolved
-    # products and then splat inputs to the Task execution function.
-    promises = set()
-
-    def _iter_promises(item):
-      if isinstance(item, Promise) and item not in promises:
-        promises.add(item)
+    def iter_promises(item):
+      if isinstance(item, Promise):
         yield item
       elif self._is_mapping(item):
         for _, v in item.items():
-          for p in _iter_promises(v):
+          for p in iter_promises(v):
             yield p
       elif self._is_iterable(item):
         for i in item:
-          for p in _iter_promises(i):
+          for p in iter_promises(i):
             yield p
 
+    promises = set()
     for _, value in self._inputs.items():
-      for promise in _iter_promises(value):
-        yield promise
+      promises.update(iter_promises(value))
+    return promises
+
+  def bind(self, products_by_promise):
+    """Bind this plans inputs to functions arguments.
+
+    :param products_by_promise: A mapping containing this plan's satisfied promises.
+    :type products_by_promise: dict of (:class:`Promise`, product)
+    :returns: A binding for this plan to the given satisfied promises.
+    :rtype: :class:`Binding`
+    """
+    def bind_products(item):
+      if isinstance(item, Promise):
+        return products_by_promise[item]
+      elif self._is_mapping(item):
+        return {k: bind_products(v) for k, v in item.items()}
+      elif self._is_iterable(item):
+        return [bind_products(i) for i in item]
+      else:
+        return item
+
+    inputs = {}
+    for key, value in self._inputs.items():
+      inputs[key] = bind_products(value)
+
+    return Binding(_execute_binding, args=(self._func_or_task_type,), kwargs=inputs)
 
   def _asdict(self):
     d = self._inputs.copy()
-    d.update(task_type=self._task_type, subjects=tuple(self._subjects))
+    d.update(func_or_task_type=self._func_or_task_type, subjects=tuple(self._subjects))
     return d
 
   def _key(self):
@@ -161,7 +242,7 @@ class Plan(Serializable):
         return tuple(hashable(v) for v in value)
       else:
         return value
-    return self._task_type, self._subjects, hashable(self._inputs)
+    return self._func_or_task_type, self._subjects, hashable(self._inputs)
 
   def __hash__(self):
     return hash(self._key())
@@ -173,25 +254,33 @@ class Plan(Serializable):
     return not (self == other)
 
   def __repr__(self):
-    return ('Plan(task_type={!r}, subjects={!r}, inputs={!r})'
-            .format(self._task_type, self._subjects, self._inputs))
+    return ('Plan(func_or_task_type={!r}, subjects={!r}, inputs={!r})'
+            .format(self._func_or_task_type, self._subjects, self._inputs))
 
 
 class SchedulingError(Exception):
   """Indicates inability to make a required scheduling promise."""
 
 
-class Scheduler(object):
+class Scheduler(AbstractClass):
   """Schedule the creation of products."""
 
-  def promise(self, subject, product_type, required=True):
+  @abstractmethod
+  def promise(self, subject, product_type, configuration=None, required=True):
     """Return an promise for a product of the given `product_type` for the given `subject`.
+
+    The subject can either be a :class:`pants.engine.exp.objects.Serializable` object or else an
+    :class:`Address`, in which case the promise subject is the addressable, serializable object it
+    points to.
+
+    If a configuration is supplied, the promise is for the requested product in that configuration.
 
     If the promise is required and no production plans can be made a
     :class:`Scheduler.SchedulingError` is raised.
 
-    :param subject: The subject that the product type should be created for.
-    :param product_type: The type of product to promise production of for the given subject.
+    :param object subject: The subject that the product type should be created for.
+    :param type product_type: The type of product to promise production of for the given subject.
+    :param object configuration: An optional requested configuration for the product.
     :param bool required: `False` if the product is not required; `True` by default.
     :returns: A promise to make the given product type available for subject at task execution time
               or None if the promise was not required and no production plans could be made.
@@ -199,21 +288,6 @@ class Scheduler(object):
     :raises: :class:`SchedulerError` if the promise was required and no production plans could be
              made.
     """
-    # TODO(John Sirois): Get to the bottom of this when using an AbstractClass base and
-    # @abstractmethod:
-    #  ERROR collecting tests/python/pants_test/engine/exp/test_scheduler.py
-    # tests/python/pants_test/engine/exp/test_scheduler.py:20: in <module>
-    #     from pants.engine.exp.scheduler import (BuildRequest, GlobalScheduler, Plan, Planners, Promise,
-    #                                             src/python/pants/engine/exp/scheduler.py:418: in <module>
-    #     class LocalScheduler(Scheduler):
-    #   ../jsirois-pants3/build-support/pants_dev_deps.venv/lib/python2.7/abc.py:90: in __new__
-    #   for name, value in namespace.items()
-    # ../jsirois-pants3/build-support/pants_dev_deps.venv/lib/python2.7/abc.py:91: in <genexpr>
-    # if getattr(value, "__isabstractmethod__", False))
-    # src/python/pants/engine/exp/scheduler.py:111: in __getattr__
-    # return self._inputs[item]
-    # E   KeyError: '__isabstractmethod__'
-    raise NotImplementedError()
 
 
 class TaskPlanner(AbstractClass):
@@ -221,6 +295,47 @@ class TaskPlanner(AbstractClass):
 
   class Error(Exception):
     """Indicates an error creating a product plan for a subject."""
+
+  @classmethod
+  def iter_configured_dependencies(cls, subject):
+    """Return an iterator of the given subject's dependencies including any selected configurations.
+
+    If no configuration is selected by a dependency (there is no `@[config-name]` specifier suffix),
+    then `None` is returned for the paired configuration object; otherwise the `[config-name]` is
+    looked for in the subject `configurations` list and returned if found or else an error is
+    raised.
+
+    :returns: An iterator over subjects dependencies as pairs of (dependency, configuration).
+    :rtype: :class:`collections.Iterator` of (object, string)
+    :raises: :class:`TaskPlanner.Error` if a dependency configuration was selected by subject but
+             could not be found or was not unique.
+    """
+    for derivation in Subject.as_subject(subject).iter_derivations:
+      if derivation.dependencies:
+        for dep in derivation.dependencies:
+          configuration = None
+          if dep.address:
+            config_specifier = extract_config_selector(dep.address)
+            if config_specifier:
+              if not dep.configurations:
+                raise cls.Error('The dependency of {dependee} on {dependency} selects '
+                                'configuration {config} but {dependency} has no configurations.'
+                                .format(dependee=derivation,
+                                        dependency=dep,
+                                        config=config_specifier))
+              configs = tuple(config for config in dep.configurations
+                              if config.name == config_specifier)
+              if len(configs) != 1:
+                configurations = ('{} -> {!r}'.format(repr(c.name) if c.name else '<anonymous>', c)
+                                  for c in configs)
+                raise cls.Error('Failed to find config named {config} selected by {dependee} '
+                                'amongst these configurations in {dependency}:\n\t{configurations}'
+                                .format(config=config_specifier,
+                                        dependee=derivation,
+                                        dependency=dep,
+                                        configurations='\n\t'.join(configurations)))
+              configuration = configs[0]
+          yield dep, configuration
 
   @abstractproperty
   def goal_name(self):
@@ -237,7 +352,7 @@ class TaskPlanner(AbstractClass):
     """Return an iterator over the product types this planner's task can produce."""
 
   @abstractmethod
-  def plan(self, scheduler, product_type, subject):
+  def plan(self, scheduler, product_type, subject, configuration=None):
     """
     :param scheduler: A scheduler that can supply promises for any inputs needed that the planner
                       cannot supply on its own to its associated task.
@@ -245,6 +360,7 @@ class TaskPlanner(AbstractClass):
     :param type product_type: The type of product this plan should produce given subject when
                               executed.
     :param object subject: The subject of the plan.  Any products produced will be for the subject.
+    :param object configuration: An optional requested configuration for the product.
     """
 
   def finalize_plans(self, plans):
@@ -354,39 +470,62 @@ class ExecutionGraph(object):
     self._root_promises = root_promises
     self._product_mapper = product_mapper
 
+  @property
+  def root_promises(self):
+    """Return the root promises in the graph.
+
+    These represent the final products requested to satisfy a build request.
+
+    :rtype: :class:`collections.Iterable` of :class:`Promise`
+    """
+    return self._root_promises
+
   def walk(self):
     """Performs a depth first post-order walk of the graph of execution plans.
 
     All plans are visited exactly once.
+
+    :returns: A tuple of the product type the plan will produce when executed and the plan itself.
+    :rtype tuple of (type, :class:`Plan`)
     """
     plans = set()
     for promise in self._root_promises:
       for plan in self._walk_plan(promise, plans):
         yield plan
 
-  def _walk_plan(self, pr, plans):
-    plan = self._product_mapper.promised(pr)
+  def _walk_plan(self, promise, plans):
+    plan = self._product_mapper.promised(promise)
     if plan not in plans:
       plans.add(plan)
-      for pr in plan.iter_promises():
+      for pr in plan.promises:
         for pl in self._walk_plan(pr, plans):
           yield pl
-      yield plan
+      yield promise._product_type, plan
 
 
 class Promise(object):
   """Represents a promise to produce a given product type for a given subject."""
 
-  def __init__(self, product_type, subject):
+  def __init__(self, product_type, subject, configuration=None):
     """
     :param type product_type: The type of product promised.
     :param subject: The subject the product will be produced for; ie: a java library would be a
                     natural subject for a request for classfile products.
     :type subject: :class:`Subject` or else any object that will be the primary of the stored
                    `Subject`.
+    :param object configuration: An optional promised configuration for the product.
     """
     self._product_type = product_type
     self._subject = Subject.as_subject(subject)
+    self._configuration = configuration
+
+  @property
+  def product_type(self):
+    """Return the type of product promised.
+
+    :rtype: type
+    """
+    return self._product_type
 
   @property
   def subject(self):
@@ -397,9 +536,9 @@ class Promise(object):
     return self._subject
 
   def _key(self):
-    # We promise the product_type for the primary subject, the alternate does not affect consume
-    # side identity.
-    return self._product_type, self._subject.primary
+    # We promise the product_type for the primary subject, the alternate does not affect
+    # consume-side identity.
+    return self._product_type, self._subject.primary, self._configuration
 
   def __hash__(self):
     return hash(self._key())
@@ -411,7 +550,8 @@ class Promise(object):
     return not (self == other)
 
   def __repr__(self):
-    return 'Promise(product_type={!r}, subject={!r})'.format(self._product_type, self._subject)
+    return ('Promise(product_type={!r}, subject={!r}, configuration={!r})'
+            .format(self._product_type, self._subject, self._configuration))
 
 
 class ProductMapper(object):
@@ -423,7 +563,7 @@ class ProductMapper(object):
   def __init__(self):
     self._promises = {}
 
-  def register_promises(self, product_type, plan, primary_subject=None):
+  def register_promises(self, product_type, plan, primary_subject=None, configuration=None):
     """Registers the promises the given plan will satisfy when executed.
 
     :param type product_type: The product type the plan will produce when executed.
@@ -431,15 +571,17 @@ class ProductMapper(object):
     :type plan: :class:`Plan`
     :param primary_subject: An optional primary subject.  If supplied, the registered promise for
                             this subject will be returned.
+    :param object configuration: An optional promised configuration.
     :returns: The promise for the primary subject of one was supplied.
     :rtype: :class:`Promise`
-    :raises:
+    :raises: :class:`ProductMapper.InvalidRegistrationError` if a primary subject was supplied but
+             not a member of the given plan's subjects.
     """
     # Index by all subjects.  This allows dependencies on products from "chunking" tasks, even
     # products from tasks that act globally in the extreme.
     primary_promise = None
     for subject in plan.subjects:
-      promise = Promise(product_type, subject)
+      promise = Promise(product_type, subject, configuration=configuration)
       if primary_subject == subject.primary:
         primary_promise = promise
       self._promises[promise] = plan
@@ -461,10 +603,7 @@ class ProductMapper(object):
 
 
 class LocalScheduler(Scheduler):
-  """A scheduler that formulates an execution graph locally.
-
-  This implementation is synchronous in addition to being local.
-  """
+  """A scheduler that formulates an execution graph locally."""
 
   class NoProducersError(SchedulingError):
     """Indicates no planners were able to promise a required product for a given subject."""
@@ -484,25 +623,30 @@ class LocalScheduler(Scheduler):
                      '\n\t'.join(type(p).__name__ for p in planners)))
       super(LocalScheduler.ConflictingProducersError, self).__init__(msg)
 
-  def __init__(self, planners):
+  def __init__(self, graph, planners):
     """
-    :param planners: All the planners installed in the system.
+    :param graph: The BUILD graph build requests will execute against.
+    :type graph: :class:`pants.engine.exp.graph.Graph`
+    :param planners: All the task planners known to the system.
     :type planners: :class:`Planners`
     """
+    self._graph = graph
     self._planners = planners
     self._product_mapper = ProductMapper()
     self._plans_by_product_type_by_planner = defaultdict(lambda: defaultdict(OrderedSet))
 
-  def formulate_graph(self, goals, subjects):
-    """Formulate the execution graph that satisfies the given `build_request`.
+  def execution_graph(self, build_request):
+    """Create an execution graph that can satisfy the given build request.
 
-    :param goals: The names of the goals to achieve.
-    :type goals: :class:`collections.Iterable` of string
-    :param list subjects: The subjects to attempt the given goals for.
-    :returns: An execution graph of plans, that when reduced
+    :param build_request: The description of the goals to achieve.
+    :type build_request: :class:`BuildRequest`
     :returns: An execution graph of plans that, when reduced, can satisfy the given build request.
+    :rtype: :class:`ExecutionGraph`
     :raises: :class:`LocalScheduler.SchedulingError` if no execution graph solution could be found.
     """
+    goals = build_request.goals
+    subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
+
     root_promises = []
     for goal in goals:
       for planner in self._planners.for_goal(goal):
@@ -526,16 +670,19 @@ class LocalScheduler(Scheduler):
 
   # A sentinel that denotes a `None` planning result that was accepted.  This can happen for
   # promise requests that are not required.
-  NO_PLAN = Plan(task_type=None, subjects=())
+  NO_PLAN = Plan(func_or_task_type=None, subjects=())
 
-  def promise(self, subject, product_type, required=True):
-    promise = Promise(product_type, subject)
+  def promise(self, subject, product_type, configuration=None, required=True):
+    if isinstance(subject, Address):
+      subject = self._graph.resolve(subject)
+
+    promise = Promise(product_type, subject, configuration=configuration)
     plan = self._product_mapper.promised(promise)
     if plan is not None:
       # The `NO_PLAN` plan may have been decided in a non-required round.
       if required and promise is self.NO_PLAN:
         raise self.NoProducersError(product_type, subject)
-      return None
+      return None if promise is self.NO_PLAN else promise
 
     planners = self._planners.for_product_type(product_type)
     if required and not planners:
@@ -543,7 +690,7 @@ class LocalScheduler(Scheduler):
 
     plans = []
     for planner in planners:
-      plan = planner.plan(self, product_type, subject)
+      plan = planner.plan(self, product_type, subject, configuration=configuration)
       if plan:
         plans.append((planner, plan))
 
@@ -559,7 +706,8 @@ class LocalScheduler(Scheduler):
     planner, plan = plans[0]
     try:
       primary_promise = self._product_mapper.register_promises(product_type, plan,
-                                                               primary_subject=subject)
+                                                               primary_subject=subject,
+                                                               configuration=configuration)
       self._plans_by_product_type_by_planner[planner][product_type].add(plan)
       return primary_promise
     except ProductMapper.InvalidRegistrationError:
@@ -567,33 +715,3 @@ class LocalScheduler(Scheduler):
                             '{subject!r}:\n\t{plan!r}'.format(subject=subject,
                                                               planner=type(planner).__name__,
                                                               plan=plan))
-
-
-class GlobalScheduler(object):
-  """Generates execution graphs for build requests.
-
-  This is the front-end of the new pants execution engine.
-  """
-
-  def __init__(self, graph, planners):
-    """
-    :param graph: The BUILD graph build requests will execute against.
-    :type graph: :class:`pants.engine.exp.graph.Graph`
-    :param planners: All the task planners known to the system.
-    :type planners: :class:`Planners`
-    """
-    self._graph = graph
-    self._planners = planners
-
-  def execution_graph(self, build_request):
-    """Create an execution graph that can satisfy the given build request.
-
-    :param build_request: The description of the goals to achieve.
-    :type build_request: :class:`BuildRequest`
-    :returns: An execution graph of plans that, when reduced, can satisfy the given build request.
-    :rtype: :class:`ExecutionGraph`
-    """
-    scheduler = LocalScheduler(planners=self._planners)
-    goals = build_request.goals
-    subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
-    return scheduler.formulate_graph(goals, subjects)

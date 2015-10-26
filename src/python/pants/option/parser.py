@@ -10,7 +10,6 @@ import os
 import re
 import warnings
 from argparse import ArgumentParser, _HelpAction
-from collections import defaultdict
 
 import six
 
@@ -98,6 +97,9 @@ class Parser(object):
     # If True, no more registration is allowed on this parser.
     self._frozen = False
 
+    # All option args registered with this parser.  Used to prevent shadowing args in inner scopes.
+    self._known_args = set()
+
     # List of (args, kwargs) registration pairs, more-or-less as captured at registration time.
     # Note that:
     # 1. kwargs may include our custom, non-argparse arguments (e.g., 'recursive' and 'advanced').
@@ -109,18 +111,10 @@ class Parser(object):
     #    here will contain only [-x].
     self._registration_args = []
 
-    # arg -> list that arg appears in, in self_registration_args above.
-    # Used to ensure that shadowed args are removed from their lists.
-    self._arg_lists_by_arg = {}
-
     # The argparser we use for actually parsing args.
     self._argparser = CustomArgumentParser(scope=self._scope, conflict_handler='resolve')
 
-    # Map of external to internal dest names. See docstring for _set_dest below.
-    self._dest_forwardings = {}
-
     # Map of dest -> (deprecated_version, deprecated_hint), for deprecated options.
-    # The keys are external dest names (the ones seen by the user, not by argparse).
     self._deprecated_option_dests = {}
 
     # A Parser instance, or None for the global scope parser.
@@ -144,30 +138,14 @@ class Parser(object):
 
   def parse_args(self, args, namespace):
     """Parse the given args and set their values onto the namespace object's attributes."""
-    namespace.add_forwardings(self._dest_forwardings)
     new_args = vars(self._argparser.parse_args(args))
     namespace.update(new_args)
-    # Compute the inverse of the dest forwardings.
-    # We do this here and not when creating the forwardings, because forwardings inherited
-    # from outer scopes can be overridden in inner scopes, so this computation is only
-    # correct after all options have been registered on all scopes.
-    inverse_dest_forwardings = defaultdict(set)
-    for src, dest in self._dest_forwardings.items():
-      inverse_dest_forwardings[dest].add(src)
 
     # Check for deprecated flags.
-    all_deprecated_dests = set(self._deprecated_option_dests.keys())
-    for internal_dest in new_args.keys():
-      external_dests = inverse_dest_forwardings.get(internal_dest, set())
-      deprecated_dests = all_deprecated_dests & external_dests
-      if deprecated_dests:
-        # Check all dests. Typically there is only one, unless the option was registered with
-        # multiple aliases (which we almost never do).  And in any case we'll only warn for the
-        # ones actually used on the cmd line.
-        for dest in deprecated_dests:
-          if namespace.get_rank(dest) == RankedValue.FLAG:
-            warnings.warn('*** {}'.format(self._deprecated_message(dest)), DeprecationWarning,
-                          stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
+    for key in self._deprecated_option_dests.keys():
+      if namespace.get_rank(key) == RankedValue.FLAG:
+        warnings.warn('*** {}'.format(self._deprecated_message(key)), DeprecationWarning,
+                      stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
     return namespace
 
   @property
@@ -213,7 +191,8 @@ class Parser(object):
       ancestor = ancestor._parent_parser
 
     self._validate(args, kwargs)
-    dest = self._set_dest(args, kwargs)
+    dest = kwargs.get('dest') or self._select_dest(args)
+    kwargs['dest'] = dest
     if 'recursive' in kwargs:
       if self._scope_info.category == ScopeInfo.SUBSYSTEM:
         raise ParseError('Option {} in scope {} registered as recursive, but subsystem options '
@@ -221,7 +200,7 @@ class Parser(object):
       kwargs['recursive_root'] = True  # So we can distinguish the original registrar.
     if self._scope_info.category == ScopeInfo.SUBSYSTEM:
       kwargs['subsystem'] = True
-    self._register(dest, args, kwargs)  # Note: May modify kwargs (to remove recursive_root).
+    self._register(args, kwargs)  # Note: May modify kwargs (to remove recursive_root).
 
   def _deprecated_message(self, dest):
     """Returns the message to be displayed when a deprecated option is specified on the cmd line.
@@ -244,13 +223,7 @@ class Parser(object):
   def _clean_argparse_kwargs(self, dest, args, kwargs):
     ranked_default = self._compute_default(dest, kwargs=kwargs)
     kwargs_with_default = dict(kwargs, default=ranked_default)
-
     args_copy = list(args)
-    for arg in args_copy:
-      shadowed_arg_list = self._arg_lists_by_arg.get(arg)
-      if shadowed_arg_list is not None:
-        shadowed_arg_list.remove(arg)
-      self._arg_lists_by_arg[arg] = args_copy
     self._registration_args.append((args_copy, kwargs_with_default))
 
     deprecated_version = kwargs.get('deprecated_version', None)
@@ -266,9 +239,9 @@ class Parser(object):
       argparse_kwargs.pop(custom_kwarg, None)
     return argparse_kwargs
 
-  def _register(self, dest, args, kwargs):
+  def _register(self, args, kwargs):
     """Register the option for parsing (recursively if needed)."""
-    argparse_kwargs = self._clean_argparse_kwargs(dest, args, kwargs)
+    argparse_kwargs = self._clean_argparse_kwargs(kwargs['dest'], args, kwargs)
     if is_boolean_flag(argparse_kwargs):
       inverse_args = self._create_inverse_args(args)
       if inverse_args:
@@ -285,7 +258,7 @@ class Parser(object):
       # Propagate registration down to inner scopes.
       for child_parser in self._child_parsers:
         kwargs.pop('recursive_root', False)
-        child_parser._register(dest, args, kwargs)
+        child_parser._register(args, kwargs)
 
   def _validate(self, args, kwargs):
     """Ensure that the caller isn't trying to use unsupported argparse features."""
@@ -293,42 +266,30 @@ class Parser(object):
       raise RegistrationError('No args provided for option in scope {}'.format(self.scope))
     for arg in args:
       if not arg.startswith('-'):
-        raise RegistrationError('Option {0} in scope {1} must begin '
+        raise RegistrationError('Option {} in scope {} must begin '
                                 'with a dash.'.format(arg, self._scope))
       if not arg.startswith('--') and len(arg) > 2:
-        raise RegistrationError('Multicharacter option {0} in scope {1} must begin '
+        raise RegistrationError('Multicharacter option {} in scope {} must begin '
                                 'with a double-dash'.format(arg, self._scope))
+      existing_scope = self.existing_scope(arg)
+      if existing_scope is not None:
+        raise RegistrationError('Option {} in scope {} already registered in {} scope'.format(
+                                arg, self._scope, existing_scope or 'global'))
     if 'nargs' in kwargs and kwargs['nargs'] != '?':
-      raise RegistrationError('nargs={0} unsupported in registration of option {1} in '
-                              'scope {2}.'.format(kwargs['nargs'], args, self._scope))
+      raise RegistrationError('nargs={} unsupported in registration of option {} in '
+                              'scope {}.'.format(kwargs['nargs'], args, self._scope))
     if 'required' in kwargs:
-      raise RegistrationError('required unsupported in registration of option {0} in '
-                              'scope {1}.'.format(args, self._scope))
+      raise RegistrationError('required unsupported in registration of option {} in '
+                              'scope {}.'.format(args, self._scope))
+    self._known_args.update(args)
 
-  def _set_dest(self, args, kwargs):
-    """Maps the externally-used dest to a scoped one only seen internally.
-
-    If an option is re-registered in an inner scope, it'll shadow the external dest but will
-    use a different internal one. This is important in the case that an option is registered
-    with two names (say -x, --xlong) and we only re-register one of them, say --xlong, in an
-    inner scope. In this case we no longer want them to write to the same dest, so we can
-    use both (now with different meanings) in the inner scope.
-
-    Note: Modfies kwargs.
-    """
-    dest = kwargs.get('dest') or self._select_dest(args)
-    scoped_dest = '_{0}_{1}__'.format(self._scope or 'DEFAULT', dest)
-
-    # Make argparse write to the internal dest.
-    kwargs['dest'] = scoped_dest
-
-    # Make reads from the external dest forward to the internal one.
-    self._dest_forwardings[dest] = scoped_dest
-
-    # Also forward all option aliases, so we can reference -x (as options.x) in the example above.
-    for arg in args:
-      self._dest_forwardings[arg.lstrip('-').replace('-', '_')] = scoped_dest
-    return dest
+  def existing_scope(self, arg):
+    if arg in self._known_args:
+      return self._scope
+    elif self._parent_parser:
+      return self._parent_parser.existing_scope(arg)
+    else:
+      return None
 
   _ENV_SANITIZER_RE = re.compile(r'[.-]')
 

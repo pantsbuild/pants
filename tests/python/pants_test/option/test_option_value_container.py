@@ -22,61 +22,40 @@ class OptionValueContainerTest(unittest.TestCase):
     with self.assertRaises(AttributeError):
       o.bar
 
-  def test_forwarding(self):
-    o = OptionValueContainer()
-    o.add_forwardings({'foo': 'bar'})
-    o.bar = 1
-    self.assertEqual(1, o.foo)
-    o.bar = 2
-    self.assertEqual(2, o.foo)
-
-    o.add_forwardings({'baz': 'qux'})
-    o.qux = 3
-    self.assertEqual(2, o.foo)
-    self.assertEqual(3, o.baz)
-
-    # Direct setting overrides forwarding.
-    o.foo = 4
-    self.assertEqual(4, o.foo)
-
   def test_value_ranking(self):
     o = OptionValueContainer()
-    o.add_forwardings({'foo': 'bar'})
-    o.bar = RankedValue(RankedValue.CONFIG, 11)
+    o.foo = RankedValue(RankedValue.CONFIG, 11)
     self.assertEqual(11, o.foo)
     self.assertEqual(RankedValue.CONFIG, o.get_rank('foo'))
-    o.bar = RankedValue(RankedValue.HARDCODED, 22)
+    o.foo = RankedValue(RankedValue.HARDCODED, 22)
     self.assertEqual(11, o.foo)
     self.assertEqual(RankedValue.CONFIG, o.get_rank('foo'))
-    o.bar = RankedValue(RankedValue.ENVIRONMENT, 33)
+    o.foo = RankedValue(RankedValue.ENVIRONMENT, 33)
     self.assertEqual(33, o.foo)
     self.assertEqual(RankedValue.ENVIRONMENT, o.get_rank('foo'))
-    o.bar = 44  # No explicit rank is assumed to be a FLAG.
+    o.foo = 44  # No explicit rank is assumed to be a FLAG.
     self.assertEqual(44, o.foo)
     self.assertEqual(RankedValue.FLAG, o.get_rank('foo'))
 
   def test_is_flagged(self):
     o = OptionValueContainer()
-    o.add_forwardings({'foo': 'bar'})
 
-    o.bar = RankedValue(RankedValue.NONE, 11)
+    o.foo = RankedValue(RankedValue.NONE, 11)
     self.assertFalse(o.is_flagged('foo'))
 
-    o.bar = RankedValue(RankedValue.CONFIG, 11)
+    o.foo = RankedValue(RankedValue.CONFIG, 11)
     self.assertFalse(o.is_flagged('foo'))
 
-    o.bar = RankedValue(RankedValue.ENVIRONMENT, 11)
+    o.foo = RankedValue(RankedValue.ENVIRONMENT, 11)
     self.assertFalse(o.is_flagged('foo'))
 
-    o.bar = RankedValue(RankedValue.FLAG, 11)
+    o.foo = RankedValue(RankedValue.FLAG, 11)
     self.assertTrue(o.is_flagged('foo'))
 
   def test_indexing(self):
     o = OptionValueContainer()
-    o.add_forwardings({'foo': 'bar'})
-    o.bar = 1
+    o.foo = 1
     self.assertEqual(1, o['foo'])
-    self.assertEqual(1, o['bar'])
 
     self.assertEqual(1, o.get('foo'))
     self.assertEqual(1, o.get('foo', 2))
@@ -84,37 +63,32 @@ class OptionValueContainerTest(unittest.TestCase):
     self.assertEqual(2, o.get('unknown', 2))
 
     with self.assertRaises(AttributeError):
-      o['baz']
+      o['bar']
 
   def test_iterator(self):
     o = OptionValueContainer()
-    o.add_forwardings({'a': '_a'})
-    o.add_forwardings({'b': '_b'})
-    o.add_forwardings({'b_prime': '_b'})  # Should be elided in favor of b.
-    o.add_forwardings({'c': '_c'})
+    o.a = 3
+    o.b = 2
+    o.c = 1
     names = list(iter(o))
     self.assertListEqual(['a', 'b', 'c'], names)
 
   def test_copy(self):
     # copy semantics can get hairy when overriding __setattr__/__getattr__, so we test them.
     o = OptionValueContainer()
-    o.add_forwardings({'foo': 'bar'})
-    o.add_forwardings({'baz': 'qux'})
-    o.bar = 1
-    o.qux = {'a': 111}
+    o.foo = 1
+    o.bar = {'a': 111}
     p = copy.copy(o)
-    o.baz['b'] = 222  # Add to original dict.
+    o.bar['b'] = 222  # Add to original dict.
     self.assertEqual(1, p.foo)
-    self.assertEqual({'a': 111, 'b': 222}, p.baz)  # Ensure dict was not copied.
+    self.assertEqual({'a': 111, 'b': 222}, p.bar)  # Ensure dict was not copied.
 
   def test_deepcopy(self):
     # deepcopy semantics can get hairy when overriding __setattr__/__getattr__, so we test them.
     o = OptionValueContainer()
-    o.add_forwardings({'foo': 'bar'})
-    o.add_forwardings({'baz': 'qux'})
-    o.bar = 1
-    o.qux = {'a': 111}
+    o.foo = 1
+    o.bar = {'a': 111}
     p = copy.deepcopy(o)
-    o.baz['b'] = 222  # Add to original dict.
+    o.bar['b'] = 222  # Add to original dict.
     self.assertEqual(1, p.foo)
-    self.assertEqual({'a': 111}, p.baz)  # Ensure dict was copied.
+    self.assertEqual({'a': 111}, p.bar)  # Ensure dict was copied.

@@ -13,7 +13,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import temporary_dir
 
 
-@pytest.mark.parametrize('version_flag', ['-V', '--version', '--pants-version'])
+@pytest.mark.parametrize('version_flag', ['-V', '--pants-version'])
 def test_version_request(version_flag):
   class ExitException(Exception):
     def __init__(self, exit_code):

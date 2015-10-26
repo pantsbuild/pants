@@ -123,7 +123,7 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     ./pants ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
-    ./pants.pex --version && \
+    ./pants.pex -V && \
     ./pants.pex --pants-version
   ) || die "Failed to bootstrap pants."
 fi

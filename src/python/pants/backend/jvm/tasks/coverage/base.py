@@ -9,23 +9,35 @@ import os
 import shutil
 from abc import ABCMeta, abstractmethod, abstractproperty
 
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
 
+class CoverageTaskSettings(object):
+  """A class containing settings for code coverage tasks."""
+
+  def __init__(self, task):
+    self.options = task.get_options()
+    self.context = task.context
+    self.workdir = task.workdir
+    self.tool_classpath = task.tool_classpath
+    self.confs = task.confs
+    self.coverage_dir = os.path.join(self.workdir, 'coverage')
+    self.coverage_instrument_dir = os.path.join(self.coverage_dir, 'classes')
+    self.coverage_console_file = os.path.join(self.coverage_dir, 'coverage.txt')
+    self.coverage_xml_file = os.path.join(self.coverage_dir, 'coverage.xml')
+    self.coverage_html_file = os.path.join(self.coverage_dir, 'html', 'index.html')
+
+
 class Coverage(object):
-  """Base class for emma-like coverage processors. Do not instantiate."""
+  """Base class for coverage processors. Do not instantiate."""
   __metaclass__ = ABCMeta
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register('--coverage-patterns', advanced=True, action='append',
-             help='Restrict coverage measurement. Values are class name prefixes in dotted form '
-                  'with ? and * wildcards. If preceded with a - the pattern is excluded. For '
-                  'example, to include all code in org.pantsbuild.raven except claws and the eye '
-                  'you would use: {flag}=org.pantsbuild.raven.* {flag}=-org.pantsbuild.raven.claw '
-                  '{flag}=-org.pantsbuild.raven.Eye.'.format(flag='--coverage_patterns'))
+    register('--coverage', action='store_true', help='Collect code coverage data.')
+    register('--coverage-processor', advanced=True, default='cobertura',
+             help='Which coverage subsystem to use.')
     register('--coverage-jvm-options', advanced=True, action='append',
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
@@ -35,26 +47,16 @@ class Coverage(object):
              help='Attempt to run the reporting phase of coverage even if tests failed '
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
 
-  def __init__(self, task_exports, context):
-    options = task_exports.task_options
-    self._task_exports = task_exports
-    self._context = context
+  def __init__(self, settings):
+    self._settings = settings
+    options = settings.options
+    self._context = settings.context
     self._coverage = options.coverage
-    self._coverage_filters = options.coverage_patterns or []
 
     self._coverage_jvm_options = []
     for jvm_option in options.coverage_jvm_options:
       self._coverage_jvm_options.extend(safe_shlex_split(jvm_option))
 
-    self._coverage_dir = os.path.join(task_exports.workdir, 'coverage')
-    self._coverage_instrument_dir = os.path.join(self._coverage_dir, 'classes')
-    # TODO(ji): These may need to be transferred down to the Emma class, as the suffixes
-    # may be emma-specific. Resolve when we also provide cobertura support.
-    self._coverage_metadata_file = os.path.join(self._coverage_dir, 'coverage.em')
-    self._coverage_file = os.path.join(self._coverage_dir, 'coverage.ec')
-    self._coverage_console_file = os.path.join(self._coverage_dir, 'coverage.txt')
-    self._coverage_xml_file = os.path.join(self._coverage_dir, 'coverage.xml')
-    self._coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
     self._coverage_open = options.coverage_open
     self._coverage_force = options.coverage_force
 
@@ -82,29 +84,6 @@ class Coverage(object):
   def is_coverage_target(self, tgt):
     return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_codegen
 
-  def get_coverage_patterns(self, targets):
-    if self._coverage_filters:
-      return self._coverage_filters
-    else:
-      classes_under_test = set()
-      classpath_products = self._context.products.get_data('runtime_classpath')
-
-      def add_sources_under_test(tgt):
-        if self.is_coverage_target(tgt):
-          contents = ClasspathUtil.classpath_contents(
-            (tgt,),
-            classpath_products,
-            confs=self._task_exports.confs,
-            transitive=False)
-          for f in contents:
-            clsname = ClasspathUtil.classname_for_rel_classfile(f)
-            if clsname:
-              classes_under_test.add(clsname)
-
-      for target in targets:
-        target.walk(add_sources_under_test)
-      return classes_under_test
-
   def initialize_instrument_classpath(self, targets):
     """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
     paths.
@@ -112,7 +91,7 @@ class Coverage(object):
     :param targets: the targets which should be mutated.
     :returns the instrument_classpath ClasspathProducts containing the mutated paths.
     """
-    safe_mkdir(self._coverage_instrument_dir, clean=True)
+    safe_mkdir(self._settings.coverage_instrument_dir, clean=True)
 
     runtime_classpath = self._context.products.get_data('runtime_classpath')
     self._context.products.safe_create_data('instrument_classpath', runtime_classpath.copy)
@@ -126,13 +105,13 @@ class Coverage(object):
         # there are two sorts of classpath entries we see in the compile classpath: jars and dirs
         # the branches below handle the cloning of those respectively.
         if os.path.isfile(path):
-          shutil.copy2(path, self._coverage_instrument_dir)
-          new_path = os.path.join(self._coverage_instrument_dir, os.path.basename(path))
+          shutil.copy2(path, self._settings.coverage_instrument_dir)
+          new_path = os.path.join(self._settings.coverage_instrument_dir, os.path.basename(path))
         else:
           files = os.listdir(path)
           for file in files:
-            shutil.copy2(file, self._coverage_instrument_dir)
-          new_path = self._coverage_instrument_dir
+            shutil.copy2(file, self._settings.coverage_instrument_dir)
+          new_path = self._settings.coverage_instrument_dir
 
         instrumentation_classpath.remove_for_target(target, [(config, path)])
         instrumentation_classpath.add_for_target(target, [(config, new_path)])

@@ -1,9 +1,0 @@
-{{! Render a message consisting of elements each of which is either text or text+detail.
-    In the latter case we render such that clicking on the text toggles the detail, and closes
-    all other known details in the message (as specified in all-detail-ids). }}
-<div>
-{{#elements}}{{#detail?}}<a href="#" onclick="{{#all-detail-ids}}$('#{{.}}').not('#{{detail-id}}').hide(); {{/all-detail-ids}}$('#{{detail-id}}').toggle(); return false;">{{{text}}}</a>{{/detail?}}{{^detail?}}{{{text}}}{{/detail?}}{{/elements}}
-{{#elements}}{{#detail?}}
-<div id="{{detail-id}}" {{^detail_initially_visible}}class="nodisplay"{{/detail_initially_visible}}>{{{detail}}}</div>
-{{/detail?}}{{/elements}}
-</div>

@@ -51,6 +51,9 @@ class SourceRootBootstrapper(Subsystem):
     super(SourceRootBootstrapper, cls).register_options(register)
     # TODO: Get rid of this in favor of source root registration at backend load time.
     register('--bootstrap-buildfiles', advanced=True, type=list_option, default=[],
+             deprecated_version='0.0.59',
+             deprecated_hint='bootstrap BUILD files are no longer necessary or supported. '
+                             'Source roots are configured in pants.ini or by default.',
              help='Initialize state by evaluating these buildfiles.')
 
   def bootstrap(self, address_mapper, build_file_parser):
@@ -351,7 +354,6 @@ class GoalRunner(object):
       self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
       raise
     finally:
-      self._run_tracker.end()
       # Must kill nailguns only after run_tracker.end() is called, otherwise there may still
       # be pending background work that needs a nailgun.
       if should_kill_nailguns:

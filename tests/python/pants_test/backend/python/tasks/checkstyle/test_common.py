@@ -31,6 +31,7 @@ FILE_TEXT = """
 
     def session(self):
       return self._session
+
 """
 
 
@@ -44,7 +45,7 @@ class MinimalCheckstylePlugin(CheckstylePlugin):
 @pytest.fixture
 def test_statement():
   """Pytest Fixture to create a test python file from statement"""
-  return '\n'.join(textwrap.dedent(FILE_TEXT).splitlines()[1:])
+  return '\n'.join(textwrap.dedent(FILE_TEXT).split('\n')[1:])
 
 
 @pytest.fixture
@@ -91,7 +92,7 @@ def test_python_file_exceeds_index(test_statement):
   """Test that we get an Index error when we exceed the line number"""
   test_python_file = PythonFile(test_statement, 'keeper.py')
   with pytest.raises(IndexError):
-    test_python_file[len(test_statement.splitlines()) + 1]
+    test_python_file[len(test_statement.split('\n')) + 1]
 
 
 def test_line_retrieval(test_python_file):
@@ -112,10 +113,11 @@ def test_line_retrieval(test_python_file):
     [""],
     ["  def session(self):"],
     ["    return self._session"],
+    [""]
   ]
-  assert expected == [test_python_file[x] for x in range(1,16)], \
+  assert expected == [test_python_file[x] for x in range(1,17)], \
     "Expected:\n{} Actual:\n{}".format(
-      pprint(expected), pprint([test_python_file[x] for x in range(1,16)]))
+      pprint(expected), pprint([test_python_file[x] for x in range(1,17)]))
 
 
 def test_rejoin(test_statement):
@@ -127,7 +129,7 @@ def test_rejoin(test_statement):
 def test_off_by_one_enumeration(test_statement):
   """Test that enumerate is offset by one"""
   python_file = PythonFile(test_statement, 'keeper.py')
-  assert list(python_file.enumerate()) == list(enumerate(test_statement.splitlines(), 1))
+  assert list(python_file.enumerate()) == list(enumerate(test_statement.split('\n'), 1))
 
 
 @pytest.mark.parametrize("ln_test_input,ln_test_expected", [

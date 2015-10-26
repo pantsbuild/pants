@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import os
 import subprocess
 from collections import OrderedDict
@@ -24,7 +23,6 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
 
@@ -49,7 +47,7 @@ class ProtobufGen(SimpleCodegenTask):
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
-    register('--plugins', advanced=True, fingerprint=True, action='append',
+    register('--protoc-plugins', advanced=True, fingerprint=True, action='append',
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.',
              default=[])

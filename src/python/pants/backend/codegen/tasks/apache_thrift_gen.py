@@ -21,7 +21,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.custom_types import list_option
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
 
@@ -66,13 +65,6 @@ class ApacheThriftGen(SimpleCodegenTask):
   def _thrift_binary(self):
     thrift_binary = ThriftBinary.Factory.scoped_instance(self).create()
     return thrift_binary.path
-
-  def invalidate_for_files(self):
-    # TODO: This will prevent artifact caching across platforms.
-    # Find some cross-platform way to assert the thrift binary version.
-    # NB: We have access to the version via the ThriftBinary instance's `version`, we just need
-    # support for invalidation based on non-files.
-    return [self._thrift_binary]
 
   @memoized_property
   def _deps(self):

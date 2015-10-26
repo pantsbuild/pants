@@ -27,7 +27,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     expected_patterns = [
-      '/gen/wire/[^/]*/org/pantsbuild/example/temperature/Temperature.java',
+      '/gen/wire/[^/]*/[^/]*/org/pantsbuild/example/temperature/Temperature.java',
     ]
     expected_outputs = [
       'Compiling proto source file',
@@ -41,7 +41,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                       '{0}'.format(pattern))
 
   def test_bundle_wire_normal(self):
-    pants_run = self.run_pants(['bundle',
+    pants_run = self.run_pants(['bundle.jvm',
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/wire/temperatureservice'])
     self.assert_success(pants_run)
@@ -56,7 +56,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('19 degrees celsius', java_out)
 
   def test_bundle_wire_dependent_targets(self):
-    pants_run = self.run_pants(['bundle',
+    pants_run = self.run_pants(['bundle.jvm',
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/wire/element'])
     self.assert_success(pants_run)
@@ -77,7 +77,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                   'atomic_number=1}}', java_out)
 
   def test_compile_wire_roots(self):
-    pants_run = self.run_pants(['bundle', '--deployjar',
+    pants_run = self.run_pants(['bundle.jvm', '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/wire/roots'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-roots-example.jar')

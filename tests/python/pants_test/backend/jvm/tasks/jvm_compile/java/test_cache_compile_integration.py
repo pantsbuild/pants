@@ -26,9 +26,6 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       f.write(value)
 
   def test_stale_artifacts_rmd_when_cache_used_with_zinc(self):
-    self._do_test_stale_artifacts_rmd_when_cache_used()
-
-  def _do_test_stale_artifacts_rmd_when_cache_used(self):
     with temporary_dir() as cache_dir, \
         temporary_dir(root_dir=self.workdir_root()) as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir:
@@ -71,19 +68,21 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Should cause NotMain.class to be removed
       self.run_compile(cachetest_spec, config, workdir)
 
-      cachetest_id = cachetest_spec.replace(':', '.').replace(os.sep, '.')
+      root = os.path.join(workdir, 'compile', 'jvm', 'zinc')
+      # One target.
+      self.assertEqual(len(os.listdir(root)), 1)
+      target_workdir_root = os.path.join(root, os.listdir(root)[0])
+      target_workdirs = os.listdir(target_workdir_root)
+      # Two workdirs.
+      self.assertEqual(len(target_workdirs), 2)
 
-      class_file_dir = os.path.join(workdir,
-                                      'compile',
-                                      'jvm',
-                                      'zinc',
-                                      'isolated-classes',
-                                      cachetest_id,
-                                      'org',
-                                      'pantsbuild',
-                                      'cachetest',
-                                      )
-      self.assertEqual(sorted(os.listdir(class_file_dir)), sorted(['A.class', 'Main.class']))
+      def classfiles(d):
+        cd = os.path.join(target_workdir_root, d, 'classes', 'org', 'pantsbuild', 'cachetest')
+        return sorted(os.listdir(cd))
+
+      # One workdir should contain NotMain, and the other should contain Main.
+      self.assertEquals(sorted(classfiles(w) for w in target_workdirs),
+                        sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
   def test_incremental_caching(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""

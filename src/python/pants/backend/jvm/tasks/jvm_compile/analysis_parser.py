@@ -122,21 +122,20 @@ class AnalysisParser(object):
       raise ParseError('Expected: "<num> items". Found: "{0}"'.format(line))
     return int(matchobj.group(1))
 
-  def rebase_from_path(self, infile_path, outfile_path, pants_home_from, pants_home_to,
-                       java_home=None):
+  def rebase_from_path(self, infile_path, outfile_path, old_base, new_base, java_home=None):
     """Rebase an analysis at infile_path, writing the result to outfile_path.
 
     See rebase() below for an explanation of rebasing.
     """
     with open(infile_path, 'rb') as infile:
       with open(outfile_path, 'wb') as outfile:
-        self.rebase(infile, outfile, pants_home_from, pants_home_to, java_home)
+        self.rebase(infile, outfile, old_base, new_base, java_home)
 
-  def rebase(self, infile, outfile, pants_home_from, pants_home_to, java_home=None):
+  def rebase(self, infile, outfile, old_base, new_base, java_home=None):
     """Rebase an analysis read from infile and write the result to outfile.
 
-    Rebasing means replacing references to paths under pants_home_from with references to
-    equivalent paths under pants_home_to.
+    Rebasing means replacing references to paths under old_base with references to
+    equivalent paths under new_base.
 
     If java_home is specified then any references to paths under it are scrubbed entirely.
     """

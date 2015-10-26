@@ -11,11 +11,16 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.tasks.coverage.base import Coverage
+from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
 from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch
+
+
+class CoberturaTaskSettings(CoverageTaskSettings):
+  """A class that holds task settings for cobertura coverage."""
+  pass
 
 
 class Cobertura(Coverage):
@@ -57,10 +62,10 @@ class Cobertura(Coverage):
 
     register_jvm_tool(register, 'cobertura-report', classpath=[cobertura_jar()])
 
-  def __init__(self, task_exports, context):
-    super(Cobertura, self).__init__(task_exports, context)
-    options = task_exports.task_options
-    self._coverage_datafile = os.path.join(self._coverage_dir, 'cobertura.ser')
+  def __init__(self, settings):
+    super(Cobertura, self).__init__(settings)
+    options = settings.options
+    self._coverage_datafile = os.path.join(self._settings.coverage_dir, 'cobertura.ser')
     touch(self._coverage_datafile)
     self._rootdirs = defaultdict(OrderedSet)
     self._include_classes = options.coverage_cobertura_include_classes
@@ -70,7 +75,7 @@ class Cobertura(Coverage):
   def instrument(self, targets, tests, compute_junit_classpath, execute_java_for_targets):
     instrumentation_classpath = self.initialize_instrument_classpath(targets)
     junit_classpath = compute_junit_classpath()
-    cobertura_cp = self._task_exports.tool_classpath('cobertura-instrument')
+    cobertura_cp = self._settings.tool_classpath('cobertura-instrument')
     aux_classpath = os.pathsep.join(relativize_paths(junit_classpath, get_buildroot()))
     safe_delete(self._coverage_datafile)
     files_to_instrument = []
@@ -119,7 +124,7 @@ class Cobertura(Coverage):
 
   @property
   def classpath_prepend(self):
-    return self._task_exports.tool_classpath('cobertura-run')
+    return self._settings.tool_classpath('cobertura-run')
 
   @property
   def extra_jvm_options(self):
@@ -135,10 +140,10 @@ class Cobertura(Coverage):
         self._context.log.warn('Generating report even though tests failed.')
       else:
         return
-    cobertura_cp = self._task_exports.tool_classpath('cobertura-report')
+    cobertura_cp = self._settings.tool_classpath('cobertura-report')
     source_roots = { t.target_base for t in targets if self.is_coverage_target(t) }
     for report_format in ['xml', 'html']:
-      report_dir = os.path.join(self._coverage_dir, report_format)
+      report_dir = os.path.join(self._settings.coverage_dir, report_format)
       safe_mkdir(report_dir, clean=True)
       args = list(source_roots)
       args += [
@@ -162,5 +167,5 @@ class Cobertura(Coverage):
                         " 'failed to report'".format(main, result))
 
     if self._coverage_open:
-      coverage_html_file = os.path.join(self._coverage_dir, 'html', 'index.html')
+      coverage_html_file = os.path.join(self._settings.coverage_dir, 'html', 'index.html')
       binary_util.ui_open(coverage_html_file)
