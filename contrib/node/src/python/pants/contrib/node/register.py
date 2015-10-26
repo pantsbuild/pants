@@ -11,6 +11,7 @@ from pants.goal.task_registrar import TaskRegistrar as task
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.tasks.node_repl import NodeRepl
+from pants.contrib.node.tasks.node_run import NodeRun
 from pants.contrib.node.tasks.npm_resolve import NpmResolve
 
 
@@ -25,4 +26,5 @@ def build_file_aliases():
 
 def register_goals():
   task(name='node', action=NodeRepl).install('repl')
+  task(name='node', action=NodeRun).install('run')
   task(name='npm', action=NpmResolve).install('resolve')
