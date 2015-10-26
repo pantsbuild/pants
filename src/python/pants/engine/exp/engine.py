@@ -394,6 +394,7 @@ class LocalMultiprocessEngine(Engine):
           self._waiting.pop(index)
           inputs = self.collect_inputs(self._products_by_promise, promise, plan)
           if isinstance(inputs, FailedToProduce):
+            # Short circuit plan execution since we don't have all the inputs it needs.
             self._results.put((promise, plan.subjects, inputs))
           else:
             func, args, kwargs = plan.bind(inputs)
