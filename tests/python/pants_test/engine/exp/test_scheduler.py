@@ -23,25 +23,26 @@ class SchedulerTest(unittest.TestCase):
     self.thrift = self.graph.resolve(Address.parse('src/thrift/codegen/simple'))
     self.java = self.graph.resolve(Address.parse('src/java/codegen/simple'))
 
-  def assert_resolve_only(self, goals, root_specs, jars):
+  def assert_resolve_only(self, goals, root_specs, jar):
     build_request = BuildRequest(goals=goals,
                                  addressable_roots=[Address.parse(spec) for spec in root_specs])
     execution_graph = self.scheduler.execution_graph(build_request)
 
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
-    self.assertEqual((Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=list(jars))),
+    self.assertEqual((Promise(Classpath, jar),
+                      Plan(func_or_task_type=IvyResolve, subjects=[jar], jars=[jar])),
                      plans[0])
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
                              root_specs=['3rdparty/jvm:guava'],
-                             jars=[self.guava])
+                             jar=self.guava)
 
   def test_compile_only_3rdaprty(self):
     self.assert_resolve_only(goals=['compile'],
                              root_specs=['3rdparty/jvm:guava'],
-                             jars=[self.guava])
+                             jar=self.guava)
 
   def test_gen_noop(self):
     # TODO(John Sirois): Ask around - is this OK?
@@ -61,7 +62,7 @@ class SchedulerTest(unittest.TestCase):
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
 
-    self.assertEqual((Sources.of('.java'),
+    self.assertEqual((Promise(Sources.of('.java'), self.thrift),
                       Plan(func_or_task_type=gen_apache_thrift,
                            subjects=[self.thrift],
                            strict=True,
@@ -77,32 +78,34 @@ class SchedulerTest(unittest.TestCase):
     plans = list(execution_graph.walk())
     self.assertEqual(4, len(plans))
 
+    slf4j_api = self.graph.resolve(Address.parse('src/thrift:slf4j-api'))
     thrift_jars = [Jar(org='org.apache.thrift', name='libthrift', rev='0.9.2'),
                    Jar(org='commons-lang', name='commons-lang', rev='2.5'),
-                   self.graph.resolve(Address.parse('src/thrift:slf4j-api'))]
+                   slf4j_api]
 
     jars = [self.guava] + thrift_jars
 
     # Independent leaves 1st
-    self.assertEqual({(Sources.of('.java'),
+    self.assertEqual({(Promise(Sources.of('.java'), self.thrift),
                        Plan(func_or_task_type=gen_apache_thrift,
                             subjects=[self.thrift],
                             strict=True,
                             rev='0.9.2',
                             gen='java',
                             sources=['src/thrift/codegen/simple/simple.thrift'])),
-                      (Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=jars))},
+                      (Promise(Classpath, self.guava),
+                       Plan(func_or_task_type=IvyResolve, subjects=jars, jars=jars))},
                      set(plans[0:2]))
 
     # The rest is linked.
-    self.assertEqual((Classpath,
+    self.assertEqual((Promise(Classpath, self.thrift),
                       Plan(func_or_task_type=Javac,
                            subjects=[self.thrift],
                            sources=Promise(Sources.of('.java'), self.thrift),
                            classpath=[Promise(Classpath, jar) for jar in thrift_jars])),
                      plans[2])
 
-    self.assertEqual((Classpath,
+    self.assertEqual((Promise(Classpath, self.java),
                       Plan(func_or_task_type=Javac,
                            subjects=[self.java],
                            sources=['src/java/codegen/simple/Simple.java'],

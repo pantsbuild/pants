@@ -11,6 +11,7 @@ from abc import abstractmethod, abstractproperty
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.configuration import Configuration
@@ -37,7 +38,8 @@ def printing_func(func):
   @functools.wraps(func)
   def wrapper(**inputs):
     print('{} being executed with inputs: {}'.format(func.__name__, inputs))
-    return '<<<Fake{}Product>>>'.format(func.__name__)
+    product = func(**inputs)
+    return product if product else '<<<Fake{}Product>>>'.format(func.__name__)
   return wrapper
 
 
@@ -238,9 +240,15 @@ class ApacheThriftPlanner(ThriftPlanner):
                 strict=apache_thrift_config.strict)
 
 
+class ApacheThriftError(TaskError):
+  pass
+
+
 @printing_func
 def gen_apache_thrift(sources, rev, gen, strict):
-  pass
+  if rev == 'fail':
+    raise ApacheThriftError('Failed to generate via apache thrift for sources: {}, rev: {}, '
+                            'gen:{}, strict: {}'.format(sources, rev, gen, strict))
 
 
 class ScroogeConfiguration(ThriftConfiguration):
