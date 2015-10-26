@@ -2,7 +2,17 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+git rev-parse --show-toplevel &> /dev/null
+if [ $? != 0 ]
+then
+  #Assuming pants source repo is one level up above location of this file
+  REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)/..
+  source ${REPO_ROOT}/build-support/common.sh
+  echo_warning "Warning: Git repo root cannot be found, assuming current directory $REPO_ROOT is REPO_ROOT"
+else
+  REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
+fi
+
 source ${REPO_ROOT}/build-support/common.sh
 
 REQUIREMENTS=(

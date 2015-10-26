@@ -46,4 +46,11 @@ function set_archflags() {
     export set ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
   fi
 }
+
+function echo_warning() { # $1 = string
+    COLOR='\033[1;33m'
+    NC='\033[0m'
+    printf "${COLOR}$1${NC}\n"
+}
+
 set_archflags
