@@ -13,12 +13,12 @@ from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
-class NodeRun(NodeTask):
-  """Runs a script from package.json."""
+class NpmRun(NodeTask):
+  """Runs a script from package.json like "npm run [script name]"."""
 
   @classmethod
   def register_options(cls, register):
-    super(NodeRun, cls).register_options(register)
+    super(NpmRun, cls).register_options(register)
     register('--script-name', default='start',
              help='The script name to run.')
 
@@ -36,8 +36,8 @@ class NodeRun(NodeTask):
       args = ['run', self.get_options().script_name] + self.get_passthru_args()
 
       with pushd(node_path):
-        result, npm_install = self.execute_npm(args=args,
-                                               workunit_labels=[WorkUnitLabel.RUN])
+        result, npm_run = self.execute_npm(args=args,
+                                           workunit_labels=[WorkUnitLabel.RUN])
         if result != 0:
           raise TaskError('npm run script failed:\n'
-                          '\t{} failed with exit code {}'.format(npm_install, result))
+                          '\t{} failed with exit code {}'.format(npm_run, result))
