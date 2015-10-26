@@ -57,7 +57,14 @@ class FailedToProduce(object):
     return self._error
 
   def walk(self, postorder=True):
-    """"""
+    """Walk this failed product and its priors to explore all failure paths leading here.
+
+    :param bool postorder: When `True`, the traversal order is postorder; ie: root causes are
+                           visited 1st; otherwise the current `FailedToProduce` is visited first.
+    :returns: An iterator over the graph of failed products that make this failure's promise
+              unsatisfiable.
+    :rtype: :class:`collections.Iterator` of :class:`FailedToProduce`
+    """
     visited = set()
     for prior in self._walk(visited=visited, postorder=postorder):
       yield prior
@@ -391,13 +398,19 @@ class LocalMultiprocessEngine(Engine):
           else:
             func, args, kwargs = plan.bind(inputs)
 
-            # TODO(John Sirois): Improve this 3-step.  Its very hard to read.
+            # A no-arg callable that, when executed, produces the promised product.
             executable = functools.partial(func, *args, **kwargs)
+
+            # A wrapper of executable that handles failing slow as needed.
             maybe_fail_slow_executor = functools.partial(maybe_fail_slow,
                                                          executable,
                                                          promise,
                                                          plan,
                                                          self._fail_slow)
+
+            # A picklable execution that returns the promise and subjects in addition to the
+            # product produced by executable.  We need this triple to feed the consume side of the
+            # _results queue.
             execute_plan = functools.partial(_execute_plan,
                                              maybe_fail_slow_executor,
                                              promise,
