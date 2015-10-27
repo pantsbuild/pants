@@ -27,3 +27,12 @@ class NpmTestIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
+
+  def test_test_multiple_targets(self):
+    command = ['-q',
+               'test',
+               'contrib/node/examples/src/node/web-component-button:unit',
+               'contrib/node/examples/src/node/web-component-button:integration']
+    pants_run = self.run_pants(command=command)
+
+    self.assert_success(pants_run)
