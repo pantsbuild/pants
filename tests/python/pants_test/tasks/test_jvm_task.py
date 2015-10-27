@@ -49,4 +49,4 @@ class JvmTaskTest(JvmTaskTestBase):
                      self.task.classpath([self.t1], classpath_prefix=['first']))
 
   def test_classpath_custom_product(self):
-    self.assertEqual([], self.task.classpath([self.t1], classpath_product=ClasspathProducts()))
+    self.assertEqual([], self.task.classpath([self.t1], classpath_product=ClasspathProducts(self.pants_workdir)))

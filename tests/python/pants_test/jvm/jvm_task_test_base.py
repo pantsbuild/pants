@@ -41,4 +41,4 @@ class JvmTaskTestBase(TaskTestBase):
     runtime_classpath.add_for_target(tgt, [('default', classpath_dir)])
 
   def get_runtime_classpath(self, context):
-    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts)
+    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
