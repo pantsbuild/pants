@@ -14,9 +14,9 @@ import mox
 import six
 
 from pants.util import dirutil
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir,
-                                relative_symlink, relativize_paths, safe_mkdir)
+                                relative_symlink, relativize_paths, rm_rf, safe_mkdir, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -156,3 +156,17 @@ class DirutilTest(unittest.TestCase):
     self.assertEquals(get_basedir('foo/bar/baz'), 'foo')
     self.assertEquals(get_basedir('/foo/bar/baz'), '')
     self.assertEquals(get_basedir('foo'), 'foo')
+
+  def test_rm_rf_file(self, file_name='./foo'):
+    with temporary_dir() as td, pushd(td):
+      touch(file_name)
+      self.assertTrue(os.path.isfile(file_name))
+      rm_rf(file_name)
+      self.assertFalse(os.path.exists(file_name))
+
+  def test_rm_rf_dir(self, dir_name='./bar'):
+    with temporary_dir() as td, pushd(td):
+      safe_mkdir(dir_name)
+      self.assertTrue(os.path.isdir(dir_name))
+      rm_rf(dir_name)
+      self.assertFalse(os.path.exists(dir_name))

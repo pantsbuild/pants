@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
 import os
 import unittest
 from contextlib import contextmanager
@@ -161,15 +162,21 @@ class TestProcessManager(unittest.TestCase):
     with mock.patch.object(ProcessManager, 'is_alive') as mock_alive:
       mock_alive.return_value = True
       with self.assertRaises(AssertionError):
-        self.pm._purge_metadata()
+        self.pm.purge_metadata()
 
-  @mock.patch('pants.pantsd.process_manager.safe_delete')
-  def test_purge_metadata(self, *args):
+  def test_purge_metadata(self):
     with mock.patch.object(ProcessManager, 'is_alive') as mock_alive, \
-         mock.patch('os.path.exists') as mock_exists:
+         mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
       mock_alive.return_value = False
-      mock_exists.return_value = True
-      self.pm._purge_metadata()
+      self.pm.purge_metadata()
+      mock_rm_rf.assert_called_once_with(self.pm.get_metadata_dir())
+
+  def test_purge_metadata_alive_but_forced(self):
+    with mock.patch.object(ProcessManager, 'is_alive') as mock_alive, \
+         mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
+      mock_alive.return_value = True
+      self.pm.purge_metadata(force=True)
+      mock_rm_rf.assert_called_once_with(self.pm.get_metadata_dir())
 
   def test_get_metadata_dir(self):
     self.assertEqual(self.pm.get_metadata_dir(),
@@ -239,6 +246,21 @@ class TestProcessManager(unittest.TestCase):
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
+  def test_stale_pid_removal(self):
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process, \
+         mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge_metadata:
+      mock_as_process.side_effect = psutil.AccessDenied
+      self.pm.is_alive()
+      mock_purge_metadata.assert_called_once_with(self.pm, force=True)
+
+  def test_stale_pid_removal_oserror(self):
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process, \
+         mock.patch('pants.pantsd.process_manager.rm_rf', **PATCH_OPTS) as mock_rm_rf:
+      mock_as_process.side_effect = psutil.AccessDenied
+      mock_rm_rf.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
+      with self.assertRaises(ProcessManager.MetadataError):
+        self.pm.is_alive()
+
   def test_kill(self):
     with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
       self.pm._pid = 42
@@ -251,13 +273,11 @@ class TestProcessManager(unittest.TestCase):
       self.assertFalse(mock_kill.called, 'If we have no pid, kills should noop gracefully.')
 
   @contextmanager
-  def setup_terminate(self, assert_purged=True):
+  def setup_terminate(self, forced=True):
     with mock.patch.object(ProcessManager, '_kill', **PATCH_OPTS) as mock_kill, \
-         mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive, \
-         mock.patch.object(ProcessManager, '_purge_metadata', **PATCH_OPTS) as mock_purge:
+         mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive:
       yield mock_kill, mock_alive
-      if assert_purged:
-        mock_purge.assert_called_once_with(self.pm)
+      self.assertGreater(mock_alive.call_count, 0)
 
   def test_terminate_quick_death(self):
     with self.setup_terminate() as (mock_kill, mock_alive):
@@ -266,7 +286,7 @@ class TestProcessManager(unittest.TestCase):
       self.pm.terminate(kill_wait=.1)
 
   def test_terminate(self):
-    with self.setup_terminate(assert_purged=False) as (mock_kill, mock_alive):
+    with self.setup_terminate() as (mock_kill, mock_alive):
       mock_alive.return_value = True
       with self.assertRaises(self.pm.NonResponsiveProcess):
         self.pm.terminate(kill_wait=.1, purge=False)
@@ -298,27 +318,27 @@ class TestProcessManager(unittest.TestCase):
       if chk_post_child: mock_post_child.assert_called_once_with(self.pm)
       if chk_post_parent: mock_post_parent.assert_called_once_with(self.pm)
 
-  def test_daemonize_parent(self, *args):
+  def test_daemonize_parent(self):
     with self.mock_daemonize_context() as mock_fork:
       mock_fork.side_effect = [1, 1]    # Simulate the parent.
       self.pm.daemonize(write_pid=False)
 
-  def test_daemonize_child(self, *args):
+  def test_daemonize_child(self):
     with self.mock_daemonize_context(chk_post_child=True) as mock_fork:
       mock_fork.side_effect = [0, 0]    # Simulate the child.
       self.pm.daemonize(write_pid=False)
 
-  def test_daemonize_child_parent(self, *args):
+  def test_daemonize_child_parent(self):
     with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:
       mock_fork.side_effect = [0, 1]    # Simulate the childs parent.
       self.pm.daemonize(write_pid=False)
 
-  def test_daemon_spawn_parent(self, *args):
+  def test_daemon_spawn_parent(self):
     with self.mock_daemonize_context(chk_post_parent=True) as mock_fork:
       mock_fork.return_value = 1        # Simulate the parent.
       self.pm.daemon_spawn()
 
-  def test_daemon_spawn_child(self, *args):
+  def test_daemon_spawn_child(self):
     with self.mock_daemonize_context(chk_post_child=True) as mock_fork:
       mock_fork.return_value = 0        # Simulate the child.
       self.pm.daemon_spawn()

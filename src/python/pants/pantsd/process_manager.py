@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import logging
 import os
 import signal
@@ -16,7 +17,7 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
+from pants.util.dirutil import rm_rf, safe_mkdir, safe_open
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,7 @@ class ProcessManager(object):
   """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
   class ExecutionError(Exception): pass
+  class MetadataError(Exception): pass
   class InvalidCommandOutput(Exception): pass
   class NonResponsiveProcess(Exception): pass
   class Timeout(Exception): pass
@@ -196,16 +198,21 @@ class ProcessManager(object):
     """
     return os.path.join(self._buildroot, '.pids', self._name)
 
-  def _purge_metadata(self):
-    assert not self.is_alive(), 'aborting attempt to purge metadata for a running process!'
+  def purge_metadata(self, force=False):
+    """Purge a processes metadata directory.
 
-    for f in (self.get_pid_path(), self.get_socket_path()):
-      if f and os.path.exists(f):
-        try:
-          logging.debug('purging {file}'.format(file=f))
-          safe_delete(f)
-        except OSError as e:
-          logging.warning('failed to unlink {file}: {exc}'.format(file=f, exc=e))
+    :param bool force: If True, skip process liveness check before purging metadata.
+    :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
+    """
+    if not force:
+      assert not self.is_alive(), 'aborting attempt to purge metadata for a running process!'
+
+    meta_dir = self.get_metadata_dir()
+    logging.debug('purging metadata directory: {}'.format(meta_dir))
+    try:
+      rm_rf(meta_dir)
+    except OSError as e:
+      raise self.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
 
   def get_pid_path(self):
     """Return the path to the file containing the processes pid."""
@@ -242,25 +249,40 @@ class ProcessManager(object):
     except (IOError, OSError):
       return None
 
-  def is_dead(self):
+  def is_dead(self, purge=True):
     """Return a boolean indicating whether the process is dead or not."""
-    return not self.is_alive()
+    return not self.is_alive(purge)
 
-  def is_alive(self):
-    """Return a boolean indicating whether the process is running or not."""
-    try:
-      process = self._as_process()
-      if not process:
-        # Can happen if we don't find our pid.
-        return False
-      if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
-          (self.process_name and self.process_name != process.name())):  # Check for stale pids.
-        return False
-    except (psutil.NoSuchProcess, psutil.AccessDenied):
-      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
-      return False
+  def is_alive(self, purge=True):
+    """Return a boolean indicating whether the process is running or not.
 
-    return True
+    :param bool purge: If True (default), ensure the processes metadata directory is purged when
+                       the process is found to not be alive.
+    :raises: `ProcessManager.MetadataError` on failure to remove metadata dir (if applicable).
+    """
+    def _is_alive():
+      try:
+        process = self._as_process()
+        if not process:
+          # Can happen if we don't find our pid.
+          return False
+        if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
+            (self.process_name and self.process_name != process.name())):  # Check for stale pids.
+          return False
+      except (psutil.NoSuchProcess, psutil.AccessDenied):
+        # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
+        return False
+      return True
+
+    alive = _is_alive()
+
+    # Once we fail a pid check (for any reason), immediately ensure any stale metadata files are
+    # removed if purge=True in order to avoid accidental re-use. In extreme circumstances this can
+    # fail with `ProcessManager.MetadataError` (permissions issues, chattr +i, etc).
+    if not alive and purge:
+      self.purge_metadata(force=True)
+
+    return alive
 
   def _kill(self, kill_sig):
     """Send a signal to the current process."""
@@ -269,7 +291,7 @@ class ProcessManager(object):
 
   def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT_SEC, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
-    alive = self.is_alive()
+    alive = self.is_alive(purge=purge)
     if alive:
       for signal_type in signal_chain:
         try:
@@ -280,7 +302,7 @@ class ProcessManager(object):
 
         # Wait up to kill_wait seconds to terminate or move onto the next signal.
         try:
-          if self._deadline_until(self.is_dead, kill_wait):
+          if self._deadline_until(functools.partial(self.is_dead, purge=purge), kill_wait):
             alive = False
             break
         except self.Timeout:
@@ -290,9 +312,6 @@ class ProcessManager(object):
     if alive:
       raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
-
-    if purge:
-      self._purge_metadata()
 
   def get_subprocess_output(self, *args):
     try:
@@ -316,6 +335,7 @@ class ProcessManager(object):
        daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
        differ in their permissions without good reason - in this case, we want to inherit the umask.
     """
+    self.purge_metadata(force=True)
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
     if pid == 0:
@@ -346,6 +366,7 @@ class ProcessManager(object):
        Using this daemonization method vs daemonize() leaves the responsibility of writing the pid
        to the caller to allow for library-agnostic flexibility in subprocess execution.
     """
+    self.purge_metadata(force=True)
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
     if pid == 0:
