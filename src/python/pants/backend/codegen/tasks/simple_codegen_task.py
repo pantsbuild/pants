@@ -69,6 +69,15 @@ class SimpleCodegenTask(Task):
   def cache_target_dirs(self):
     return True
 
+  @property
+  def validate_sources_present():
+    """A property indicating whether input targets require sources.
+    
+    If targets should have sources, the `--allow-empty` flag indicates whether it is a
+    warning or an error for sources to be missing.
+    """
+    return False
+
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     """Gets any extra dependencies generated synthetic targets should have.
 
@@ -113,7 +122,7 @@ class SimpleCodegenTask(Task):
     """
     return self.context.targets(self.is_gentarget)
 
-  def _validate_sources_present(self, target):
+  def _do_validate_sources_present(self, target):
     """Checks whether sources is empty, and either raises a TaskError or just returns False.
 
     The specifics of this behavior are defined by whether the user sets --allow-empty to True/False:
@@ -125,6 +134,8 @@ class SimpleCodegenTask(Task):
     :param target: Target to validate.
     :return: True if sources is not empty, False otherwise.
     """
+    if not self.validate_sources_present:
+      return True
     sources = target.sources_relative_to_buildroot()
     if not sources:
       message = ('Target {} has no sources.'.format(target.address.spec))
@@ -149,7 +160,7 @@ class SimpleCodegenTask(Task):
         for vt in invalidation_check.all_vts:
           # Build the target and handle duplicate sources.
           if not vt.valid:
-            if self._validate_sources_present(vt.target):
+            if self._do_validate_sources_present(vt.target):
               self.execute_codegen(vt.target, vt.results_dir)
               self._handle_duplicate_sources(vt.target, vt.results_dir)
             vt.update()
