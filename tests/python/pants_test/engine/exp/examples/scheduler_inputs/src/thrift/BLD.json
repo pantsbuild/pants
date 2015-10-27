@@ -92,6 +92,13 @@
         "3rdparty/jvm:scala-library",
         ":slf4j-api"
       ]
+    },
+    {
+      "type_alias": "apache_thrift_configuration",
+      "name": "failing",
+      "rev": "fail",
+      "strict": true,
+      "gen": "java"
     }
   ]
 }

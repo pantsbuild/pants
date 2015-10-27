@@ -24,6 +24,7 @@ python_library(
   name='engine',
   sources=['engine.py'],
   dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/util:meta',

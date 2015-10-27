@@ -376,7 +376,7 @@ migrations = {
   # Preventing shadowing of global options.
   ('compile.zinc', 'plugins'): ('compile.zinc', 'scalac_plugins'),
   ('compile.zinc', 'plugin_args'): ('compile.zinc', 'scalac_plugin_args'),
-  ('gen.protoc', 'plugins'): ('compile.zinc', 'protoc_plugins'),
+  ('gen.protoc', 'plugins'): ('gen.protoc', 'protoc_plugins'),
 
   # Superceded by the global --tags option.
   ('filter', 'tags'): None

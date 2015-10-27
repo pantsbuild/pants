@@ -23,6 +23,10 @@ class SchedulerTest(unittest.TestCase):
     self.thrift = self.graph.resolve(Address.parse('src/thrift/codegen/simple'))
     self.java = self.graph.resolve(Address.parse('src/java/codegen/simple'))
 
+  def extract_product_type_and_plan(self, plan):
+    promise, plan = plan
+    return promise.product_type, plan
+
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = BuildRequest(goals=goals,
                                  addressable_roots=[Address.parse(spec) for spec in root_specs])
@@ -30,8 +34,9 @@ class SchedulerTest(unittest.TestCase):
 
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
-    self.assertEqual((Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=list(jars))),
-                     plans[0])
+    self.assertEqual((Classpath,
+                      Plan(func_or_task_type=IvyResolve, subjects=jars, jars=list(jars))),
+                     self.extract_product_type_and_plan(plans[0]))
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
@@ -68,7 +73,7 @@ class SchedulerTest(unittest.TestCase):
                            rev='0.9.2',
                            gen='java',
                            sources=['src/thrift/codegen/simple/simple.thrift'])),
-                     plans[0])
+                     self.extract_product_type_and_plan(plans[0]))
 
   def test_codegen_simple(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])
@@ -92,7 +97,7 @@ class SchedulerTest(unittest.TestCase):
                             gen='java',
                             sources=['src/thrift/codegen/simple/simple.thrift'])),
                       (Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=jars))},
-                     set(plans[0:2]))
+                     set(self.extract_product_type_and_plan(p) for p in plans[0:2]))
 
     # The rest is linked.
     self.assertEqual((Classpath,
@@ -100,7 +105,7 @@ class SchedulerTest(unittest.TestCase):
                            subjects=[self.thrift],
                            sources=Promise(Sources.of('.java'), self.thrift),
                            classpath=[Promise(Classpath, jar) for jar in thrift_jars])),
-                     plans[2])
+                     self.extract_product_type_and_plan(plans[2]))
 
     self.assertEqual((Classpath,
                       Plan(func_or_task_type=Javac,
@@ -108,4 +113,4 @@ class SchedulerTest(unittest.TestCase):
                            sources=['src/java/codegen/simple/Simple.java'],
                            classpath=[Promise(Classpath, self.guava),
                                       Promise(Classpath, self.thrift)])),
-                     plans[3])
+                     self.extract_product_type_and_plan(plans[3]))
