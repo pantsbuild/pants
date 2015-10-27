@@ -249,40 +249,25 @@ class ProcessManager(object):
     except (IOError, OSError):
       return None
 
-  def is_dead(self, purge=True):
+  def is_dead(self):
     """Return a boolean indicating whether the process is dead or not."""
-    return not self.is_alive(purge)
+    return not self.is_alive()
 
-  def is_alive(self, purge=True):
-    """Return a boolean indicating whether the process is running or not.
-
-    :param bool purge: If True (default), ensure the processes metadata directory is purged when
-                       the process is found to not be alive.
-    :raises: `ProcessManager.MetadataError` on failure to remove metadata dir (if applicable).
-    """
-    def _is_alive():
-      try:
-        process = self._as_process()
-        if not process:
-          # Can happen if we don't find our pid.
-          return False
-        if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
-            (self.process_name and self.process_name != process.name())):  # Check for stale pids.
-          return False
-      except (psutil.NoSuchProcess, psutil.AccessDenied):
-        # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
+  def is_alive(self):
+    """Return a boolean indicating whether the process is running or not."""
+    try:
+      process = self._as_process()
+      if not process:
+        # Can happen if we don't find our pid.
         return False
-      return True
+      if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
+          (self.process_name and self.process_name != process.name())):  # Check for stale pids.
+        return False
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
+      return False
 
-    alive = _is_alive()
-
-    # Once we fail a pid check (for any reason), immediately ensure any stale metadata files are
-    # removed if purge=True in order to avoid accidental re-use. In extreme circumstances this can
-    # fail with `ProcessManager.MetadataError` (permissions issues, chattr +i, etc).
-    if not alive and purge:
-      self.purge_metadata(force=True)
-
-    return alive
+    return True
 
   def _kill(self, kill_sig):
     """Send a signal to the current process."""
@@ -291,7 +276,7 @@ class ProcessManager(object):
 
   def terminate(self, signal_chain=KILL_CHAIN, kill_wait=KILL_WAIT_SEC, purge=True):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
-    alive = self.is_alive(purge=purge)
+    alive = self.is_alive()
     if alive:
       for signal_type in signal_chain:
         try:
@@ -302,7 +287,7 @@ class ProcessManager(object):
 
         # Wait up to kill_wait seconds to terminate or move onto the next signal.
         try:
-          if self._deadline_until(functools.partial(self.is_dead, purge=purge), kill_wait):
+          if self._deadline_until(self.is_dead, kill_wait):
             alive = False
             break
         except self.Timeout:
@@ -312,6 +297,9 @@ class ProcessManager(object):
     if alive:
       raise self.NonResponsiveProcess('failed to kill pid {pid} with signals {chain}'
                                       .format(pid=self.pid, chain=signal_chain))
+
+    if purge:
+      self.purge_metadata(force=True)
 
   def get_subprocess_output(self, *args):
     try:

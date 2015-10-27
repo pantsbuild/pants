@@ -178,6 +178,14 @@ class TestProcessManager(unittest.TestCase):
       self.pm.purge_metadata(force=True)
       mock_rm_rf.assert_called_once_with(self.pm.get_metadata_dir())
 
+  def test_purge_metadata_metadata_error(self):
+    with mock.patch.object(ProcessManager, 'is_alive') as mock_alive, \
+         mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
+      mock_alive.return_value = False
+      mock_rm_rf.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
+      with self.assertRaises(ProcessManager.MetadataError):
+        self.pm.purge_metadata()
+
   def test_get_metadata_dir(self):
     self.assertEqual(self.pm.get_metadata_dir(),
                      os.path.join(self.pm._buildroot, '.pids', self.pm._name))
@@ -246,21 +254,6 @@ class TestProcessManager(unittest.TestCase):
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
-  def test_stale_pid_removal(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process, \
-         mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge_metadata:
-      mock_as_process.side_effect = psutil.AccessDenied
-      self.pm.is_alive()
-      mock_purge_metadata.assert_called_once_with(self.pm, force=True)
-
-  def test_stale_pid_removal_oserror(self):
-    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process, \
-         mock.patch('pants.pantsd.process_manager.rm_rf', **PATCH_OPTS) as mock_rm_rf:
-      mock_as_process.side_effect = psutil.AccessDenied
-      mock_rm_rf.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
-      with self.assertRaises(ProcessManager.MetadataError):
-        self.pm.is_alive()
-
   def test_kill(self):
     with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
       self.pm._pid = 42
@@ -273,23 +266,43 @@ class TestProcessManager(unittest.TestCase):
       self.assertFalse(mock_kill.called, 'If we have no pid, kills should noop gracefully.')
 
   @contextmanager
-  def setup_terminate(self, forced=True):
+  def setup_terminate(self):
     with mock.patch.object(ProcessManager, '_kill', **PATCH_OPTS) as mock_kill, \
-         mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive:
-      yield mock_kill, mock_alive
+         mock.patch.object(ProcessManager, 'is_alive', **PATCH_OPTS) as mock_alive, \
+         mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge:
+      yield mock_kill, mock_alive, mock_purge
       self.assertGreater(mock_alive.call_count, 0)
 
   def test_terminate_quick_death(self):
-    with self.setup_terminate() as (mock_kill, mock_alive):
+    with self.setup_terminate() as (mock_kill, mock_alive, mock_purge):
       mock_kill.side_effect = OSError('oops')
       mock_alive.side_effect = [True, False]
       self.pm.terminate(kill_wait=.1)
+      self.assertEqual(mock_kill.call_count, 1)
+      self.assertEqual(mock_purge.call_count, 1)
 
-  def test_terminate(self):
-    with self.setup_terminate() as (mock_kill, mock_alive):
+  def test_terminate_quick_death_no_purge(self):
+    with self.setup_terminate() as (mock_kill, mock_alive, mock_purge):
+      mock_kill.side_effect = OSError('oops')
+      mock_alive.side_effect = [True, False]
+      self.pm.terminate(purge=False, kill_wait=.1)
+      self.assertEqual(mock_kill.call_count, 1)
+      self.assertEqual(mock_purge.call_count, 0)
+
+  def test_terminate_already_dead(self):
+    with self.setup_terminate() as (mock_kill, mock_alive, mock_purge):
+      mock_alive.return_value = False
+      self.pm.terminate(purge=True)
+      self.assertEqual(mock_kill.call_count, 0)
+      self.assertEqual(mock_purge.call_count, 1)
+
+  def test_terminate_no_kill(self):
+    with self.setup_terminate() as (mock_kill, mock_alive, mock_purge):
       mock_alive.return_value = True
       with self.assertRaises(self.pm.NonResponsiveProcess):
-        self.pm.terminate(kill_wait=.1, purge=False)
+        self.pm.terminate(kill_wait=.1, purge=True)
+      self.assertEqual(mock_kill.call_count, len(ProcessManager.KILL_CHAIN))
+      self.assertEqual(mock_purge.call_count, 0)
 
   def test_get_subprocess_output(self):
     test_str = '333'
@@ -308,12 +321,14 @@ class TestProcessManager(unittest.TestCase):
     with mock.patch.object(ProcessManager, 'post_fork_parent', **PATCH_OPTS) as mock_post_parent, \
          mock.patch.object(ProcessManager, 'post_fork_child', **PATCH_OPTS) as mock_post_child, \
          mock.patch.object(ProcessManager, 'pre_fork', **PATCH_OPTS) as mock_pre, \
+         mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge, \
          mock.patch('os.chdir', **PATCH_OPTS), \
          mock.patch('os._exit', **PATCH_OPTS), \
          mock.patch('os.setsid', **PATCH_OPTS), \
          mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
       yield mock_fork
 
+      mock_purge.assert_called_once_with(self.pm, force=True)
       if chk_pre: mock_pre.assert_called_once_with(self.pm)
       if chk_post_child: mock_post_child.assert_called_once_with(self.pm)
       if chk_post_parent: mock_post_parent.assert_called_once_with(self.pm)
