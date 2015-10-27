@@ -144,16 +144,16 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       self.assertEqual(args, (1,))
 
   def execute_junit_runner(self, content):
-
     # Create the temporary base test directory
     test_rel_path = 'tests/java/org/pantsbuild/foo'
-    test_abs_path = os.path.join(self.build_root, test_rel_path)
-    self.create_dir(test_rel_path)
+    test_abs_path = self.create_dir(test_rel_path)
 
     # Generate the temporary java test source code.
     test_java_file_rel_path = os.path.join(test_rel_path, 'FooTest.java')
-    test_java_file_abs_path = os.path.join(self.build_root, test_java_file_rel_path)
-    self.create_file(test_java_file_rel_path, content)
+    test_java_file_abs_path = self.create_file(test_java_file_rel_path, content)
+
+    # Create the temporary classes directory under work dir
+    test_classes_abs_path = self.create_workdir_dir(test_rel_path)
 
     # Invoke ivy to resolve classpath for junit.
     classpath_file_abs_path = os.path.join(test_abs_path, 'junit.classpath')
@@ -172,7 +172,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # the test on.
     javac = distribution.binary('javac')
     subprocess.check_call(
-      [javac, '-d', test_abs_path, '-cp', classpath, test_java_file_abs_path])
+      [javac, '-d', test_classes_abs_path, '-cp', classpath, test_java_file_abs_path])
 
     # Create a java_tests target and a synthetic resource target.
     java_tests = self.create_library(test_rel_path, 'java_tests', 'foo_test', ['FooTest.java'])
@@ -189,7 +189,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # the compiled test java classes that JUnitRun will know which test
     # classes to execute. In a normal run, this "runtime_classpath" will be
     # populated by java compilation step.
-    self.populate_runtime_classpath(context=context, classpath=[test_abs_path])
+    self.populate_runtime_classpath(context=context, classpath=[test_classes_abs_path])
 
     # Finally execute the task.
     self.execute(context)

@@ -33,7 +33,7 @@ class JvmTaskTest(JvmTaskTestBase):
 
     context = self.context(target_roots=[self.t1, self.t2, self.t3])
 
-    self.classpath = [os.path.join(self.build_root, entry) for entry in 'a', 'b']
+    self.classpath = [os.path.join(self.pants_workdir, entry) for entry in 'a', 'b']
     self.populate_runtime_classpath(context, self.classpath)
 
     self.task = self.create_task(context)

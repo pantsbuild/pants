@@ -380,7 +380,7 @@ class ClasspathProductsTest(BaseTest):
     return self.path('ivy/jars/com.example/lib/jars/123.4.jar')
 
   def path(self, p):
-    return os.path.join(self.build_root, p)
+    return os.path.join(self.pants_workdir, p)
 
   def add_jar_classpath_element_for_path(self,
                                          classpath_product,

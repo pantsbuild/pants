@@ -31,7 +31,7 @@ class JvmRunTest(JvmTaskTestBase):
                                   main='org.pantsbuild.Binary')
     context = self.context(target_roots=[jvm_binary])
     jvm_run = self.create_task(context)
-    self._cmdline_classpath = [os.path.join(self.build_root, c) for c in ['bob', 'fred']]
+    self._cmdline_classpath = [os.path.join(self.pants_workdir, c) for c in ['bob', 'fred']]
     self.populate_runtime_classpath(context=jvm_run.context, classpath=self._cmdline_classpath)
     with temporary_dir() as pwd:
       with pushd(pwd):

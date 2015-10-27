@@ -52,6 +52,15 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(path)
     return path
 
+  def create_workdir_dir(self, relpath):
+    """Creates a directory under the work directory.
+
+    relpath: The relative path to the directory from the work directory.
+    """
+    path = os.path.join(self.pants_workdir, relpath)
+    safe_mkdir(path)
+    return path
+
   def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
 
@@ -60,6 +69,18 @@ class BaseTest(unittest.TestCase):
     mode:     The mode to write to the file in - over-write by default.
     """
     path = os.path.join(self.build_root, relpath)
+    with safe_open(path, mode=mode) as fp:
+      fp.write(contents)
+    return path
+
+  def create_workdir_file(self, relpath, contents='', mode='wb'):
+    """Writes to a file under the work directory.
+
+    relpath:  The relative path to the file from the work directory.
+    contents: A string containing the contents of the file - '' by default..
+    mode:     The mode to write to the file in - over-write by default.
+    """
+    path = os.path.join(self.pants_workdir, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
     return path
