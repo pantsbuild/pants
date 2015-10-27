@@ -178,16 +178,6 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
 
     self._executor = None
 
-  def kill(self):
-    """Kills the test run."""
-
-    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
-    #   storing the process handle here, the test mixin class will call the start_test() fn
-    #   on the language specific class which will return an object that can kill/monitor/etc
-    #   the test process.
-    if self._executor is not None:
-      self._executor.kill()
-
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
                                             if isinstance(target, JvmTarget)])
@@ -430,7 +420,14 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       raise TargetDefinitionException(target, msg)
 
   def _timeout_abort_handler(self):
-    self.kill()
+    """Kills the test run."""
+
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process.
+    if self._executor is not None:
+      self._executor.kill()
 
   def _execute(self, targets):
     # We only run tests within java_tests/junit_tests targets.
