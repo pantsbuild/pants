@@ -110,6 +110,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     return self._artifact(self._cache_file_for_key(cache_key))
 
   def use_cached_files(self, cache_key, results_dir=None):
+    tarfile = self._cache_file_for_key(cache_key)
     try:
       artifact = self._artifact_for(cache_key)
       if artifact.exists():
@@ -117,9 +118,15 @@ class LocalArtifactCache(BaseLocalArtifactCache):
           safe_rmtree(results_dir)
         artifact.extract()
         return True
+    except (ArtifactError, IOError) as non_retryable_exception:
+      logger.warn('Cleaning up corrupted artifact {0}: {1}'
+                  .format(tarfile, non_retryable_exception))
+      safe_delete(tarfile)
+      return UnreadableArtifact(cache_key, non_retryable_exception)
     except Exception as e:
-      # TODO(davidt): Consider being more granular in what is caught.
-      logger.warn('Error while reading from local artifact cache: {0}'.format(e))
+      # The rest exceptions could be transient, we can further refine this by moving
+      # non-retryable errors handling to the above section.
+      logger.warn('Error while reading {0}: {1}'.format(tarfile, e))
       return UnreadableArtifact(cache_key, e)
 
     return False
