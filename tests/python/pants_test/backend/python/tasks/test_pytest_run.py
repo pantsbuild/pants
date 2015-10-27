@@ -233,7 +233,10 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
       self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
-      mock_timeout.assert_called_with(None)
+
+      # Ensures that Timeout is instantiated with no timeout.
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (None,))
 
   def test_timeout(self):
     """Check that a failed timeout returns the right results."""
@@ -242,7 +245,10 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
       mock_timeout().__exit__.side_effect = TimeoutReached(1)
       self.run_failing_tests(targets=[self.sleep_timeout],
                              failed_targets=[self.sleep_timeout])
-      mock_timeout.assert_called_with(1)
+
+      # Ensures that Timeout is instantiated with a 1 second timeout.
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (1,))
 
   def test_junit_xml_option(self):
     # We expect xml of the following form:
