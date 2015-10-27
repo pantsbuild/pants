@@ -4,10 +4,13 @@ var WebBuildTool = require('web-build-tool'),
 if(process.env.NODE_ENV == "test") {
   config = WebBuildTool.UnitTest;
 
-  config.entry = './test/unit.js';
+  config.entry = {
+    'unit': './test/unit.js',
+    'integration': './test/integration.js'
+  };
   config.output = {
-    path: __dirname + '/dist',
-    filename: 'unit.js'
+    path: __dirname + '/dist/test',
+    filename: '[name].js'
   };
 } else {
   config = WebBuildTool.Normal;
