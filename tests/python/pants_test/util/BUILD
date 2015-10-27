@@ -110,3 +110,13 @@ python_tests(
     'src/python/pants/util:timeout',
   ],
 )
+
+python_tests(
+  name = 'socket',
+  sources = ['test_socket.py'],
+  coverage = ['pants.util.socket'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:socket',
+  ],
+)

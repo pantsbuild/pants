@@ -24,8 +24,8 @@ def create_digraph(execution_graph):
   def format_promise(promise):
     return '{}({})'.format(promise.product_type.__name__, format_subject(promise.subject))
 
-  def format_label(product_type, plan):
-    return '{}:{}'.format(plan.func_or_task_type.value.__name__, product_type.__name__)
+  def format_label(promise, plan):
+    return '{}:{}'.format(plan.func_or_task_type.value.__name__, promise.product_type.__name__)
 
   colorscheme = 'set312'
   colors = {}
@@ -38,8 +38,8 @@ def create_digraph(execution_graph):
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for product_type, plan in execution_graph.walk():
-    label = format_label(product_type, plan)
+  for promise, plan in execution_graph.walk():
+    label = format_label(promise, plan)
     color = color_index(plan.func_or_task_type)
     if len(plan.subjects) > 1:
       # NB: naming a subgraph cluster* triggers drawing of a box around the subgraph.  We levarge
@@ -56,12 +56,12 @@ def create_digraph(execution_graph):
         yield ('    node [style=filled, fillcolor={color}, label="{label}"] "{node}";'
                .format(color=subgraph_node_color,
                        label=format_subject(subject),
-                       node=format_promise(Promise(product_type, subject))))
+                       node=format_promise(promise.rebind(subject))))
 
       yield '  }'
     else:
       subject = list(plan.subjects)[0]
-      node = Promise(product_type, subject)
+      node = promise.rebind(subject)
 
       yield ('  node [style=filled, fillcolor={color}, label="{label}({subject})"] "{node}";'
              .format(color=color,
@@ -69,10 +69,10 @@ def create_digraph(execution_graph):
                      subject=format_subject(subject),
                      node=format_promise(node)))
 
-    for promise in plan.promises:
+    for pr in plan.promises:
       for subject in plan.subjects:
-        yield '  "{}" -> "{}"'.format(format_promise(Promise(product_type, subject)),
-                                      format_promise(promise))
+        yield '  "{}" -> "{}"'.format(format_promise(promise.rebind(subject)),
+                                      format_promise(pr))
 
   yield '}'
 

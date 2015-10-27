@@ -23,3 +23,13 @@
     "src/thrift/codegen/selector"
   ]
 }
+
+{
+  "type_alias": "target",
+  "name": "failing",
+  "sources": ":sources",
+  "dependencies": [
+    "3rdparty/jvm:guava",
+    "src/thrift/codegen/selector:selector@failing"
+  ]
+}

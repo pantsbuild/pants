@@ -17,6 +17,15 @@ python_library(
 python_library(
   name = 'nailgun_client',
   sources = ['nailgun_client.py'],
+  dependencies = [
+    ':nailgun_protocol',
+    'src/python/pants/util:socket'
+  ]
+)
+
+python_library(
+  name = 'nailgun_protocol',
+  sources = ['nailgun_protocol.py'],
 )
 
 python_library(

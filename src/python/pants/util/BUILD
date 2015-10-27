@@ -72,3 +72,8 @@ python_library(
   name = 'timeout',
   sources = ['timeout.py'],
 )
+
+python_library(
+  name = 'socket',
+  sources = ['socket.py']
+)
