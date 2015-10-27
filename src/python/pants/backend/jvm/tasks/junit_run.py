@@ -430,7 +430,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       raise TargetDefinitionException(target, msg)
 
   def _timeout_abort_handler(self):
-    self._runner.kill()
+    self.kill()
 
   def _execute(self, targets):
     # We only run tests within java_tests/junit_tests targets.
