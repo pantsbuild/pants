@@ -10,6 +10,7 @@ import re
 import time
 from textwrap import dedent
 
+from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
@@ -73,7 +74,13 @@ class AntlrGenTest(NailgunTaskTestBase):
     context = self.create_context()
     task = self.prepare_execute(context)
     target_workdir_fun = target_workdir_fun or (lambda x: safe_mkdtemp(dir=x))
-    target_workdir = target_workdir_fun(task.workdir)
+    # target_workdir = target_workdir_fun(task.workdir)
+    # temporary fix for target_workdir
+    target_workdir = os.path.abspath(task.workdir+"/../../_GENERATE_WORKDIR")
+    safe_rmtree(target_workdir)
+    os.mkdir(target_workdir)
+    target_workdir = target_workdir_fun(target_workdir)
+    # end of fix
 
     # Generate code, then create a synthetic target.
     task.execute_codegen(target, target_workdir)

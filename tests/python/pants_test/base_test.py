@@ -156,6 +156,9 @@ class BaseTest(unittest.TestCase):
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     self.addCleanup(safe_rmtree, self.build_root)
 
+    # self.pants_workdir = os.path.abspath(self.build_root+"/../_WORKDIR")
+    # safe_rmtree(self.pants_workdir)
+    # os.mkdir(self.pants_workdir)
     self.pants_workdir = os.path.realpath(mkdtemp(suffix='_WORK_DIR'))
     self.addCleanup(safe_rmtree, self.pants_workdir)
 
