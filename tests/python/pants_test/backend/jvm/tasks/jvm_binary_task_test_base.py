@@ -32,7 +32,7 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
     coordinate = M2Coordinate(org=org, name=name, rev=rev, classifier=classifier, ext=ext)
     cache_path = 'not/a/real/cache/path'
     jar_name = str(coordinate)
-    pants_path = self.create_file(jar_name) if materialize else os.path.join(self.build_root,
+    pants_path = self.create_workdir_file(jar_name) if materialize else os.path.join(self.pants_workdir,
                                                                              jar_name)
     return ResolvedJar(coordinate=coordinate, cache_path=cache_path, pants_path=pants_path)
 
