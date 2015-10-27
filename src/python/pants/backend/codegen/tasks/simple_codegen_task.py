@@ -70,13 +70,13 @@ class SimpleCodegenTask(Task):
     return True
 
   @property
-  def validate_sources_present():
+  def validate_sources_present(self):
     """A property indicating whether input targets require sources.
-    
+
     If targets should have sources, the `--allow-empty` flag indicates whether it is a
     warning or an error for sources to be missing.
     """
-    return False
+    return True
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     """Gets any extra dependencies generated synthetic targets should have.
