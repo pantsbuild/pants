@@ -95,7 +95,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     executor = self.create_java_executor()
     targets = self.context.targets()
     compile_classpath = self.context.products.get_data('compile_classpath',
-                                                       init_func=ClasspathProducts)
+                                                       init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
     resolve_hash_name = self.resolve(executor=executor,
                                      targets=targets,
                                      classpath_products=compile_classpath,

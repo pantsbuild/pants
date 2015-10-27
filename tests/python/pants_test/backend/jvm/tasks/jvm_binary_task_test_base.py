@@ -55,4 +55,4 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
     :returns: The classpath products associated with the given `context`
     :rtype: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
     """
-    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts)
+    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
