@@ -54,7 +54,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
   @ensure_cached(expected_num_artifacts=2)
   def test_config_invalidates_targets(self, cache_args):
     with self.temporary_workdir() as workdir:
-      with temporary_dir(root_dir=self.workdir_root()) as tmp:
+      with temporary_dir() as tmp:
         configs = [
             dedent("""
               <module name="TreeWalker">
