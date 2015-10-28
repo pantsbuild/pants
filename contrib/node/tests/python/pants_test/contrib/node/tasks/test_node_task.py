@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
+import string
 from textwrap import dedent
 
 from pants.build_graph.target import Target
@@ -32,28 +33,54 @@ class NodeTaskTest(TaskTestBase):
     return cls.TestNodeTask
 
   def test_is_npm_package(self):
-    self.assertTrue(NodeTask.is_npm_package(self.make_target(':a', NodeRemoteModule)))
-    self.assertTrue(NodeTask.is_npm_package(self.make_target(':b', NodeModule)))
-    self.assertFalse(NodeTask.is_npm_package(self.make_target(':c', NpmTest)))
-    self.assertFalse(NodeTask.is_npm_package(self.make_target(':d', Target)))
+    expected = {
+      NodeRemoteModule: True,
+      NodeModule: True,
+      NpmTest: False,
+      Target: False,
+    }
+    self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_npm_package))
 
   def test_is_node_module(self):
-    self.assertTrue(NodeTask.is_node_module(self.make_target(':a', NodeModule)))
-    self.assertFalse(NodeTask.is_node_module(self.make_target(':b', NodeRemoteModule)))
-    self.assertFalse(NodeTask.is_node_module(self.make_target(':c', NpmTest)))
-    self.assertFalse(NodeTask.is_node_module(self.make_target(':d', Target)))
+    expected = {
+      NodeRemoteModule: False,
+      NodeModule: True,
+      NpmTest: False,
+      Target: False,
+    }
+    self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_node_module))
 
   def test_is_node_remote_module(self):
-    self.assertTrue(NodeTask.is_node_remote_module(self.make_target(':a', NodeRemoteModule)))
-    self.assertFalse(NodeTask.is_node_remote_module(self.make_target(':b', NodeModule)))
-    self.assertFalse(NodeTask.is_node_remote_module(self.make_target(':c', NpmTest)))
-    self.assertFalse(NodeTask.is_node_remote_module(self.make_target(':d', Target)))
+    expected = {
+      NodeRemoteModule: True,
+      NodeModule: False,
+      NpmTest: False,
+      Target: False,
+    }
+    self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_node_remote_module))
 
   def test_is_npm_test(self):
-    self.assertTrue(NodeTask.is_npm_test(self.make_target(':a', NpmTest)))
-    self.assertFalse(NodeTask.is_npm_test(self.make_target(':b', NodeRemoteModule)))
-    self.assertFalse(NodeTask.is_npm_test(self.make_target(':c', NodeModule)))
-    self.assertFalse(NodeTask.is_npm_test(self.make_target(':d', Target)))
+    expected = {
+      NodeRemoteModule: False,
+      NodeModule: False,
+      NpmTest: True,
+      Target: False,
+    }
+    self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_npm_test))
+
+  def _type_check(self, types, type_check_function):
+    # Make sure the diff display length is long enough for the test_is_* tests.
+    # It's a little weird to include this side effect here, but otherwise it would have to
+    # be duplicated or go in the setup (in which case it would affect all tests).
+    self.maxDiff = None
+
+    target_names = [':' + letter for letter in list(string.ascii_lowercase)]
+    types_with_target_names = zip(types, target_names)
+
+    type_check_results = [(type, type_check_function(self.make_target(target_name, type)))
+                          for (type, target_name) in types_with_target_names]
+
+    return dict(type_check_results)
 
   def test_render_npm_package_dependency(self):
     node_module_target = self.make_target(':a', NodeModule)
