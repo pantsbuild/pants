@@ -38,7 +38,7 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
       return '{}:{}'.format(self.javadir, name)
 
     def clean_all(self):
-      return self.test.run_pants(['clean-all'])
+      return self.test.run_pants_with_workdir(['clean-all'], workdir=self.workdir)
 
     def jvm_platform_validate(self, *targets):
       return self.test.run_pants_with_workdir(['jvm-platform-validate', '--check=fatal']
