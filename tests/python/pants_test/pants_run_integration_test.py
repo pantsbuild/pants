@@ -74,13 +74,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return False
 
   def temporary_workdir(self):
-    # We can hard-code '.pants.d' here because we know that will always be its value
-    # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
-    # Grabbing the pants_workdir config would require this pants's config object,
-    # which we don't have a reference to here.
-    root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
-    safe_mkdir(root)
-    return temporary_dir(root_dir=root, suffix='.pants.d')
+    return temporary_dir(suffix=".pants.d")
 
   def temporary_cachedir(self):
     return temporary_dir(suffix='__CACHEDIR')
