@@ -17,7 +17,7 @@ class HaskellPackage(Target):
     :param str resolver: The `stack` resolver (i.e. "lts-3.1" or "nightly-2015-08-29")
     """
 
-    self.package  = package or self.name
+    self.package  = package or kwargs['name']
     self.resolver = resolver
 
     payload = Payload()

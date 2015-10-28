@@ -1,6 +1,6 @@
 stackage(
   name='pipes',
-  package='pipes',
+# package='pipes',
   resolver='lts-3.1',
 )
 
