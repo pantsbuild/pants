@@ -109,15 +109,16 @@ class StackTask(Task):
     safe_mkdir(bin_path)
 
     try:
-      subprocess.check_call([
-        "stack",
-        "--verbosity", "error",
-        "--local-bin-path", bin_path,
-        "--install-ghc",
-        "--stack-yaml=" + stack_yaml_path,
-        command,
-        vt.target.package
-      ] + extra_args)
+      with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL]) as workunit:
+        subprocess.check_call([
+          "stack",
+          "--verbosity", "error",
+          "--local-bin-path", bin_path,
+          "--install-ghc",
+          "--stack-yaml=" + stack_yaml_path,
+          command,
+          vt.target.package
+        ] + extra_args)
     except subprocess.CalledProcessError:
       print("")
       print("Contents of " + stack_yaml_path + ":")
