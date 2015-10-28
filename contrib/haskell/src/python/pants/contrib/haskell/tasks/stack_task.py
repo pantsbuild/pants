@@ -118,7 +118,7 @@ class StackTask(Task):
         command,
         vt.target.package
       ] + extra_args)
-    except:
+    except subprocess.CalledProcessError:
       print("")
       print("Contents of " + stack_yaml_path + ":")
       print("")
