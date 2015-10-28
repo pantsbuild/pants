@@ -13,8 +13,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class NpmRunIntegrationTest(PantsRunIntegrationTest):
 
   def test_run_simple(self):
-    command = ['-q',
-               'run',
+    command = ['run',
                'contrib/node/examples/src/node/web-component-button',
                '--run-npm-script-name=build']
     pants_run = self.run_pants(command=command)

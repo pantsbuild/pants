@@ -13,24 +13,21 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class NpmTestIntegrationTest(PantsRunIntegrationTest):
 
   def test_test_simple(self):
-    command = ['-q',
-               'test',
+    command = ['test',
                'contrib/node/examples/src/node/server-project:unit']
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
 
   def test_test_target_with_non_default_script_name(self):
-    command = ['-q',
-               'test',
+    command = ['test',
                'contrib/node/examples/src/node/web-component-button:unit']
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
 
   def test_test_multiple_targets(self):
-    command = ['-q',
-               'test',
+    command = ['test',
                'contrib/node/examples/src/node/web-component-button:unit',
                'contrib/node/examples/src/node/web-component-button:integration']
     pants_run = self.run_pants(command=command)
