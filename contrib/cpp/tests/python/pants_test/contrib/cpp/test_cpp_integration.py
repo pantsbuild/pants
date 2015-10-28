@@ -69,7 +69,7 @@ class CppIntegrationTest(PantsRunIntegrationTest):
                   pants_run.stdout_data)
 
   def _run_with_cache(self, task, target):
-    with temporary_dir(root_dir=self.workdir_root()) as cache:
+    with self.temporary_cachedir() as cache:
       args = [
         'clean-all',
         task,

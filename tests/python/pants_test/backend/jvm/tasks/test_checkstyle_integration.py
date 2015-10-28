@@ -15,7 +15,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensur
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
   def test_checkstyle_cached(self):
-    with temporary_dir(root_dir=self.workdir_root()) as cache:
+    with self.temporary_cachedir() as cache:
       with self.temporary_workdir() as workdir:
         args = [
             'clean-all',
