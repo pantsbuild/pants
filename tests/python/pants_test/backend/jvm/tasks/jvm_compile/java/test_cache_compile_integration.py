@@ -27,7 +27,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
   def test_stale_artifacts_rmd_when_cache_used_with_zinc(self):
     with temporary_dir() as cache_dir, \
-        temporary_dir(root_dir=self.workdir_root()) as workdir, \
+        self.temporary_workdir() as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
@@ -87,7 +87,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
   def test_incremental_caching(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""
     with temporary_dir() as cache_dir, \
-        temporary_dir(root_dir=self.workdir_root()) as workdir, \
+        self.temporary_workdir() as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       def config(incremental_caching):

@@ -65,7 +65,7 @@ class JvmPlatformIntegrationMixin(object):
       jar_name = jar_name[jar_name.find(':') + 1:]
     with temporary_dir() as cache_dir:
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with self.temporary_workdir() as workdir:
         pants_run = self.run_pants_with_workdir(
           ['binary'] + self.get_pants_compile_args()
           + ['compile.checkstyle', '--skip', spec]
@@ -194,7 +194,7 @@ class JvmPlatformIntegrationMixin(object):
       }
 
       # We run these all in the same working directory, because we're testing caching behavior.
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with self.temporary_workdir() as workdir:
 
         def compile_diamond(platform):
           return self.run_pants_with_workdir(['--jvm-platform-platforms={}'.format(platforms),

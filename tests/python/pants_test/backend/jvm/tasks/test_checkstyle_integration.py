@@ -16,7 +16,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
   def test_checkstyle_cached(self):
     with temporary_dir(root_dir=self.workdir_root()) as cache:
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with self.temporary_workdir() as workdir:
         args = [
             'clean-all',
             'compile.checkstyle',
@@ -53,7 +53,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_cached(expected_num_artifacts=2)
   def test_config_invalidates_targets(self, cache_args):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as tmp:
         configs = [
             dedent("""
@@ -85,7 +85,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_cached(expected_num_artifacts=2)
   def test_jvm_tool_changes_invalidate_targets(self, cache_args):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       # Ensure that only the second use of the default checkstyle will not invalidate anything.
       for checkstyle_jar in (None, 'testprojects/3rdparty/checkstyle', None):
         args = [

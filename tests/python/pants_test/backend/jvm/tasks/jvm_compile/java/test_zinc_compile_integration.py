@@ -20,7 +20,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       pass
 
   def test_in_process(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
         pants_run = self.run_test_compile(
           workdir, cachedir, 'examples/src/java/org/pantsbuild/example/hello/main',
@@ -30,7 +30,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         self.assertNotIn('Forking javac', pants_run.stdout_data)
 
   def test_log_level(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
         target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
         pants_run = self.run_test_compile(
@@ -41,7 +41,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         self.assertIn('[error]     System2.out.println("Hello World!");', pants_run.stdout_data)
 
   def test_unicode_source_symbol(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
         target = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/unicodedep/consumer'
         pants_run = self.run_test_compile(
@@ -107,7 +107,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
 
     # Try to reproduce second compile that fails with missing symbol
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
         # This annotation processor has a unique external dependency
         self.assert_success(self.run_test_compile(
