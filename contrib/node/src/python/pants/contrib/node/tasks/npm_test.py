@@ -14,7 +14,7 @@ from pants.contrib.node.tasks.node_task import NodeTask
 
 
 class NpmTest(NodeTask):
-  """Runs a test script from package.json, like "npm run [script name]"."""
+  """Runs a test script from package.json, via "npm run [script name]"."""
 
   @classmethod
   def supports_passthru_args(cls):
