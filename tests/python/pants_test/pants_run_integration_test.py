@@ -87,7 +87,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return temporary_dir(root_dir=self.workdir_root())
 
   def temporary_cachedir(self):
-    return temporary_dir(root_dir=self.workdir_root())
+    return temporary_dir(suffix="__CACHEDIR")
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              **kwargs):
