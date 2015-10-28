@@ -8,11 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 from textwrap import dedent
-from xml.etree import ElementTree
 
-import pytest
-
-from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -148,7 +144,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def _failing_test_cases(self):
-    with temporary_dir() as source_dir:
+    with self.temporary_sourcedir() as source_dir:
       with open(os.path.join(source_dir, 'BUILD'), 'w+') as f:
         f.write('source_root("{}/tests")\n'.format(os.path.basename(source_dir)))
       tests_dir = os.path.join(source_dir, 'tests')
@@ -246,7 +242,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def _mixed_test_cases(self):
-    with temporary_dir() as source_dir:
+    with self.temporary_sourcedir() as source_dir:
       with open(os.path.join(source_dir, 'BUILD'), 'w+') as f:
         f.write('source_root("{}/tests")\n'.format(os.path.basename(source_dir)))
       tests_dir = os.path.join(source_dir, 'tests')
