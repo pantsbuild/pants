@@ -47,11 +47,11 @@ class JvmPlatformAnalysisIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def setup_sandbox(self):
-    with temporary_dir('.') as tempdir:
-      workdir = os.path.abspath(tempdir)
-      javadir = os.path.join(tempdir, 'src', 'java')
-      os.makedirs(javadir)
-      yield self.JavaSandbox(self, os.path.join(workdir, '.pants.d'), javadir)
+    with temporary_dir('.') as sourcedir:
+      with self.temporary_workdir() as workdir:
+        javadir = os.path.join(sourcedir, 'src', 'java')
+        os.makedirs(javadir)
+        yield self.JavaSandbox(self, workdir, javadir)
 
   @property
   def _good_one_two(self):

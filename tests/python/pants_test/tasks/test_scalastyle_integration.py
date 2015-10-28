@@ -12,7 +12,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class ScalastyleIntegrationTest(PantsRunIntegrationTest):
   def test_scalastyle_cached(self):
     with temporary_dir(root_dir=self.workdir_root()) as cache:
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with self.temporary_workdir() as workdir:
         scalastyle_args = [
           'clean-all',
           'compile.scalastyle',

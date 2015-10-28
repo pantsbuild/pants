@@ -48,7 +48,7 @@ def environment_as(**kwargs):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True):
+def temporary_dir(root_dir=None, cleanup=True, suffix=str()):
   """
     A with-context that creates a temporary directory.
 
@@ -56,7 +56,7 @@ def temporary_dir(root_dir=None, cleanup=True):
     :param string root_dir: The parent directory to create the temporary directory.
     :param bool cleanup: Whether or not to clean up the temporary directory.
   """
-  path = tempfile.mkdtemp(dir=root_dir)
+  path = tempfile.mkdtemp(dir=root_dir, suffix=suffix)
   try:
     yield path
   finally:

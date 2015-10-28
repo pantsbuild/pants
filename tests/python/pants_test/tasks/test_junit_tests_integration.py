@@ -29,7 +29,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.welcome.WelSpec')
 
   def test_junit_test_custom_interpreter(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           'examples/tests/java/org/pantsbuild/example/hello/greet',
@@ -41,7 +41,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self._assert_junit_output(workdir)
 
   def test_junit_test(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           'testprojects/tests/scala/org/pantsbuild/testproject/empty'],
@@ -49,7 +49,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self.assert_failure(pants_run)
 
   def test_junit_test_with_test_option_with_relpath(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           '--test-junit-test=examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
@@ -60,7 +60,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
 
   def test_junit_test_with_test_option_with_dot_slash_relpath(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           '--test-junit-test=./examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
@@ -71,7 +71,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
 
   def test_junit_test_with_test_option_with_classname(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           '--test-junit-test=org.pantsbuild.example.hello.greet.GreetingTest',
@@ -293,7 +293,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       yield tests_subdir
 
   def test_junit_test_failure_summary(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with self._failing_test_cases() as tests_dir:
         pants_run = self.run_pants_with_workdir([
           'test',
@@ -322,7 +322,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           self.assertIn('\n'.join(group), output)
 
   def test_junit_test_no_failure_summary(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with self._failing_test_cases() as tests_dir:
         pants_run = self.run_pants_with_workdir([
           'test',
@@ -336,7 +336,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
                          output)
 
   def test_junit_test_successes_and_failures(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with self._mixed_test_cases() as tests_dir:
         pants_run = self.run_pants_with_workdir([
           'test',

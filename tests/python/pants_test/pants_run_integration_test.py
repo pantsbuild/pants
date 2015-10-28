@@ -73,6 +73,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     except OSError:
       return False
 
+  # todo: change all usages to self.temporary_workdir
   def workdir_root(self):
     # We can hard-code '.pants.d' here because we know that will always be its value
     # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
@@ -81,6 +82,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
     root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
     safe_mkdir(root)
     return root
+
+  def temporary_workdir(self):
+    return temporary_dir(root_dir=self.workdir_root())
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              **kwargs):
@@ -124,7 +128,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,  **kwargs)
 
   @contextmanager
@@ -138,7 +142,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,  **kwargs)
 
   def bundle_and_run(self, target, bundle_name, args=None):

@@ -86,7 +86,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       pass
 
   def test_zinc_unsupported_option(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
         # compile with an unsupported flag
         pants_run = self.run_test_compile(

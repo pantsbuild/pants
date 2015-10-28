@@ -24,7 +24,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
 
     By default, runs twice to shake out errors related to noops.
     """
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with temporary_dir(root_dir=self.workdir_root()) as cachedir:
         for i in six.moves.xrange(0, iterations):
           pants_run = self.run_test_compile(workdir, cachedir, target,
