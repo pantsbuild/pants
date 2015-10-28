@@ -21,5 +21,8 @@ class StackBuild(StackTask):
       extra_args = ["--file-watch"]
     else:
       extra_args = []
-    for dir in self.stack_task("build", extra_args):
-      pass
+    for target in self.context.target_roots:
+      with self.invalidated(targets=target.closure()) as invalidated:
+        for vt in invalidated.invalid_vts:
+          if StackTask.is_haskell_package(vt.target):
+            StackTask.stack_task("build", vt, extra_args)

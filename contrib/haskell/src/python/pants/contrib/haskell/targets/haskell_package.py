@@ -25,4 +25,4 @@ class HaskellPackage(Target):
       'package': PrimitiveField(self.package),
       'resolver': PrimitiveField(self.resolver),
     })
-    super(HaskellPackage, self).__init__(**kwargs)
+    super(HaskellPackage, self).__init__(payload = payload, **kwargs)
