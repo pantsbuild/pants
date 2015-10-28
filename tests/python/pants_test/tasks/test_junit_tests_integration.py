@@ -148,7 +148,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def _failing_test_cases(self):
-    with temporary_dir(root_dir=self.workdir_root()) as source_dir:
+    with temporary_dir() as source_dir:
       with open(os.path.join(source_dir, 'BUILD'), 'w+') as f:
         f.write('source_root("{}/tests")\n'.format(os.path.basename(source_dir)))
       tests_dir = os.path.join(source_dir, 'tests')
@@ -246,7 +246,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def _mixed_test_cases(self):
-    with temporary_dir(root_dir=self.workdir_root()) as source_dir:
+    with temporary_dir() as source_dir:
       with open(os.path.join(source_dir, 'BUILD'), 'w+') as f:
         f.write('source_root("{}/tests")\n'.format(os.path.basename(source_dir)))
       tests_dir = os.path.join(source_dir, 'tests')
