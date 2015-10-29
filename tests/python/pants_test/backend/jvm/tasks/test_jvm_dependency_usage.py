@@ -27,7 +27,7 @@ class TestJvmDependencyUsage(TaskTestBase):
     context = self.context(target_roots=target_classfiles.keys())
 
     # Create classfiles in a target-specific directory, and add it to the classpath for the target.
-    classpath_products = context.products.get_data('runtime_classpath', ClasspathProducts)
+    classpath_products = context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
     for target, classfiles in target_classfiles.items():
       target_dir = os.path.join(self.test_workdir, target.id)
       safe_mkdir(target_dir)

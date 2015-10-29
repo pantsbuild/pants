@@ -133,7 +133,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
     compile_classpath = None
     if confs:
-      compile_classpath = ClasspathProducts()
+      compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
       self.resolve(executor=executor,
                    targets=targets,
                    classpath_products=compile_classpath,

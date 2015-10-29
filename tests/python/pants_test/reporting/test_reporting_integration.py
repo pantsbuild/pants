@@ -25,7 +25,7 @@ _PRE = re.compile(ur'^\d+,ZincCompile,\w+,\S+,pre-check,(True|False)')
 class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
   def test_invalidation_report_output(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       command = ['compile',
                  'examples/src/java/org/pantsbuild/example/hello/main',
                  '--reporting-invalidation-report']

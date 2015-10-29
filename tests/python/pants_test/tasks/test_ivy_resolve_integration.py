@@ -8,14 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_ivy_resolve_gives_correct_exception_on_cycles(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'compile', 'testprojects/src/java/org/pantsbuild/testproject/cycle1'], workdir)
       self.assert_failure(pants_run)
@@ -23,7 +22,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_java_compile_with_ivy_report(self):
     # Ensure the ivy report file gets generated
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       ivy_report_dir = '{workdir}/ivy-report'.format(workdir=workdir)
       pants_run = self.run_pants_with_workdir([
           'compile',
