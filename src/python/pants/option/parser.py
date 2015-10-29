@@ -20,6 +20,7 @@ from pants.option.errors import ParseError, RegistrationError
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
+from pants.util.memo import memoized_property
 
 
 # Standard ArgumentParser prints usage and exits on error. We subclass so we can raise instead.
@@ -104,9 +105,6 @@ class Parser(object):
     # double-registration (e.g., during bootstrapping).
     self._argparse_registered_args = set()
 
-    # The argparser we use for actually parsing args.
-    self._argparser = CustomArgumentParser(scope=self._scope, conflict_handler='resolve')
-
     # Map of dest -> (deprecated_version, deprecated_hint), for deprecated options.
     self._deprecated_option_dests = {}
 
@@ -186,14 +184,14 @@ class Parser(object):
 
     Includes all the options we inherit recursively from our ancestors.
     """
+    if self._parent_parser:
+      for args, kwargs in self._parent_parser._recursive_option_registration_args():
+        yield args, kwargs
     for args, kwargs in self._option_registrations:
-      # Note that all subsystem options are recursively registered: a subscope of a subsystem
+      # Note that all subsystem options are implicitly recursive: a subscope of a subsystem
       # scope is another (optionable-specific) instance of the same subsystem, so it needs
       # all the same options.
       if self._scope_info.category == ScopeInfo.SUBSYSTEM or 'recursive' in kwargs:
-        yield args, kwargs
-    if self._parent_parser:
-      for args, kwargs in self._parent_parser._recursive_option_registration_args():
         yield args, kwargs
 
   def register(self, *args, **kwargs):
@@ -214,7 +212,7 @@ class Parser(object):
        a deprecated option.
     """
     if self._frozen:
-      raise RegistrationError('Cannot register option {0} in scope {1} after registering options '
+      raise RegistrationError('Cannot register option {} in scope {} after registering options '
                               'in any of its inner scopes.'.format(args[0], self._scope))
 
     # Prevent further registration in enclosing scopes.
@@ -226,11 +224,16 @@ class Parser(object):
     # Record the args. We'll do the underlying argparse registration on-demand.
     self._option_registrations.append((args, kwargs))
     if self._parent_parser:
-      existing_scope = self._parent_parser._existing_scope(args[0])
-      if existing_scope is not None:
-        raise RegistrationError('Option {} in scope {} already registered in {}'.format(
-          args[0], self.scope, _scope_str(existing_scope)))
+      for arg in args:
+        existing_scope = self._parent_parser._existing_scope(arg)
+        if existing_scope is not None:
+          raise RegistrationError('Option {} in scope {} already registered in {}'.format(
+            arg, self.scope, _scope_str(existing_scope)))
     self._known_args.update(args)
+
+  @memoized_property
+  def _argparser(self):
+    return CustomArgumentParser(scope=self._scope, conflict_handler='resolve')
 
   def _argparse_register(self, args, kwargs):
     """Do the deferred argparse registration."""
