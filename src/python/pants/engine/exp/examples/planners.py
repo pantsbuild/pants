@@ -251,6 +251,36 @@ def gen_apache_thrift(sources, rev, gen, strict):
                             'gen:{}, strict: {}'.format(sources, rev, gen, strict))
 
 
+class NameConfiguration(Configuration):
+  pass
+
+
+class NameFilePlanner(TaskPlanner):
+  @property
+  def goal_name(self):
+    return None
+
+  @property
+  def product_types(self):
+    yield Classpath
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
+    if not isinstance(subject, Target):
+      return
+    name_config = filter(lambda x: isinstance(x, NameConfiguration), subject.configurations)
+    if not name_config:
+      return
+    assert product_type == Classpath
+
+    return Plan(func_or_task_type=write_name_file, subjects=(subject,), name=subject.name)
+
+
+def write_name_file(name):
+  # Write a file containing the name in CWD
+  with safe_open('build.properties') as f:
+    f.write('name={}\n'.format(name))
+
+
 class ScroogeConfiguration(ThriftConfiguration):
   def __init__(self, rev=None, lang=None, strict=True, **kwargs):
     """
@@ -408,7 +438,8 @@ def setup_json_scheduler(build_root):
                   'requirement': Requirement,
                   'scrooge_configuration': ScroogeConfiguration,
                   'sources': AddressableSources,
-                  'target': Target}
+                  'target': Target,
+                  'name_configuration': NameConfiguration}
   json_parser = functools.partial(parse_json, symbol_table=symbol_table)
   graph = Graph(AddressMapper(build_root=build_root,
                               build_pattern=r'^BLD.json$',
@@ -418,6 +449,8 @@ def setup_json_scheduler(build_root):
                        GlobalIvyResolvePlanner(),
                        JavacPlanner(),
                        ScalacPlanner(),
-                       ScroogePlanner()])
+                       ScroogePlanner(),
+                       NameFilePlanner()
+                       ])
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler
