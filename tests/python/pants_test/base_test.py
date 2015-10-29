@@ -12,7 +12,7 @@ from collections import defaultdict
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.base import build_environment
+from pants.base.build_environment import PANTS_WORKDIR_SUFFIX
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -157,7 +157,7 @@ class BaseTest(unittest.TestCase):
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     self.addCleanup(safe_rmtree, self.build_root)
 
-    self.pants_workdir = os.path.join(self.build_root, '.pants.d')
+    self.pants_workdir = os.path.join(self.build_root, PANTS_WORKDIR_SUFFIX)
     safe_mkdir(self.pants_workdir)
 
     self.options = defaultdict(dict)  # scope -> key-value mapping.

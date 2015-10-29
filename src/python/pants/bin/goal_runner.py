@@ -11,7 +11,7 @@ import sys
 import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
-from pants.base.build_environment import get_scm
+from pants.base.build_environment import PANTS_WORKDIR_SUFFIX, get_scm
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.scm_build_file import ScmBuildFile
@@ -30,7 +30,7 @@ from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.logging.setup import setup_logging
 from pants.option.custom_types import list_option
-from pants.option.global_options import PANTS_WORKDIR_SUFFIX, GlobalOptionsRegistrar
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting

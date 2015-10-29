@@ -15,9 +15,8 @@ from operator import eq, ne
 
 from colors import strip_color
 
-from pants.base.build_environment import get_buildroot
+from pants.base.build_environment import PANTS_WORKDIR_SUFFIX, get_buildroot
 from pants.fs.archive import ZIP
-from pants.option.global_options import PANTS_WORKDIR_SUFFIX
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 

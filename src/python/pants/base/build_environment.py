@@ -17,6 +17,9 @@ from pants.version import VERSION as _VERSION
 logger = logging.getLogger(__name__)
 
 
+PANTS_WORKDIR_SUFFIX = '.pants.d'
+
+
 def pants_version():
   """Returns the pants semantic version number: http://semver.org/"""
   return _VERSION

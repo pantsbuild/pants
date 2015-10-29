@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.tasks.task import Task
+from pants.base.build_environment import PANTS_WORKDIR_SUFFIX
 from pants.base.exceptions import TaskError
-from pants.option.global_options import PANTS_WORKDIR_SUFFIX
 from pants.util.dirutil import safe_rmtree
 
 
