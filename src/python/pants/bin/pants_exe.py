@@ -14,7 +14,8 @@ import warnings
 # See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete list.
 warnings.simplefilter('default', DeprecationWarning)
 
-from pants.bin.pants_runner import Exiter, LocalPantsRunner           # isort:skip
+from pants.bin.pants_runner import LocalPantsRunner           # isort:skip
+from pants.bin.exiter import Exiter                           # isort:skip
 
 
 def main():
