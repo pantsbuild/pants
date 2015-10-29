@@ -328,7 +328,7 @@ class TestProcessManager(unittest.TestCase):
          mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
       yield mock_fork
 
-      mock_purge.assert_called_once_with(self.pm, force=True)
+      mock_purge.assert_called_once_with(self.pm)
       if chk_pre: mock_pre.assert_called_once_with(self.pm)
       if chk_post_child: mock_post_child.assert_called_once_with(self.pm)
       if chk_post_parent: mock_post_parent.assert_called_once_with(self.pm)
