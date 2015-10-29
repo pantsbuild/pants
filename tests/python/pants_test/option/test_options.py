@@ -655,6 +655,7 @@ class OptionsTest(unittest.TestCase):
                           '--modifycompile="blah blah blah" --modifylogs="durrrr"')
 
     pairs = options.get_fingerprintable_for_scope('compile.scala')
+    print(pairs)
     self.assertEquals(len(pairs), 3)
     self.assertEquals(('', 'blah blah blah'), pairs[0])
     self.assertEquals(('', True), pairs[1])
