@@ -21,6 +21,7 @@ def _cautious_get_working_directory(task):
                     .format(workdir))
   return workdir
 
+
 class Invalidator(Task):
   """Invalidate the entire build."""
 
