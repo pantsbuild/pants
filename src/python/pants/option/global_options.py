@@ -16,6 +16,9 @@ from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 
 
+PANTS_WORKDIR_SUFFIX = '.pants.d'
+
+
 class GlobalOptionsRegistrar(Optionable):
   options_scope = GLOBAL_SCOPE
   options_scope_category = ScopeInfo.GLOBAL
@@ -75,7 +78,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-configdir', advanced=True, metavar='<dir>', default=get_pants_configdir(),
              help='Use this dir for global config files.')
     register('--pants-workdir', advanced=True, metavar='<dir>',
-             default=os.path.join(buildroot, '.pants.d'),
+             default=os.path.join(buildroot, PANTS_WORKDIR_SUFFIX),
              help='Write intermediate output files to this dir.')
     register('--pants-supportdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'build-support'),
