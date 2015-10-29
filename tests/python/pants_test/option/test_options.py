@@ -273,10 +273,10 @@ class OptionsTest(unittest.TestCase):
   def test_boolean_invalid_value(self):
     with self.assertRaises(Parser.BooleanConversionError):
       self._parse('./pants', config={'DEFAULT': {'store_true_flag': 11,
-                                                 }})
+                                                 }}).for_global_scope()
     with self.assertRaises(Parser.BooleanConversionError):
       self._parse('./pants', config={'DEFAULT': {'store_true_flag': 'AlmostTrue',
-                                               }})
+                                               }}).for_global_scope()
 
   def test_defaults(self):
     # Hard-coded defaults.
@@ -486,6 +486,7 @@ class OptionsTest(unittest.TestCase):
                                option_tracker=OptionTracker())
       options.register(GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
                        deprecated_hint='The semver for this option has already passed.')
+      options.for_global_scope()
 
   @contextmanager
   def warnings_catcher(self):
@@ -660,16 +661,16 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals((int, 77), pairs[2])
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
-    def assert_fromfile(dest, expected, contents):
+    def _do_assert_fromfile(dest, expected, contents):
       with temporary_file() as fp:
         fp.write(contents)
         fp.close()
         options = parse_func(dest, fp.name)
         self.assertEqual(expected, options.for_scope('fromfile')[dest])
 
-    assert_fromfile(dest='string', expected='jake', contents='jake')
-    assert_fromfile(dest='intvalue', expected=42, contents='42')
-    assert_fromfile(dest='dictvalue', expected={'a': 42, 'b': (1, 2)}, contents=dedent("""
+    _do_assert_fromfile(dest='string', expected='jake', contents='jake')
+    _do_assert_fromfile(dest='intvalue', expected=42, contents='42')
+    _do_assert_fromfile(dest='dictvalue', expected={'a': 42, 'b': (1, 2)}, contents=dedent("""
       {
         'a': 42,
         'b': (
@@ -678,7 +679,7 @@ class OptionsTest(unittest.TestCase):
         )
       }
       """))
-    assert_fromfile(dest='listvalue', expected=['a', 1, 2], contents=dedent("""
+    _do_assert_fromfile(dest='listvalue', expected=['a', 1, 2], contents=dedent("""
       ['a',
        1,
        2]
@@ -692,7 +693,7 @@ class OptionsTest(unittest.TestCase):
        42
       ]
       """)
-    assert_fromfile(dest='appendvalue', expected=expected_append, contents=append_contents)
+    _do_assert_fromfile(dest='appendvalue', expected=expected_append, contents=append_contents)
 
   def test_fromfile_flags(self):
     def parse_func(dest, fromfile):

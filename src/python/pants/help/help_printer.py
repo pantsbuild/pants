@@ -132,6 +132,6 @@ class HelpPrinter(object):
     show_recursive = self._help_request.advanced
     show_advanced = self._help_request.advanced
     color = sys.stdout.isatty()
-    registration_args = self._options.get_parser(scope).registration_args
     help_formatter = HelpFormatter(scope, show_recursive, show_advanced, color)
-    return '\n'.join(help_formatter.format_options(scope, description, registration_args))
+    return '\n'.join(help_formatter.format_options(scope, description,
+        self._options.get_parser(scope).option_registrations_iter()))
