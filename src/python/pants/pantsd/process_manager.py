@@ -322,7 +322,7 @@ class ProcessManager(object):
        daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
        differ in their permissions without good reason - in this case, we want to inherit the umask.
     """
-    self.purge_metadata(force=True)
+    self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
     if pid == 0:
@@ -353,7 +353,7 @@ class ProcessManager(object):
        Using this daemonization method vs daemonize() leaves the responsibility of writing the pid
        to the caller to allow for library-agnostic flexibility in subprocess execution.
     """
-    self.purge_metadata(force=True)
+    self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
     if pid == 0:
