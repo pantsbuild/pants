@@ -293,7 +293,8 @@ class GoalRunnerFactory(object):
                       goals=self._goals,
                       kill_nailguns=self._kill_nailguns,
                       run_tracker=self._run_tracker,
-                      invalidation_report=invalidation_report)
+                      invalidation_report=invalidation_report,
+                      exiter=self._exiter)
 
 
 class GoalRunner(object):
