@@ -6,11 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import atexit
+import errno
 import os
 import tempfile
 import unittest
 
 import mox
+import mock
 import six
 
 from pants.util import dirutil
@@ -170,3 +172,22 @@ class DirutilTest(unittest.TestCase):
       self.assertTrue(os.path.isdir(dir_name))
       rm_rf(dir_name)
       self.assertFalse(os.path.exists(dir_name))
+
+  def test_rm_rf_nonexistent(self, file_name='./non_existent_file'):
+    with temporary_dir() as td, pushd(td):
+      rm_rf(file_name)
+
+  def test_rm_rf_permission_error_raises(self, file_name='./perm_guarded_file'):
+    with temporary_dir() as td, pushd(td), \
+         mock.patch('pants.util.dirutil.shutil.rmtree') as mock_rmtree, \
+         self.assertRaises(OSError):
+      mock_rmtree.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
+      touch(file_name)
+      rm_rf(file_name)
+
+  def test_rm_rf_no_such_file_not_an_error(self, file_name='./vanishing_file'):
+    with temporary_dir() as td, pushd(td), \
+         mock.patch('pants.util.dirutil.shutil.rmtree') as mock_rmtree:
+      mock_rmtree.side_effect = OSError(errno.ENOENT, os.strerror(errno.ENOENT))
+      touch(file_name)
+      rm_rf(file_name)
