@@ -37,6 +37,10 @@ def intermediate(scope):
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 
+def subsystem(scope):
+  return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
+
+
 class OptionsTest(unittest.TestCase):
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
@@ -319,12 +323,21 @@ class OptionsTest(unittest.TestCase):
   def test_shadowing(self):
     options = Options.create(env={},
                              config=self._create_config({}),
-                             known_scope_infos=[task('foo')],
+                             known_scope_infos=[task('bar'), intermediate('foo'), task('foo.bar')],
                              args='./pants',
                              option_tracker=OptionTracker())
-    options.register('', '--bar')
+    options.register('', '--opt1')
+    options.register('foo', '-o', '--opt2')
     with self.assertRaises(RegistrationError):
-      options.register('foo', '--bar')
+      options.register('bar', '--opt1')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt1')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt2')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt1', '--opt3')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt3', '--opt2')
 
   def test_recursion(self):
     # Recursive option.
@@ -338,6 +351,22 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants compile --bar-baz=foo')
     with self.assertRaises(ParseError):
       options.for_scope('compile').bar_baz
+
+  def test_no_recursive_subsystem_options(self):
+    options = Options.create(env={},
+                             config=self._create_config({}),
+                             known_scope_infos=[subsystem('foo')],
+                             args='./pants',
+                             option_tracker=OptionTracker())
+    # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
+    # a separate instance of the subsystem, so it needs all the options).
+    # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
+    with self.assertRaises(RegistrationError):
+      options.register('foo', '--bar', recursive=False)
+      options.for_scope('foo')
+    with self.assertRaises(RegistrationError):
+      options.register('foo', '--baz', recursive=True)
+      options.for_scope('foo')
 
   def test_is_known_scope(self):
     options = self._parse('./pants')
