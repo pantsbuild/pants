@@ -8,6 +8,7 @@ target(
     ':analysis_parser',
     ':analysis_tools',
     ':anonymizer',
+    ':jvm_classpath_publisher',
     ':jvm_compile',
     ':zinc',
   ],
@@ -40,6 +41,16 @@ python_library(
   sources = ['compile_context.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
+  ]
+)
+
+python_library(
+  name = 'jvm_classpath_publisher',
+  sources = ['jvm_classpath_publisher.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:task',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:fileutil',
   ]
 )
 
