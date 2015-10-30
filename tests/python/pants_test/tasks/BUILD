@@ -422,3 +422,10 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'clean_all_integration',
+  sources = ['test_clean_all_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ]
+)
