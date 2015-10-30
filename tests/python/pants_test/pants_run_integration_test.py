@@ -80,10 +80,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # which we don't have a reference to here.
     root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
     safe_mkdir(root)
-    return temporary_dir(root_dir=root, suffix=".pants.d")
+    return temporary_dir(root_dir=root, suffix='.pants.d')
 
   def temporary_cachedir(self):
-    return temporary_dir(suffix="__CACHEDIR")
+    return temporary_dir(suffix='__CACHEDIR')
 
   def temporary_sourcedir(self):
     return temporary_dir(root_dir=get_buildroot())

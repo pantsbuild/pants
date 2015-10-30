@@ -156,7 +156,7 @@ class BaseTest(unittest.TestCase):
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     self.addCleanup(safe_rmtree, self.build_root)
 
-    self.pants_workdir = os.path.join(self.build_root, ".pants.d")
+    self.pants_workdir = os.path.join(self.build_root, '.pants.d')
     safe_mkdir(self.pants_workdir)
 
     self.options = defaultdict(dict)  # scope -> key-value mapping.

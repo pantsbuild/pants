@@ -75,7 +75,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-configdir', advanced=True, metavar='<dir>', default=get_pants_configdir(),
              help='Use this dir for global config files.')
     register('--pants-workdir', advanced=True, metavar='<dir>',
-             default=os.path.join(buildroot, ".pants.d"),
+             default=os.path.join(buildroot, '.pants.d'),
              help='Write intermediate output files to this dir.')
     register('--pants-supportdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'build-support'),
