@@ -324,6 +324,12 @@ class GoalRunner(object):
     return {SourceRootBootstrapper, SourceRootConfig, Reporting, Reproducer, RunTracker}
 
   def _execute_engine(self):
+    workdir = self._context.options.for_global_scope().pants_workdir
+    if not workdir.endswith('.pants.d'):
+      self._context.log.error('Pants working directory should end with \'.pants.d\', currently it is {}\n'
+                              .format(workdir))
+      return 1
+
     unknown_goals = [goal.name for goal in self._goals if not goal.ordered_task_names()]
     if unknown_goals:
       self._context.log.error('Unknown goal(s): {}\n'.format(' '.join(unknown_goals)))

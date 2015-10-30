@@ -28,7 +28,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
   def test_compile_changed(self):
     cmd = ['compile-changed', '--diffspec={}'.format(self.ref_for_greet_change())]
 
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       # Nothing exists.
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'GreetingTest.class')))
@@ -40,7 +40,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'GreetingTest.class')))
 
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       # Nothing exists.
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'GreetingTest.class')))
@@ -54,7 +54,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
 
   @pytest.mark.xfail
   def test_test_changed(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       cmd = ['test-changed', '--diffspec={}'.format(self.ref_for_greet_change())]
       junit_out = os.path.join(workdir, 'test', 'junit',
         'org.pantsbuild.example.hello.greet.GreetingTest.out.txt')
