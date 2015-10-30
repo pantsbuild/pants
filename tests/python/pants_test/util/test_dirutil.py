@@ -11,8 +11,8 @@ import os
 import tempfile
 import unittest
 
-import mox
 import mock
+import mox
 import six
 
 from pants.util import dirutil
