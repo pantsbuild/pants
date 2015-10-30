@@ -11,7 +11,7 @@ import sys
 import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
-from pants.base.build_environment import PANTS_WORKDIR_SUFFIX, get_scm
+from pants.base.build_environment import get_scm
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.scm_build_file import ScmBuildFile
@@ -325,7 +325,7 @@ class GoalRunner(object):
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir
-    if not workdir.endswith(PANTS_WORKDIR_SUFFIX):
+    if not workdir.endswith(".pants.d"):
       self._context.log.error('Pants working directory should end with \'.pants.d\', currently it is {}\n'
                               .format(workdir))
       return 1

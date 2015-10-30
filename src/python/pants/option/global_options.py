@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from pants.base.build_environment import (PANTS_WORKDIR_SUFFIX, get_buildroot, get_pants_cachedir,
-                                          get_pants_configdir, pants_version)
+from pants.base.build_environment import (get_buildroot, get_pants_cachedir, get_pants_configdir,
+                                          pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import list_option
 from pants.option.optionable import Optionable
@@ -75,7 +75,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-configdir', advanced=True, metavar='<dir>', default=get_pants_configdir(),
              help='Use this dir for global config files.')
     register('--pants-workdir', advanced=True, metavar='<dir>',
-             default=os.path.join(buildroot, PANTS_WORKDIR_SUFFIX),
+             default=os.path.join(buildroot, ".pants.d"),
              help='Write intermediate output files to this dir.')
     register('--pants-supportdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'build-support'),

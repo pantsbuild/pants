@@ -15,7 +15,7 @@ from operator import eq, ne
 
 from colors import strip_color
 
-from pants.base.build_environment import PANTS_WORKDIR_SUFFIX, get_buildroot
+from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -80,7 +80,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # which we don't have a reference to here.
     root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
     safe_mkdir(root)
-    return temporary_dir(root_dir=root, suffix=PANTS_WORKDIR_SUFFIX)
+    return temporary_dir(root_dir=root, suffix=".pants.d")
 
   def temporary_cachedir(self):
     return temporary_dir(suffix="__CACHEDIR")
