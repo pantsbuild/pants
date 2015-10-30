@@ -48,7 +48,7 @@ python_library(
   name = 'jvm_classpath_publisher',
   sources = ['jvm_classpath_publisher.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/tasks:task',
+    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
   ]
