@@ -6,33 +6,27 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import textwrap
-from collections import namedtuple
 
 import pytest
 
 from pants.backend.python.tasks.checkstyle.checker import PythonCheckStyleTask, PythonFile
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
-from pants.subsystem.subsystem import Subsystem
+from pants.backend.python.tasks.checkstyle.plugin_subsystem_base import PluginSubsystemBase
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class RageSubsystem(Subsystem):
+class RageSubsystem(PluginSubsystemBase):
   options_scope = 'pycheck-Rage'
-  @classmethod
-  def register_options(cls, register):
-    super(Subsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
+
+  def get_plugin_type(self):
+    return Rage
+
 
 class Rage(CheckstylePlugin):
   """Dummy Checkstyle plugin that hates everything"""
-  subsystem = RageSubsystem
-
-  def __init__(self, python_file):
-    self.python_file = python_file
 
   def nits(self):
-    """Return Nits for everything you see"""
+    """Return Nits for everything you see."""
     for line_no, _ in self.python_file.enumerate():
       yield self.error('T999', 'I hate everything!', line_no)
 
@@ -70,7 +64,7 @@ class TestPyStyleTask(PythonTaskTestBase):
     """Setup PythonCheckStyleTask with Rage Checker"""
     super(TestPyStyleTask, self).setUp()
     PythonCheckStyleTask.clear_plugins()
-    PythonCheckStyleTask.register_plugin(name='angry_test', checker=Rage)
+    PythonCheckStyleTask.register_plugin(name='angry_test', subsystem=RageSubsystem)
 
     self.style_check = self._create_task()
     self.style_check.options.suppress = None
@@ -78,16 +72,16 @@ class TestPyStyleTask(PythonTaskTestBase):
   def test_noqa_line_filter_length(self):
     """Verify the number of lines filtered is what we expect"""
     nits = list(self.style_check.get_nits(self.no_qa_line))
-    assert len(nits) == 1, ('Actually got nits: {}'.format(
+    self.assertEqual(1, len(nits), ('Actually got nits: {}'.format(
       ' '.join('{}:{}'.format(nit._line_number, nit) for nit in nits)
-    ))
+    )))
 
   def test_noqa_line_filter_code(self):
     """Verify that the line we see has the correct code"""
     nits = list(self.style_check.get_nits(self.no_qa_line))
-    assert nits[0].code == 'T999', 'Not handling the code correctly'
+    self.assertEqual('T999', nits[0].code, 'Not handling the code correctly')
 
   def test_noqa_file_filter(self):
     """Verify Whole file filters are applied correctly"""
     nits = list(self.style_check.get_nits(self.no_qa_file))
-    assert len(nits) == 0, 'Expected zero nits since entire file should be ignored'
+    self.assertEqual(0, len(nits), 'Expected zero nits since entire file should be ignored')

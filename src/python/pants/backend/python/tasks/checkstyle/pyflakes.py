@@ -8,17 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pyflakes.checker import Checker as FlakesChecker
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin, Nit
-from pants.subsystem.subsystem import Subsystem
-
-
-class FlakeCheckSubsystem(Subsystem):
-  options_scope = 'pycheck-pyflakes'
-
-  @classmethod
-  def register_options(cls, register):
-    super(FlakeCheckSubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
 
 
 class FlakeError(Nit):
@@ -51,7 +40,6 @@ class FlakeError(Nit):
 
 class PyflakesChecker(CheckstylePlugin):
   """Detect common coding errors via the pyflakes package."""
-  subsystem = FlakeCheckSubsystem
 
   def nits(self):
     checker = FlakesChecker(self.python_file.tree, self.python_file.filename)
