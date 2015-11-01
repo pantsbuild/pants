@@ -24,6 +24,7 @@ class PlainTextReporterBase(Reporter):
     if settings.cache_stats:
       ret += b'\nCache Stats\n===========\n{}\n'.format(
         self._format_artifact_cache_stats(self.run_tracker.artifact_cache_stats))
+    ret += '\n'
     return ret
 
   def _format_aggregated_timings(self, aggregated_timings):
