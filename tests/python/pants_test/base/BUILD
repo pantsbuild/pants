@@ -78,16 +78,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'build_graph_cache',
-  sources = ['test_build_graph_cache.py'],
-  dependencies = [
-    'src/python/pants/base:address',
-    'src/python/pants/base:build_graph_cache',
-    'tests/python/pants_test:base_test'
-  ],
-)
-
-python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],
   dependencies = [

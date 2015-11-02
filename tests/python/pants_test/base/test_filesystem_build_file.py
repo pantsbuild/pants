@@ -206,6 +206,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_dropping_from_buildfile_cache(self):
     key = (self.root_dir, 'grandparent/parent/BUILD', True)
+    FilesystemBuildFile.from_cache(*key)
     self.assertTrue(FilesystemBuildFile.has_cache_entry(*key))
     FilesystemBuildFile.invalidate_cache_entry(*key)
     self.assertFalse(FilesystemBuildFile.has_cache_entry(*key))

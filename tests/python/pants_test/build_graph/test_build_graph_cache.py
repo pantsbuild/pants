@@ -5,9 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.address import Address
 from pants.base.build_file import FilesystemBuildFile
-from pants.base.build_graph_cache import BuildGraphCache
+from pants.build_graph.address import Address
+from pants.build_graph.build_graph_cache import BuildGraphCache
 from pants_test.base_test import BaseTest
 
 

@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import threading
 
-from pants.base.address_lookup_error import AddressLookupError
-from pants.base.build_file_address_mapper import BuildFileAddressMapper
-from pants.base.build_file_parser import BuildFileParser
-from pants.base.build_graph import BuildGraph
+from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
+from pants.build_graph.build_file_parser import BuildFileParser
+from pants.build_graph.build_graph import BuildGraph
 
 
 class BuildGraphCache(object):
@@ -43,7 +43,6 @@ class BuildGraphCache(object):
     # )
     # TODO: encapsulate BuildConfiguration in this
     # TODO: encapsulate build_file_type in this
-
   def _spec_path_to_addresses(self, spec_path, raise_on_error=False):
     """Parse a BUILD file into a set of addresses that we can inject into the BuildGraph."""
     try:
@@ -58,7 +57,6 @@ class BuildGraphCache(object):
 #   # The mapping here is /path/to/requirements.txt -> /path/to (which nets /path/to/BUILD:).
 #   requirements_spec = os.path.dirname(requirements_file)
 #   return self._build_file_path_to_addresses(requirements_spec, raise_on_error=raise_on_error)
-
   def _reinsert_addresses_to_build_graph(self, addresses):
     """Inject a set of address closures into the BuildGraph."""
     for address in addresses:

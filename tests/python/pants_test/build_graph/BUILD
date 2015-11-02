@@ -11,6 +11,7 @@ target(
     ':build_file_aliases',
     ':build_file_parser',
     ':build_graph',
+    ':build_graph_cache',
     ':source_mapper',
     ':target',
   ]
@@ -70,6 +71,15 @@ python_tests(
 python_tests(
   name = 'build_graph',
   sources = ['test_build_graph.py'],
+  dependencies = [
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:base_test'
+  ],
+)
+
+python_tests(
+  name = 'build_graph_cache',
+  sources = ['test_build_graph_cache.py'],
   dependencies = [
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test'
