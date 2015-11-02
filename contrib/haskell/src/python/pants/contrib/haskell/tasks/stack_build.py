@@ -20,11 +20,11 @@ class StackBuild(StackTask):
 
   def execute(self):
     if self.get_options().watch:
-      extra_args = ["--file-watch"]
+      extra_args = ['--file-watch']
     else:
       extra_args = []
     for target in self.context.target_roots:
       with self.invalidated(targets=target.closure()) as invalidated:
         for vt in invalidated.invalid_vts:
           if StackTask.is_haskell_package(vt.target):
-            self.stack_task("build", vt, extra_args)
+            self.stack_task('build', vt, extra_args)

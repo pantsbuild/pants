@@ -54,12 +54,12 @@ class StackTask(Task):
     for dependency in filter(StackTask.is_haskell_package, target.closure()):
       if target.resolver != dependency.resolver:
         raise TaskError(
-          "Every package in a Haskell build graph must use the same resolver\n"
-          "\n"
-          "Root target : " + target.address.spec + "\n"
-          "  - Resolver: " + target.resolver + "\n"
-          "Dependency  : " + dependency.address.spec + "\n"
-          "  - Resolver: " + dependency.resolver + "\n"
+          'Every package in a Haskell build graph must use the same resolver\n'
+          '\n'
+          'Root target : ' + target.address.spec + '\n'
+          '  - Resolver: ' + target.resolver + '\n'
+          'Dependency  : ' + dependency.address.spec + '\n'
+          '  - Resolver: ' + dependency.resolver + '\n'
           )
 
     packages = [target] + target.dependencies
@@ -67,24 +67,24 @@ class StackTask(Task):
     hackage_packages = filter(StackTask.is_hackage, packages)
     cabal_packages   = filter(StackTask.is_cabal  , packages)
 
-    yaml = "flags: {}\n"
+    yaml = 'flags: {}\n'
 
     if cabal_packages:
-      yaml += "packages:\n"
+      yaml += 'packages:\n'
       for pkg in cabal_packages:
         path = pkg.path or os.path.join(get_buildroot(), pkg.target_base)
-        yaml += "- " + path + "\n"
+        yaml += '- ' + path + '\n'
     else:
-      yaml += "packages: []\n"
+      yaml += 'packages: []\n'
 
     if hackage_packages:
-      yaml += "extra-deps:\n"
+      yaml += 'extra-deps:\n'
       for pkg in hackage_packages:
-        yaml += "- " + pkg.package + "-" + pkg.version + "\n"
+        yaml += '- ' + pkg.package + '-' + pkg.version + '\n'
     else:
-      yaml += "extra-deps: []\n"
+      yaml += 'extra-deps: []\n'
 
-    yaml += "resolver: " + target.resolver + "\n"
+    yaml += 'resolver: ' + target.resolver + '\n'
 
     return yaml
 
@@ -101,31 +101,31 @@ class StackTask(Task):
     """
     yaml = StackTask.make_stack_yaml(vt.target)
 
-    stack_yaml_path = os.path.join(vt.results_dir, "stack.yaml")
+    stack_yaml_path = os.path.join(vt.results_dir, 'stack.yaml')
     with open(stack_yaml_path, 'w') as handle:
       handle.write(yaml)
 
-    bin_path = os.path.join(vt.results_dir, "bin")
+    bin_path = os.path.join(vt.results_dir, 'bin')
     safe_mkdir(bin_path)
 
     try:
       with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL]) as workunit:
         subprocess.check_call([
-          "stack",
-          "--verbosity", "error",
-          "--local-bin-path", bin_path,
-          "--install-ghc",
-          "--stack-yaml=" + stack_yaml_path,
+          'stack',
+          '--verbosity', 'error',
+          '--local-bin-path', bin_path,
+          '--install-ghc',
+          '--stack-yaml=' + stack_yaml_path,
           command,
           vt.target.package
         ] + extra_args)
     except subprocess.CalledProcessError:
-      print("")
-      print("Contents of " + stack_yaml_path + ":")
-      print("")
-      print("```")
+      print('')
+      print('Contents of ' + stack_yaml_path + ':')
+      print('')
+      print('```')
       print(yaml)
-      print("```")
+      print('```')
       raise
 
   @abstractmethod
