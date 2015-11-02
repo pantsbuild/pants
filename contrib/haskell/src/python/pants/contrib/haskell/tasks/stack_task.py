@@ -12,6 +12,7 @@ from abc import ABCMeta, abstractmethod
 from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.haskell.targets.cabal import Cabal
@@ -87,8 +88,7 @@ class StackTask(Task):
 
     return yaml
 
-  @staticmethod
-  def stack_task(command, vt, extra_args = []):
+  def stack_task(self, command, vt, extra_args = []):
     """
     This function provides shared logic for all `StackTask` sub-classes, which
     consists of:

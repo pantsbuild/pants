@@ -14,7 +14,9 @@ class StackBuild(StackTask):
   @classmethod
   def register_options(cls, register):
     super(StackBuild, cls).register_options(register)
-    register('--watch', action='store_true', help='Watch for changes in local files and automatically rebuild.')
+    register('--watch',
+             action='store_true',
+             help='Watch for changes in local files and automatically rebuild.')
 
   def execute(self):
     if self.get_options().watch:
@@ -25,4 +27,4 @@ class StackBuild(StackTask):
       with self.invalidated(targets=target.closure()) as invalidated:
         for vt in invalidated.invalid_vts:
           if StackTask.is_haskell_package(vt.target):
-            StackTask.stack_task("build", vt, extra_args)
+            self.stack_task("build", vt, extra_args)
