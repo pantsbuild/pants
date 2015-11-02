@@ -23,6 +23,7 @@ matrix:
 env:
   global:
     - CXX=clang++
+    - PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']"
   matrix:
     # No need to run the self-checks on OSX where vms are at a premium since these are file-level,
     # non-platform fragile lints.
