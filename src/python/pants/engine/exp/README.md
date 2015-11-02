@@ -9,9 +9,9 @@ The code is limited in scope to proving out capabilities of the new engine conce
 + Can task writer accomplish their goals with the engine APIs reasonably?
 + Can a BUILD writer express BUILD rules reasonably.
 
-The code leaves out much that would be needed in a full execution model; notably option plumbing.
-The presumption is that the bits left out are straight-forward to plumb and do not provide insight
-into the questions above.
+The code leaves out much that would be needed in a full execution model; notably option plumbing and
+and product caching.  The presumption is that the bits left out are straight-forward to plumb and do
+not provide insight into the questions above.
 
 ## History
 
@@ -41,13 +41,16 @@ seen in the jvm compilers to the wider pants world of tasks.
 The design doc is [linked][tuple-design] above, but some goals and direction are further explained
 here in light of the actual code to land in the `pants/engine/exp` package.
 
-3 primary concerns can be seen as driving much of the design:
+4 primary concerns can be seen as driving much of the design, in no particular order:
 
-1. It should be easy to write a maximally fine-grained task and have the engine handle scheduling;
+* It should be easy to write a maximally fine-grained task and have the engine handle scheduling;
    it should still be possible to write a coarse-grained task.
-2. It should be possible to distribute execution of independent units of work to exploit more cores
+* It should be possible to determine the full execution plan while doing a minimum amount of work.
+  The plan should be fully determined from the list of goals, targets and options specified and
+  it should require minimal work to execute.
+* It should be possible to distribute execution of independent units of work to exploit more cores
    and more disk IO bandwidth.
-3. It should be easy for plugin authors to extend the operations available on a target without a
+* It should be easy for plugin authors to extend the operations available on a target without a
    brittle web of target subclassing across the core and plugins.
 
 There were other concerns, like bootstrapping in-repo tools from their sources, but the 3 above
@@ -96,12 +99,13 @@ There are two important outgrowths from the flexible edge-schema model:
    themselves don't naturally admit (local) dependencies.  Both jars and python requirements are
    good examples of these.  For those that remember the old inline `jar(...)`s and un-wrapped
    (but still addressable) `python_requirement`s, this supports those in a disciplined way.
-2. A templating scheme is viable.  Since dependency edges are easy to define, `Configuration`
-   defines an optional `extends` one to one property and an optional `merges` one to many list
+2. A templating scheme becomes viable.  Since dependency edges are easy to define, `Configuration`
+   defines an optional `extends` one-to-one property and an optional `merges` one-to-many list
    property.  These combine with graph support for `Serializable` object factories to allow for
    "target templating".  More accurately, a set of default properties for a `Configuration` (or
    Target) can be written down in a BUILD file as an addressable object that is conceptually
-   abstract.  Other targets can then inherit properties and configurations from these templates.
+   abstract.  Other targets can then inherit properties and configurations from these templates. 
+   This allows normalization of BUILD configuration in general.
 
 In addition to the new edge schema system, the `Serializable` basis of the object model allows for
 straight-forward introduction of BUILD file formats.  The experiment ships with three: the legacy
@@ -110,7 +114,7 @@ assignments, and a JSON format.
 
 ### Planning and Scheduling
 
-In the current engine, work is scheduled and performed via the `Task` interface.  In the
+In the current engine, work is scheduled and then later performed via the `Task` interface.  In the
 experimental engine these two roles are split apart.  A
 [`TaskPlanner`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/scheduler.py#L264)
 is responsible for scheduling and a Task - or just a plain function - is responsible for execution
@@ -135,7 +139,7 @@ state, an optional
 method can be implemented to aggregate any plans produced in a scheduling round into fewer plans
 across more subjects.  An example of this is provided with the
 [`GlobalIvyResolvePlanner`](https://github.com/pantsbuild/pants/blob/06e62bd1f00e130d76ada31b932062c5531cd717/src/python/pants/engine/exp/examples/planners.py#L75)
-Which implements complete aggregatin of all jar resolve promises into one global resolution.
+Which implements complete aggregation of all jar resolve promises into one global resolution.
 
 Planning execution requires that all inputs to a task be calculated ahead of time to both ensure
 complete invalidation data is at hand and that all execution data is available to ship to a worker
@@ -144,9 +148,9 @@ For example, a javac planner might need to know the version of the java platform
 code should be compiled under (say Java 6).  As such, the concepts of target `configurations` and
 promise configuration are introduced.  The target `configurations` is just a list of `Configuration`
 objects that apply to the target in various situations.  Perhaps a `JvmConfiguration` for the case
-described a `JavadocConfiguration` for controlling aspects of javadoc gen for the target.  Users
-can add configurations to a target to support new plugins without need to extend target types to add
-new task-specific parameters and task planners can export the configurations they require.
+described above and a `JavadocConfiguration` for controlling aspects of javadoc gen for the target.
+Users can add configurations to a target to support new plugins without need to extend target types
+to add new task-specific parameters and task planners can export the configurations they require.
 
 In some cases configuration can be ambiguous.  A target may have 2 configurations that conceptually
 apply for a given planner.  In these cases the planner can chose to fail to plan based on the
@@ -190,5 +194,9 @@ aggregation for ivy resolves and tool bootstrapping.
    https://github.com/pantsbuild/pants/issues/2417
 3. Validate configurations specified in the target graph, ie: a target with java sources should
    probably not be allowed to list a python interpreter configuration.
+4. Allow for more than one fulfillment of a promise.  An example here is a java library target
+   subject that a javac planner can promise a classpath product for (via compilation of java
+   sources) and a service-info planner can offer a `META-INF/services/...` resource classpath
+   product for. See: https://github.com/pantsbuild/pants/issues/2484
 
 [tuple-design]: https://docs.google.com/a/twitter.com/document/d/1MQLmVGHLnA2xlVgnFjwQQeFZRonTbxM1FyBS5sYwyr8/edit?usp=sharing "Tuple Engine Design Doc"
