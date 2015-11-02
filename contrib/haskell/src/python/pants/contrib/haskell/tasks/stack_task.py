@@ -53,17 +53,17 @@ class StackTask(Task):
     """
     for dependency in filter(StackTask.is_haskell_package, target.closure()):
       if target.resolver != dependency.resolver:
-        raise TaskError(dedent("""
-          Every package in a Haskell build graph must use the same resolver.
+        raise TaskError('''
+Every package in a Haskell build graph must use the same resolver.
 
-          Root target : {root}
-            - Resolver: {root_resolver}
-          Dependency  : {dep}
-            - Resolver: {dep_resolver}
-          """).strip().format(root=target.address.spec,
-                              root_resolver=target.resolver,
-                              dep=dependency.address.spec,
-                              dep_resolver=dependency.resolver))
+Root target : {root}
+  - Resolver: {root_resolver}
+Dependency  : {dep}
+  - Resolver: {dep_resolver}
+'''.strip().format(root=target.address.spec,
+                   root_resolver=target.resolver,
+                   dep=dependency.address.spec,
+                   dep_resolver=dependency.resolver))
 
     packages = [target] + target.dependencies
 
@@ -111,24 +111,32 @@ class StackTask(Task):
     bin_path = os.path.join(vt.results_dir, 'bin')
     safe_mkdir(bin_path)
 
+    args = [
+      'stack',
+      '--verbosity', 'error',
+      '--local-bin-path', bin_path,
+      '--install-ghc',
+      '--stack-yaml=' + stack_yaml_path,
+      command,
+      vt.target.package
+    ] + extra_args
+
     try:
       with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL]) as workunit:
-        subprocess.check_call([
-          'stack',
-          '--verbosity', 'error',
-          '--local-bin-path', bin_path,
-          '--install-ghc',
-          '--stack-yaml=' + stack_yaml_path,
-          command,
-          vt.target.package
-        ] + extra_args)
+        subprocess.check_call(args)
     except subprocess.CalledProcessError:
-      print('')
-      print('Contents of ' + stack_yaml_path + ':')
-      print('')
-      print('```')
-      print(yaml)
-      print('```')
+      raise TaskError('''
+`stack` subprocess failed with the following inputs:
+
+Arguments: {args}
+Contents of {stack_yaml_path}:
+
+```
+{yaml}
+```
+'''.strip().format(stack_yaml_path=stack_yaml_path,
+                   yaml=yaml,
+                   args=args))
       raise
 
   @abstractmethod
