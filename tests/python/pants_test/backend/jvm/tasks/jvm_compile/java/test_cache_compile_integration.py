@@ -25,7 +25,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     with safe_open(path, 'w') as f:
       f.write(value)
 
-  def test_stale_artifacts_rmd_when_cache_used_with_zinc(self):
+  def test_incremental_caching(self):
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir, \
@@ -100,7 +100,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertEquals(sorted(classfiles(w) for w in target_workdirs),
                         sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
-  def test_incremental_caching(self):
+  def test_no_incremental_caching_flag(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
