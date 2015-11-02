@@ -68,7 +68,7 @@ class StackTask(Task):
     packages = [target] + target.dependencies
 
     hackage_packages = filter(StackTask.is_hackage, packages)
-    cabal_packages   = filter(StackTask.is_cabal  , packages)
+    cabal_packages = filter(StackTask.is_cabal, packages)
 
     yaml = 'flags: {}\n'
 
