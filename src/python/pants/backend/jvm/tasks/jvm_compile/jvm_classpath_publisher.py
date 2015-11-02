@@ -21,7 +21,10 @@ Creates symlinks in pants_distdir to context jars per target.
 
 See JvmCompile#_create_context_jar for details.
 """
+
+
 class CompileClasspathPublisher(Task):
+
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data('runtime_classpath')
