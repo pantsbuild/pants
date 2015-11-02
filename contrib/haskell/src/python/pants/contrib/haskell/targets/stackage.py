@@ -15,4 +15,3 @@ class Stackage(HaskellPackage):
   specifies all Stackage-related dependencies.  The only purpose of this target is if
   you wish to directly compile/test/bench/install/etc. a Stackage package.
   """
-  pass
