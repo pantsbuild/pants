@@ -1,9 +1,4 @@
 target(
   name='targets',
-  sources=[
-    'cabal.py',
-    'hackage.py',
-    'haskell_package.py',
-    'stackage.py',
-  ],
+  sources=globs('*.py'),
 )
