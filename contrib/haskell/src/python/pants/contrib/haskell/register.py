@@ -16,7 +16,7 @@ from pants.contrib.haskell.tasks.stack_build import StackBuild
 
 def build_file_aliases():
   return BuildFileAliases(
-    targets ={
+    targets={
       'stackage': Stackage,
     }
   )
