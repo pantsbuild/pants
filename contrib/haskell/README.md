@@ -136,7 +136,7 @@ author:              Alice
 maintainer:          alice@example.com
 build-type:          Simple
 cabal-version:       >=1.10
- 
+
 library
     hs-source-dirs:    src
     build-depends:     base       >= 4.5 && < 4.8
@@ -698,7 +698,7 @@ cabal(
 )
 ```
 
-Then when they build their package, the tool would: 
+Then when they build their package, the tool would:
 
 * resolve all non-source dependencies in the exact same way as before
 * check the `~/.stack-work` directory underneath my package to see if my work
