@@ -9,7 +9,7 @@ from pants.contrib.haskell.tasks.stack_task import StackTask
 
 
 class StackBuild(StackTask):
-  """Build the given Haskell target"""
+  """Build the given Haskell targets."""
 
   @classmethod
   def register_options(cls, register):
