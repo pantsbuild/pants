@@ -53,14 +53,17 @@ class StackTask(Task):
     """
     for dependency in filter(StackTask.is_haskell_package, target.closure()):
       if target.resolver != dependency.resolver:
-        raise TaskError(
-          'Every package in a Haskell build graph must use the same resolver\n'
-          '\n'
-          'Root target : ' + target.address.spec + '\n'
-          '  - Resolver: ' + target.resolver + '\n'
-          'Dependency  : ' + dependency.address.spec + '\n'
-          '  - Resolver: ' + dependency.resolver + '\n'
-          )
+        raise TaskError(dedent("""
+          Every package in a Haskell build graph must use the same resolver.
+
+          Root target : {root}
+            - Resolver: {root_resolver}
+          Dependency  : {dep}
+            - Resolver: {dep_resolver}
+          """).strip().format(root=target.address.spec,
+                              root_resolver=target.resolver,
+                              dep=dependency.address.spec,
+                              dep_resolver=dependency.resolver))
 
     packages = [target] + target.dependencies
 
