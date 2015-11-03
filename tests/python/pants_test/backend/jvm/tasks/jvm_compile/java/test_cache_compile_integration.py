@@ -41,7 +41,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
       buildfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD')
-      runtime_classpath = os.path.join(dist_dir, 'runtime_classpath')
+      runtime_classpath = os.path.join(dist_dir, 'compile', 'publish-classpath', 'runtime_classpath')
 
       self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
@@ -58,8 +58,13 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Caches values A.class, Main.class
       self.run_compile(cachetest_spec, config, workdir)
       self.assertEqual(len(os.listdir(runtime_classpath)), 1)
-      classes_symlink_folder = os.path.join(runtime_classpath, os.listdir(runtime_classpath)[0])
-      real_classes1 = os.path.realpath(os.path.join(classes_symlink_folder, 'classes.jar'))
+      classes_symlink_folder = os.path.join(
+        runtime_classpath,
+        os.listdir(runtime_classpath)[0],
+        'org', 'pantsbuild', 'cachetest', 'cachetest'
+      )
+      self.assertTrue(os.path.exists(classes_symlink_folder), msg='Can\'t find a folder with symlinks!')
+      real_classes1 = os.path.realpath(os.path.join(classes_symlink_folder, 'z.jar'))
 
       self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
