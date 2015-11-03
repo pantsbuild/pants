@@ -9,7 +9,7 @@ import logging
 import os
 
 from pants.backend.core.tasks.task import Task
-`from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir
 
 
 logger = logging.getLogger(__name__)
