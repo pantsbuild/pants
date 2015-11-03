@@ -17,19 +17,15 @@ logger = logging.getLogger(__name__)
 
 
 class RuntimeClasspathPublisher(Task):
-  """
-  Creates symlinks in pants_distdir to context jars per target.
-
-  See JvmCompile#_create_context_jar for details.
-  """
-
-  def __init__(self, *args, **kwargs):
-    super(Task, self).__init__(*args, **kwargs)
-    self._output_folder = self.options_scope.replace('.', os.sep)
+  """Creates symlinks in pants_distdir to classpath entries per target."""
 
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data('runtime_classpath')
+
+  @property
+  def _output_folder(self):
+    return self.options_scope.replace('.', os.sep)
 
   def _stable_output_folder(self, target):
     """
@@ -46,14 +42,12 @@ class RuntimeClasspathPublisher(Task):
   def execute(self):
     runtime_classpath = self.context.products.get_data('runtime_classpath')
     """
-    :type runtime_classpath: pants.backend.jvm.tasks.classpath_products.ClasspathProducts
+    :type runtime_classpath: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
     """
     for target in self.context.targets():
       folder_for_symlinks = self._stable_output_folder(target)
       safe_rmtree(folder_for_symlinks)
-      """
-      :type target: pants.build_graph.target.Target
-      """
+
       classpath_entries_for_target = \
         runtime_classpath.get_internal_classpath_entries_for_targets([target], transitive=False)
 
