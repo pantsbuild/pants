@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from pants.base.build_environment import pants_release
+from pants.base.build_environment import pants_release, pants_version
 from pants.help.help_formatter import HelpFormatter
-from pants.option.arg_splitter import GLOBAL_SCOPE, NoGoalHelp, OptionsHelp, UnknownGoalHelp
+from pants.option.arg_splitter import (GLOBAL_SCOPE, NoGoalHelp, OptionsHelp, UnknownGoalHelp,
+                                       VersionHelp)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.scope import ScopeInfo
@@ -35,7 +36,9 @@ class HelpPrinter(object):
     def print_hint():
       print('Use `pants goals` to list goals.')
       print('Use `pants help` to get help.')
-    if isinstance(self._help_request, OptionsHelp):
+    if isinstance(self._help_request, VersionHelp):
+      print(pants_version())
+    elif isinstance(self._help_request, OptionsHelp):
       self._print_options_help()
     elif isinstance(self._help_request, UnknownGoalHelp):
       print('Unknown goals: {}'.format(', '.join(self._help_request.unknown_goals)))
