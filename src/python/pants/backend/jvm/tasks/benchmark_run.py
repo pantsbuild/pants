@@ -14,6 +14,8 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import SubprocessExecutor
 from pants.java.util import execute_java
 
 
@@ -81,12 +83,14 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
     classpath = self.classpath(targets, benchmark_tools_classpath)
 
+    java_executor = SubprocessExecutor(DistributionLocator.cached())
     exit_code = execute_java(classpath=classpath,
                              main=self._CALIPER_MAIN,
                              jvm_options=self.jvm_options,
                              args=self.args,
                              workunit_factory=self.context.new_workunit,
                              workunit_name='caliper',
-                             workunit_labels=[WorkUnitLabel.RUN])
+                             workunit_labels=[WorkUnitLabel.RUN],
+                             executor=java_executor)
     if exit_code != 0:
       raise TaskError('java {} ... exited non-zero ({})'.format(self._CALIPER_MAIN, exit_code))
