@@ -17,7 +17,7 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class CacheCompileIntegrationTest(BaseCompileIT):
   def run_compile(self, target_spec, config, workdir):
-    args = ['export-classpath', 'compile', target_spec]
+    args = ['compile', target_spec]
     pants_run = self.run_pants_with_workdir(args, workdir, config)
     self.assert_success(pants_run)
 
@@ -25,29 +25,18 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     with safe_open(path, 'w') as f:
       f.write(value)
 
-  def test_incremental_caching_and_publishing(self):
-    def find_jar(directory):
-      for path in os.listdir(directory):
-        if path.endswith('.jar'):
-          return path
-      return None
-
+  def test_stale_artifacts_rmd_when_cache_used_with_zinc(self):
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
-        temporary_dir(root_dir=get_buildroot()) as src_dir, \
-        temporary_dir(root_dir=get_buildroot()) as dist_dir:
+        temporary_dir(root_dir=get_buildroot()) as src_dir:
 
       config = {
-        'DEFAULT': {
-          'pants_distdir': dist_dir
-        },
         'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
         'compile.zinc': {'incremental_caching': True },
       }
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
       buildfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD')
-      runtime_classpath = os.path.join(dist_dir, 'export-classpath')
 
       self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
@@ -63,14 +52,6 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       # Caches values A.class, Main.class
       self.run_compile(cachetest_spec, config, workdir)
-      self.assertEqual(len(os.listdir(runtime_classpath)), 1)
-      classes_symlink_folder = os.path.join(
-        runtime_classpath,
-        os.listdir(runtime_classpath)[0],
-        'org', 'pantsbuild', 'cachetest', 'cachetest'
-      )
-      self.assertTrue(os.path.exists(classes_symlink_folder), msg='Can\'t find a folder with symlinks!')
-      real_classes1 = os.path.realpath(find_jar(classes_symlink_folder))
 
       self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
@@ -79,10 +60,6 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Caches values A.class, NotMain.class and leaves them on the filesystem
       self.run_compile(cachetest_spec, config, workdir)
 
-      # symlink should be updated
-      real_classes2 = os.path.realpath(find_jar(classes_symlink_folder))
-      self.assertNotEqual(real_classes1, real_classes2)
-
       self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
                           class A {}
@@ -90,10 +67,6 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       # Should cause NotMain.class to be removed
       self.run_compile(cachetest_spec, config, workdir)
-
-      # symlink should be changed back
-      real_classes3 = os.path.realpath(find_jar(classes_symlink_folder))
-      self.assertEqual(real_classes1, real_classes3)
 
       root = os.path.join(workdir, 'compile', 'jvm', 'zinc')
       # One target.
@@ -111,7 +84,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.assertEquals(sorted(classfiles(w) for w in target_workdirs),
                         sorted([['A.class', 'Main.class'], ['A.class', 'NotMain.class']]))
 
-  def test_no_incremental_caching_flag(self):
+  def test_incremental_caching(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
