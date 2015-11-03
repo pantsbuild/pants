@@ -17,7 +17,7 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class CacheCompileIntegrationTest(BaseCompileIT):
   def run_compile(self, target_spec, config, workdir):
-    args = ['publish-classpath', 'compile', target_spec]
+    args = ['export-classpath', 'compile', target_spec]
     pants_run = self.run_pants_with_workdir(args, workdir, config)
     self.assert_success(pants_run)
 
@@ -26,6 +26,12 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       f.write(value)
 
   def test_incremental_caching_and_publishing(self):
+    def find_jar(directory):
+      for path in os.listdir(directory):
+        if path.endswith('.jar'):
+          return path
+      return None
+
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir, \
@@ -41,7 +47,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
       buildfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD')
-      runtime_classpath = os.path.join(dist_dir, 'publish-classpath', 'runtime_classpath')
+      runtime_classpath = os.path.join(dist_dir, 'export-classpath')
 
       self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
@@ -64,7 +70,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         'org', 'pantsbuild', 'cachetest', 'cachetest'
       )
       self.assertTrue(os.path.exists(classes_symlink_folder), msg='Can\'t find a folder with symlinks!')
-      real_classes1 = os.path.realpath(os.path.join(classes_symlink_folder, 'z.jar'))
+      real_classes1 = os.path.realpath(find_jar(classes_symlink_folder))
 
       self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;
@@ -74,7 +80,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.run_compile(cachetest_spec, config, workdir)
 
       # symlink should be updated
-      real_classes2 = os.path.realpath(os.path.join(classes_symlink_folder, 'z.jar'))
+      real_classes2 = os.path.realpath(find_jar(classes_symlink_folder))
       self.assertNotEqual(real_classes1, real_classes2)
 
       self.create_file(srcfile,
@@ -86,7 +92,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.run_compile(cachetest_spec, config, workdir)
 
       # symlink should be changed back
-      real_classes3 = os.path.realpath(os.path.join(classes_symlink_folder, 'z.jar'))
+      real_classes3 = os.path.realpath(find_jar(classes_symlink_folder))
       self.assertEqual(real_classes1, real_classes3)
 
       root = os.path.join(workdir, 'compile', 'jvm', 'zinc')

@@ -144,7 +144,7 @@ def register_goals():
   jvm_compile.add_member(ZincCompile)
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
 
-  task(name='publish-classpath', action=RuntimeClasspathPublisher).install().with_description(
+  task(name='export-classpath', action=RuntimeClasspathPublisher).install().with_description(
       'Create stable symlinks for runtime classpath entries for JVM targets.')
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile').with_description(
       'Check that used dependencies have been requested.')

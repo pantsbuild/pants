@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+from hashlib import sha1
 
 from pants.backend.core.tasks.task import Task
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,10 @@ class RuntimeClasspathPublisher(Task):
   See JvmCompile#_create_context_jar for details.
   """
 
+  def __init__(self, *args, **kwargs):
+    super(Task, self).__init__(*args, **kwargs)
+    self._output_folder = self.options_scope.replace('.', os.sep)
+
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data('runtime_classpath')
@@ -30,12 +35,12 @@ class RuntimeClasspathPublisher(Task):
     """
     :type target: pants.build_graph.target.Target
     """
+    address = target.address
     return os.path.join(
       self.get_options().pants_distdir,
-      self.options_scope.replace('.', os.sep),
-      'runtime_classpath',
+      self._output_folder,
       # target.address.spec is used in export goal to identify targets
-      target.address.spec.replace(':', os.sep),
+      address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
     )
 
   def execute(self):
@@ -45,6 +50,7 @@ class RuntimeClasspathPublisher(Task):
     """
     for target in self.context.targets():
       folder_for_symlinks = self._stable_output_folder(target)
+      safe_rmtree(folder_for_symlinks)
       """
       :type target: pants.build_graph.target.Target
       """
@@ -52,7 +58,9 @@ class RuntimeClasspathPublisher(Task):
         runtime_classpath.get_internal_classpath_entries_for_targets([target], transitive=False)
 
       if len(classpath_entries_for_target) > 0:
-        safe_mkdir(folder_for_symlinks, clean=True)
+        safe_mkdir(folder_for_symlinks)
+
       for conf, entry in classpath_entries_for_target:
-        path = entry.path
-        os.symlink(path, os.path.join(folder_for_symlinks, os.path.basename(path)))
+        file_name = os.path.basename(entry.path)
+        symlink_name = '{}-{}'.format(sha1(entry.path).hexdigest(), file_name)
+        os.symlink(entry.path, os.path.join(folder_for_symlinks, symlink_name))
