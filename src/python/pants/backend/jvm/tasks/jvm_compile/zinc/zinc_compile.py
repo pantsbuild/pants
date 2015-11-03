@@ -23,11 +23,10 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import relativize_paths, safe_open
+from pants.util.dirutil import safe_open
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -302,14 +301,14 @@ class ZincCompile(JvmCompile):
     # only intended to allow target authors to omit a scala-library dependency, then ScalaLibrary
     # already overrides traversable_dependency_specs to achieve the same end; arguably at a more
     # appropriate level and certainly at a more appropriate granularity.
-    relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
+    compile_classpath = self.compiler_classpath() + classpath
 
     zinc_args = []
 
     zinc_args.extend([
       '-log-level', self.get_options().level,
       '-analysis-cache', analysis_file,
-      '-classpath', ':'.join(relativized_classpath),
+      '-classpath', ':'.join(compile_classpath),
       '-d', classes_output_dir
     ])
     if not self.get_options().colors:
