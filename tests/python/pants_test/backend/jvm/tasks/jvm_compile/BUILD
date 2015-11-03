@@ -14,9 +14,7 @@ python_tests(
   sources = ['test_jvm_classpath_published.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/tasks/jvm_compile:jvm_classpath_publisher',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',

@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
@@ -22,24 +20,16 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
   def task_type(cls):
     return RuntimeClasspathPublisher
 
-  @property
-  def alias_groups(self):
-    return register_core().merge(register_jvm())
-
-  def setUp(self):
-    super(RuntimeClasspathPublisherTest, self).setUp()
-    self.make_target(
-        'java/classpath:java_lib',
-        target_type=JavaLibrary,
-        sources=['com/foo/Bar.java'],
-      )
-
   def test_incremental_caching(self):
     with temporary_dir(root_dir=self.pants_workdir) as jar_dir, \
          temporary_dir(root_dir=self.pants_workdir) as dist_dir:
       self.set_options(pants_distdir=dist_dir)
 
-      target = self.target('java/classpath:java_lib')
+      target = self.make_target(
+        'java/classpath:java_lib',
+        target_type=JavaLibrary,
+        sources=['com/foo/Bar.java'],
+      )
       context = self.context(target_roots=[target])
       runtime_classpath = context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
       task = self.create_task(context)
