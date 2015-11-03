@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import xml.etree.ElementTree as ET
 
-from pants.util.contextutil import open_tar, open_zip, temporary_dir
+from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
@@ -101,3 +101,24 @@ class ZincCompileIntegrationTest(BaseCompileIT):
 
         # confirm that we were warned
         self.assertIn('is not supported, and is subject to change/removal', pants_run.stdout_data)
+
+  def _file_content_from_compilation(self, target, file_name):
+    with self.do_test_compile(target, iterations=1, expected_files=[file_name]) as found:
+      files = found[file_name]
+      self.assertEqual(1, len(files))
+      with open(list(files)[0]) as file:
+        return file.read()
+
+  def test_analysis_portability(self):
+    target = 'testprojects/src/scala/org/pantsbuild/testproject/javasources'
+    analysis_file_name = 'testprojects.src.scala.org.pantsbuild.testproject.javasources.javasources.analysis.portable'
+
+    analysis1 = self._file_content_from_compilation(target, analysis_file_name)
+    analysis2 = self._file_content_from_compilation(target, analysis_file_name)
+
+    def extract_content(analysis):
+      # TODO(stuhood): comparing content before stamps only, because there is different line in internal apis section
+      # return re.sub(re.compile('lastModified\(\d+\)'), "lastModified()", analysis).split('\n')
+      return analysis.partition("stamps")[0].split("\n")
+
+    self.assertListEqual(extract_content(analysis1), extract_content(analysis2))
