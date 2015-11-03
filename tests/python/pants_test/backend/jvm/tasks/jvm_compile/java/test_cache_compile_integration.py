@@ -17,7 +17,7 @@ from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test impo
 
 class CacheCompileIntegrationTest(BaseCompileIT):
   def run_compile(self, target_spec, config, workdir):
-    args = ['compile', target_spec]
+    args = ['publish-classpath', 'compile', target_spec]
     pants_run = self.run_pants_with_workdir(args, workdir, config)
     self.assert_success(pants_run)
 
@@ -25,7 +25,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
     with safe_open(path, 'w') as f:
       f.write(value)
 
-  def test_incremental_caching(self):
+  def test_incremental_caching_and_publishing(self):
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir, \
@@ -41,7 +41,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
       buildfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD')
-      runtime_classpath = os.path.join(dist_dir, 'compile', 'publish-classpath', 'runtime_classpath')
+      runtime_classpath = os.path.join(dist_dir, 'publish-classpath', 'runtime_classpath')
 
       self.create_file(srcfile,
                        dedent("""package org.pantsbuild.cachetest;

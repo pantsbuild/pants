@@ -45,12 +45,14 @@ class RuntimeClasspathPublisher(Task):
     """
     for target in self.context.targets():
       folder_for_symlinks = self._stable_output_folder(target)
-      safe_mkdir(folder_for_symlinks, clean=True)
       """
       :type target: pants.build_graph.target.Target
       """
       classpath_entries_for_target = \
         runtime_classpath.get_internal_classpath_entries_for_targets([target], transitive=False)
+
+      if len(classpath_entries_for_target) > 0:
+        safe_mkdir(folder_for_symlinks, clean=True)
       for conf, entry in classpath_entries_for_target:
         path = entry.path
         os.symlink(path, os.path.join(folder_for_symlinks, os.path.basename(path)))
