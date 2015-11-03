@@ -69,7 +69,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.run_compile(cachetest_spec, config, workdir)
 
       # symlink should be updated
-      real_classes2 = os.path.realpath(os.path.join(classes_symlink_folder, 'classes.jar'))
+      real_classes2 = os.path.realpath(os.path.join(classes_symlink_folder, 'z.jar'))
       self.assertNotEqual(real_classes1, real_classes2)
 
       self.create_file(srcfile,
@@ -81,7 +81,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.run_compile(cachetest_spec, config, workdir)
 
       # symlink should be changed back
-      real_classes3 = os.path.realpath(os.path.join(classes_symlink_folder, 'classes.jar'))
+      real_classes3 = os.path.realpath(os.path.join(classes_symlink_folder, 'z.jar'))
       self.assertEqual(real_classes1, real_classes3)
 
       root = os.path.join(workdir, 'compile', 'jvm', 'zinc')

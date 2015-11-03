@@ -9,21 +9,18 @@ import logging
 import os
 
 from pants.backend.core.tasks.task import Task
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
-from pants.util.dirutil import safe_mkdir
+`from pants.util.dirutil import safe_mkdir
 
 
 logger = logging.getLogger(__name__)
 
 
-"""
-Creates symlinks in pants_distdir to context jars per target.
+class RuntimeClasspathPublisher(Task):
+  """
+  Creates symlinks in pants_distdir to context jars per target.
 
-See JvmCompile#_create_context_jar for details.
-"""
-
-
-class CompileClasspathPublisher(Task):
+  See JvmCompile#_create_context_jar for details.
+  """
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -50,9 +47,8 @@ class CompileClasspathPublisher(Task):
       """
       classpath_entries_for_target = \
         runtime_classpath.get_internal_classpath_entries_for_targets([target], transitive=False)
-      for (conf, entry) in classpath_entries_for_target:
+      for conf, entry in classpath_entries_for_target:
         path = entry.path
-        if os.path.basename(path) == JvmCompile.context_jar_name:
-          symlink = self._stable_output_folder(target)
-          safe_mkdir(symlink, clean=True)
-          os.symlink(path, os.path.join(symlink, "classes.jar"))
+        symlink = self._stable_output_folder(target)
+        safe_mkdir(symlink, clean=True)
+        os.symlink(path, os.path.join(symlink, os.path.basename(path)))

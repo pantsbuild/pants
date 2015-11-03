@@ -40,7 +40,7 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
-from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import CompileClasspathPublisher
+from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
@@ -144,7 +144,7 @@ def register_goals():
   jvm_compile.add_member(ZincCompile)
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
 
-  task(name='publish-classpath', action=CompileClasspathPublisher).install('compile').with_description(
+  task(name='publish-classpath', action=RuntimeClasspathPublisher).install('compile').with_description(
       'Create stable symlinks for output jars for JVM targets.')
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile').with_description(
       'Check that used dependencies have been requested.')

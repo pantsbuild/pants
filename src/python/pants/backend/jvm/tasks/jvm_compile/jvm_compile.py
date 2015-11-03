@@ -68,7 +68,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   """
 
   size_estimators = create_size_estimators()
-  context_jar_name = 'z.jar'
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -328,7 +327,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     analysis_file = JvmCompile._analysis_for_target(target_workdir, target)
     portable_analysis_file = JvmCompile._portable_analysis_for_target(target_workdir, target)
     classes_dir = os.path.join(target_workdir, 'classes')
-    jar_file = os.path.join(target_workdir, self.context_jar_name)
+    jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
     return CompileContext(target,
                           analysis_file,
