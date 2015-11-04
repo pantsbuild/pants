@@ -201,7 +201,8 @@ class ZincCompile(JvmCompile):
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
 
   def create_analysis_tools(self):
-    return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis)
+    return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis,
+                         self.get_options().pants_workdir)
 
   def zinc_classpath(self):
     # Zinc takes advantage of tools.jar if it's presented in classpath.
