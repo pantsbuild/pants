@@ -49,6 +49,10 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
                           ],
                           classpath_spec='//:benchmark-java-allocation-instrumenter-2.1')
 
+  @classmethod
+  def global_subsystems(cls):
+    return super(BenchmarkRun, cls).global_subsystems() + (DistributionLocator,)
+
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)
     # TODO(Steve Gury):
