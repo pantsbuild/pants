@@ -7,3 +7,19 @@ node_module(
     'contrib/node/examples/src/node/web-build-tool',
   ]
 )
+
+npm_test(
+  name='unit',
+  script_name='test_unit',
+  dependencies=[
+    ':web-component-button'
+  ]
+)
+
+npm_test(
+  name='integration',
+  script_name='test_integration',
+  dependencies=[
+    ':web-component-button'
+  ]
+)

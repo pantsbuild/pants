@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
+
 from pants.option.ranked_value import RankedValue
 
 
@@ -135,3 +137,9 @@ class OptionValueContainer(object):
     """Returns an iterator over all option names, in lexicographical order."""
     for name in sorted(self._value_map.keys()):
       yield name
+
+  def __copy__(self):
+    """Ensure that a shallow copy has its own value map."""
+    ret = type(self)()
+    ret._value_map = copy.copy(self._value_map)
+    return ret

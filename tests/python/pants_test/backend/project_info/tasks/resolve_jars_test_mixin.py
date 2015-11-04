@@ -26,9 +26,9 @@ class ResolveJarsTestMixin(object):
     raise NotImplementedError()
 
   def _test_jar_lib_with_url(self, load_all):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      with temporary_dir(root_dir=self.workdir_root()) as source_dir:
-        with temporary_dir(root_dir=self.workdir_root()) as dist_dir:
+    with self.temporary_workdir() as workdir:
+      with self.temporary_sourcedir() as source_dir:
+        with temporary_dir() as dist_dir:
           os.makedirs(os.path.join(source_dir, 'src'))
           with open(os.path.join(source_dir, 'src', 'BUILD.one'), 'w+') as f:
             f.write(dedent("""

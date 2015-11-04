@@ -8,25 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import tokenize
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
-from pants.subsystem.subsystem import Subsystem
 
 
 # TODO(wickman) Update this to sanitize line continuation styling as we have
 # disabled it from pep8.py due to mismatched indentation styles.
-class IndentationSubsystem(Subsystem):
-  options_scope = 'pycheck-indentation'
-
-  @classmethod
-  def register_options(cls, register):
-    super(IndentationSubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
-
-
 class Indentation(CheckstylePlugin):
   """Enforce proper indentation."""
   INDENT_LEVEL = 2  # the one true way
-  subsystem = IndentationSubsystem
 
   def nits(self):
     indents = []

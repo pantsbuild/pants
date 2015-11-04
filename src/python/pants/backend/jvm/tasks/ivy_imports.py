@@ -42,7 +42,7 @@ class IvyImports(IvyTaskMixin, NailgunTask):
     for target in targets:
       all_targets.update(target.imported_jar_libraries)
 
-    imports_classpath = ClasspathProducts()
+    imports_classpath = ClasspathProducts(self.get_options().pants_workdir)
     self.resolve(executor=self.create_java_executor(),
                  targets=all_targets,
                  classpath_products=imports_classpath,

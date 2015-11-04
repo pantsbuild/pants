@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ast
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
-from pants.subsystem.subsystem import Subsystem
 
 
 # Warn on non 2.x/3.x compatible symbols:
@@ -30,22 +29,11 @@ from pants.subsystem.subsystem import Subsystem
 #
 # Class internals:
 #   __metaclass__
-class FutureCompatibilitySubsystem(Subsystem):
-  options_scope = 'pycheck-future-compat'
-
-  @classmethod
-  def register_options(cls, register):
-    super(FutureCompatibilitySubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
-
-
 class FutureCompatibility(CheckstylePlugin):
   """Warns about behavior that will likely break when moving to Python 3.x"""
   BAD_ITERS = frozenset(('iteritems', 'iterkeys', 'itervalues'))
   BAD_FUNCTIONS = frozenset(('xrange',))
   BAD_NAMES = frozenset(('basestring', 'unicode'))
-  subsystem = FutureCompatibilitySubsystem
 
   def nits(self):
     for call in self.iter_ast_types(ast.Call):

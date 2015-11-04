@@ -30,7 +30,7 @@ class ClasspathProductsTest(BaseTest):
   def test_single_classpath_element_no_excludes(self):
     a = self.make_target('a', JvmTarget)
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     path = self.path('jar/path')
     self.add_jar_classpath_element_for_path(classpath_product, a, path)
 
@@ -40,7 +40,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     resolved_jar = self.add_jar_classpath_element_for_path(classpath_product,
                                                            a,
                                                            self._example_jar_path())
@@ -67,29 +67,29 @@ class ClasspathProductsTest(BaseTest):
   def test_fails_if_paths_outside_buildroot(self):
     a = self.make_target('a', JvmTarget)
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     with self.assertRaises(TaskError) as cm:
       classpath_product.add_for_target(a, [('default', '/dev/null')])
 
     self.assertEqual(
-      'Classpath entry /dev/null for target a:a is located outside the buildroot.',
+      'Classpath entry /dev/null for target a:a is located outside the working directory.',
       str(cm.exception))
 
   def test_fails_if_jar_paths_outside_buildroot(self):
     a = self.make_target('a', JvmTarget)
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     with self.assertRaises(TaskError) as cm:
       classpath_product.add_jars_for_targets([a], 'default', [(resolved_example_jar_at('/dev/null'))])
 
     self.assertEqual(
-      'Classpath entry /dev/null for target a:a is located outside the buildroot.',
+      'Classpath entry /dev/null for target a:a is located outside the working directory.',
       str(cm.exception))
 
   def test_excluded_classpath_element(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
     self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
     self.add_excludes_for_targets(classpath_product, a)
@@ -102,7 +102,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     self.add_jar_classpath_element_for_path(classpath_product, a, self._example_jar_path())
     self.add_excludes_for_targets(classpath_product, b, a)
 
@@ -113,7 +113,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
     classpath_product.add_for_target(a, [('default', example_jar_path)])
     classpath_product.add_excludes_for_targets([a, b])
@@ -125,7 +125,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget)
     a = self.make_target('a', JvmTarget, dependencies=[b], excludes=[Exclude('com.example', 'lib')])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
     self.add_jar_classpath_element_for_path(classpath_product, b, example_jar_path)
     self.add_excludes_for_targets(classpath_product, b, a)
@@ -138,7 +138,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     com_example_jar_path = self._example_jar_path()
     org_example_jar_path = self.path('ivy/jars/org.example/lib/123.4.jar')
     classpath_product.add_jars_for_targets([a], 'default',
@@ -156,7 +156,7 @@ class ClasspathProductsTest(BaseTest):
     a = self.make_target('a', JvmTarget, dependencies=[b], excludes=[Exclude('com.example', 'lib')])
 
     example_jar_path = self._example_jar_path()
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     self.add_jar_classpath_element_for_path(classpath_product, b, example_jar_path)
     self.add_excludes_for_targets(classpath_product, a)
 
@@ -168,7 +168,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget)
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     self.add_example_jar_classpath_element_for(classpath_product, b)
     self.add_excludes_for_targets(classpath_product, a)
 
@@ -180,7 +180,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget)
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.exam')], dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     self.add_example_jar_classpath_element_for(classpath_product, b)
     self.add_excludes_for_targets(classpath_product, a)
 
@@ -192,7 +192,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget)
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example')], dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     self.add_example_jar_classpath_element_for(classpath_product, b)
     self.add_excludes_for_targets(classpath_product, a)
 
@@ -206,7 +206,7 @@ class ClasspathProductsTest(BaseTest):
     consumer = self.make_target('consumer', JvmTarget)
     root = self.make_target('root', JvmTarget, dependencies=[provider, consumer])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     self.add_example_jar_classpath_element_for(classpath_product, consumer)
     self.add_excludes_for_targets(classpath_product, consumer, provider, root)
 
@@ -220,7 +220,7 @@ class ClasspathProductsTest(BaseTest):
                          provides=Artifact('com.example', 'li', Repository()))
     root = self.make_target('root', JvmTarget, dependencies=[provider])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     self.add_example_jar_classpath_element_for(classpath_product, root)
     self.add_excludes_for_targets(classpath_product, provider, root)
 
@@ -233,7 +233,7 @@ class ClasspathProductsTest(BaseTest):
                          provides=Artifact('com.example.lib', '', Repository()))
     root = self.make_target('root', JvmTarget, dependencies=[provider])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     self.add_example_jar_classpath_element_for(classpath_product, root)
     self.add_excludes_for_targets(classpath_product, provider, root)
 
@@ -247,7 +247,7 @@ class ClasspathProductsTest(BaseTest):
 
     example_jar_path = self._example_jar_path()
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     classpath_product.add_for_target(b, [('default', example_jar_path)])
     self.add_excludes_for_targets(classpath_product, a)
 
@@ -258,7 +258,7 @@ class ClasspathProductsTest(BaseTest):
   def test_jar_missing_pants_path_fails_adding(self):
     b = self.make_target('b', JvmTarget)
 
-    classpath_products = ClasspathProducts()
+    classpath_products = ClasspathProducts(self.pants_workdir)
     with self.assertRaises(TaskError) as cm:
       classpath_products.add_jars_for_targets([b], 'default',
                                               [ResolvedJar(M2Coordinate(org='org', name='name'),
@@ -271,7 +271,7 @@ class ClasspathProductsTest(BaseTest):
   def test_get_classpath_entries_for_targets_respect_excludes(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
     self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
     self.add_excludes_for_targets(classpath_product, a)
@@ -283,7 +283,7 @@ class ClasspathProductsTest(BaseTest):
   def test_get_classpath_entries_for_targets_ignore_excludes(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
     resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path,
                                                            conf='fred-conf')
@@ -300,7 +300,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
     resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
 
@@ -321,7 +321,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
     resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
 
@@ -341,7 +341,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
     resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
 
@@ -360,7 +360,7 @@ class ClasspathProductsTest(BaseTest):
     b = self.make_target('b', JvmTarget)
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
-    classpath_product = ClasspathProducts()
+    classpath_product = ClasspathProducts(self.pants_workdir)
 
     # This artifact classpath entry should be ignored.
     example_jar_path = self._example_jar_path()
@@ -380,7 +380,7 @@ class ClasspathProductsTest(BaseTest):
     return self.path('ivy/jars/com.example/lib/jars/123.4.jar')
 
   def path(self, p):
-    return os.path.join(self.build_root, p)
+    return os.path.join(self.pants_workdir, p)
 
   def add_jar_classpath_element_for_path(self,
                                          classpath_product,

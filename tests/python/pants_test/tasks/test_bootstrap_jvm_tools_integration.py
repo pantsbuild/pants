@@ -12,7 +12,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
 
   def test_zinc_tool_reuse_between_scala_and_java(self):
-    with temporary_dir(root_dir=self.workdir_root()) as artifact_cache:
+    with temporary_dir() as artifact_cache:
       bootstrap_args = [
         'bootstrap.bootstrap-jvm-tools',
         "--cache-write-to=['{}']".format(artifact_cache),

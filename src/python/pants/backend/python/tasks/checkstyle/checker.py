@@ -18,7 +18,14 @@ from pants.base.exceptions import TaskError
 
 _NOQA_LINE_SEARCH = re.compile(r'# noqa\b').search
 _NOQA_FILE_SEARCH = re.compile(r'# (flake8|checkstyle): noqa$').search
-lint_plugin = namedtuple('lint_plugin', 'name checker')
+
+
+class LintPlugin(namedtuple('_LintPlugin', ['name', 'subsystem'])):
+  def skip(self):
+    return self.subsystem.global_instance().get_options().skip
+
+  def checker(self, python_file):
+    return self.subsystem.global_instance().get_plugin(python_file)
 
 
 def noqa_line_filter(python_file, line_number):
@@ -36,8 +43,7 @@ class PythonCheckStyleTask(PythonTask):
 
   def __init__(self, *args, **kwargs):
     super(PythonCheckStyleTask, self).__init__(*args, **kwargs)
-    self._plugins = [plugin for plugin in self._plugins
-                      if not plugin.checker.subsystem.global_instance().get_options().skip]
+    self._plugins = [plugin for plugin in self._plugins if not plugin.skip()]
     self.options = self.get_options()
 
   @classmethod
@@ -71,15 +77,15 @@ class PythonCheckStyleTask(PythonTask):
     cls._plugins = []
 
   @classmethod
-  def register_plugin(cls, name, checker):
-    """Register plugin to be used run as part of Python Style checks.
+  def register_plugin(cls, name, subsystem):
+    """Register plugin to be run as part of Python Style checks.
 
-    :param name: (string) Name of the method plugin
-    :param checker: (CheckstylePlugin) Plugin subclass
+    :param string name: Name of the plugin.
+    :param PluginSubsystemBase subsystem: Plugin subsystem subclass.
     """
-    plugin = lint_plugin(name=name, checker=checker)
+    plugin = LintPlugin(name=name, subsystem=subsystem)
     cls._plugins.append(plugin)
-    cls._subsystems += (plugin.checker.subsystem, )
+    cls._subsystems += (plugin.subsystem, )
 
   def get_nits(self, python_file):
     """Iterate over the instances style checker and yield Nits.
