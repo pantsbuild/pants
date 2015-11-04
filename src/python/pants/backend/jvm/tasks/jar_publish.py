@@ -871,10 +871,9 @@ class JarPublish(ScmPublishMixin, JarTask):
     return sha.hexdigest()
 
   def changelog(self, target, sha):
-    # todo: temporary fix should be discussed, filtering synthetic files
-    files = [fi for fi in target.sources_relative_to_buildroot() if not fi.startswith(os.pardir)]
-    return ensure_text(self.scm.changelog(from_commit=sha,
-                                          files=files))
+    # filter synthetic files
+    files = filter(lambda filename: not filename.startswith(os.pardir), target.sources_relative_to_buildroot())
+    return ensure_text(self.scm.changelog(from_commit=sha, files=files))
 
   def fetch_ivysettings(self, ivy):
     if self.get_options().ivy_settings:
