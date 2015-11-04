@@ -40,10 +40,10 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
       touch(os.path.join(jar_dir, 'z1.jar'))
       runtime_classpath.add_for_target(target, [(None, os.path.join(jar_dir, 'z1.jar'))])
       task.execute()
-      # Check only one symlink was created.
-      self.assertEqual(len(os.listdir(target_classpath_output)), 1)
+      # Check only one symlink and classpath.txt were created.
+      self.assertEqual(len(os.listdir(target_classpath_output)), 2)
       self.assertEqual(
-        os.path.realpath(os.path.join(target_classpath_output, os.listdir(target_classpath_output)[0])),
+        os.path.realpath(os.path.join(target_classpath_output, sorted(os.listdir(target_classpath_output))[0])),
         os.path.join(jar_dir, 'z1.jar')
       )
 
@@ -55,8 +55,8 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
       runtime_classpath.add_for_target(target, [(None, os.path.join(jar_dir, 'z2.jar'))])
       task.execute()
       # Check the symlink was updated.
-      self.assertEqual(len(os.listdir(target_classpath_output)), 1)
+      self.assertEqual(len(os.listdir(target_classpath_output)), 2)
       self.assertEqual(
-        os.path.realpath(os.path.join(target_classpath_output, os.listdir(target_classpath_output)[0])),
+        os.path.realpath(os.path.join(target_classpath_output, sorted(os.listdir(target_classpath_output))[0])),
         os.path.join(jar_dir, 'z2.jar')
       )
