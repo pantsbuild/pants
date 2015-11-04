@@ -7,10 +7,5 @@
   "dependencies": [
     "3rdparty/jvm:guava",
     "src/thrift/codegen/simple"
-  ],
-  "configurations": [
-    {
-      "type_alias": "name_configuration"
-    }
   ]
 }

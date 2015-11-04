@@ -251,11 +251,16 @@ def gen_apache_thrift(sources, rev, gen, strict):
                             'gen:{}, strict: {}'.format(sources, rev, gen, strict))
 
 
-class NameConfiguration(Configuration):
-  pass
+class BuildPropertiesPlanner(TaskPlanner):
+  """A planner that adds a Classpath entry for all targets configured for build_properties.
 
+  NB: In the absence of support for merging multiple Promises for a particular product_type,
+  this serves as a valid example that explodes when it should succeed.
+  """
 
-class NameFilePlanner(TaskPlanner):
+  class Configuration(Configuration):
+    pass
+
   @property
   def goal_name(self):
     return None
@@ -267,7 +272,7 @@ class NameFilePlanner(TaskPlanner):
   def plan(self, scheduler, product_type, subject, configuration=None):
     if not isinstance(subject, Target):
       return
-    name_config = filter(lambda x: isinstance(x, NameConfiguration), subject.configurations)
+    name_config = filter(lambda x: isinstance(x, self.Configuration), subject.configurations)
     if not name_config:
       return
     assert product_type == Classpath
@@ -439,7 +444,7 @@ def setup_json_scheduler(build_root):
                   'scrooge_configuration': ScroogeConfiguration,
                   'sources': AddressableSources,
                   'target': Target,
-                  'name_configuration': NameConfiguration}
+                  'build_properties': BuildPropertiesPlanner.Configuration}
   json_parser = functools.partial(parse_json, symbol_table=symbol_table)
   graph = Graph(AddressMapper(build_root=build_root,
                               build_pattern=r'^BLD.json$',
@@ -450,7 +455,7 @@ def setup_json_scheduler(build_root):
                        JavacPlanner(),
                        ScalacPlanner(),
                        ScroogePlanner(),
-                       NameFilePlanner()
+                       BuildPropertiesPlanner()
                        ])
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler
