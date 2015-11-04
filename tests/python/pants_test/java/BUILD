@@ -52,3 +52,11 @@ python_tests(
     'src/python/pants/util:dirutil',
   ]
 )
+
+python_tests(
+  name = 'nailgun_integration',
+  sources = ['test_nailgun_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test'
+  ]
+)
