@@ -6,10 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from hashlib import sha1
 
 from pants.backend.core.tasks.task import Task
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 
 
 class RuntimeClasspathPublisher(Task):
@@ -47,8 +46,12 @@ class RuntimeClasspathPublisher(Task):
       if len(classpath_entries_for_target) > 0:
         safe_mkdir(folder_for_symlinks)
 
-      for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
-        file_name = os.path.basename(entry.path)
-        # Preserve classpath order.
-        symlink_name = '{}-{}'.format(index, file_name)
-        os.symlink(entry.path, os.path.join(folder_for_symlinks, symlink_name))
+        classpath = []
+        for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
+          classpath.append(entry.path)
+          file_name = os.path.basename(entry.path)
+          # Preserve classpath order.
+          symlink_name = '{}-{}'.format(index, file_name)
+          os.symlink(entry.path, os.path.join(folder_for_symlinks, symlink_name))
+
+        safe_open(os.path.join(folder_for_symlinks, 'classpath.txt'), 'w').write(os.pathsep.join(classpath))
