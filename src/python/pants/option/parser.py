@@ -106,12 +106,13 @@ class Parser(object):
     for child in self._child_parsers:
       child.walk(callback)
 
-  def parse_args(self, flags, namespace):
-    """Set values for this parser's options on the namespace object."""
+  def _create_flag_value_map(self, flags):
+    """Returns a map of flag -> list of values, based on the given flag strings.
 
-    # Create a map of flag to list of values.  None signals no value given (e.g., -x, --foo).
-    # The value is a list because the user may specify the same flag multiple times, and that's
-    # sometimes OK (e.g., when action=='append').
+    None signals no value given (e.g., -x, --foo).
+    The value is a list because the user may specify the same flag multiple times, and that's
+    sometimes OK (e.g., when action=='append').
+    """
     flag_value_map = defaultdict(list)
     for flag in flags:
       key, has_equals_sign, flag_val = flag.partition('=')
@@ -125,11 +126,20 @@ class Parser(object):
           # string ('--foo='), for options with an implicit_value.
           flag_val = None
       flag_value_map[key].append(flag_val)
+    return flag_value_map
+
+  def parse_args(self, flags, namespace):
+    """Set values for this parser's options on the namespace object."""
+    flag_value_map = self._create_flag_value_map(flags)
 
     for args, kwargs in self._unnormalized_option_registrations_iter():
       self._validate(args, kwargs)
       dest = kwargs.get('dest') or self._select_dest(args)
       is_bool = is_boolean_flag(kwargs)
+
+      def consume_flag(flag):
+        self._check_deprecated(dest, kwargs)
+        del flag_value_map[flag]
 
       # Compute the values provided on the command line for this option.  Note tha there may be
       # multiple values, for any combination of the following reasons:
@@ -142,31 +152,35 @@ class Parser(object):
       # specified in config, which isn't something they control.
       implicit_value = kwargs.get('implicit_value')
       flag_vals = []
-      for arg in args:
-        if arg in flag_value_map:
-          self._check_deprecated(dest, kwargs)
-          if is_bool:
-            flag_vals.append('true' if kwargs['action'] == 'store_true' else 'false')
+
+      def add_flag_val(v):
+        if v is None:
+          if implicit_value is None:
+            raise ParseError('Missing value for command line flag {}'.format(arg))
           else:
-            vals = flag_value_map[arg]
-            for v in vals:
-              if v is None:
-                if implicit_value is None:
-                  raise ParseError('Missing value for command line flag {}'.format(arg))
-                else:
-                  flag_vals.append(implicit_value)
-              else:
-                flag_vals.append(v)
-          del flag_value_map[arg]
-        elif is_bool and self._inverse_arg(arg) in flag_value_map:
-          self._check_deprecated(dest, kwargs)
-          del flag_value_map[self._inverse_arg(arg)]
-          flag_vals.append('false' if kwargs['action'] == 'store_true' else 'true')
+            flag_vals.append(implicit_value)
+        else:
+          flag_vals.append(v)
+
+      for arg in args:
+        if is_bool:
+          if arg in flag_value_map:
+            flag_vals.append('true' if kwargs['action'] == 'store_true' else 'false')
+            consume_flag(arg)
+          elif self._inverse_arg(arg) in flag_value_map:
+            flag_vals.append('false' if kwargs['action'] == 'store_true' else 'true')
+            consume_flag(self._inverse_arg(arg))
+        else:
+          if arg in flag_value_map:
+            for v in flag_value_map[arg]:
+              add_flag_val(v)
+            consume_flag(arg)
 
       # Get the value for this option, falling back to defaults as needed.
       val = self._compute_value(dest, kwargs, flag_vals)
       setattr(namespace, dest, val)
 
+    # See if there are any unconsumed flags remaining.
     if flag_value_map:
       raise ParseError('Unrecognized command line flags on {}: {}'.format(
         self._scope_str(), ', '.join(flag_value_map.keys())))
@@ -262,10 +276,7 @@ class Parser(object):
     self._known_args.update(args)
 
   def _check_deprecated(self, dest, kwargs):
-    """Checks option for deprecation and issues a warning if necessary.
-
-    :param arg: The name of the option to check.
-    """
+    """Checks option for deprecation and issues a warning if necessary."""
     deprecated_ver = kwargs.get('deprecated_version', None)
     if deprecated_ver is not None:
       msg = 'Option {dest} in {scope} is deprecated and will be removed in version ' \
