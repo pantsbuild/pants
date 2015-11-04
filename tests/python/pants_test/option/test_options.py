@@ -37,6 +37,10 @@ def intermediate(scope):
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 
+def subsystem(scope):
+  return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
+
+
 class OptionsTest(unittest.TestCase):
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
@@ -54,7 +58,7 @@ class OptionsTest(unittest.TestCase):
     def register_global(*args, **kwargs):
       options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-    register_global('-v', '--verbose', action='store_true', help='Verbose output.', recursive=True)
+    register_global('-z', '--verbose', action='store_true', help='Verbose output.', recursive=True)
     register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
     register_global('--y', action='append', type=int)
     register_global('--config-override', action='append')
@@ -157,7 +161,7 @@ class OptionsTest(unittest.TestCase):
     # Some basic smoke tests.
     options = self._parse('./pants --verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
-    options = self._parse('./pants -v compile path/to/tgt')
+    options = self._parse('./pants -z compile path/to/tgt')
     self.assertEqual(['path/to/tgt'], options.target_specs)
     self.assertEqual(True, options.for_global_scope().verbose)
 
@@ -168,7 +172,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(True, options.for_scope('compile').verbose)
     self.assertEqual(False, options.for_scope('compile.java').verbose)
 
-    options = self._parse('./pants --verbose compile --no-verbose compile.java -v test '
+    options = self._parse('./pants --verbose compile --no-verbose compile.java -z test '
                           'test.junit --no-verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
     self.assertEqual(False, options.for_scope('compile').verbose)
@@ -273,10 +277,10 @@ class OptionsTest(unittest.TestCase):
   def test_boolean_invalid_value(self):
     with self.assertRaises(Parser.BooleanConversionError):
       self._parse('./pants', config={'DEFAULT': {'store_true_flag': 11,
-                                                 }})
+                                                 }}).for_global_scope()
     with self.assertRaises(Parser.BooleanConversionError):
       self._parse('./pants', config={'DEFAULT': {'store_true_flag': 'AlmostTrue',
-                                               }})
+                                               }}).for_global_scope()
 
   def test_defaults(self):
     # Hard-coded defaults.
@@ -319,12 +323,21 @@ class OptionsTest(unittest.TestCase):
   def test_shadowing(self):
     options = Options.create(env={},
                              config=self._create_config({}),
-                             known_scope_infos=[task('foo')],
+                             known_scope_infos=[task('bar'), intermediate('foo'), task('foo.bar')],
                              args='./pants',
                              option_tracker=OptionTracker())
-    options.register('', '--bar')
+    options.register('', '--opt1')
+    options.register('foo', '-o', '--opt2')
     with self.assertRaises(RegistrationError):
-      options.register('foo', '--bar')
+      options.register('bar', '--opt1')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt1')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt2')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt1', '--opt3')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt3', '--opt2')
 
   def test_recursion(self):
     # Recursive option.
@@ -338,6 +351,22 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants compile --bar-baz=foo')
     with self.assertRaises(ParseError):
       options.for_scope('compile').bar_baz
+
+  def test_no_recursive_subsystem_options(self):
+    options = Options.create(env={},
+                             config=self._create_config({}),
+                             known_scope_infos=[subsystem('foo')],
+                             args='./pants',
+                             option_tracker=OptionTracker())
+    # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
+    # a separate instance of the subsystem, so it needs all the options).
+    # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
+    with self.assertRaises(RegistrationError):
+      options.register('foo', '--bar', recursive=False)
+      options.for_scope('foo')
+    with self.assertRaises(RegistrationError):
+      options.register('foo', '--baz', recursive=True)
+      options.for_scope('foo')
 
   def test_is_known_scope(self):
     options = self._parse('./pants')
@@ -486,6 +515,7 @@ class OptionsTest(unittest.TestCase):
                                option_tracker=OptionTracker())
       options.register(GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
                        deprecated_hint='The semver for this option has already passed.')
+      options.for_global_scope()
 
   @contextmanager
   def warnings_catcher(self):
@@ -660,16 +690,16 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals((int, 77), pairs[2])
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
-    def assert_fromfile(dest, expected, contents):
+    def _do_assert_fromfile(dest, expected, contents):
       with temporary_file() as fp:
         fp.write(contents)
         fp.close()
         options = parse_func(dest, fp.name)
         self.assertEqual(expected, options.for_scope('fromfile')[dest])
 
-    assert_fromfile(dest='string', expected='jake', contents='jake')
-    assert_fromfile(dest='intvalue', expected=42, contents='42')
-    assert_fromfile(dest='dictvalue', expected={'a': 42, 'b': (1, 2)}, contents=dedent("""
+    _do_assert_fromfile(dest='string', expected='jake', contents='jake')
+    _do_assert_fromfile(dest='intvalue', expected=42, contents='42')
+    _do_assert_fromfile(dest='dictvalue', expected={'a': 42, 'b': (1, 2)}, contents=dedent("""
       {
         'a': 42,
         'b': (
@@ -678,7 +708,7 @@ class OptionsTest(unittest.TestCase):
         )
       }
       """))
-    assert_fromfile(dest='listvalue', expected=['a', 1, 2], contents=dedent("""
+    _do_assert_fromfile(dest='listvalue', expected=['a', 1, 2], contents=dedent("""
       ['a',
        1,
        2]
@@ -692,7 +722,7 @@ class OptionsTest(unittest.TestCase):
        42
       ]
       """)
-    assert_fromfile(dest='appendvalue', expected=expected_append, contents=append_contents)
+    _do_assert_fromfile(dest='appendvalue', expected=expected_append, contents=append_contents)
 
   def test_fromfile_flags(self):
     def parse_func(dest, fromfile):

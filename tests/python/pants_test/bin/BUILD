@@ -28,9 +28,9 @@ python_tests(
   sources=['test_goal_runner.py'],
   dependencies=[
     '3rdparty/python:setuptools',
+    'src/python/pants/base:exceptions',
     'src/python/pants/bin',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test/option/util',
+    'src/python/pants/option',
   ]
 )
 

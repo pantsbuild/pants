@@ -164,7 +164,7 @@ class ExportTest(ConsoleTaskTestBase):
 
   def execute_export(self, *specs):
     context = self.context(target_roots=[self.target(spec) for spec in specs])
-    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
+    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()),
                                     context.products.get_data('compile_classpath')))

@@ -5,7 +5,7 @@ import time
 
 
 def test_sleep_short():
-  time.sleep(1)
+  time.sleep(0.1)
 
 
 def test_sleep_long():

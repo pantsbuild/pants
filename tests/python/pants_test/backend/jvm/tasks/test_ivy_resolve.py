@@ -65,7 +65,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     context = self.context(target_roots=[losing_lib, winning_lib])
 
     def artifact_path(name):
-      return os.path.join(self.build_root, 'ivy_artifact', name)
+      return os.path.join(self.pants_workdir, 'ivy_artifact', name)
 
     symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
                    artifact_path('bogus1'): artifact_path('bogus1'),

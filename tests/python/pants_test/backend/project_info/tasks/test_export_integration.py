@@ -13,7 +13,6 @@ from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.util.contextutil import temporary_dir
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
@@ -63,7 +62,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         self.assertTrue(os.path.exists(path), 'Expected jar at {} to actually exist.'.format(path))
 
   def test_export_code_gen(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, load_libs=True)
       thrift_target_name = ('examples.src.thrift.org.pantsbuild.example.precipitation'
@@ -74,14 +73,14 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue(any(p.match(target) for target in json_data.get('targets').keys()))
 
   def test_export_json_transitive_jar(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, load_libs=True)
       targets = json_data.get('targets')
       self.assertIn('org.hamcrest:hamcrest-core:1.3', targets[test_target]['libraries'])
 
   def test_export_jar_path_with_excludes(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:foo'
       json_data = self.run_export(test_target, workdir, load_libs=True)
       self.assertIsNone(json_data
@@ -93,7 +92,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
 
   def test_export_jar_path_with_excludes_soft(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:'
       json_data = self.run_export(test_target,
                                   workdir,
@@ -110,7 +109,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue('org.pantsbuild' in foo_target.get('excludes'))
 
   def test_export_jar_path(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, load_libs=True)
       with subsystem_instance(IvySubsystem) as ivy_subsystem:
@@ -133,14 +132,14 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         )
 
   def test_dep_map_for_java_sources(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
       json_data = self.run_export(test_target, workdir)
       targets = json_data.get('targets')
       self.assertIn('examples/src/java/org/pantsbuild/example/java_sources:java_sources', targets)
 
   def test_sources_and_javadocs(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
       json_data = self.run_export(test_target, workdir, load_libs=True)
       scala_lang_lib = json_data.get('libraries').get('org.scala-lang:scala-library:2.10.4')
@@ -150,7 +149,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertIsNotNone(scala_lang_lib['javadoc'])
 
   def test_ivy_classifiers(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
       json_data = self.run_export(test_target, workdir, load_libs=True)
       with subsystem_instance(IvySubsystem) as ivy_subsystem:
@@ -175,7 +174,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         )
 
   def test_distributions_and_platforms(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       test_target = 'examples/src/java/org/pantsbuild/example/hello/simple'
       json_data = self.run_export(test_target, workdir, load_libs=False, extra_args=[
         '--jvm-platform-default-platform=java7',
@@ -215,7 +214,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
         json_data['jvm_platforms'])
 
   def test_intellij_integration(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       targets = ['src/python/::', 'tests/python/pants_test:all', 'contrib/::']
       excludes = [
         '--exclude-target-regexp=.*go/examples.*',

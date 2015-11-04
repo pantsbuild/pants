@@ -78,17 +78,31 @@ class OptionValueContainerTest(unittest.TestCase):
     o = OptionValueContainer()
     o.foo = 1
     o.bar = {'a': 111}
+
     p = copy.copy(o)
-    o.bar['b'] = 222  # Add to original dict.
-    self.assertEqual(1, p.foo)
-    self.assertEqual({'a': 111, 'b': 222}, p.bar)  # Ensure dict was not copied.
+
+    # Verify that the result is in fact a copy.
+    self.assertEqual(1, p.foo)  # Has original attribute.
+    o.baz = 42
+    self.assertFalse(hasattr(p, 'baz'))  # Does not have attribute added after the copy.
+
+    # Verify that it's a shallow copy by modifying a referent in o and reading it in p.
+    o.bar['b'] = 222
+    self.assertEqual({'a': 111, 'b': 222}, p.bar)
 
   def test_deepcopy(self):
-    # deepcopy semantics can get hairy when overriding __setattr__/__getattr__, so we test them.
+    # copy semantics can get hairy when overriding __setattr__/__getattr__, so we test them.
     o = OptionValueContainer()
     o.foo = 1
     o.bar = {'a': 111}
+
     p = copy.deepcopy(o)
-    o.bar['b'] = 222  # Add to original dict.
-    self.assertEqual(1, p.foo)
-    self.assertEqual({'a': 111}, p.bar)  # Ensure dict was copied.
+
+    # Verify that the result is in fact a copy.
+    self.assertEqual(1, p.foo)  # Has original attribute.
+    o.baz = 42
+    self.assertFalse(hasattr(p, 'baz'))  # Does not have attribute added after the copy.
+
+    # Verify that it's a deep copy by modifying a referent in o and reading it in p.
+    o.bar['b'] = 222
+    self.assertEqual({'a': 111}, p.bar)

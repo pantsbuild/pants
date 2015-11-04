@@ -15,6 +15,7 @@ from pants.contrib.go.tasks.go_binary_create import GoBinaryCreate
 from pants.contrib.go.tasks.go_buildgen import GoBuildgen
 from pants.contrib.go.tasks.go_compile import GoCompile
 from pants.contrib.go.tasks.go_fetch import GoFetch
+from pants.contrib.go.tasks.go_go import GoEnv, GoGo
 from pants.contrib.go.tasks.go_run import GoRun
 from pants.contrib.go.tasks.go_test import GoTest
 
@@ -34,6 +35,8 @@ def build_file_aliases():
 def register_goals():
   task(name='go', action=GoBuildgen).install('buildgen').with_description(
     'Automatically generate BUILD files.')
+  task(name='go', action=GoGo).install('go')
+  task(name='go-env', action=GoEnv).install()
   task(name='go', action=GoFetch).install('resolve')
   task(name='go', action=GoCompile).install('compile')
   task(name='go', action=GoBinaryCreate).install('binary')

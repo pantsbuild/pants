@@ -11,7 +11,7 @@ var Button = React.createClass({
   },
 
   render: function() {
-    <button
+    return <button
       name={this.props.name}
       className='WebComponentButton'
       onClick={this.handleClick}>{this.state.clickCount} clicks!</button>

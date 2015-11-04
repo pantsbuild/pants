@@ -5,35 +5,31 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.checkstyle.new_style_classes import NewStyleClasses
+from pants_test.backend.python.tasks.checkstyle.plugin_test_base import CheckstylePluginTestBase
 
 
-def test_new_style_classes():
-  nsc = NewStyleClasses(PythonFile.from_statement("""
-    class OldStyle:
-      pass
-    
-    class NewStyle(object):
-      pass
-  """))
-  nits = list(nsc.nits())
-  assert len(nits) == 1
-  assert nits[0]._line_number == 1
-  assert nits[0].code == 'T606'
-  assert nits[0].severity == Nit.ERROR
+class NewStyleClassesTest(CheckstylePluginTestBase):
+  plugin_type = NewStyleClasses
 
-  nsc = NewStyleClasses(PythonFile.from_statement("""
-    class NewStyle(OtherThing, ThatThing, WhatAmIDoing):
-      pass
-  """))
-  nits = list(nsc.nits())
-  assert len(nits) == 0
+  def test_new_style_classes(self):
+    statement = """
+      class OldStyle:
+        pass
 
-  nsc = NewStyleClasses(PythonFile.from_statement("""
-    class OldStyle():  # unspecified mro
-      pass
-  """))
-  nits = list(nsc.nits())
-  assert len(nits) == 1
-  assert nits[0].code == 'T606'
+      class NewStyle(object):
+        pass
+    """
+    self.assertNit(statement, 'T606')
+
+    statement = """
+      class NewStyle(OtherThing, ThatThing, WhatAmIDoing):
+        pass
+    """
+    self.assertNoNits(statement)
+
+    statement = """
+      class OldStyle():  # unspecified mro
+        pass
+    """
+    self.assertNit(statement, 'T606')

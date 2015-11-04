@@ -13,6 +13,7 @@ from pants.contrib.node.subsystems.node_distribution import NodeDistribution
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.npm_package import NpmPackage
+from pants.contrib.node.targets.npm_test import NpmTest
 
 
 class NodeTask(Task):
@@ -40,6 +41,11 @@ class NodeTask(Task):
   def is_node_remote_module(cls, target):
     """Returns `True` if the given target is a `NodeRemoteModule`."""
     return isinstance(target, NodeRemoteModule)
+
+  @classmethod
+  def is_npm_test(cls, target):
+    """Returns `True` if the given target is a `NpmTest`."""
+    return isinstance(target, NpmTest)
 
   @classmethod
   def render_npm_package_dependency(cls, node_paths, target):

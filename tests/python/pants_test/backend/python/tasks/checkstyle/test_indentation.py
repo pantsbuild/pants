@@ -5,33 +5,31 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.checkstyle.indentation import Indentation
+from pants_test.backend.python.tasks.checkstyle.plugin_test_base import CheckstylePluginTestBase
 
 
-def test_indentation():
-  ind = Indentation(PythonFile.from_statement("""
-    def foo():
+class IndentationTest(CheckstylePluginTestBase):
+  plugin_type = Indentation
+
+  def test_indentation(self):
+    statement = """
+      def foo():
+          pass
+    """
+    self.assertNit(statement, 'T100')
+
+    statement = """
+      def foo():
         pass
-  """))
-  nits = list(ind.nits())
-  assert len(nits) == 1
-  assert nits[0].code == 'T100'
-  assert nits[0].severity == Nit.ERROR
+    """
+    self.assertNoNits(statement)
 
-  ind = Indentation(PythonFile.from_statement("""
-    def foo():
-      pass
-  """))
-  nits = list(ind.nits())
-  assert len(nits) == 0
-
-  ind = Indentation(PythonFile.from_statement("""
-    def foo():
-      baz = (
-          "this "
-          "is "
-          "ok")
-  """))
-  nits = list(ind.nits())
-  assert len(nits) == 0
+    statement = """
+      def foo():
+        baz = (
+            "this "
+            "is "
+            "ok")
+    """
+    self.assertNoNits(statement)

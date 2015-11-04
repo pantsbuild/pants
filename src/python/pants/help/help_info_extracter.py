@@ -54,7 +54,7 @@ class HelpInfoExtracter(object):
 
     Callers can format this dict into cmd-line help, HTML or whatever.
     """
-    return cls(parser.scope).get_option_scope_help_info(parser.registration_args)
+    return cls(parser.scope).get_option_scope_help_info(parser.option_registrations_iter())
 
   @staticmethod
   def compute_default(kwargs):
@@ -100,12 +100,13 @@ class HelpInfoExtracter(object):
     self._scope = scope
     self._scope_prefix = scope.replace('.', '-')
 
-  def get_option_scope_help_info(self, registration_args):
+  def get_option_scope_help_info(self, option_registrations_iter):
     """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs) pairs."""
     basic_options = []
     recursive_options = []
     advanced_options = []
-    for args, kwargs in registration_args:
+    # Sort the arguments, so we display the help in alphabetical order.
+    for args, kwargs in sorted(option_registrations_iter):
       ohi = self.get_option_help_info(args, kwargs)
       if kwargs.get('advanced'):
         advanced_options.append(ohi)
