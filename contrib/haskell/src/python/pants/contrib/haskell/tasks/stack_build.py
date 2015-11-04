@@ -26,5 +26,5 @@ class StackBuild(StackTask):
     for target in self.context.target_roots:
       with self.invalidated(targets=target.closure()) as invalidated:
         for vt in invalidated.invalid_vts:
-          if StackTask.is_haskell_package(vt.target):
+          if self.is_haskell_package(vt.target):
             self.stack_task('build', vt, extra_args)
