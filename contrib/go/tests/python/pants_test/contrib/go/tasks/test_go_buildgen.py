@@ -298,3 +298,38 @@ class GoBuildgenTest(TaskTestBase):
   def test_fail_floating(self):
     with self.assertRaises(GoBuildgen.FloatingRemoteError):
       self.stitch_deps_remote(remote=True, materialize=True, fail_floating=True)
+
+  def test_issues_2395(self):
+    # Previously, when a remote was indirectly discovered via a scan of locals (no target roots
+    # presented on the CLI), the remote would be queried for from the build graph under the
+    # erroneous assumption it had been injected.  This would result in a graph miss (BUILD file was
+    # there on disk, but never loaded via injection) and lead to creation of a new synthetic remote
+    # target with no rev.  The end result was lossy go remote library rev values when using the
+    # newer, encouraged, target-less invocation of GoBuildgen.
+
+    self.set_options(remote=True, materialize=True, fail_floating=True)
+    self.set_options_for_scope(Fetchers.options_scope,
+                               mapping={r'pantsbuild.org/.*':
+                                          '{}.{}'.format(FakeFetcher.__module__,
+                                                         FakeFetcher.__name__)})
+
+    self.add_to_build_file(relpath='3rdparty/go/pantsbuild.org/fake',
+                           target='go_remote_library(rev="v4.5.6")')
+
+    self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
+        package jane
+
+        import "pantsbuild.org/fake"
+
+        var PublicConstant = fake.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
+      """))
+    self.add_to_build_file(relpath='src/go/jane', target='go_library()')
+
+    context = self.context(target_roots=[])
+    pre_execute_files = self.buildroot_files()
+    task = self.create_task(context)
+    task.execute()
+
+    self.build_graph.reset()  # Force targets to be loaded off disk
+    self.assertEqual('v4.5.6', self.target('3rdparty/go/pantsbuild.org/fake').rev)
+    self.assertEqual(pre_execute_files, self.buildroot_files())

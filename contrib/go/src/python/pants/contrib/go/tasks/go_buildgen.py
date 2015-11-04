@@ -16,6 +16,7 @@ from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.address import Address
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
@@ -84,8 +85,9 @@ class GoTargetGenerator(object):
             remote_pkg_path = GoRemoteLibrary.remote_package_path(remote_root, import_path)
             name = remote_pkg_path or os.path.basename(import_path)
             address = Address(os.path.join(self._remote_source_root, remote_root), name)
-            found = self._build_graph.get_target(address)
-            if not found:
+            try:
+              self._build_graph.inject_address_closure(address)
+            except AddressLookupError:
               if not self._generate_remotes:
                 raise self.NewRemoteEncounteredButRemotesNotAllowedError(
                   'Cannot generate dependency for remote import path {}'.format(import_path))
