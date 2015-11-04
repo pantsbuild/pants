@@ -5,9 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-from textwrap import dedent
-
 from pants.backend.jvm.tasks.benchmark_run import BenchmarkRun
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
@@ -23,7 +20,7 @@ class BenchmarkRunTest(JvmToolTaskTestBase):
   def test_benchmark_complains_on_python_target(self):
     self.make_target('foo:hello', target_type=Target)
 
-    self.set_options(target='foo:hello')
+    self.set_options(target='<unused, but required>')
     context = self.context(target_roots=[self.target('foo:hello')])
     self.populate_runtime_classpath(context)
 
