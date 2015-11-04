@@ -199,8 +199,8 @@ class GoBuildgenTest(TaskTestBase):
     self.assertEqual({'src/go/fred/BUILD.gen', 'src/go/jane/BUILD.gen'},
                      self.buildroot_files() - pre_execute_files)
 
-  def stitch_deps_remote(self, remote=True, materialize=False):
-    self.set_options(remote=remote, materialize=materialize)
+  def stitch_deps_remote(self, remote=True, materialize=False, fail_floating=False):
+    self.set_options(remote=remote, materialize=materialize, fail_floating=fail_floating)
     self.set_options_for_scope(Fetchers.options_scope,
                                mapping={r'pantsbuild.org/.*':
                                         '{}.{}'.format(FakeFetcher.__module__,
@@ -294,3 +294,7 @@ class GoBuildgenTest(TaskTestBase):
       self.stitch_deps_remote(remote=False)
     self.assertEqual(GoTargetGenerator.NewRemoteEncounteredButRemotesNotAllowedError,
                      type(exc.exception.cause))
+
+  def test_fail_floating(self):
+    with self.assertRaises(GoBuildgen.FloatingRemoteError):
+      self.stitch_deps_remote(remote=True, materialize=True, fail_floating=True)
