@@ -156,7 +156,7 @@ Dependency  : {dep}
 
     try:
       with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL], cmd=' '.join(args)) as workunit:
-        subprocess.check_call(args)
+        subprocess.check_call(args, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
     except subprocess.CalledProcessError:
       raise TaskError("""
 `stack` subprocess failed with the following inputs:
