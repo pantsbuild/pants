@@ -10,6 +10,7 @@ from pants.base.build_file import BuildFile
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_parser import BuildFileParser
+from pants.util.dirutil import fast_relpath
 
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
@@ -27,23 +28,22 @@ class BuildFileAddressMapper(object):
   """
 
   class AddressNotInBuildFile(AddressLookupError):
-    """ Raised when an address cannot be found in an existing BUILD file."""
-    pass
+    """Indicates an address cannot be found in an existing BUILD file."""
 
   class EmptyBuildFileError(AddressLookupError):
-    """Raised if no addresses are defined in a BUILD file."""
-    pass
+    """Indicates no addresses are defined in a BUILD file."""
 
   class InvalidBuildFileReference(AddressLookupError):
-    """ Raised when a BUILD file does not exist at the address referenced."""
-    pass
+    """Indicates no BUILD file exists at the address referenced."""
 
   class InvalidAddressError(AddressLookupError):
-    """ Raised when an address cannot be parsed."""
-    pass
+    """Indicates an address cannot be parsed."""
 
   class BuildFileScanError(AddressLookupError):
-    """ Raised when a problem was encountered scanning a tree of BUILD files."""
+    """Indicates a problem was encountered scanning a tree of BUILD files."""
+
+  class InvalidRootError(BuildFileScanError):
+    """Indicates an invalid scan root was supplied."""
 
   def __init__(self, build_file_parser, build_file_type):
     """Create a BuildFileAddressMapper.
@@ -199,13 +199,26 @@ class BuildFileAddressMapper(object):
 
   def scan_addresses(self, root=None, spec_excludes=None):
     """Recursively gathers all addresses visible under `root` of the virtual address space.
+
+    :param string root: The absolute path of the root to scan; defaults to the root directory of the
+                        pants project.
+    :rtype: set of :class:`pants.build_graph.address.Address`
     :raises AddressLookupError: if there is a problem parsing a BUILD file
-    :param path root: defaults to the root directory of the pants project.
     """
+    root_dir = get_buildroot()
+    base_path = None
+
+    if root:
+      try:
+        base_path = fast_relpath(root, root_dir)
+      except ValueError as e:
+        raise self.InvalidRootError(e)
+
     addresses = set()
-    root = root or get_buildroot()
     try:
-      for build_file in self._build_file_type.scan_buildfiles(root, spec_excludes=spec_excludes):
+      for build_file in self._build_file_type.scan_buildfiles(root_dir=root_dir,
+                                                              base_path=base_path,
+                                                              spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
     except BuildFile.BuildFileError as e:

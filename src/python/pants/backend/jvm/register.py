@@ -40,8 +40,6 @@ from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.backend.jvm.tasks.javadoc_gen import JavadocGen
 from pants.backend.jvm.tasks.junit_run import JUnitRun
-from pants.backend.jvm.tasks.jvm_compile.java.java_compile import JmakeCompile
-from pants.backend.jvm.tasks.jvm_compile.zinc.apt_compile import AptCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.backend.jvm.tasks.jvm_dependency_check import JvmDependencyCheck
 from pants.backend.jvm.tasks.jvm_dependency_usage import JvmDependencyUsage
@@ -57,11 +55,6 @@ from pants.base.deprecated import deprecated
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
-
-
-@deprecated(removal_version='0.0.54', hint_message="Replace 'Repository' with 'repository'.")
-def Repository(*args, **kwargs):
-  return repo(*args, **kwargs)
 
 
 def build_file_aliases():
@@ -95,7 +88,6 @@ def build_file_aliases():
       'jar': JarDependency,
       'scala_jar': ScalaJarDependency,
       'jar_rules': JarRules,
-      'Repository': Repository,
       'repository': repo,
       'Skip': Skip,
       'shading_relocate': Shading.Relocate.new,
@@ -142,18 +134,16 @@ def register_goals():
   task(name='services', action=PrepareServices).install('resources')
 
   # Compilation.
+  # NB: Despite being the only member, ZincCompile should continue to use GroupTask until
+  # post engine refactor. It's possible that someone will want to rush in an additional
+  # jvm language.
   jvm_compile = GroupTask.named(
       'jvm-compilers',
       product_type=['runtime_classpath', 'classes_by_source', 'product_deps_by_src'],
       flag_namespace=['compile'])
-
-  # It's important we add AptCompile before other java-compiling tasks since the first selector wins,
-  # and apt code is a subset of java code.
-  jvm_compile.add_member(AptCompile)
-  jvm_compile.add_member(JmakeCompile)
   jvm_compile.add_member(ZincCompile)
-
   task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
+
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile').with_description(
       'Check that used dependencies have been requested.')
 
@@ -165,13 +155,13 @@ def register_goals():
   task(name='scaladoc', action=ScaladocGen).install('doc')
 
   # Bundling.
-  task(name='jar', action=JarCreate).install('jar')
+  task(name='create', action=JarCreate).install('jar')
   detect_duplicates = task(name='dup', action=DuplicateDetector)
 
-  task(name='binary', action=BinaryCreate).install().with_description('Create a runnable binary.')
+  task(name='jvm', action=BinaryCreate).install('binary').with_description('Create a runnable binary.')
   detect_duplicates.install('binary')
 
-  task(name='bundle', action=BundleCreate).install().with_description(
+  task(name='jvm', action=BundleCreate).install('bundle').with_description(
       'Create an application bundle from binary targets.')
   detect_duplicates.install('bundle')
 

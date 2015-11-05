@@ -5,33 +5,32 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
+from pants.backend.python.tasks.checkstyle.common import Nit
 from pants.backend.python.tasks.checkstyle.missing_contextmanager import MissingContextManager
+from pants_test.backend.python.tasks.checkstyle.plugin_test_base import CheckstylePluginTestBase
 
 
-def test_missing_contextmanager():
-  mcm = MissingContextManager(PythonFile.from_statement("""
-    with open("derp.txt"):
-      pass
-    
-    with open("herp.txt") as fp:
-      fp.read()
-  """))
-  nits = list(mcm.nits())
-  assert len(nits) == 0
+class MissingContextManagerTest(CheckstylePluginTestBase):
+  plugin_type = MissingContextManager
 
-  mcm = MissingContextManager(PythonFile.from_statement("""
-    foo = open("derp.txt")
-  """))
-  nits = list(mcm.nits())
-  assert len(nits) == 1
-  assert nits[0].code == 'T802'
-  assert nits[0].severity == Nit.WARNING
+  def test_missing_contextmanager(self):
+    statement = """
+      with open("derp.txt"):
+        pass
 
-  # TODO(wickman) In these cases suggest using contextlib.closing
-  mcm = MissingContextManager(PythonFile.from_statement("""
-    from urllib2 import urlopen
-    the_googs = urlopen("http://www.google.com").read()
-  """))
-  nits = list(mcm.nits())
-  assert len(nits) == 0
+      with open("herp.txt") as fp:
+        fp.read()
+    """
+    self.assertNoNits(statement)
+
+    statement = """
+      foo = open("derp.txt")
+    """
+    self.assertNit(statement, 'T802', Nit.WARNING)
+
+    # TODO(wickman): In these cases suggest using contextlib.closing.
+    statement = """
+      from urllib2 import urlopen
+      the_googs = urlopen("http://www.google.com").read()
+    """
+    self.assertNoNits(statement)

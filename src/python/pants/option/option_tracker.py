@@ -10,6 +10,7 @@ from collections import defaultdict, namedtuple
 from pants.option.ranked_value import RankedValue
 
 
+# TODO: Get rid of this? The parser should be able to lazily track.
 class OptionTracker(object):
   """Records a history of what options are set and where they came from."""
 

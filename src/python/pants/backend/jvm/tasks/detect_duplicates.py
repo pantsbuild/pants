@@ -31,8 +31,6 @@ class DuplicateDetector(JvmBinaryTask):
   @classmethod
   def register_options(cls, register):
     super(DuplicateDetector, cls).register_options(register)
-    register('--fail-fast', default=False, action='store_true',
-             help='Fail fast if duplicate classes/resources are found.')
     register('--excludes', default=EXCLUDED_FILES, action='append',
              help='Case insensitive filenames (without directory) to exclude from duplicate check. '
                   'Filenames can be specified in a comma-separated list or by using multiple '

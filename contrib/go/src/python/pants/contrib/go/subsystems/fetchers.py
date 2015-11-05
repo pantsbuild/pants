@@ -184,9 +184,11 @@ class Fetchers(Subsystem):
     register('--mapping', metavar='<mapping>', type=dict_option, default=cls._DEFAULT_FETCHERS,
              advanced=True,
              help="A mapping from a remote import path matching regex to a fetcher type to use "
-                  "to fetch the remote sources.  Fetcher types are fully qualified class names "
-                  "or else an installed alias for a fetcher type; ie the builtin "
-                  "`contrib.go.subsystems.fetchers.ArchiveFetcher` is aliased as 'ArchiveFetcher'.")
+                  "to fetch the remote sources.  The regex must match the beginning of the remote "
+                  "import path; no '^' anchor is needed, it is assumed.  The Fetcher types are "
+                  "fully qualified class names or else an installed alias for a fetcher type; ie "
+                  "the builtin `contrib.go.subsystems.fetchers.ArchiveFetcher` is aliased as "
+                  "'ArchiveFetcher'.")
 
   class GetFetcherError(Exception):
     """Indicates an error finding an appropriate Fetcher."""
@@ -280,12 +282,16 @@ class ArchiveFetcher(Fetcher, Subsystem):
   options_scope = 'archive-fetcher'
 
   _DEFAULT_MATCHERS = {
-    r'bitbucket.org/(?P<user>[^/]+)/(?P<repo>[^/]+)':
+    r'bitbucket\.org/(?P<user>[^/]+)/(?P<repo>[^/]+)':
       UrlInfo(url_format='https://bitbucket.org/\g<user>/\g<repo>/get/{rev}.tar.gz',
               default_rev='tip',
               strip_level=1),
-    r'github.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':
+    r'github\.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':
       UrlInfo(url_format='https://github.com/\g<user>/\g<repo>/archive/{rev}.tar.gz',
+              default_rev='master',
+              strip_level=1),
+    r'golang\.org/x/(?P<repo>[^/]+)':
+      UrlInfo(url_format='https://github.com/golang/\g<repo>/archive/{rev}.tar.gz',
               default_rev='master',
               strip_level=1),
   }
@@ -298,8 +304,9 @@ class ArchiveFetcher(Fetcher, Subsystem):
              # They're converted to a single space by the help formatting and the resulting long
              # line of help text is simply wrapped.
              help="A mapping from a remote import path matching regex to an UrlInfo struct "
-                  "describing how to fetch and unpack a remote import path.  The UrlInfo struct is "
-                  "a 3-tuple with the following slots:\n"
+                  "describing how to fetch and unpack a remote import path.  The regex must match "
+                  "the beginning of the remote import path; no '^' anchor is needed, it is "
+                  "assumed. The UrlInfo struct is a 3-tuple with the following slots:\n"
                   "0. An url format string that is supplied to the regex match\'s `.template` "
                   "method and then formatted with the remote import path\'s `rev` and `pkg`.\n"
                   "1. The default revision string to use when no `rev` is supplied; ie 'HEAD' or "
@@ -564,8 +571,9 @@ class GopkgInFetcher(Fetcher, Subsystem):
 # All builtin fetchers should be advertised and registered as defaults here, 1st advertise,
 # then register:
 Fetchers.advertise(GopkgInFetcher, namespace='')
-Fetchers._register_default(r'^gopkg\.in/.*$', GopkgInFetcher)
+Fetchers._register_default(r'gopkg\.in/.*', GopkgInFetcher)
 
 Fetchers.advertise(ArchiveFetcher, namespace='')
-Fetchers._register_default(r'^bitbucket\.org/.*$', ArchiveFetcher)
-Fetchers._register_default(r'^github\.com/.*$', ArchiveFetcher)
+Fetchers._register_default(r'bitbucket\.org/.*', ArchiveFetcher)
+Fetchers._register_default(r'github\.com/.*', ArchiveFetcher)
+Fetchers._register_default(r'golang\.org/x/.*', ArchiveFetcher)

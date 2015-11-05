@@ -22,24 +22,6 @@ SourceRoot = namedtuple('_SourceRoot', ['path', 'langs'])
 class SourceRoots(object):
   """An interface for querying source roots."""
 
-  @classmethod
-  @memoized_method
-  def instance(cls):
-    """A singleton instance of SourceRoots.
-
-    Required temporarily, while migrating from the old source roots registry mechanism.
-    Tasks should be able to access a SourceRoots from context, so we may be able to get rid of
-    this explicit singleton.
-    """
-    return SourceRootConfig.global_instance().get_source_roots()
-
-  @classmethod
-  def reset(cls):
-    """Reset all source roots to empty. Only intended for testing."""
-    # TODO: Remove this after migration, when tests access source roots via context rather
-    # than from the singleton.
-    cls.instance.forget(cls)
-
   def __init__(self, source_root_config):
     """Create an object for querying source roots via patterns in a trie.
 
@@ -50,8 +32,13 @@ class SourceRoots(object):
     self._trie = source_root_config.create_trie()
     self._options = source_root_config.get_options()
 
-  def register(self, path, langs=tuple()):
-    """TEMPORARY registration method, during transition from old to new implementation."""
+  def add_source_root(self, path, langs=tuple()):
+    """Add the specified fixed source root.
+
+    Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
+    unknown structure.  Tests should prefer to use dirs that match our source root patterns
+    instead of explicitly setting source roots here.
+    """
     self._trie.add_fixed(path, langs)
 
   def find(self, target):
@@ -140,6 +127,14 @@ class SourceRootConfig(Subsystem):
 
   options_scope = 'source'
 
+  # TODO: When we have a proper model of the concept of a language, these should really be
+  # gathered from backends.
+  _DEFAULT_LANG_CANONICALIZATIONS = {
+    'jvm': ('java', 'scala'),
+    'protobuf': ('proto',),
+    'py': ('python',)
+  }
+
   _DEFAULT_SOURCE_ROOT_PATTERNS = [
     '3rdparty/*',
     'src/*',
@@ -152,12 +147,18 @@ class SourceRootConfig(Subsystem):
     'src/test/*'
   }
 
-  # TODO: When we have a proper model of the concept of a language, these should really be
-  # gathered from backends.
-  _DEFAULT_LANG_CANONICALIZATIONS = {
-    'jvm': ('java', 'scala'),
-    'protobuf': ('proto',),
-    'py': ('python',)
+  _DEFAULT_SOURCE_ROOTS = {
+    # Go requires some special-case handling of source roots.  In particular, go buildgen assumes
+    # that there's a single source root for local code and (optionally) a single source root
+    # for remote code.  This fixed source root shows how to capture that distinction.
+    # Go repos may need to add their own appropriate special cases in their pants.ini, until we fix this hack.
+    # TODO: Treat third-party/remote code as a separate category (akin to 'source' and 'test').
+    # Then this hack won't be necessary.
+    '3rdparty/go': ('go_remote', ),
+    'contrib/go/examples/3rdparty/go': ('go_remote', )
+  }
+
+  _DEFAULT_TEST_ROOTS = {
   }
 
   @classmethod
@@ -171,17 +172,20 @@ class SourceRootConfig(Subsystem):
              help='A list of source root patterns. Use a "*" wildcard path segment to match the '
                   'language name, which will be canonicalized.')
     register('--test-root-patterns', metavar='<list>', type=list_option,
-             default=cls._DEFAULT_SOURCE_ROOT_PATTERNS, advanced=True,
+             default=cls._DEFAULT_TEST_ROOT_PATTERNS, advanced=True,
              help='A list of source root patterns. Use a "*" wildcard path segment to match the '
                   'language name, which will be canonicalized.')
 
-    register('--source-roots', metavar='<map>', type=dict_option, advanced=True,
+    register('--source-roots', metavar='<map>', type=dict_option,
+             default=cls._DEFAULT_SOURCE_ROOTS, advanced=True,
              help='A map of source roots to list of languages.  Useful when you want to enumerate '
                   'fixed source roots explicitly, instead of relying on patterns.')
-    register('--test-roots', metavar='<map>', type=dict_option, advanced=True,
+    register('--test-roots', metavar='<map>', type=dict_option,
+             default=cls._DEFAULT_TEST_ROOTS, advanced=True,
              help='A map of test roots to list of languages.  Useful when you want to enumerate '
                   'fixed test roots explicitly, instead of relying on patterns.')
 
+  @memoized_method
   def get_source_roots(self):
     return SourceRoots(self)
 

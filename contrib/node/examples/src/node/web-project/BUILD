@@ -9,3 +9,10 @@ node_module(
     'contrib/node/examples/src/node/web-component-button',
   ]
 )
+
+npm_test(
+  name='unit',
+  dependencies=[
+    ':web-project'
+  ]
+)

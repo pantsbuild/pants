@@ -48,9 +48,7 @@ python_tests(
   sources=['test_python_eval.py'],
   dependencies=[
     ':python_task_test_base',
-    'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
-    'src/python/pants/base:source_root',
   ]
 )
 
@@ -60,11 +58,9 @@ python_tests(
   dependencies=[
     ':python_task_test_base',
     'src/python/pants/backend/core/tasks:repl_task_mixin',
-    'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:all_utils',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
   ]
@@ -73,6 +69,14 @@ python_tests(
 python_tests(
   name='python_repl_integration',
   sources=['test_python_repl_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+)
+
+python_tests(
+  name='pytest_run_integration',
+  sources=['test_pytest_run_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
@@ -96,7 +100,6 @@ python_tests(
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',

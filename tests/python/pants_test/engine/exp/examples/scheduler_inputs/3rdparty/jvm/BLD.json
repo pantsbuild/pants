@@ -1,0 +1,13 @@
+{
+  "type_alias": "jar",
+  "org": "com.google.guava",
+  "name": "guava",
+  "rev": "18.0"
+}
+
+{
+  "type_alias": "jar",
+  "org": "org.scala-lang",
+  "name": "scala-library",
+  "rev": "2.10.6"
+}

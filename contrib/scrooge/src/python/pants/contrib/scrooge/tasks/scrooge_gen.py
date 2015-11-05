@@ -34,20 +34,7 @@ _TARGET_TYPE_FOR_LANG = dict(scala=ScalaLibrary, java=JavaLibrary, android=JavaL
 class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   DepInfo = namedtuple('DepInfo', ['service', 'structs'])
-
-  class PartialCmd(namedtuple('PC', ['language', 'rpc_style', 'namespace_map'])):
-
-    @property
-    def relative_outdir(self):
-      namespace_sig = None
-      if self.namespace_map:
-        sha = hashlib.sha1()
-        for ns_from, ns_to in sorted(self.namespace_map):
-          sha.update(ns_from)
-          sha.update(ns_to)
-        namespace_sig = sha.hexdigest()
-      output_style = '-'.join(filter(None, (self.language, self.rpc_style, namespace_sig)))
-      return output_style
+  PartialCmd = namedtuple('PartialCmd', ['language', 'rpc_style', 'namespace_map'])
 
   @classmethod
   def register_options(cls, register):
@@ -92,9 +79,6 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     os.close(fd)
     return path
 
-  def _outdir(self, target):
-    return os.path.join(self.workdir, self.codegen_strategy.codegen_workdir_suffix(target))
-
   def _resolve_deps(self, depmap):
     """Given a map of gen-key=>target specs, resolves the target specs into references."""
     deps = defaultdict(lambda: OrderedSet())
@@ -112,91 +96,61 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
                                     ))
     return deps
 
-  def execute_codegen(self, invalid_targets):
-    self._validate_compiler_configs(invalid_targets)
-    self._must_have_sources(invalid_targets)
+  def execute_codegen(self, target, target_workdir):
+    self._validate_compiler_configs([target])
+    self._must_have_sources(target)
 
-    gentargets_by_dependee = self.context.dependents(
-        on_predicate=self.is_gentarget,
-        from_predicate=lambda t: not self.is_gentarget(t))
+    language = self._thrift_defaults.language(target)
+    rpc_style = self._thrift_defaults.rpc_style(target)
+    partial_cmd = self.PartialCmd(
+        language=language,
+        rpc_style=rpc_style,
+        namespace_map=tuple(sorted(target.namespace_map.items()) if target.namespace_map else ()))
 
-    dependees_by_gentarget = defaultdict(set)
-    for dependee, tgts in gentargets_by_dependee.items():
-      for gentarget in tgts:
-        dependees_by_gentarget[gentarget].add(dependee)
+    self.gen(partial_cmd, target, target_workdir)
 
-    partial_cmds = defaultdict(set)
-    gentargets = filter(self.is_gentarget, invalid_targets)
-    if not gentargets:
-      return
+  def gen(self, partial_cmd, target, target_workdir):
+    import_paths, _ = calculate_compile_sources([target], self.is_gentarget)
 
-    for target in gentargets:
-      language = self._thrift_defaults.language(target)
-      rpc_style = self._thrift_defaults.rpc_style(target)
-      partial_cmd = self.PartialCmd(
-          language=language,
-          rpc_style=rpc_style,
-          namespace_map=tuple(sorted(target.namespace_map.items()) if target.namespace_map else ()))
-      partial_cmds[partial_cmd].add(target)
+    args = []
 
-    for partial_cmd, tgts in partial_cmds.items():
-      self.gen(partial_cmd, tgts)
+    for import_path in import_paths:
+      args.extend(['--import-path', import_path])
 
-  def gen(self, partial_cmd, invalid_targets):
+    args.extend(['--language', partial_cmd.language])
 
-    for vt in invalid_targets:
-      outdir = self.codegen_workdir(vt)
-      import_paths, dummy_changed_srcs = calculate_compile_sources(invalid_targets, self.is_gentarget)
-      changed_srcs = vt.sources_relative_to_buildroot()
+    for lhs, rhs in partial_cmd.namespace_map:
+      args.extend(['--namespace-map', '%s=%s' % (lhs, rhs)])
 
-      if changed_srcs:
-        args = []
+    if partial_cmd.rpc_style == 'ostrich':
+      args.append('--finagle')
+      args.append('--ostrich')
+    elif partial_cmd.rpc_style == 'finagle':
+      args.append('--finagle')
 
-        for import_path in import_paths:
-          args.extend(['--import-path', import_path])
+    args.extend(['--dest', target_workdir])
 
-        args.extend(['--language', partial_cmd.language])
+    if not self.get_options().strict:
+      args.append('--disable-strict')
 
-        for lhs, rhs in partial_cmd.namespace_map:
-          args.extend(['--namespace-map', '%s=%s' % (lhs, rhs)])
+    if self.get_options().verbose:
+      args.append('--verbose')
 
-        if partial_cmd.rpc_style == 'ostrich':
-          args.append('--finagle')
-          args.append('--ostrich')
-        elif partial_cmd.rpc_style == 'finagle':
-          args.append('--finagle')
+    gen_file_map_path = os.path.relpath(self._tempname())
+    args.extend(['--gen-file-map', gen_file_map_path])
 
-        args.extend(['--dest', outdir])
-        safe_mkdir(outdir)
+    args.extend(target.sources_relative_to_buildroot())
 
-        if not self.get_options().strict:
-          args.append('--disable-strict')
-
-        if self.get_options().verbose:
-          args.append('--verbose')
-
-        gen_file_map_path = os.path.relpath(self._tempname())
-        args.extend(['--gen-file-map', gen_file_map_path])
-
-        args.extend(changed_srcs)
-
-        classpath = self.tool_classpath('scrooge-gen')
-        jvm_options = list(self.get_options().jvm_options)
-        jvm_options.append('-Dfile.encoding=UTF-8')
-        returncode = self.runjava(classpath=classpath,
-                                  main='com.twitter.scrooge.Main',
-                                  jvm_options=jvm_options,
-                                  args=args,
-                                  workunit_name='scrooge-gen')
-        try:
-          # TODO: This entire block appears to have no effect.
-          if 0 == returncode:
-            self.parse_gen_file_map(gen_file_map_path, outdir)
-        finally:
-          os.remove(gen_file_map_path)
-
-        if 0 != returncode:
-          raise TaskError('Scrooge compiler exited non-zero ({0})'.format(returncode))
+    classpath = self.tool_classpath('scrooge-gen')
+    jvm_options = list(self.get_options().jvm_options)
+    jvm_options.append('-Dfile.encoding=UTF-8')
+    returncode = self.runjava(classpath=classpath,
+                              main='com.twitter.scrooge.Main',
+                              jvm_options=jvm_options,
+                              args=args,
+                              workunit_name='scrooge-gen')
+    if 0 != returncode:
+      raise TaskError('Scrooge compiler exited non-zero for {} ({})'.format(target, returncode))
 
   SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')
 
@@ -229,6 +183,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     return True
 
   def _validate_compiler_configs(self, targets):
+    assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")
     ValidateCompilerConfig = namedtuple('ValidateCompilerConfig', ['language', 'rpc_style'])
 
     def compiler_config(tgt):
@@ -259,16 +214,15 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
           msg.append('    %s - %s\n' % (dep, compiler_config(dep)))
       raise TaskError(''.join(msg))
 
-  def _must_have_sources(self, targets):
-    for target in targets:
-      if isinstance(target, JavaThriftLibrary) and not target.payload.sources.source_paths:
-        raise TargetDefinitionException(target, 'no thrift files found')
+  def _must_have_sources(self, target):
+    if isinstance(target, JavaThriftLibrary) and not target.payload.sources.source_paths:
+      raise TargetDefinitionException(target, 'no thrift files found')
 
   def synthetic_target_type(self, target):
     language = self._thrift_defaults.language(target)
     return _TARGET_TYPE_FOR_LANG[language]
 
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     has_service = False
     for source in target.sources_relative_to_buildroot():
       has_service = has_service or self._declares_service(source)

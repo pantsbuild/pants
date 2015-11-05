@@ -45,8 +45,6 @@ class CppTask(Task):
       subprocess.check_call(cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
     except subprocess.CalledProcessError as e:
       raise TaskError('Execution failed: {0}'.format(e))
-    except:
-      raise TaskError('Failed to execute {0}'.format(cmd))
 
   @property
   def cpp_toolchain(self):

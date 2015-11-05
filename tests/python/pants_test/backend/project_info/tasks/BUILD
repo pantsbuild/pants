@@ -9,7 +9,6 @@ python_library(
     ':export',
     ':filedeps',
     ':ide_gen',
-    ':idea_gen',
   ],
 )
 
@@ -79,10 +78,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:export',
-    'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
   ]
@@ -121,22 +118,9 @@ python_tests(
   sources = ['test_ide_gen.py'],
   dependencies = [
     'src/python/pants/backend/project_info/tasks:ide_gen',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:source_root',
+    'src/python/pants/source',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'idea_gen',
-  sources = ['test_idea_gen.py'],
-  dependencies = [
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/project_info/tasks:ide_gen',
-    'src/python/pants/backend/project_info/tasks:idea_gen',
-    'src/python/pants/base:source_root',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

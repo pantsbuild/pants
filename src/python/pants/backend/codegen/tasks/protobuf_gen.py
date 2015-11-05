@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import os
 import subprocess
 from collections import OrderedDict
@@ -21,11 +20,9 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
 
@@ -50,7 +47,7 @@ class ProtobufGen(SimpleCodegenTask):
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
-    register('--plugins', advanced=True, fingerprint=True, action='append',
+    register('--protoc-plugins', advanced=True, fingerprint=True, action='append',
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.',
              default=[])
@@ -96,11 +93,11 @@ class ProtobufGen(SimpleCodegenTask):
   def synthetic_target_type(self, target):
     return JavaLibrary
 
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     deps = OrderedSet()
     if target.imported_jars:
       # We need to add in the proto imports jars.
-      jars_address = Address(os.path.relpath(self.codegen_workdir(target), get_buildroot()),
+      jars_address = Address(os.path.relpath(target_workdir, get_buildroot()),
                              target.id + '-rjars')
       jars_target = self.context.add_new_target(jars_address,
                                                 JarLibrary,
@@ -113,56 +110,23 @@ class ProtobufGen(SimpleCodegenTask):
   def is_gentarget(self, target):
     return isinstance(target, JavaProtobufLibrary)
 
-  @classmethod
-  def supported_strategy_types(cls):
-    return [cls.IsolatedCodegenStrategy, cls.ProtobufGlobalCodegenStrategy]
-
-  def sources_generated_by_target(self, target):
-    genfiles = []
-    for source in target.sources_relative_to_source_root():
-      path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(path, source))
-    return genfiles
-
-  def execute_codegen(self, targets):
-    if not targets:
-      return
-
-    sources_by_base = self._calculate_sources(targets)
-    if self.codegen_strategy.name() == 'isolated':
-      sources = OrderedSet()
-      for target in targets:
-        sources.update(target.sources_relative_to_buildroot())
-    else:
-      sources = OrderedSet(itertools.chain.from_iterable(sources_by_base.values()))
-
-    if not self.validate_sources_present(sources, targets):
-      return
+  def execute_codegen(self, target, target_workdir):
+    sources_by_base = self._calculate_sources([target])
+    sources = target.sources_relative_to_buildroot()
 
     bases = OrderedSet(sources_by_base.keys())
-    bases.update(self._proto_path_imports(targets))
+    bases.update(self._proto_path_imports([target]))
     check_duplicate_conflicting_protos(self, sources_by_base, sources, self.context.log)
 
-    for target in targets:
-      # NB(gm): If the strategy is set to 'isolated', then 'targets' should contain only a single
-      # element, which means this simply sets the output directory depending on that element.
-      # If the strategy is set to 'global', the target passed in as a parameter here will be
-      # completely arbitrary, but that's OK because the codegen_workdir function completely
-      # ignores the target parameter when using a global strategy.
-      output_dir = self.codegen_workdir(target)
-      break
     gen_flag = '--java_out'
 
-    safe_mkdir(output_dir)
-    gen = '{0}={1}'.format(gen_flag, output_dir)
+    gen = '{0}={1}'.format(gen_flag, target_workdir)
 
     args = [self.protobuf_binary, gen]
 
     if self.plugins:
       for plugin in self.plugins:
-        # TODO(Eric Ayers) Is it a good assumption that the generated source output dir is
-        # acceptable for all plugins?
-        args.append("--{0}_out={1}".format(plugin, output_dir))
+        args.append("--{0}_out={1}".format(plugin, target_workdir))
 
     for base in bases:
       args.append('--proto_path={0}'.format(base))
@@ -182,6 +146,7 @@ class ProtobufGen(SimpleCodegenTask):
       raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
 
   def _calculate_sources(self, targets):
+    assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")
     gentargets = OrderedSet()
 
     def add_to_gentargets(target):
@@ -196,11 +161,11 @@ class ProtobufGen(SimpleCodegenTask):
     # to get the correct source root for paths outside the current BUILD tree.
     for target in gentargets:
       for source in target.sources_relative_to_buildroot():
-        base = SourceRoot.find_by_path(source)
+        src_root = self.context.source_roots.find_by_path(source)
+        base = src_root.path if src_root else None
         if not base:
           base, _ = target.target_base, target.sources_relative_to_buildroot()
-          self.context.log.debug('Could not find source root for {source}.'
-                                 ' Missing call to SourceRoot.register()?  Fell back to {base}.'
+          self.context.log.debug('Could not find source root for {source}. Fell back to {base}.'
                                  .format(source=source, base=base))
         if base not in sources_by_base:
           sources_by_base[base] = OrderedSet()
@@ -252,11 +217,6 @@ class ProtobufGen(SimpleCodegenTask):
 
     for classname in classnames:
       yield os.path.join(basepath, '{0}.java'.format(classname))
-
-  class ProtobufGlobalCodegenStrategy(SimpleCodegenTask.GlobalCodegenStrategy):
-
-    def find_sources(self, target):
-      return self._task.sources_generated_by_target(target)
 
 
 def _same_contents(a, b):

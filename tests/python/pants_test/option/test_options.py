@@ -17,7 +17,7 @@ from pants.base.deprecated import PastRemovalVersionError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
-from pants.option.errors import ParseError
+from pants.option.errors import ParseError, RegistrationError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
@@ -37,6 +37,10 @@ def intermediate(scope):
   return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
 
 
+def subsystem(scope):
+  return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
+
+
 class OptionsTest(unittest.TestCase):
   _known_scope_infos = [intermediate('compile'),
                         task('compile.java'),
@@ -54,9 +58,8 @@ class OptionsTest(unittest.TestCase):
     def register_global(*args, **kwargs):
       options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-    register_global('-v', '--verbose', action='store_true', help='Verbose output.', recursive=True)
+    register_global('-z', '--verbose', action='store_true', help='Verbose output.', recursive=True)
     register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
-    register_global('-x', '--xlong', action='store_true', recursive=True)
     register_global('--y', action='append', type=int)
     register_global('--config-override', action='append')
 
@@ -85,12 +88,8 @@ class OptionsTest(unittest.TestCase):
     register_global('--global-crufty-boolean', action='store_true', deprecated_version='999.99.9',
                     deprecated_hint='say no to crufty global options')
 
-    # Override --xlong with a different type (but leave -x alone).
-    options.register('test', '--xlong', type=int)
-
     # For the design doc example test.
     options.register('compile', '--c', type=int, recursive=True)
-    options.register('compile.java', '--b', type=str, default='foo')
 
     # Test deprecated options with a scope
     options.register('stale', '--still-good')
@@ -162,11 +161,9 @@ class OptionsTest(unittest.TestCase):
     # Some basic smoke tests.
     options = self._parse('./pants --verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
-    self.assertEqual(True, options.for_global_scope().v)
-    options = self._parse('./pants -v compile path/to/tgt')
+    options = self._parse('./pants -z compile path/to/tgt')
     self.assertEqual(['path/to/tgt'], options.target_specs)
     self.assertEqual(True, options.for_global_scope().verbose)
-    self.assertEqual(True, options.for_global_scope().v)
 
     # Scoping of different values of the same option.
     # Also tests the --no-* boolean flag inverses.
@@ -175,20 +172,13 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(True, options.for_scope('compile').verbose)
     self.assertEqual(False, options.for_scope('compile.java').verbose)
 
-    options = self._parse('./pants --verbose compile --no-verbose compile.java -v test '
+    options = self._parse('./pants --verbose compile --no-verbose compile.java -z test '
                           'test.junit --no-verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
     self.assertEqual(False, options.for_scope('compile').verbose)
     self.assertEqual(True, options.for_scope('compile.java').verbose)
     self.assertEqual(True, options.for_scope('test').verbose)
     self.assertEqual(False, options.for_scope('test.junit').verbose)
-
-    # Proper shadowing of a re-registered flag.  The flag's -x alias retains its old meaning.
-    options = self._parse('./pants --no-xlong test --xlong=100 -x')
-    self.assertEqual(False, options.for_global_scope().xlong)
-    self.assertEqual(False, options.for_global_scope().x)
-    self.assertEqual(100, options.for_scope('test').xlong)
-    self.assertEqual(True, options.for_scope('test').x)
 
     # Test action=append option.
     options = self._parse('./pants', config={'DEFAULT': {'y': ['88', '-99']}})
@@ -287,10 +277,10 @@ class OptionsTest(unittest.TestCase):
   def test_boolean_invalid_value(self):
     with self.assertRaises(Parser.BooleanConversionError):
       self._parse('./pants', config={'DEFAULT': {'store_true_flag': 11,
-                                                 }})
+                                                 }}).for_global_scope()
     with self.assertRaises(Parser.BooleanConversionError):
       self._parse('./pants', config={'DEFAULT': {'store_true_flag': 'AlmostTrue',
-                                               }})
+                                               }}).for_global_scope()
 
   def test_defaults(self):
     # Hard-coded defaults.
@@ -330,11 +320,30 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(55, options.for_scope('compile').num)
     self.assertEqual(44, options.for_scope('compile.java').num)
 
+  def test_shadowing(self):
+    options = Options.create(env={},
+                             config=self._create_config({}),
+                             known_scope_infos=[task('bar'), intermediate('foo'), task('foo.bar')],
+                             args='./pants',
+                             option_tracker=OptionTracker())
+    options.register('', '--opt1')
+    options.register('foo', '-o', '--opt2')
+    with self.assertRaises(RegistrationError):
+      options.register('bar', '--opt1')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt1')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt2')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt1', '--opt3')
+    with self.assertRaises(RegistrationError):
+      options.register('foo.bar', '--opt3', '--opt2')
+
   def test_recursion(self):
     # Recursive option.
     options = self._parse('./pants -n=5 compile -n=6')
-    self.assertEqual(5, options.for_global_scope().n)
-    self.assertEqual(6, options.for_scope('compile').n)
+    self.assertEqual(5, options.for_global_scope().num)
+    self.assertEqual(6, options.for_scope('compile').num)
 
     # Non-recursive option.
     options = self._parse('./pants --bar-baz=foo')
@@ -342,6 +351,22 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants compile --bar-baz=foo')
     with self.assertRaises(ParseError):
       options.for_scope('compile').bar_baz
+
+  def test_no_recursive_subsystem_options(self):
+    options = Options.create(env={},
+                             config=self._create_config({}),
+                             known_scope_infos=[subsystem('foo')],
+                             args='./pants',
+                             option_tracker=OptionTracker())
+    # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
+    # a separate instance of the subsystem, so it needs all the options).
+    # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
+    with self.assertRaises(RegistrationError):
+      options.register('foo', '--bar', recursive=False)
+      options.for_scope('foo')
+    with self.assertRaises(RegistrationError):
+      options.register('foo', '--baz', recursive=True)
+      options.for_scope('foo')
 
   def test_is_known_scope(self):
     options = self._parse('./pants')
@@ -374,12 +399,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(66, options.for_scope('compile').c)
 
     self.assertEqual(3, options.for_scope('compile.java').a)
-
-    # TODO(John Sirois): This should pick up 'foo' from the flag's default value, but instead
-    # it picks up `b`'s value from the config DEFAULT section.  Fix this test as part of
-    # https://github.com/pantsbuild/pants/issues/1803
-    self.assertEqual('99', options.for_scope('compile.java').b)
-
+    self.assertEqual(2, options.for_scope('compile.java').b)
     self.assertEqual(4, options.for_scope('compile.java').c)
 
   def test_file_spec_args(self):
@@ -491,15 +511,16 @@ class OptionsTest(unittest.TestCase):
       options = Options.create(env={},
                                config=self._create_config({}),
                                known_scope_infos=OptionsTest._known_scope_infos,
-                               args="./pants",
+                               args='./pants',
                                option_tracker=OptionTracker())
       options.register(GLOBAL_SCOPE, '--too-old-option', deprecated_version='0.0.24',
                        deprecated_hint='The semver for this option has already passed.')
+      options.for_global_scope()
 
   @contextmanager
   def warnings_catcher(self):
     with warnings.catch_warnings(record=True) as w:
-      warnings.simplefilter("always")
+      warnings.simplefilter('always')
       yield w
 
   def test_deprecated_options(self):
@@ -507,7 +528,7 @@ class OptionsTest(unittest.TestCase):
       self.assertEquals(1, len(w))
       self.assertTrue(issubclass(w[-1].category, DeprecationWarning))
       warning_message = str(w[-1].message)
-      self.assertIn("is deprecated and will be removed", warning_message)
+      self.assertIn('is deprecated and will be removed', warning_message)
       self.assertIn(option_string, warning_message)
 
     with self.warnings_catcher() as w:
@@ -556,8 +577,7 @@ class OptionsTest(unittest.TestCase):
       self.assertEquals(0, len(w))
 
   def test_middle_scoped_options(self):
-    """
-    Make sure the rules for inheriting from a hierarchy of scopes.
+    """Make sure the rules for inheriting from a hierarchy of scopes.
 
     Values should follow
      1. A short circuit scan for a value from the following sources in-order:
@@ -566,7 +586,7 @@ class OptionsTest(unittest.TestCase):
         within that source.
     """
 
-    # Short circuit using command line
+    # Short circuit using command line.
     options = self._parse('./pants --a=100 compile --a=99')
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
@@ -593,7 +613,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
-    # Command line has precedence over config
+    # Command line has precedence over config.
     options = self._parse('./pants compile --a=99',
                           config={
                             'DEFAULT': {'a': 100},
@@ -602,14 +622,14 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
-    # Command line has precedence over environment
+    # Command line has precedence over environment.
     options = self._parse('./pants compile --a=99',
                           env={'PANTS_A': 100},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
-    # Env has precedence over config
+    # Env has precedence over config.
     options = self._parse('./pants ',
                           config={
                             'DEFAULT': {'a': 100},
@@ -619,14 +639,14 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
-    # Command line global overrides the middle scope setting in then env
+    # Command line global overrides the middle scope setting in then env.
     options = self._parse('./pants --a=100',
                           env={'PANTS_COMPILE_A': 99},)
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
 
-    # Command line global overrides the middle scope in config
+    # Command line global overrides the middle scope in config.
     options = self._parse('./pants --a=100 ',
                           config={
                             'compile': {'a': 99},
@@ -635,7 +655,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
 
-    # Env global overrides the middle scope in config
+    # Env global overrides the middle scope in config.
     options = self._parse('./pants --a=100 ',
                           config={
                             'compile': {'a': 99},
@@ -644,30 +664,6 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
-
-  def test_registration_arg_iter(self):
-    options = self._parse('./pants',
-                          config={
-                            'compile': {'a': 99},
-                          })
-
-    def get_registration_args(scope, name):
-      return next((x for x in options.registration_args_iter_for_scope(scope) if x[0] == name))
-
-    # The global xlong arg.
-    for_xlong = get_registration_args('', 'xlong')
-    self.assertEquals(for_xlong[1], ['-x', '--xlong'])
-    self.assertEquals(for_xlong[2].get('action'), 'store_true')
-
-    # The new, local xlong arg, which shadows the recursive registration of the global one.
-    for_xlong = get_registration_args('test', 'xlong')
-    self.assertEquals(for_xlong[1], ['--xlong'])
-    self.assertEquals(for_xlong[2].get('type'), int)
-
-    # The recursive registration, without the shadowed --xlong arg.
-    for_x = get_registration_args('test', 'x')
-    self.assertEquals(for_x[1], ['-x'])
-    self.assertEquals(for_x[2].get('action'), 'store_true')
 
   def test_complete_scopes(self):
     _global = GlobalOptionsRegistrar.get_scope_info()
@@ -694,16 +690,16 @@ class OptionsTest(unittest.TestCase):
     self.assertEquals((int, 77), pairs[2])
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
-    def assert_fromfile(dest, expected, contents):
+    def _do_assert_fromfile(dest, expected, contents):
       with temporary_file() as fp:
         fp.write(contents)
         fp.close()
         options = parse_func(dest, fp.name)
         self.assertEqual(expected, options.for_scope('fromfile')[dest])
 
-    assert_fromfile(dest='string', expected='jake', contents='jake')
-    assert_fromfile(dest='intvalue', expected=42, contents='42')
-    assert_fromfile(dest='dictvalue', expected={'a': 42, 'b': (1, 2)}, contents=dedent("""
+    _do_assert_fromfile(dest='string', expected='jake', contents='jake')
+    _do_assert_fromfile(dest='intvalue', expected=42, contents='42')
+    _do_assert_fromfile(dest='dictvalue', expected={'a': 42, 'b': (1, 2)}, contents=dedent("""
       {
         'a': 42,
         'b': (
@@ -712,7 +708,7 @@ class OptionsTest(unittest.TestCase):
         )
       }
       """))
-    assert_fromfile(dest='listvalue', expected=['a', 1, 2], contents=dedent("""
+    _do_assert_fromfile(dest='listvalue', expected=['a', 1, 2], contents=dedent("""
       ['a',
        1,
        2]
@@ -726,7 +722,7 @@ class OptionsTest(unittest.TestCase):
        42
       ]
       """)
-    assert_fromfile(dest='appendvalue', expected=expected_append, contents=append_contents)
+    _do_assert_fromfile(dest='appendvalue', expected=expected_append, contents=append_contents)
 
   def test_fromfile_flags(self):
     def parse_func(dest, fromfile):

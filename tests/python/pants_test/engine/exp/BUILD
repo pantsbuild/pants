@@ -11,6 +11,27 @@ python_tests(
 
 
 python_tests(
+  name='configuration',
+  sources=['test_configuration.py'],
+  dependencies=[
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/exp:configuration',
+    'src/python/pants/engine/exp:objects',
+  ]
+)
+
+python_tests(
+  name='engine',
+  sources=['test_engine.py'],
+  dependencies=[
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/exp:engine',
+    'src/python/pants/engine/exp:scheduler',
+    'src/python/pants/engine/exp/examples:planners',
+  ]
+)
+
+python_tests(
   name='graph',
   sources=['test_graph.py'],
   dependencies=[
@@ -47,11 +68,11 @@ python_tests(
 )
 
 python_tests(
-  name='configuration',
-  sources=['test_configuration.py'],
+  name='scheduler',
+  sources=['test_scheduler.py'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine/exp:configuration',
-    'src/python/pants/engine/exp:objects',
+    'src/python/pants/engine/exp:scheduler',
+    'src/python/pants/engine/exp/examples:planners',
   ]
 )

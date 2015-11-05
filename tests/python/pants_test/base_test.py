@@ -16,7 +16,6 @@ from pants.base.build_file import FilesystemBuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -53,6 +52,15 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(path)
     return path
 
+  def create_workdir_dir(self, relpath):
+    """Creates a directory under the work directory.
+
+    relpath: The relative path to the directory from the work directory.
+    """
+    path = os.path.join(self.pants_workdir, relpath)
+    safe_mkdir(path)
+    return path
+
   def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
 
@@ -61,6 +69,18 @@ class BaseTest(unittest.TestCase):
     mode:     The mode to write to the file in - over-write by default.
     """
     path = os.path.join(self.build_root, relpath)
+    with safe_open(path, mode=mode) as fp:
+      fp.write(contents)
+    return path
+
+  def create_workdir_file(self, relpath, contents='', mode='wb'):
+    """Writes to a file under the work directory.
+
+    relpath:  The relative path to the file from the work directory.
+    contents: A string containing the contents of the file - '' by default..
+    mode:     The mode to write to the file in - over-write by default.
+    """
+    path = os.path.join(self.pants_workdir, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
     return path
@@ -148,10 +168,6 @@ class BaseTest(unittest.TestCase):
       'cache_key_gen_version': '0-test',
     }
 
-    # Many tests need source root functionality, so might as well always set it up.
-    self.options['source'] = {
-    }
-
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)
 
@@ -187,7 +203,8 @@ class BaseTest(unittest.TestCase):
   def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
               console_outstream=None, workspace=None, for_subsystems=None):
 
-    # Many tests need source root functionality, so might as well always set it up.
+    # Many tests use source root functionality via the SourceRootConfig.global_instance()
+    # (typically accessed via Target.target_base), so we always set it up, for convenience.
     optionables = {SourceRootConfig}
     extra_scopes = set()
 
@@ -230,7 +247,7 @@ class BaseTest(unittest.TestCase):
     return context
 
   def tearDown(self):
-    SourceRoot.reset()
+    super(BaseTest, self).tearDown()
     FilesystemBuildFile.clear_cache()
     Subsystem.reset()
 

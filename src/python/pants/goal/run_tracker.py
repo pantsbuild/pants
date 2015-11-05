@@ -121,7 +121,7 @@ class RunTracker(Subsystem):
     self._background_worker_pool = None
     self._background_root_workunit = None
 
-    # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring)
+    # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring).
     SubprocPool.foreground()
 
     self._aborted = False
@@ -200,19 +200,19 @@ class RunTracker(Subsystem):
     workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels,
                         cmd=cmd, log_config=log_config)
     workunit.start()
+
+    outcome = WorkUnit.FAILURE  # Default to failure we will override if we get success/abort.
     try:
       self.report.start_workunit(workunit)
       yield workunit
     except KeyboardInterrupt:
-      workunit.set_outcome(WorkUnit.ABORTED)
+      outcome = WorkUnit.ABORTED
       self._aborted = True
       raise
-    except:
-      workunit.set_outcome(WorkUnit.FAILURE)
-      raise
     else:
-      workunit.set_outcome(WorkUnit.SUCCESS)
+      outcome = WorkUnit.SUCCESS
     finally:
+      workunit.set_outcome(outcome)
       self.end_workunit(workunit)
 
   def log(self, level, *msg_elements):
@@ -273,7 +273,6 @@ class RunTracker(Subsystem):
 
     Note: If end() has been called once, subsequent calls are no-ops.
     """
-
     if self._background_worker_pool:
       if self._aborted:
         self.log(Report.INFO, "Aborting background workers.")
@@ -285,7 +284,7 @@ class RunTracker(Subsystem):
 
     SubprocPool.shutdown(self._aborted)
 
-    # Run a dummy work unit to write out one last timestamp
+    # Run a dummy work unit to write out one last timestamp.
     with self.new_workunit("complete"):
       pass
 

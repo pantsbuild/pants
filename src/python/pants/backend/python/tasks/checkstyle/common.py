@@ -79,7 +79,7 @@ class PythonFile(object):
     """
     # Remove the # coding=utf-8 to avoid AST erroneous parse errors
     #   https://bugs.python.org/issue22221
-    lines = [x.decode('utf-8', errors='replace') for x in blob.splitlines()]
+    lines = blob.split('\n')
     if lines and 'coding=utf-8' in lines[0]:
       lines[0] = '#remove coding'
     return '\n'.join(lines).encode('ascii', errors='replace')
@@ -87,7 +87,7 @@ class PythonFile(object):
   def __init__(self, blob, filename='<expr>'):
     self._blob = self._remove_coding_header(blob)
     self.tree = ast.parse(self._blob, filename)
-    self.lines = OffByOneList(self._blob.splitlines())
+    self.lines = OffByOneList(self._blob.split('\n'))
     self.filename = filename
     self.logical_lines = dict((start, (start, stop, indent))
         for start, stop, indent in self.iter_logical_lines(self._blob))
@@ -103,7 +103,7 @@ class PythonFile(object):
 
   @classmethod
   def parse(cls, filename):
-    with codecs.open(filename) as fp:
+    with codecs.open(filename, encoding='utf-8') as fp:
       blob = fp.read()
     return cls(blob, filename)
 
@@ -113,7 +113,10 @@ class PythonFile(object):
     :param statement: Python file contents
     :return: Instance of PythonFile
     """
-    return cls('\n'.join(textwrap.dedent(statement).splitlines()[1:]))
+    lines = textwrap.dedent(statement).split('\n')
+    if lines and not lines[0]:  # Remove the initial empty line, which is an artifact of dedent.
+      lines = lines[1:]
+    return cls('\n'.join(lines))
 
   @classmethod
   def iter_tokens(cls, blob):
@@ -267,9 +270,11 @@ class Nit(object):
 class CheckstylePlugin(Interface):
   """Interface for checkstyle plugins."""
 
-  def __init__(self, python_file):
+  def __init__(self, options, python_file):
+    super(CheckstylePlugin, self).__init__()
     if not isinstance(python_file, PythonFile):
       raise TypeError('CheckstylePlugin takes PythonFile objects.')
+    self.options = options
     self.python_file = python_file
 
   def iter_ast_types(self, ast_type):

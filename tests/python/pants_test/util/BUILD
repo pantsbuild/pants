@@ -28,8 +28,10 @@ python_tests(
 python_tests(
   name = 'dirutil',
   sources = ['test_dirutil.py'],
+  coverage = ['pants.util.dirutil'],
   dependencies = [
     '3rdparty/python:mox',
+    '3rdparty/python:mock',
     '3rdparty/python:pytest',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
@@ -108,5 +110,15 @@ python_tests(
   sources = ['test_timeout.py'],
   dependencies = [
     'src/python/pants/util:timeout',
+  ],
+)
+
+python_tests(
+  name = 'socket',
+  sources = ['test_socket.py'],
+  coverage = ['pants.util.socket'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:socket',
   ],
 )

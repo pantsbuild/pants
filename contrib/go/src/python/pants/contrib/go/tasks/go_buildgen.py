@@ -14,9 +14,9 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
-from pants.base.source_root import SourceRoot
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.address import Address
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
@@ -85,8 +85,9 @@ class GoTargetGenerator(object):
             remote_pkg_path = GoRemoteLibrary.remote_package_path(remote_root, import_path)
             name = remote_pkg_path or os.path.basename(import_path)
             address = Address(os.path.join(self._remote_source_root, remote_root), name)
-            found = self._build_graph.get_target(address)
-            if not found:
+            try:
+              self._build_graph.inject_address_closure(address)
+            except AddressLookupError:
               if not self._generate_remotes:
                 raise self.NewRemoteEncounteredButRemotesNotAllowedError(
                   'Cannot generate dependency for remote import path {}'.format(import_path))
@@ -181,7 +182,12 @@ class GoBuildgen(GoTask):
   @classmethod
   def register_options(cls, register):
     register('--remote', action='store_true', advanced=True, fingerprint=True,
-             help='Allow auto-generation of remote dependencies without pinned versions.')
+             help='Allow auto-generation of remote dependencies without pinned versions '
+                  '(FLOATING versions).')
+
+    register('--fail-floating', action='store_true', advanced=True, fingerprint=True,
+             help='After generating all dependencies, fail if any newly generated or pre-existing '
+                  'dependencies have un-pinned - aka FLOATING - versions.')
 
     register('--materialize', action='store_true', advanced=True, fingerprint=True,
              help='Instead of just auto-generating missing go_binary and go_library targets in '
@@ -197,33 +203,123 @@ class GoBuildgen(GoTask):
              help='An optional extension for all materialized BUILD files (should include the .)')
 
   def execute(self):
-    local_go_targets = self.context.targets(self.is_local_src)
-    if not local_go_targets:
+    materialize = self.get_options().materialize
+    if materialize:
+      local_go_targets = None  # We want a full scan, which passing no local go targets signals.
+      if self.context.target_roots:
+        self.context.log.warn('{} ignoring targets passed on the command line and re-materializing '
+                              'the complete Go BUILD forest.'.format(self.options_scope))
+    else:
+      local_go_targets = self.context.targets(self.is_local_src)
+      if not local_go_targets:
+        return
+
+    generation_result = self.generate_targets(local_go_targets=local_go_targets)
+    if not generation_result:
       return
 
-    generated = self.generate_targets(local_go_targets)
-    if not self.get_options().materialize:
+    # TODO(John Sirois): It would be nice to fail for floating revs for either the materialize or
+    # in-memory cases.  Right now we only fail for the materialize case.
+    if not materialize:
       msg = ('Auto generated the following Go targets: target (import path):\n\t{}'
              .format('\n\t'.join(sorted('{} ({})'.format(addr.reference(), ip)
-                                        for ip, addr in generated))))
+                                        for ip, addr in generation_result.generated))))
       self.context.log.info(msg)
-    elif generated:
-      self._materialize()
+    elif generation_result:
+      self._materialize(generation_result)
 
   class TemplateResult(namedtuple('TemplateResult', ['build_file_path', 'data', 'import_paths',
-                                                     'needs_rev', 'rev'])):
+                                                     'local', 'rev', 'fail_floating'])):
+
+    @classmethod
+    def local_target(cls, build_file_path, data, import_paths):
+      return cls(build_file_path=build_file_path, data=data, import_paths=import_paths, local=True,
+                 rev=None, fail_floating=False)
+
+    @classmethod
+    def remote_target(cls, build_file_path, data, import_paths, rev, fail_floating):
+      return cls(build_file_path=build_file_path, data=data, import_paths=import_paths, local=False,
+                 rev=rev, fail_floating=fail_floating)
 
     def log(self, logger):
-      log = logger.warn if (self.needs_rev and not self.rev) else logger.info
-      log('\t{} ({}){}'.format(self.build_file_path,
-                               ' '.join(sorted(self.import_paths)),
-                               ' {}'.format(self.rev or 'FLOATING') if self.needs_rev else ''))
+      """Log information about the generated target including its BUILD file and import paths.
 
-  def _materialize(self):
-    self.context.log.info('Auto generated the following Go BUILD files: BUILD file '
-                          '(import paths)')
-    for result in self.generate_build_files():
+      :param logger: The logger to log with.
+      :type logger: A :class:`logging.Logger` compatible object.
+      """
+      log = logger.info if self.local or self.rev else logger.warn
+      log('\t{}'.format(self))
+
+    @property
+    def failed(self):
+      """Return `True` if the generated target should be considered a failed generation.
+
+      :rtype: bool
+      """
+      return self.fail_floating and not self.rev
+
+    def __str__(self):
+      import_paths = ' '.join(sorted(self.import_paths))
+      rev = '' if self.local else ' {}'.format(self.rev or 'FLOATING')
+      return ('{build_file_path} ({import_paths}){rev}'
+              .format(build_file_path=self.build_file_path, import_paths=import_paths, rev=rev))
+
+  class FloatingRemoteError(TaskError):
+    """Indicates Go remote libraries exist or were generated that don't specify a `rev`."""
+
+  def _materialize(self, generation_result):
+    remote = self.get_options().remote
+    existing_go_buildfiles = set()
+
+    def gather_go_buildfiles(rel_path):
+      address_mapper = self.context.address_mapper
+      for build_file in address_mapper.scan_buildfiles(root_dir=get_buildroot(),
+                                                       base_path=rel_path,
+                                                       spec_excludes=self.context.spec_excludes):
+        existing_go_buildfiles.add(build_file.relpath)
+
+    gather_go_buildfiles(generation_result.local_root)
+    if remote and generation_result.remote_root != generation_result.local_root:
+      gather_go_buildfiles(generation_result.remote_root)
+
+    targets = set(self.context.build_graph.targets(self.is_go))
+    if remote and generation_result.remote_root:
+      # Generation only walks out from local source, but we might have transitive remote
+      # dependencies under the remote root which are not linked except by `resolve.go`.  Add all
+      # the remotes we can find to ensure they are re-materialized too.
+      remote_root = os.path.join(get_buildroot(), generation_result.remote_root)
+      targets.update(self.context.scan(remote_root).targets(self.is_remote_lib))
+
+    failed_results = []
+    for result in self.generate_build_files(targets):
+      existing_go_buildfiles.discard(result.build_file_path)
       result.log(self.context.log)
+      if result.failed:
+        failed_results.append(result)
+
+    if existing_go_buildfiles:
+      deleted = []
+      for existing_go_buildfile in existing_go_buildfiles:
+        spec_path = os.path.dirname(existing_go_buildfile)
+        for address in self.context.address_mapper.addresses_in_spec_path(spec_path):
+          target = self.context.address_mapper.resolve(address)
+          if isinstance(target, GoLocalSource):
+            os.unlink(existing_go_buildfile)
+            deleted.append(existing_go_buildfile)
+      if deleted:
+        self.context.log.info('Deleted the following obsolete BUILD files:\n\t{}'
+                              .format('\n\t'.join(sorted(deleted))))
+
+    if failed_results:
+      self.context.log.error('Un-pinned (FLOATING) Go remote library dependencies are not '
+                             'allowed in this repository!\n'
+                             'Found the following FLOATING Go remote libraries:\n\t{}'
+                             .format('\n\t'.join('{}'.format(result) for result in failed_results)))
+      self.context.log.info('You can fix this by editing the target in each FLOATING BUILD file '
+                            'listed above to include a `rev` parameter that points to a sha, tag '
+                            'or commit id that pins the code in the source repository to a fixed, '
+                            'non-FLOATING version.')
+      raise self.FloatingRemoteError('Un-pinned (FLOATING) Go remote libraries detected.')
 
   class NoLocalRootsError(TaskError):
     """Indicates the Go local source owning targets' source roots are invalid."""
@@ -244,35 +340,52 @@ class GoBuildgen(GoTask):
       super(GoBuildgen.GenerationError, self).__init__(str(cause))
       self.cause = cause
 
-  def generate_targets(self, local_go_targets):
+  class GenerationResult(namedtuple('GenerationResult', ['generated',
+                                                         'local_root',
+                                                         'remote_root'])):
+    """Captures the result of a Go target generation round."""
+
+  def generate_targets(self, local_go_targets=None):
+    """Generate Go targets in memory to form a complete Go graph.
+
+    :param local_go_targets: The local Go targets to fill in a complete target graph for.  If
+                             `None`, then all local Go targets under the Go source root are used.
+    :type local_go_targets: :class:`collections.Iterable` of
+                            :class:`pants.contrib.go.targets.go_local_source import GoLocalSource`
+    :returns: A generation result if targets were generated, else `None`.
+    :rtype: :class:`GoBuildgen.GenerationResult`
+    """
     # TODO(John Sirois): support multiple source roots like GOPATH does?
     # The GOPATH's 1st element is read-write, the rest are read-only; ie: their sources build to
     # the 1st element's pkg/ and bin/ dirs.
-    all_rooted_types = set()
-    for types in SourceRoot.all_roots().values():
-      all_rooted_types.update(types)
 
-    def safe_get_source_roots(target_type):
-      return set(SourceRoot.roots(target_type)) if target_type in all_rooted_types else set()
-
-    local_roots = safe_get_source_roots(GoBinary) | safe_get_source_roots(GoLibrary)
+    # TODO: Add "find source roots for lang" functionality to SourceRoots and use that instead.
+    all_roots = list(self.context.source_roots.all_roots())
+    local_roots = [sr.path for sr in all_roots if 'go' in sr.langs]
     if not local_roots:
-      raise self.NoLocalRootsError('Can only BUILD gen if a Go local sources source root is'
+      raise self.NoLocalRootsError('Can only BUILD gen if a Go local sources source root is '
                                    'defined.')
     if len(local_roots) > 1:
       raise self.InvalidLocalRootsError('Can only BUILD gen for a single Go local sources source '
                                         'root, found:\n\t{}'
                                         .format('\n\t'.join(sorted(local_roots))))
     local_root = local_roots.pop()
-    unrooted_locals = {t for t in local_go_targets if t.target_base != local_root}
-    if unrooted_locals:
-      raise self.UnrootedLocalSourceError('Cannot BUILD gen until the following targets are '
-                                          'relocated to the build root at {}:\n\t{}'
-                                          .format(local_root,
-                                                  '\n\t'.join(sorted(t.address.reference()
-                                                                     for t in unrooted_locals))))
 
-    remote_roots = set(safe_get_source_roots(GoRemoteLibrary))
+    if local_go_targets:
+      unrooted_locals = {t for t in local_go_targets if t.target_base != local_root}
+      if unrooted_locals:
+        raise self.UnrootedLocalSourceError('Cannot BUILD gen until the following targets are '
+                                            'relocated to the source root at {}:\n\t{}'
+                                            .format(local_root,
+                                                    '\n\t'.join(sorted(t.address.reference()
+                                                                       for t in unrooted_locals))))
+    else:
+      root = os.path.join(get_buildroot(), local_root)
+      local_go_targets = self.context.scan(root=root).targets(self.is_local_src)
+      if not local_go_targets:
+        return None
+
+    remote_roots = [sr.path for sr in all_roots if 'go_remote' in sr.langs]
     if len(remote_roots) > 1:
       raise self.InvalidRemoteRootsError('Can only BUILD gen for a single Go remote library source '
                                          'root, found:\n\t{}'
@@ -288,11 +401,14 @@ class GoBuildgen(GoTask):
                                   remote_root=remote_root)
     with self.context.new_workunit('go.buildgen', labels=[WorkUnitLabel.MULTITOOL]):
       try:
-        return generator.generate(local_go_targets)
+        generated = generator.generate(local_go_targets)
+        return self.GenerationResult(generated=generated,
+                                     local_root=local_root,
+                                     remote_root=remote_root)
       except generator.GenerationError as e:
         raise self.GenerationError(e)
 
-  def generate_build_files(self):
+  def generate_build_files(self, targets):
     goal_name = self.options_scope
     flags = '--materialize'
     if self.get_options().remote:
@@ -306,7 +422,7 @@ class GoBuildgen(GoTask):
     build_file_basename = 'BUILD' + self.get_options().extension
 
     targets_by_spec_path = defaultdict(set)
-    for target in self.context.targets(self.is_go):
+    for target in targets:
       targets_by_spec_path[target.address.spec_path].add(target)
 
     for spec_path, targets in targets_by_spec_path.items():
@@ -327,21 +443,21 @@ class GoBuildgen(GoTask):
       local_target = targets[0]
       data = self._data(target_type='go_binary' if self.is_binary(local_target) else 'go_library',
                         deps=[d.address.reference() for d in local_target.dependencies])
-      return self.TemplateResult(build_file_path=build_file_path,
-                                 data=data,
-                                 import_paths=[local_target.import_path],
-                                 needs_rev=False,
-                                 rev=None)
+      return self.TemplateResult.local_target(build_file_path=build_file_path,
+                                              data=data,
+                                              import_paths=[local_target.import_path])
     elif self.get_options().remote:
+      fail_floating = self.get_options().fail_floating
       if len(targets) == 1 and not targets[0].pkg:
         remote_lib = targets[0]
-        data = self._data(target_type='go_remote_library',
-                          rev=remote_lib.rev)
-        return self.TemplateResult(build_file_path=build_file_path,
-                                   data=data,
-                                   import_paths=(remote_lib.import_path,),
-                                   needs_rev=True,
-                                   rev=remote_lib.rev)
+        rev = remote_lib.rev
+        data = self._data(target_type='go_remote_library', rev=rev)
+        import_paths = (remote_lib.import_path,)
+        return self.TemplateResult.remote_target(build_file_path=build_file_path,
+                                                 data=data,
+                                                 import_paths=import_paths,
+                                                 rev=rev,
+                                                 fail_floating=fail_floating)
       else:
         revs = {t.rev for t in targets if t.rev}
         if len(revs) > 1:
@@ -355,11 +471,12 @@ class GoBuildgen(GoTask):
         data = self._data(target_type='go_remote_libraries',
                           rev=rev,
                           pkgs=sorted({t.pkg for t in targets}))
-        return self.TemplateResult(build_file_path=build_file_path,
-                                   data=data,
-                                   import_paths=tuple(t.import_path for t in targets),
-                                   needs_rev=True,
-                                   rev=rev)
+        import_paths = tuple(t.import_path for t in targets)
+        return self.TemplateResult.remote_target(build_file_path=build_file_path,
+                                                 data=data,
+                                                 import_paths=import_paths,
+                                                 rev=rev,
+                                                 fail_floating=fail_floating)
     else:
       return None
 

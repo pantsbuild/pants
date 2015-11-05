@@ -21,7 +21,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.custom_types import list_option
-from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 
 
@@ -67,13 +66,6 @@ class ApacheThriftGen(SimpleCodegenTask):
     thrift_binary = ThriftBinary.Factory.scoped_instance(self).create()
     return thrift_binary.path
 
-  def invalidate_for_files(self):
-    # TODO: This will prevent artifact caching across platforms.
-    # Find some cross-platform way to assert the thrift binary version.
-    # NB: We have access to the version via the ThriftBinary instance's `version`, we just need
-    # support for invalidation based on non-files.
-    return [self._thrift_binary]
-
   @memoized_property
   def _deps(self):
     deps = self.get_options().deps
@@ -90,7 +82,7 @@ class ApacheThriftGen(SimpleCodegenTask):
     with open(source) as thrift:
       return any(line for line in thrift if self.SERVICE_PARSER.search(line))
 
-  def synthetic_target_extra_dependencies(self, target):
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
     for source in target.sources_relative_to_buildroot():
       if self._declares_service(os.path.join(get_buildroot(), source)):
         return self._service_deps
@@ -116,16 +108,14 @@ class ApacheThriftGen(SimpleCodegenTask):
       cmd.append('-verbose')
     return cmd
 
-  def _generate_thrift(self, target):
+  def _generate_thrift(self, target, target_workdir):
     target_cmd = self._thrift_cmd[:]
 
     bases = OrderedSet(tgt.target_base for tgt in target.closure() if self.is_gentarget(tgt))
     for base in bases:
       target_cmd.extend(('-I', base))
 
-    work_dir = self.codegen_workdir(target)
-    safe_mkdir(work_dir, clean=True)
-    target_cmd.extend(('-o', work_dir))
+    target_cmd.extend(('-o', target_workdir))
 
     for source in target.sources_relative_to_buildroot():
       cmd = target_cmd[:]
@@ -140,13 +130,12 @@ class ApacheThriftGen(SimpleCodegenTask):
           raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary, result))
 
     # The thrift compiler generates sources to a gen-[lang] subdir of the `-o` argument.  We
-    # relocate the generated java sources to the root of the `work_dir` so that our base class
+    # relocate the generated java sources to the root of the `target_workdir` so that our base class
     # maps them properly for source jars and the like.
-    gen_dir = os.path.join(work_dir, 'gen-java')
+    gen_dir = os.path.join(target_workdir, 'gen-java')
     for path in os.listdir(gen_dir):
-      shutil.move(os.path.join(gen_dir, path), work_dir)
+      shutil.move(os.path.join(gen_dir, path), target_workdir)
     os.rmdir(gen_dir)
 
-  def execute_codegen(self, invalid_targets):
-    for target in invalid_targets:
-      self._generate_thrift(target)
+  def execute_codegen(self, target, target_workdir):
+    self._generate_thrift(target, target_workdir)

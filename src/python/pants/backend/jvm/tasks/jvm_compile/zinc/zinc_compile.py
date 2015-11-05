@@ -13,6 +13,7 @@ from xml.etree import ElementTree
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
@@ -22,6 +23,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
@@ -30,6 +32,10 @@ from pants.util.dirutil import relativize_paths, safe_open
 
 # Well known metadata file required to register scalac plugins with nsc.
 _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
+
+
+# Well known metadata file to register annotation processors with a java 1.6+ compiler
+_PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 
 class ZincCompile(JvmCompile):
@@ -90,9 +96,9 @@ class ZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(ZincCompile, cls).register_options(register)
-    register('--plugins', advanced=True, action='append', fingerprint=True,
+    register('--scalac-plugins', advanced=True, action='append', fingerprint=True,
              help='Use these scalac plugins.')
-    register('--plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
+    register('--scalac-plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
              help='Map from plugin name to list of arguments for that plugin.')
     # TODO: disable by default because it breaks dependency parsing:
     #   https://github.com/pantsbuild/pants/issues/2224
@@ -109,6 +115,14 @@ class ZincCompile(JvmCompile):
              help='A dict of option regexes that make up pants\' supported API for zinc. '
                   'Options not listed here are subject to change/removal. The value of the dict '
                   'indicates that an option accepts an argument.')
+
+    # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
+    #  https://github.com/sbt/sbt/pull/2085
+    #  https://github.com/sbt/sbt/pull/2160
+    register('--incremental-caching', advanced=True, action='store_true', default=False,
+             help='When set, the results of incremental compiles will be written to the cache. '
+                  'This is unset by default, because it is generally a good precaution to cache '
+                  'only clean/cold builds.')
 
     cls.register_jvm_tool(register,
                           'zinc',
@@ -156,6 +170,20 @@ class ZincCompile(JvmCompile):
     super(ZincCompile, cls).prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
 
+  @property
+  def incremental(self):
+    """Zinc implements incremental compilation.
+
+    Setting this property causes the task infrastructure to clone the previous
+    results_dir for a target into the new results_dir for a target.
+    """
+    return True
+
+  @property
+  def cache_incremental(self):
+    """Optionally write the results of incremental compiles to the cache."""
+    return self.get_options().incremental_caching
+
   def select(self, target):
     return target.has_sources('.java') or target.has_sources('.scala')
 
@@ -165,10 +193,10 @@ class ZincCompile(JvmCompile):
   def __init__(self, *args, **kwargs):
     super(ZincCompile, self).__init__(*args, **kwargs)
 
-    # A directory independent of any other classpath which can contain per-target
-    # plugin resource files.
-    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
     self._lazy_plugin_args = None
+
+    # A directory to contain per-target subdirectories with apt processor info files.
+    self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
     # Validate zinc options
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
@@ -251,16 +279,19 @@ class ZincCompile(JvmCompile):
       raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
     return plugins
 
-  def extra_products(self, target):
-    """Override extra_products to produce a plugin information file."""
-    ret = []
+  def write_extra_resources(self, compile_context):
+    """Override write_extra_resources to produce plugin and annotation processor files."""
+    target = compile_context.target
     if target.is_scalac_plugin and target.classname:
-      # NB: We don't yet support explicit in-line compilation of scala compiler plugins from
-      # the workspace to be used in subsequent compile rounds like we do for annotation processors
-      # with javac. This would require another GroupTask similar to AptCompile, but for scala.
-      root, plugin_info_file = self.write_plugin_info(self._plugin_info_dir, target)
-      ret.append((root, [plugin_info_file]))
-    return ret
+      self.write_plugin_info(compile_context.classes_dir, target)
+    elif isinstance(target, AnnotationProcessor) and target.processors:
+      processor_info_file = os.path.join(compile_context.classes_dir, _PROCESSOR_INFO_FILE)
+      self._write_processor_info(processor_info_file, target.processors)
+
+  def _write_processor_info(self, processor_info_file, processors):
+    with safe_open(processor_info_file, 'w') as f:
+      for processor in processors:
+        f.write('{}\n'.format(processor.strip()))
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
               log_file, settings):

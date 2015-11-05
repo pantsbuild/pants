@@ -6,6 +6,8 @@ target(
   dependencies=[
     ':node_repl',
     ':npm_resolve',
+    ':npm_run',
+    ':npm_test',
   ]
 )
 
@@ -32,6 +34,7 @@ python_library(
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
     'contrib/node/src/python/pants/contrib/node/targets:npm_package',
+    'contrib/node/src/python/pants/contrib/node/targets:npm_test',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:workunit',
     'src/python/pants/util:memo',
@@ -49,5 +52,29 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ]
+)
+
+python_library(
+  name='npm_run',
+  sources=['npm_run.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_library(
+  name='npm_test',
+  sources=['npm_test.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:contextutil',
   ]
 )

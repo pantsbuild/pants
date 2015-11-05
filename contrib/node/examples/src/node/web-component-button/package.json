@@ -3,6 +3,7 @@
   "scripts": {
     "build": "web-build-tool",
     "pretest": "NODE_ENV=test web-build-tool",
-    "test": "mocha ./dist/unit.js"
+    "test_unit": "npm run pretest && mocha ./dist/test/unit.js",
+    "test_integration": "npm run pretest && mocha ./dist/test/integration.js"
   }
 }

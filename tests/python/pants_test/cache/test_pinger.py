@@ -60,7 +60,7 @@ class TestPinger(BaseTest):
     self.assertEqual(ping_results[self.slow_netloc], Pinger.UNREACHABLE)
 
   def test_global_pinger_memo(self):
-    fast_pinger = Pinger(timeout=self.slow_seconds, tries=2)
+    fast_pinger = Pinger(timeout=self.slow_seconds - .01, tries=2)
     slow_pinger = Pinger(timeout=self.timeout_seconds, tries=2)
     self.assertEqual(fast_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE)
     self.assertNotEqual(slow_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE)

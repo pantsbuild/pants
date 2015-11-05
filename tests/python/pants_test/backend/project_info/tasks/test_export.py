@@ -25,9 +25,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
@@ -146,30 +144,27 @@ class ExportTest(ConsoleTaskTestBase):
         target_type=JvmTarget,
       )
 
-      SourceRoot.register(os.path.realpath(os.path.join(self.build_root, 'src')),
-                          PythonLibrary)
-
-      self.add_to_build_file('src/x/BUILD', '''
+      self.add_to_build_file('src/python/x/BUILD', '''
          python_library(name="x", sources=globs("*.py"))
       '''.strip())
 
-      self.add_to_build_file('src/y/BUILD', dedent('''
+      self.add_to_build_file('src/python/y/BUILD', dedent('''
         python_library(name="y", sources=rglobs("*.py"))
         python_library(name="y2", sources=rglobs("subdir/*.py"))
         python_library(name="y3", sources=rglobs("Test*.py"))
       '''))
 
-      self.add_to_build_file('src/z/BUILD', '''
+      self.add_to_build_file('src/python/z/BUILD', '''
         python_library(name="z", sources=zglobs("**/*.py"))
       '''.strip())
 
-      self.add_to_build_file('src/exclude/BUILD', '''
+      self.add_to_build_file('src/python/exclude/BUILD', '''
         python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
       '''.strip())
 
   def execute_export(self, *specs):
     context = self.context(target_roots=[self.target(spec) for spec in specs])
-    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
+    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()),
                                     context.products.get_data('compile_classpath')))
@@ -179,11 +174,11 @@ class ExportTest(ConsoleTaskTestBase):
 
   def test_source_globs_py(self):
     self.set_options(globs=True)
-    result = self.execute_export_json('src/x')
+    result = self.execute_export_json('src/python/x')
 
     self.assertEqual(
-      {'globs': ['src/x/*.py']},
-      result['targets']['src/x:x']['globs']
+      {'globs': ['src/python/x/*.py']},
+      result['targets']['src/python/x:x']['globs']
     )
 
   def test_source_globs_java(self):
@@ -324,49 +319,49 @@ class ExportTest(ConsoleTaskTestBase):
 
   def test_source_exclude(self):
     self.set_options(globs=True)
-    result = self.execute_export_json('src/exclude')
+    result = self.execute_export_json('src/python/exclude')
 
     self.assertEqual(
-      {'globs': ['src/exclude/*.py'],
+      {'globs': ['src/python/exclude/*.py'],
        'exclude': [{
-         'globs': ['src/exclude/foo.py']
+         'globs': ['src/python/exclude/foo.py']
        }],
      },
-      result['targets']['src/exclude:exclude']['globs']
+      result['targets']['src/python/exclude:exclude']['globs']
     )
 
   def test_source_rglobs(self):
     self.set_options(globs=True)
-    result = self.execute_export_json('src/y')
+    result = self.execute_export_json('src/python/y')
 
     self.assertEqual(
-      {'globs': ['src/y/**/*.py', 'src/y/*.py']},
-      result['targets']['src/y:y']['globs']
+      {'globs': ['src/python/y/**/*.py', 'src/python/y/*.py']},
+      result['targets']['src/python/y:y']['globs']
     )
 
   def test_source_rglobs_subdir(self):
     self.set_options(globs=True)
-    result = self.execute_export_json('src/y:y2')
+    result = self.execute_export_json('src/python/y:y2')
 
     self.assertEqual(
-      {'globs': ['src/y/subdir/**/*.py', 'src/y/subdir/*.py']},
-      result['targets']['src/y:y2']['globs']
+      {'globs': ['src/python/y/subdir/**/*.py', 'src/python/y/subdir/*.py']},
+      result['targets']['src/python/y:y2']['globs']
     )
 
   def test_source_rglobs_noninitial(self):
     self.set_options(globs=True)
-    result = self.execute_export_json('src/y:y3')
+    result = self.execute_export_json('src/python/y:y3')
 
     self.assertEqual(
-      {'globs': ['src/y/Test*.py']},
-      result['targets']['src/y:y3']['globs']
+      {'globs': ['src/python/y/Test*.py']},
+      result['targets']['src/python/y:y3']['globs']
     )
 
   def test_source_zglobs(self):
     self.set_options(globs=True)
-    result = self.execute_export_json('src/z')
+    result = self.execute_export_json('src/python/z')
 
     self.assertEqual(
-      {'globs': ['src/z/**/*.py']},
-      result['targets']['src/z:z']['globs']
+      {'globs': ['src/python/z/**/*.py']},
+      result['targets']['src/python/z:z']['globs']
     )

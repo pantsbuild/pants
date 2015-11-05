@@ -36,7 +36,7 @@ function pkg_pants_install_test() {
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
-  [[ "$(execute_packaged_pants_with_internal_backends --pants-version 2>/dev/null)" \
+  [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
      == "$(local_version)" ]] || die "Installed version of pants does match local version!"
 }
 
@@ -85,12 +85,6 @@ function run_local_pants() {
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
 function execute_packaged_pants_with_internal_backends() {
-  local extra_bootstrap_buildfiles
-  if [[ "$1" =~ "extra_bootstrap_buildfiles" ]]; then
-    extra_bootstrap_buildfiles=${1#*=}
-    shift
-  fi
-
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
@@ -100,10 +94,6 @@ function execute_packaged_pants_with_internal_backends() {
         'internal_backend.repositories', \
         'internal_backend.sitegen', \
         'internal_backend.utilities', \
-      ]" \
-    --goals-bootstrap-buildfiles="[ \
-        '${ROOT}/BUILD', \
-        ${extra_bootstrap_buildfiles}
       ]" \
     "$@"
 }
@@ -127,7 +117,7 @@ function pkg_install_test_func() {
 }
 
 function local_version() {
-  run_local_pants --pants-version 2>/dev/null
+  run_local_pants --version 2>/dev/null
 }
 
 function build_packages() {

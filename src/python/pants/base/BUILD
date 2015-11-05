@@ -2,24 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'address',
-  sources = ['address.py'],
-  dependencies = [
-    ':deprecated',
-    'src/python/pants/build_graph'
-  ]
-)
-
-python_library(
-  name = 'address_lookup_error',
-  sources = ['address_lookup_error.py'],
-  dependencies = [
-    ':deprecated',
-    'src/python/pants/build_graph'
-  ]
-)
-
-python_library(
   name = 'build_environment',
   sources = ['build_environment.py'],
   dependencies = [
@@ -44,15 +26,6 @@ python_library(
   sources = ['scm_build_file.py'],
   dependencies = [
     ':build_file',
-  ]
-)
-
-python_library(
-  name = 'build_file_aliases',
-  sources = ['build_file_aliases.py'],
-  dependencies = [
-    ':deprecated',
-    'src/python/pants/build_graph',
   ]
 )
 
@@ -164,9 +137,8 @@ python_library(
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':address',
-    ':address_lookup_error',
     ':build_file',
+    'src/python/pants/build_graph',
   ],
 )
 
@@ -177,21 +149,13 @@ python_library(
     ':build_environment',
     ':build_file_target_factory',
     ':build_manual',
+    ':deprecated',
     ':exceptions',
     ':parse_context',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     # TEMPORARY dep during migration to new source roots mechanism.
     # I've verified that this does not introduce a circular dep.
     'src/python/pants/source',
-  ],
-)
-
-python_library(
-  name = 'target',
-  sources = ['target.py'],
-  dependencies = [
-    ':deprecated',
-    'src/python/pants/build_graph',
   ],
 )
 

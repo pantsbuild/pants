@@ -13,6 +13,7 @@ target(
     ':go_buildgen',
     ':go_compile',
     ':go_fetch',
+    ':go_go',
     ':go_workspace_task',
   ]
 )
@@ -51,7 +52,6 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/tasks:go_buildgen',
     'contrib/go/src/python/pants/contrib/go:plugin',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
@@ -64,7 +64,6 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
-    'src/python/pants/base:source_root',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
@@ -89,8 +88,18 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_fetch',
-    'src/python/pants/base:source_root',
     'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
+  name='go_go',
+  sources=['test_go_go.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_go',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]

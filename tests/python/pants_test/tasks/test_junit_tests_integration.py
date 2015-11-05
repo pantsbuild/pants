@@ -8,11 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 from textwrap import dedent
-from xml.etree import ElementTree
 
-import pytest
-
-from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -29,7 +25,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.welcome.WelSpec')
 
   def test_junit_test_custom_interpreter(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           'examples/tests/java/org/pantsbuild/example/hello/greet',
@@ -41,7 +37,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self._assert_junit_output(workdir)
 
   def test_junit_test(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           'testprojects/tests/scala/org/pantsbuild/testproject/empty'],
@@ -49,7 +45,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self.assert_failure(pants_run)
 
   def test_junit_test_with_test_option_with_relpath(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           '--test-junit-test=examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
@@ -60,7 +56,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
 
   def test_junit_test_with_test_option_with_dot_slash_relpath(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           '--test-junit-test=./examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
@@ -71,7 +67,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
 
   def test_junit_test_with_test_option_with_classname(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       pants_run = self.run_pants_with_workdir([
           'test',
           '--test-junit-test=org.pantsbuild.example.hello.greet.GreetingTest',
@@ -80,44 +76,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output_exists_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
-
-  def test_junit_test_with_emma(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'test',
-          'examples/tests/java//org/pantsbuild/example/hello/greet',
-          'examples/tests/scala/org/pantsbuild/example/hello/welcome',
-          '--interpreter=CPython>=2.6,<3',
-          '--interpreter=CPython>=3.3',
-          '--test-junit-coverage-processor=emma',
-          '--test-junit-coverage',
-          '--test-junit-coverage-jvm-options=-Xmx1g',
-          '--test-junit-coverage-jvm-options=-XX:MaxPermSize=256m'],
-          workdir)
-      self.assert_success(pants_run)
-      self._assert_junit_output(workdir)
-      # TODO(Eric Ayers): Why does  emma puts coverage.xml in a different directory from cobertura?
-      self.assertTrue(os.path.exists(
-        os.path.join(workdir, 'test', 'junit', 'coverage', 'coverage.xml')))
-      self.assertTrue(os.path.exists(
-        os.path.join(workdir, 'test', 'junit', 'coverage', 'html', 'index.html')))
-
-    # Look for emma report in stdout_data:
-    # 23:20:21 00:02       [emma-report][EMMA v2.1.5320 (stable) report, generated Mon Oct 13 ...
-    self.assertIn('[emma-report]', pants_run.stdout_data)
-
-    # See if the two test classes ended up generating data in the coverage report.
-    lines = pants_run.stdout_data.split('\n')
-    in_package_report = False
-    package_report = ""
-    for line in lines:
-      if 'COVERAGE BREAKDOWN BY PACKAGE:' in line:
-        in_package_report = True
-      if in_package_report:
-        package_report += line
-
-    self.assertIn('org.pantsbuild.example.hello.welcome', package_report)
-    self.assertIn('org.pantsbuild.example.hello.greet', package_report)
 
   def test_junit_test_requiring_cwd_fails_without_option_specified(self):
     pants_run = self.run_pants([
@@ -186,7 +144,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def _failing_test_cases(self):
-    with temporary_dir(root_dir=self.workdir_root()) as source_dir:
+    with self.temporary_sourcedir() as source_dir:
       with open(os.path.join(source_dir, 'BUILD'), 'w+') as f:
         f.write('source_root("{}/tests")\n'.format(os.path.basename(source_dir)))
       tests_dir = os.path.join(source_dir, 'tests')
@@ -284,7 +242,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   @contextmanager
   def _mixed_test_cases(self):
-    with temporary_dir(root_dir=self.workdir_root()) as source_dir:
+    with self.temporary_sourcedir() as source_dir:
       with open(os.path.join(source_dir, 'BUILD'), 'w+') as f:
         f.write('source_root("{}/tests")\n'.format(os.path.basename(source_dir)))
       tests_dir = os.path.join(source_dir, 'tests')
@@ -331,7 +289,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
       yield tests_subdir
 
   def test_junit_test_failure_summary(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with self._failing_test_cases() as tests_dir:
         pants_run = self.run_pants_with_workdir([
           'test',
@@ -360,7 +318,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           self.assertIn('\n'.join(group), output)
 
   def test_junit_test_no_failure_summary(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with self._failing_test_cases() as tests_dir:
         pants_run = self.run_pants_with_workdir([
           'test',
@@ -374,7 +332,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
                          output)
 
   def test_junit_test_successes_and_failures(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       with self._mixed_test_cases() as tests_dir:
         pants_run = self.run_pants_with_workdir([
           'test',

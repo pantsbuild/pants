@@ -51,9 +51,9 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
     path = os.path.join('dist', 'shading.jar')
     with subsystem_instance(DistributionLocator):
       execute_java = DistributionLocator.cached(minimum_version='1.6').execute_java
-      self.assertEquals(0, execute_java(classpath=path,
+      self.assertEquals(0, execute_java(classpath=[path],
                                         main='org.pantsbuild.testproject.shading.Main'))
-      self.assertEquals(0, execute_java(classpath=path,
+      self.assertEquals(0, execute_java(classpath=[path],
                                         main='org.pantsbuild.testproject.foo.bar.MyNameIsDifferentNow'))
 
     received_classes = set()
@@ -92,7 +92,7 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
   def test_no_deployjar_run(self):
     with self._dist_dir() as dist_dir:
       bundle_args = [
-        '--pants-distdir={}'.format(dist_dir), 'bundle', '--no-deployjar',
+        '--pants-distdir={}'.format(dist_dir), 'bundle.jvm', '--no-deployjar',
       ]
       classpath=[
         os.path.join(dist_dir, 'third-bundle', 'third.jar'),
@@ -103,7 +103,7 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
   def test_deployjar_run(self):
     with self._dist_dir() as dist_dir:
       bundle_args = [
-        '--pants-distdir={}'.format(dist_dir), 'bundle', '--deployjar',
+        '--pants-distdir={}'.format(dist_dir), 'bundle.jvm', '--deployjar',
       ]
       classpath=[
         os.path.join(dist_dir, 'third-bundle', 'third.jar'),

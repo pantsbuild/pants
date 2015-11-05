@@ -43,7 +43,7 @@ Collection of Targets, Goals, Tasks, Commands to do something useful. At
 Pants' core are the abstractions Target, and Task. These abstractions
 don't do anything in particular. To build real code, you need to define
 and register some more specific classes. For example, to build Java
-code, you want the `JavaLibrary` Target, `JavaCompile` task (registered
+code, you want the `JavaLibrary` Target, `ZincCompile` task (registered
 in the `compile` goal), and many more. We organize this "real" code into
 "plugins". A typical plugin defines several classes and registers them
 with the Pants core. For a design discussion on registering plugins, see

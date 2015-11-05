@@ -5,43 +5,35 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.checkstyle.except_statements import ExceptStatements
+from pants_test.backend.python.tasks.checkstyle.plugin_test_base import CheckstylePluginTestBase
 
 
 EXCEPT_TEMPLATE = """
-try:                  # 001
-  1 / 0
-%s
-  pass
-"""
+  try:                  # 001
+    1 / 0
+  {}
+    pass
+  """
 
 
-def nits_from(clause):
-  return list(ExceptStatements(PythonFile.from_statement(EXCEPT_TEMPLATE % clause)).nits())
+class ExceptStatementsTest(CheckstylePluginTestBase):
+  plugin_type = ExceptStatements
 
+  def test_except_statements(self):
+    for clause in ('except:', 'except :', 'except\t:'):
+      self.assertNit(EXCEPT_TEMPLATE.format(clause), 'T803')
 
-def test_except_statements():
-  for clause in ('except:', 'except :', 'except\t:'):
-    nits = nits_from(clause)
-    assert len(nits) == 1
-    assert nits[0].code == 'T803'
-    assert nits[0].severity == Nit.ERROR
+    for clause in (
+        'except KeyError, e:',
+        'except (KeyError, ValueError), e:',
+        'except KeyError, e :',
+        'except (KeyError, ValueError), e\t:'):
+      self.assertNit(EXCEPT_TEMPLATE.format(clause), 'T601')
 
-  for clause in (
-      'except KeyError, e:',
-      'except (KeyError, ValueError), e:',
-      'except KeyError, e :',
-      'except (KeyError, ValueError), e\t:'):
-    nits = nits_from(clause)
-    assert len(nits) == 1
-    assert nits[0].code == 'T601'
-    assert nits[0].severity == Nit.ERROR
-
-  for clause in (
-      'except KeyError:',
-      'except KeyError as e:',
-      'except (KeyError, ValueError) as e:',
-      'except (KeyError, ValueError) as e:'):
-    nits = nits_from(clause)
-    assert len(nits) == 0
+    for clause in (
+        'except KeyError:',
+        'except KeyError as e:',
+        'except (KeyError, ValueError) as e:',
+        'except (KeyError, ValueError) as e:'):
+      self.assertNoNits(EXCEPT_TEMPLATE.format(clause))

@@ -23,15 +23,20 @@ def fast_relpath(path, start):
   if not path.startswith(start):
     raise ValueError('{} is not a prefix of {}'.format(start, path))
 
-  # Confirm that the split occurs on a directory boundary.
-  if start[-1] == '/':
-    slash_offset = 0
+  if len(path) == len(start):
+    # Items are identical: the relative path is empty.
+    return ''
+  elif len(start) == 0:
+    # Empty prefix.
+    return path
+  elif start[-1] == '/':
+    # The prefix indicates that it is a directory.
+    return path[len(start):]
   elif path[len(start)] == '/':
-    slash_offset = 1
+    # The suffix indicates that the prefix is a directory.
+    return path[len(start)+1:]
   else:
     raise ValueError('{} is not a directory containing {}'.format(start, path))
-
-  return path[len(start)+slash_offset:]
 
 
 def safe_mkdir(directory, clean=False):
@@ -258,3 +263,24 @@ def get_basedir(path):
     get_basedir('foo') --> 'foo'
   """
   return path[:path.index(os.sep)] if os.sep in path else path
+
+
+def rm_rf(name):
+  """Remove a file or a directory similarly to running `rm -rf <name>` in a UNIX shell.
+
+  :param str name: the name of the file or directory to remove.
+  :raises: OSError on error.
+  """
+  if not os.path.exists(name):
+    return
+
+  try:
+    # Avoid using safe_rmtree so we can detect failures.
+    shutil.rmtree(name)
+  except OSError as e:
+    if e.errno == errno.ENOTDIR:
+      # 'Not a directory', but a file. Attempt to os.unlink the file, raising OSError on failure.
+      safe_delete(name)
+    elif e.errno != errno.ENOENT:
+      # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
+      raise

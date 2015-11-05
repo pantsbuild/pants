@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from contextlib import contextmanager
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
@@ -30,7 +31,7 @@ class JvmRunTest(JvmTaskTestBase):
                                   main='org.pantsbuild.Binary')
     context = self.context(target_roots=[jvm_binary])
     jvm_run = self.create_task(context)
-    self._cmdline_classpath = [os.path.join(self.build_root, c) for c in ['bob', 'fred']]
+    self._cmdline_classpath = [os.path.join(self.pants_workdir, c) for c in ['bob', 'fred']]
     self.populate_runtime_classpath(context=jvm_run.context, classpath=self._cmdline_classpath)
     with temporary_dir() as pwd:
       with pushd(pwd):
@@ -43,13 +44,17 @@ class JvmRunTest(JvmTaskTestBase):
           yield contents
 
   def test_cmdline_only(self):
-    with self.setup_cmdline_run() as cmdline:
-      expected_suffix = 'java -cp {} org.pantsbuild.Binary'.format(
-        os.path.pathsep.join(self._cmdline_classpath))
-      self.assertEquals(expected_suffix, cmdline[-len(expected_suffix):])
+    main_entry = 'org.pantsbuild.Binary'
+    with self.setup_cmdline_run(main=main_entry) as cmdline:
+      self.assertTrue(self._match_cmdline_regex(cmdline, main_entry))
 
   def test_opt_main(self):
-    with self.setup_cmdline_run(main='org.pantsbuild.OptMain') as cmdline:
-      expected_suffix = 'java -cp {} org.pantsbuild.OptMain'.format(
-        os.path.pathsep.join(self._cmdline_classpath))
-      self.assertEquals(expected_suffix, cmdline[-len(expected_suffix):])
+    main_entry = 'org.pantsbuild.OptMain'
+    with self.setup_cmdline_run(main=main_entry) as cmdline:
+      self.assertTrue(self._match_cmdline_regex(cmdline, main_entry))
+
+  def _match_cmdline_regex(self, cmdline, main):
+    # Original classpath is embedded in the manifest file of a synthetic jar, just verify
+    # classpath is a singleton jar here.
+    m = re.search(r'java -cp [^:]*\.jar {}'.format(main), cmdline)
+    return m is not None

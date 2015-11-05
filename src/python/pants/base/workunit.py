@@ -180,10 +180,12 @@ class WorkUnit(object):
     """Returns the time (in fractional seconds) spent in this workunit and its children."""
     return (self.end_time or time.time()) - self.start_time
 
+  @property
   def start_time_string(self):
     """A convenient string representation of start_time."""
     return time.strftime('%H:%M:%S', time.localtime(self.start_time))
 
+  @property
   def start_delta_string(self):
     """A convenient string representation of how long after the run started we started."""
     delta = int(self.start_time) - int(self.root().start_time)

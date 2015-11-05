@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.checkstyle.future_compatibility import FutureCompatibility
+from pants_test.backend.python.tasks.checkstyle.plugin_test_base import CheckstylePluginTestBase
 
 
 BAD_CLASS = PythonFile.from_statement("""
@@ -18,60 +19,53 @@ class Distiller(object):
 """)
 
 
-def exemplar_fail(code, severity, statement):
-  nits = list(FutureCompatibility(PythonFile.from_statement(statement)).nits())
-  assert len(nits) == 1
-  assert nits[0].code == code
-  assert nits[0].severity == severity
-  return nits[0]
+class FutureCompatibilityTest(CheckstylePluginTestBase):
+  plugin_type = FutureCompatibility
 
+  def exemplar_fail(self, code, severity, statement):
+    self.assertNit(statement, code, severity)
 
-def exemplar_pass(statement):
-  nits = list(FutureCompatibility(PythonFile.from_statement(statement)).nits())
-  assert len(nits) == 0
+  def exemplar_pass(self, statement):
+    self.assertNoNits(statement)
 
-
-def test_xrange():
-  exemplar_fail('T603', Nit.ERROR, """
-    for k in range(5):
-      pass
-    for k in xrange(10):
-      pass
-  """)
-
-  exemplar_pass("""
-    for k in obj.xrange(10):
-      pass
-  """)
-
-
-def test_iters():
-  for function_name in FutureCompatibility.BAD_ITERS:
-    exemplar_fail('T602', Nit.ERROR, """
-      d = {1: 2, 2: 3, 3: 4}
-      for k in d.%s():
+  def test_xrange(self):
+    self.exemplar_fail('T603', Nit.ERROR, """
+      for k in range(5):
         pass
-      for k in d.values():
+      for k in xrange(10):
         pass
-    """ % function_name)
+    """)
 
-
-def test_names():
-  for class_name in FutureCompatibility.BAD_NAMES:
-    exemplar_fail('T604', Nit.ERROR, """
-      if isinstance(k, %s):
+    self.exemplar_pass("""
+      for k in obj.xrange(10):
         pass
-      if isinstance(k, str):
-        pass
-    """ % class_name)
+    """)
 
+  def test_iters(self):
+    for function_name in FutureCompatibility.BAD_ITERS:
+      self.exemplar_fail('T602', Nit.ERROR, """
+        d = {1: 2, 2: 3, 3: 4}
+        for k in d.%s():
+          pass
+        for k in d.values():
+          pass
+      """ % function_name)
 
-def test_metaclass():
-  exemplar_fail('T605', Nit.WARNING, """
-    class Singleton(object):
-      __metaclass__ = SingletonMetaclass
-      CONSTANT = 2 + 3
+  def test_names(self):
+    for class_name in FutureCompatibility.BAD_NAMES:
+      self.exemplar_fail('T604', Nit.ERROR, """
+        if isinstance(k, %s):
+          pass
+        if isinstance(k, str):
+          pass
+      """ % class_name)
 
-      def __init__(self):
-        pass
-  """)
+  def test_metaclass(self):
+    self.exemplar_fail('T605', Nit.WARNING, """
+      class Singleton(object):
+        __metaclass__ = SingletonMetaclass
+        CONSTANT = 2 + 3
+
+        def __init__(self):
+          pass
+    """)

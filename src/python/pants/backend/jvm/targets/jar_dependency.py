@@ -16,7 +16,7 @@ from pants.util.memo import memoized_property
 class JarDependency(object):
   """A pre-built Maven repository dependency."""
 
-  def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None, type_=None,
+  def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
                classifier=None, mutable=None, intransitive=False, excludes=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
@@ -31,7 +31,6 @@ class JarDependency(object):
       (specifying this parameter is unusual).
     :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
       will properly hyperlink {\ @link}s.
-    :param string type_: Artifact packaging type - Deprecated: use `ext` instead.
     :param string classifier: Classifier specifying the artifact variant to use.
     :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
       Maven -SNAPSHOT style artifacts in an active development/integration cycle.
@@ -44,11 +43,7 @@ class JarDependency(object):
     self._base_name = name
     self.rev = rev
     self.force = force
-
     self.ext = ext
-    if type_:
-      self._maybe_set_ext(type_)
-
     self.url = url
     self.apidocs = apidocs
     self.classifier = classifier
@@ -60,22 +55,6 @@ class JarDependency(object):
                                       can_be_none=True,
                                       key_arg='excludes',
                                       allowable=(tuple, list,)))
-
-  @deprecated(removal_version='0.0.54',
-              hint_message='Pass `ext` to `jar(...)` instead if the dependency has a non-standard '
-                           'extension.')
-  def _maybe_set_ext(self, type_):
-    if not self.ext:
-      self.ext = type_
-
-  @deprecated(removal_version='0.0.54',
-              hint_message='Pass an `excludes=[exclude(...), ...]` list to `jar(...)` '
-                           'instead.')
-  def exclude(self, org, name=None):
-    """Adds a transitive dependency of this jar to the exclude list."""
-
-    self.excludes += (Exclude(org, name),)
-    return self
 
   @property
   def name(self):
@@ -98,6 +77,7 @@ class JarDependency(object):
                         ext=self.ext)
 
   def cache_key(self):
+    excludes = [(e.org, e.name) for e in self.excludes]
     return stable_json_sha1(dict(org=self.org,
                                  name=self.name,
                                  rev=self.rev,
@@ -106,4 +86,5 @@ class JarDependency(object):
                                  url=self.url,
                                  classifier=self.classifier,
                                  transitive=self.transitive,
-                                 mutable=self.mutable))
+                                 mutable=self.mutable,
+                                 excludes=excludes,))

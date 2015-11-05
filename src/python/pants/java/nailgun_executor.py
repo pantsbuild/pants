@@ -151,7 +151,7 @@ class NailgunExecutor(Executor, ProcessManager):
         nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
         try:
           logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
-          return nailgun(main, cwd, *args)
+          return nailgun.execute(main, cwd, *args)
         except nailgun.NailgunError as e:
           self.terminate()
           raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'

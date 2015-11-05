@@ -30,6 +30,10 @@ cache:
   directories:
     - $HOME/.cache/pants
     - $HOME/.ivy2/pants
+    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
+    # using its own isolated cache:
+    #   https://github.com/pantsbuild/pants/issues/2485
+    - $HOME/.npm
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 

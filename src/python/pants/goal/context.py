@@ -13,7 +13,6 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.source_root import SourceRoot
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_graph import BuildGraph
@@ -22,7 +21,7 @@ from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
 from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.reporting.report import Report
-from pants.source.source_root import SourceRoots
+from pants.source.source_root import SourceRootConfig
 
 
 class Context(object):
@@ -71,7 +70,7 @@ class Context(object):
     self._target_base = target_base or Target
     self._products = Products()
     self._buildroot = get_buildroot()
-    self._source_roots = SourceRoots.instance()
+    self._source_roots = SourceRootConfig.global_instance().get_source_roots()
     self._lock = OwnerPrintingPIDLockFile(os.path.join(self._buildroot, '.pants.run'))
     self._java_sysprops = None  # Computed lazily.
     self.requested_goals = requested_goals or []
@@ -232,8 +231,11 @@ class Context(object):
     target_base = os.path.join(get_buildroot(), target_base or address.spec_path)
     if not os.path.exists(target_base):
       os.makedirs(target_base)
-    if not SourceRoot.find_by_path(target_base):
-      SourceRoot.register(target_base)
+      # TODO: Adding source roots on the fly like this is yucky, but hopefully this
+      # method will go away entirely under the new engine. It's primarily used for injecting
+      # synthetic codegen targets, and that isn't how codegen will work in the future.
+    if not self.source_roots.find_by_path(target_base):
+      self.source_roots.add_source_root(target_base)
     if dependencies:
       dependencies = [dep.address for dep in dependencies]
 

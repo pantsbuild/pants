@@ -9,7 +9,6 @@ import json
 import os
 from textwrap import dedent
 
-from pants.base.source_root import SourceRoot
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -34,27 +33,9 @@ class NpmResolveTest(TaskTestBase):
     task = self.create_task(self.context(target_roots=[target]))
     task.execute()
 
-  def test_resolve_remote(self):
-    SourceRoot.register('3rdparty/node', NodeRemoteModule)
-    typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
-
-    context = self.context(target_roots=[typ])
-    task = self.create_task(context)
-    task.execute()
-
-    node_paths = context.products.get_data(NodePaths)
-    node_path = node_paths.node_path(typ)
-    self.assertIsNotNone(node_path)
-
-    script = 'var typ = require("typ"); console.log("type of boolean is: " + typ.BOOLEAN)'
-    out = task.node_distribution.node_command(args=['--eval', script]).check_output(cwd=node_path)
-    self.assertIn('type of boolean is: boolean', out)
-
   def test_resolve_simple(self):
-    SourceRoot.register('3rdparty/node', NodeRemoteModule)
     typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
 
-    SourceRoot.register('src/node', NodeModule)
     self.create_file('src/node/util/util.js', contents=dedent("""
       var typ = require('typ');
       console.log("type of boolean is: " + typ.BOOLEAN);
@@ -77,17 +58,15 @@ class NpmResolveTest(TaskTestBase):
     self.assertIn('type of boolean is: boolean', out)
 
   def test_resolve_simple_graph(self):
-    SourceRoot.register('3rdparty/node', NodeRemoteModule)
     typ1 = self.make_target(spec='3rdparty/node:typ1',
                             target_type=NodeRemoteModule,
                             package_name='typ',
-                            version='0.6.1')
+                            version='0.6.x')
     typ2 = self.make_target(spec='3rdparty/node:typ2',
                             target_type=NodeRemoteModule,
                             package_name='typ',
-                            version='0.6.x')
+                            version='0.6.1')
 
-    SourceRoot.register('src/node', NodeModule)
     self.create_file('src/node/util/typ.js', contents=dedent("""
       var typ = require('typ');
       module.exports = {
@@ -119,7 +98,14 @@ class NpmResolveTest(TaskTestBase):
     node_path = node_paths.node_path(leaf)
     self.assertIsNotNone(node_paths.node_path(leaf))
 
-    # Verify dependencies are de-duped
+    # Verify the 'typ' package is not duplicated under leaf. The target dependency tree is:
+    # leaf
+    #   typ2 (0.6.1)
+    #   util
+    #     typ1 (0.6.x)
+    # If we install leaf normally, NPM will install the typ2 target (typ version 0.6.1) at the top
+    # level under leaf, and then not install the typ1 target (typ version 0.6.x) under util
+    # because the dependency is already satisfied.
     typ_packages = []
     for root, _, files in os.walk(node_path):
       for f in files:
@@ -128,9 +114,9 @@ class NpmResolveTest(TaskTestBase):
             package = json.load(fp)
             if 'typ' == package['name']:
               typ_packages.append(os.path.relpath(os.path.join(root, f), node_path))
-    self.assertEqual(1, len(typ_packages),
-                     'Expected to find exactly 1 de-duped `typ` package, but found these:\n\t{}'
-                     .format('\n\t'.join(sorted(typ_packages))))
+              self.assertEqual(1, len(typ_packages),
+                              'Expected to find exactly 1 de-duped `typ` package, but found these:'
+                              '\n\t{}'.format('\n\t'.join(sorted(typ_packages))))
 
     script_path = os.path.join(node_path, 'leaf.js')
     out = task.node_distribution.node_command(args=[script_path]).check_output()
@@ -139,8 +125,6 @@ class NpmResolveTest(TaskTestBase):
     self.assertIn('type of bool is: boolean', lines)
 
   def test_resolve_preserves_package_json(self):
-    SourceRoot.register('src/node', NodeModule)
-
     util = self.make_target(spec='src/node/util',
                             target_type=NodeModule,
                             sources=[],

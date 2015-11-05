@@ -3,12 +3,10 @@
 
 Target(
   name='thrift1',
-  sources=[]
 )
 
 Target(
   name='thrift2',
-  sources=[],
   dependencies=[
     ':thrift1',
   ]
@@ -18,8 +16,8 @@ Target(
 # can always be built up via a sequence of objects extending or merging others.
 Target(
   name='java1',
-  merges=':production_thrift_configs',
-  sources=[],
+  merges=[':production_thrift_configs'],
+  sources={},
   dependencies=[
     ':thrift2',
   ],
