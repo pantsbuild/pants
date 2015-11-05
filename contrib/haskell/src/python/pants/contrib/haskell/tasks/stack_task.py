@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 
 from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
@@ -22,8 +22,6 @@ from pants.contrib.haskell.targets.haskell_package import HaskellPackage
 
 class StackTask(Task):
   """Abstract class that all other `stack` tasks inherit from"""
-
-  __metaclass__ = ABCMeta
 
   @property
   def cache_target_dirs(self):
