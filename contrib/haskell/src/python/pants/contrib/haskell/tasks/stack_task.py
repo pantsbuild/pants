@@ -21,7 +21,7 @@ from pants.contrib.haskell.targets.haskell_package import HaskellPackage
 
 
 class StackTask(Task):
-  """ Abstract class that all other `stack` tasks inherit from """
+  """Abstract class that all other `stack` tasks inherit from"""
 
   __metaclass__ = ABCMeta
 
