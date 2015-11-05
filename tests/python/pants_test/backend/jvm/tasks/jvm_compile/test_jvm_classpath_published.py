@@ -69,11 +69,10 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
 
       classpath = sorted(os.listdir(target_classpath_output))[2]
       with safe_open(os.path.join(target_classpath_output, classpath)) as classpath_file:
-        print(os.path.join(target_classpath_output, classpath))
+        # Assert there is only one line ending with a newline
         self.assertListEqual(
-          [line.rstrip('\n') for line in classpath_file.readlines()],
+          classpath_file.readlines(),
           [
-            os.path.join(jar_dir, 'z2.jar'),
-            os.path.join(jar_dir, 'z3.jar')
+            os.pathsep.join([os.path.join(jar_dir, 'z2.jar'), os.path.join(jar_dir, 'z3.jar')]) + '\n'
           ]
         )

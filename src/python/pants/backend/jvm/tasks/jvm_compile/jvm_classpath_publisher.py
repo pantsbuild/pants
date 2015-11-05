@@ -46,11 +46,14 @@ class RuntimeClasspathPublisher(Task):
       if len(classpath_entries_for_target) > 0:
         safe_mkdir(folder_for_symlinks)
 
+        classpath = []
+        for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
+          classpath.append(entry.path)
+          file_name = os.path.basename(entry.path)
+          # Avoid name collisions
+          symlink_name = '{}-{}'.format(index, file_name)
+          os.symlink(entry.path, os.path.join(folder_for_symlinks, symlink_name))
+
         with safe_open(os.path.join(folder_for_symlinks, 'classpath.txt'), 'w') as classpath_file:
-          for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
-            classpath_file.write(entry.path)
-            classpath_file.write('\n')
-            file_name = os.path.basename(entry.path)
-            # Avoid name collisions
-            symlink_name = '{}-{}'.format(index, file_name)
-            os.symlink(entry.path, os.path.join(folder_for_symlinks, symlink_name))
+          classpath_file.write(os.pathsep.join(classpath))
+          classpath_file.write('\n')
