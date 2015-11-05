@@ -17,6 +17,8 @@ from pants.contrib.haskell.tasks.stack_build import StackBuild
 def build_file_aliases():
   return BuildFileAliases(
     targets={
+      'cabal': Cabal,
+      'hackage': Hackage,
       'stackage': Stackage,
     }
   )
