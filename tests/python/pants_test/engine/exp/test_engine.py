@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 from contextlib import closing
-from multiprocessing.pool import MaybeEncodingError
 
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import Engine, LocalMultiprocessEngine, LocalSerialEngine
@@ -98,5 +97,11 @@ class EngineTest(unittest.TestCase):
     engine = LocalMultiprocessEngine(self.scheduler)
     build_request = BuildRequest(goals=['unpickleable_result'],
                                  addressable_roots=[self.java.address])
-    with self.assertRaises(MaybeEncodingError):
+
+    # The pool raises `multiprocessing.pool.MaybeEncodingError`, but this type is hidden via
+    # `__all__` in `multiprocessing/__init__.py`.  As such we just verify the exception raised is
+    # from within the `multiprocessing` package.
+    with self.assertRaises(Exception) as exc:
       engine.execute(build_request)
+    root_module, _, _ = exc.exception.__module__.partition('.')
+    self.assertEqual('multiprocessing', root_module)
