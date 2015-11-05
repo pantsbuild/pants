@@ -156,7 +156,8 @@ class Parser(object):
       def add_flag_val(v):
         if v is None:
           if implicit_value is None:
-            raise ParseError('Missing value for command line flag {}'.format(arg))
+            raise ParseError('Missing value for command line flag {} in {}'.format(
+              arg, self._scope_str()))
           else:
             flag_vals.append(implicit_value)
         else:
@@ -272,7 +273,7 @@ class Parser(object):
       for arg in args:
         existing_scope = self._parent_parser._existing_scope(arg)
         if existing_scope is not None:
-          raise Shadowing(self.scope, arg, outer_scope=_scope_str(existing_scope))
+          raise Shadowing(self.scope, arg, outer_scope=self._scope_str(existing_scope))
     self._known_args.update(args)
 
   def _check_deprecated(self, dest, kwargs):
@@ -292,6 +293,10 @@ class Parser(object):
     'fingerprint', 'deprecated_version', 'deprecated_hint', 'fromfile'
   }
 
+  _allowed_actions = {
+    'store', 'store_true', 'store_false', 'append'
+  }
+
   def _validate(self, args, kwargs):
     """Validate option registration arguments."""
     def error(exception_type, arg_name=None, **msg_kwargs):
@@ -299,7 +304,6 @@ class Parser(object):
         arg_name = args[0] if args else '<unknown>'
       raise exception_type(self.scope, arg_name, **msg_kwargs)
 
-    scope_str = self._scope_str()
     if not args:
       error(NoOptionNames)
     # validate args.
@@ -310,7 +314,7 @@ class Parser(object):
         error(OptionNameDoubleDash, arg_name=arg)
 
     # Validate kwargs.
-    if kwargs.get('action', 'store') not in {'store', 'store_true', 'store_false', 'append'}:
+    if kwargs.get('action', 'store') not in self._allowed_actions:
       error(InvalidAction, action=kwargs['action'])
 
     if is_boolean_flag(kwargs) and 'type' in kwargs:
@@ -395,7 +399,7 @@ class Parser(object):
             return fp.read().strip()
         except IOError as e:
           raise self.FromfileError('Failed to read {} in {} from file {}: {}'.format(
-            dest, self._scope_str() ,fromfile, e))
+            dest, self._scope_str(), fromfile, e))
       else:
         # Support a literal @ for fromfile values via @@.
         return val_str[1:] if is_fromfile and val_str.startswith('@@') else val_str
@@ -424,6 +428,8 @@ class Parser(object):
 
     config_details = 'in {}'.format(config_source_file) if config_source_file else None
 
+    # Note: ranked_vals is guaranteed to have at least one element, and none of the values
+    # of any of its elements will be None.
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(
       flag_val, env_val, config_val, hardcoded_val, default))))
     choices = kwargs.get('choices')
@@ -441,9 +447,8 @@ class Parser(object):
       return val
 
     if action == 'append':
-      non_none_ranked_vals = filter(None, ranked_vals)
-      merged_rank = non_none_ranked_vals[-1].rank
-      merged_val = [check(val) for vals in non_none_ranked_vals for val in vals.value]
+      merged_rank = ranked_vals[-1].rank
+      merged_val = [check(val) for vals in ranked_vals for val in vals.value]
       return RankedValue(merged_rank, merged_val)
     else:
       map(lambda rv: check(rv.value), ranked_vals)
@@ -463,12 +468,9 @@ class Parser(object):
   def _freeze(self):
     self._frozen = True
 
-  def _scope_str(self):
-    return _scope_str(self.scope)
+  def _scope_str(self, scope=None):
+    scope = scope or self.scope
+    return 'global scope' if scope == GLOBAL_SCOPE else "scope '{}'".format(scope)
 
   def __str__(self):
     return 'Parser({})'.format(self._scope)
-
-
-def _scope_str(scope):
-  return 'global scope' if scope == GLOBAL_SCOPE else "scope '{}'".format(scope)

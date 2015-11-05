@@ -202,6 +202,9 @@ class OptionsTest(unittest.TestCase):
                           config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
 
+    options = self._parse('./pants')
+    self.assertEqual([], options.for_global_scope().y)
+
     options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
     self.assertEqual(['123','456'], options.for_global_scope().config_override)
 
@@ -350,24 +353,22 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual([42, 99], options.for_global_scope().int_choices)
 
   def test_validation(self):
-    def check(expected_error, *args, **kwargs):
+    def assertError(expected_error, *args, **kwargs):
       with self.assertRaises(expected_error):
         options = Options.create(args=[], env={}, config=self._create_config({}),
                                  known_scope_infos=[], option_tracker=OptionTracker())
         options.register(GLOBAL_SCOPE, *args, **kwargs)
         options.for_global_scope()
 
-    # Note: it's a little fragile to test for specific strings, but the alternative is to create
-    # a large number of RegistrationError subclasses, and that seems like overkill in this case.
-    check(NoOptionNames)
-    check(OptionNameDash, 'badname')
-    check(OptionNameDoubleDash, '-badname')
-    check(InvalidAction, '--foo', action='store_const')
-    check(InvalidKwarg, '--foo', badkwarg=42)
-    check(ImplicitValIsNone, '--foo', implicit_value=None)
-    check(BooleanOptionType, '--foo', action='store_true', type=int)
-    check(BooleanOptionImplicitVal, '--foo', action='store_true', implicit_value=False)
-    check(BooleanOptionNameWithNo, '--no-foo', action='store_true')
+    assertError(NoOptionNames)
+    assertError(OptionNameDash, 'badname')
+    assertError(OptionNameDoubleDash, '-badname')
+    assertError(InvalidAction, '--foo', action='store_const')
+    assertError(InvalidKwarg, '--foo', badkwarg=42)
+    assertError(ImplicitValIsNone, '--foo', implicit_value=None)
+    assertError(BooleanOptionType, '--foo', action='store_true', type=int)
+    assertError(BooleanOptionImplicitVal, '--foo', action='store_true', implicit_value=False)
+    assertError(BooleanOptionNameWithNo, '--no-foo', action='store_true')
 
   def test_frozen_registration(self):
     options = Options.create(args=[], env={}, config=self._create_config({}),
