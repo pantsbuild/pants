@@ -10,14 +10,11 @@ import re
 import time
 from textwrap import dedent
 
-from twitter.common.dirutil import safe_rmtree
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
 from pants.backend.codegen.tasks.antlr_gen import AntlrGen
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
@@ -74,13 +71,9 @@ class AntlrGenTest(NailgunTaskTestBase):
     context = self.create_context()
     task = self.prepare_execute(context)
     target_workdir_fun = target_workdir_fun or (lambda x: safe_mkdtemp(dir=x))
-    # target_workdir = target_workdir_fun(task.workdir)
-    # temporary fix for target_workdir
-    target_workdir = os.path.abspath(task.workdir+"/../../_GENERATE_WORKDIR")
-    safe_rmtree(target_workdir)
-    os.mkdir(target_workdir)
-    target_workdir = target_workdir_fun(target_workdir)
-    # end of fix
+    # do not use task.workdir here, because when we calculating hash for synthetic target
+    # we need persistent source paths in terms of relative position to build root
+    target_workdir = target_workdir_fun(self.build_root)
 
     # Generate code, then create a synthetic target.
     task.execute_codegen(target, target_workdir)
