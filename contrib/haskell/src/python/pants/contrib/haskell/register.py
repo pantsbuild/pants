@@ -23,5 +23,6 @@ def build_file_aliases():
     }
   )
 
+
 def register_goals():
   TaskRegistrar(name='stack-build', action=StackBuild).install('compile')
