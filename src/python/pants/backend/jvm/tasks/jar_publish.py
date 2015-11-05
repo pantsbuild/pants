@@ -701,7 +701,7 @@ class JarPublish(ScmPublishMixin, JarTask):
           ))
         newentry = oldentry.with_sem_ver(sem_ver)
 
-      newfingerprint = self.fingerprint(target, fingerprint_internal)
+      newfingerprint = self.entry_fingerprint(target, fingerprint_internal)
       newentry = newentry.with_sha_and_fingerprint(head_sha, newfingerprint)
       no_changes = newentry.fingerprint == oldentry.fingerprint
 
@@ -848,7 +848,7 @@ class JarPublish(ScmPublishMixin, JarTask):
     return OrderedSet(filter(exportable,
                              reversed(sort_targets(filter(exportable, candidates)))))
 
-  def fingerprint(self, target, fingerprint_internal):
+  def entry_fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
     sha.update(target.invalidation_hash())
 
