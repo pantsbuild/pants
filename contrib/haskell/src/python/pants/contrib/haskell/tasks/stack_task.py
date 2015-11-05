@@ -41,8 +41,7 @@ class StackTask(Task):
 
   @staticmethod
   def make_stack_yaml(target):
-    """
-    Build a `stack.yaml` file from a root target's dependency graph:
+    """Build a `stack.yaml` file from a root target's dependency graph:
 
     * Every `stackage` target is currently ignored since they are already covered
       by the `resolver` field
