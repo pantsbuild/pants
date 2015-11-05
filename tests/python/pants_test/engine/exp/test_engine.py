@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 from contextlib import closing
+from multiprocessing.pool import MaybeEncodingError
 
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import Engine, LocalMultiprocessEngine, LocalSerialEngine
@@ -43,6 +44,10 @@ class EngineTest(unittest.TestCase):
     with closing(LocalMultiprocessEngine(self.scheduler)) as engine:
       self.assert_engine(engine)
 
+  def test_multiprocess_engine_single_process(self):
+    with closing(LocalMultiprocessEngine(self.scheduler, pool_size=1)) as engine:
+      self.assert_engine(engine)
+
   def assert_engine_fail_slow(self, engine):
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.java.address, self.java_fail_slow.address])
@@ -72,3 +77,26 @@ class EngineTest(unittest.TestCase):
   def test_multiprocess_engine_fail_slow(self):
     engine = LocalMultiprocessEngine(self.scheduler)
     self.assert_engine_fail_slow(engine)
+
+  def test_multiprocess_engine_fail_slow_single_process(self):
+    engine = LocalMultiprocessEngine(self.scheduler, pool_size=1)
+    self.assert_engine_fail_slow(engine)
+
+  def test_multiprocess_unpicklable_inputs(self):
+    engine = LocalMultiprocessEngine(self.scheduler)
+    build_request = BuildRequest(goals=['unpickleable_inputs'],
+                                 addressable_roots=[self.java.address])
+
+    # PickleError is a bit awkward to test for since both pickle and cPickle export unrelated
+    # PicklingError exception types.  Instead of guessing which pickling module is in-use by
+    # multiprocessing we just test the name.
+    with self.assertRaises(Exception) as exc:
+      engine.execute(build_request)
+    self.assertEqual('PicklingError', type(exc.exception).__name__)
+
+  def test_multiprocess_unpicklable_outputs(self):
+    engine = LocalMultiprocessEngine(self.scheduler)
+    build_request = BuildRequest(goals=['unpickleable_result'],
+                                 addressable_roots=[self.java.address])
+    with self.assertRaises(MaybeEncodingError):
+      engine.execute(build_request)

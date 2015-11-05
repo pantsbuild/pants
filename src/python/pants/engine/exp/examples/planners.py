@@ -433,6 +433,43 @@ class Scalac(PrintingTask):
     return super(Scalac, self).execute(sources=sources, classpath=classpath)
 
 
+# TODO(John Sirois): When https://github.com/pantsbuild/pants/issues/2413 is resolved, move the
+# unpickleable input and output test planners below to engine test.  There will be less setup
+# required at that point since no target addresses will need to be supplied in the build_request.
+class UnpickleableInputsPlanner(TaskPlanner):
+  @property
+  def goal_name(self):
+    return 'unpickleable_inputs'
+
+  @property
+  def product_types(self):
+    # A convenient product type only, will never be used outside engine internals.
+    yield Sources.of('unpickleable_inputs')
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
+    # Nested functions like this lambda are unpicklable.
+    return Plan(lambda: None, (subject,))
+
+
+def unpickable_result_func():
+  # Nested functions like this lambda are unpicklable.
+  return lambda: None
+
+
+class UnpickleableResultPlanner(TaskPlanner):
+  @property
+  def goal_name(self):
+    return 'unpickleable_result'
+
+  @property
+  def product_types(self):
+    # A convenient product type only, will never be used outside engine internals.
+    yield Sources.of('unpickleable_result')
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
+    return Plan(unpickable_result_func, (subject,))
+
+
 def setup_json_scheduler(build_root):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
@@ -452,11 +489,12 @@ def setup_json_scheduler(build_root):
                               parser=json_parser))
 
   planners = Planners([ApacheThriftPlanner(),
+                       BuildPropertiesPlanner(),
                        GlobalIvyResolvePlanner(),
                        JavacPlanner(),
                        ScalacPlanner(),
                        ScroogePlanner(),
-                       BuildPropertiesPlanner()
-                       ])
+                       UnpickleableInputsPlanner(),
+                       UnpickleableResultPlanner()])
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler
