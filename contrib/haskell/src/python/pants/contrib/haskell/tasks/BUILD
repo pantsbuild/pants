@@ -9,9 +9,7 @@ python_library(
     'stack_task.py',
   ],
   dependencies=[
-    'contrib/haskell/src/python/pants/contrib/haskell/targets:cabal',
-    'contrib/haskell/src/python/pants/contrib/haskell/targets:hackage',
-    'contrib/haskell/src/python/pants/contrib/haskell/targets:haskell_package',
+    'contrib/haskell/src/python/pants/contrib/haskell/targets',
     'src/python/pants/backend/core/tasks:common',
   ],
 )
