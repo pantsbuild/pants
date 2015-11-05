@@ -78,14 +78,14 @@ class StackTask(Task):
     """
     for dependency in filter(StackTask.is_haskell_package, target.closure()):
       if target.resolver != dependency.resolver:
-        raise TaskError('''
+        raise TaskError("""
 Every package in a Haskell build graph must use the same resolver.
 
 Root target : {root}
   - Resolver: {root_resolver}
 Dependency  : {dep}
   - Resolver: {dep_resolver}
-'''.strip().format(root=target.address.spec,
+""".strip().format(root=target.address.spec,
                    root_resolver=target.resolver,
                    dep=dependency.address.spec,
                    dep_resolver=dependency.resolver))
@@ -158,7 +158,7 @@ Dependency  : {dep}
       with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL]) as workunit:
         subprocess.check_call(args)
     except subprocess.CalledProcessError:
-      raise TaskError('''
+      raise TaskError("""
 `stack` subprocess failed with the following inputs:
 
 Arguments: {args}
@@ -167,7 +167,7 @@ Contents of {stack_yaml_path}:
 ```
 {yaml}
 ```
-'''.strip().format(stack_yaml_path=stack_yaml_path,
+""".strip().format(stack_yaml_path=stack_yaml_path,
                    yaml=yaml,
                    args=args))
       raise
