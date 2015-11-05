@@ -218,7 +218,17 @@ class Parser(object):
     # Then yield our directly-registered options.
     # This must come after yielding inherited recursive options, so we can detect shadowing.
     for args, kwargs in self._option_registrations:
-      normalized_kwargs = normalize_kwargs(args, kwargs)
+      try:
+        normalized_kwargs = normalize_kwargs(kwargs)
+      except ParseError as e:
+        # Re-raise a new exception with context on the option being processed at the time of error.
+        # Note that other exception types can be raised here that are caught by ParseError (e.g.
+        # BooleanConversionError), hence we reference the original exception type by exc.__class__.
+        raise e.__class__(
+          'Error normalizing option: {} (may also be from PANTS_* environment variables):\n{}: {}'
+          .format(args[0], e.__class__.__name__, e)
+        )
+
       if 'recursive' in normalized_kwargs:
         # If we're the original registrar, make sure we can distinguish that.
         normalized_kwargs['recursive_root'] = True
