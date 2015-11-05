@@ -131,7 +131,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
     with self.temporary_workdir() as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,  **kwargs)
+      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
   @contextmanager
   def pants_results(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
@@ -145,7 +145,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
     with self.temporary_workdir() as workdir:
-      yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,  **kwargs)
+      yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
   def bundle_and_run(self, target, bundle_name, args=None):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.

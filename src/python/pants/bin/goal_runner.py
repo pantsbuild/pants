@@ -11,9 +11,10 @@ import sys
 import pkg_resources
 
 from pants.backend.core.tasks.task import QuietTaskMixin
-from pants.base.build_environment import get_scm
+from pants.base.build_environment import get_scm, pants_version
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.exceptions import BuildConfigurationError
 from pants.base.scm_build_file import ScmBuildFile
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.extension_loader import load_plugins_and_backends
@@ -108,11 +109,12 @@ class OptionsInitializer(object):
     bootstrap_options = options_bootstrapper.get_bootstrap_options()
     global_bootstrap_options = bootstrap_options.for_global_scope()
 
-    # The pants_version may be set in pants.ini for bootstrapping, so we make sure the user actually
-    # requested the version on the command line before deciding to print the version and exit.
-    if global_bootstrap_options.is_flagged('pants_version'):
-      print(global_bootstrap_options.pants_version)
-      self._exiter(0)
+    if global_bootstrap_options.pants_version != pants_version():
+      raise BuildConfigurationError(
+        'Version mismatch: Requested version was {}, our version is {}.'.format(
+          global_bootstrap_options.pants_version, pants_version()
+        )
+      )
 
     # Get logging setup prior to loading backends so that they can log as needed.
     self._setup_logging(global_bootstrap_options)

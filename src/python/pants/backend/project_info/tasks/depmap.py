@@ -46,6 +46,8 @@ class Depmap(ConsoleTask):
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
     register('--path-to',
+             deprecated_version='0.0.59',
+             deprecated_hint='Use the `path` and `paths` goal to find paths between targets.',
              help='Show only items on the path to the given target. This is a no-op for --graph.')
 
   def __init__(self, *args, **kwargs):
@@ -61,7 +63,6 @@ class Depmap(ConsoleTask):
     self.is_graph = self.get_options().graph
     self.should_tree = self.get_options().tree
     self.show_types = self.get_options().show_types
-    self.path_to = self.get_options().path_to
     self.separator = self.get_options().separator
     self.target_aliases_map = None
 
@@ -120,18 +121,11 @@ class Depmap(ConsoleTask):
       if self.is_minimal and dep_id in outputted:
         return
 
-      if self.path_to:
-        # If we hit the search target from self.path_to, yield the stack items and bail.
-        if dep_id == self.path_to:
-          for dep_id, indent in stack + [(dep_id, indent)]:
-            yield make_line(dep_id, indent)
-          return
-      else:
-        if self.output_candidate(internal):
-          yield make_line(dep_id,
-                          0 if self.is_external_only else indent,
-                          is_dupe=dep_id in outputted)
-          outputted.add(dep_id)
+      if self.output_candidate(internal):
+        yield make_line(dep_id,
+                        0 if self.is_external_only else indent,
+                        is_dupe=dep_id in outputted)
+        outputted.add(dep_id)
 
       for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
         for item in output_deps(sub_dep, indent + 1, outputted, stack + [(dep_id, indent)]):

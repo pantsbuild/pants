@@ -263,3 +263,24 @@ def get_basedir(path):
     get_basedir('foo') --> 'foo'
   """
   return path[:path.index(os.sep)] if os.sep in path else path
+
+
+def rm_rf(name):
+  """Remove a file or a directory similarly to running `rm -rf <name>` in a UNIX shell.
+
+  :param str name: the name of the file or directory to remove.
+  :raises: OSError on error.
+  """
+  if not os.path.exists(name):
+    return
+
+  try:
+    # Avoid using safe_rmtree so we can detect failures.
+    shutil.rmtree(name)
+  except OSError as e:
+    if e.errno == errno.ENOTDIR:
+      # 'Not a directory', but a file. Attempt to os.unlink the file, raising OSError on failure.
+      safe_delete(name)
+    elif e.errno != errno.ENOENT:
+      # Pass on 'No such file or directory', otherwise re-raise OSError to surface perm issues etc.
+      raise

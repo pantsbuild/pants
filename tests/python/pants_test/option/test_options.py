@@ -58,7 +58,7 @@ class OptionsTest(unittest.TestCase):
     def register_global(*args, **kwargs):
       options.register(GLOBAL_SCOPE, *args, **kwargs)
 
-    register_global('-v', '--verbose', action='store_true', help='Verbose output.', recursive=True)
+    register_global('-z', '--verbose', action='store_true', help='Verbose output.', recursive=True)
     register_global('-n', '--num', type=int, default=99, recursive=True, fingerprint=True)
     register_global('--y', action='append', type=int)
     register_global('--config-override', action='append')
@@ -161,7 +161,7 @@ class OptionsTest(unittest.TestCase):
     # Some basic smoke tests.
     options = self._parse('./pants --verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
-    options = self._parse('./pants -v compile path/to/tgt')
+    options = self._parse('./pants -z compile path/to/tgt')
     self.assertEqual(['path/to/tgt'], options.target_specs)
     self.assertEqual(True, options.for_global_scope().verbose)
 
@@ -172,7 +172,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(True, options.for_scope('compile').verbose)
     self.assertEqual(False, options.for_scope('compile.java').verbose)
 
-    options = self._parse('./pants --verbose compile --no-verbose compile.java -v test '
+    options = self._parse('./pants --verbose compile --no-verbose compile.java -z test '
                           'test.junit --no-verbose')
     self.assertEqual(True, options.for_global_scope().verbose)
     self.assertEqual(False, options.for_scope('compile').verbose)

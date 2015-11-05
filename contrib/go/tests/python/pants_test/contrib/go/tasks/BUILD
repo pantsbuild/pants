@@ -13,6 +13,7 @@ target(
     ':go_buildgen',
     ':go_compile',
     ':go_fetch',
+    ':go_go',
     ':go_workspace_task',
   ]
 )
@@ -88,6 +89,17 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_fetch',
     'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
+  name='go_go',
+  sources=['test_go_go.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_go',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]

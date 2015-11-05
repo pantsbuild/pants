@@ -14,7 +14,7 @@ class PlainTextReporterBase(Reporter):
   """Base class for plain-text reporting to stdout."""
 
   def generate_epilog(self, settings):
-    ret = ''
+    ret = b''
     if settings.timing:
       ret += b'\nCumulative Timings\n==================\n{}\n'.format(
         self._format_aggregated_timings(self.run_tracker.cumulative_timings)
@@ -24,6 +24,7 @@ class PlainTextReporterBase(Reporter):
     if settings.cache_stats:
       ret += b'\nCache Stats\n===========\n{}\n'.format(
         self._format_artifact_cache_stats(self.run_tracker.artifact_cache_stats))
+    ret += b'\n'
     return ret
 
   def _format_aggregated_timings(self, aggregated_timings):

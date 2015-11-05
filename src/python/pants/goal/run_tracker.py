@@ -121,7 +121,7 @@ class RunTracker(Subsystem):
     self._background_worker_pool = None
     self._background_root_workunit = None
 
-    # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring)
+    # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring).
     SubprocPool.foreground()
 
     self._aborted = False
@@ -284,7 +284,7 @@ class RunTracker(Subsystem):
 
     SubprocPool.shutdown(self._aborted)
 
-    # Run a dummy work unit to write out one last timestamp
+    # Run a dummy work unit to write out one last timestamp.
     with self.new_workunit("complete"):
       pass
 
