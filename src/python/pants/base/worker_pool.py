@@ -194,10 +194,12 @@ class SubprocPool(object):
     signal.signal(signal.SIGINT, lambda *args: sys.exit())
 
   @classmethod
-  def foreground(cls):
+  def foreground(cls, processes=None):
     with cls._lock:
       if cls._pool is None:
-        cls._pool = multiprocessing.Pool(initializer=SubprocPool.worker_init)
+        if processes is None:
+          processes = multiprocessing.cpu_count()
+        cls._pool = multiprocessing.Pool(processes=processes, initializer=SubprocPool.worker_init)
       return cls._pool
 
   @classmethod

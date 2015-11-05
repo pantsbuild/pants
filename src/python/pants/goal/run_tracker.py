@@ -122,7 +122,7 @@ class RunTracker(Subsystem):
     self._background_root_workunit = None
 
     # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring).
-    SubprocPool.foreground()
+    SubprocPool.foreground(self._num_foreground_workers)
 
     self._aborted = False
 
