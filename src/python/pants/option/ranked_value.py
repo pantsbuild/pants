@@ -118,14 +118,6 @@ class RankedValue(object):
   def value(self):
     return self._value
 
-  def __copy__(self):
-    # The only time copy.copy() is called on a RankedValue is when the action is 'append', in which
-    # case argparse copies the default value (which will be a RankedValue wrapping a list), appends
-    # to it, and then sets the copy as the new value.
-    # We expect argparse to set regular values, not RankedValue instances, so we return a copy of
-    # the underlying list here.
-    return copy.copy(self._value)
-
   def __eq__(self, other):
     return self._rank == other._rank and self._value == other._value
 

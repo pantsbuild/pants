@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.util.contextutil import temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
@@ -35,7 +34,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
         pants_run = self.run_test_compile(
           workdir, cachedir, target,
-          extra_args=['--no-color'], clean_all=True
+          extra_args=['--no-colors'], clean_all=True
         )
         self.assertIn('[warn] import sun.security.x509.X500Name;', pants_run.stdout_data)
         self.assertIn('[error]     System2.out.println("Hello World!");', pants_run.stdout_data)
