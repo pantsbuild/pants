@@ -197,8 +197,7 @@ class SubprocPool(object):
   def foreground(cls, processes=None):
     with cls._lock:
       if cls._pool is None:
-        if processes is None:
-          processes = multiprocessing.cpu_count()
+        processes = processes or multiprocessing.cpu_count()
         cls._pool = multiprocessing.Pool(processes=processes, initializer=SubprocPool.worker_init)
       return cls._pool
 
