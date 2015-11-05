@@ -9,7 +9,6 @@ import collections
 import functools
 import multiprocessing
 from abc import abstractmethod
-from multiprocessing.pool import AsyncResult
 
 from twitter.common.collections.orderedset import OrderedSet
 
@@ -352,12 +351,25 @@ class LocalMultiprocessEngine(Engine):
       self._pending_results = []
       self._products_by_promise = {}
 
+    class CompletedResult(object):
+      """An already satisfied AsyncResult.
+
+      NB: This is duck-typed just enough for our use of AsyncResult objects.  The actual type
+      is hidden by the multiprocessing package, although it is in the public docs of the package.
+      """
+
+      def __init__(self, result):
+        self._result = result
+
+      def get(self, timeout=None):
+        return self._result
+
     def submit(self, promise, plan):
       inputs = self.collect_inputs(self._products_by_promise, promise, plan)
       if isinstance(inputs, FailedToProduce):
         # Short circuit plan execution since we don't have all the inputs it needs.
         result = (promise, plan.subjects, inputs)
-        self._pending_results.append(result)
+        self._pending_results.append(self.CompletedResult(result))
       else:
         func, args, kwargs = plan.bind(inputs)
 
@@ -383,17 +395,20 @@ class LocalMultiprocessEngine(Engine):
         self._pending_results.append(async_result)
 
     def _gather_one_pending(self):
-      # We poll futures here for 3 reasons:
-      # 1. The small timeout allows us to process early-finishers early and keep the process pool
-      #    ~maximally occupied.
-      # 2. The small timeout avoids busy-waiting and burning CPU on the main thread.
-      # 3. Foreground collection of results from the main thread allows for background errors to
+      # Ideally we'd be using an apply_async callback and a queue to signal results as they
+      # complete, quickest 1st, but that leads to inscrutable hangs when there are pickling errors.
+      # So we poll futures here for 3 reasons:
+      # 1. Foreground collection of results from the main thread allows for background errors to
       #    propagate to the foreground making debugging easier.  Notably, pickling errors on the
       #    internal queues used by the multiprocessing Pool are exposed directly.
+      # 2. The hopefully small enough timeout allows us to process early-finishers early and keep
+      #    the process pool ~maximally occupied.
+      # 3. The hopefully not too small timeout avoids busy-waiting and burning CPU on the main
+      #    thread.
       while True:
         for index, result in enumerate(self._pending_results):
           try:
-            result = result.get(timeout=.1) if isinstance(result, AsyncResult) else result
+            result = result.get(timeout=.1)
             self._pending_results.pop(index)
             return result
           except multiprocessing.TimeoutError:
