@@ -11,7 +11,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher import RuntimeClasspathPublisher
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import touch
+from pants.util.dirutil import safe_open, touch
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -60,3 +60,20 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
         os.path.realpath(os.path.join(target_classpath_output, sorted(os.listdir(target_classpath_output))[0])),
         os.path.join(jar_dir, 'z2.jar')
       )
+
+      # Add a different classpath entry
+      touch(os.path.join(jar_dir, 'z3.jar'))
+      runtime_classpath.add_for_target(target, [(None, os.path.join(jar_dir, 'z3.jar'))])
+      task.execute()
+      self.assertEqual(len(os.listdir(target_classpath_output)), 3)
+
+      classpath = sorted(os.listdir(target_classpath_output))[2]
+      with safe_open(os.path.join(target_classpath_output, classpath)) as classpath_file:
+        print(os.path.join(target_classpath_output, classpath))
+        self.assertListEqual(
+          [line.rstrip('\n') for line in classpath_file.readlines()],
+          [
+            os.path.join(jar_dir, 'z2.jar'),
+            os.path.join(jar_dir, 'z3.jar')
+          ]
+        )
