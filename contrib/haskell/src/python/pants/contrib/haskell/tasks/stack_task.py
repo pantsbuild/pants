@@ -155,7 +155,7 @@ Dependency  : {dep}
     ] + extra_args
 
     try:
-      with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL]) as workunit:
+      with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL], cmd=' '.join(args)) as workunit:
         subprocess.check_call(args)
     except subprocess.CalledProcessError:
       raise TaskError("""
