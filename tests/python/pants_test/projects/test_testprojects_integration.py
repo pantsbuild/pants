@@ -20,6 +20,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       # to be first in the context, and test.junit mixes all classpaths.
       'testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb',
       'testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec',
+      # This will fail until we release and upgrade to junit runner 0.0.11.
+      'testprojects/tests/java/org/pantsbuild/testproject/cucumber',
     ]
 
     # Targets that are intended to fail
