@@ -9,7 +9,6 @@ import os
 from contextlib import closing
 
 import mox
-import pytest
 import requests
 from six import StringIO
 
@@ -102,7 +101,7 @@ class FetcherTest(mox.MoxTestBase):
 
     self.mox.ReplayAll()
 
-    with pytest.raises(self.fetcher.Error):
+    with self.assertRaises(self.fetcher.Error):
       self.fetcher.fetch('http://foo',
                          self.listener,
                          chunk_size_bytes=1024,
@@ -113,7 +112,7 @@ class FetcherTest(mox.MoxTestBase):
 
     self.mox.ReplayAll()
 
-    with pytest.raises(self.fetcher.TransientError):
+    with self.assertRaises(self.fetcher.TransientError):
       self.fetcher.fetch('http://foo',
                          self.listener,
                          chunk_size_bytes=1024,
@@ -124,12 +123,12 @@ class FetcherTest(mox.MoxTestBase):
 
     self.mox.ReplayAll()
 
-    with pytest.raises(self.fetcher.PermanentError) as e:
+    with self.assertRaises(self.fetcher.PermanentError) as e:
       self.fetcher.fetch('http://foo',
                          self.listener,
                          chunk_size_bytes=1024,
                          timeout_secs=60)
-    self.assertTrue(e.value.response_code is None)
+    self.assertTrue(e.exception.response_code is None)
 
   def test_http_error(self):
     self.requests.get('http://foo', stream=True, timeout=60).AndReturn(self.response)
@@ -140,12 +139,12 @@ class FetcherTest(mox.MoxTestBase):
 
     self.mox.ReplayAll()
 
-    with pytest.raises(self.fetcher.PermanentError) as e:
+    with self.assertRaises(self.fetcher.PermanentError) as e:
       self.fetcher.fetch('http://foo',
                          self.listener,
                          chunk_size_bytes=1024,
                          timeout_secs=60)
-    self.assertEqual(404, e.value.response_code)
+    self.assertEqual(404, e.exception.response_code)
 
   def test_iter_content_error(self):
     self.requests.get('http://foo', stream=True, timeout=60).AndReturn(self.response)
@@ -158,7 +157,7 @@ class FetcherTest(mox.MoxTestBase):
 
     self.mox.ReplayAll()
 
-    with pytest.raises(self.fetcher.TransientError):
+    with self.assertRaises(self.fetcher.TransientError):
       self.fetcher.fetch('http://foo',
                          self.listener,
                          chunk_size_bytes=1024,
