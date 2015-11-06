@@ -9,8 +9,6 @@ import ast
 import textwrap
 import unittest
 
-import pytest
-
 from pants.backend.python.tasks.checkstyle.common import (CheckstylePlugin, Nit, OffByOneList,
                                                           PythonFile)
 from pants_test.option.util.fakes import create_options
@@ -79,12 +77,12 @@ class CommonTest(unittest.TestCase):
 
     PythonFile is offset by one to match users expectations with file line numbering.
     """
-    with pytest.raises(IndexError):
+    with self.assertRaises(IndexError):
       self._python_file_for_testing()[0]
 
   def test_python_file_exceeds_index(self):
     """Test that we get an Index error when we exceed the line number."""
-    with pytest.raises(IndexError):
+    with self.assertRaises(IndexError):
       self._python_file_for_testing()[len(self._statement_for_testing().split('\n')) + 1]
 
   def test_line_retrieval(self):
@@ -166,14 +164,14 @@ class CommonTest(unittest.TestCase):
     """Test index errors with data in list."""
     test_list = OffByOneList([])
     for k in (0, 4):
-      with pytest.raises(IndexError):
+      with self.assertRaises(IndexError):
         test_list[k]
 
   def test_index_error_no_data(self):
     """Test that when start or end are -1,0, or 1 we get an index error."""
     for index in [-1, 0, 1, slice(-1,0), slice(0,1)]:
       test_list = OffByOneList([])
-      with pytest.raises(IndexError):
+      with self.assertRaises(IndexError):
         test_list[index]
 
   def test_empty_slice(self):
@@ -196,5 +194,5 @@ class CommonTest(unittest.TestCase):
     test_list = OffByOneList([])
     # Test index type sanity.
     for value in (None, 2.0, type):
-      with pytest.raises(TypeError):
+      with self.assertRaises(TypeError):
         test_list[value]

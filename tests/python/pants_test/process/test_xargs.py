@@ -9,7 +9,6 @@ import errno
 import os
 
 import mox
-import pytest
 
 from pants.process.xargs import Xargs
 
@@ -32,9 +31,9 @@ class XargsTest(mox.MoxTestBase):
     self.call(['one', 'two', 'three', 'four']).AndRaise(exception)
     self.mox.ReplayAll()
 
-    with pytest.raises(Exception) as raised:
+    with self.assertRaises(Exception) as raised:
       self.xargs.execute(['one', 'two', 'three', 'four'])
-    self.assertTrue(exception is raised.value)
+    self.assertIs(exception, raised.exception)
 
   def test_execute_nosplit_fail(self):
     self.call(['one', 'two', 'three', 'four']).AndReturn(42)
