@@ -178,7 +178,17 @@ class Parser(object):
             consume_flag(arg)
 
       # Get the value for this option, falling back to defaults as needed.
-      val = self._compute_value(dest, kwargs, flag_vals)
+      try:
+        val = self._compute_value(dest, kwargs, flag_vals)
+      except ParseError as e:
+        # Reraise a new exception with context on the option being processed at the time of error.
+        # Note that other exception types can be raised here that are caught by ParseError (e.g.
+        # BooleanConversionError), hence we reference the original exception type by e.__class__.
+        raise e.__class__(
+          'Error normalizing option: {} (may also be from PANTS_* environment variables):\n{}: {}'
+          .format(args[0], e.__class__.__name__, e)
+        )
+
       setattr(namespace, dest, val)
 
     # See if there are any unconsumed flags remaining.
@@ -218,17 +228,7 @@ class Parser(object):
     # Then yield our directly-registered options.
     # This must come after yielding inherited recursive options, so we can detect shadowing.
     for args, kwargs in self._option_registrations:
-      try:
-        normalized_kwargs = normalize_kwargs(kwargs)
-      except ParseError as e:
-        # Re-raise a new exception with context on the option being processed at the time of error.
-        # Note that other exception types can be raised here that are caught by ParseError (e.g.
-        # BooleanConversionError), hence we reference the original exception type by exc.__class__.
-        raise e.__class__(
-          'Error normalizing option: {} (may also be from PANTS_* environment variables):\n{}: {}'
-          .format(args[0], e.__class__.__name__, e)
-        )
-
+      normalized_kwargs = normalize_kwargs(args, kwargs)
       if 'recursive' in normalized_kwargs:
         # If we're the original registrar, make sure we can distinguish that.
         normalized_kwargs['recursive_root'] = True
