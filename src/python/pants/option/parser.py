@@ -185,8 +185,8 @@ class Parser(object):
         # Note that other exception types can be raised here that are caught by ParseError (e.g.
         # BooleanConversionError), hence we reference the original exception type by e.__class__.
         raise e.__class__(
-          'Error normalizing option: {} (may also be from PANTS_* environment variables):\n{}: {}'
-          .format(args[0], e.__class__.__name__, e)
+          'Error computing value for {} (may also be from PANTS_* environment variables):\n'
+          '{}: {}'.format(args[0], e.__class__.__name__, e)
         )
 
       setattr(namespace, dest, val)
