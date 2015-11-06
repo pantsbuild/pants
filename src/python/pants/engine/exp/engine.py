@@ -8,13 +8,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 import functools
 import multiprocessing
+import os
 from abc import abstractmethod
+from Queue import Queue
 
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.engine.exp.scheduler import Promise
 from pants.util.meta import AbstractClass
+
+
+try:
+  import cPickle as pickle
+except ImportError:
+  import pickle
 
 
 class FailedToProduce(object):
@@ -320,56 +328,78 @@ class LocalSerialEngine(FailSlowHelper, Engine):
     return self.collect_root_outputs(products_by_promise, execution_graph)
 
 
-def _execute_plan(func, promise, subjects, *args, **kwargs):
+class SerializationError(Exception):
+  """Indicates an error serializing input or outputs of an execution node.
+
+  The `LocalMultiprocessEngine` uses this exception to communicate incompatible planner code when
+  run in debug mode.  Both the plans and the products they produce must be picklable to be executed
+  by the multiprocess engine.
+  """
+
+
+def _try_pickle(obj):
+  with open(os.devnull, 'w') as devnull:
+    try:
+      pickle.dump(obj, devnull)
+    except Exception as e:
+      # Unfortunately, pickle can raise things other than PickleError instances.  For example it
+      # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
+      # `Exception` type here.
+      raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
+
+
+def _execute_plan(func, promise, subjects, debug, *args, **kwargs):
   # A picklable top-level function to help support local multiprocessing uses.
-  product = func(*args, **kwargs)
-  return promise, subjects, product
+  try:
+    product = func(*args, **kwargs)
+  except Exception as e:
+    # Trap any exception raised by the execution node that bubbles up past the fail slow guards
+    # (if enabled) and pass this back to our main thread for handling.
+    return e
+
+  result = (promise, subjects, product)
+  if debug:
+    try:
+      _try_pickle(result)
+    except SerializationError as e:
+      return e
+  return result
 
 
 class LocalMultiprocessEngine(Engine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, local_scheduler, pool_size=0):
+  def __init__(self, local_scheduler, pool_size=None, debug=False):
     """
     :param local_scheduler: The local scheduler for creating execution graphs.
     :type local_scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
-    :param pool: A multiprocessing process pool.
-    :type pool: :class:`multiprocessing.Pool`
+    :param int pool_size: The number of worker processes to use; by default 1 process per core will
+                          be used.
+    :param bool debug: `True` to turn on pickling error debug mode (slower); false by default.
     """
     super(LocalMultiprocessEngine, self).__init__(local_scheduler)
-    self._pool_size = pool_size if pool_size > 0 else multiprocessing.cpu_count()
+    self._pool_size = pool_size if pool_size and pool_size > 0 else multiprocessing.cpu_count()
     self._pool = multiprocessing.Pool(self._pool_size)
+    self._debug = debug
 
   class Executor(FailSlowHelper):
-    def __init__(self, pool, pool_size, fail_slow=False):
+    def __init__(self, pool, pool_size, fail_slow=False, debug=False):
       super(LocalMultiprocessEngine.Executor, self).__init__()
 
       self._pool = pool
       self._pool_size = pool_size
       self._fail_slow = fail_slow
+      self._debug = debug
 
-      self._pending_results = []
+      self._results = Queue()
       self._products_by_promise = {}
-
-    class CompletedResult(object):
-      """An already satisfied AsyncResult.
-
-      NB: This is duck-typed just enough for our use of AsyncResult objects.  The actual type
-      is hidden by the multiprocessing package, although it is in the public docs of the package.
-      """
-
-      def __init__(self, result):
-        self._result = result
-
-      def get(self, timeout=None):
-        return self._result
 
     def submit(self, promise, plan):
       inputs = self.collect_inputs(self._products_by_promise, promise, plan)
       if isinstance(inputs, FailedToProduce):
         # Short circuit plan execution since we don't have all the inputs it needs.
         result = (promise, plan.subjects, inputs)
-        self._pending_results.append(self.CompletedResult(result))
+        self._results.put(result)
       else:
         func, args, kwargs = plan.bind(inputs)
 
@@ -389,33 +419,22 @@ class LocalMultiprocessEngine(Engine):
         execute_plan = functools.partial(_execute_plan,
                                          maybe_fail_slow_executor,
                                          promise,
-                                         plan.subjects)
+                                         plan.subjects,
+                                         self._debug)
 
-        async_result = self._pool.apply_async(execute_plan)
-        self._pending_results.append(async_result)
-
-    def _gather_one_pending(self):
-      # Ideally we'd be using an apply_async callback and a queue to signal results as they
-      # complete, quickest 1st, but that leads to inscrutable hangs when there are pickling errors.
-      # So we poll futures here for 3 reasons:
-      # 1. Foreground collection of results from the main thread allows for background errors to
-      #    propagate to the foreground making debugging easier.  Notably, pickling errors on the
-      #    internal queues used by the multiprocessing Pool are exposed directly.
-      # 2. The hopefully small enough timeout allows us to process early-finishers early and keep
-      #    the process pool ~maximally occupied.
-      # 3. The hopefully not too small timeout avoids busy-waiting and burning CPU on the main
-      #    thread.
-      while True:
-        for index, result in enumerate(self._pending_results):
-          try:
-            result = result.get(timeout=.1)
-            self._pending_results.pop(index)
-            return result
-          except multiprocessing.TimeoutError:
-            pass
+        if self._debug:
+          _try_pickle(execute_plan)
+        self._pool.apply_async(execute_plan, callback=self._results.put)
 
     def gather_one_result(self):
-      promise, subjects, product = self._gather_one_pending()
+      results = self._results.get()
+      if isinstance(results, Exception):
+        # If we get an exception here from an execution node, we're either in fail-slow mode and the
+        # exception was uncontrolled (not a TaskError), or else we're not in fail slow mode in which
+        # case any exception should bubble to higher layers.
+        raise results
+
+      promise, subjects, product = results
       for subject in subjects:
         promised = promise.rebind(subject)
         self._products_by_promise[promised] = product
@@ -425,7 +444,7 @@ class LocalMultiprocessEngine(Engine):
       return self.collect_root_outputs(self._products_by_promise, execution_graph)
 
   def reduce(self, execution_graph, fail_slow=False):
-    executor = self.Executor(self._pool, self._pool_size, fail_slow=fail_slow)
+    executor = self.Executor(self._pool, self._pool_size, fail_slow=fail_slow, debug=self._debug)
 
     # ExecutionGraph nodes move from `pending_submission` to `in_flight` to `satisfied_promises`.
     pending_submission = {}

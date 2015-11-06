@@ -7,10 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from contextlib import closing
+from contextlib import closing, contextmanager
 
 from pants.build_graph.address import Address
-from pants.engine.exp.engine import Engine, LocalMultiprocessEngine, LocalSerialEngine
+from pants.engine.exp.engine import (Engine, LocalMultiprocessEngine, LocalSerialEngine,
+                                     SerializationError)
 from pants.engine.exp.examples.planners import (ApacheThriftError, Classpath, Javac, Sources,
                                                 setup_json_scheduler)
 from pants.engine.exp.scheduler import BuildRequest, Promise
@@ -35,16 +36,21 @@ class EngineTest(unittest.TestCase):
                      result.root_products)
     self.assertIsNone(result.error)
 
+  @contextmanager
+  def multiprocessing_engine(self, pool_size=None):
+    with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=True)) as e:
+      yield e
+
   def test_serial_engine(self):
     engine = LocalSerialEngine(self.scheduler)
     self.assert_engine(engine)
 
   def test_multiprocess_engine(self):
-    with closing(LocalMultiprocessEngine(self.scheduler)) as engine:
+    with self.multiprocessing_engine() as engine:
       self.assert_engine(engine)
 
   def test_multiprocess_engine_single_process(self):
-    with closing(LocalMultiprocessEngine(self.scheduler, pool_size=1)) as engine:
+    with self.multiprocessing_engine(pool_size=1) as engine:
       self.assert_engine(engine)
 
   def assert_engine_fail_slow(self, engine):
@@ -74,34 +80,25 @@ class EngineTest(unittest.TestCase):
     self.assert_engine_fail_slow(engine)
 
   def test_multiprocess_engine_fail_slow(self):
-    engine = LocalMultiprocessEngine(self.scheduler)
-    self.assert_engine_fail_slow(engine)
+    with self.multiprocessing_engine() as engine:
+      self.assert_engine_fail_slow(engine)
 
   def test_multiprocess_engine_fail_slow_single_process(self):
-    engine = LocalMultiprocessEngine(self.scheduler, pool_size=1)
-    self.assert_engine_fail_slow(engine)
+    with self.multiprocessing_engine(pool_size=1) as engine:
+      self.assert_engine_fail_slow(engine)
 
   def test_multiprocess_unpicklable_inputs(self):
-    engine = LocalMultiprocessEngine(self.scheduler)
     build_request = BuildRequest(goals=['unpickleable_inputs'],
                                  addressable_roots=[self.java.address])
 
-    # PickleError is a bit awkward to test for since both pickle and cPickle export unrelated
-    # PicklingError exception types.  Instead of guessing which pickling module is in-use by
-    # multiprocessing we just test the name.
-    with self.assertRaises(Exception) as exc:
-      engine.execute(build_request)
-    self.assertEqual('PicklingError', type(exc.exception).__name__)
+    with self.multiprocessing_engine() as engine:
+      with self.assertRaises(SerializationError):
+        engine.execute(build_request)
 
   def test_multiprocess_unpicklable_outputs(self):
-    engine = LocalMultiprocessEngine(self.scheduler)
     build_request = BuildRequest(goals=['unpickleable_result'],
                                  addressable_roots=[self.java.address])
 
-    # The pool raises `multiprocessing.pool.MaybeEncodingError`, but this type is hidden via
-    # `__all__` in `multiprocessing/__init__.py`.  As such we just verify the exception raised is
-    # from within the `multiprocessing` package.
-    with self.assertRaises(Exception) as exc:
-      engine.execute(build_request)
-    root_module, _, _ = exc.exception.__module__.partition('.')
-    self.assertEqual('multiprocessing', root_module)
+    with self.multiprocessing_engine() as engine:
+      with self.assertRaises(SerializationError):
+        engine.execute(build_request)
