@@ -10,22 +10,10 @@ import tokenize
 from collections import defaultdict
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
-from pants.subsystem.subsystem import Subsystem
-
-
-class TrailingWhitespaceSubsystem(Subsystem):
-  options_scope = 'pycheck-trailing-whitespace'
-
-  @classmethod
-  def register_options(cls, register):
-    super(TrailingWhitespaceSubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
 
 
 class TrailingWhitespace(CheckstylePlugin):
   """Warn on invalid trailing whitespace."""
-  subsystem = TrailingWhitespaceSubsystem
 
   @classmethod
   def build_exception_map(cls, tokens):

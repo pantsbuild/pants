@@ -34,12 +34,13 @@ class HelpFormatter(object):
   def _maybe_color(self, color, s):
     return color(s) if self._color else s
 
-  def format_options(self, scope, description, registration_args):
+  def format_options(self, scope, description, option_registrations_iter):
     """Return a help message for the specified options.
 
-    :param registration_args: A list of (args, kwargs) pairs, as passed in to options registration.
+    :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
+                                      options registration.
     """
-    oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(registration_args)
+    oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
     lines = []
     def add_option(category, ohis):
       if ohis:

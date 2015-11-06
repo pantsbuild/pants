@@ -113,6 +113,10 @@ class PytestRun(TestTaskMixin, PythonTask):
   def supports_passthru_args(cls):
     return True
 
+  def __init__(self, *args, **kwargs):
+    super(PytestRun, self).__init__(*args, **kwargs)
+    self._process = None
+
   def _test_target_filter(self):
     def target_filter(target):
       return isinstance(target, PythonTests)
@@ -517,12 +521,25 @@ class PytestRun(TestTaskMixin, PythonTask):
           args.insert(0, '--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
+  def _timeout_abort_handler(self):
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process.
+    if self._process is not None:
+      self._process.kill()
+
   def _pex_run(self, pex, workunit, args, setsid=False):
     # NB: We don't use pex.run(...) here since it makes a point of running in a clean environment,
     # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
     # task.
-    process = subprocess.Popen(pex.cmdline(args),
+
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process.
+    self._process = subprocess.Popen(pex.cmdline(args),
                                preexec_fn=os.setsid if setsid else None,
                                stdout=workunit.output('stdout'),
                                stderr=workunit.output('stderr'))
-    return process.wait()
+    return self._process.wait()

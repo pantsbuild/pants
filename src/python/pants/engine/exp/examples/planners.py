@@ -11,6 +11,7 @@ from abc import abstractmethod, abstractproperty
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.configuration import Configuration
@@ -37,7 +38,8 @@ def printing_func(func):
   @functools.wraps(func)
   def wrapper(**inputs):
     print('{} being executed with inputs: {}'.format(func.__name__, inputs))
-    return '<<<Fake{}Product>>>'.format(func.__name__)
+    product = func(**inputs)
+    return product if product else '<<<Fake{}Product>>>'.format(func.__name__)
   return wrapper
 
 
@@ -238,9 +240,51 @@ class ApacheThriftPlanner(ThriftPlanner):
                 strict=apache_thrift_config.strict)
 
 
+class ApacheThriftError(TaskError):
+  pass
+
+
 @printing_func
 def gen_apache_thrift(sources, rev, gen, strict):
+  if rev == 'fail':
+    raise ApacheThriftError('Failed to generate via apache thrift for sources: {}, rev: {}, '
+                            'gen:{}, strict: {}'.format(sources, rev, gen, strict))
+
+
+class BuildPropertiesConfiguration(Configuration):
   pass
+
+
+class BuildPropertiesPlanner(TaskPlanner):
+  """A planner that adds a Classpath entry for all targets configured for build_properties.
+
+  NB: In the absence of support for merging multiple Promises for a particular product_type,
+  this serves as a valid example that explodes when it should succeed.
+  """
+
+  @property
+  def goal_name(self):
+    return None
+
+  @property
+  def product_types(self):
+    yield Classpath
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
+    if not isinstance(subject, Target):
+      return
+    name_config = filter(lambda x: isinstance(x, BuildPropertiesConfiguration), subject.configurations)
+    if not name_config:
+      return
+    assert product_type == Classpath
+
+    return Plan(func_or_task_type=write_name_file, subjects=(subject,), name=subject.name)
+
+
+def write_name_file(name):
+  # Write a file containing the name in CWD
+  with safe_open('build.properties') as f:
+    f.write('name={}\n'.format(name))
 
 
 class ScroogeConfiguration(ThriftConfiguration):
@@ -400,7 +444,8 @@ def setup_json_scheduler(build_root):
                   'requirement': Requirement,
                   'scrooge_configuration': ScroogeConfiguration,
                   'sources': AddressableSources,
-                  'target': Target}
+                  'target': Target,
+                  'build_properties': BuildPropertiesConfiguration}
   json_parser = functools.partial(parse_json, symbol_table=symbol_table)
   graph = Graph(AddressMapper(build_root=build_root,
                               build_pattern=r'^BLD.json$',
@@ -410,6 +455,8 @@ def setup_json_scheduler(build_root):
                        GlobalIvyResolvePlanner(),
                        JavacPlanner(),
                        ScalacPlanner(),
-                       ScroogePlanner()])
+                       ScroogePlanner(),
+                       BuildPropertiesPlanner()
+                       ])
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler

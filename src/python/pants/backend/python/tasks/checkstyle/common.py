@@ -113,7 +113,10 @@ class PythonFile(object):
     :param statement: Python file contents
     :return: Instance of PythonFile
     """
-    return cls('\n'.join(textwrap.dedent(statement).split('\n')[1:]))
+    lines = textwrap.dedent(statement).split('\n')
+    if lines and not lines[0]:  # Remove the initial empty line, which is an artifact of dedent.
+      lines = lines[1:]
+    return cls('\n'.join(lines))
 
   @classmethod
   def iter_tokens(cls, blob):
@@ -267,9 +270,11 @@ class Nit(object):
 class CheckstylePlugin(Interface):
   """Interface for checkstyle plugins."""
 
-  def __init__(self, python_file):
+  def __init__(self, options, python_file):
+    super(CheckstylePlugin, self).__init__()
     if not isinstance(python_file, PythonFile):
       raise TypeError('CheckstylePlugin takes PythonFile objects.')
+    self.options = options
     self.python_file = python_file
 
   def iter_ast_types(self, ast_type):

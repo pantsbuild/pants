@@ -42,7 +42,7 @@ migrations = {
                                                                  'changed_targets_heuristic_limit'),
   ('scala-compile', 'warning_args'): ('compile.scala', 'warning_args'),
   ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
-  ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
+  ('scala-compile', 'runtime_deps'): ('compile.scala', 'runtime_deps'),
   ('scala-compile', 'use_nailgun'): ('compile.scala', 'use_nailgun'),
   ('scala-compile', 'args'): ('compile.scala', 'args'),
 
@@ -67,7 +67,7 @@ migrations = {
 
   ('scala-repl', 'args'): ('repl.scala', 'args'),
 
-  ('checkstyle', 'bootstrap-tools'): ('compile.checkstyle', 'bootstrap_tools'),
+  ('checkstyle', 'bootstrap_tools'): ('compile.checkstyle', 'bootstrap_tools'),
   ('checkstyle', 'configuration'): ('compile.checkstyle', 'configuration'),
   ('checkstyle', 'properties'): ('compile.checkstyle', 'properties'),
 
@@ -80,11 +80,11 @@ migrations = {
   ('jvm', 'debug_config'): ('DEFAULT', 'debug_config'),
   ('jvm', 'debug_port'): ('DEFAULT', 'debug_port'),
 
-  ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
-  ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin_args'),
+  ('scala-compile', 'scalac_plugins'): ('compile.scala', 'plugins'),
+  ('scala-compile', 'scalac_plugin_args'): ('compile.scala', 'plugin_args'),
 
   ('markdown-to-html', 'extensions'): ('markdown', 'extensions'),
-  ('markdown-to-html', 'code-style'): ('markdown', 'code_style'),
+  ('markdown-to-html', 'code_style'): ('markdown', 'code_style'),
 
   # Note: This assumes that ConfluencePublish is registered as the only task in a
   #       goal called 'confluence'.  Adjust if this is not the case in your pants.ini.
@@ -93,25 +93,25 @@ migrations = {
   # JVM tool migrations.
   ('antlr-gen', 'javadeps'): ('gen.antlr', 'antlr3'),
   ('antlr4-gen', 'javadeps'): ('gen.antlr', 'antlr4'),
-  ('scrooge-gen', 'bootstrap-tools'): ('gen.scrooge', 'scrooge'),
-  ('thrift-linter', 'bootstrap-tools'): ('thrift-linter', 'scrooge_linter'),
-  ('wire-gen', 'bootstrap-tools'): ('gen.wire', 'wire_compiler'),
-  ('benchmark-run', 'bootstrap-tools'): ('bench', 'benchmark_tool'),
-  ('benchmark-run', 'agent-bootstrap-tools'): ('bench', 'benchmark_agent'),
-  ('compile.checkstyle', 'bootstrap-tools'): ('compile.checkstyle', 'checkstyle'),
-  ('ivy-resolve', 'bootstrap-tools'): ('resolve.ivy', 'xalan'),
-  ('jar-tool', 'bootstrap-tools'): ('DEFAULT', 'jar-tool'),
-  ('junit-run', 'junit-bootstrap-tools'): ('test.junit', 'junit'),
-  ('junit-run', 'emma-bootstrap-tools'): ('test.junit', 'emma'),
-  ('junit-run', 'cobertura-bootstrap-tools'): ('test.junit', 'cobertura'),
-  ('java-compile', 'jmake-bootstrap-tools'): ('compile.java', 'jmake'),
+  ('scrooge-gen', 'bootstrap_tools'): ('gen.scrooge', 'scrooge'),
+  ('thrift-linter', 'bootstrap_tools'): ('thrift-linter', 'scrooge_linter'),
+  ('wire-gen', 'bootstrap_tools'): ('gen.wire', 'wire_compiler'),
+  ('benchmark-run', 'bootstrap_tools'): ('bench', 'benchmark_tool'),
+  ('benchmark-run', 'agent_bootstrap_tools'): ('bench', 'benchmark_agent'),
+  ('compile.checkstyle', 'bootstrap_tools'): ('compile.checkstyle', 'checkstyle'),
+  ('ivy-resolve', 'bootstrap_tools'): ('resolve.ivy', 'xalan'),
+  ('jar-tool', 'bootstrap_tools'): ('DEFAULT', 'jar-tool'),
+  ('junit-run', 'junit_bootstrap_tools'): ('test.junit', 'junit'),
+  ('junit-run', 'emma_bootstrap_tools'): ('test.junit', 'emma'),
+  ('junit-run', 'cobertura_bootstrap_tools'): ('test.junit', 'cobertura'),
+  ('java-compile', 'jmake_bootstrap_tools'): ('compile.java', 'jmake'),
   ('java-compile', 'compiler-bootstrap-tools'): ('compile.java', 'java_compiler'),
   # Note: compile-bootstrap-tools is not a typo.
-  ('scala-compile', 'compile-bootstrap-tools'): ('compile.scala', 'scalac'),
-  ('scala-compile', 'zinc-bootstrap-tools'): ('compile.scala', 'zinc'),
-  ('scala-compile', 'scalac-plugin-bootstrap-tools'): ('compile.scala', 'plugin_jars'),
-  ('scala-repl', 'bootstrap-tools'): ('repl.scala', 'scala_repl'),
-  ('specs-run', 'bootstrap-tools'): ('test.specs', 'specs'),
+  ('scala-compile', 'compile_bootstrap_tools'): ('compile.scala', 'scalac'),
+  ('scala-compile', 'zinc_bootstrap_tools'): ('compile.scala', 'zinc'),
+  ('scala-compile', 'scalac_plugin_bootstrap_tools'): ('compile.scala', 'plugin_jars'),
+  ('scala-repl', 'bootstrap_tools'): ('repl.scala', 'scala_repl'),
+  ('specs-run', 'bootstrap_tools'): ('test.specs', 'specs'),
 
   # Artifact cache spec migration.
   ('dx-tool', 'read_artifact_caches'): ('dex', 'read_artifact_caches'),
@@ -140,7 +140,7 @@ migrations = {
 
   ('backend', 'python-path'): ('DEFAULT', 'pythonpath'),
 
-  ('python-ipython', 'entry-point'): ('repl.py', 'ipython_entry_point'),
+  ('python-ipython', 'entry_point'): ('repl.py', 'ipython_entry_point'),
   ('python-ipython', 'requirements'): ('repl.py', 'ipython_requirements'),
 
   ('jar-publish', 'restrict_push_branches'): ('publish.jar', 'restrict_push_branches'),
@@ -224,7 +224,7 @@ migrations = {
   ('scrooge-gen', 'java'): ('gen.scrooge', 'service_deps'),
 
   # jar-tool subsystem.
-  ('jar-tool', 'bootstrap-tools'): ('jar-tool', 'jar-tool'),
+  ('jar-tool', 'bootstrap_tools'): ('jar-tool', 'jar_tool'),
   ('jar-tool', 'jvm_args'): ('jar-tool', 'jvm_options'),
 
   # Technically 'indices' and 'indexes' are both acceptable plural forms of 'index'. However
@@ -335,6 +335,51 @@ migrations = {
   ('compile.zinc', 'changed-targets-heuristic-limit'): None,
   ('compile.zinc', 'partition-size-hint'): None,
   ('compile.zinc', 'strategy'): None,
+
+  # Jmake and Apt removal.
+  ('compile.apt', 'args'): ('compile.zinc', 'args'),
+  ('compile.apt', 'jvm_options'): ('compile.zinc', 'jvm_options'),
+  ('compile.java', 'args'): ('compile.zinc', 'args'),
+  ('compile.java', 'jvm_options'): ('compile.zinc', 'jvm_options'),
+
+  # Renaming JarCreate's scope.  It was previously privileged to be called 'jar'. That might seem reasonable,
+  # except that adding anything to the 'jar' goal (e.g., see extra_test_jar_example.py) creates the potential
+  # for option shadowing.
+  # Note: We probably did the "eliding a task with the same name as its goal" thing wrong. Since options are
+  # inherited from outer scopes, this creates lots of potential for option shadowing. We should probably not
+  # have elided the option scope (e.g., the scope should have remained jar.jar, not jar, internally), but rather
+  # done the elision early, when interpreting scopes in config/cmd-line args etc.
+  # TODO: Fix this?  I don't think it would be that difficult, but there might be unintended consequences.
+  # For now we simply avoid it in cases where there's any likelihood of options collision occuring.
+  # In practice this won't be a problem with cases where there really is only one sensible task in a goal,
+  # e.g., the various ConsoleTasks.
+  ('jar', 'use_nailgun'): ('jar.create', 'use_nailgun'),
+  ('jar', 'nailgun_timeout_seconds'): ('jar.create', 'nailgun_timeout_seconds'),
+  ('jar', 'nailgun_connect_attempts'): ('jar.create', 'nailgun_connect_attempts'),
+  ('jar', 'nailgun_server'): ('jar.create', 'nailgun_server'),
+
+  # Renaming JvmBinaryCreate's scope.  It was previously privileged to be called 'binary'.
+  ('binary', 'use_nailgun'): ('binary.jvm', 'use_nailgun'),
+  ('binary', 'nailgun_timeout_seconds'): ('binary.jvm', 'nailgun_timeout_seconds'),
+  ('binary', 'nailgun_connect_attempts'): ('binary.jvm', 'nailgun_connect_attempts'),
+  ('binary', 'nailgun_server'): ('binary.jvm', 'nailgun_server'),
+
+  # Renaming JvmBundleCreate's scope.  It was previously privileged to be called 'bundle'.
+  ('bundle', 'use_nailgun'): ('bundle.jvm', 'use_nailgun'),
+  ('bundle', 'nailgun_timeout_seconds'): ('bundle.jvm', 'nailgun_timeout_seconds'),
+  ('bundle', 'nailgun_connect_attempts'): ('bundle.jvm', 'nailgun_connect_attempts'),
+  ('bundle', 'nailgun_server'): ('bundle.jvm', 'nailgun_server'),
+  ('bundle', 'deployjar'): ('bundle.jvm', 'deployjar'),
+  ('bundle', 'archive'): ('bundle.jvm', 'archive'),
+  ('bundle', 'archive_prefix'): ('bundle.jvm', 'archive_prefix'),
+
+  # Preventing shadowing of global options.
+  ('compile.zinc', 'plugins'): ('compile.zinc', 'scalac_plugins'),
+  ('compile.zinc', 'plugin_args'): ('compile.zinc', 'scalac_plugin_args'),
+  ('gen.protoc', 'plugins'): ('gen.protoc', 'protoc_plugins'),
+
+  # Superceded by the global --tags option.
+  ('filter', 'tags'): None
 }
 
 jvm_global_strategy_removal = ('The JVM global compile strategy was removed in favor of the '
@@ -530,11 +575,10 @@ notes = {
   ('compile.zinc', 'partition-size-hint'): jvm_global_strategy_removal,
   ('compile.zinc', 'strategy'): jvm_global_strategy_removal,
 
-  # Jmake and Apt removal.
-  ('compile.apt', 'args'): ('compile.zinc', 'args'),
-  ('compile.apt', 'jvm-options'): ('compile.zinc', 'jvm-options'),
-  ('compile.java', 'args'): ('compile.zinc', 'args'),
-  ('compile.java', 'jvm-options'): ('compile.zinc', 'jvm-options'),
+  ('bootstrap.bootstrap-jvm-tools', 'jvm-options'): 'This previously shadowed the same option '
+                                                    'registered by IvyTaskMixin.  If you want to '
+                                                    'specifically configure the shader, use '
+                                                    'shader-jvm-options.'
 }
 
 

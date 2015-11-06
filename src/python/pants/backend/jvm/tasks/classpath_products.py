@@ -11,7 +11,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.goal.products import UnionProducts
 
@@ -123,11 +122,14 @@ def _not_excluded_filter(excludes):
 
 
 class ClasspathProducts(object):
-
-  def __init__(self, classpaths=None, excludes=None):
+  def __init__(self, pants_workdir, classpaths=None, excludes=None):
     self._classpaths = classpaths or UnionProducts()
     self._excludes = excludes or UnionProducts()
-    self._buildroot = get_buildroot()
+    self._pants_workdir = pants_workdir
+
+  @staticmethod
+  def init_func(pants_workdir):
+    return lambda: ClasspathProducts(pants_workdir)
 
   def copy(self):
     """Returns a copy of this ClasspathProducts.
@@ -138,7 +140,8 @@ class ClasspathProducts(object):
 
     :rtype: :class:`ClasspathProducts`
     """
-    return ClasspathProducts(classpaths=self._classpaths.copy(),
+    return ClasspathProducts(pants_workdir=self._pants_workdir,
+                             classpaths=self._classpaths.copy(),
                              excludes=self._excludes.copy())
 
   def add_for_targets(self, targets, classpath_elements):
@@ -279,17 +282,17 @@ class ClasspathProducts(object):
     self._classpaths.add_for_target(target, elements)
 
   def _validate_classpath_tuples(self, classpath, target):
-    """Validates that all files are located within the working copy, to simplify relativization.
+    """Validates that all files are located within the working directory, to simplify relativization.
 
     :param classpath: The list of classpath tuples. Each tuple is a 2-tuple of ivy_conf and
                       ClasspathEntry.
     :param target: The target that the classpath tuple is being registered for.
-    :raises: `TaskError` when the path is outside the build root
+    :raises: `TaskError` when the path is outside the work directory
     """
     for classpath_tuple in classpath:
       conf, classpath_entry = classpath_tuple
       path = classpath_entry.path
-      if os.path.relpath(path, self._buildroot).startswith(os.pardir):
+      if os.path.relpath(path, self._pants_workdir).startswith(os.pardir):
         raise TaskError(
-          'Classpath entry {} for target {} is located outside the buildroot.'
+          'Classpath entry {} for target {} is located outside the working directory.'
           .format(path, target.address.spec))

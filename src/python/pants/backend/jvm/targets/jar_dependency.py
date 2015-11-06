@@ -16,7 +16,7 @@ from pants.util.memo import memoized_property
 class JarDependency(object):
   """A pre-built Maven repository dependency."""
 
-  def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None, type_=None,
+  def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
                classifier=None, mutable=None, intransitive=False, excludes=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
@@ -31,7 +31,6 @@ class JarDependency(object):
       (specifying this parameter is unusual).
     :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
       will properly hyperlink {\ @link}s.
-    :param string type_: Artifact packaging type - Deprecated: use `ext` instead.
     :param string classifier: Classifier specifying the artifact variant to use.
     :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
       Maven -SNAPSHOT style artifacts in an active development/integration cycle.
@@ -44,11 +43,7 @@ class JarDependency(object):
     self._base_name = name
     self.rev = rev
     self.force = force
-
     self.ext = ext
-    if type_:
-      self._maybe_set_ext(type_)
-
     self.url = url
     self.apidocs = apidocs
     self.classifier = classifier

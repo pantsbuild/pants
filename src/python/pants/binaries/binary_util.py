@@ -82,10 +82,6 @@ class BinaryUtil(object):
     """Indicates that no urls were specified in pants.ini."""
     pass
 
-  class MissingBinaryUtilOptionsError(Exception):
-    """Internal error. --supportdir and --version must be registered in register_options()"""
-    pass
-
   def _select_binary_base_path(self, supportdir, version, name, uname_func=None):
     """Calculate the base path.
 

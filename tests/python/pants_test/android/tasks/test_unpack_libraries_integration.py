@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.util.contextutil import temporary_dir
 from pants_test.android.android_integration_test import AndroidIntegrationTest
 
 
@@ -22,7 +21,7 @@ class UnpackLibrariesIntegrationTest(AndroidIntegrationTest):
   @unittest.skipUnless(tools, reason='UnpackLibraries integration test requires that '
                                      'ANDROID_HOME is set.')
   def test_library_unpack(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       spec = 'examples/src/android/hello_with_library:'
       pants_run = self.run_pants_with_workdir(['unpack-jars', spec], workdir)
       self.assert_success(pants_run)

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import codecs
 import os.path
+import time
 from unittest import skipIf
 
 from pants.java.distribution.distribution import DistributionLocator
@@ -66,3 +67,27 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest_BAD_CLASS', 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])
     self.assert_failure(pants_run)
     self.assertIn("No target found for test specifier", pants_run.stdout_data)
+
+  def test_junit_run_timeout_succeeds(self):
+    pants_run = self.run_pants(['clean-all',
+                                'test.junit',
+                                '--timeout-default=1',
+                                '--test=org.pantsbuild.testproject.timeout.SleeperTestShort',
+                                'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target'])
+    self.assert_success(pants_run)
+
+  def test_junit_run_timeout_fails(self):
+    start = time.time()
+    pants_run = self.run_pants(['clean-all',
+                                'test.junit',
+                                '--timeout-default=1',
+                                '--test=org.pantsbuild.testproject.timeout.SleeperTestLong',
+                                'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target'])
+    end = time.time()
+    self.assert_failure(pants_run)
+
+    # Ensure that the failure took less than 120 seconds to run.
+    self.assertLess(end - start, 120)
+
+    # Ensure that the timeout triggered.
+    self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)

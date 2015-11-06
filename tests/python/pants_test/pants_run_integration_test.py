@@ -73,14 +73,20 @@ class PantsRunIntegrationTest(unittest.TestCase):
     except OSError:
       return False
 
-  def workdir_root(self):
+  def temporary_workdir(self):
     # We can hard-code '.pants.d' here because we know that will always be its value
     # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
     # Grabbing the pants_workdir config would require this pants's config object,
     # which we don't have a reference to here.
     root = os.path.join(get_buildroot(), '.pants.d', 'tmp')
     safe_mkdir(root)
-    return root
+    return temporary_dir(root_dir=root, suffix='.pants.d')
+
+  def temporary_cachedir(self):
+    return temporary_dir(suffix='__CACHEDIR')
+
+  def temporary_sourcedir(self):
+    return temporary_dir(root_dir=get_buildroot())
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              **kwargs):
@@ -124,8 +130,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,  **kwargs)
+    with self.temporary_workdir() as workdir:
+      return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
   @contextmanager
   def pants_results(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
@@ -138,8 +144,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
     :returns a tuple (returncode, stdout_data, stderr_data).
     """
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env,  **kwargs)
+    with self.temporary_workdir() as workdir:
+      yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
   def bundle_and_run(self, target, bundle_name, args=None):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
@@ -149,7 +155,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param args: optional arguments to pass to executable
     :return: stdout as a string on success, raises an Exception on error
     """
-    pants_run = self.run_pants(['bundle', '--archive=zip', target])
+    pants_run = self.run_pants(['bundle.jvm', '--archive=zip', target])
     self.assert_success(pants_run)
 
     # TODO(John Sirois): We need a zip here to suck in external library classpath elements

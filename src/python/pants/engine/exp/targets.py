@@ -94,6 +94,9 @@ Sources.excludes = addressable(Exactly(Sources))(Sources.excludes)
 class Target(Configuration):
   """TODO(John Sirois): XXX DOCME"""
 
+  class ConfigurationNotFound(Exception):
+    """Indicates a requested configuration of a target could not be found."""
+
   def __init__(self, name=None, sources=None, configurations=None, dependencies=None, **kwargs):
     """
     :param string name: The name of this target which forms its address in its namespace.
@@ -121,6 +124,30 @@ class Target(Configuration):
     :rtype: list
     """
 
+  @addressable(Exactly(Sources))
+  def sources(self):
+    """Return the sources this target owns.
+
+    :rtype: :class:`Sources`
+    """
+
+  def select_configuration(self, name):
+    """Selects a named configuration of this target.
+
+    :param string name: The name of the configuration to select.
+    :returns: The configuration with the given name.
+    :rtype: :class:`pants.engine.exp.configuration.Configuration`
+    :raises: :class:`Target.ConfigurationNotFound` if the configuration was not found.
+    """
+    configs = tuple(config for config in self.configurations if config.name == name)
+    if len(configs) != 1:
+      configurations = ('{} -> {!r}'.format(repr(c.name) if c.name else '<anonymous>', c)
+                        for c in configs)
+      raise self.ConfigurationNotFound('Failed to find a single configuration named {!r} these '
+                                       'configurations in {!r}:\n\t{}'
+                                       .format(name, self, '\n\t'.join(configurations)))
+    return configs[0]
+
   def walk_targets(self, postorder=True):
     """Performs a depth first walk of this target, visiting all reachable targets exactly once.
 
@@ -143,10 +170,3 @@ class Target(Configuration):
 
     for target in walk(self):
       yield target
-
-  @addressable(Exactly(Sources))
-  def sources(self):
-    """Return the sources this target owns.
-
-    :rtype: :class:`Sources`
-    """

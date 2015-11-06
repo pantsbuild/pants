@@ -39,9 +39,6 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
              help='Filter on targets that these targets depend on.')
     register('--regex', action='append', metavar='[+-]regex1,regex2,...',
              help='Filter on target addresses matching these regexes.')
-    # TODO: Do we need this now that we have a global --tag flag? Deprecate this if not.
-    register('--tag', action='append', metavar='[+-]tag1,tag2,...',
-             help='Filter on targets with these tags.')
     register('--tag-regex', action='append', metavar='[+-]regex1,regex2,...',
              help='Filter on targets with tags matching these regexes.')
 
@@ -97,10 +94,6 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
         raise TaskError("Invalid regular expression: {}: {}".format(tag_regex, e))
       return lambda target: any(map(regex.search, map(str, target.tags)))
     self._filters.extend(create_filters(self.get_options().tag_regex, filter_for_tag_regex))
-
-    def filter_for_tag(tag):
-      return lambda target: tag in map(str, target.tags)
-    self._filters.extend(create_filters(self.get_options().tag, filter_for_tag))
 
   def console_output(self, _):
     wrapped_filter = wrap_filters(self._filters)

@@ -33,11 +33,11 @@ class JvmRun(JvmTask):
     super(JvmRun, cls).register_options(register)
     register('--only-write-cmd-line', metavar='<file>',
              help='Instead of running, just write the cmd line to this file.')
-    # Note the unusual registration pattern. This is so we can support three cases:
+    # Note the use of implicit_value. This is so we can support three cases:
     # --cwd=<path>
-    # --cwd (defaults to the value of 'const', which is None here)
-    # No explicit --cwd at all (defaults to the value of 'default')
-    register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
+    # --cwd (uses the implicit value)
+    # No explicit --cwd at all (uses the default)
+    register('--cwd', default=_CWD_NOT_PRESENT, implicit_value='',
              help='Set the working directory. If no argument is passed, use the target path.')
     register('--main', metavar='<main class>',
              help='Invoke this class (overrides "main"" attribute in jvm_binary targets)')

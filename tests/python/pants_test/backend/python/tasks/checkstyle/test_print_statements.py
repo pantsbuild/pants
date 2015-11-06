@@ -5,34 +5,32 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.tasks.checkstyle.common import Nit, PythonFile
 from pants.backend.python.tasks.checkstyle.print_statements import PrintStatements
+from pants_test.backend.python.tasks.checkstyle.plugin_test_base import CheckstylePluginTestBase
 
 
-def test_print_override():
-  ps = PrintStatements(PythonFile.from_statement("""
-    from __future__ import print_function
-    print("I do what I want")
-    
-    class Foo(object):
-      def print(self):
-        "I can do this because it's not a reserved word."
-  """))
-  assert len(list(ps.nits())) == 0
+class PrintStatementsTest(CheckstylePluginTestBase):
+  plugin_type = PrintStatements
 
+  def test_print_override(self):
+    statement = """
+      from __future__ import print_function
+      print("I do what I want")
 
-def test_print_function():
-  ps = PrintStatements(PythonFile.from_statement("""
-    print("I do what I want")
-  """))
-  assert len(list(ps.nits())) == 0
+      class Foo(object):
+        def print(self):
+          "I can do this because it's not a reserved word."
+    """
+    self.assertNoNits(statement)
 
+  def test_print_function(self):
+    statement = """
+      print("I do what I want")
+    """
+    self.assertNoNits(statement)
 
-def test_print_statement():
-  ps = PrintStatements(PythonFile.from_statement("""
-    print["I do what I want"]
-  """))
-  nits = list(ps.nits())
-  assert len(nits) == 1
-  assert nits[0].code == 'T607'
-  assert nits[0].severity == Nit.ERROR
+  def test_print_statement(self):
+    statement = """
+      print["I do what I want"]
+    """
+    self.assertNit(statement, 'T607')

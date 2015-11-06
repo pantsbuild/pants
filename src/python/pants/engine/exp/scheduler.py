@@ -262,6 +262,26 @@ class SchedulingError(Exception):
   """Indicates inability to make a required scheduling promise."""
 
 
+class NoProducersError(SchedulingError):
+  """Indicates no planners were able to promise a required product for a given subject."""
+
+  def __init__(self, product_type, subject=None):
+    msg = ('No plans to generate {!r}{} could be made.'
+            .format(product_type.__name__, ' {!r}'.format(subject) if subject else ''))
+    super(NoProducersError, self).__init__(msg)
+
+
+class ConflictingProducersError(SchedulingError):
+  """Indicates more than one planner was able to promise a product for a given subject."""
+
+  def __init__(self, product_type, subject, planners):
+    msg = ('Collected the following plans for generating {!r} from {!r}\n\t{}'
+            .format(product_type.__name__,
+                    subject,
+                    '\n\t'.join(type(p).__name__ for p in planners)))
+    super(ConflictingProducersError, self).__init__(msg)
+
+
 class Scheduler(AbstractClass):
   """Schedule the creation of products."""
 
@@ -323,18 +343,7 @@ class TaskPlanner(AbstractClass):
                                 .format(dependee=derivation,
                                         dependency=dep,
                                         config=config_specifier))
-              configs = tuple(config for config in dep.configurations
-                              if config.name == config_specifier)
-              if len(configs) != 1:
-                configurations = ('{} -> {!r}'.format(repr(c.name) if c.name else '<anonymous>', c)
-                                  for c in configs)
-                raise cls.Error('Failed to find config named {config} selected by {dependee} '
-                                'amongst these configurations in {dependency}:\n\t{configurations}'
-                                .format(config=config_specifier,
-                                        dependee=derivation,
-                                        dependency=dep,
-                                        configurations='\n\t'.join(configurations)))
-              configuration = configs[0]
+              configuration = dep.select_configuration(config_specifier)
           yield dep, configuration
 
   @abstractproperty
@@ -489,9 +498,9 @@ class ExecutionGraph(object):
     :rtype tuple of (type, :class:`Plan`)
     """
     plans = set()
-    for promise in self._root_promises:
-      for plan in self._walk_plan(promise, plans):
-        yield plan
+    for root_promise in self._root_promises:
+      for promise, plan in self._walk_plan(root_promise, plans):
+        yield promise, plan
 
   def _walk_plan(self, promise, plans):
     plan = self._product_mapper.promised(promise)
@@ -500,7 +509,7 @@ class ExecutionGraph(object):
       for pr in plan.promises:
         for pl in self._walk_plan(pr, plans):
           yield pl
-      yield promise._product_type, plan
+      yield promise, plan
 
 
 class Promise(object):
@@ -534,6 +543,16 @@ class Promise(object):
     :rtype: :class:`Subject`
     """
     return self._subject
+
+  def rebind(self, subject):
+    """Return a version of this promise bound to the new subject.
+
+    :param subject: The new subject of the promise.
+    :type subject: :class:`Subject` or else any object that will be the primary of the stored
+                   `Subject`.
+    :rtype: :class:`Promise`
+    """
+    return Promise(self._product_type, subject, configuration=self._configuration)
 
   def _key(self):
     # We promise the product_type for the primary subject, the alternate does not affect
@@ -605,24 +624,6 @@ class ProductMapper(object):
 class LocalScheduler(Scheduler):
   """A scheduler that formulates an execution graph locally."""
 
-  class NoProducersError(SchedulingError):
-    """Indicates no planners were able to promise a required product for a given subject."""
-
-    def __init__(self, product_type, subject=None):
-      msg = ('No plans to generate {!r}{} could be made.'
-             .format(product_type.__name__, ' {!r}'.format(subject) if subject else ''))
-      super(LocalScheduler.NoProducersError, self).__init__(msg)
-
-  class ConflictingProducersError(SchedulingError):
-    """Indicates more than one planner was able to promise a product for a given subject."""
-
-    def __init__(self, product_type, subject, planners):
-      msg = ('Collected the following plans for generating {!r} from {!r}\n\t{}'
-             .format(product_type.__name__,
-                     subject,
-                     '\n\t'.join(type(p).__name__ for p in planners)))
-      super(LocalScheduler.ConflictingProducersError, self).__init__(msg)
-
   def __init__(self, graph, planners):
     """
     :param graph: The BUILD graph build requests will execute against.
@@ -653,6 +654,20 @@ class LocalScheduler(Scheduler):
         for product_type in planner.product_types:
           # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
           # ng-killall, and buildgen.go.
+          #
+          # 1. If not subjects check for a special Planner subtype with a special subject-less
+          #    promise method.
+          # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
+          #    looks for Target or Jar or ... will naturally just skip it and no-op.
+          #
+          # Option 1 allows for failing the build if no such subtypes are amongst the goals;
+          # ie: `./pants compile` would fail since there are no inputs and all compile registered
+          # planners require subjects (don't implement the subtype).
+          # Seems promising - but what about mixed goals and no subjects?
+          #
+          # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
+          # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
+          # a TaskPlanner baseclass.
           for subject in subjects:
             promise = self.promise(subject, product_type, required=False)
             if promise:
@@ -681,12 +696,12 @@ class LocalScheduler(Scheduler):
     if plan is not None:
       # The `NO_PLAN` plan may have been decided in a non-required round.
       if required and promise is self.NO_PLAN:
-        raise self.NoProducersError(product_type, subject)
+        raise NoProducersError(product_type, subject)
       return None if promise is self.NO_PLAN else promise
 
     planners = self._planners.for_product_type(product_type)
     if required and not planners:
-      raise self.NoProducersError(product_type)
+      raise NoProducersError(product_type)
 
     plans = []
     for planner in planners:
@@ -696,10 +711,10 @@ class LocalScheduler(Scheduler):
 
     if len(plans) > 1:
       planners = [planner for planner, plan in plans]
-      raise self.ConflictingProducersError(product_type, subject, planners)
+      raise ConflictingProducersError(product_type, subject, planners)
     elif not plans:
       if required:
-        raise self.NoProducersError(product_type, subject)
+        raise NoProducersError(product_type, subject)
       self._product_mapper.register_promises(product_type, self.NO_PLAN)
       return None
 

@@ -11,19 +11,8 @@ from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
 from pants.subsystem.subsystem import Subsystem
 
 
-class ExceptStatementsSubsystem(Subsystem):
-  options_scope = 'pycheck-except-statement'
-
-  @classmethod
-  def register_options(cls, register):
-    super(ExceptStatementsSubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
-
-
 class ExceptStatements(CheckstylePlugin):
   """Do not allow non-3.x-compatible and/or dangerous except statements."""
-  subsystem = ExceptStatementsSubsystem
 
   @classmethod
   def blanket_excepts(cls, node):
