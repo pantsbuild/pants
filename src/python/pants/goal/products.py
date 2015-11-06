@@ -18,7 +18,10 @@ class ProductError(Exception): pass
 
 
 class UnionProducts(object):
-  """Here, products for a target are the ordered union of the products for its deps."""
+  """Here, products for a target are an insertion ordered set.
+
+  When products for multiple targets are requested, an ordered union is provided.
+  """
 
   def __init__(self, products_by_target=None):
     # A map of target to OrderedSet of product members.
@@ -54,11 +57,11 @@ class UnionProducts(object):
       self._products_by_target[target].discard(product)
 
   def get_for_target(self, target):
-    """Gets the product deps for the given target."""
+    """Gets the products for the given target."""
     return self.get_for_targets([target])
 
   def get_for_targets(self, targets):
-    """Gets the product deps for the given targets, preserving the input order."""
+    """Gets the union of the products for the given targets, preserving the input order."""
     products = OrderedSet()
     for target in targets:
       products.update(self._products_by_target[target])
