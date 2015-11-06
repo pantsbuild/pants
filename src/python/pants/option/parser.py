@@ -186,7 +186,7 @@ class Parser(object):
         # BooleanConversionError), hence we reference the original exception type by e.__class__.
         raise e.__class__(
           'Error computing value for {} (may also be from PANTS_* environment variables):\n'
-          '{}: {}'.format(args[0], e.__class__.__name__, e)
+          '{}: {}'.format(', '.join(args), e.__class__.__name__, e)
         )
 
       setattr(namespace, dest, val)
