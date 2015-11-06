@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
