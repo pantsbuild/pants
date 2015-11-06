@@ -234,7 +234,7 @@ class AntJunitXmlReportListener extends RunListener {
 
     @XmlAttribute
     public String getName() {
-      return name;
+      return name.trim().replaceAll("[^a-zA-Z0-9_.-]", "-").replaceAll("[.]+$", "");
     }
 
     @XmlAttribute
@@ -412,7 +412,8 @@ class AntJunitXmlReportListener extends RunListener {
           suite.setErr(new String(streamSource.readErr(suite.testClass), Charsets.UTF_8));
         }
 
-        Writer xmlOut = new FileWriter(new File(outdir, String.format("TEST-%s.xml", suite.name)));
+        Writer xmlOut = new FileWriter(
+            new File(outdir, String.format("TEST-%s.xml", suite.getName())));
 
         // Only output valid XML1.0 characters - JAXB does not handle this.
         JAXB.marshal(suite, new XmlWriter(xmlOut) {
