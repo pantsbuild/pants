@@ -32,10 +32,7 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     return isinstance(target, (JarLibrary, JvmTarget))
 
   def setup_repl_session(self, targets):
-    classpath = OrderedSet(self.tool_classpath('scala-repl'))
-    for target in targets:
-      classpath.update(self.classpath(target.closure(bfs=True)))
-    return classpath
+    return self.classpath(targets, classpath_prefix=self.tool_classpath('scala-repl'))
 
   def launch_repl(self, classpath):
     # The scala repl requires -Dscala.usejavacp=true since Scala 2.8 when launching in the way

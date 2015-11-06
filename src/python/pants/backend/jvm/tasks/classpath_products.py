@@ -256,9 +256,12 @@ class ClasspathProducts(object):
   def _filter_by_excludes(self, classpath_tuples, root_targets):
     # Excludes are always applied transitively, so regardless of whether a transitive
     # set of targets was included here, their closure must be included.
-    excludes = OrderedSet()
+    closure = set()
     for root_target in root_targets:
-      excludes.update(self._excludes.get_for_targets(root_target.closure(bfs=True)))
+      closure.update(root_target.closure(bfs=True))
+    excludes = set()
+    for target in closure:
+      excludes.update(self._excludes.get_for_targets(target))
     return filter(_not_excluded_filter(excludes), classpath_tuples)
 
   def _add_excludes_for_target(self, target):

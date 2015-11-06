@@ -133,9 +133,7 @@ class JvmdocGen(JvmTask):
   def _generate_combined(self, targets, create_jvmdoc_command):
     gendir = os.path.join(self.workdir, 'combined')
     if targets:
-      classpath = OrderedSet()
-      for target in targets:
-        classpath.update(self.classpath(target.closure(bfs=True)))
+      classpath = self.classpath(targets)
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
       if command:
@@ -149,7 +147,7 @@ class JvmdocGen(JvmTask):
     jobs = {}
     for target in targets:
       gendir = self._gendir(target)
-      classpath = self.classpath(target.closure(bfs=True))
+      classpath = self.classpath([target])
       command = create_jvmdoc_command(classpath, gendir, target)
       if command:
         jobs[gendir] = (target, command)
