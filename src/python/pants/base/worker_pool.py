@@ -187,6 +187,7 @@ class SubprocPool(object):
   """
   _pool = None
   _lock = threading.Lock()
+  _num_processes = multiprocessing.cpu_count()
 
   @staticmethod
   def worker_init():
@@ -194,10 +195,15 @@ class SubprocPool(object):
     signal.signal(signal.SIGINT, lambda *args: sys.exit())
 
   @classmethod
+  def set_num_processes(cls, num_processes):
+    cls._num_processes = num_processes
+
+  @classmethod
   def foreground(cls):
     with cls._lock:
       if cls._pool is None:
-        cls._pool = multiprocessing.Pool(initializer=SubprocPool.worker_init)
+        cls._pool = multiprocessing.Pool(processes=cls._num_processes,
+                                         initializer=SubprocPool.worker_init)
       return cls._pool
 
   @classmethod

@@ -29,7 +29,7 @@ class SortTargetsTest(BaseTest):
     # no cycles yet
     sort_targets([a])
     self.build_graph.inject_dependency(a.address, a.address)
-    with pytest.raises(CycleException):
+    with self.assertRaises(CycleException):
       sort_targets([a])
 
   def test_detect_cycle_indirect(self):
@@ -41,7 +41,7 @@ class SortTargetsTest(BaseTest):
     sort_targets([a])
 
     self.build_graph.inject_dependency(c.address, a.address)
-    with pytest.raises(CycleException):
+    with self.assertRaises(CycleException):
       sort_targets([a])
 
   def test_sort(self):
