@@ -20,7 +20,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     with temporary_dir() as cache_dir:
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with self.temporary_workdir() as workdir:
         pants_run = self.run_pants_with_workdir(
           ['compile',
            'testprojects/src/java/org/pantsbuild/testproject/publish/hello/main:',
@@ -129,7 +129,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     # We want to ensure that running java compile with binary incompatible libraries will
     # produces two different artifacts.
 
-    with temporary_dir(root_dir=self.workdir_root()) as workdir,  temporary_dir() as cache_dir:
+    with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
       path_prefix = 'testprojects/src/java/org/pantsbuild/testproject/jarversionincompatibility'
       dotted_path = path_prefix.replace(os.path.sep, '.')
       artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),

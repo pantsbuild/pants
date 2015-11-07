@@ -76,6 +76,14 @@ python_tests(
 )
 
 python_tests(
+  name = 'benchmark_run_integration',
+  sources = ['test_benchmark_run_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ]
+)
+
+python_tests(
   name = 'binary_create_integration',
   sources = ['test_binary_create_integration.py'],
   dependencies = [

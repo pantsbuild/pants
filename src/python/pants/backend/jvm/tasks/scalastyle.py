@@ -71,10 +71,9 @@ class Scalastyle(NailgunTask):
                   '(relative to the repo root) matches any of these regexes.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run scalastyle with these extra jvm options.')
+    # TODO: Use the task's log level instead of this separate verbosity knob.
     register('--verbose', action='store_true', default=False,
              help='Enable verbose scalastyle output.')
-    register('--quiet', action='store_true', default=False,
-             help='Silence scalastyle error messages.')
     cls.register_jvm_tool(register, 'scalastyle')
 
   @classmethod
@@ -131,7 +130,7 @@ class Scalastyle(NailgunTask):
 
       scalastyle_config = self.validate_scalastyle_config()
       scalastyle_verbose = self.get_options().verbose
-      scalastyle_quiet = self.get_options().quiet
+      scalastyle_quiet = self.get_options().quiet or False
       scalastyle_excluder = self.create_file_excluder()
 
       self.context.log.debug('Non synthetic scala targets to be checked:')

@@ -100,16 +100,23 @@ class JvmCompile(NailgunTaskBase, GroupMember):
              help='When set, any invalid/incompatible analysis files will be deleted '
                   'automatically.  When unset, an error is raised instead.')
 
-    register('--warnings', default=True, action='store_true',
+    register('--warnings', default=True, action='store_true', fingerprint=True,
              help='Compile with all configured warnings enabled.')
 
-    register('--warning-args', advanced=True, action='append',
+    register('--warning-args', advanced=True, action='append', fingerprint=True,
              default=list(cls.get_warning_args_default()),
              help='Extra compiler args to use when warnings are enabled.')
 
-    register('--no-warning-args', advanced=True, action='append',
+    register('--no-warning-args', advanced=True, action='append', fingerprint=True,
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
+
+    register('--debug-symbols', default=False, action='store_true', fingerprint=True,
+             help='Compile with debug symbol enabled.')
+
+    register('--debug-symbol-args', advanced=True, action='append', fingerprint=True,
+             default=['-C-g:lines,source,vars'],
+             help='Extra args to enable debug symbol.')
 
     register('--delete-scratch', advanced=True, default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
@@ -256,6 +263,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       self._args.extend(self.get_options().warning_args)
     else:
       self._args.extend(self.get_options().no_warning_args)
+
+    if self.get_options().debug_symbols:
+      self._args.extend(self.get_options().debug_symbol_args)
 
     # The ivy confs for which we're building.
     self._confs = self.get_options().confs

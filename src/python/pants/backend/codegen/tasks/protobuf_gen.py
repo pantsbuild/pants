@@ -47,7 +47,7 @@ class ProtobufGen(SimpleCodegenTask):
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
-    register('--plugins', advanced=True, fingerprint=True, action='append',
+    register('--protoc-plugins', advanced=True, fingerprint=True, action='append',
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
                   'named protoc-gen-$NAME on PATH.',
              default=[])

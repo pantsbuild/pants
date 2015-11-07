@@ -43,11 +43,12 @@ class TestTaskMixin(object):
         self._validate_target(target)
 
       timeout = self._timeout_for_targets(test_targets)
+
       try:
-        with Timeout(timeout):
+        with Timeout(timeout, abort_handler=self._timeout_abort_handler):
           self._execute(all_targets)
-      except TimeoutReached:
-        raise TestFailedTaskError(failed_targets=test_targets)
+      except TimeoutReached as e:
+        raise TestFailedTaskError(str(e), failed_targets=test_targets)
 
   def _timeout_for_target(self, target):
     return getattr(target, 'timeout', None)
@@ -97,6 +98,10 @@ class TestTaskMixin(object):
 
     test_targets = list(filter(self._test_target_filter(), self._get_targets()))
     return test_targets
+
+  @abstractmethod
+  def _timeout_abort_handler(self):
+    """Abort the test process when it has been timed out."""
 
   @abstractmethod
   def _test_target_filter(self):

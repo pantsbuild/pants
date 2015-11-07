@@ -5,6 +5,7 @@ target(
     ':go_buildgen',
     ':go_compile',
     ':go_fetch',
+    ':go_go',
     ':go_run',
     ':go_test',
   ]
@@ -64,6 +65,18 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
+  name='go_go',
+  sources=['go_go.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:ansicolors',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/base:exceptions',
   ]
 )
 

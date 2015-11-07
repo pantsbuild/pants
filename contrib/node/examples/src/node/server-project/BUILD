@@ -10,3 +10,10 @@ node_module(
     'contrib/node/examples/3rdparty/node/mocha',
   ]
 )
+
+npm_test(
+  name='unit',
+  dependencies=[
+    ':server-project'
+  ]
+)

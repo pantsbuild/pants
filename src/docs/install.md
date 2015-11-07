@@ -24,7 +24,7 @@ run it.  It's recommended though, that you pin the version of pants.  To do this
 version of pants you just installed:
 
       :::bash
-      ./pants --version
+      ./pants -V
       0.0.42
 
 Then add an entry like so to pants.ini with that version:

@@ -16,7 +16,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class ProtobufIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_protobuf_normal(self):
-    pants_run = self.run_pants(['bundle',
+    pants_run = self.run_pants(['bundle.jvm',
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/protobuf/distance'])
     self.assert_success(pants_run)
@@ -31,7 +31,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("parsec", java_out)
 
   def test_bundle_protobuf_imports(self):
-    pants_run = self.run_pants(['bundle',
+    pants_run = self.run_pants(['bundle.jvm',
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/protobuf/imports'])
     self.assert_success(pants_run)
@@ -46,9 +46,9 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("very test", java_out)
 
   def test_bundle_protobuf_unpacked_jars(self):
-    pants_run = self.run_pants(
-      ['bundle', 'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars',
-       '--bundle-deployjar'])
+    pants_run = self.run_pants(['bundle.jvm',
+                                '--deployjar',
+                                'examples/src/java/org/pantsbuild/example/protobuf/unpacked_jars'])
     self.assertEquals(pants_run.returncode, self.PANTS_SUCCESS_CODE,
                       "goal bundle run expected success, got {0}\n"
                       "got stderr:\n{1}\n"

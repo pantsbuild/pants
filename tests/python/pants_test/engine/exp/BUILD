@@ -28,7 +28,8 @@ python_tests(
     'src/python/pants/engine/exp:engine',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp/examples:planners',
-  ]
+  ],
+  timeout=10,
 )
 
 python_tests(

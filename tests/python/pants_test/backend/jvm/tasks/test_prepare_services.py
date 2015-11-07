@@ -34,10 +34,8 @@ class PrepareServicesTest(TaskTestBase):
                                                        java_library2]))
     relevant_resources_targets = task.find_all_relevant_resources_targets()
 
-    # Just the JvmTargets are relevant, and they're relevant whether they have defined services or
-    # not.
-    self.assertEqual(sorted([jvm_target, java_library, java_library2]),
-                     sorted(relevant_resources_targets))
+    # Only a JvmTargets with a service is relevant.
+    self.assertEqual([java_library2], relevant_resources_targets)
 
   def test_create_invalidation_strategy(self):
     task = self.create_task(self.context())

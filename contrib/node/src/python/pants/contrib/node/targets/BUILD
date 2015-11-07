@@ -6,6 +6,7 @@ target(
   dependencies=[
     ':node_module',
     ':node_remote_module',
+    ':npm_test',
   ]
 )
 
@@ -31,6 +32,16 @@ python_library(
 python_library(
   name='npm_package',
   sources=['npm_package.py'],
+  dependencies=[
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
+    'src/python/pants/build_graph',
+  ]
+)
+
+python_library(
+  name='npm_test',
+  sources=['npm_test.py'],
   dependencies=[
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',

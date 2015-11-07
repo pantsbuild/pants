@@ -25,12 +25,13 @@ class Timeout(object):
       <handle timeout>
   """
 
-  def __init__(self, seconds, threading_timer=threading.Timer):
+  def __init__(self, seconds, abort_handler=lambda: None, threading_timer=threading.Timer):
 
     # self._triggered is not protected by a mutex because boolean set/get is atomic in all the Python
     # implementations we care about.
     self._triggered = False
     self._seconds = seconds
+    self._abort_handler = abort_handler
 
     if self._seconds:
       self._timer = threading_timer(self._seconds, self._handle_timeout)
@@ -38,9 +39,8 @@ class Timeout(object):
       self._timer = None
 
   def _handle_timeout(self):
-    sys.stderr.flush()  # Python 3 stderr is likely buffered.
     self._triggered = True
-    thread.interrupt_main()  # Raises KeyboardInterrupt.
+    self._abort_handler()
 
   def __enter__(self):
     if self._timer is not None:

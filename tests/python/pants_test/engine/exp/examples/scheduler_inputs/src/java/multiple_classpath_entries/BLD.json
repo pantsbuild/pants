@@ -1,0 +1,13 @@
+{
+  "type_alias": "target",
+  "name": "multiple_classpath_entries",
+  "sources": {
+    "files": ["Example.java"]
+  },
+  "dependencies": [
+    "3rdparty/jvm:guava"
+  ],
+  "configurations": [
+    { "type_alias": "build_properties" }
+  ]
+}

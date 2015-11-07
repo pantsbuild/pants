@@ -44,7 +44,7 @@ class ResourcesTaskTestBase(TaskTestBase):
   def create_resources_task(self, target_roots=None, **options):
     self.set_options(**options)
     context = self.context(target_roots=target_roots)
-    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
+    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
     return self.create_task(context)
 
   def create_target(self, spec, contents=None, **kwargs):
