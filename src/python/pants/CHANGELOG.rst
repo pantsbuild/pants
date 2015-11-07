@@ -1,6 +1,181 @@
 RELEASE HISTORY
 ===============
 
+0.0.56 (11/06/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release squashes a bunch of bugs in various area of the codebase, and improves the performance
+of both the options and reporting systems.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove support for type_ in jar_dependency. It has been superceded by the 'ext' argument
+  `Issue #2442 <https://github.com/pantsbuild/pants/issues/2442>`_
+  `RB #3038 <https://rbcommons.com/s/twitter/r/3038>`_
+
+* Prevent option shadowing, and deprecate/remove some shadowed options.
+  `RB #3035 <https://rbcommons.com/s/twitter/r/3035>`_
+
+* Synthetic jars always created when invoking the JVM (Argument list too long revisited)
+  `RB #2672 <https://rbcommons.com/s/twitter/r/2672>`_
+  `RB #3003 <https://rbcommons.com/s/twitter/r/3003>`_
+
+New Features
+~~~~~~~~~~~~
+
+* The ./pants junit runner now works with Cucumber scenarios.
+  `RB #3090 <https://rbcommons.com/s/twitter/r/3090>`_
+
+* New compile task to publish symlinks to jars with class files to pants_distdir
+  `RB #3059 <https://rbcommons.com/s/twitter/r/3059>`_
+
+* Add new `--fail-floating` option to `GoBuildgen`.
+  `RB #3073 <https://rbcommons.com/s/twitter/r/3073>`_
+
+* Add `go` and `go-env` goals.
+  `RB #3060 <https://rbcommons.com/s/twitter/r/3060>`_
+
+* Adding NpmRun and NpmTest
+  `RB #3048 <https://rbcommons.com/s/twitter/r/3048>`_
+
+* Add --compile-zinc-debug-symbols option
+  `RB #3013 <https://rbcommons.com/s/twitter/r/3013>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix test_multiple_source_roots, ignore ordering.
+  `RB #3089 <https://rbcommons.com/s/twitter/r/3089>`_
+
+* Change JarPublish.fingerprint to JarPublish.entry_fingerprint to ensure task fingerprint can change
+  `RB #3078 <https://rbcommons.com/s/twitter/r/3078>`_
+
+* Deprecate/remove broken path-to option in depmap
+  `RB #3079 <https://rbcommons.com/s/twitter/r/3079>`_
+
+* Fix `buildgen.go` to be non-lossy for remote revs.
+  `RB #3077 <https://rbcommons.com/s/twitter/r/3077>`_
+
+* Fixup NailgunClient-related OSX CI break
+  `RB #3069 <https://rbcommons.com/s/twitter/r/3069>`_
+
+* Fix bench goal, include integration test
+  `Issue #2303 <https://github.com/pantsbuild/pants/issues/2303>`_
+  `RB #3072 <https://rbcommons.com/s/twitter/r/3072>`_
+
+* Fix missing newline at end of pants output.
+  `RB #3019 <https://rbcommons.com/s/twitter/r/3019>`_
+  `RB #3063 <https://rbcommons.com/s/twitter/r/3063>`_
+
+* For prepare.services, avoid empty classpath entries by only selecting jvm targets that have services defined
+  `RB #3058 <https://rbcommons.com/s/twitter/r/3058>`_
+
+* Safeguard against stale ProcessManager metadata re-use.
+  `RB #3047 <https://rbcommons.com/s/twitter/r/3047>`_
+
+* Fix test timeout implementation by adding abort handlers
+  `RB #2979 <https://rbcommons.com/s/twitter/r/2979>`_
+
+* Allow for sourceless codegen based purely on target parameters
+  `RB #3044 <https://rbcommons.com/s/twitter/r/3044>`_
+
+* Fix a copy-paste error in migrate_config.py.
+  `RB #3039 <https://rbcommons.com/s/twitter/r/3039>`_
+
+* Fix issue with trailing newlines in Python checkstyle
+  `RB #3033 <https://rbcommons.com/s/twitter/r/3033>`_
+
+* Make profiling cover the init sequence too.
+  `RB #3022 <https://rbcommons.com/s/twitter/r/3022>`_
+
+* Unshade org.pantsbuild.junit.annotation so that @TestParallel works
+  `RB #3012 <https://rbcommons.com/s/twitter/r/3012>`_
+
+Improvements, Refactoring, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove pytest helpers where unittest will do.
+  `RB #3091 <https://rbcommons.com/s/twitter/r/3091>`_
+
+* Remove a hack in IvyResolve.
+  `Issue #2177 <https://github.com/pantsbuild/pants/issues/2177>`_
+  `RB #3088 <https://rbcommons.com/s/twitter/r/3088>`_
+
+* Get rid of argparse usage entirely.
+  `RB #3074 <https://rbcommons.com/s/twitter/r/3074>`_
+
+* Additional test case for changed goal
+  `RB #2589 <https://rbcommons.com/s/twitter/r/2589>`_
+  `RB #2660 <https://rbcommons.com/s/twitter/r/2660>`_
+
+* Upgrade to RBTools 0.7.5.
+  `RB #3076 <https://rbcommons.com/s/twitter/r/3076>`_
+
+* Improve handling of -v, -V, --version and --pants-version.
+  `RB #3071 <https://rbcommons.com/s/twitter/r/3071>`_
+
+* Turn off ng under OSX-CI like we do for linux.
+  `RB #3067 <https://rbcommons.com/s/twitter/r/3067>`_
+
+* Cache npm resolves in CI.
+  `RB #3065 <https://rbcommons.com/s/twitter/r/3065>`_
+
+* Improve incremental caching tests
+  `RB #) <https://rbcommons.com/s/twitter/r/3028/)>`_
+  `RB #3034 <https://rbcommons.com/s/twitter/r/3034>`_
+
+* Refactor the python checkstyle plugin system.
+  `RB #3061 <https://rbcommons.com/s/twitter/r/3061>`_
+
+* Better implementation of the reporting emitter thread.
+  `RB #3057 <https://rbcommons.com/s/twitter/r/3057>`_
+
+* Preparation to allow locating the workdir outside of the build root
+  `RB #3050 <https://rbcommons.com/s/twitter/r/3050>`_
+  `RB #3050 <https://rbcommons.com/s/twitter/r/3050>`_
+
+* Create the argparse.ArgParser instance only on demand.
+  `RB #3056 <https://rbcommons.com/s/twitter/r/3056>`_
+
+* Fix implementation of shallow copy on OptionValueContainer.
+  `RB #3041 <https://rbcommons.com/s/twitter/r/3041>`_
+
+* Defer argparse registration to the last possible moment.
+  `RB #3049 <https://rbcommons.com/s/twitter/r/3049>`_
+
+* Pave the way for server-side python nailgun components
+  `RB #3030 <https://rbcommons.com/s/twitter/r/3030>`_
+
+* Don't resolve node_remote_module targets by themselves and modify how REPL works
+  `RB #2997 <https://rbcommons.com/s/twitter/r/2997>`_
+
+* Remove mustache use from the reporting system.
+  `RB #3018 <https://rbcommons.com/s/twitter/r/3018>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* Add an engine/exp README.
+  `RB #3042 <https://rbcommons.com/s/twitter/r/3042>`_
+
+* Simplify and robustify `LocalMultiprocessEngine`.
+  `RB #3084 <https://rbcommons.com/s/twitter/r/3084>`_
+
+* Example of an additional planner that produces a Classpath for targets
+  `Issue #2484) <https://github.com/pantsbuild/pants/issues/2484)>`_
+  `RB #3075 <https://rbcommons.com/s/twitter/r/3075>`_
+
+* Add fail-slow handling to `Engine`.
+  `RB #3040 <https://rbcommons.com/s/twitter/r/3040>`_
+
+* Cleanup a few scheduler warts.
+  `RB #3032 <https://rbcommons.com/s/twitter/r/3032>`_
+
+
 0.0.55 (10/23/2015)
 -------------------
 
