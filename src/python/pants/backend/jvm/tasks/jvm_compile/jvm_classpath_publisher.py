@@ -41,7 +41,7 @@ class RuntimeClasspathPublisher(Task):
       safe_rmtree(folder_for_symlinks)
 
       classpath_entries_for_target = runtime_classpath.get_internal_classpath_entries_for_targets(
-        [target], transitive=False)
+        [target])
 
       if len(classpath_entries_for_target) > 0:
         safe_mkdir(folder_for_symlinks)

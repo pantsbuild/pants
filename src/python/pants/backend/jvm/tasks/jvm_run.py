@@ -89,7 +89,7 @@ class JvmRun(JvmTask):
       executor = CommandLineGrabber(jvm) if self.only_write_cmd_line else None
       self.context.release_lock()
       result = jvm.execute_java(
-        classpath=(self.classpath([target])),
+        classpath=self.classpath([target]),
         main=self.get_options().main or binary.main,
         executor=executor,
         jvm_options=self.jvm_options,

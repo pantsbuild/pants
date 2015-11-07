@@ -47,7 +47,7 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
       # changes between versions, that you won't get runtime errors due to using an artifact built
       # against a binary incompatible version resolved for a previous compile.
       classpath_entries = self._classpath_products.get_artifact_classpath_entries_for_targets(
-        [target], transitive=False)
+        [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
     return hasher
@@ -532,8 +532,9 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                  compile_context,
                                  extra_compile_time_classpath):
     # Generate a classpath specific to this compile and target.
-    return ClasspathUtil.compute_classpath_for_target(compile_context.target, classpath_products,
-                                                      extra_compile_time_classpath, self._confs)
+    target_closure = compile_context.target.closure(bfs=True)
+    return ClasspathUtil.compute_classpath(target_closure, classpath_products,
+                                           extra_compile_time_classpath, self._confs)
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -575,11 +576,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
     def work_for_vts(vts, compile_context):
       progress_message = compile_context.target.address.spec
-      cp_entries = self._compute_classpath_entries(classpath_products,
-                                                   compile_context,
-                                                   extra_compile_time_classpath)
-
-      upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
       # Capture a compilation log if requested.
       log_file = compile_context.log_file if self._capture_log else None
@@ -588,6 +584,13 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       hit_cache = check_cache(vts)
 
       if not hit_cache:
+        # Compute the compile classpath for this target.
+        cp_entries = self._compute_classpath_entries(classpath_products,
+                                                     compile_context,
+                                                     extra_compile_time_classpath)
+        # TODO: always provide transitive analysis, but not always all classpath entries?
+        upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
+
         # Write analysis to a temporary file, and move it to the final location on success.
         tmp_analysis_file = "{}.tmp".format(compile_context.analysis_file)
         if vts.is_incremental:
@@ -601,14 +604,14 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           safe_delete(tmp_analysis_file)
         target, = vts.targets
         self._compile_vts(vts,
-                    compile_context.sources,
-                    tmp_analysis_file,
-                    upstream_analysis,
-                    cp_entries,
-                    compile_context.classes_dir,
-                    log_file,
-                    progress_message,
-                    target.platform)
+                          compile_context.sources,
+                          tmp_analysis_file,
+                          upstream_analysis,
+                          cp_entries,
+                          compile_context.classes_dir,
+                          log_file,
+                          progress_message,
+                          target.platform)
         os.rename(tmp_analysis_file, compile_context.analysis_file)
         self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
 

@@ -146,7 +146,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
     classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
     classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
-      [classifier_and_no_classifier_lib])
+      classifier_and_no_classifier_lib.closure(bfs=True))
 
     self.assertIn(no_classifier.coordinate,
                   {resolved_jar.coordinate
