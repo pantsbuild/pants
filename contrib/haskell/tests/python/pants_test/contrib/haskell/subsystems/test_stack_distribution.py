@@ -33,7 +33,7 @@ class StackDistributionTest(unittest.TestCase):
 
   def assert_stack_root(self):
     with self.distribution() as stack_distribution:
-      stack_cmd = stack_distribution.create_stack_cmd(cmd='env', args=['GOPATH'])
+      stack_cmd = stack_distribution.create_stack_cmd(cmd='setup', args=['7.10.2', '--reinstall'])
 
       self.assertIn('STACK_ROOT', stack_cmd.env)
       self.assertNotEqual(os.path.expanduser(os.path.join('~', '.stack')),
