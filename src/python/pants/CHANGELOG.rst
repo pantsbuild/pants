@@ -13,7 +13,7 @@ of both the options and reporting systems.
 API Changes
 ~~~~~~~~~~~
 
-* Remove support for type_ in jar_dependency. It has been superceded by the 'ext' argument
+* Remove support for `type_` in jar_dependency. It has been superceded by the 'ext' argument
   `Issue #2442 <https://github.com/pantsbuild/pants/issues/2442>`_
   `RB #3038 <https://rbcommons.com/s/twitter/r/3038>`_
 
@@ -125,7 +125,7 @@ Improvements, Refactoring, and Tooling
   `RB #3065 <https://rbcommons.com/s/twitter/r/3065>`_
 
 * Improve incremental caching tests
-  `RB #) <https://rbcommons.com/s/twitter/r/3028/)>`_
+  `RB #3028 <https://rbcommons.com/s/twitter/r/3028>`_
   `RB #3034 <https://rbcommons.com/s/twitter/r/3034>`_
 
 * Refactor the python checkstyle plugin system.
@@ -166,7 +166,7 @@ New Engine Work
   `RB #3084 <https://rbcommons.com/s/twitter/r/3084>`_
 
 * Example of an additional planner that produces a Classpath for targets
-  `Issue #2484) <https://github.com/pantsbuild/pants/issues/2484)>`_
+  `Issue #2484 <https://github.com/pantsbuild/pants/issues/2484>`_
   `RB #3075 <https://rbcommons.com/s/twitter/r/3075>`_
 
 * Add fail-slow handling to `Engine`.
