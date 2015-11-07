@@ -67,7 +67,8 @@ class RunTracker(Subsystem):
     register('--num-foreground-workers', advanced=True, type=int,
              default=multiprocessing.cpu_count(),
              help='Number of threads for foreground work.')
-    register('--num-background-workers', advanced=True, type=int, default=8,
+    register('--num-background-workers', advanced=True, type=int,
+             default=multiprocessing.cpu_count(),
              help='Number of threads for background work.')
 
   def __init__(self, *args, **kwargs):
@@ -124,7 +125,8 @@ class RunTracker(Subsystem):
     self._background_root_workunit = None
 
     # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring).
-    SubprocPool.foreground(self._num_foreground_workers)
+    SubprocPool.set_num_processes(self._num_foreground_workers)
+    SubprocPool.foreground()
 
     self._aborted = False
 
