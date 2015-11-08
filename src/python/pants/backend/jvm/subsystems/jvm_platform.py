@@ -123,6 +123,17 @@ class JvmPlatform(Subsystem):
       raise self.UndefinedJvmPlatform(for_target, name, self.platforms_by_name)
     return self.platforms_by_name[name]
 
+  def get_strict_deps_for_target(self, target):
+    """Find the strict_deps setting for this target.
+
+    :param JvmTarget target: target to query.
+    :return: True to apply strict_deps for this target.
+    :rtype: bool
+    """
+    if target.payload.strict_deps is not None:
+      return target.payload.strict_deps
+    return self.strict_deps
+
   def get_platform_for_target(self, target):
     """Find the platform associated with this target.
 
