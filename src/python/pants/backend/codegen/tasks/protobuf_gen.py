@@ -76,7 +76,7 @@ class ProtobufGen(SimpleCodegenTask):
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Google protobuf compiler."""
     super(ProtobufGen, self).__init__(*args, **kwargs)
-    self.plugins = self.get_options().plugins
+    self.plugins = self.get_options().protoc_plugins
     self._extra_paths = self.get_options().extra_path
 
   @memoized_property
