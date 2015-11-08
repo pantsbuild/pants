@@ -58,8 +58,6 @@ class JvmPlatform(Subsystem):
              help='Compile settings that can be referred to by name in jvm_targets.')
     register('--default-platform', advanced=True, type=str, default=None, fingerprint=True,
              help='Name of the default platform to use if none are specified.')
-    register('--strict-deps', advanced=True, default=False, action='store_true',
-             help='The default for the "strict_deps" argument for jvm targets.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -83,13 +81,6 @@ class JvmPlatform(Subsystem):
     target_level = source_level
     platform_name = '(DistributionLocator.cached().version {})'.format(source_level)
     return JvmPlatformSettings(source_level, target_level, [], name=platform_name)
-
-  @property
-  def strict_deps(self):
-    """Whether to limit compile time deps to those that are directly declared by a target.
-    :rtype: bool
-    """
-    return self.get_options().strict_deps
 
   @memoized_property
   def default_platform(self):
@@ -122,17 +113,6 @@ class JvmPlatform(Subsystem):
     if name not in self.platforms_by_name:
       raise self.UndefinedJvmPlatform(for_target, name, self.platforms_by_name)
     return self.platforms_by_name[name]
-
-  def get_strict_deps_for_target(self, target):
-    """Find the strict_deps setting for this target.
-
-    :param JvmTarget target: target to query.
-    :return: True to apply strict_deps for this target.
-    :rtype: bool
-    """
-    if target.payload.strict_deps is not None:
-      return target.payload.strict_deps
-    return self.strict_deps
 
   def get_platform_for_target(self, target):
     """Find the platform associated with this target.

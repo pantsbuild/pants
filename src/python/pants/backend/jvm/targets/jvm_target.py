@@ -84,12 +84,12 @@ class JvmTarget(Target, Jarable):
 
   @property
   def strict_deps(self):
-    """Whether to limit compile time deps for this target to those that are directly declared.
+    """If set, whether to limit compile time deps to those that are directly declared.
 
     :return: See constructor.
-    :rtype: bool
+    :rtype: bool or None
     """
-    return JvmPlatform.global_instance().get_strict_deps_for_target(self)
+    return self.payload.strict_deps
 
   @property
   def platform(self):

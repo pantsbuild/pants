@@ -15,7 +15,7 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     self.do_test_success_and_failure(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
       [],
-      ['--strict-deps'],
+      ['--java-strict-deps'],
     )
 
   def test_direct_jar_dep(self):
@@ -23,7 +23,7 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     self.do_test_success_and_failure(
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
       [],
-      ['--strict-deps'],
+      ['--java-strict-deps'],
     )
 
   def test_missing_source_dep_whitelist(self):
