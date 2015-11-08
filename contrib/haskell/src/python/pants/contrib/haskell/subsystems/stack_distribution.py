@@ -80,7 +80,7 @@ class StackDistribution(object):
       # We isolate our stack root from the default (~/.stack) using STACK_ROOT.
       # See: https://github.com/commercialhaskell/stack/issues/1178
       env = OrderedDict(STACK_ROOT=os.path.join(base_dir, '.stack'))
-      return cls([os.path.join(base_dir, 'stack'), cmd] + (args or []), env=env)
+      return cls(cmdline=[os.path.join(base_dir, 'stack'), cmd] + (args or []), env=env)
 
     def spawn(self, env=None, **kwargs):
       """Spawn this stack command returning a handle to the spawned process.

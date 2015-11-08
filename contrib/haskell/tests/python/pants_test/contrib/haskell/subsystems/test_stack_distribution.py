@@ -24,22 +24,25 @@ class StackDistributionTest(unittest.TestCase):
 
   def test_bootstrap(self):
     with self.distribution() as stack_distribution:
-      stack_cmd = stack_distribution.create_stack_cmd(cmd='--version')
+      stack_cmd = stack_distribution.create_stack_cmd(cmd='--numeric-version')
       output = stack_cmd.check_output()
 
-      # Stack version strings look like so:
-      # Version 0.1.6.0, Git revision e22271f5ce9afa2cb5be3bad9cafa392c623f85c (2313 commits) x86_64
-      self.assertIn('Version {},'.format(stack_distribution.version), output.strip())
+      self.assertEqual(stack_distribution.version, output.strip())
 
   def assert_stack_root(self):
     with self.distribution() as stack_distribution:
-      stack_cmd = stack_distribution.create_stack_cmd(cmd='setup', args=['7.10.2', '--reinstall'])
+      stack_cmd = stack_distribution.create_stack_cmd(cmd='path', args=['--global-stack-root'])
 
       self.assertIn('STACK_ROOT', stack_cmd.env)
+      expected_stack_root = stack_cmd.env['STACK_ROOT']
       self.assertNotEqual(os.path.expanduser(os.path.join('~', '.stack')),
-                          stack_cmd.env['STACK_ROOT'])
+                          expected_stack_root)
 
-  def test_go_command_no_gopath(self):
+      output = stack_cmd.check_output()
+
+      self.assertEqual(expected_stack_root, output.strip())
+
+  def test_stack_command_stack_root(self):
     self.assert_stack_root()
 
   def test_stack_command_stack_root_overrides_user_stack_root(self):
