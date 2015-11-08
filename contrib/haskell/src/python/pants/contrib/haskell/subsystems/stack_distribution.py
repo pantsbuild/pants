@@ -77,10 +77,24 @@ class StackDistribution(object):
 
     @classmethod
     def _create(cls, base_dir, cmd, args=None):
+      # TODO(John Sirois): Right now we take full control of stack flags and only allow the caller
+      # to pass sub-command args.  Consider opening this up as the need arises.
+
+      stack_exe = os.path.join(base_dir, 'stack')
+      cmdline = [stack_exe]
+      # Ensure we always run with a hermetic ghc
+      cmdline.extend(['--no-system-ghc', '--install-ghc'])
+
+      cmdline.append(cmd)
+      if args:
+        cmdline.extend(args)
+
       # We isolate our stack root from the default (~/.stack) using STACK_ROOT.
       # See: https://github.com/commercialhaskell/stack/issues/1178
-      env = OrderedDict(STACK_ROOT=os.path.join(base_dir, '.stack'))
-      return cls(cmdline=[os.path.join(base_dir, 'stack'), cmd] + (args or []), env=env)
+      stack_root = os.path.join(base_dir, '.stack')
+      env = OrderedDict(STACK_ROOT=stack_root)
+
+      return cls(cmdline=cmdline, env=env)
 
     def spawn(self, env=None, **kwargs):
       """Spawn this stack command returning a handle to the spawned process.
