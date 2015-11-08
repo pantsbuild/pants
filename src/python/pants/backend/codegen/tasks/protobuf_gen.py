@@ -23,6 +23,7 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
+from pants.option.custom_types import list_option
 from pants.util.memo import memoized_property
 
 
@@ -47,12 +48,11 @@ class ProtobufGen(SimpleCodegenTask):
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
-    register('--protoc-plugins', advanced=True, fingerprint=True, action='append',
+    register('--protoc-plugins', advanced=True, fingerprint=True, type=list_option,
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
-                  'named protoc-gen-$NAME on PATH.',
-             default=[])
+                  'named protoc-gen-$NAME on PATH.')
 
-    register('--extra_path', advanced=True, action='append',
+    register('--extra_path', advanced=True, type=list_option,
              help='Prepend this path onto PATH in the environment before executing protoc. '
                   'Intended to help protoc find its plugins.',
              default=None)
@@ -60,7 +60,7 @@ class ProtobufGen(SimpleCodegenTask):
              help='Path to use for the protoc binary.  Used as part of the path to lookup the'
                   'tool under --pants-bootstrapdir.',
              default='bin/protobuf')
-    register('--javadeps', advanced=True, action='append',
+    register('--javadeps', advanced=True, type=list_option,
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
              default=['3rdparty:protobuf-java'])
@@ -76,8 +76,8 @@ class ProtobufGen(SimpleCodegenTask):
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Google protobuf compiler."""
     super(ProtobufGen, self).__init__(*args, **kwargs)
-    self.plugins = self.get_options().protoc_plugins
-    self._extra_paths = self.get_options().extra_path
+    self.plugins = self.get_options().protoc_plugins or []
+    self._extra_paths = self.get_options().extra_path or []
 
   @memoized_property
   def protobuf_binary(self):
@@ -88,7 +88,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @property
   def javadeps(self):
-    return self.resolve_deps(self.get_options().javadeps)
+    return self.resolve_deps(self.get_options().javadeps or [])
 
   def synthetic_target_type(self, target):
     return JavaLibrary
