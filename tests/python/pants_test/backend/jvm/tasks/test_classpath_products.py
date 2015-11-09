@@ -75,7 +75,7 @@ class ClasspathProductsTest(BaseTest):
       classpath_product.add_for_target(a, [('default', '/dev/null')])
 
     self.assertEqual(
-      'Classpath entry /dev/null for target a:a is located outside the working directory.',
+      'Classpath entry /dev/null for target a:a is located outside the working directory "{}".'.format(self.pants_workdir),
       str(cm.exception))
 
   def test_fails_if_jar_paths_outside_buildroot(self):
@@ -86,7 +86,7 @@ class ClasspathProductsTest(BaseTest):
       classpath_product.add_jars_for_targets([a], 'default', [(resolved_example_jar_at('/dev/null'))])
 
     self.assertEqual(
-      'Classpath entry /dev/null for target a:a is located outside the working directory.',
+      'Classpath entry /dev/null for target a:a is located outside the working directory "{}".'.format(self.pants_workdir),
       str(cm.exception))
 
   def test_excluded_classpath_element(self):
