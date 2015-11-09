@@ -12,6 +12,8 @@ target(
     ':scm_publish',
     ':target_filter_task_mixin',
     ':test_task_mixin',
+    ':clean_all',
+    ':cache_cleanup',
   ],
 )
 
@@ -30,12 +32,15 @@ python_tests(
   name='clean_all',
   sources=['test_cleanall.py'],
   coverage=['pants.backend.core.tasks.clean_all'],
-  dependencies=['src/python/pants/util:dirutil']
+  dependencies=[
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ]
 )
 
 python_tests(
   name='cache_cleanup',
-  sources=['test_cleanall.py'],
+  sources=['test_cache_cleanup.py'],
   coverage=['pants.backend.core.tasks.cache_cleanup'],
   dependencies=[
     'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',

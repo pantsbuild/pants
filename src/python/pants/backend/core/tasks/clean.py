@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.tasks.task import Task
-from pants.cache.cache_setup import CacheSetup
+from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.dirutil import safe_rmtree
 
@@ -36,12 +36,10 @@ class Cleaner(Task):
   @classmethod
   def register_options(cls, register):
     super(Cleaner, cls).register_options(register)
-    register('--skip-ivy', action='store_true', default=True,
-             help='Skip .ivy directory')
-    register('--skip-buildcache', action='store_true', default=True,
-             help='Skip .buildcache directory')
-    register('--skip-pex', action='store_true', default=True,
-             help='Skip .pex directory')
+    register('--include-ivy', action='store_true', default=False,
+             help='include .ivy directory')
+    register('--include-buildcache', action='store_true', default=False,
+             help='include .buildcache directory')
 
   def execute(self):
     print()
@@ -54,21 +52,18 @@ class Cleaner(Task):
     ivy_options = ivy.get_options()
 
     safe_rmtree(self.get_options().pants_workdir)
-    if not options.skip_buildcache and cache_options.read_from:
+    if options.include_buildcache and cache_options.read_from:
       for dir in cache_options.read_from:
-        print('Removing cache [read] dir: {}'.format(dir))
-        safe_rmtree(dir)
+        if CacheFactory.is_local(dir):
+          print('Removing cache [read] dir: {}'.format(dir))
+          safe_rmtree(dir)
 
-    if not options.skip_buildcache and cache_options.write_to:
+    if options.include_buildcache and cache_options.write_to:
       for dir in cache_options.write_to:
-        print('Removing cache [read] dir: {}'.format(dir))
-        safe_rmtree(dir)
+        if CacheFactory.is_local(dir):
+          print('Removing cache [read] dir: {}'.format(dir))
+          safe_rmtree(dir)
 
-    if not self.get_options().skip_pex:
-      pex_path = os.path.join(options.pants_workdir, '.pex')
-      print('Removing .pex dir: {}'.format(pex_path))
-      safe_rmtree(pex_path)
-
-    if not options.skip_ivy:
+    if options.include_ivy:
       print('Removing Ivy cache dir: {}'.format(ivy_options.cache_dir))
       safe_rmtree(ivy_options.cache_dir)

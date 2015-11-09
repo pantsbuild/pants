@@ -21,14 +21,13 @@ class CleanAllTest(PantsRunIntegrationTest):
       with temporary_dir() as ivy_dir:
         pex_dir = os.environ.get('PEX_ROOT')
         config = {
-          'cache': {'write_to': [cache_dir],
-                    'read_from': [cache_dir]},
+          'cache': {'write_to': [cache_dir, 'https://pants.build.com/test'],
+                    'read_from': [cache_dir, 'https://pants.build.com/test']},
         }
 
         pants_run = self.run_pants(['clean-all',
-                                    '--no-skip-buildcache',
-                                    '--no-skip-ivy',
-                                    '--no-skip-pex',
+                                    '--include-buildcache',
+                                    '--include-ivy',
                                     self.gen_ivy_option(ivy_dir)
                                     ],
                                    config=config)
@@ -44,15 +43,14 @@ class CleanAllTest(PantsRunIntegrationTest):
     with temporary_dir() as cache_dir:
       with temporary_dir() as ivy_dir:
         config = {
-          'cache': {'write_to': [cache_dir],
-                    'read_from': [cache_dir]},
+          'cache': {'write_to': [cache_dir, 'https://pants.build.com/test'],
+                    'read_from': [cache_dir, 'https://pants.build.com/test']},
           'ivy': {'cache_dir': [ivy_dir]}
         }
 
         pants_run = self.run_pants(['clean-all',
-                                    '--skip-buildcache',
-                                    '--skip-ivy',
-                                    '--skip-pex',
+                                    '--no-include-buildcache',
+                                    '--no-include-ivy',
                                     ],
                                    config=config)
         self.assert_success(pants_run)
