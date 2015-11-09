@@ -77,7 +77,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                   'which paths are used for tests.  This is usually what you want if your repo '
                   ' uses a maven style directory layout.')
     register('--infer-test-from-siblings', action='store_true',
-             deprecated_version='0.0.57',
+             deprecated_version='0.0.58',
              deprecated_hint='Setting test attribute on paths is now handled automatically.',
              help='When determining if a path should be added to the IDE, check to see if any of '
                   'its sibling source roots define test targets.  This is usually what '

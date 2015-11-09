@@ -1,6 +1,47 @@
 RELEASE HISTORY
 ===============
 
+0.0.57 (11/09/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release that fixes a bug preventing repos using `plugins` in the `DEFAULT` section
+of `pants.ini` from upgrading to `0.0.56`.
+
+API Changes
+~~~~~~~~~~~
+
+* API Change: Move graph walking out of classpath_(util|products)
+  `RB #3036 <https://rbcommons.com/s/twitter/r/3036>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix bug when analysis file is corrupt or missing during an incremental compile
+  `RB #3101 <https://rbcommons.com/s/twitter/r/3101>`_
+
+* Update the option types for protobuf-gen to be list types, since they are all advanced.
+  `RB #3098 <https://rbcommons.com/s/twitter/r/3098>`_
+  `RB #3100 <https://rbcommons.com/s/twitter/r/3100>`_
+
+* Fix plugin option references in leaves.
+  `RB #3098 <https://rbcommons.com/s/twitter/r/3098>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Seed the haskell contrib with `StackDistribution`.
+  `RB #2975 <https://rbcommons.com/s/twitter/r/2975>`_
+  `RB #3095 <https://rbcommons.com/s/twitter/r/3095>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Better error message for classpath entries outside the working directory
+  `RB #3099 <https://rbcommons.com/s/twitter/r/3099>`_
+
 0.0.56 (11/06/2015)
 -------------------
 
@@ -95,7 +136,7 @@ Bugfixes
 * Unshade org.pantsbuild.junit.annotation so that @TestParallel works
   `RB #3012 <https://rbcommons.com/s/twitter/r/3012>`_
 
-Improvements, Refactoring, and Tooling
+Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Remove pytest helpers where unittest will do.
