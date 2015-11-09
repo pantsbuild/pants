@@ -44,17 +44,13 @@ class ResourcesTaskTestBase(TaskTestBase):
   def create_resources_task(self, target_roots=None, **options):
     self.set_options(**options)
     context = self.context(target_roots=target_roots)
-    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts)
+    context.products.safe_create_data('compile_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
     return self.create_task(context)
 
   def create_target(self, spec, contents=None, **kwargs):
     return self.make_target(spec, target_type=self.TestTarget, contents=contents, **kwargs)
 
   def assert_no_products(self, task, target):
-    classpath_products = task.context.products.get_data('runtime_classpath')
-    self.assertEqual(0, len(classpath_products.get_for_target(target)))
-
-  def assert_empty_products(self, task, target):
     classpath_products = task.context.products.get_data('runtime_classpath')
     self.assertEqual(0, len(classpath_products.get_for_target(target)))
 

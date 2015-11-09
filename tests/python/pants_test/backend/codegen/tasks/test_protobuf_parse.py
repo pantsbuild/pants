@@ -8,8 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 from textwrap import dedent
-
-import pytest
+from unittest.case import expectedFailure
 
 from pants.backend.codegen.tasks.protobuf_parse import (MESSAGE_PARSER, ProtobufParse, camelcase,
                                                         get_outer_class_name, update_type_list)
@@ -124,7 +123,7 @@ class ProtobufParseTest(unittest.TestCase):
 
   # TODO(Eric Ayers) The following tests won't pass because the .proto parse is not reliable.
   #  https://github.com/pantsbuild/pants/issues/96
-  @pytest.mark.xfail
+  @expectedFailure
   def test_inner_class_no_newline(self):
     with temporary_dir() as workdir:
       filename = 'inner_class_no_newline.proto'
@@ -145,7 +144,7 @@ class ProtobufParseTest(unittest.TestCase):
         self.assertEqual(set(), proto_parse.services)
         self.assertEqual('InnerClassNoNewline', proto_parse.outer_class_name)
 
-  @pytest.mark.xfail
+  @expectedFailure
   def test_no_newline_at_all1(self):
     with temporary_dir() as workdir:
       filename = 'no_newline_at_all1.proto'
@@ -161,7 +160,7 @@ class ProtobufParseTest(unittest.TestCase):
         self.assertEqual(set(), proto_parse.services)
         self.assertEqual('NoNewlineAtAll1', proto_parse.outer_class_name)
 
-  @pytest.mark.xfail
+  @expectedFailure
   def test_no_newline_at_all2(self):
     with temporary_dir() as workdir:
       filename = 'no_newline_at_all2.proto'
@@ -177,7 +176,7 @@ class ProtobufParseTest(unittest.TestCase):
         self.assertEqual(set(), proto_parse.services)
         self.assertEqual('NoNewlineAtAll2', proto_parse.outer_class_name)
 
-  @pytest.mark.xfail
+  @expectedFailure
   def test_no_newline_at_all3(self):
     with temporary_dir() as workdir:
       filename = 'no_newline_at_all3.proto'
@@ -192,7 +191,7 @@ class ProtobufParseTest(unittest.TestCase):
         self.assertEqual(set(), proto_parse.services)
         self.assertEqual('NoNewlineAtAll3', proto_parse.outer_class_name)
 
-  @pytest.mark.xfail
+  @expectedFailure
   def test_crazy_whitespace(self):
     with temporary_dir() as workdir:
       filename = 'crazy_whitespace.proto'

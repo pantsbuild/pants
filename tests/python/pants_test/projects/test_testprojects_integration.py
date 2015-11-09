@@ -20,6 +20,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       # to be first in the context, and test.junit mixes all classpaths.
       'testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb',
       'testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec',
+      # This will fail until we release and upgrade to junit runner 0.0.11.
+      'testprojects/tests/java/org/pantsbuild/testproject/cucumber',
     ]
 
     # Targets that are intended to fail
@@ -46,7 +48,14 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-test-platform',
     ]
 
-    targets_to_exclude = known_failing_targets + negative_test_targets + need_java_8
+    # Targets for testing timeouts. These should only be run during specific integration tests,
+    # because they take a long time to run.
+    timeout_targets = [
+      'testprojects/tests/python/pants/timeout:sleeping_target',
+      'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target'
+    ]
+
+    targets_to_exclude = known_failing_targets + negative_test_targets + need_java_8 + timeout_targets
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target), targets_to_exclude)
     pants_run = self.pants_test(['testprojects::'] + exclude_opts)
     self.assert_success(pants_run)

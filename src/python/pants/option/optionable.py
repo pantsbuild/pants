@@ -36,7 +36,7 @@ class Optionable(AbstractClass):
   def register_options(cls, register):
     """Register options for this optionable.
 
-    Subclasses may override and call register(*args, **kwargs) with argparse arguments.
+    Subclasses may override and call register(*args, **kwargs).
     """
 
   @classmethod

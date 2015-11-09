@@ -7,7 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import codecs
 import os.path
-from unittest import skipIf
+import time
+from unittest import expectedFailure, skipIf
 
 from pants.java.distribution.distribution import DistributionLocator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -66,3 +67,33 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all', 'test.junit', '--test=org.pantsbuild.testproject.matcher.MatcherTest_BAD_CLASS', 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])
     self.assert_failure(pants_run)
     self.assertIn("No target found for test specifier", pants_run.stdout_data)
+
+  def test_junit_run_timeout_succeeds(self):
+    pants_run = self.run_pants(['clean-all',
+                                'test.junit',
+                                '--timeout-default=1',
+                                '--test=org.pantsbuild.testproject.timeout.SleeperTestShort',
+                                'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target'])
+    self.assert_success(pants_run)
+
+  def test_junit_run_timeout_fails(self):
+    start = time.time()
+    pants_run = self.run_pants(['clean-all',
+                                'test.junit',
+                                '--timeout-default=1',
+                                '--test=org.pantsbuild.testproject.timeout.SleeperTestLong',
+                                'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target'])
+    end = time.time()
+    self.assert_failure(pants_run)
+
+    # Ensure that the failure took less than 120 seconds to run.
+    self.assertLess(end - start, 120)
+
+    # Ensure that the timeout triggered.
+    self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
+
+  @expectedFailure
+  def test_junit_tests_using_cucumber(self):
+    test_spec = 'testprojects/tests/java/org/pantsbuild/testproject/cucumber'
+    with self.pants_results(['clean-all', 'test.junit', test_spec]) as results:
+      self.assert_success(results)

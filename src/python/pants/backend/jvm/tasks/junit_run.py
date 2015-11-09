@@ -29,6 +29,7 @@ from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import SubprocessExecutor
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -171,6 +172,8 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
 
+    self._executor = None
+
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
                                             if isinstance(target, JvmTarget)])
@@ -183,8 +186,10 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     max_version = Revision(*(min_version.components + [9999])) if self._strict_jvm_version else None
     return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
 
-  def execute_java_for_targets(self, targets, *args, **kwargs):
-    return self.preferred_jvm_distribution_for_targets(targets).execute_java(*args, **kwargs)
+  def execute_java_for_targets(self, targets, executor=None, *args, **kwargs):
+    distribution = self.preferred_jvm_distribution_for_targets(targets)
+    self._executor = executor or SubprocessExecutor(distribution)
+    return distribution.execute_java(*args, executor=self._executor, **kwargs)
 
   def _collect_test_targets(self, targets):
     """Returns a mapping from test names to target objects for all tests that
@@ -286,18 +291,19 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       for batch in self._partition(tests):
         # Batches of test classes will likely exist within the same targets: dedupe them.
         relevant_targets = set(map(tests_to_targets.get, batch))
-        classpath = self.classpath(relevant_targets,
-                                   classpath_prefix=self.tool_classpath('junit'),
-                                   classpath_product=classpath_product)
         complete_classpath = OrderedSet()
         complete_classpath.update(classpath_prepend)
-        complete_classpath.update(classpath)
+        complete_classpath.update(self.tool_classpath('junit'))
+        complete_classpath.update(self.classpath(relevant_targets,
+                                                 classpath_product=classpath_product))
         complete_classpath.update(classpath_append)
         distribution = self.preferred_jvm_distribution([platform])
         with binary_util.safe_args(batch, self.get_options()) as batch_tests:
           self.context.log.debug('CWD = {}'.format(workdir))
           self.context.log.debug('platform = {}'.format(platform))
+          self._executor = SubprocessExecutor(distribution)
           result += abs(distribution.execute_java(
+            executor=self._executor,
             classpath=complete_classpath,
             main=JUnitRun._MAIN,
             jvm_options=self.jvm_options + extra_jvm_options,
@@ -370,11 +376,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     """
     classpath_products = self.context.products.get_data('runtime_classpath')
     for target in targets:
-      contents = ClasspathUtil.classpath_contents(
-        (target,),
-        classpath_products,
-        confs=self.confs,
-        transitive=False)
+      contents = ClasspathUtil.classpath_contents((target,), classpath_products, confs=self.confs)
       for f in contents:
         classname = ClasspathUtil.classname_for_rel_classfile(f)
         if classname:
@@ -404,6 +406,16 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       msg = 'JavaTests target must include a non-empty set of sources.'
       raise TargetDefinitionException(target, msg)
 
+  def _timeout_abort_handler(self):
+    """Kills the test run."""
+
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process.
+    if self._executor is not None:
+      self._executor.kill()
+
   def _execute(self, targets):
     """
     Implements the primary junit test execution. This method is called by the TestTaskMixin,
@@ -426,7 +438,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     bootstrapped_cp = self.tool_classpath('junit')
 
     def compute_complete_classpath():
-      return self.classpath(targets, classpath_prefix=bootstrapped_cp)
+      return self.classpath(targets)
 
     self.context.release_lock()
     if self._coverage:

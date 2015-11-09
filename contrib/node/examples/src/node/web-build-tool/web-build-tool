@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Assumes this is being run via "npm run web-build-tool" in a containing project.
 # That means this script is executed via the symlink [containing project directory]/node_modules/.bin/web-build-tool.
 

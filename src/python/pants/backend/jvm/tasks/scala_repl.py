@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -30,8 +32,7 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     return isinstance(target, (JarLibrary, JvmTarget))
 
   def setup_repl_session(self, targets):
-    tools_classpath = self.tool_classpath('scala-repl')
-    return self.classpath(targets, classpath_prefix=tools_classpath)
+    return self.classpath(targets, classpath_prefix=self.tool_classpath('scala-repl'))
 
   def launch_repl(self, classpath):
     # The scala repl requires -Dscala.usejavacp=true since Scala 2.8 when launching in the way

@@ -113,9 +113,6 @@ def create_options(options, passthru_args=None):
     def items(self):
       return options.items()
 
-    def registration_args_iter_for_scope(self, scope):
-      return []
-
     def get_fingerprintable_for_scope(self, scope):
       return []
 

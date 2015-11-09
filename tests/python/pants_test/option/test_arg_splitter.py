@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import shlex
 import unittest
 
-from pants.option.arg_splitter import ArgSplitter, NoGoalHelp, OptionsHelp, UnknownGoalHelp
+from pants.option.arg_splitter import (ArgSplitter, NoGoalHelp, OptionsHelp, UnknownGoalHelp,
+                                       VersionHelp)
 from pants.option.scope import ScopeInfo
 
 
@@ -56,6 +57,11 @@ class ArgSplitterTest(unittest.TestCase):
                 expected_is_help=True,
                 expected_help_advanced=expected_help_advanced,
                 expected_help_all=expected_help_all)
+
+  def _split_version_request(self, args_str):
+    splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+    splitter.split_args(shlex.split(args_str))
+    self.assertTrue(isinstance(splitter.help_request, VersionHelp))
 
   def _split_unknown_goal(self, args_str, unknown_goals):
     splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
@@ -194,6 +200,13 @@ class ArgSplitterTest(unittest.TestCase):
                      {'': [], 'compile': []}, [], True, False)
     self._split_help('./pants compile help-all test --help', ['compile', 'test'],
                      {'': [], 'compile': [], 'test': []}, [], False, True)
+
+  def test_version_request_detection(self):
+    self._split_version_request('./pants -v')
+    self._split_version_request('./pants -V')
+    self._split_version_request('./pants --version')
+    # A version request supercedes anything else.
+    self._split_version_request('./pants --version compile --foo --bar path/to/target')
 
   def test_unknown_goal_detection(self):
     self._split_unknown_goal('./pants foo', ['foo'])

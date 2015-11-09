@@ -13,6 +13,8 @@ from pants.util.memo import memoized
 
 
 class ScaladocGen(JvmdocGen):
+  """Generate scaladoc html for Scala source targets."""
+
   @classmethod
   @memoized
   def jvmdoc(cls):

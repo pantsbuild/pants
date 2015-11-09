@@ -10,7 +10,6 @@ import os
 from distutils import sysconfig
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
-from pants.subsystem.subsystem import Subsystem
 
 
 class ImportType(object):
@@ -47,16 +46,6 @@ class ImportType(object):
     return ' '.join(cls.NAMES.get(import_id, 'unknown') for import_id in import_order)
 
 
-class ImportOrderSubsystem(Subsystem):
-  options_scope = 'pycheck-import-order'
-
-  @classmethod
-  def register_options(cls, register):
-    super(ImportOrderSubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
-
-
 class ImportOrder(CheckstylePlugin):
   # TODO(wickman)
   #   - Warn if a package is marked as a 3rdparty but it's actually a package
@@ -64,7 +53,6 @@ class ImportOrder(CheckstylePlugin):
   #     import (i.e. from __future__ import absolute_imports)
 
   STANDARD_LIB_PATH = os.path.realpath(sysconfig.get_python_lib(standard_lib=1))
-  subsystem = ImportOrderSubsystem
 
   @classmethod
   def extract_import_modules(cls, node):

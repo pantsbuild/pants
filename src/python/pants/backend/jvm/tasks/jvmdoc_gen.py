@@ -11,6 +11,8 @@ import multiprocessing
 import os
 import subprocess
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
@@ -103,7 +105,6 @@ class JvmdocGen(JvmTask):
 
     with self.invalidated(targets) as invalidation_check:
       safe_mkdir(self.workdir)
-      classpath = self.classpath(targets)
 
       def find_jvmdoc_targets():
         invalid_targets = set()
@@ -117,9 +118,9 @@ class JvmdocGen(JvmTask):
 
       jvmdoc_targets = list(find_jvmdoc_targets())
       if self.combined:
-        self._generate_combined(classpath, jvmdoc_targets, create_jvmdoc_command)
+        self._generate_combined(jvmdoc_targets, create_jvmdoc_command)
       else:
-        self._generate_individual(classpath, jvmdoc_targets, create_jvmdoc_command)
+        self._generate_individual(jvmdoc_targets, create_jvmdoc_command)
 
     if catalog:
       for target in targets:
@@ -129,9 +130,10 @@ class JvmdocGen(JvmTask):
           jvmdocs.extend(os.path.relpath(os.path.join(root, f), gendir) for f in files)
         self.context.products.get(self.jvmdoc().product_type).add(target, gendir, jvmdocs)
 
-  def _generate_combined(self, classpath, targets, create_jvmdoc_command):
+  def _generate_combined(self, targets, create_jvmdoc_command):
     gendir = os.path.join(self.workdir, 'combined')
     if targets:
+      classpath = self.classpath(targets)
       safe_mkdir(gendir, clean=True)
       command = create_jvmdoc_command(classpath, gendir, *targets)
       if command:
@@ -141,10 +143,11 @@ class JvmdocGen(JvmTask):
     if self.open:
       binary_util.ui_open(os.path.join(gendir, 'index.html'))
 
-  def _generate_individual(self, classpath, targets, create_jvmdoc_command):
+  def _generate_individual(self, targets, create_jvmdoc_command):
     jobs = {}
     for target in targets:
       gendir = self._gendir(target)
+      classpath = self.classpath([target])
       command = create_jvmdoc_command(classpath, gendir, target)
       if command:
         jobs[gendir] = (target, command)

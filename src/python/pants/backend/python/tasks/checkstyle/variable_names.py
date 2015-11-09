@@ -13,7 +13,6 @@ from functools import wraps
 from twitter.common.lang import Compatibility
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
-from pants.subsystem.subsystem import Subsystem
 
 
 ALL_LOWER_CASE_RE = re.compile(r'^[a-z][a-z\d]*$')
@@ -78,16 +77,6 @@ def is_constant(name):
   return UPPER_SNAKE_RE.match(name) is not None
 
 
-class VariableNamesSubsystem(Subsystem):
-  options_scope = 'pycheck-variable-names'
-
-  @classmethod
-  def register_options(cls, register):
-    super(VariableNamesSubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
-
-
 class PEP8VariableNames(CheckstylePlugin):
   """Enforces PEP8 recommendations for variable names.
   Specifically:
@@ -97,7 +86,6 @@ class PEP8VariableNames(CheckstylePlugin):
      CLASS_LEVEL_CONSTANTS = {}
      GLOBAL_LEVEL_CONSTANTS = {}
   """
-  subsystem = VariableNamesSubsystem
 
   CLASS_GLOBAL_BUILTINS = frozenset((
     '__slots__',

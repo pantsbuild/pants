@@ -60,6 +60,6 @@ class JvmdocGenTest(JvmTaskTestBase):
     for generate in [self.task._generate_individual,
                      self.task._generate_combined]:
       with self.assertRaises(TaskError):
-        generate([], self.targets, create_jvmdoc_command_fail)
+        generate(self.targets, create_jvmdoc_command_fail)
 
-      generate([], self.targets, create_jvmdoc_command_succeed)
+      generate(self.targets, create_jvmdoc_command_succeed)

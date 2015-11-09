@@ -134,7 +134,7 @@ class NailgunClient(object):
   DEFAULT_NG_HOST = '127.0.0.1'
   DEFAULT_NG_PORT = 2113
 
-  def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=None, out=None, err=None,
+  def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
                workdir=None):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
@@ -145,11 +145,11 @@ class NailgunClient(object):
                      in which case no input is read
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
-    :param string workdir: the default working directory for all nailgun commands (defaults to PWD)
+    :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
     """
     self._host = host
     self._port = port
-    self._stdin = ins or sys.stdin
+    self._stdin = ins
     self._stdout = out or sys.stdout
     self._stderr = err or sys.stderr
     self._workdir = workdir or os.path.abspath(os.path.curdir)

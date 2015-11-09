@@ -226,7 +226,7 @@ class ZincCompile(JvmCompile):
 
   def plugin_jars(self):
     """The classpath entries for jars containing code for enabled plugins."""
-    if self.get_options().plugins:
+    if self.get_options().scalac_plugins:
       return self.tool_classpath('plugin-jars')
     else:
       return []
@@ -237,7 +237,7 @@ class ZincCompile(JvmCompile):
     return self._lazy_plugin_args
 
   def _create_plugin_args(self):
-    if not self.get_options().plugins:
+    if not self.get_options().scalac_plugins:
       return []
 
     plugin_args = self.get_options().plugin_args
@@ -252,7 +252,7 @@ class ZincCompile(JvmCompile):
   def _find_plugins(self):
     """Returns a map from plugin name to plugin jar."""
     # Allow multiple flags and also comma-separated values in a single flag.
-    plugin_names = set([p for val in self.get_options().plugins for p in val.split(',')])
+    plugin_names = set([p for val in self.get_options().scalac_plugins for p in val.split(',')])
     plugins = {}
     buildroot = get_buildroot()
     for jar in self.plugin_jars():

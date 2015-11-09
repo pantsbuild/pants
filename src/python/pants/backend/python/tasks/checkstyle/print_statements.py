@@ -9,24 +9,12 @@ import ast
 import re
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
-from pants.subsystem.subsystem import Subsystem
-
-
-class PrintStatementsSubsystem(Subsystem):
-  options_scope = 'pycheck-print-statements'
-
-  @classmethod
-  def register_options(cls, register):
-    super(PrintStatementsSubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
 
 
 class PrintStatements(CheckstylePlugin):
   """Enforce the use of print as a function and not a statement."""
 
   FUNCTIONY_EXPRESSION = re.compile(r'^\s*\(.*\)\s*$')
-  subsystem = PrintStatementsSubsystem
 
   def nits(self):
     for print_stmt in self.iter_ast_types(ast.Print):
