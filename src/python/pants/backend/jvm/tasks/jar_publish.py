@@ -871,7 +871,7 @@ class JarPublish(ScmPublishMixin, JarTask):
     return sha.hexdigest()
 
   def changelog(self, target, sha):
-    # filter synthetic files
+    # Filter synthetic files.
     files = filter(lambda filename: not filename.startswith(os.pardir), target.sources_relative_to_buildroot())
     return ensure_text(self.scm.changelog(from_commit=sha, files=files))
 

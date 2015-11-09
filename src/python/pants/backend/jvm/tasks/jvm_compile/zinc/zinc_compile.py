@@ -197,7 +197,7 @@ class ZincCompile(JvmCompile):
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
-    # Validate zinc options
+    # Validate zinc options.
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
 
   def create_analysis_tools(self):

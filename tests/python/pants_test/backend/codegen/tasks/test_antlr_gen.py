@@ -71,8 +71,8 @@ class AntlrGenTest(NailgunTaskTestBase):
     context = self.create_context()
     task = self.prepare_execute(context)
     target_workdir_fun = target_workdir_fun or (lambda x: safe_mkdtemp(dir=x))
-    # do not use task.workdir here, because when we calculating hash for synthetic target
-    # we need persistent source paths in terms of relative position to build root
+    # Do not use task.workdir here, because when we calculating hash for synthetic target
+    # we need persistent source paths in terms of relative position to build root.
     target_workdir = target_workdir_fun(self.build_root)
 
     # Generate code, then create a synthetic target.

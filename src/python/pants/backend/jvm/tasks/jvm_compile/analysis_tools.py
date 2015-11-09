@@ -70,7 +70,7 @@ class AnalysisTools(object):
       # in those rare cases.
       # Work on a tmpfile, for safety.
       # Start with rebasing working directory,
-      # because build root cannot be subdirectory of working directory
+      # because build root cannot be subdirectory of working directory.
       self.parser.rebase_from_path(src_analysis, tmp_analysis_file1,
                                    self._pants_workdir, self._PANTS_WORKDIR_PLACEHOLDER, self._java_home)
       self.parser.rebase_from_path(tmp_analysis_file1, tmp_analysis_file2,

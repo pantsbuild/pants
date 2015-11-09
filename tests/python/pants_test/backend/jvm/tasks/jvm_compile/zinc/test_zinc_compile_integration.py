@@ -99,7 +99,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
             ])
         self.assert_success(pants_run)
 
-        # confirm that we were warned
+        # Confirm that we were warned.
         self.assertIn('is not supported, and is subject to change/removal', pants_run.stdout_data)
 
   def _file_content_from_compilation(self, target, file_name):
@@ -117,7 +117,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     analysis2 = self._file_content_from_compilation(target, analysis_file_name)
 
     def extract_content(analysis):
-      # TODO(stuhood): comparing content before stamps only, because there is different line in internal apis section
+      # TODO(stuhood): Comparing content before stamps only, because there is different line in internal apis section.
       # return re.sub(re.compile('lastModified\(\d+\)'), "lastModified()", analysis).split('\n')
       return analysis.partition("stamps")[0].split("\n")
 

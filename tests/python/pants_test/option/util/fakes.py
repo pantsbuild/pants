@@ -182,7 +182,7 @@ def create_options_for_optionables(optionables, extra_scopes=None, options=None)
 
   all_scopes = complete_scopes(all_scopes)
 
-  # We need to update options before completing them based on inner/outer relation
+  # We need to update options before completing them based on inner/outer relation.
   if options:
     for scope, opts in options.items():
       all_options[scope].update(opts)
