@@ -9,7 +9,7 @@ import logging
 import os
 from contextlib import contextmanager
 
-from pants.cache.artifact import ArtifactError, TarballArtifact
+from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache, UnreadableArtifact
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree
@@ -118,15 +118,10 @@ class LocalArtifactCache(BaseLocalArtifactCache):
           safe_rmtree(results_dir)
         artifact.extract()
         return True
-    except (ArtifactError, IOError) as non_retryable_exception:
-      logger.warn('Cleaning up corrupted artifact {0}: {1}'
-                  .format(tarfile, non_retryable_exception))
-      safe_delete(tarfile)
-      return UnreadableArtifact(cache_key, non_retryable_exception)
     except Exception as e:
-      # The rest exceptions could be transient, we can further refine this by moving
-      # non-retryable errors handling to the above section.
-      logger.warn('Error while reading {0}: {1}'.format(tarfile, e))
+      # TODO(davidt): Consider being more granular in what is caught.
+      logger.warn('Error while reading {0} from local artifact cache: {1}'.format(tarfile, e))
+      safe_delete(tarfile)
       return UnreadableArtifact(cache_key, e)
 
     return False
