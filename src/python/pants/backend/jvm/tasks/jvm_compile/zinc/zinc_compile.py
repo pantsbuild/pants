@@ -304,6 +304,9 @@ class ZincCompile(JvmCompile):
     # appropriate level and certainly at a more appropriate granularity.
     compile_classpath = self.compiler_classpath() + classpath
 
+    self._verify_zinc_classpath(self.get_options().pants_workdir, compile_classpath)
+    self._verify_zinc_classpath(self.get_options().pants_workdir, upstream_analysis.keys())
+
     zinc_args = []
 
     zinc_args.extend([
@@ -348,6 +351,18 @@ class ZincCompile(JvmCompile):
                     workunit_name='zinc',
                     workunit_labels=[WorkUnitLabel.COMPILER]):
       raise TaskError('Zinc compile failed.')
+
+  @staticmethod
+  def _verify_zinc_classpath(pants_workdir, classpath):
+    for path in classpath:
+      if not os.path.isabs(path):
+        raise TaskError('Classpath elements provided to zinc should be absolute. ' + path + ' is not.')
+      if os.path.relpath(path, pants_workdir).startswith(os.pardir):
+        raise TaskError('Classpath elements provided to zinc should be in working directory. ' +
+                        path + ' is not.')
+      if path != os.path.normpath(path):
+        raise TaskError('Classpath elements provided to zinc should be normalised (i.e. without ".." and "."). ' +
+                        path + ' is not.')
 
   def log_zinc_file(self, analysis_file):
     self.context.log.debug('Calling zinc on: {} ({})'
