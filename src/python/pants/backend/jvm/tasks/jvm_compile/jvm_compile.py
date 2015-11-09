@@ -574,6 +574,17 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
       return True
 
+    def should_compile_incrementally(vts):
+      """Check to see if the compile should try to re-use the existing analysis.
+
+      Returns true if we should try to compile the target incrementally.
+      """
+      if not vts.is_incremental:
+        return False
+      if not self._clear_invalid_analysis:
+        return True
+      return os.path.exists(compile_context.analysis_file)
+
     def work_for_vts(vts, compile_context):
       progress_message = compile_context.target.address.spec
 
@@ -593,7 +604,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
         # Write analysis to a temporary file, and move it to the final location on success.
         tmp_analysis_file = "{}.tmp".format(compile_context.analysis_file)
-        if vts.is_incremental:
+        if should_compile_incrementally(vts):
           # If this is an incremental compile, rebase the analysis to our new classes directory.
           self._analysis_tools.rebase_from_path(compile_context.analysis_file,
                                                 tmp_analysis_file,
