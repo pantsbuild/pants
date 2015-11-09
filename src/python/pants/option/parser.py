@@ -184,9 +184,9 @@ class Parser(object):
         # Reraise a new exception with context on the option being processed at the time of error.
         # Note that other exception types can be raised here that are caught by ParseError (e.g.
         # BooleanConversionError), hence we reference the original exception type by e.__class__.
-        raise e.__class__(
-          'Error computing value for {} (may also be from PANTS_* environment variables):\n'
-          '{}: {}'.format(', '.join(args), e.__class__.__name__, e)
+        raise type(e)(
+          'Error computing value for {} in {} (may also be from PANTS_* environment variables):\n'
+          '{}'.format(', '.join(args), self._scope_str(), e)
         )
 
       setattr(namespace, dest, val)
