@@ -70,6 +70,7 @@ class AnalysisTools(object):
       # Work on a tmpfile, for safety.
       # Start with rebasing working directory,
       # because build root cannot be subdirectory of working directory.
+      # TODO: Change to one call to zincutils when API will be made: https://github.com/pantsbuild/zincutils/issues/8.
       self.parser.rebase_from_path(src_analysis, tmp_analysis_file1,
                                    self._pants_workdir, self._PANTS_WORKDIR_PLACEHOLDER, self._java_home)
       self.parser.rebase_from_path(tmp_analysis_file1, tmp_analysis_file2,
@@ -83,6 +84,7 @@ class AnalysisTools(object):
       tmp_analysis_file2 = os.path.join(tmp_analysis_dir, 'analysys.2')
 
       # Work on a tmpfile, for safety.
+      # TODO: Change to one call to zincutils when API will be made: https://github.com/pantsbuild/zincutils/issues/8.
       self.parser.rebase_from_path(src_analysis, tmp_analysis_file1,
                                    self._PANTS_WORKDIR_PLACEHOLDER, self._pants_workdir)
       self.parser.rebase_from_path(tmp_analysis_file1, tmp_analysis_file2,
