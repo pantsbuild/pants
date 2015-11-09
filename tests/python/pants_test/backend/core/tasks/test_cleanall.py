@@ -35,8 +35,8 @@ class CleanAllTest(PantsRunIntegrationTest):
         map(print,pants_run.stdout_data.split('\n'))
         self.assert_success(pants_run)
 
-        assert not os.path.exists(cache_dir), 'Cache dir still exists'.format(cache_dir)
-        assert not os.path.exists(ivy_dir), 'Ivy dir still exists {}'.format(ivy_dir)
+        self.assertFalse(os.path.exists(cache_dir))
+        self.assertFalse(os.path.exists(ivy_dir))
 
   def test_optional_removal_negative(self):
     """Verify that directories are left alone if skipped"""
