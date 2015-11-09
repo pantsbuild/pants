@@ -202,7 +202,7 @@ class ZincCompile(JvmCompile):
 
   def create_analysis_tools(self):
     return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis,
-                         self.get_options().pants_workdir)
+                         get_buildroot(), self.get_options().pants_workdir)
 
   def zinc_classpath(self):
     # Zinc takes advantage of tools.jar if it's presented in classpath.
