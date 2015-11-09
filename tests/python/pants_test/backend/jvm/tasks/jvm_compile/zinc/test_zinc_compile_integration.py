@@ -102,7 +102,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         # Confirm that we were warned.
         self.assertIn('is not supported, and is subject to change/removal', pants_run.stdout_data)
 
-  def _file_content_from_compilation(self, target, file_name):
+  def _do_test_compile_and_return_file_content(self, target, file_name):
     with self.do_test_compile(target, iterations=1, expected_files=[file_name]) as found:
       files = found[file_name]
       self.assertEqual(1, len(files))
@@ -113,8 +113,8 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     target = 'testprojects/src/scala/org/pantsbuild/testproject/javasources'
     analysis_file_name = 'testprojects.src.scala.org.pantsbuild.testproject.javasources.javasources.analysis.portable'
 
-    analysis1 = self._file_content_from_compilation(target, analysis_file_name)
-    analysis2 = self._file_content_from_compilation(target, analysis_file_name)
+    analysis1 = self._do_test_compile_and_return_file_content(target, analysis_file_name)
+    analysis2 = self._do_test_compile_and_return_file_content(target, analysis_file_name)
 
     def extract_content(analysis):
       # TODO(stuhood): Comparing content before stamps only, because there is different line in internal apis section.
