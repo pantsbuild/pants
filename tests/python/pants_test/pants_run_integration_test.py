@@ -74,7 +74,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return False
 
   def temporary_workdir(self):
-    return temporary_dir(suffix=".pants.d")
+    return temporary_dir(suffix='.pants.d')
 
   def temporary_cachedir(self):
     return temporary_dir(suffix='__CACHEDIR')
