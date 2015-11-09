@@ -356,12 +356,12 @@ class ZincCompile(JvmCompile):
   def _verify_zinc_classpath(pants_workdir, classpath):
     for path in classpath:
       if not os.path.isabs(path):
-        raise TaskError('Classpath elements provided to zinc should be absolute. ' + path + ' is not.')
+        raise TaskError('Classpath entries provided to zinc should be absolute. ' + path + ' is not.')
       if os.path.relpath(path, pants_workdir).startswith(os.pardir):
-        raise TaskError('Classpath elements provided to zinc should be in working directory. ' +
+        raise TaskError('Classpath entries provided to zinc should be in working directory. ' +
                         path + ' is not.')
       if path != os.path.normpath(path):
-        raise TaskError('Classpath elements provided to zinc should be normalised (i.e. without ".." and "."). ' +
+        raise TaskError('Classpath entries provided to zinc should be normalised (i.e. without ".." and "."). ' +
                         path + ' is not.')
 
   def log_zinc_file(self, analysis_file):
