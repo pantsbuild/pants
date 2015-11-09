@@ -113,6 +113,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     target = 'testprojects/src/scala/org/pantsbuild/testproject/javasources'
     analysis_file_name = 'testprojects.src.scala.org.pantsbuild.testproject.javasources.javasources.analysis.portable'
 
+    # _do_test_compile_and_return_file_content executes pants with different build root/work directory each time.
     analysis1 = self._do_test_compile_and_return_file_content(target, analysis_file_name)
     analysis2 = self._do_test_compile_and_return_file_content(target, analysis_file_name)
 
