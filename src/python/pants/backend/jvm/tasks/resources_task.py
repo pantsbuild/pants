@@ -5,15 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 from abc import abstractmethod
-from collections import defaultdict
 
 from pants.backend.core.tasks.task import Task
-from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.base.build_environment import get_buildroot
 from pants.option.custom_types import list_option
-from pants.util.dirutil import relativize_path, safe_mkdir
 
 
 class ResourcesTask(Task):
@@ -43,6 +38,7 @@ class ResourcesTask(Task):
 
   def execute(self):
     # Tracked and returned for use in tests.
+    # TODO: Rewrite those tests. execute() is not supposed to return anything.
     processed_targets = []
 
     compile_classpath = self.context.products.get_data('compile_classpath')
