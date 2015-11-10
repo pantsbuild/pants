@@ -12,7 +12,6 @@ from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser_hierarchy import ParserHierarchy, enclosing_scope
-from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
 
 
@@ -217,11 +216,11 @@ class Options(object):
       return []
 
   def register(self, scope, *args, **kwargs):
-    """Register an option in the given scope, using argparse params."""
+    """Register an option in the given scope."""
     self.get_parser(scope).register(*args, **kwargs)
 
   def registration_function_for_optionable(self, optionable_class):
-    """Returns a function for registering argparse args on the given scope."""
+    """Returns a function for registering options on the given scope."""
     # TODO(benjy): Make this an instance of a class that implements __call__, so we can
     # docstring it, and so it's less weird than attatching properties to a function.
     def register(*args, **kwargs):
@@ -254,7 +253,7 @@ class Options(object):
     if scope == GLOBAL_SCOPE:
       values = OptionValueContainer()
     else:
-      values = copy.deepcopy(self.for_scope(enclosing_scope(scope)))
+      values = copy.copy(self.for_scope(enclosing_scope(scope)))
 
     # Now add our values.
     flags_in_scope = self._scope_to_flags.get(scope, [])
@@ -264,13 +263,6 @@ class Options(object):
       self._option_tracker.record_option(scope=scope, option=option, value=values[option],
                                          rank=values.get_rank(option))
     return values
-
-  def registration_args_iter_for_scope(self, scope):
-    """Returns an iterator over the registration arguments of each option in this scope.
-
-    See `Parser.registration_args_iter` for details.
-    """
-    return self._parser_hierarchy.get_parser_by_scope(scope).registration_args_iter()
 
   def get_fingerprintable_for_scope(self, scope):
     """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
@@ -283,8 +275,9 @@ class Options(object):
     # they can affect that code's output.
     registration_scope = scope
     while registration_scope is not None:
-      # This iterator will have already sorted the options, so their order is deterministic.
-      for (name, _, kwargs) in self.registration_args_iter_for_scope(registration_scope):
+      parser = self._parser_hierarchy.get_parser_by_scope(registration_scope)
+      # Sort the arguments, so that the fingerprint is consistent.
+      for (_, kwargs) in sorted(parser.option_registrations_iter()):
         if kwargs.get('recursive') and not kwargs.get('recursive_root'):
           continue  # We only need to fprint recursive options once.
         if kwargs.get('fingerprint') is not True:
@@ -292,7 +285,7 @@ class Options(object):
         # Note that we read the value from scope, even if the registration was on an enclosing
         # scope, to get the right value for recursive options (and because this mirrors what
         # option-using code does).
-        val = self.for_scope(scope)[name]
+        val = self.for_scope(scope)[kwargs['dest']]
         val_type = kwargs.get('type', '')
         pairs.append((val_type, val))
       registration_scope = (None if registration_scope == ''

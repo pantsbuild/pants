@@ -65,7 +65,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     context = self.context(target_roots=[losing_lib, winning_lib])
 
     def artifact_path(name):
-      return os.path.join(self.build_root, 'ivy_artifact', name)
+      return os.path.join(self.pants_workdir, 'ivy_artifact', name)
 
     symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
                    artifact_path('bogus1'): artifact_path('bogus1'),
@@ -146,7 +146,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
     classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
     classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
-      [classifier_and_no_classifier_lib])
+      classifier_and_no_classifier_lib.closure(bfs=True))
 
     self.assertIn(no_classifier.coordinate,
                   {resolved_jar.coordinate

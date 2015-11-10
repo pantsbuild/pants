@@ -8,28 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ast
 
 from pants.backend.python.tasks.checkstyle.common import CheckstylePlugin
+
+
 # TODO(wickman)
 #
 # 1. open(foo) should always be done in a with context.
 #
 # 2. if you see acquire/release on the same variable in a particular ast
 #    body, warn about context manager use.
-from pants.subsystem.subsystem import Subsystem
-
-
-class MissingContextManagerSubsystem(Subsystem):
-  options_scope = 'pycheck-context-manager'
-
-  @classmethod
-  def register_options(cls, register):
-    super(MissingContextManagerSubsystem, cls).register_options(register)
-    register('--skip', default=False, action='store_true',
-             help='If enabled, skip this style checker.')
-
-
 class MissingContextManager(CheckstylePlugin):
   """Recommend the use of contextmanagers when it seems appropriate."""
-  subsystem = MissingContextManagerSubsystem
 
   def nits(self):
     with_contexts = set(self.iter_ast_types(ast.With))

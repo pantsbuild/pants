@@ -49,18 +49,12 @@ class GlobalOptionsRegistrar(Optionable):
     register('--colors', action='store_true', default=True, recursive=True,
              help='Set whether log messages are displayed in color.')
 
-    # NB: Right now this option is a placeholder that is unused within pants itself except when
-    # specified on the command line to print the OSS pants version.  Both the IntelliJ Pants plugin
-    # and the pantsbuild/setup bootstrap script grep for pants_version though so this option
-    # registration serves in part as documentation of the dependency.
-    # TODO(John Sirois): Move pantsbuild.pants bootstrapping into pants itself and have it use this
-    # version option directly.
-    register('-v', '-V', '--pants-version',
-             nargs='?',  # Allows using the flag with no args on the CLI to print version as well
-                         # as setting the version in pants.ini
-             default=pants_version(),  # Displays the current version correctly in `./pants -h`.
-             const=pants_version(),  # Displays the current version via `./pants -V`.
-             help="Prints pants' version number and exits.")
+    # Pants code uses this only to verify that we are of the requested version. However
+    # setup scripts, runner scripts, IDE plugins, etc., may grep this out of pants.ini
+    # and use it to select the right version.
+    # Note that to print the version of the pants instance you're running, use -v, -V or --version.
+    register('--pants-version', advanced=True, default=pants_version(),
+             help='Use this pants version.')
 
     register('--plugins', advanced=True, type=list_option, help='Load these plugins.')
     register('--plugin-cache-dir', advanced=True,

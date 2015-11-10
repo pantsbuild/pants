@@ -6,10 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from unittest import expectedFailure
 
-import pytest
-
-from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -24,11 +22,11 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
     path = 'compile/jvm/java/classes/org/pantsbuild/example/hello/greet'.split('/')
     return os.path.join(workdir, *(path + [filename]))
 
-  @pytest.mark.xfail
+  @expectedFailure
   def test_compile_changed(self):
     cmd = ['compile-changed', '--diffspec={}'.format(self.ref_for_greet_change())]
 
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       # Nothing exists.
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'GreetingTest.class')))
@@ -40,7 +38,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'GreetingTest.class')))
 
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       # Nothing exists.
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
       self.assertFalse(os.path.exists(self.greet_classfile(workdir, 'GreetingTest.class')))
@@ -52,9 +50,9 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(self.greet_classfile(workdir, 'Greeting.class')))
       self.assertTrue(os.path.exists(self.greet_classfile(workdir, 'GreetingTest.class')))
 
-  @pytest.mark.xfail
+  @expectedFailure
   def test_test_changed(self):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       cmd = ['test-changed', '--diffspec={}'.format(self.ref_for_greet_change())]
       junit_out = os.path.join(workdir, 'test', 'junit',
         'org.pantsbuild.example.hello.greet.GreetingTest.out.txt')

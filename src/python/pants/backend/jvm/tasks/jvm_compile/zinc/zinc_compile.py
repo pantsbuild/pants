@@ -23,11 +23,10 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import relativize_paths, safe_open
+from pants.util.dirutil import safe_open
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -198,11 +197,12 @@ class ZincCompile(JvmCompile):
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
-    # Validate zinc options
+    # Validate zinc options.
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
 
   def create_analysis_tools(self):
-    return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis)
+    return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis,
+                         get_buildroot(), self.get_options().pants_workdir)
 
   def zinc_classpath(self):
     # Zinc takes advantage of tools.jar if it's presented in classpath.
@@ -226,7 +226,7 @@ class ZincCompile(JvmCompile):
 
   def plugin_jars(self):
     """The classpath entries for jars containing code for enabled plugins."""
-    if self.get_options().plugins:
+    if self.get_options().scalac_plugins:
       return self.tool_classpath('plugin-jars')
     else:
       return []
@@ -237,7 +237,7 @@ class ZincCompile(JvmCompile):
     return self._lazy_plugin_args
 
   def _create_plugin_args(self):
-    if not self.get_options().plugins:
+    if not self.get_options().scalac_plugins:
       return []
 
     plugin_args = self.get_options().plugin_args
@@ -252,7 +252,7 @@ class ZincCompile(JvmCompile):
   def _find_plugins(self):
     """Returns a map from plugin name to plugin jar."""
     # Allow multiple flags and also comma-separated values in a single flag.
-    plugin_names = set([p for val in self.get_options().plugins for p in val.split(',')])
+    plugin_names = set([p for val in self.get_options().scalac_plugins for p in val.split(',')])
     plugins = {}
     buildroot = get_buildroot()
     for jar in self.plugin_jars():
@@ -302,14 +302,17 @@ class ZincCompile(JvmCompile):
     # only intended to allow target authors to omit a scala-library dependency, then ScalaLibrary
     # already overrides traversable_dependency_specs to achieve the same end; arguably at a more
     # appropriate level and certainly at a more appropriate granularity.
-    relativized_classpath = relativize_paths(self.compiler_classpath() + classpath, get_buildroot())
+    compile_classpath = self.compiler_classpath() + classpath
+
+    self._verify_zinc_classpath(self.get_options().pants_workdir, compile_classpath)
+    self._verify_zinc_classpath(self.get_options().pants_workdir, upstream_analysis.keys())
 
     zinc_args = []
 
     zinc_args.extend([
       '-log-level', self.get_options().level,
       '-analysis-cache', analysis_file,
-      '-classpath', ':'.join(relativized_classpath),
+      '-classpath', ':'.join(compile_classpath),
       '-d', classes_output_dir
     ])
     if not self.get_options().colors:
@@ -348,6 +351,18 @@ class ZincCompile(JvmCompile):
                     workunit_name='zinc',
                     workunit_labels=[WorkUnitLabel.COMPILER]):
       raise TaskError('Zinc compile failed.')
+
+  @staticmethod
+  def _verify_zinc_classpath(pants_workdir, classpath):
+    for path in classpath:
+      if not os.path.isabs(path):
+        raise TaskError('Classpath entries provided to zinc should be absolute. ' + path + ' is not.')
+      if os.path.relpath(path, pants_workdir).startswith(os.pardir):
+        raise TaskError('Classpath entries provided to zinc should be in working directory. ' +
+                        path + ' is not.')
+      if path != os.path.normpath(path):
+        raise TaskError('Classpath entries provided to zinc should be normalised (i.e. without ".." and "."). ' +
+                        path + ' is not.')
 
   def log_zinc_file(self, analysis_file):
     self.context.log.debug('Calling zinc on: {} ({})'

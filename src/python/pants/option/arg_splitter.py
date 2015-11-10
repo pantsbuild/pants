@@ -54,6 +54,11 @@ class OptionsHelp(HelpRequest):
     self.all_scopes = all_scopes
 
 
+class VersionHelp(HelpRequest):
+  """The user asked for the version of this instance of pants."""
+  pass
+
+
 class UnknownGoalHelp(HelpRequest):
   """The user specified an unknown goal (or task)."""
 
@@ -82,7 +87,8 @@ class ArgSplitter(object):
   _HELP_BASIC_ARGS = ('-h', '--help', 'help')
   _HELP_ADVANCED_ARGS = ('--help-advanced', 'help-advanced')
   _HELP_ALL_SCOPES_ARGS = ('--help-all', 'help-all')
-  _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS
+  _HELP_VERSION_ARGS = ('-v', '-V', '--version')
+  _HELP_ARGS = _HELP_BASIC_ARGS + _HELP_ADVANCED_ARGS + _HELP_ALL_SCOPES_ARGS + _HELP_VERSION_ARGS
 
   def __init__(self, known_scope_infos):
     self._known_scope_infos = known_scope_infos
@@ -113,14 +119,17 @@ class ArgSplitter(object):
   def _check_for_help_request(self, arg):
     if not arg in self._HELP_ARGS:
       return False
-    # First ensure that we have a basic OptionsHelp.
-    if not self._help_request:
-      self._help_request = OptionsHelp()
-    # Now see if we need to enhance it.
-    if isinstance(self._help_request, OptionsHelp):
-      advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
-      all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
-      self._help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
+    if arg in self._HELP_VERSION_ARGS:
+      self._help_request = VersionHelp()
+    else:
+      # First ensure that we have a basic OptionsHelp.
+      if not self._help_request:
+        self._help_request = OptionsHelp()
+      # Now see if we need to enhance it.
+      if isinstance(self._help_request, OptionsHelp):
+        advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
+        all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
+        self._help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
     return True
 
   def split_args(self, args=None):

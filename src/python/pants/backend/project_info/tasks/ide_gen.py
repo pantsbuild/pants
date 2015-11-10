@@ -77,7 +77,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                   'which paths are used for tests.  This is usually what you want if your repo '
                   ' uses a maven style directory layout.')
     register('--infer-test-from-siblings', action='store_true',
-             deprecated_version='0.0.57',
+             deprecated_version='0.0.58',
              deprecated_hint='Setting test attribute on paths is now handled automatically.',
              help='When determining if a path should be added to the IDE, check to see if any of '
                   'its sibling source roots define test targets.  This is usually what '
@@ -170,7 +170,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
       confs.append('sources')
     if self.get_options().javadoc_jars:
       confs.append('javadoc')
-    compile_classpath = ClasspathProducts()
+    compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
     self.resolve(executor=executor,
                  targets=targets,
                  classpath_products=compile_classpath,
@@ -299,7 +299,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     external_javadoc_jar_dir = os.path.join(self.gen_project_workdir, 'external-libjavadoc')
     safe_mkdir(external_javadoc_jar_dir, clean=True)
 
-    classpath_products = self.resolve_jars(targets) or ClasspathProducts()
+    classpath_products = self.resolve_jars(targets) or ClasspathProducts(self.get_options().pants_workdir)
     cp_entry_by_classifier_by_orgname = defaultdict(lambda: defaultdict(dict))
     for conf, jar_entry in classpath_products.get_artifact_classpath_entries_for_targets(targets):
       coord = (jar_entry.coordinate.org, jar_entry.coordinate.name)

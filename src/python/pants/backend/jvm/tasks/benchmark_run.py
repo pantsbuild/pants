@@ -14,6 +14,8 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.java.distribution.distribution import DistributionLocator
+from pants.java.executor import SubprocessExecutor
 from pants.java.util import execute_java
 
 
@@ -47,6 +49,10 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
                           ],
                           classpath_spec='//:benchmark-java-allocation-instrumenter-2.1')
 
+  @classmethod
+  def global_subsystems(cls):
+    return super(BenchmarkRun, cls).global_subsystems() + (DistributionLocator,)
+
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)
     # TODO(Steve Gury):
@@ -60,9 +66,12 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
     if self.get_options().debug:
       self.args.append('--debug')
 
+  def _is_benchmark(self, target):
+    return isinstance(target, Benchmark)
+
   def execute(self):
-    targets = self.context.targets()
-    if not any(isinstance(t, Benchmark) for t in targets):
+    targets = self.context.targets(predicate=self._is_benchmark)
+    if not targets:
       raise TaskError('No jvm targets specified for benchmarking.')
 
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
@@ -79,14 +88,17 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
     benchmark_tools_classpath = self.tool_classpath('benchmark-tool')
 
+    # Collect a transitive classpath for the benchmark targets.
     classpath = self.classpath(targets, benchmark_tools_classpath)
 
+    java_executor = SubprocessExecutor(DistributionLocator.cached())
     exit_code = execute_java(classpath=classpath,
                              main=self._CALIPER_MAIN,
                              jvm_options=self.jvm_options,
                              args=self.args,
                              workunit_factory=self.context.new_workunit,
                              workunit_name='caliper',
-                             workunit_labels=[WorkUnitLabel.RUN])
+                             workunit_labels=[WorkUnitLabel.RUN],
+                             executor=java_executor)
     if exit_code != 0:
       raise TaskError('java {} ... exited non-zero ({})'.format(self._CALIPER_MAIN, exit_code))

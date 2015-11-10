@@ -42,14 +42,14 @@ class IvyImports(IvyTaskMixin, NailgunTask):
     for target in targets:
       all_targets.update(target.imported_jar_libraries)
 
-    imports_classpath = ClasspathProducts()
+    imports_classpath = ClasspathProducts(self.get_options().pants_workdir)
     self.resolve(executor=self.create_java_executor(),
                  targets=all_targets,
                  classpath_products=imports_classpath,
                  invalidate_dependents=True)
 
     for target in targets:
-      cp_entries = imports_classpath.get_classpath_entries_for_targets((target,))
+      cp_entries = imports_classpath.get_classpath_entries_for_targets(target.closure(bfs=True))
       for conf, cp_entry in cp_entries:
         if isinstance(cp_entry, ArtifactClasspathEntry):
           jar_import_products.imported(target, cp_entry.coordinate, cp_entry.path)

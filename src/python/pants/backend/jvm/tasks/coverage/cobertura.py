@@ -81,7 +81,7 @@ class Cobertura(Coverage):
     files_to_instrument = []
     for target in targets:
       if self.is_coverage_target(target):
-        paths = instrumentation_classpath.get_for_target(target, False)
+        paths = instrumentation_classpath.get_for_target(target)
         for (name, path) in paths:
           files_to_instrument.append(path)
 

@@ -110,6 +110,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     return self._artifact(self._cache_file_for_key(cache_key))
 
   def use_cached_files(self, cache_key, results_dir=None):
+    tarfile = self._cache_file_for_key(cache_key)
     try:
       artifact = self._artifact_for(cache_key)
       if artifact.exists():
@@ -119,7 +120,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
         return True
     except Exception as e:
       # TODO(davidt): Consider being more granular in what is caught.
-      logger.warn('Error while reading from local artifact cache: {0}'.format(e))
+      logger.warn('Error while reading {0} from local artifact cache: {1}'.format(tarfile, e))
+      safe_delete(tarfile)
       return UnreadableArtifact(cache_key, e)
 
     return False
