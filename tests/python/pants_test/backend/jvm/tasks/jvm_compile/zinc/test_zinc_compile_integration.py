@@ -102,20 +102,21 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         # Confirm that we were warned.
         self.assertIn('is not supported, and is subject to change/removal', pants_run.stdout_data)
 
-  def _do_test_compile_and_return_file_content(self, target, file_name):
-    with self.do_test_compile(target, iterations=1, expected_files=[file_name]) as found:
-      files = found[file_name]
-      self.assertEqual(1, len(files))
-      with open(list(files)[0]) as file:
-        return file.read()
-
   def test_analysis_portability(self):
     target = 'testprojects/src/scala/org/pantsbuild/testproject/javasources'
     analysis_file_name = 'testprojects.src.scala.org.pantsbuild.testproject.javasources.javasources.analysis.portable'
 
-    # _do_test_compile_and_return_file_content executes pants with different build root/work directory each time.
-    analysis1 = self._do_test_compile_and_return_file_content(target, analysis_file_name)
-    analysis2 = self._do_test_compile_and_return_file_content(target, analysis_file_name)
+    # do_new_project_compile_and_return_analysis executes pants with different build root/work directory each time.
+    def do_new_project_compilation_and_return_analysis():
+      with self.do_test_compile(target, iterations=1, expected_files=[analysis_file_name],
+                                workdir_outside_of_buildroot=True) as found:
+        files = found[analysis_file_name]
+        self.assertEqual(1, len(files))
+        with open(list(files)[0]) as file:
+          return file.read()
+
+    analysis1 = do_new_project_compilation_and_return_analysis()
+    analysis2 = do_new_project_compilation_and_return_analysis()
 
     def extract_content(analysis):
       # TODO(stuhood): Comparing content before stamps only, because there is different line in internal apis section.
