@@ -31,6 +31,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.option.errors import OptionsError
 from pants.option.ranked_value import RankedValue
 from pants.util.memo import memoized_property
 
@@ -126,7 +127,11 @@ class ExportTask(IvyTaskMixin, PythonTask):
     # Kill it ASAP, and update test_export_integration#test_export_jar_path_with_excludes_soft to
     # use the flag actually scoped for this task.
     export_options = self.get_options()
-    ivy_options = self.context.options.for_scope('resolve.ivy')
+    try:
+      ivy_options = self.context.options.for_scope('resolve.ivy')
+    except OptionsError:
+      # No resolve.ivy task installed, so continue silently.
+      ivy_options = []
     for name in set.intersection(set(export_options), set(ivy_options)):
       if not ivy_options.is_default(name):
         setattr(export_options, name, RankedValue(RankedValue.FLAG, ivy_options[name]))
