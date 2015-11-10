@@ -178,7 +178,17 @@ class Parser(object):
             consume_flag(arg)
 
       # Get the value for this option, falling back to defaults as needed.
-      val = self._compute_value(dest, kwargs, flag_vals)
+      try:
+        val = self._compute_value(dest, kwargs, flag_vals)
+      except ParseError as e:
+        # Reraise a new exception with context on the option being processed at the time of error.
+        # Note that other exception types can be raised here that are caught by ParseError (e.g.
+        # BooleanConversionError), hence we reference the original exception type by e.__class__.
+        raise type(e)(
+          'Error computing value for {} in {} (may also be from PANTS_* environment variables):\n'
+          '{}'.format(', '.join(args), self._scope_str(), e)
+        )
+
       setattr(namespace, dest, val)
 
     # See if there are any unconsumed flags remaining.

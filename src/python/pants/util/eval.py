@@ -44,7 +44,7 @@ def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
 
   try:
     parsed_value = eval(val)
-  except (ValueError, SyntaxError) as e:
+  except Exception as e:
     raise raise_type(dedent("""\
       The {name} cannot be evaluated as a literal expression: {error}
       Given raw value:
@@ -52,6 +52,7 @@ def parse_expression(val, acceptable_types, name=None, raise_type=ValueError):
       """.format(name=get_name(),
                  error=e,
                  value=format_raw_value())))
+
   if not isinstance(parsed_value, acceptable_types):
     def iter_types(types):
       if isinstance(types, type):
