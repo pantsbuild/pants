@@ -18,7 +18,7 @@ class AnalysisTools(object):
   # for that reason.
   # TODO: If some future change requires us to invalidate all cached artifacts for some good reason
   # (by bumping GLOBAL_CACHE_KEY_GEN_VERSION), we can use that opportunity to change this string.
-  _PANTS_BUILDROOT_PLACEHOLDER = b'/_PANTS_HOME_PLACEHOLDER'
+  _PANTS_BUILDROOT_PLACEHOLDER = b'/_PANTS_BUILDROOT_PLACEHOLDER'
   _PANTS_WORKDIR_PLACEHOLDER = b'/_PANTS_WORKDIR_PLACEHOLDER'
 
   def __init__(self, java_home, parser, analysis_cls, pants_buildroot, pants_workdir):
