@@ -136,7 +136,7 @@ class DxCompile(AndroidTask, NailgunTask):
     def get_entries(tgt):
       # We gather just internal classpath elements here.  Unpacked external dependency classpath
       # elements are gathered just below.
-      cp_entries = ClasspathUtil.internal_classpath((tgt,), classpath_products, transitive=False)
+      cp_entries = ClasspathUtil.internal_classpath((tgt,), classpath_products)
       gathered_entries.update(cp_entries)
 
       # Gather classes from the contents of unpacked libraries.

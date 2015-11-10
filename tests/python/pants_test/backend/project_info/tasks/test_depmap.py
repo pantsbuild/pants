@@ -257,16 +257,6 @@ class DepmapTest(BaseDepmapTest):
       targets=[self.target('common/g'), self.target('common/h'), self.target('common/i')]
     )
 
-  def test_path_to(self):
-    self.assert_console_output_ordered(
-      'internal-overlaps.two',
-      '  internal-overlaps.one',
-      '    internal-common.i.i',
-      '      internal-common.g.g',
-      targets=[self.target('overlaps:two')],
-      options={'path_to': 'internal-common.g.g'},
-    )
-
   def test_resources(self):
     self.assert_console_output_ordered(
       'internal-src.java.a.a_java',

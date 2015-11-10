@@ -17,7 +17,11 @@ from pants.base.deprecated import PastRemovalVersionError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
-from pants.option.errors import ParseError, RegistrationError
+from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
+                                 BooleanOptionType, FrozenRegistration, ImplicitValIsNone,
+                                 InvalidAction, InvalidKwarg, NoOptionNames, OptionNameDash,
+                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
+                                 Shadowing)
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
@@ -72,11 +76,18 @@ class OptionsTest(unittest.TestCase):
     register_global('--store-false-def-false-flag', action='store_false', default=False)
     register_global('--store-false-def-true-flag', action='store_false', default=True)
 
+    # Choices.
+    register_global('--str-choices', choices=['foo', 'bar'])
+    register_global('--int-choices', choices=[42, 99], type=int, action='append')
+
     # Custom types.
     register_global('--dicty', type=dict_option, default='{"a": "b"}')
     register_global('--listy', type=list_option, default='[1, 2, 3]')
     register_global('--target_listy', type=target_list_option, default=[':a', ':b'])
     register_global('--filey', type=file_option, default='default.txt')
+
+    # Implicit value.
+    register_global('--implicit-valuey', default='default', implicit_value='implicit')
 
     # For the design doc example test.
     register_global('--a', type=int, recursive=True)
@@ -137,7 +148,7 @@ class OptionsTest(unittest.TestCase):
     return options
 
   def _parse_type_int(self, args_str, env=None, config=None, bootstrap_option_values=None,
-                      action=None):
+                      action='store'):
     args = shlex.split(str(args_str))
     options = Options.create(env=env or {},
                              config=self._create_config(config or {}),
@@ -157,6 +168,19 @@ class OptionsTest(unittest.TestCase):
     options = self._parse_type_int('./pants ', env={'PANTS_CONFIG_OVERRIDE': "123"})
     self.assertEqual(123, options.for_global_scope().config_override)
 
+  def test_env_bad_override_var(self):
+    """Check for bad PANTS_CONFIG_OVERRIDE values.
+
+    Checks for a case where an environment variable exists like:
+
+        PANTS_CONFIG_OVERRIDE=old_style_pants.ini
+
+    Which was known to throw an unhandled NameError for 'old_style_pants' during the eval().
+    """
+    with self.assertRaisesRegexp(ParseError, 'config.*override'):
+      options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': 'old_style_pants.ini'})
+      options.for_global_scope().config_override
+
   def test_arg_scoping(self):
     # Some basic smoke tests.
     options = self._parse('./pants --verbose')
@@ -164,6 +188,9 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants -z compile path/to/tgt')
     self.assertEqual(['path/to/tgt'], options.target_specs)
     self.assertEqual(True, options.for_global_scope().verbose)
+
+    with self.assertRaises(ParseError):
+      self._parse('./pants --unregistered-option compile').for_global_scope()
 
     # Scoping of different values of the same option.
     # Also tests the --no-* boolean flag inverses.
@@ -187,6 +214,9 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --y=5 --y=-6 --y=77',
                           config={'DEFAULT': {'y': ['88', '-99']}})
     self.assertEqual([88, -99, 5, -6, 77], options.for_global_scope().y)
+
+    options = self._parse('./pants')
+    self.assertEqual([], options.for_global_scope().y)
 
     options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
     self.assertEqual(['123','456'], options.for_global_scope().config_override)
@@ -320,6 +350,54 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual(55, options.for_scope('compile').num)
     self.assertEqual(44, options.for_scope('compile.java').num)
 
+  def test_choices(self):
+    options = self._parse('./pants --str-choices=foo')
+    self.assertEqual('foo', options.for_global_scope().str_choices)
+    options = self._parse('./pants', config={'DEFAULT': {'str_choices': 'bar'}})
+    self.assertEqual('bar', options.for_global_scope().str_choices)
+    with self.assertRaises(ParseError):
+      options = self._parse('./pants --str-choices=baz')
+      options.for_global_scope()
+    with self.assertRaises(ParseError):
+      options = self._parse('./pants', config={'DEFAULT': {'str_choices': 'baz'}})
+      options.for_global_scope()
+
+    options = self._parse('./pants --int-choices=42 --int-choices=99')
+    self.assertEqual([42, 99], options.for_global_scope().int_choices)
+
+  def test_validation(self):
+    def assertError(expected_error, *args, **kwargs):
+      with self.assertRaises(expected_error):
+        options = Options.create(args=[], env={}, config=self._create_config({}),
+                                 known_scope_infos=[], option_tracker=OptionTracker())
+        options.register(GLOBAL_SCOPE, *args, **kwargs)
+        options.for_global_scope()
+
+    assertError(NoOptionNames)
+    assertError(OptionNameDash, 'badname')
+    assertError(OptionNameDoubleDash, '-badname')
+    assertError(InvalidAction, '--foo', action='store_const')
+    assertError(InvalidKwarg, '--foo', badkwarg=42)
+    assertError(ImplicitValIsNone, '--foo', implicit_value=None)
+    assertError(BooleanOptionType, '--foo', action='store_true', type=int)
+    assertError(BooleanOptionImplicitVal, '--foo', action='store_true', implicit_value=False)
+    assertError(BooleanOptionNameWithNo, '--no-foo', action='store_true')
+
+  def test_frozen_registration(self):
+    options = Options.create(args=[], env={}, config=self._create_config({}),
+                             known_scope_infos=[task('foo')], option_tracker=OptionTracker())
+    options.register('foo', '--arg1')
+    with self.assertRaises(FrozenRegistration):
+      options.register(GLOBAL_SCOPE, '--arg2')
+
+  def test_implicit_value(self):
+    options = self._parse('./pants')
+    self.assertEqual('default', options.for_global_scope().implicit_valuey)
+    options = self._parse('./pants --implicit-valuey')
+    self.assertEqual('implicit', options.for_global_scope().implicit_valuey)
+    options = self._parse('./pants --implicit-valuey=explicit')
+    self.assertEqual('explicit', options.for_global_scope().implicit_valuey)
+
   def test_shadowing(self):
     options = Options.create(env={},
                              config=self._create_config({}),
@@ -328,15 +406,15 @@ class OptionsTest(unittest.TestCase):
                              option_tracker=OptionTracker())
     options.register('', '--opt1')
     options.register('foo', '-o', '--opt2')
-    with self.assertRaises(RegistrationError):
+    with self.assertRaises(Shadowing):
       options.register('bar', '--opt1')
-    with self.assertRaises(RegistrationError):
+    with self.assertRaises(Shadowing):
       options.register('foo.bar', '--opt1')
-    with self.assertRaises(RegistrationError):
+    with self.assertRaises(Shadowing):
       options.register('foo.bar', '--opt2')
-    with self.assertRaises(RegistrationError):
+    with self.assertRaises(Shadowing):
       options.register('foo.bar', '--opt1', '--opt3')
-    with self.assertRaises(RegistrationError):
+    with self.assertRaises(Shadowing):
       options.register('foo.bar', '--opt3', '--opt2')
 
   def test_recursion(self):
@@ -350,7 +428,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual('foo', options.for_global_scope().bar_baz)
     options = self._parse('./pants compile --bar-baz=foo')
     with self.assertRaises(ParseError):
-      options.for_scope('compile').bar_baz
+      options.for_scope('compile')
 
   def test_no_recursive_subsystem_options(self):
     options = Options.create(env={},
@@ -361,10 +439,10 @@ class OptionsTest(unittest.TestCase):
     # All subsystem options are implicitly recursive (a subscope of subsystem scope represents
     # a separate instance of the subsystem, so it needs all the options).
     # We disallow explicit specification of recursive (even if set to True), to avoid confusion.
-    with self.assertRaises(RegistrationError):
+    with self.assertRaises(RecursiveSubsystemOption):
       options.register('foo', '--bar', recursive=False)
       options.for_scope('foo')
-    with self.assertRaises(RegistrationError):
+    with self.assertRaises(RecursiveSubsystemOption):
       options.register('foo', '--baz', recursive=True)
       options.for_scope('foo')
 
@@ -571,7 +649,7 @@ class OptionsTest(unittest.TestCase):
       self.assertTrue(options.for_scope('stale').crufty_boolean)
       assertWarning(w, 'crufty_boolean')
 
-    # Make sure the warnings don't come out for regular options
+    # Make sure the warnings don't come out for regular options.
     with self.warnings_catcher() as w:
       self._parse('./pants stale --pants-foo stale --still-good')
       self.assertEquals(0, len(w))
@@ -602,7 +680,7 @@ class OptionsTest(unittest.TestCase):
 
     # TODO(John Sirois): This should pick up 99 from the the recursive global '--a' flag defined in
     # middle scope 'compile', but instead it picks up `a`'s value from the config DEFAULT section.
-    # Fix this test as part of https://github.com/pantsbuild/pants/issues/1803
+    # Fix this test as part of https://github.com/pantsbuild/pants/issues/1803.
     self.assertEquals(100, options.for_scope('compile.java').a)
 
     options = self._parse('./pants',

@@ -180,6 +180,7 @@ class AntJunitXmlReportListener extends RunListener {
   @XmlRootElement(name = "testsuite")
   static class TestSuite {
     private final String name;
+    private final Class<?> testClass;
 
     private int errors;
     private int failures;
@@ -203,10 +204,12 @@ class AntJunitXmlReportListener extends RunListener {
     TestSuite() {
       // for JAXB
       name = null;
+      testClass = null;
     }
 
     TestSuite(Description test) {
       name = test.getClassName();
+      testClass = test.getTestClass();
       try {
         hostname = InetAddress.getLocalHost().getHostName();
       } catch (UnknownHostException e) {
@@ -231,7 +234,7 @@ class AntJunitXmlReportListener extends RunListener {
 
     @XmlAttribute
     public String getName() {
-      return name;
+      return Util.sanitizeSuiteName(name);
     }
 
     @XmlAttribute
@@ -304,8 +307,8 @@ class AntJunitXmlReportListener extends RunListener {
     }
   }
 
-  private final Map<Class<?>, TestSuite> suites = Maps.newHashMap();
-  private final Map<Description, TestCase> cases = Maps.newHashMap();
+  private final Map<String, TestSuite> suites = Maps.newHashMap();
+  private final Map<String, TestCase> cases = Maps.newHashMap();
 
   private final File outdir;
   private final StreamSource streamSource;
@@ -320,11 +323,19 @@ class AntJunitXmlReportListener extends RunListener {
     createSuites(description.getChildren());
   }
 
-  private void createSuites(Iterable<Description> tests) {
+  private TestSuite getTestSuiteFor(Description description) {
+    return suites.get(description.getClassName());
+  }
+
+  private TestCase getTestCaseFor(Description description) {
+    return cases.get(Util.getPantsFriendlyDisplayName(description));
+  }
+
+  private void createSuites(Iterable<Description> tests) throws java.lang.Exception {
     for (Description test : tests) {
       createSuites(test.getChildren());
       if (Util.isRunnable(test)) {
-        Class<?> testClass = test.getTestClass();
+        String testClass = test.getClassName();
         TestSuite suite = suites.get(testClass);
         if (suite == null) {
           suite = new TestSuite(test);
@@ -332,15 +343,16 @@ class AntJunitXmlReportListener extends RunListener {
         }
         TestCase testCase = new TestCase(test);
         suite.testCases.add(testCase);
-        cases.put(test, testCase);
+        cases.put(Util.getPantsFriendlyDisplayName(test), testCase);
       }
     }
   }
 
   @Override
   public void testStarted(Description description) throws java.lang.Exception {
-    suites.get(description.getTestClass()).started();
-    cases.get(description).started();
+    if (!Util.isRunnable(description)) return;
+    getTestSuiteFor(description).started();
+    getTestCaseFor(description).started();
   }
 
   @Override
@@ -350,10 +362,7 @@ class AntJunitXmlReportListener extends RunListener {
     boolean isFailure = Util.isAssertionFailure(failure);
     TestSuite suite = null;
 
-    Class<?> testClass = description.getTestClass();
-    if (testClass != null) {
-      suite = suites.get(testClass);
-    }
+    suite = getTestSuiteFor(description);
     if (suite == null) {
       incrementUnknownSuiteFailure(description);
     } else {
@@ -364,7 +373,7 @@ class AntJunitXmlReportListener extends RunListener {
       }
     }
 
-    TestCase testCase = cases.get(description);
+    TestCase testCase = getTestCaseFor(description);
     if (testCase == null) {
       incrementUnknownTestCaseFailure(description, exception);
     } else {
@@ -378,21 +387,33 @@ class AntJunitXmlReportListener extends RunListener {
 
   @Override
   public void testFinished(Description description) throws java.lang.Exception {
-    cases.get(description).finished();
-    suites.get(description.getTestClass()).finished();
+    if (!Util.isRunnable(description)) {
+      return;
+    }
+    try {
+      getTestCaseFor(description).finished();
+    } catch (NullPointerException e) {
+      throw new RuntimeException("No TestCase for '" + description.getClassName() + "#"
+          + description.getMethodName() + "'");
+    }
+    try {
+      getTestSuiteFor(description).finished();
+    } catch (NullPointerException e) {
+      throw new RuntimeException("No suite for '" + description.getClassName() + "'.");
+    }
   }
 
   @Override
   public void testRunFinished(Result result) throws java.lang.Exception {
-    for (Entry<Class<?>, TestSuite> entry : suites.entrySet()) {
-      Class<?> testClass = entry.getKey();
-      TestSuite suite = entry.getValue();
-
+    for (TestSuite suite : suites.values()) {
       if (suite.wasStarted()) {
-        suite.setOut(new String(streamSource.readOut(testClass), Charsets.UTF_8));
-        suite.setErr(new String(streamSource.readErr(testClass), Charsets.UTF_8));
+        if (suite.testClass != null) {
+          suite.setOut(new String(streamSource.readOut(suite.testClass), Charsets.UTF_8));
+          suite.setErr(new String(streamSource.readErr(suite.testClass), Charsets.UTF_8));
+        }
 
-        Writer xmlOut = new FileWriter(new File(outdir, String.format("TEST-%s.xml", suite.name)));
+        Writer xmlOut = new FileWriter(
+            new File(outdir, String.format("TEST-%s.xml", suite.getName())));
 
         // Only output valid XML1.0 characters - JAXB does not handle this.
         JAXB.marshal(suite, new XmlWriter(xmlOut) {
@@ -473,14 +494,14 @@ class AntJunitXmlReportListener extends RunListener {
    * @param exception exception to record.
    */
   private void incrementUnknownSuiteFailure(Description description) {
-    if (description == null || description.getTestClass() == null) {
+    if (description == null || description.getClassName() == null) {
       description = Description.createTestDescription(UnknownFailureSuite.class,
           "unknown");
     }
-    TestSuite unknownSuite = suites.get(description.getTestClass());
+    TestSuite unknownSuite = getTestSuiteFor(description);
     if (unknownSuite == null) {
       unknownSuite = new TestSuite(description);
-      suites.put(description.getTestClass(), unknownSuite);
+      suites.put(description.getClassName(), unknownSuite);
     }
     unknownSuite.incrementFailures();
   }
@@ -498,10 +519,10 @@ class AntJunitXmlReportListener extends RunListener {
    * @param exception exception to record.
    */
   private void incrementUnknownTestCaseFailure(Description description, Exception exception) {
-    TestCase unknownCase = cases.get(description);
+    TestCase unknownCase = getTestCaseFor(description);
     if (unknownCase == null) {
       unknownCase = new TestCase(description);
-      cases.put(description, unknownCase);
+      cases.put(Util.getPantsFriendlyDisplayName(description), unknownCase);
     }
     unknownCase.setFailure(exception);
   }
@@ -511,11 +532,12 @@ class AntJunitXmlReportListener extends RunListener {
   }
 
   @VisibleForTesting
-  protected Map<Class<?>, TestSuite> getSuites() {
+  protected Map<String, TestSuite> getSuites() {
     return suites;
   }
+
   @VisibleForTesting
-  protected Map<Description, TestCase> getCases() {
+  protected Map<String, TestCase> getCases() {
     return cases;
   }
 }

@@ -9,8 +9,6 @@ import os
 import threading
 from Queue import Empty, Queue
 
-import pytest
-
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -55,9 +53,9 @@ class ConsoleTaskTest(TaskTestBase):
       task.stop()
       execution.join()
 
-    with pytest.raises(Empty):
+    with self.assertRaises(Empty):
       e = raised.get_nowait()
 
-      # Instead of taking the generic pytest.raises message, provide a more detailed failure
+      # Instead of taking the generic assertRaises raises message, provide a more detailed failure
       # message that shows exactly what untrapped error was on the queue.
       self.fail('task raised {0}'.format(e))

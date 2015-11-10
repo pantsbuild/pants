@@ -182,6 +182,11 @@ def create_options_for_optionables(optionables, extra_scopes=None, options=None)
 
   all_scopes = complete_scopes(all_scopes)
 
+  # We need to update options before completing them based on inner/outer relation.
+  if options:
+    for scope, opts in options.items():
+      all_options[scope].update(opts)
+
   # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
   # and therefore only have to inherit from our immediately enclosing scope.
   for s in sorted(all_scopes):
@@ -192,7 +197,4 @@ def create_options_for_optionables(optionables, extra_scopes=None, options=None)
         if key not in opts:  # Inner scope values override the inherited ones.
           opts[key] = val
 
-  if options:
-    for scope, opts in options.items():
-      all_options[scope].update(opts)
   return create_options(all_options)

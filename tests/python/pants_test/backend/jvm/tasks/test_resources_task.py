@@ -54,10 +54,6 @@ class ResourcesTaskTestBase(TaskTestBase):
     classpath_products = task.context.products.get_data('runtime_classpath')
     self.assertEqual(0, len(classpath_products.get_for_target(target)))
 
-  def assert_empty_products(self, task, target):
-    classpath_products = task.context.products.get_data('runtime_classpath')
-    self.assertEqual(0, len(classpath_products.get_for_target(target)))
-
   def assert_products(self, task, target, count, expected_confs=None):
     classpath_products = task.context.products.get_data('runtime_classpath')
 

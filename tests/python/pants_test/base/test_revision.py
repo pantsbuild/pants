@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-import pytest
-
 from pants.base.revision import Revision
 
 
@@ -20,7 +18,7 @@ class RevisionTest(unittest.TestCase):
 class SemverTest(RevisionTest):
   def test_bad(self):
     for bad_rev in ('a.b.c', '1.b.c', '1.2.c', '1.2.3;4', '1.2.3;4+5'):
-      with pytest.raises(Revision.BadRevision):
+      with self.assertRaises(Revision.BadRevision):
         Revision.semver(bad_rev)
 
   def test_simple(self):

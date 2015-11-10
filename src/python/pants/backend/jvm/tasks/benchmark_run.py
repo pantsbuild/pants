@@ -66,9 +66,12 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
     if self.get_options().debug:
       self.args.append('--debug')
 
+  def _is_benchmark(self, target):
+    return isinstance(target, Benchmark)
+
   def execute(self):
-    targets = self.context.targets()
-    if not any(isinstance(t, Benchmark) for t in targets):
+    targets = self.context.targets(predicate=self._is_benchmark)
+    if not targets:
       raise TaskError('No jvm targets specified for benchmarking.')
 
     # For rewriting JDK classes to work, the JAR file has to be listed specifically in
@@ -85,6 +88,7 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
 
     benchmark_tools_classpath = self.tool_classpath('benchmark-tool')
 
+    # Collect a transitive classpath for the benchmark targets.
     classpath = self.classpath(targets, benchmark_tools_classpath)
 
     java_executor = SubprocessExecutor(DistributionLocator.cached())
