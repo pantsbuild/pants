@@ -40,6 +40,12 @@ class PythonTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
+    # TODO: fix pex so that it doesn't mutate environment state
+    # https://github.com/pantsbuild/pex/issues/180
+    # Ideally this would be done in goal_runner or somewhere earlier but pex invocations
+    # alter the environment state when we call it so we need to do this for each task.
+    os.environ['PEX_ROOT'] = os.path.join(self.get_options().pants_workdir, '.pex')
+    print('Set to... {}'.format(os.path.join(self.get_options().pants_workdir, '.pex')))
     self._compatibilities = self.get_options().interpreter or [b'']
     self._interpreter_cache = None
     self._interpreter = None
