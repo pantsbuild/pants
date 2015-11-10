@@ -9,12 +9,14 @@ import functools
 import hashlib
 import itertools
 import os
-import shutil
 from collections import OrderedDict, defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_app import JvmApp
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
@@ -40,20 +42,27 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
     self._classpath_products = classpath_products
 
   def _build_hasher(self, target):
-    if isinstance(target, JarLibrary):
+    if isinstance(target, JvmTarget) or isinstance(target, JarLibrary) or \
+            isinstance(target, JvmApp) or isinstance(target, ImportJarsMixin):
+      # Something jvm related, use sources for fingerprinting.
       hasher = super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self)._build_hasher(target)
-      # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
-      # the resolved coordinates, and the requested coordinates are used. This ensures that if a
-      # source file depends on a library with source compatible but binary incompatible signature
-      # changes between versions, that you won't get runtime errors due to using an artifact built
-      # against a binary incompatible version resolved for a previous compile.
-      classpath_entries = self._classpath_products.get_artifact_classpath_entries_for_targets(
-        [target])
-      for _, entry in classpath_entries:
-        hasher.update(str(entry.coordinate))
-      return hasher
+
+      if isinstance(target, JarLibrary):
+        # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
+        # the resolved coordinates, and the requested coordinates are used. This ensures that if a
+        # source file depends on a library with source compatible but binary incompatible signature
+        # changes between versions, that you won't get runtime errors due to using an artifact built
+        # against a binary incompatible version resolved for a previous compile.
+        classpath_entries = self._classpath_products.get_artifact_classpath_entries_for_targets(
+          [target])
+        for _, entry in classpath_entries:
+          hasher.update(str(entry.coordinate))
     else:
-      return hashlib.sha1()
+      # Just do nothing, this kind of dependency shouldn't affect result's hash.
+      hasher = hashlib.sha1()
+      hasher.update(self._task.fingerprint or '')
+
+    return hasher
 
   def __hash__(self):
     return hash((type(self), self._task.fingerprint))
