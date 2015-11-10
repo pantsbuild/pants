@@ -55,7 +55,6 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
         [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
-
     return hasher
 
   def __hash__(self):
