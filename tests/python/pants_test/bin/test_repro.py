@@ -7,22 +7,20 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
+from functools import partial
 
 from pants.bin.repro import Repro
 from pants.util.contextutil import open_tar, temporary_dir
-from pants.util.dirutil import safe_mkdir_for
+from pants_test.bin.repro_mixin import ReproMixin
 
 
-class ReproTest(unittest.TestCase):
+class ReproTest(unittest.TestCase, ReproMixin):
   def test_repro(self):
+    """Verify that Repro object creates expected tar.gz file"""
     with temporary_dir() as tmpdir:
       fake_buildroot = os.path.join(tmpdir, 'buildroot')
-      def add_file(path, content):
-        fullpath = os.path.join(fake_buildroot, path)
-        safe_mkdir_for(fullpath)
-        with open(fullpath, 'w') as outfile:
-          outfile.write(content)
 
+      add_file = partial(self.add_file, fake_buildroot)
       add_file('.git/foo', 'foo')
       add_file('dist/bar', 'bar')
       add_file('baz.txt', 'baz')
@@ -36,21 +34,11 @@ class ReproTest(unittest.TestCase):
       with open_tar(repro_file, 'r:gz') as tar:
         tar.extractall(extract_dir)
 
-      def assert_not_exists(relpath):
-        fullpath = os.path.join(extract_dir, relpath)
-        self.assertFalse(os.path.exists(fullpath))
-
-      def assert_file(relpath, expected_content=None):
-        fullpath = os.path.join(extract_dir, relpath)
-        self.assertTrue(os.path.isfile(fullpath))
-        if expected_content:
-          with open(fullpath, 'r') as infile:
-            content = infile.read()
-          self.assertEquals(expected_content, content)
-
+      assert_file = partial(self.assert_file, extract_dir)
       assert_file('baz.txt', 'baz')
       assert_file('qux/quux.txt', 'quux')
       assert_file('repro.sh')
 
+      assert_not_exists = partial(self.assert_not_exists, extract_dir)
       assert_not_exists('.git')
       assert_not_exists('dist')

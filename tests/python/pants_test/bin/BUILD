@@ -8,6 +8,7 @@ target(
     ':goal_runner',
     ':plugin_resolver',
     ':repro',
+    ':repro_ignore',
   ]
 )
 
@@ -47,13 +48,23 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name='repro',
-  sources=['test_repro.py'],
+  sources=['test_repro.py', 'repro_mixin.py'],
   dependencies=[
     'src/python/pants/bin',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
+  name='repro_ignore',
+  sources=['test_repro_ignore.py', 'repro_mixin.py'],
+  dependencies=[
+    'src/python/pants/bin',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
   ]
 )
