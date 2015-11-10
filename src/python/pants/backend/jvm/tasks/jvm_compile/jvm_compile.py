@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
+import hashlib
 import itertools
 import os
 import shutil
@@ -39,8 +40,8 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
     self._classpath_products = classpath_products
 
   def _build_hasher(self, target):
-    hasher = super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self)._build_hasher(target)
     if isinstance(target, JarLibrary):
+      hasher = super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self)._build_hasher(target)
       # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
       # the resolved coordinates, and the requested coordinates are used. This ensures that if a
       # source file depends on a library with source compatible but binary incompatible signature
@@ -50,7 +51,9 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
         [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
-    return hasher
+      return hasher
+    else:
+      return hashlib.sha1()
 
   def __hash__(self):
     return hash((type(self), self._task.fingerprint))
