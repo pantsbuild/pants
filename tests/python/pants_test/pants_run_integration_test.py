@@ -88,6 +88,25 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def temporary_sourcedir(self):
     return temporary_dir(root_dir=get_buildroot())
 
+  @contextmanager
+  def source_clone(self, source_dir):
+    with self.temporary_sourcedir() as clone_dir:
+      target_spec_dir = os.path.relpath(clone_dir)
+
+      for root, dirs, files in os.walk(source_dir):
+        clone_root = os.path.join(clone_dir, os.path.relpath(root, source_dir))
+        for dir in dirs:
+          os.mkdir(os.path.join(clone_root, dir))
+        for file_name in files:
+          with open(os.path.join(root, file_name), 'r') as file:
+            content = file.read()
+          if file_name == 'BUILD':
+            content = content.replace(source_dir, target_spec_dir)
+          with open(os.path.join(clone_root, file_name), 'w') as file:
+            file.write(content)
+
+      yield clone_dir
+
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              **kwargs):
 
