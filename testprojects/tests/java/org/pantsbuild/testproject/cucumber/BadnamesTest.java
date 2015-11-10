@@ -11,5 +11,5 @@ import org.junit.runner.RunWith;
 
 @RunWith(Cucumber.class) @CucumberOptions(
     glue = {"org.pantsbuild.testproject.cucumber"})
-public class CukeTest {
+public class BadnamesTest {
 }
