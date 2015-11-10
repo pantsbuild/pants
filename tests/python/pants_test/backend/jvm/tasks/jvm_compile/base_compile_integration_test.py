@@ -19,12 +19,17 @@ class BaseCompileIT(PantsRunIntegrationTest):
 
   @contextmanager
   def do_test_compile(self, target,
-      expected_files=None, iterations=2, expect_failure=False, extra_args=None):
+      expected_files=None, iterations=2, expect_failure=False, extra_args=None, workdir_outside_of_buildroot=False):
     """Runs a configurable number of iterations of compilation for the given target.
 
     By default, runs twice to shake out errors related to noops.
     """
-    with self.temporary_workdir() as workdir:
+    if not workdir_outside_of_buildroot:
+      workdir_generator = self.temporary_workdir()
+    else:
+      workdir_generator = temporary_dir(suffix='.pants.d')
+
+    with workdir_generator as workdir:
       with self.temporary_cachedir() as cachedir:
         for i in six.moves.xrange(0, iterations):
           pants_run = self.run_test_compile(workdir, cachedir, target,
