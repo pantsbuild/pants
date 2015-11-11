@@ -26,8 +26,8 @@ class CleanAllTest(PantsRunIntegrationTest):
         }
 
         pants_run = self.run_pants(['clean-all',
-                                    '--include-buildcache',
-                                    '--include-ivy',
+                                    '--clean-buildcache',
+                                    '--clean-ivy',
                                     self.gen_ivy_option(ivy_dir)
                                     ],
                                    config=config)
@@ -49,8 +49,8 @@ class CleanAllTest(PantsRunIntegrationTest):
         }
 
         pants_run = self.run_pants(['clean-all',
-                                    '--no-include-buildcache',
-                                    '--no-include-ivy',
+                                    '--no-clean-buildcache',
+                                    '--no-clean-ivy',
                                     ],
                                    config=config)
         self.assert_success(pants_run)

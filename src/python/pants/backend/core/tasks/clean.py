@@ -36,10 +36,10 @@ class Cleaner(Task):
   @classmethod
   def register_options(cls, register):
     super(Cleaner, cls).register_options(register)
-    register('--include-ivy', action='store_true', default=False,
-             help='include .ivy directory')
-    register('--include-buildcache', action='store_true', default=False,
-             help='include .buildcache directory')
+    register('--clean-ivy', action='store_true', default=False,
+             help='include ivy cache directory')
+    register('--clean-cache', action='store_true', default=False,
+             help='include cache directory')
 
   def execute(self):
     print()
