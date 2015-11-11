@@ -16,6 +16,7 @@ from operator import eq, ne
 from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
+from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -93,17 +94,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     with self.temporary_sourcedir() as clone_dir:
       target_spec_dir = os.path.relpath(clone_dir)
 
-      for root, dirs, files in os.walk(source_dir):
-        clone_root = os.path.join(clone_dir, os.path.relpath(root, source_dir))
-        for dir in dirs:
-          os.mkdir(os.path.join(clone_root, dir))
-        for file_name in files:
-          with open(os.path.join(root, file_name), 'r') as file:
-            content = file.read()
-          if file_name == 'BUILD':
+      for dir_path, dir_names, file_names in os.walk(source_dir):
+        clone_dir_path = os.path.join(clone_dir, os.path.relpath(dir_path, source_dir))
+        for dir_name in dir_names:
+          os.mkdir(os.path.join(clone_dir_path, dir_name))
+        for file_name in file_names:
+          with open(os.path.join(dir_path, file_name), 'r') as f:
+            content = f.read()
+          if BuildFile._is_buildfile_name(file_name):
             content = content.replace(source_dir, target_spec_dir)
-          with open(os.path.join(clone_root, file_name), 'w') as file:
-            file.write(content)
+          with open(os.path.join(clone_dir_path, file_name), 'w') as f:
+            f.write(content)
 
       yield clone_dir
 
