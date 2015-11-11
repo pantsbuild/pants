@@ -9,6 +9,7 @@ import os
 import shutil
 from abc import ABCMeta, abstractmethod, abstractproperty
 
+from pants.base.exceptions import TaskError
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
@@ -101,20 +102,25 @@ class Coverage(object):
       if not self.is_coverage_target(target):
         continue
       paths = instrumentation_classpath.get_for_target(target)
-      for (config, path) in paths:
+      target_instrumentation_path = os.path.join(self._settings.coverage_instrument_dir, target.id)
+      for index in xrange(0, len(paths)):
         # there are two sorts of classpath entries we see in the compile classpath: jars and dirs
         # the branches below handle the cloning of those respectively.
+        (config, path) = paths[index]
+        entry_instrumentation_path = os.path.join(target_instrumentation_path, str(index))
         if os.path.isfile(path):
-          shutil.copy2(path, self._settings.coverage_instrument_dir)
-          new_path = os.path.join(self._settings.coverage_instrument_dir, os.path.basename(path))
+          if os.path.exists(entry_instrumentation_path):
+              raise TaskError("Instrumentation path entry '{}' already exists for target: [].".format(
+                entry_instrumentation_path, target.id))
+          safe_mkdir(entry_instrumentation_path, clean=True)
+          shutil.copy2(path, entry_instrumentation_path)
+          new_path = os.path.join(entry_instrumentation_path, os.path.basename(path))
         else:
-          files = os.listdir(path)
-          for file in files:
-            shutil.copy2(file, self._settings.coverage_instrument_dir)
-          new_path = self._settings.coverage_instrument_dir
+          shutil.copytree(path, entry_instrumentation_path)
+          new_path = entry_instrumentation_path
 
         instrumentation_classpath.remove_for_target(target, [(config, path)])
         instrumentation_classpath.add_for_target(target, [(config, new_path)])
         self._context.log.debug(
-          "runtime_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+        "runtime_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
     return instrumentation_classpath
