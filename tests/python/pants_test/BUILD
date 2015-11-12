@@ -45,6 +45,7 @@ python_library(
   dependencies = [
     '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_file',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

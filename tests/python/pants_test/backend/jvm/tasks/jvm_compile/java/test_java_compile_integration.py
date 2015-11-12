@@ -156,6 +156,24 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       '--compile-jvm-dep-check-missing-direct-deps=fatal',
     )
 
+  def test_java_compile_with_changes_in_resources_dependencies(self):
+    with self.source_clone('testprojects/src/java/org/pantsbuild/testproject/resdependency') as resdependency:
+      with self.temporary_workdir() as workdir:
+        with self.temporary_cachedir() as cachedir:
+          target = os.path.join(resdependency, 'java:testsources')
+
+          first_run = self.run_test_compile(workdir, cachedir, target, clean_all=True)
+          self.assert_success(first_run)
+          self.assertTrue("Compiling" in first_run.stdout_data)
+
+          with open(os.path.join(resdependency, 'resources/resource.xml'), 'w') as xml_resource:
+            xml_resource.write('<xml>Changed Hello World</xml>\n')
+
+          second_run = self.run_test_compile(workdir, cachedir, target, clean_all=False)
+          self.assert_success(second_run)
+          self.assertTrue("Compiling" not in second_run.stdout_data,
+                          "In case of resources change nothing should be recompiled")
+
   def test_java_compile_with_different_resolved_jars_produce_different_artifacts(self):
     # Since unforced dependencies resolve to the highest version including transitive jars,
     # We want to ensure that running java compile with binary incompatible libraries will
