@@ -103,14 +103,13 @@ class Coverage(object):
         continue
       paths = instrumentation_classpath.get_for_target(target)
       target_instrumentation_path = os.path.join(self._settings.coverage_instrument_dir, target.id)
-      for index in xrange(0, len(paths)):
+      for (index, (config, path)) in enumerate(paths):
         # there are two sorts of classpath entries we see in the compile classpath: jars and dirs
         # the branches below handle the cloning of those respectively.
-        (config, path) = paths[index]
         entry_instrumentation_path = os.path.join(target_instrumentation_path, str(index))
         if os.path.isfile(path):
           if os.path.exists(entry_instrumentation_path):
-              raise TaskError("Instrumentation path entry '{}' already exists for target: [].".format(
+              raise TaskError("Instrumentation path entry '{}' already exists for target: {}.".format(
                 entry_instrumentation_path, target.id))
           safe_mkdir(entry_instrumentation_path, clean=True)
           shutil.copy2(path, entry_instrumentation_path)
