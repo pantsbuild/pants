@@ -2,9 +2,6 @@ import re
 
 from twitter.common.collections import OrderedDict
 
-from pants.base.build_graph import sort_targets
-
-
 class Properties(object):
   """
     A Python reader for java.util.Properties formatted data as oulined here:
