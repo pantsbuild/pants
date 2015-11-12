@@ -2,6 +2,7 @@ import re
 
 from twitter.common.collections import OrderedDict
 
+
 class Properties(object):
   """
     A Python reader for java.util.Properties formatted data as oulined here:
