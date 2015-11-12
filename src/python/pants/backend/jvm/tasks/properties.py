@@ -33,7 +33,6 @@ class Properties(object):
   # An unescaped '=' or ':' forms an explicit separator
   _EXPLICIT_KV_SEP = re.compile(r'(?<!\\)[=:]')
 
-
   @staticmethod
   def _parse(lines):
     def coalesce_lines():
