@@ -16,7 +16,6 @@ from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
 from twitter.common.collections import OrderedSet
-from twitter.common.config import Properties
 
 from pants.backend.core.tasks.scm_publish import Namedver, ScmPublishMixin, Semver
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
@@ -36,6 +35,7 @@ from pants.ivy.ivy import Ivy
 from pants.option.custom_types import dict_option, list_option
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
+from pants.backend.jvm.tasks.properties import Properties
 
 
 _TEMPLATES_RELPATH = os.path.join('templates', 'jar_publish')

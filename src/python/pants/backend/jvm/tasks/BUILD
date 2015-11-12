@@ -30,6 +30,7 @@ python_library(
     ':nailgun_task',
     ':prepare_resources',
     ':prepare_services',
+    ':properties',
     ':resources_task',
     ':scala_repl',
     ':scaladoc_gen',
@@ -232,6 +233,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.config',
     ':jar_task',
+    ':properties',
     'src/python/pants/backend/core/tasks:scm_publish',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -482,6 +484,15 @@ python_library(
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:payload_field',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'properties',
+  sources = ['properties.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:build_graph',
   ],
 )
 
