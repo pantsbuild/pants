@@ -22,6 +22,7 @@ from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadat
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.backend.jvm.tasks.properties import Properties
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
@@ -35,7 +36,6 @@ from pants.ivy.ivy import Ivy
 from pants.option.custom_types import dict_option, list_option
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
-from pants.backend.jvm.tasks.properties import Properties
 
 
 _TEMPLATES_RELPATH = os.path.join('templates', 'jar_publish')
