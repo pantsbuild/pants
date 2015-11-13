@@ -44,7 +44,6 @@ class ReproOptionsTest(unittest.TestCase, ReproMixin):
                 ignore=['src'],
             )}
             with subsystem_instance(Reproducer, **options) as repro_sub:
-              # self.create_task(self.context())
               repro = repro_sub.create_repro()  # This is normally called in pants_exe
               repro.capture(run_info_dict={})
 
