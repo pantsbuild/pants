@@ -2,6 +2,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
@@ -13,16 +14,22 @@ from twitter.common.collections import OrderedDict
 
 
 class Properties(object):
-  """
-    A Python reader for java.util.Properties formatted data as oulined here:
-    http://download.oracle.com/javase/6/docs/api/java/util/Properties.html#load(java.io.Reader)
+  """A Python reader for java.util.Properties formatted data.
+
+  Based on:
+  http://download.oracle.com/javase/6/docs/api/java/util/Properties.html#load(java.io.Reader)
+
+  Originally copied from:
+  https://github.com/twitter/commons/blob/master/src/python/twitter/common/config/properties.py
   """
 
   @staticmethod
   def load(data):
-    """
-      Loads properties from an open stream or the contents of a string and returns a dict of the
-      parsed property data.
+    """Loads properties from an open stream or the contents of a string.
+
+    :param (string | open stream) data: An open stream or a string.
+    :returns: A dict of parsed property data.
+    :rtype: dict
     """
 
     if hasattr(data, 'read') and callable(data.read):
