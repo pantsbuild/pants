@@ -20,7 +20,3 @@ class JvmTargetTest(BaseTest):
     target = self.make_target(':foo', JvmTarget, resources=[':resource_target'])
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([':resource_target'], list(target.traversable_dependency_specs))
-
-  def test_invalid_fatal_warnings(self):
-    with pytest.raises(TargetDefinitionException):
-      target = self.make_target(':foo', JvmTarget, fatal_warnings='asdf')
