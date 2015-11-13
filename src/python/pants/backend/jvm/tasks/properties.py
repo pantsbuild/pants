@@ -7,7 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 
+import six
 from twitter.common.collections import OrderedDict
+
 
 
 class Properties(object):
@@ -25,7 +27,7 @@ class Properties(object):
 
     if hasattr(data, 'read') and callable(data.read):
       contents = data.read()
-    elif isinstance(data, Compatibility.string):
+    elif isinstance(data, six.string_types):
       contents = data
     else:
       raise TypeError('Can only process data from a string or a readable object, given: %s' % data)
@@ -97,7 +99,7 @@ class Properties(object):
 
     if hasattr(output, 'write') and callable(output.write):
       write(output)
-    elif isinstance(output, Compatibility.string):
+    elif isinstance(output, six.string_types):
       with open(output, 'w+a') as out:
         write(out)
     else:

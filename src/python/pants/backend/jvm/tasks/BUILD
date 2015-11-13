@@ -492,6 +492,7 @@ python_library(
   sources = ['properties.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
   ],
 )
 
