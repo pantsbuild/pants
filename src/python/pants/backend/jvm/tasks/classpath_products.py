@@ -292,5 +292,5 @@ class ClasspathProducts(object):
       path = classpath_entry.path
       if os.path.relpath(path, self._pants_workdir).startswith(os.pardir):
         raise TaskError(
-          'Classpath entry {} for target {} is located outside the working directory.'
-          .format(path, target.address.spec))
+          'Classpath entry {} for target {} is located outside the working directory "{}".'
+          .format(path, target.address.spec, self._pants_workdir))

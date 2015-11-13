@@ -168,6 +168,19 @@ class OptionsTest(unittest.TestCase):
     options = self._parse_type_int('./pants ', env={'PANTS_CONFIG_OVERRIDE': "123"})
     self.assertEqual(123, options.for_global_scope().config_override)
 
+  def test_env_bad_override_var(self):
+    """Check for bad PANTS_CONFIG_OVERRIDE values.
+
+    Checks for a case where an environment variable exists like:
+
+        PANTS_CONFIG_OVERRIDE=old_style_pants.ini
+
+    Which was known to throw an unhandled NameError for 'old_style_pants' during the eval().
+    """
+    with self.assertRaisesRegexp(ParseError, 'config.*override'):
+      options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': 'old_style_pants.ini'})
+      options.for_global_scope().config_override
+
   def test_arg_scoping(self):
     # Some basic smoke tests.
     options = self._parse('./pants --verbose')

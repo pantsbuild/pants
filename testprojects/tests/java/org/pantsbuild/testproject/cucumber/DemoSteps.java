@@ -24,19 +24,25 @@ public class DemoSteps {
   @Before public void before() {
     fruits = new LinkedList<String>();
     veggies = new LinkedList<String>();
+    cart = new LinkedList<String>();
   }
 
   @After public void after() {
     fruits = null;
     veggies = null;
+    cart = null;
   }
 
-  @Given("^some fruit$")
+  @Given("^nothing in particular$")
+  public void nothingInParticular() {
+  }
+
+  @Given("^some fruit: (.*)$")
   public void addFruitToList(List<String> fruits) {
     this.fruits.addAll(fruits);
   }
 
-  @Given("^some veggies$")
+  @Given("^some veggies: (.*)$")
   public void addVeggiesToList(List<String> veggies) {
     this.veggies.addAll(veggies);
   }
@@ -47,7 +53,7 @@ public class DemoSteps {
     cart.addAll(veggies);
   }
 
-  @Then("^expect the cart to contain$")
+  @Then("^expect the cart to contain: (.*)$")
   public void checkCart(List<String> foods) {
     assertArrayEquals(
       foods.toArray(new String[cart.size()]),
