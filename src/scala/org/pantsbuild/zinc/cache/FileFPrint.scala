@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.cache
 
 import java.io.{FileNotFoundException, File}
 import com.google.common.hash.Hashing

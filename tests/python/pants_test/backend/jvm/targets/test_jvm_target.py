@@ -5,8 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import pytest
+
 from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.exceptions import TargetDefinitionException
 from pants_test.base_test import BaseTest
 
 
@@ -17,3 +20,7 @@ class JvmTargetTest(BaseTest):
     target = self.make_target(':foo', JvmTarget, resources=[':resource_target'])
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([':resource_target'], list(target.traversable_dependency_specs))
+
+  def test_invalid_fatal_warnings(self):
+    with pytest.raises(TargetDefinitionException):
+      target = self.make_target(':foo', JvmTarget, fatal_warnings='asdf')

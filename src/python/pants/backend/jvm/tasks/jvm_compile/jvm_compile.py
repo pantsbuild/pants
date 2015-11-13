@@ -12,7 +12,9 @@ import shutil
 from collections import OrderedDict, defaultdict
 
 from pants.backend.core.tasks.group_task import GroupMember
+from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext
@@ -163,9 +165,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   @classmethod
   def task_subsystems(cls):
-    # NB(gmalmquist): This is only used to make sure the JvmTargets get properly fingerprinted.
-    # See: java_zinc_compile_jvm_platform_integration#test_compile_stale_platform_settings.
-    return super(JvmCompile, cls).task_subsystems() + (JvmPlatform,)
+    return super(JvmCompile, cls).task_subsystems() + (Java, JvmPlatform, ScalaPlatform)
 
   @classmethod
   def name(cls):
@@ -211,7 +211,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings):
+              log_file, settings, fatal_warnings):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -226,6 +226,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     :param log_file: Where to write logs.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
+    :param fatal_warnings: whether to convert compilation warnings to errors.
     """
     raise NotImplementedError()
 
@@ -270,8 +271,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # The ivy confs for which we're building.
     self._confs = self.get_options().confs
 
-    # Mapping of relevant (as selected by the predicate) sources by target.
-    self._sources_by_target = None
+    # Determines which sources are relevant to this target.
     self._sources_predicate = self.select_source
 
     self._capture_log = self.get_options().capture_log
@@ -305,10 +305,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def prepare_execute(self, chunks):
     relevant_targets = list(itertools.chain(*chunks))
 
-    # Target -> sources (relative to buildroot).
-    # TODO(benjy): Should sources_by_target be available in all Tasks?
-    self._sources_by_target = self._compute_sources_by_target(relevant_targets)
-
     # Clone the compile_classpath to the runtime_classpath.
     compile_classpath = self.context.products.get_data('compile_classpath')
     runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
@@ -335,7 +331,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           classes_dir,
                           jar_file,
                           log_file,
-                          self._sources_for_target(target))
+                          self._compute_sources_for_target(target),
+                          self._compute_strict_deps(target))
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
@@ -351,7 +348,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
 
-      # Initialize the classpath for all targets
+      # Initialize the classpath for all targets.
       compile_contexts = {vt.target: self._compile_context(vt.target, vt.results_dir)
                           for vt in invalidation_check.all_vts}
       for cc in compile_contexts.values():
@@ -413,7 +410,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       raise TaskError("Compilation failure: {}".format(e))
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings):
+                   log_file, progress_message, settings, fatal_warnings):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -446,7 +443,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
         self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings)
+                     log_file, settings, fatal_warnings)
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -532,8 +529,16 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                                  compile_context,
                                  extra_compile_time_classpath):
     # Generate a classpath specific to this compile and target.
-    target_closure = compile_context.target.closure(bfs=True)
-    return ClasspathUtil.compute_classpath(target_closure, classpath_products,
+    target = compile_context.target
+    if compile_context.strict_deps:
+      classpath_targets = [target] + target.dependencies
+      pruned = [t.address.spec for t in target.closure(bfs=True) if t not in classpath_targets]
+      self.context.log.debug(
+          'Using strict classpath for {}, which prunes the following dependencies: {}'.format(
+            target.address.spec, pruned))
+    else:
+      classpath_targets = target.closure(bfs=True)
+    return ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
                                            extra_compile_time_classpath, self._confs)
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
@@ -614,6 +619,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           # Otherwise, simply ensure that it is empty.
           safe_delete(tmp_analysis_file)
         target, = vts.targets
+        fatal_warnings = self._compute_fatal_warnings(target)
         self._compile_vts(vts,
                           compile_context.sources,
                           tmp_analysis_file,
@@ -622,7 +628,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           compile_context.classes_dir,
                           log_file,
                           progress_message,
-                          target.platform)
+                          target.platform,
+                          fatal_warnings)
         os.rename(tmp_analysis_file, compile_context.analysis_file)
         self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
 
@@ -688,8 +695,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         raise TaskError("An internal build directory contains invalid/mismatched analysis: please "
                         "run `clean-all` if your tools versions changed recently:\n{}".format(e))
 
-  def _compute_sources_by_target(self, targets):
-    """Computes and returns a map target->sources (relative to buildroot)."""
+  def _compute_sources_for_target(self, target):
+    """Computes and returns the sources (relative to buildroot) for the given target."""
     def resolve_target_sources(target_sources):
       resolved_sources = []
       for target in target_sources:
@@ -697,25 +704,43 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           resolved_sources.extend(target.sources_relative_to_buildroot())
       return resolved_sources
 
-    def calculate_sources(target):
-      sources = [s for s in target.sources_relative_to_buildroot() if self._sources_predicate(s)]
-      # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
-      if hasattr(target, 'java_sources') and target.java_sources:
-        sources.extend(resolve_target_sources(target.java_sources))
-      return sources
-    return {t: calculate_sources(t) for t in targets}
+    sources = [s for s in target.sources_relative_to_buildroot() if self._sources_predicate(s)]
+    # TODO: Make this less hacky. Ideally target.java_sources will point to sources, not targets.
+    if hasattr(target, 'java_sources') and target.java_sources:
+      sources.extend(resolve_target_sources(target.java_sources))
+    return sources
 
-  def _sources_for_targets(self, targets):
-    """Returns a cached map of target->sources for the specified targets."""
-    if self._sources_by_target is None:
-      raise TaskError('self._sources_by_target not computed yet.')
-    return {t: self._sources_by_target.get(t, []) for t in targets}
+  def _compute_strict_deps(self, target):
+    """Computes the strict_deps setting for the given target sources.
 
-  def _sources_for_target(self, target):
-    """Returns the cached sources for the given target."""
-    if self._sources_by_target is None:
-      raise TaskError('self._sources_by_target not computed yet.')
-    return self._sources_by_target.get(target, [])
+    If the target does not have the strict_dep setting declared, chooses the most strict
+    of the matched languages for the target.
+    """
+    if target.strict_deps is not None:
+      return target.strict_deps
+
+    strict_deps = False
+    if target.has_sources('.java'):
+      strict_deps |= Java.global_instance().strict_deps
+    if target.has_sources('.scala'):
+      strict_deps |= ScalaPlatform.global_instance().strict_deps
+    return strict_deps
+
+  def _compute_fatal_warnings(self, target):
+    """Computes the fatal_warnings setting for the given target sources.
+
+    If the target does not have the fatal_warnings setting declared, chooses the most strict
+    of the matched languages for the target.
+    """
+    if target.fatal_warnings is not None:
+      return target.fatal_warnings
+
+    fatal_warnings = False
+    if target.has_sources('.java'):
+      fatal_warnings |= Java.global_instance().default_fatal_warnings
+    if target.has_sources('.scala'):
+      fatal_warnings |= ScalaPlatform.global_instance().default_fatal_warnings
+    return fatal_warnings
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.

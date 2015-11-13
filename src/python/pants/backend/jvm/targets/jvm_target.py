@@ -12,6 +12,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField
 from pants.build_graph.target import Target
@@ -34,12 +35,14 @@ class JvmTarget(Target, Jarable):
                resources=None,
                services=None,
                platform=None,
+               strict_deps=None,
+               fatal_warnings=None,
                **kwargs):
     """
     :param excludes: List of `exclude <#exclude>`_\s to filter this target's
       transitive dependencies against.
     :param sources: Source code files to build. Paths are relative to the BUILD
-       file's directory.
+      file's directory.
     :type sources: ``Fileset`` (from globs or rglobs) or list of strings
     :param services: A dict mapping service interface names to the classes owned by this target
                      that implement them.  Keys are fully qualified service class names, values are
@@ -47,20 +50,31 @@ class JvmTarget(Target, Jarable):
                      by this target that implements the service interface and should be
                      discoverable by the jvm service provider discovery mechanism described here:
                      https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
-    :param str platform: The name of the platform (defined under the jvm-platform subsystem) to use
+    :param platform: The name of the platform (defined under the jvm-platform subsystem) to use
       for compilation (that is, a key into the --jvm-platform-platforms dictionary). If unspecified,
       the platform will default to the first one of these that exist: (1) the default_platform
       specified for jvm-platform, (2) a platform constructed from whatever java version is returned
       by DistributionLocator.cached().version.
+    :type platform: str
+    :param strict_deps: When True, only the directly declared deps of the target will be used at
+      compilation time. This enforces that all direct deps of the target are declared, and can
+      improve compilation speed due to smaller classpaths. Transitive deps are always provided
+      at runtime.
+    :type strict_deps: bool
+    :param fatal_warnings: If present, override zinc-compile-fatal-warnings for this target.
+    :type fatal_warnings: bool
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
+
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
       'excludes': excludes,
       'platform': PrimitiveField(platform),
+      'strict_deps': PrimitiveField(strict_deps),
+      'fatal_warnings': PrimitiveField(fatal_warnings),
     })
     self._resource_specs = self.assert_list(resources, key_arg='resources')
 
@@ -72,6 +86,24 @@ class JvmTarget(Target, Jarable):
     self._services = services or {}
 
     self.add_labels('jvm')
+
+  @property
+  def strict_deps(self):
+    """If set, whether to limit compile time deps to those that are directly declared.
+
+    :return: See constructor.
+    :rtype: bool or None
+    """
+    return self.payload.strict_deps
+
+  @property
+  def fatal_warnings(self):
+    """If set, overrides the platform's default fatal_warnings setting.
+
+    :return: See constructor.
+    :rtype: bool or None
+    """
+    return self.payload.fatal_warnings
 
   @property
   def platform(self):
