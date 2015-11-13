@@ -325,6 +325,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     classes_dir = os.path.join(target_workdir, 'classes')
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
+    strict_deps = self._compute_language_property(target, lambda x: x.strict_deps)
     return CompileContext(target,
                           analysis_file,
                           portable_analysis_file,
@@ -332,7 +333,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           jar_file,
                           log_file,
                           self._compute_sources_for_target(target),
-                          self._compute_strict_deps(target))
+                          strict_deps)
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
@@ -619,7 +620,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           # Otherwise, simply ensure that it is empty.
           safe_delete(tmp_analysis_file)
         target, = vts.targets
-        fatal_warnings = self._compute_fatal_warnings(target)
+        fatal_warnings = fatal_warnings = self._compute_language_property(target, lambda x: x.fatal_warnings)
         self._compile_vts(vts,
                           compile_context.sources,
                           tmp_analysis_file,
@@ -710,37 +711,26 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       sources.extend(resolve_target_sources(target.java_sources))
     return sources
 
-  def _compute_strict_deps(self, target):
-    """Computes the strict_deps setting for the given target sources.
+  def _compute_language_property(self, target, selector):
+    """Computes the a language property setting for the given target sources.
 
-    If the target does not have the strict_dep setting declared, chooses the most strict
-    of the matched languages for the target.
+    :param target The target whose language property will be calculated.
+    :param selector A function that takes a target or platform and returns the boolean value of the
+                    property for that target or platform, or None if that target or platform does
+                    not directly define the property.
+
+    If the target does not override the language property, returns true iff the property
+    is true for any of the matched languages for the target.
     """
-    if target.strict_deps is not None:
-      return target.strict_deps
+    if selector(target) is not None:
+      return selector(target)
 
-    strict_deps = False
+    property = False
     if target.has_sources('.java'):
-      strict_deps |= Java.global_instance().strict_deps
+      property |= selector(Java.global_instance())
     if target.has_sources('.scala'):
-      strict_deps |= ScalaPlatform.global_instance().strict_deps
-    return strict_deps
-
-  def _compute_fatal_warnings(self, target):
-    """Computes the fatal_warnings setting for the given target sources.
-
-    If the target does not have the fatal_warnings setting declared, chooses the most strict
-    of the matched languages for the target.
-    """
-    if target.fatal_warnings is not None:
-      return target.fatal_warnings
-
-    fatal_warnings = False
-    if target.has_sources('.java'):
-      fatal_warnings |= Java.global_instance().default_fatal_warnings
-    if target.has_sources('.scala'):
-      fatal_warnings |= ScalaPlatform.global_instance().default_fatal_warnings
-    return fatal_warnings
+      property |= selector(ScalaPlatform.global_instance())
+    return property
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.

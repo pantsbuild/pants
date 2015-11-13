@@ -18,9 +18,9 @@ class ZincLanguageMixin(object):
     register('--strict-deps', advanced=True, default=False, fingerprint=True, action='store_true',
              help='The default for the "strict_deps" argument for targets of this language.')
 
-    register('--default-fatal-warnings', advanced=True, action='store_true', default=False,
+    register('--fatal-warnings', advanced=True, action='store_true', default=False,
              fingerprint=True,
-             help='If true, make warnings fatal for targets that do not specify fatal_warnings.')
+             help='The default for the "fatal_warnings" argument for targets of this language.')
 
   @property
   def strict_deps(self):
@@ -30,8 +30,8 @@ class ZincLanguageMixin(object):
     return self.get_options().strict_deps
 
   @property
-  def default_fatal_warnings(self):
+  def fatal_warnings(self):
     """If true, make warnings fatal for targets that do not specify fatal_warnings.
     :rtype: bool
     """
-    return self.get_options().default_fatal_warnings
+    return self.get_options().fatal_warnings
