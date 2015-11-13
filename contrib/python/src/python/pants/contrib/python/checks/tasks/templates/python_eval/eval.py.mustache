@@ -1,0 +1,45 @@
+from __future__ import print_function
+
+import inspect
+import os
+import sys
+import traceback
+
+
+def backtrace_to_here():
+  trace = inspect.trace(context=1)
+  trace.pop(0)  # discard this helper function frame
+
+  pre_processed = []
+  for info in trace:
+    frame = info[0]
+    tb = inspect.getframeinfo(frame)
+    filename = tb.filename
+    if filename.startswith('{{chroot_parent}}'):
+      relpath_parent = os.path.relpath(filename, '{{chroot_parent}}')
+      relpath = relpath_parent.split(os.sep, 1)[1]
+      filename = os.path.join('[srcroot]', relpath)
+    line_text = tb.code_context[tb.index]
+    pre_processed.append((filename, tb.lineno, tb.function, line_text))
+
+  return ''.join(traceback.format_list(pre_processed)).rstrip()
+
+
+def log(message=''):
+  print(message, file=sys.stderr)
+
+
+if __name__ == '__main__':
+  # TODO(John Sirois): Consider collecting all import errors before exiting non-zero.
+  {{#modules}}
+  try:
+    {{import_statement}}
+  except ImportError as e:
+    log()
+    log("Failed to eval '{{source}}':")
+    log(backtrace_to_here())
+    log(str(e))
+    sys.exit(1)
+
+  {{/modules}}
+  sys.exit(0)
