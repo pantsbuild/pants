@@ -77,6 +77,20 @@ EOF
       repl.node contrib/node/examples::
 }
 
+PKG_PYTHON_CHECKS=(
+  "pantsbuild.pants.contrib.python.checks"
+  "//contrib/python/src/python/pants/contrib/python/checks:plugin"
+  "pkg_python_checks_install_test"
+)
+function pkg_python_checks_install_test() {
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
+    --explain compile | grep "python-eval" &> /dev/null && \
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
+    --explain compile | grep "pythonstyle" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_SCROOGE
@@ -84,4 +98,5 @@ CONTRIB_PACKAGES=(
   PKG_SPINDLE
   PKG_GO
   PKG_NODE
+  PKG_PYTHON_CHECKS
 )
