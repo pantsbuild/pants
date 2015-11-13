@@ -17,6 +17,7 @@ python_library(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/backend/core/tasks:test_task_mixin',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:antlr_builder',
     'src/python/pants/backend/python:interpreter_cache',
