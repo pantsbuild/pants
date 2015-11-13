@@ -15,7 +15,7 @@ This release completes the deprecated cycle for two options and removes them:
 Two existing tasks not installed by default have been moved from `pantsbuild.pants` to
 `pantsbuild.pants.contrib.python.checks`.  You can add `pantsbuild.pants.contrib.python.checks` to
 your `plugins` list in `pants.ini` to get these tasks installed and start verifying you python
-BUILD deps and to check you python code confirms to pep8 and various other lints.
+BUILD deps and to check that your python code confirms to pep8 and various other lints.
 
 API Changes
 ~~~~~~~~~~~
