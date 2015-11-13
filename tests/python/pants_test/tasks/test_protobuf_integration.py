@@ -65,11 +65,6 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("Message is: Hello World!", java_out)
 
   def test_source_ordering(self):
-    expected_blocks = {
-      'isolated': 3,
-    }
-
-    gen_strategy = 'isolated'
     # force a compile to happen, we count on compile output in this test
     self.assert_success(self.run_pants(['clean-all']))
 
@@ -78,8 +73,7 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['gen.protoc',
                                 'testprojects/src/java/org/pantsbuild/testproject/proto-ordering',
                                 '--level=debug',
-                                '--no-colors',
-                                '--gen-protoc-strategy={0}'.format(gen_strategy)])
+                                '--no-colors'])
     self.assert_success(pants_run)
 
     def pairs(iterable):
@@ -95,10 +89,10 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
     all_blocks = list(find_protoc_blocks([l.strip() for l in pants_run.stdout_data.split('\n')]))
     block_text = '\n\n'.join('[block {0}]\n{1}'.format(index, '\n'.join(block))
                               for index, block in enumerate(all_blocks))
-    self.assertEquals(len(all_blocks), expected_blocks[gen_strategy],
+    self.assertEquals(len(all_blocks), 3,
         'Expected there to be exactly {expected} protoc compilation group! (Were {count}.)'
         '\n{out}\n\nBLOCKS:\n{blocks}'
-        .format(expected=expected_blocks[gen_strategy], count=len(all_blocks),
+        .format(expected=3, count=len(all_blocks),
                 out=pants_run.stderr_data,
                 blocks=block_text))
 
