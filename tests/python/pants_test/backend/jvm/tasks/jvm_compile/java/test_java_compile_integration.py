@@ -124,7 +124,6 @@ class JavaCompileIntegrationTest(BaseCompileIT):
              'org.pantsbuild.testproject.annotation.main.Main$TestInnerClass'},
             set(annotated_classes))
 
-
   def test_java_compile_with_changes_in_resources_dependencies(self):
     with self.source_clone('testprojects/src/java/org/pantsbuild/testproject/resdependency') as resdependency:
       with self.temporary_workdir() as workdir:
