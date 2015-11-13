@@ -13,15 +13,9 @@ from pants_test.base_test import BaseTest
 
 
 class PantsRequirementTest(BaseTest):
-  # NB: We use  aliases and BUILD files to test proper registration of anonymous targets and macros.
-
-  def setUp(self):
-    super(PantsRequirementTest, self).setUp()
-    # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
-    self.context()
-
   @property
   def alias_groups(self):
+    # NB: We use aliases and BUILD files to test proper registration of the pants_requirement macro.
     return build_file_aliases()
 
   def assert_pants_requirement(self, python_requirement_library):
