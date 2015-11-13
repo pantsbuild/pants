@@ -2,7 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 junit_tests(name='cucumber',
-  sources=['CukeTest.java'],
+  sources=[
+    'BadnamesTest.java',
+    'CukeTest.java',
+    'NormalTest.java',
+  ],
   dependencies=[
     ':lib',
   ],
@@ -10,6 +14,7 @@ junit_tests(name='cucumber',
 
 java_library(name='lib',
   sources=[
+    'BadnamesSteps.java',
     'DemoSteps.java',
   ],
   dependencies=[

@@ -22,6 +22,7 @@ target(
     ':resources_task',
     ':prepare_resources',
     ':prepare_services',
+    ':properties',
     ':scalastyle',
     ':unpack_jars',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
@@ -329,6 +330,14 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:prepare_services',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'properties',
+  sources = ['test_properties.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:properties',
   ]
 )
 

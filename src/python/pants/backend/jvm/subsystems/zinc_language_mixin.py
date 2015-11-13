@@ -24,7 +24,7 @@ class ZincLanguageMixin(object):
 
   @property
   def strict_deps(self):
-    """Whether to limit compile time deps to those that are directly declared by a target.
+    """When True, limits compile time deps to those that are directly declared by a target.
     :rtype: bool
     """
     return self.get_options().strict_deps

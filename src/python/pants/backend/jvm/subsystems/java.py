@@ -10,7 +10,7 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class Java(ZincLanguageMixin, Subsystem):
-  """A subsystem to encapsulate Java language features that are not platform specific.
+  """A subsystem to encapsulate Java language features.
 
   Platform specific options (ie, JDK specific) are captured by the JvmPlatform subsystem.
   """

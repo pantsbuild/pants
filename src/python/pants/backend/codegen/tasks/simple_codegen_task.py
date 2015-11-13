@@ -18,10 +18,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.build_graph import sort_targets
-from pants.util.dirutil import fast_relpath, safe_delete, safe_rmtree, safe_walk
-from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
+from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
 
 
 logger = logging.getLogger(__name__)
@@ -44,13 +41,6 @@ class SimpleCodegenTask(Task):
     register('--allow-empty', action='store_true', default=True, fingerprint=True,
              help='Skip targets with no sources defined.',
              advanced=True)
-    register('--strategy', fingerprint=True, choices=['isolated', 'global'], default=None,
-              deprecated_version='0.0.58',
-              deprecated_hint='Only isolated codegen is supported; this flag is ignored.',
-              help='Selects the compilation strategy to use. The "global" strategy uses a shared '
-                  'global directory for all generated code, and the "isolated" strategy uses '
-                  'per-target codegen directories.',
-              advanced=True)
     register('--allow-dups', action='store_true', default=False, fingerprint=True,
               help='Allow multiple targets specifying the same sources. If duplicates are '
                    'allowed, the logic of find_sources will associate generated sources with '

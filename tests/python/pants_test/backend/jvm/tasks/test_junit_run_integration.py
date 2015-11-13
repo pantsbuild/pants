@@ -95,5 +95,5 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
   @expectedFailure
   def test_junit_tests_using_cucumber(self):
     test_spec = 'testprojects/tests/java/org/pantsbuild/testproject/cucumber'
-    with self.pants_results(['clean-all', 'test.junit', test_spec]) as results:
+    with self.pants_results(['clean-all', 'test.junit', '--per-test-timer', test_spec]) as results:
       self.assert_success(results)

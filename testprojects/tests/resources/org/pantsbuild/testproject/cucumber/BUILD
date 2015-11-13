@@ -2,5 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 resources(name='cucumber',
-  sources=['demo.feature'],
+  sources=[
+    'badnames.feature',
+    'demo.feature',
+  ],
 )
