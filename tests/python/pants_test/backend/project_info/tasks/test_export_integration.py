@@ -65,10 +65,11 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      thrift_target_name = ('examples.src.thrift.org.pantsbuild.example.precipitation'
-                            '.precipitation-java')
+      thrift_target_name = 'precipitation-java'
+      thrift_target_id = 'examples.src.thrift.org.pantsbuild.example.precipitation.{}'.format(
+          thrift_target_name)
       codegen_target_regex = os.path.join(os.path.relpath(workdir, get_buildroot()),
-                                          'gen/thrift/[^/:]*/[^/:]*:{0}'.format(thrift_target_name))
+                                          'gen/thrift/{0}/[^/:]*:{1}'.format(thrift_target_id, thrift_target_name))
       p = re.compile(codegen_target_regex)
       self.assertTrue(any(p.match(target) for target in json_data.get('targets').keys()))
 
