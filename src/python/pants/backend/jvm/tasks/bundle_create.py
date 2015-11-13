@@ -63,7 +63,7 @@ class BundleCreate(JvmBinaryTask):
 
   def execute(self):
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
-    for target in self.context.target_roots:
+    for target in self.context.targets():
       for app in map(self.App, filter(self.App.is_app, [target])):
         basedir = self.bundle(app)
         # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
