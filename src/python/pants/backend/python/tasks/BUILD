@@ -4,9 +4,6 @@
 python_library(
   name='python',
   sources=globs('*.py'),
-  resource_targets=[
-    ':resources'
-  ],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -44,9 +41,4 @@ python_library(
     'src/python/pants/util:xml_parser',
     'src/python/pants/util:timeout',
   ]
-)
-
-resources(
-  name='resources',
-  sources=globs('templates/python_eval/*.mustache'),
 )

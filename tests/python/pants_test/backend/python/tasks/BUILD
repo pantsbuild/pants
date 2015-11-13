@@ -2,7 +2,6 @@ target(
   name='tasks',
   dependencies=[
     ':pytest_run',
-    ':python_eval',
     ':python_repl',
     ':python_task',
     ':setup_py',
@@ -39,16 +38,6 @@ python_tests(
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:python_setup',
     'src/python/pants/util:contextutil',
-  ]
-)
-
-
-python_tests(
-  name='python_eval',
-  sources=['test_python_eval.py'],
-  dependencies=[
-    ':python_task_test_base',
-    'src/python/pants/backend/python/tasks:python',
   ]
 )
 

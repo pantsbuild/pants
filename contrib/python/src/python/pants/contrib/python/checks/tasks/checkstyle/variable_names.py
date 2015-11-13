@@ -10,7 +10,7 @@ import keyword
 import re
 from functools import wraps
 
-from twitter.common.lang import Compatibility
+import six
 
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckstylePlugin
 
@@ -21,14 +21,7 @@ LOWER_SNAKE_RE = re.compile(r'^([a-z][a-z\d]*)(_[a-z\d]+)*$')
 UPPER_SNAKE_RE = re.compile(r'^([A-Z][A-Z\d]*)(_[A-Z\d]+)*$')
 UPPER_CAMEL_RE = re.compile(r'^([A-Z][a-z\d]*)+$')
 RESERVED_NAMES = frozenset(keyword.kwlist)
-
-
-if Compatibility.PY2:
-  import __builtin__
-  BUILTIN_NAMES = dir(__builtin__)
-else:
-  import builtin
-  BUILTIN_NAMES = dir(builtin)
+BUILTIN_NAMES = dir(six.moves.builtins)
 
 
 def allow_underscores(num):

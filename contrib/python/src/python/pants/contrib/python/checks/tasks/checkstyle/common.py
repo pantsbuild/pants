@@ -14,7 +14,8 @@ import tokenize
 from abc import abstractmethod
 from collections import Sequence
 
-from twitter.common.lang import Compatibility, Interface
+import six
+from pants.util.meta import AbstractClass
 
 
 __all__ = (
@@ -39,7 +40,7 @@ class OffByOneList(Sequence):
     return len(self._list)
 
   def __getitem__(self, element_id):
-    if isinstance(element_id, Compatibility.integer):
+    if isinstance(element_id, six.integer_types):
       return self.__get_list_item(element_id)
     elif isinstance(element_id, slice):
       return self.__getslice(element_id)
@@ -124,7 +125,7 @@ class PythonFile(object):
     :param blob: Input string with python file contents
     :return: token iterator
     """
-    return tokenize.generate_tokens(Compatibility.StringIO(blob).readline)
+    return tokenize.generate_tokens(six.StringIO(blob).readline)
 
   @property
   def tokens(self):
@@ -267,7 +268,7 @@ class Nit(object):
     return self.python_file[self._line_number] if self._line_number else []
 
 
-class CheckstylePlugin(Interface):
+class CheckstylePlugin(AbstractClass):
   """Interface for checkstyle plugins."""
 
   def __init__(self, options, python_file):
@@ -297,7 +298,7 @@ class CheckstylePlugin(Interface):
 
   def nit(self, code, severity, message, line_number_or_ast=None):
     line_number = None
-    if isinstance(line_number_or_ast, Compatibility.integer):
+    if isinstance(line_number_or_ast, six.integer_types):
       line_number = line_number_or_ast
     elif isinstance(line_number_or_ast, ast.AST):
       line_number = getattr(line_number_or_ast, 'lineno', None)
