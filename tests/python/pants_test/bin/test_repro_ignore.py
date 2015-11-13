@@ -39,7 +39,7 @@ class ReproOptionsTest(unittest.TestCase, ReproMixin):
 
             repro_file = os.path.join(capture_dir, 'repro.tar.gz')
             options = {
-              'repro':dict(
+              'repro': dict(
                 capture=repro_file,
                 ignore=['src'],
             )}

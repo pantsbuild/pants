@@ -65,6 +65,7 @@ python_tests(
   sources=['test_repro_ignore.py'],
   dependencies=[
     ':repro_mixin',
+    'src/python/pants/base:build_root',
     'src/python/pants/bin',
     'src/python/pants/fs',
     'src/python/pants/util:dirutil',
