@@ -231,7 +231,6 @@ python_library(
   ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python/twitter/commons:twitter.common.config',
     ':jar_task',
     ':properties',
     'src/python/pants/backend/core/tasks:scm_publish',

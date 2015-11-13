@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import defaultdict
 
+from twitter.common.util import topological_sort
+
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.build_graph.target import Target
 
