@@ -147,9 +147,13 @@ class SimpleCodegenTask(Task):
     return True
 
   def _get_synthetic_address(self, target, target_workdir):
+    """Create a synthetic Address for the given concrete target.
+
+    Because the target_workdir is stable and unique, the synthetic target name can be short.
+    """
     synthetic_name = target.id
     sources_rel_path = os.path.relpath(target_workdir, get_buildroot())
-    synthetic_address = Address(sources_rel_path, synthetic_name)
+    synthetic_address = Address(sources_rel_path, target.name)
     return synthetic_address
 
   def execute(self):
