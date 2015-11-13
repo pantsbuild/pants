@@ -16,9 +16,9 @@ class ReproMixin(object):
   def add_file(self, root, path, content):
     """Add a file with specified contents
 
-    :param root: (string) Root directory for path.
-    :param path: (string) Path relative to root.
-    :param content: (string) Content to write to file.
+    :param str root: Root directory for path.
+    :param str path: Path relative to root.
+    :param str content: Content to write to file.
     """
     fullpath = os.path.join(root, path)
     safe_mkdir_for(fullpath)
@@ -28,8 +28,8 @@ class ReproMixin(object):
   def assert_not_exists(self, root, path):
     """Assert a file at relpath doesn't exist
 
-    :param root: (string) Root directory of path.
-    :param path: (string) Path relative to tar.gz.
+    :param str root: Root directory of path.
+    :param str path: Path relative to tar.gz.
     :return: bool
     """
     fullpath = os.path.join(root, path)
@@ -38,13 +38,12 @@ class ReproMixin(object):
   def assert_file(self, root, path, expected_content=None):
     """ Assert that a file exists with the content specified
 
-    :param root: (string) Root directory of path.
-    :param path: (string) Path relative to tar.gz.
-    :param expected_content: (string) file contents.
+    :param str root: Root directory of path.
+    :param str path: Path relative to tar.gz.
+    :param str expected_content: file contents.
     :return: bool
     """
     fullpath = os.path.join(root, path)
-    print(fullpath)
     self.assertTrue(os.path.isfile(fullpath))
     if expected_content:
       with open(fullpath, 'r') as infile:

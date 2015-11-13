@@ -59,13 +59,14 @@ class Repro(object):
     :param string buildroot: Capture the workspace at this buildroot.
     :param ignore: Ignore these top-level files/dirs under buildroot.
     """
-    if os.path.realpath(os.path.expanduser(path)).startswith(buildroot):
+    path = os.path.expanduser(path)
+    if os.path.realpath(path).startswith(buildroot):
       raise ReproError('Repro capture file location must be outside the build root.')
     if not path.endswith('tar.gz') and not path.endswith('.tgz'):
       path += '.tar.gz'
     if os.path.exists(path):
       raise ReproError('Repro capture file already exists: {}'.format(path))
-    self._path = os.path.expanduser(path)
+    self._path = path
     self._buildroot = buildroot
     self._ignore = ignore
 
@@ -76,7 +77,6 @@ class Repro(object):
     with open_tar(self._path, 'w:gz', dereference=True, compresslevel=6) as tarout:
       for relpath in os.listdir(self._buildroot):
         if relpath not in self._ignore:
-          print('Adding {}...'.format(relpath))
           tarout.add(os.path.join(self._buildroot, relpath), relpath)
 
       with temporary_file() as tmpfile:

@@ -10,6 +10,7 @@ import unittest
 from functools import partial
 
 from pants.bin.repro import Repro
+from pants.fs.archive import TGZ
 from pants.util.contextutil import open_tar, temporary_dir
 from pants_test.bin.repro_mixin import ReproMixin
 
@@ -31,8 +32,7 @@ class ReproTest(unittest.TestCase, ReproMixin):
       repro.capture(run_info_dict={'foo': 'bar', 'baz': 'qux'})
 
       extract_dir = os.path.join(tmpdir, 'extract')
-      with open_tar(repro_file, 'r:gz') as tar:
-        tar.extractall(extract_dir)
+      TGZ.extract(repro_file, extract_dir)
 
       assert_file = partial(self.assert_file, extract_dir)
       assert_file('baz.txt', 'baz')

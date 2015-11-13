@@ -11,6 +11,7 @@ from functools import partial
 
 from pants.backend.core.tasks.clean import Cleaner
 from pants.bin.repro import Reproducer
+from pants.fs.archive import TGZ
 from pants.util.contextutil import open_tar, pushd, temporary_dir
 from pants_test.bin.repro_mixin import ReproMixin
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -20,6 +21,7 @@ class ReproOptionsTest(TaskTestBase, ReproMixin):
 
   @classmethod
   def task_type(cls):
+    """ Dummy task to invoke options to be fetched from subsystem """
     return Cleaner
 
   def test_ignore_dir(self):
@@ -46,13 +48,10 @@ class ReproOptionsTest(TaskTestBase, ReproMixin):
 
         self.create_task(self.context())
         repro = Reproducer.global_instance().create_repro()
-        repro.capture(run_info_dict={'foo': 'bar', 'baz': 'qux'})
-
-        # clean_task.execute()
+        repro.capture(run_info_dict={})
 
         extract_loc = os.path.join(capture_dir, 'extract')
-        with open_tar(repro_file, 'r:gz') as tar:
-          tar.extractall(extract_loc)
+        TGZ.extract(repro_file, extract_loc)
 
         assert_file = partial(self.assert_file, extract_loc)
         assert_file('foo/bar', 'baz')
