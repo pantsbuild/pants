@@ -11,6 +11,18 @@ target(
 )
 
 python_tests(
+  name='pants_requirements',
+  sources=['test_pants_requirement.py'],
+  dependencies=[
+    'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:build_environment',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
   name='python_chroot',
   sources=['test_python_chroot.py'],
   dependencies=[
