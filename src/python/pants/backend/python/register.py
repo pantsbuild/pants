@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.core.targets.dependencies import Dependencies
+from pants.backend.python.pants_requirement import pants_requirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import python_requirements
@@ -38,6 +39,7 @@ def build_file_aliases():
     },
     context_aware_object_factories={
       'python_requirements': BuildFileAliases.curry_context(python_requirements),
+      'pants_requirement': BuildFileAliases.curry_context(pants_requirement),
     }
   )
 
