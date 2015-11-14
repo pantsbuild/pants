@@ -13,7 +13,6 @@ from hashlib import sha1
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -116,7 +115,6 @@ class ProtobufGen(SimpleCodegenTask):
 
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports([target]))
-    check_duplicate_conflicting_protos(self, sources_by_base, sources, self.context.log)
 
     gen_flag = '--java_out'
 
@@ -201,67 +199,3 @@ class ProtobufGen(SimpleCodegenTask):
     for target in proto_targets:
       for path in self._jars_to_directories(target):
         yield os.path.relpath(path, get_buildroot())
-
-  def calculate_genfiles(self, path, source):
-    protobuf_parse = ProtobufParse(path, source)
-    protobuf_parse.parse()
-    return OrderedSet(self.calculate_java_genfiles(protobuf_parse))
-
-  def calculate_java_genfiles(self, protobuf_parse):
-    basepath = protobuf_parse.package.replace('.', os.path.sep)
-
-    classnames = {protobuf_parse.outer_class_name}
-    if protobuf_parse.multiple_files:
-      classnames |= protobuf_parse.enums | protobuf_parse.messages | protobuf_parse.services | \
-        set(['{name}OrBuilder'.format(name=m) for m in protobuf_parse.messages])
-
-    for classname in classnames:
-      yield os.path.join(basepath, '{0}.java'.format(classname))
-
-
-def _same_contents(a, b):
-  """Perform a comparison of the two files"""
-  with open(a, 'rb') as fp_a, open(b, 'rb') as fp_b:
-    return fp_a.read() == fp_b.read()
-
-
-def check_duplicate_conflicting_protos(task, sources_by_base, sources, log):
-  """Checks if proto files are duplicate or conflicting.
-
-  There are sometimes two files with the same name on the .proto path.  This causes the protobuf
-  compiler to stop with an error.  Some repos have legitimate cases for this, and so this task
-  decides to just choose one to keep the entire build from failing.  Sometimes, they are identical
-  copies.  That is harmless, but if there are two files with the same name with different contents,
-  that is ambiguous and we want to complain loudly.
-
-  :param task: provides an implementation of the method calculate_genfiles()
-  :param dict sources_by_base: mapping of base to path
-  :param set|OrderedSet sources: set of sources
-  :param Context.Log log: writes error messages to the console for conflicts
-  """
-  sources_by_genfile = {}
-  for base in sources_by_base.keys():  # Need to iterate over /original/ bases.
-    for path in sources_by_base[base]:
-      if not path in sources:
-        continue  # Check to make sure we haven't already removed it.
-      source = path[len(base):]
-
-      genfiles = task.calculate_genfiles(path, source)
-      for genfile in genfiles:
-        if genfile in sources_by_genfile:
-          # Possible conflict!
-          prev = sources_by_genfile[genfile]
-          if not prev in sources:
-            # Must have been culled by an earlier pass.
-            continue
-          if not _same_contents(path, prev):
-            log.error('Proto conflict detected (.proto files are different):\n'
-                      '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
-          else:
-            log.warn('Proto duplication detected (.proto files are identical):\n'
-                     '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
-          log.warn('  Arbitrarily favoring proto 1.')
-          if path in sources:
-            sources.remove(path)  # Favor the first version.
-          continue
-        sources_by_genfile[genfile] = path
