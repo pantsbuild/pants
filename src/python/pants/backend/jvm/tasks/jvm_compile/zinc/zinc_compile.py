@@ -294,7 +294,7 @@ class ZincCompile(JvmCompile):
         f.write('{}\n'.format(processor.strip()))
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings):
+              log_file, settings, fatal_warnings):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
@@ -338,6 +338,9 @@ class ZincCompile(JvmCompile):
       '-C-target', '-C{}'.format(settings.target_level),
     ])
     zinc_args.extend(settings.args)
+
+    if fatal_warnings:
+      zinc_args.extend(['-S-Xfatal-warnings', '-C-Werror'])
 
     jvm_options = list(self._jvm_options)
 

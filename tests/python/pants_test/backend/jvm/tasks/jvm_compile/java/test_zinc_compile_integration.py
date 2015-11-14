@@ -121,3 +121,28 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           cachedir,
           'testprojects/src/java/org/pantsbuild/testproject/annotation/processor::',
           clean_all=False))
+
+  def test_fatal_warning(self):
+    def test_combination(target, default_fatal_warnings, expect_success):
+      with self.temporary_workdir() as workdir:
+        with self.temporary_cachedir() as cachedir:
+          if default_fatal_warnings:
+            arg = '--java-fatal-warnings'
+          else:
+            arg = '--no-java-fatal-warnings'
+          pants_run = self.run_test_compile(
+              workdir,
+              cachedir,
+              'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:{}'.format(target),
+              extra_args=[arg, '--compile-zinc-warning-args=-C-Xlint:all'])
+
+          if expect_success:
+            self.assert_success(pants_run)
+          else:
+            self.assert_failure(pants_run)
+    test_combination('defaultfatal', default_fatal_warnings=True, expect_success=False)
+    test_combination('defaultfatal', default_fatal_warnings=False, expect_success=True)
+    test_combination('fatal', default_fatal_warnings=True, expect_success=False)
+    test_combination('fatal', default_fatal_warnings=False, expect_success=False)
+    test_combination('nonfatal', default_fatal_warnings=True, expect_success=True)
+    test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)
