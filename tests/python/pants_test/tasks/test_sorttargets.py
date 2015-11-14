@@ -49,7 +49,6 @@ class SortTargetsTest(BaseSortTargetsTest):
 
   def test_sort(self):
     targets = [self.target('common/a'), self.target('common/c'), self.target('common/b')]
-    print("HERE!!", type(targets[0]))
     self.assertEqual(['common/a', 'common/b', 'common/c'],
                      list(self.execute_console_task(targets=targets)))
 
