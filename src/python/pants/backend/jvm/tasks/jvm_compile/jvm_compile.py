@@ -11,6 +11,7 @@ import itertools
 import os
 from collections import defaultdict
 
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.java import Java
@@ -27,6 +28,7 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.target import Target
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
@@ -530,6 +532,15 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         product_deps_by_src[compile_context.target] = \
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
 
+  def _resolve_aliases(self, target):
+    """Recursively resolve `target` aliases."""
+    for declared in target.dependencies:
+      if isinstance(declared, Dependencies) or type(declared) == Target:
+        for r in self._resolve_aliases(declared):
+          yield r
+      else:
+        yield declared
+
   def _compute_classpath_entries(self,
                                  classpath_products,
                                  compile_context,
@@ -537,7 +548,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Generate a classpath specific to this compile and target.
     target = compile_context.target
     if compile_context.strict_deps:
-      classpath_targets = [target] + target.dependencies
+      classpath_targets = [target] + list(self._resolve_aliases(target))
       pruned = [t.address.spec for t in target.closure(bfs=True) if t not in classpath_targets]
       self.context.log.debug(
           'Using strict classpath for {}, which prunes the following dependencies: {}'.format(
