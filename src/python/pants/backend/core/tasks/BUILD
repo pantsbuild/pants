@@ -372,7 +372,6 @@ python_library(
   dependencies = [
     ':common',
     ':console_task',
-    '3rdparty/python/twitter/commons:twitter.common.util',
     'src/python/pants/build_graph',
   ],
 )

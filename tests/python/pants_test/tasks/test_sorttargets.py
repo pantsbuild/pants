@@ -49,10 +49,11 @@ class SortTargetsTest(BaseSortTargetsTest):
 
   def test_sort(self):
     targets = [self.target('common/a'), self.target('common/c'), self.target('common/b')]
-    self.assertEqual(['common/a:a', 'common/b:b', 'common/c:c'],
+    print("HERE!!", type(targets[0]))
+    self.assertEqual(['common/a', 'common/b', 'common/c'],
                      list(self.execute_console_task(targets=targets)))
 
   def test_sort_reverse(self):
     targets = [self.target('common/c'), self.target('common/a'), self.target('common/b')]
-    self.assertEqual(['common/c:c', 'common/b:b', 'common/a:a'],
+    self.assertEqual(['common/c', 'common/b', 'common/a'],
                      list(self.execute_console_task(targets=targets, options={'reverse': True})))
