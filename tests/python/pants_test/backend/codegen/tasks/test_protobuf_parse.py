@@ -10,7 +10,7 @@ import unittest
 from textwrap import dedent
 from unittest.case import expectedFailure
 
-from pants.backend.codegen.tasks.protobuf_parse import (MESSAGE_PARSER, ProtobufParse, camelcase,
+from pants.backend.codegen.tasks.protobuf_parse import (ProtobufParse, camelcase,
                                                         get_outer_class_name, update_type_list)
 from pants.util.contextutil import temporary_dir
 
@@ -77,7 +77,7 @@ class ProtobufParseTest(unittest.TestCase):
         self.assertEqual('JackSpratt', proto_parse_with_whitespace.outer_class_name)
 
   def test_update_type_list(self):
-    match = MESSAGE_PARSER.match('message Temperature {')
+    match = ProtobufParse._message_parser_re().match('message Temperature {')
 
     expected_value = set()
     expected_value.add('Temperature')
