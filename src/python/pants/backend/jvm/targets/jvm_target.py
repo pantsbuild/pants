@@ -61,7 +61,8 @@ class JvmTarget(Target, Jarable):
       improve compilation speed due to smaller classpaths. Transitive deps are always provided
       at runtime.
     :type strict_deps: bool
-    :param fatal_warnings: If present, override the platform's default fatal-warnings.
+    :param fatal_warnings: Whether to turn warnings into errors for this target.  If present,
+                           takes priority over the language's fatal-warnings option.
     :type fatal_warnings: bool
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
