@@ -7,5 +7,5 @@ jvm_binary(name='antlr4',
   dependencies=[
     'examples/src/antlr/org/pantsbuild/example/exp:exp_antlr4',
   ],
+  strict_deps=False,
 )
-
