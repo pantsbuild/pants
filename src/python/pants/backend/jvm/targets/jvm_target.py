@@ -12,6 +12,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField
 from pants.build_graph.target import Target
@@ -35,6 +36,7 @@ class JvmTarget(Target, Jarable):
                services=None,
                platform=None,
                strict_deps=None,
+               fatal_warnings=None,
                **kwargs):
     """
     :param excludes: List of `exclude <#exclude>`_\s to filter this target's
@@ -59,6 +61,9 @@ class JvmTarget(Target, Jarable):
       improve compilation speed due to smaller classpaths. Transitive deps are always provided
       at runtime.
     :type strict_deps: bool
+    :param fatal_warnings: Whether to turn warnings into errors for this target.  If present,
+                           takes priority over the language's fatal-warnings option.
+    :type fatal_warnings: bool
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
@@ -70,6 +75,7 @@ class JvmTarget(Target, Jarable):
       'excludes': excludes,
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
+      'fatal_warnings': PrimitiveField(fatal_warnings),
     })
     self._resource_specs = self.assert_list(resources, key_arg='resources')
 
@@ -90,6 +96,15 @@ class JvmTarget(Target, Jarable):
     :rtype: bool or None
     """
     return self.payload.strict_deps
+
+  @property
+  def fatal_warnings(self):
+    """If set, overrides the platform's default fatal_warnings setting.
+
+    :return: See constructor.
+    :rtype: bool or None
+    """
+    return self.payload.fatal_warnings
 
   @property
   def platform(self):

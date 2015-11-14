@@ -18,9 +18,20 @@ class ZincLanguageMixin(object):
     register('--strict-deps', advanced=True, default=False, fingerprint=True, action='store_true',
              help='The default for the "strict_deps" argument for targets of this language.')
 
+    register('--fatal-warnings', advanced=True, action='store_true', default=False,
+             fingerprint=True,
+             help='The default for the "fatal_warnings" argument for targets of this language.')
+
   @property
   def strict_deps(self):
     """When True, limits compile time deps to those that are directly declared by a target.
     :rtype: bool
     """
     return self.get_options().strict_deps
+
+  @property
+  def fatal_warnings(self):
+    """If true, make warnings fatal for targets that do not specify fatal_warnings.
+    :rtype: bool
+    """
+    return self.get_options().fatal_warnings

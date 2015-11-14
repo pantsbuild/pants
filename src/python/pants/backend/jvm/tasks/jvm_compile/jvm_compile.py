@@ -216,7 +216,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings):
+              log_file, settings, fatal_warnings):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -231,6 +231,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     :param log_file: Where to write logs.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
+    :param fatal_warnings: whether to convert compilation warnings to errors.
     """
     raise NotImplementedError()
 
@@ -329,6 +330,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     classes_dir = os.path.join(target_workdir, 'classes')
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
+    strict_deps = self._compute_language_property(target, lambda x: x.strict_deps)
     return CompileContext(target,
                           analysis_file,
                           portable_analysis_file,
@@ -336,7 +338,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           jar_file,
                           log_file,
                           self._compute_sources_for_target(target),
-                          self._compute_strict_deps(target))
+                          strict_deps)
 
   def execute_chunk(self, relevant_targets):
     if not relevant_targets:
@@ -414,7 +416,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       raise TaskError("Compilation failure: {}".format(e))
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings):
+                   log_file, progress_message, settings, fatal_warnings):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -447,7 +449,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
         self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings)
+                     log_file, settings, fatal_warnings)
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -623,6 +625,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           # Otherwise, simply ensure that it is empty.
           safe_delete(tmp_analysis_file)
         target, = vts.targets
+        fatal_warnings = fatal_warnings = self._compute_language_property(target, lambda x: x.fatal_warnings)
         self._compile_vts(vts,
                           compile_context.sources,
                           tmp_analysis_file,
@@ -631,7 +634,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           compile_context.classes_dir,
                           log_file,
                           progress_message,
-                          target.platform)
+                          target.platform,
+                          fatal_warnings)
         os.rename(tmp_analysis_file, compile_context.analysis_file)
         self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
 
@@ -712,21 +716,26 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       sources.extend(resolve_target_sources(target.java_sources))
     return sources
 
-  def _compute_strict_deps(self, target):
-    """Computes the strict_deps setting for the given target sources.
+  def _compute_language_property(self, target, selector):
+    """Computes the a language property setting for the given target sources.
 
-    If the target does not have the strict_dep setting declared, chooses the most strict
-    of the matched languages for the target.
+    :param target The target whose language property will be calculated.
+    :param selector A function that takes a target or platform and returns the boolean value of the
+                    property for that target or platform, or None if that target or platform does
+                    not directly define the property.
+
+    If the target does not override the language property, returns true iff the property
+    is true for any of the matched languages for the target.
     """
-    if target.strict_deps is not None:
-      return target.strict_deps
+    if selector(target) is not None:
+      return selector(target)
 
-    strict_deps = False
+    property = False
     if target.has_sources('.java'):
-      strict_deps |= Java.global_instance().strict_deps
+      property |= selector(Java.global_instance())
     if target.has_sources('.scala'):
-      strict_deps |= ScalaPlatform.global_instance().strict_deps
-    return strict_deps
+      property |= selector(ScalaPlatform.global_instance())
+    return property
 
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.
