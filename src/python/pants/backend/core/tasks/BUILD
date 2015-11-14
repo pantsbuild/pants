@@ -231,7 +231,7 @@ python_library(
 
 python_library(
   name = 'markdown_to_html',
-  sources = ['markdown_to_html.py'],
+  sources = ['markdown_to_html.py', 'markdown_to_html_utils.py'],
   resource_targets = [
     ':markdown_to_html_resources',
   ],

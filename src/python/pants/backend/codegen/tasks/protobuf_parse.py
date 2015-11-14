@@ -8,17 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
+from pants.util.memo import memoized_method
 from pants.util.strutil import camelcase
-
-
-DEFAULT_PACKAGE_PARSER = re.compile(r'^\s*package\s+([^;]+)\s*;\s*$')
-OPTION_PARSER = re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
-SERVICE_PARSER = re.compile(r'^\s*(service)\s+([^\s{]+).*')
-MESSAGE_PARSER = re.compile(r'^\s*(message)\s+([^\s{]+).*')
-ENUM_PARSER = re.compile(r'^\s*(enum)\s+([^\s{]+).*')
-EXTEND_PARSER = re.compile(r'^\s*(extend)\s+([^\s{]+).*')
-
-PROTO_FILENAME_PATTERN = re.compile(r'^(.*).proto$')
 
 
 class ProtobufParse(object):
@@ -27,6 +18,41 @@ class ProtobufParse(object):
   class InvalidProtoFilenameError(Exception):
     """Raised if an unexpected filename is passed"""
     pass
+
+  @classmethod
+  @memoized_method
+  def _default_package_parser_re(cls):
+    return re.compile(r'^\s*package\s+([^;]+)\s*;\s*$')
+
+  @classmethod
+  @memoized_method
+  def _option_parser_re(cls):
+    return re.compile(r'^\s*option\s+([^ =]+)\s*=\s*([^\s]+)\s*;\s*$')
+
+  @classmethod
+  @memoized_method
+  def _service_parser_re(cls):
+    return re.compile(r'^\s*(service)\s+([^\s{]+).*')
+
+  @classmethod
+  @memoized_method
+  def _message_parser_re(cls):
+    return re.compile(r'^\s*(message)\s+([^\s{]+).*')
+
+  @classmethod
+  @memoized_method
+  def _enum_parser_re(cls):
+    return re.compile(r'^\s*(enum)\s+([^\s{]+).*')
+
+  @classmethod
+  @memoized_method
+  def _extend_parser_re(cls):
+    return re.compile(r'^\s*(extend)\s+([^\s{]+).*')
+
+  @classmethod
+  @memoized_method
+  def _proto_filename_pattern_re(cls):
+    return re.compile(r'^(.*).proto$')
 
   def __init__(self, path, source):
     """
@@ -52,12 +78,12 @@ class ProtobufParse(object):
     java_package = None
 
     for line in lines:
-      match = DEFAULT_PACKAGE_PARSER.match(line)
+      match = self._default_package_parser_re().match(line)
       if match:
         self.package = match.group(1)
         continue
       else:
-        match = OPTION_PARSER.match(line)
+        match = self._option_parser_re().match(line)
         if match:
           name = match.group(1)
           value = match.group(2).strip('"')
@@ -70,18 +96,18 @@ class ProtobufParse(object):
         else:
           uline = line.decode('utf-8').strip()
           type_depth += uline.count('{') - uline.count('}')
-          match = SERVICE_PARSER.match(line)
+          match = self._service_parser_re().match(line)
           update_type_list(match, type_depth, self.services)
           if not match:
-            match = ENUM_PARSER.match(line)
+            match = self._enum_parser_re().match(line)
             if match:
               update_type_list(match, type_depth, self.enums)
               continue
-            match = MESSAGE_PARSER.match(line)
+            match = self._message_parser_re().match(line)
             if match:
               update_type_list(match, type_depth, self.messages)
               continue
-            match = EXTEND_PARSER.match(line)
+            match = self._extend_parser_re().match(line)
             if match:
               update_type_list(match, type_depth, self.extends)
               continue
@@ -95,9 +121,9 @@ class ProtobufParse(object):
 
   @property
   def filename(self):
-    ''':return: the name of the file without the directory or .proto extension.'''
+    """:return: the name of the file without the directory or .proto extension."""
     name = os.path.basename(self.path)
-    match = PROTO_FILENAME_PATTERN.match(name)
+    match = self._proto_filename_pattern_re().match(name)
     if not name:
       raise self.InvalidProtoFilenameError("{0}does not end with .proto".format(self.path))
     return match.group(1)

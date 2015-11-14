@@ -100,6 +100,7 @@ python_library(
   name = 'protobuf_parse',
   sources = ['protobuf_parse.py'],
   dependencies = [
+    'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ]
 )
