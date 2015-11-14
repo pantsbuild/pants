@@ -14,18 +14,21 @@ junit_tests(name='six',
   sources=['TestSix.java'],
   platform='java6',
   dependencies=[':base'],
+  strict_deps=False,
 )
 
 junit_tests(name='seven',
   sources=['TestSeven.java'],
   platform='java7',
   dependencies=[':base'],
+  strict_deps=False,
 )
 
 junit_tests(name='eight',
   sources=['TestEight.java'],
   platform='java8',
   dependencies=[':base'],
+  strict_deps=False,
 )
 
 junit_tests(name='eight-test-platform',
@@ -33,6 +36,7 @@ junit_tests(name='eight-test-platform',
   platform='java7',
   test_platform='java8',
   dependencies=[':base'],
+  strict_deps=False,
 )
 
 java_library(name='base',
