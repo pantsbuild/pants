@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import defaultdict
 
-
 from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.build_graph.build_graph import sort_targets
 
