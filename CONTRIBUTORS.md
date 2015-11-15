@@ -55,6 +55,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
++ Karin Lundberg
 + Ken Kawamoto
 + Kevin Sweeney
 + Kris Wilson
