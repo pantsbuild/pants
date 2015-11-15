@@ -23,7 +23,7 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
     register('--closed', default=False, action='store_true',
              help='Include the input targets in the output along with the dependees.')
     register('--type', default=[], action='append',
-             deprecated_version='0.0.59',
+             deprecated_version='0.0.60',
              deprecated_hint='This never worked anyway. Do not use for now. May be reimplemented '
                              'in the future.',
              help="Identifies target types to include. Multiple type inclusions "

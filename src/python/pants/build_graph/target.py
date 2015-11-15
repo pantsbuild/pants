@@ -257,7 +257,7 @@ class Target(AbstractTarget):
     if kwargs:
       self.UnknownArguments.check(self, kwargs)
 
-  @deprecated('0.0.59',
+  @deprecated('0.0.60',
               'The `no_cache` property is generally ambiguous, and is no longer necessary '
               'for jvm compiles.')
   def _set_no_cache(self):
