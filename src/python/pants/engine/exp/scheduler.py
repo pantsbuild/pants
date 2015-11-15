@@ -258,6 +258,40 @@ class Plan(Serializable):
             .format(self._func_or_task_type, self._subjects, self._inputs))
 
 
+class PartialPlan(namedtuple('PartialPlan', ['msg'])):
+  """Represents the failure to produce a Plan, due to incomplete configuration.
+
+  Rather than being an exception, it indicates that only some of the inputs needed to
+  produce a Plan were available.
+  """
+
+
+class PlanningResult(namedtuple('PlanningResult', ['planner', 'complete_plan', 'partial_plan'])):
+  """The union returned from `Planner.plan`: either a Plan or PartialPlan.
+
+  If only PartialPlans are produced within a particular category, then an error is reported
+  indicating that no Planner could produce a product in that category.
+  """
+
+  @classmethod
+  def complete(cls, planner, *args, **kwargs):
+    """Construct a PlanningResult for the given Plan args."""
+    return PlanningResult(planner, complete_plan=Plan(*args, **kwargs), partial_plan=None)
+
+  @classmethod
+  def partial(cls, planner, *args, **kwargs):
+    """Construct a PlanningResult for the given PartialPlan args."""
+    return PlanningResult(planner, complete_plan=None, partial_plan=PartialPlan(*args, **kwargs))
+
+  @classmethod
+  def is_complete(cls, pr):
+    return pr.complete_plan is not None
+
+  @classmethod
+  def is_partial(cls, pr):
+    return pr.partial_plan is not None
+
+
 class SchedulingError(Exception):
   """Indicates inability to make a required scheduling promise."""
 
@@ -271,8 +305,22 @@ class NoProducersError(SchedulingError):
     super(NoProducersError, self).__init__(msg)
 
 
+class NoProducersForCategoryError(SchedulingError):
+  """Indicates that no planner within a category was able to produce a complete plan."""
+
+  def __init__(self, category, product_type, subject, planner_msgs):
+    formatted_msgs = ['{}: {}'.format(type(p).__name__, m) for p, m in planner_msgs.items()]
+    msg = ('Could not complete a plan for \'{} {!r}\' from {!r}\n\t{}'
+            .format(category, product_type.__name__, subject, '\n\t'.join(formatted_msgs)))
+    super(NoProducersForCategoryError, self).__init__(msg)
+
+
 class ConflictingProducersError(SchedulingError):
-  """Indicates more than one planner was able to promise a product for a given subject."""
+  """Indicates more than one planner was able to promise a product for a given subject.
+  
+  TODO: This will need to be legal in order to support multiple Planners producing a
+  (mergeable) Classpath for one subject, for example.
+  """
 
   def __init__(self, product_type, subject, planners):
     msg = ('Collected the following plans for generating {!r} from {!r}\n\t{}'
@@ -359,6 +407,19 @@ class TaskPlanner(AbstractClass):
   @abstractproperty
   def product_types(self):
     """Return an iterator over the product types this planner's task can produce."""
+
+  @property
+  def product_category(self):
+    """May be overridden to specify the category of product type that this planner produces.
+
+    The tuple of (product_type, category) should be thought of as representing a unique slot into
+    which Planners can produce.
+
+    TODO: Should likely be merged with the `product_types` method, and it should not have a default.
+
+    :rtype: string
+    """
+    return 'default'
 
   @abstractmethod
   def plan(self, scheduler, product_type, subject, configuration=None):
@@ -703,12 +764,23 @@ class LocalScheduler(Scheduler):
     if required and not planners:
       raise NoProducersError(product_type)
 
-    plans = []
+    planning_results_by_category = defaultdict(list)
     for planner in planners:
-      plan = planner.plan(self, product_type, subject, configuration=configuration)
-      if plan:
-        plans.append((planner, plan))
+      planning_result = planner.plan(self, product_type, subject, configuration=configuration)
+      if planning_result:
+        planning_results_by_category[planner.product_category].append(planning_result)
 
+    plans = []
+    for category, planning_results in planning_results_by_category.items():
+      # For each category, we should have at least one complete Plan.
+      plan_results = filter(PlanningResult.is_complete, planning_results)
+      if not plan_results:
+        partial_plan_results = filter(PlanningResult.is_partial, planning_results)
+        planner_msgs = {pr.planner: pr.partial_plan.msg for pr in partial_plan_results}
+        raise NoProducersForCategoryError(category, product_type, subject, planner_msgs)
+      plans.extend((pr.planner, pr.complete_plan) for pr in plan_results)
+
+    # TODO: It should be legal to have multiple plans, and they should be merged.
     if len(plans) > 1:
       planners = [planner for planner, plan in plans]
       raise ConflictingProducersError(product_type, subject, planners)
