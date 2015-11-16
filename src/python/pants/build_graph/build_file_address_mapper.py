@@ -153,6 +153,12 @@ class BuildFileAddressMapper(object):
       self._spec_path_to_address_map_map[spec_path] = address_map
     return self._spec_path_to_address_map_map[spec_path]
 
+  def invalidate_address_map_entry(self, spec_path):
+    self._spec_path_to_address_map_map.pop(spec_path, None)
+
+  def known_spec_paths(self):
+    return self._spec_path_to_address_map_map.keys()
+
   def addresses_in_spec_path(self, spec_path):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()

@@ -101,3 +101,11 @@ class BuildFileAddressMapperTest(BaseTest):
     self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.InvalidAddressError(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.BuildFileScanError(), AddressLookupError)
+
+  def test_invalidate_addressmap_entry(self):
+    self.add_to_build_file('BUILD', 'target(name="foo")')
+    # Need to make a resolve because of lazy loading
+    self.address_mapper.resolve(Address.parse('//:foo'))
+    self.assertIn('', self.address_mapper.known_spec_paths())
+    self.address_mapper.invalidate_address_map_entry('')
+    self.assertNotIn('', self.address_mapper.known_spec_paths())

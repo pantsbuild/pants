@@ -51,10 +51,20 @@ class BuildFile(AbstractClass):
 
   @classmethod
   def from_cache(cls, root_dir, relpath, must_exist=True):
-    key = (root_dir, relpath, must_exist)
+    key = (os.path.realpath(root_dir), relpath, must_exist)
     if key not in cls._cache:
       cls._cache[key] = cls(*key)
     return cls._cache[key]
+
+  @classmethod
+  def has_cache_entry(cls, root_dir, relpath, must_exist=True):
+    key = (os.path.realpath(root_dir), relpath, must_exist)
+    return key in cls._cache.keys()
+
+  @classmethod
+  def invalidate_cache_entry(cls, root_dir, relpath, must_exist=True):
+    key = (os.path.realpath(root_dir), relpath, must_exist)
+    cls._cache.pop(key, None)
 
   @abstractmethod
   def _glob1(self, path, glob):
