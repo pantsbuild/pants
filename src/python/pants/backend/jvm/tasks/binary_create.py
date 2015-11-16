@@ -34,5 +34,5 @@ class BinaryCreate(JvmBinaryTask):
     self.context.log.info('creating {}'.format(os.path.relpath(binary_jarpath, get_buildroot())))
     self.context.products.get('jvm_binaries').add(binary, self._outdir).append(binary_jarname)
 
-    with self.monolithic_jar(binary, binary_jarpath, with_external_deps=True) as jar:
+    with self.monolithic_jar(binary, binary_jarpath) as jar:
       self.add_main_manifest_entry(jar, binary)

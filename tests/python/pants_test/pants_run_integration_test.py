@@ -167,15 +167,22 @@ class PantsRunIntegrationTest(unittest.TestCase):
     with self.temporary_workdir() as workdir:
       yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
-  def bundle_and_run(self, target, bundle_name, args=None):
+  def bundle_and_run(self, target, bundle_name, bundle_options=None, args=None,
+                     expected_bundle_jar_content=None,
+                     expected_bundle_content=None):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
 
     :param target: target name to compile
     :param bundle_name: resulting bundle filename (minus .jar extension)
+    :param bundle_options: additional options for bundle
     :param args: optional arguments to pass to executable
+    :param expected_bundle_content: verify the bundle zip content
+    :param expected_bundle_jar_content: verify the bundle jar content
     :return: stdout as a string on success, raises an Exception on error
     """
-    pants_run = self.run_pants(['bundle.jvm', '--archive=zip', target])
+    bundle_options = bundle_options or []
+    bundle_options = ['bundle.jvm'] + bundle_options + ['--archive=zip', target]
+    pants_run = self.run_pants(bundle_options)
     self.assert_success(pants_run)
 
     # TODO(John Sirois): We need a zip here to suck in external library classpath elements
@@ -184,6 +191,16 @@ class PantsRunIntegrationTest(unittest.TestCase):
     # this test back to using an un-archived bundle.
     with temporary_dir() as workdir:
       ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
+      if expected_bundle_content:
+        self.assert_contains_exact_files(workdir, expected_bundle_content)
+      if expected_bundle_jar_content:
+        with temporary_dir() as check_bundle_jar_dir:
+          bundle_jar = os.path.join(workdir, '{bundle_name}.jar')
+          ZIP.extract('{workdir}/{bundle_name}.jar'.format(workdir=workdir,
+                                                           bundle_name=bundle_name),
+                      check_bundle_jar_dir)
+          self.assert_contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content)
+
       optional_args = []
       if args:
         optional_args = args
@@ -225,22 +242,22 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     assertion(value, pants_run.returncode, error_msg)
 
-  def assert_contains_exact_files(self, directory, expected_files, ignore_links=True):
+  def assert_contains_exact_files(self, directory, expected_files, ignore_links=False):
     """Asserts that the only files which directory contains are expected_files.
 
     :param str directory: Path to directory to search.
     :param set expected_files: Set of filepaths relative to directory to search for.
     :param bool ignore_links: Indicates to ignore any file links.
     """
-    found = set()
+    found = []
     for root, _, files in os.walk(directory):
       for f in files:
         p = os.path.join(root, f)
         if ignore_links and os.path.islink(p):
           continue
-        found.add(os.path.relpath(p, directory))
+        found.append(os.path.relpath(p, directory))
 
-    self.assertEqual(expected_files, found)
+    self.assertEqual(sorted(expected_files), sorted(found))
 
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""

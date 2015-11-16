@@ -22,6 +22,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
+from pants.java.util import relativize_classpath
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 
@@ -83,12 +84,13 @@ class Jar(object):
         os.close(fd)
       return path
 
-  def __init__(self):
+  def __init__(self, path):
+    self._path = path
     self._entries = []
     self._jars = []
     self._manifest_entry = None
     self._main = None
-    self._classpath = None
+    self._classpath = []
 
   def main(self, main):
     """Specifies a Main-Class entry for this jar's manifest.
@@ -99,12 +101,14 @@ class Jar(object):
       raise ValueError('The main entry must be a non-empty string')
     self._main = main
 
-  def classpath(self, classpath):
+  def append_classpath(self, classpath):
     """Specifies a Class-Path entry for this jar's manifest.
+
+    If called multiple times, new entry will be appended to the existing classpath.
 
     :param list classpath: a list of paths
     """
-    self._classpath = maybe_list(classpath)
+    self._classpath = self._classpath + maybe_list(classpath)
 
   def write(self, src, dest=None):
     """Schedules a write of the file at ``src`` to the ``dest`` path in this jar.
@@ -263,7 +267,7 @@ class JarTask(NailgunTask):
     :param bool compressed: entries added to the jar should be compressed; ``True`` by default
     :param jar_rules: an optional set of rules for handling jar exclusions and duplicates
     """
-    jar = Jar()
+    jar = Jar(path)
     try:
       yield jar
     except jar.Error as e:
@@ -348,12 +352,15 @@ class JarBuilderTask(JarTask):
       self._jar = jar
       self._manifest = Manifest()
 
-    def add_target(self, target, recursive=False):
+    def add_target(self, target, recursive=False, canonicalClasspathBaseDir=None):
       """Adds the classes and resources for a target to an open jar.
 
       :param target: The target to add generated classes and resources for.
       :param bool recursive: `True` to add classes and resources for the target's transitive
         internal dependency closure.
+      :param string canonicalClasspathBaseDir: If set, instead of adding targets to the jar
+        bundle, create canonical symlinks to the original classpath and save canonical symlinks
+        to Manifest's Class-Path.
       :returns: `True` if the target contributed any files - manifest entries, classfiles or
         resource files - to this jar.
       :rtype: bool
@@ -389,19 +396,30 @@ class JarBuilderTask(JarTask):
       if not recursive and target.has_resources:
         targets += target.resources
       # We only gather internal classpath elements per our contract.
-      target_classpath = ClasspathUtil.internal_classpath(targets,
-                                                          classpath_products)
-      for entry in target_classpath:
-        if ClasspathUtil.is_jar(entry):
-          self._jar.writejar(entry)
-          products_added = True
-        elif ClasspathUtil.is_dir(entry):
-          for rel_file in ClasspathUtil.classpath_entries_contents([entry]):
-            self._jar.write(os.path.join(entry, rel_file), rel_file)
+      if canonicalClasspathBaseDir:
+        canonical_classpath = ClasspathUtil.create_canonical_classpath(
+            classpath_products, targets, canonicalClasspathBaseDir)
+        # relativize urls in canonical classpath, this needs to be stable too therefore
+        # do not follow the symlinks because symlinks may vary from platform to platform.
+        bundle_classpath = relativize_classpath(canonical_classpath,
+                                                os.path.dirname(self._jar._path),
+                                                followlinks=False)
+        self._jar.append_classpath(bundle_classpath)
+        products_added = True
+      else:
+        target_classpath = ClasspathUtil.internal_classpath(targets,
+                                                            classpath_products)
+        for entry in target_classpath:
+          if ClasspathUtil.is_jar(entry):
+            self._jar.writejar(entry)
             products_added = True
-        else:
-          # non-jar and non-directory classpath entries should be ignored
-          pass
+          elif ClasspathUtil.is_dir(entry):
+            for rel_file in ClasspathUtil.classpath_entries_contents([entry]):
+              self._jar.write(os.path.join(entry, rel_file), rel_file)
+              products_added = True
+          else:
+            # non-jar and non-directory classpath entries should be ignored
+            pass
 
       return products_added
 

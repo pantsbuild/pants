@@ -91,6 +91,10 @@ class BundleCreate(JvmBinaryTask):
     """
     assert(isinstance(app, BundleCreate.App))
 
+    # We don't want to shade those jars that are symlinks to workdir, therefore when binary
+    # has shading rules a monolithic jar will always be created
+    create_deployjar = self._create_deployjar or app.binary.shading_rules
+
     def verbose_symlink(src, dst):
       if not os.path.exists(src):
         raise self.MissingJarError('Could not find {src} when attempting to link it into the '
@@ -113,7 +117,7 @@ class BundleCreate(JvmBinaryTask):
     # If creating a deployjar, we add the external dependencies to the bundle as
     # loose classes, and have no classpath. Otherwise we add the external dependencies
     # to the bundle as jars in a libs directory.
-    if not self._create_deployjar:
+    if not create_deployjar:
       lib_dir = os.path.join(bundle_dir, 'libs')
       os.mkdir(lib_dir)
 
@@ -141,11 +145,12 @@ class BundleCreate(JvmBinaryTask):
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
+    canonicalClasspathBaseDir = lib_dir if not create_deployjar else None
     with self.monolithic_jar(app.binary, bundle_jar,
-                             with_external_deps=self._create_deployjar) as jar:
+                             canonicalClasspathBaseDir=canonicalClasspathBaseDir) as jar:
       self.add_main_manifest_entry(jar, app.binary)
       if classpath:
-        jar.classpath([os.path.join('libs', jar) for jar in classpath])
+        jar.append_classpath([os.path.join('libs', jar) for jar in classpath])
 
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():
