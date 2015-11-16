@@ -13,7 +13,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
   def test_bundle(self):
     """Default bundle with --no-deployjar.
 
-    Verify synthetic jar which contains only a manifest file and the rest bundle contains
+    Verify synthetic jar contains only a manifest file and the rest bundle contains
     other library jars.
     """
     self.assertEquals(
