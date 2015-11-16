@@ -61,6 +61,31 @@ class FetchersTest(unittest.TestCase):
     self.check_default('gopkg.in/check.v1', expected_root='gopkg.in/check.v1')
 
 
+class PrefixesTest(unittest.TestCase):
+
+  @contextmanager
+  def fetcher(self, import_path):
+    with subsystem_instance(Fetchers, options={
+        '': {
+          'prefixes' :['foo', 'bar/baz'],
+          'mapping' : {'.*': 'ArchiveFetcher'},
+          },
+        'archive-fetcher': {
+          'matchers' : {'.*': ('', None, 0)}
+        }}) as fetchers:
+      yield fetchers.get_fetcher(import_path)
+
+  def check_root(self, import_path, expected_root):
+    with self.fetcher(import_path) as fetcher:
+      self.assertEqual(expected_root, fetcher.root(import_path))
+
+  def test_roots_from_prefixes(self):
+    self.check_root('foo', 'foo')
+    self.check_root('foo/bar', 'foo')
+    self.check_root('bar/baz', 'bar/baz')
+    self.check_root('bar/baz/quuz', 'bar/baz')
+
+
 class GolangOrgFetcherTest(unittest.TestCase):
 
   def do_fetch(self, import_path, expected_url, rev=None):

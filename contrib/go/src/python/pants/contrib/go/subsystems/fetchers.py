@@ -232,19 +232,22 @@ class Fetchers(Subsystem):
                                    .format(name, cls._fully_qualified_class_name(fetcher_class)))
     return fetcher_class
 
-  @memoized_property
+  @property
   def _fetchers(self):
     fetchers = []
     for regex, fetcher in self.get_options().mapping.items():
       matcher = re.compile(regex)
 
       fetcher_class = self._fetcher(fetcher)
+      # @jsirois: Here is the line I am concerned about. Does it use a
+      # contextmanager, or does it grab the global_instance that has the
+      # previous configuration already memoized?
       fetcher = (fetcher_class.global_instance() if issubclass(fetcher_class, Subsystem)
                  else fetcher_class())
       fetchers.append((matcher, fetcher))
     return fetchers
 
-  @memoized_method
+  # @method
   def maybe_get_fetcher(self, import_path):
     """Returns a :class:`Fetcher` capable of resolving the given remote import path.
 
@@ -332,7 +335,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
              fromfile=True,
              help="Known import-prefixes for go packages")
 
-  @memoized_property
+  @property
   def _matchers(self):
     matchers = []
     for regex, info in self.get_options().matchers.items():
@@ -341,7 +344,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
       matchers.append((matcher, url_info))
     return matchers
 
-  @memoized_property
+  @property
   def _prefixes(self):
     # The Go get meta protocol involves reading the HTML to find a meta tag with the name go-import
     # that lists a prefix. Knowing this prefix ahead of time allows the ArchiveFetcher to fetch
@@ -349,7 +352,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
     # network access other than to a repository of tarballs of the source.
     return self.get_options().prefixes or []
 
-  @memoized_method
+  # @method
   def _matcher(self, import_path):
     for matcher, url_info in self._matchers:
       match = matcher.search(import_path)
