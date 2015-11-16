@@ -220,7 +220,7 @@ class SourceRoot(object):
     cls._SOURCE_ROOT_TREE = SourceRootTree()
 
   @classmethod
-  @deprecated('0.0.60', 'use context.source_roots.find() or '
+  @deprecated('0.0.59', 'use context.source_roots.find() or '
                         'SourceRootConfig.global_instance().get_source_roots().find().')
   def find(cls, target):
     """Finds the source root for the given target.
@@ -243,7 +243,7 @@ class SourceRoot(object):
     return found_source_root
 
   @classmethod
-  @deprecated('0.0.60', 'use context.source_roots.find_by_path() or '
+  @deprecated('0.0.59', 'use context.source_roots.find_by_path() or '
                         'SourceRootConfig.global_instance().get_source_roots().find_by_path().')
   def find_by_path(cls, path):
     """Finds a registered source root for a given path

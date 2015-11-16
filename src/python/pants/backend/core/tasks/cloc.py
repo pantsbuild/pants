@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.binary_util import BinaryUtil
+from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 
 
