@@ -240,7 +240,7 @@ class ZincCompile(JvmCompile):
     if not self.get_options().scalac_plugins:
       return []
 
-    plugin_args = self.get_options().plugin_args
+    plugin_args = self.get_options().scalac_plugin_args
     active_plugins = self._find_plugins()
     ret = []
     for name, jar in active_plugins.items():
