@@ -95,9 +95,6 @@ class HelpInfoExtracter(object):
       else:
         metavar = '<{}>'.format(typ.__name__)
 
-      if action == 'append':
-        metavar += ' (repeat as needed)'
-        
     return metavar
 
   def __init__(self, scope):
