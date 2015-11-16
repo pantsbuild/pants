@@ -308,9 +308,9 @@ class NoProducersError(SchedulingError):
 class NoProducersForCategoryError(SchedulingError):
   """Indicates that no planner within a category was able to produce a complete plan."""
 
-  def __init__(self, category, product_type, subject, planner_msgs):
+  def __init__(self, product_type, category, subject, planner_msgs):
     formatted_msgs = ['{}: {}'.format(type(p).__name__, m) for p, m in planner_msgs.items()]
-    msg = ('Could not complete a plan for \'{} {!r}\' from {!r}\n\t{}'
+    msg = ('Could not plan \'{} -> {}\' for {!r}\n\t{}'
             .format(category, product_type.__name__, subject, '\n\t'.join(formatted_msgs)))
     super(NoProducersForCategoryError, self).__init__(msg)
 
@@ -777,7 +777,7 @@ class LocalScheduler(Scheduler):
       if not plan_results:
         partial_plan_results = filter(PlanningResult.is_partial, planning_results)
         planner_msgs = {pr.planner: pr.partial_plan.msg for pr in partial_plan_results}
-        raise NoProducersForCategoryError(category, product_type, subject, planner_msgs)
+        raise NoProducersForCategoryError(product_type, category, subject, planner_msgs)
       plans.extend((pr.planner, pr.complete_plan) for pr in plan_results)
 
     # TODO: It should be legal to have multiple plans, and they should be merged.

@@ -157,12 +157,13 @@ class ThriftPlanner(TaskPlanner):
   def product_category(self):
     return 'thrift'
 
-  @abstractmethod
-  def extract_thrift_config(self, product_type, target, configuration=None):
-    """Return the configuration to be used to produce the given product type for the given target.
+  @abstractproperty
+  def config_type(self):
+    """The type of the configuration for this thrift compiler."""
 
-    :rtype: :class:`ThriftConfiguration`
-    """
+  @abstractmethod
+  def product_type_for_config(self, config):
+    """Given an instance of config with type config_type, return the generated product type."""
 
   @abstractproperty
   def gen_func(self):
@@ -178,24 +179,36 @@ class ThriftPlanner(TaskPlanner):
     :rtype: dict
     """
 
+  def _extract_thrift_config(self, product_type, target, configuration=None):
+    """Return the configuration to be used to produce the given product type for the given target.
+
+    :rtype: :class:`ThriftConfiguration`
+    """
+    configs = (configuration,) if configuration else target.configurations
+    configs = tuple(config for config in configs
+                    if (isinstance(config, self.config_type) and
+                        product_type == self.product_type_for_config(config)))
+    if not configs:
+      # We don't know how to generate these type of sources for this subject.
+      return None
+    if len(configs) > 1:
+      raise self.Error('Found more than one configuration for generating {!r} from {!r}:\n\t{}'
+                       .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
+    return configs[0]
+
   def plan(self, scheduler, product_type, subject, configuration=None):
     if not isinstance(subject, Target):
       return None
 
     thrift_sources = list(subject.sources.iter_paths(base_path=subject.address.spec_path,
                                                      ext='.thrift'))
-    config = self.extract_thrift_config(product_type, subject, configuration=configuration)
-
-    has_config = config is not None
-    has_thrift = bool(thrift_sources)
-    if has_config != has_thrift:
-      # If we are partially configured, indicate it.
-      missing, present = (config, thrift_sources) if has_config else (thrift_sources, configuration)
-      return PlanningResult.partial(self,
-                                    msg='{} had {} but not {}'.format(type(self), missing, present))
-    elif not has_thrift:
-      # Otherwise, with no thrift at all there is nothing to do.
+    if not thrift_sources:
       return None
+
+    config = self._extract_thrift_config(product_type, subject, configuration=configuration)
+    if config is None:
+      msg = 'has {}, but no {}'.format(Sources.of('.thrift').__name__, self.config_type.__name__)
+      return PlanningResult.partial(self, msg=msg)
 
     subject = Subject(subject, alternate=Target(dependencies=config.deps))
     inputs = self.plan_parameters(scheduler, product_type, subject, config)
@@ -222,6 +235,10 @@ class ApacheThriftPlanner(ThriftPlanner):
   def gen_func(self):
     return gen_apache_thrift
 
+  @property
+  def config_type(self):
+    return ApacheThriftConfiguration
+
   @memoized_property
   def _product_type_by_lang(self):
     # This will come via an option default.
@@ -232,22 +249,9 @@ class ApacheThriftPlanner(ThriftPlanner):
   def product_types(self):
     return self._product_type_by_lang.values()
 
-  def _product_type(self, gen):
-    lang = gen.partition(':')[0]
+  def product_type_for_config(self, config):
+    lang = config.gen.partition(':')[0]
     return self._product_type_by_lang.get(lang)
-
-  def extract_thrift_config(self, product_type, target, configuration=None):
-    configs = (configuration,) if configuration else target.configurations
-    configs = tuple(config for config in configs
-                    if (isinstance(config, ApacheThriftConfiguration) and
-                        product_type == self._product_type(config.gen)))
-    if not configs:
-      # We don't know how to generate these type of sources for this subject.
-      return None
-    if len(configs) > 1:
-      raise self.Error('Found more than one configuration for generating {!r} from {!r}:\n\t{}'
-                       .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
-    return configs[0]
 
   def plan_parameters(self, scheduler, product_type, subject, apache_thrift_config):
     return dict(rev=apache_thrift_config.rev,
@@ -320,6 +324,10 @@ class ScroogePlanner(ThriftPlanner):
   def gen_func(self):
     return gen_scrooge_thrift
 
+  @property
+  def config_type(self):
+    return ScroogeConfiguration
+
   @memoized_property
   def _product_type_by_lang(self):
     # This will come via an option default.
@@ -330,18 +338,8 @@ class ScroogePlanner(ThriftPlanner):
   def product_types(self):
     return self._product_type_by_lang.values()
 
-  def extract_thrift_config(self, product_type, target, configuration=None):
-    configs = (configuration,) if configuration else target.configurations
-    configs = tuple(config for config in configs
-                    if (isinstance(config, ScroogeConfiguration) and
-                        product_type == self._product_type_by_lang.get(config.lang)))
-    if not configs:
-      # We don't know how to generate these type of sources for this subject.
-      return None
-    if len(configs) > 1:
-      raise self.Error('Found more than one configuration for generating {!r} from {!r}:\n\t{}'
-                       .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
-    return configs[0]
+  def product_type_for_config(self, config):
+    return self._product_type_by_lang.get(config.lang)
 
   def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
     # This will come via an option default.
