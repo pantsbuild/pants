@@ -209,9 +209,10 @@ class Distribution(object):
     try:
       self._validated_executable('javac')  # Calling purely for the check and cache side effects
       self._is_jdk = True
-    except self.Error:
+    except self.Error as e:
       if self._jdk:
-        raise
+        raise self.Error('Failed to validate javac executable. Please check you have a JDK'
+        ' installed. Original error: {}'.format(e))
 
   def execute_java(self, *args, **kwargs):
     return execute_java(*args, distribution=self, **kwargs)
