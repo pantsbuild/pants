@@ -12,8 +12,8 @@ from pkg_resources import resource_string
 
 from pants.backend.core.tasks.reflect import (assemble_buildsyms, gen_glopts_reference_data,
                                               gen_tasks_options_reference_data)
-from pants.backend.core.tasks.task import Task
 from pants.base.generator import Generator, TemplateData
+from pants.task.task import Task
 from pants.util.dirutil import safe_open
 
 
