@@ -408,18 +408,7 @@ python_library(
   name = 'task',
   sources = ['task.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:hash_utils',
-    'src/python/pants/base:worker_pool',
-    'src/python/pants/base:workunit',
-    'src/python/pants/cache',
-    'src/python/pants/invalidation',
-    'src/python/pants/ivy',
-    'src/python/pants/java:executor',
-    'src/python/pants/reporting',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:meta',
+    'src/python/pants/task',
   ],
 )
 
