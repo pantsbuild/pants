@@ -20,6 +20,7 @@ jvm_binary(name='shading',
 java_library(name='lib',
   dependencies=[
     'testprojects/src/java/org/pantsbuild/testproject/shadingdep/otherpackage',
+    'testprojects/src/java/org/pantsbuild/testproject/shadingdep/subpackage',
     'testprojects/src/java/org/pantsbuild/testproject/shadingdep:lib',
     'testprojects/src/java/org/pantsbuild/testproject/shadingdep:other',
   ],
