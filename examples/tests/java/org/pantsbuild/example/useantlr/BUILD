@@ -14,6 +14,7 @@ junit_tests(name='antlr3_test',
     '3rdparty:junit',
     'examples/src/java/org/pantsbuild/example/antlr3',
   ],
+  strict_deps=False,
 )
 
 junit_tests(name='antlr4_test',
@@ -22,4 +23,5 @@ junit_tests(name='antlr4_test',
     '3rdparty:junit',
     'examples/src/java/org/pantsbuild/example/antlr4',
   ],
+  strict_deps=False,
 )

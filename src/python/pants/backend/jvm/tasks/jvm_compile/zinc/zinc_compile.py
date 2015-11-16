@@ -15,6 +15,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
@@ -79,6 +80,11 @@ class ZincCompile(JvmCompile):
   @classmethod
   def subsystem_dependencies(cls):
     return super(ZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
+
+  @property
+  def compiler_plugin_types(cls):
+    """A tuple of target types which are compiler plugins."""
+    return (AnnotationProcessor, ScalacPlugin)
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
