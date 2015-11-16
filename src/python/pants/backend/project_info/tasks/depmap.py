@@ -46,7 +46,7 @@ class Depmap(ConsoleTask):
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
     register('--path-to',
-             deprecated_version='0.0.59',
+             deprecated_version='0.0.60',
              deprecated_hint='Use the `path` and `paths` goal to find paths between targets.',
              help='Show only items on the path to the given target. This is a no-op for --graph.')
 
