@@ -317,7 +317,7 @@ class NoProducersForCategoryError(SchedulingError):
 
 class ConflictingProducersError(SchedulingError):
   """Indicates more than one planner was able to promise a product for a given subject.
-  
+
   TODO: This will need to be legal in order to support multiple Planners producing a
   (mergeable) Classpath for one subject, for example.
   """
@@ -773,12 +773,13 @@ class LocalScheduler(Scheduler):
     plans = []
     for category, planning_results in planning_results_by_category.items():
       # For each category, we should have at least one complete Plan.
-      plan_results = filter(PlanningResult.is_complete, planning_results)
-      if not plan_results:
+      plan_results = [(pr.planner, pr.complete_plan)
+                      for pr in planning_results if PlanningResult.is_complete(pr)]
+      if required and not plan_results:
         partial_plan_results = filter(PlanningResult.is_partial, planning_results)
         planner_msgs = {pr.planner: pr.partial_plan.msg for pr in partial_plan_results}
         raise NoProducersForCategoryError(product_type, category, subject, planner_msgs)
-      plans.extend((pr.planner, pr.complete_plan) for pr in plan_results)
+      plans.extend(plan_results)
 
     # TODO: It should be legal to have multiple plans, and they should be merged.
     if len(plans) > 1:
