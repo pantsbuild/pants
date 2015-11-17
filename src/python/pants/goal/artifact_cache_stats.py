@@ -12,11 +12,7 @@ from pants.util.dirutil import safe_mkdir
 
 
 # Lists of target addresses.
-CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets', 'error_miss_targets'])
-
-# Suffixes of local hits/misses files, each matches to the corresponding element in
-# the CacheStat namedtuple of the same index.
-LOCAL_STATS_SUFFIXES = ['hits', 'misses', 'error_misses']
+CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets'])
 
 
 class ArtifactCacheStats(object):
@@ -55,14 +51,13 @@ class ArtifactCacheStats(object):
       })
     return ret
 
-  # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss,
-  # 2 for error misses
+  # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss.
   def _add_stat(self, hit_or_miss, cache_name, targets):
     for tgt in targets:
       self.stats_per_cache[cache_name][hit_or_miss].append(tgt.address.reference())
 
     if self._dir and os.path.exists(self._dir):  # Check existence in case of a clean-all.
-      suffix = LOCAL_STATS_SUFFIXES[hit_or_miss]
+      suffix = 'misses' if hit_or_miss else 'hits'
       with open(os.path.join(self._dir, '{}.{}'.format(cache_name, suffix)), 'a') as f:
         f.write('\n'.join([tgt.address.reference() for tgt in targets]))
         f.write('\n')

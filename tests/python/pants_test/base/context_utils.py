@@ -51,8 +51,6 @@ class TestContext(Context):
 
       def add_misses(self, cache_name, targets): pass
 
-      def add_error_misses(self, cache_name, targets): pass
-
     artifact_cache_stats = DummyArtifactCacheStats()
 
   @contextmanager
