@@ -22,7 +22,7 @@ class ArtifactCacheStats(object):
 
   def __init__(self, dir=None):
     def init_stat():
-      return CacheStat([], [], [])
+      return CacheStat([], [])
     self.stats_per_cache = defaultdict(init_stat)
     self._dir = dir
     safe_mkdir(self._dir)
