@@ -352,14 +352,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
           self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
       if cached_vts:
         cached_targets = [vt.target for vt in cached_vts]
-        for t in cached_targets:
-          self.context.run_tracker.artifact_cache_stats.add_hit('default', t)
+        self.context.run_tracker.artifact_cache_stats.add_hits('default', cached_targets)
         if not silent:
           self._report_targets('Using cached artifacts for ', cached_targets, '.')
       if uncached_vts:
         uncached_targets = [vt.target for vt in uncached_vts]
-        for t in uncached_targets:
-          self.context.run_tracker.artifact_cache_stats.add_miss('default', t)
+        self.context.run_tracker.artifact_cache_stats.add_miss('default', uncached_targets)
         if not silent:
           self._report_targets('No cached artifacts for ', uncached_targets, '.')
       # Now that we've checked the cache, re-partition whatever is still invalid.

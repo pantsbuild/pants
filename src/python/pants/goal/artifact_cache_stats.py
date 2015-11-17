@@ -12,8 +12,8 @@ from pants.util.dirutil import safe_mkdir
 
 
 # Lists of target addresses.
-CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets'])
-
+CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets', 'error_miss_targets'])
+LOCAL_STATS_SUFFIXES = ['hits', 'misses', 'error_misses']
 
 class ArtifactCacheStats(object):
   """Tracks the hits and misses in the artifact cache.
@@ -22,16 +22,19 @@ class ArtifactCacheStats(object):
 
   def __init__(self, dir=None):
     def init_stat():
-      return CacheStat([], [])
+      return CacheStat([], [], [])
     self.stats_per_cache = defaultdict(init_stat)
     self._dir = dir
     safe_mkdir(self._dir)
 
-  def add_hit(self, cache_name, tgt):
-    self._add_stat(0, cache_name, tgt)
+  def add_hits(self, cache_name, targets):
+    self._add_stat(0, cache_name, targets)
 
-  def add_miss(self, cache_name, tgt):
-    self._add_stat(1, cache_name, tgt)
+  def add_misses(self, cache_name, targets):
+    self._add_stat(1, cache_name, targets)
+
+  def add_error_misses(self, cache_name, targets):
+    self._add_stat(2, cache_name, targets)
 
   def get_all(self):
     """Returns the cache stats as a list of dicts."""
@@ -47,10 +50,11 @@ class ArtifactCacheStats(object):
     return ret
 
   # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss.
-  def _add_stat(self, hit_or_miss, cache_name, tgt):
-    self.stats_per_cache[cache_name][hit_or_miss].append(tgt.address.reference())
+  def _add_stat(self, hit_or_miss, cache_name, targets):
+    for tgt in targets:
+      self.stats_per_cache[cache_name][hit_or_miss].append(tgt.address.reference())
+
     if self._dir and os.path.exists(self._dir):  # Check existence in case of a clean-all.
-      suffix = 'misses' if hit_or_miss else 'hits'
+      suffix = LOCAL_STATS_SUFFIXES[hit_or_miss]
       with open(os.path.join(self._dir, '{}.{}'.format(cache_name, suffix)), 'a') as f:
-        f.write(tgt.address.reference())
-        f.write('\n')
+        f.write('\n'.join([tgt.address.reference() for tgt in targets]))
