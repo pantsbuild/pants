@@ -13,7 +13,11 @@ from pants.util.dirutil import safe_mkdir
 
 # Lists of target addresses.
 CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets', 'error_miss_targets'])
+
+# Suffixes of local hits/misses files, each matches to the corresponding element in
+# the CacheStat namedtuple of the same index.
 LOCAL_STATS_SUFFIXES = ['hits', 'misses', 'error_misses']
+
 
 class ArtifactCacheStats(object):
   """Tracks the hits and misses in the artifact cache.
@@ -30,9 +34,11 @@ class ArtifactCacheStats(object):
   def add_hits(self, cache_name, targets):
     self._add_stat(0, cache_name, targets)
 
+  # any cache misses, whether legit or due to error.
   def add_misses(self, cache_name, targets):
     self._add_stat(1, cache_name, targets)
 
+  # error misses are misses due to various errors, like checksum failure, network error, etc.
   def add_error_misses(self, cache_name, targets):
     self._add_stat(2, cache_name, targets)
 
@@ -49,7 +55,8 @@ class ArtifactCacheStats(object):
       })
     return ret
 
-  # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss.
+  # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss,
+  # 2 for error misses
   def _add_stat(self, hit_or_miss, cache_name, targets):
     for tgt in targets:
       self.stats_per_cache[cache_name][hit_or_miss].append(tgt.address.reference())
@@ -58,3 +65,4 @@ class ArtifactCacheStats(object):
       suffix = LOCAL_STATS_SUFFIXES[hit_or_miss]
       with open(os.path.join(self._dir, '{}.{}'.format(cache_name, suffix)), 'a') as f:
         f.write('\n'.join([tgt.address.reference() for tgt in targets]))
+        f.write('\n')
