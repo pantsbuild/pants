@@ -211,8 +211,9 @@ class Distribution(object):
       self._is_jdk = True
     except self.Error as e:
       if self._jdk:
-        raise self.Error('Failed to validate javac executable. Please check you have a JDK'
-        ' installed. Original error: {}'.format(e))
+        logger.debug('Failed to validate javac executable. Please check you have a JDK '
+                      'installed. Original error: {}'.format(e))
+        raise
 
   def execute_java(self, *args, **kwargs):
     return execute_java(*args, distribution=self, **kwargs)
@@ -429,6 +430,7 @@ class DistributionLocator(Subsystem):
                      .format(dist, minimum_version, maximum_version, jdk))
         return dist
       except (ValueError, Distribution.Error):
+
         pass
 
     raise cls.Error('Failed to locate a {} distribution with minimum_version {}, maximum_version {}'
