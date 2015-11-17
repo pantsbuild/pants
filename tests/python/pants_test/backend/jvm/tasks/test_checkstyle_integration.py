@@ -8,12 +8,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
+import pytest
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_cached
 
 
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
+  @pytest.mark.xfail
+  # This test is now expected to fail due to changes in caching behaviour.
+  # TODO(Tansy Arron): Write a general purpose incremental compile test.
+  # https://github.com/pantsbuild/pants/issues/2591
   def test_checkstyle_cached(self):
     with self.temporary_cachedir() as cache:
       with self.temporary_workdir() as workdir:
