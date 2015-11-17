@@ -34,10 +34,6 @@ class ArtifactCacheStats(object):
   def add_misses(self, cache_name, targets):
     self._add_stat(1, cache_name, targets)
 
-  # error misses are misses due to various errors, like checksum failure, network error, etc.
-  def add_error_misses(self, cache_name, targets):
-    self._add_stat(2, cache_name, targets)
-
   def get_all(self):
     """Returns the cache stats as a list of dicts."""
     ret = []
