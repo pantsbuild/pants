@@ -18,14 +18,20 @@ logger = logging.getLogger(__name__)
 
 
 class JavaWireLibrary(ExportableJvmLibrary):
-  """Generates a stub Java library from protobuf IDL files."""
+  """Generates a stub Java library from protobuf IDL files.
+
+  Supports Wire 1.x only.
+
+  For an example Wire 2.x interface that generates service stubs see:
+  https://github.com/ericzundel/mvn2pants/tree/master/src/python/squarepants/plugins/sake_wire_codegen
+
+  But note this requires you to write a custom wire code generator with a command line interface.
+  """
 
   def __init__(self,
                payload=None,
                service_writer=None,
                service_writer_options=None,
-               service_factory=None,
-               service_factory_options=None,
                roots=None,
                registry_class=None,
                enum_options=None,
@@ -33,12 +39,9 @@ class JavaWireLibrary(ExportableJvmLibrary):
                **kwargs):
     """
     :param string service_writer: the name of the class to pass as the --service_writer option to
-    the Wire compiler (For wire 1.x compatibility)
+    the Wire compiler (For wire 1.0 only)
     :param list service_writer_options: A list of options to pass to the service writer (For
-    wire 1.x compatibility)
-    :param string service_factory: the name of the class to pass as the --service_factory option to
-    the Wire compiler
-    :param list service_factory_options: A list of options to pass to the service factory
+    wire 1.x only)
     :param list roots: passed through to the --roots option of the Wire compiler
     :param string registry_class: fully qualified class name of RegistryClass to create. If in
     doubt, specify com.squareup.wire.SimpleServiceWriter
@@ -46,26 +49,15 @@ class JavaWireLibrary(ExportableJvmLibrary):
     :param boolean no_options: boolean that determines if --no_options flag is passed
     """
 
-    if service_writer and service_factory:
-      raise TargetDefinitionException(
-        self,
-        'Specify only one of "service_writer" (wire 1.x only) or "service_factory"')
     if not service_writer and service_writer_options:
       raise TargetDefinitionException(self,
                                       'service_writer_options requires setting service_writer')
-    if not service_factory and service_factory_options:
-      raise TargetDefinitionException(self,
-                                      'service_factory_options requires setting service_factory')
 
     payload = payload or Payload()
     payload.add_fields({
       'service_writer': PrimitiveField(service_writer or None),
       'service_writer_options': PrimitiveField(
         assert_list(service_writer_options, key_arg='service_writer_options',
-                    raise_type=TargetDefinitionException)),
-      'service_factory': PrimitiveField(service_factory or None),
-      'service_factory_options': PrimitiveField(
-        assert_list(service_factory_options, key_arg='service_factory_options',
                     raise_type=TargetDefinitionException)),
       'roots': PrimitiveField(roots or []),
       'registry_class': PrimitiveField(registry_class or None),
