@@ -10,14 +10,14 @@ from collections import defaultdict
 
 from pkg_resources import resource_string
 
-from pants.backend.core.tasks.console_task import ConsoleTask
-from pants.backend.core.tasks.task import TaskBase
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
 from pants.goal.goal import Goal
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.scope import ScopeInfo
+from pants.task.console_task import ConsoleTask
+from pants.task.task import TaskBase
 
 
 class BashCompletionTask(ConsoleTask):

@@ -12,10 +12,10 @@ import subprocess
 from pants.backend.android.android_config_util import AndroidConfigUtil
 from pants.backend.android.keystore.keystore_resolver import KeystoreResolver
 from pants.backend.android.targets.android_binary import AndroidBinary
-from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
+from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir
 
 

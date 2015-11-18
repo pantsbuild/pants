@@ -5,9 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.exceptions import TaskError
+from pants.task.console_task import ConsoleTask
 
 
 class Depmap(ConsoleTask):
@@ -46,7 +46,7 @@ class Depmap(ConsoleTask):
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
     register('--path-to',
-             deprecated_version='0.0.60',
+             deprecated_version='0.0.59',
              deprecated_hint='Use the `path` and `paths` goal to find paths between targets.',
              help='Show only items on the path to the given target. This is a no-op for --graph.')
 

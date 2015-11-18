@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from colors import black, blue, cyan, green, magenta, red, white
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.option.ranked_value import RankedValue
+from pants.task.console_task import ConsoleTask
 
 
 class ExplainOptionsTask(ConsoleTask):

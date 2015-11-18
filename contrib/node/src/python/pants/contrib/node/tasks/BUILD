@@ -35,8 +35,8 @@ python_library(
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
     'contrib/node/src/python/pants/contrib/node/targets:npm_package',
     'contrib/node/src/python/pants/contrib/node/targets:npm_test',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:workunit',
+    'src/python/pants/task',
     'src/python/pants/util:memo',
   ]
 )

@@ -10,7 +10,6 @@ import sys
 
 import pkg_resources
 
-from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.base.build_environment import get_scm, pants_version
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -37,6 +36,7 @@ from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
+from pants.task.task import QuietTaskMixin
 from pants.util.filtering import create_filters, wrap_filters
 
 
@@ -52,7 +52,7 @@ class SourceRootBootstrapper(Subsystem):
     super(SourceRootBootstrapper, cls).register_options(register)
     # TODO: Get rid of this in favor of source root registration at backend load time.
     register('--bootstrap-buildfiles', advanced=True, type=list_option, default=[],
-             deprecated_version='0.0.60',
+             deprecated_version='0.0.59',
              deprecated_hint='bootstrap BUILD files are no longer necessary or supported. '
                              'Source roots are configured in pants.ini or by default.',
              help='Initialize state by evaluating these buildfiles.')

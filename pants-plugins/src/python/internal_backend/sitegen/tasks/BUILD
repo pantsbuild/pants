@@ -14,7 +14,7 @@ python_library(
   dependencies=[
     '3rdparty/python:six',
     'pants-plugins/3rdparty/python:beautifulsoup4',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/task',
   ]
 )

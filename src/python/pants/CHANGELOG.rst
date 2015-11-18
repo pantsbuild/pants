@@ -1,43 +1,6 @@
 RELEASE HISTORY
 ===============
 
-0.0.59 (11/15/2015)
--------------------
-
-Release Notes
-~~~~~~~~~~~~~
-
-This is a hotfix release that pins an internal pants python requirement to prevent failures running
-`./pants test` against `python_tests` targets.
-See more details here: http://github.com/pantsbuild/pants/issues#issue/2566
-
-Bugfixes
-~~~~~~~~
-
-* Fixup floating `pytest-timeout` dep.
-  `RB #3126 <https://rbcommons.com/s/twitter/r/3126>`_
-
-New Features
-~~~~~~~~~~~~
-
-* Allow bundle to run for all targets, rather than just target roots
-  `RB #3119 <https://rbcommons.com/s/twitter/r/3119>`_
-
-* Allow per-jvm-target configuration of fatal warnings
-  `RB #3080 <https://rbcommons.com/s/twitter/r/3080>`_
-
-* Add options to repro and expand user on output file
-  `RB #3109 <https://rbcommons.com/s/twitter/r/3109>`_
-
-Small improvements, Refactoring and Tooling
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* Remove use of twitter.common.util.topological_sort in SortTargets
-  `RB #3121 <https://rbcommons.com/s/twitter/r/3121>`_
-
-* Delay many re.compile calls.
-  `RB #3122 <https://rbcommons.com/s/twitter/r/3122>`_
-
 0.0.58 (11/13/2015)
 -------------------
 

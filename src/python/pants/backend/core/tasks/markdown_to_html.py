@@ -14,13 +14,13 @@ from pygments.formatters.html import HtmlFormatter
 from pygments.styles import get_all_styles
 
 from pants.backend.core.targets.doc import Page
-from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
+from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir
 
 
