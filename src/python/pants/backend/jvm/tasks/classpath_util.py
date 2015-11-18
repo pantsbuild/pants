@@ -149,13 +149,13 @@ class ClasspathUtil(object):
 
   @classmethod
   def create_canonical_classpath(cls, classpath_products, targets, basedir,
-                                 saveClasspathFile=False):
+                                 save_classpath_file=False):
     """Create a stable classpath of symlinks with standardized names.
 
     :param classpath_products: Classpath products.
     :param targets: Targets to create canonical classpath for.
     :param basedir: Directory to create symlinks.
-    :param saveClasspathFile: An optional file with original classpath entries that symlinks
+    :param save_classpath_file: An optional file with original classpath entries that symlinks
       are created from.
 
     :returns: Converted canonical classpath.
@@ -183,13 +183,14 @@ class ClasspathUtil(object):
         classpath = []
         for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
           classpath.append(entry.path)
+          # Create a unique symlink path by prefixing the base file name with a monotonic
+          # increasing `index` to avoid name collisions.
           file_name = os.path.basename(entry.path)
-          # Avoid name collisions
           symlink_path = os.path.join(folder_for_target_symlinks, '{}-{}'.format(index, file_name))
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
 
-        if saveClasspathFile:
+        if save_classpath_file:
           with safe_open(os.path.join(folder_for_target_symlinks, 'classpath.txt'), 'w') as classpath_file:
             classpath_file.write(os.pathsep.join(classpath))
             classpath_file.write('\n')

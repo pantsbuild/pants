@@ -145,9 +145,9 @@ class BundleCreate(JvmBinaryTask):
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
-    canonicalClasspathBaseDir = lib_dir if not create_deployjar else None
+    canonical_classpath_base_dir = lib_dir if not create_deployjar else None
     with self.monolithic_jar(app.binary, bundle_jar,
-                             canonicalClasspathBaseDir=canonicalClasspathBaseDir) as jar:
+                             canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
       self.add_main_manifest_entry(jar, app.binary)
       if classpath:
         jar.append_classpath([os.path.join('libs', jar) for jar in classpath])
