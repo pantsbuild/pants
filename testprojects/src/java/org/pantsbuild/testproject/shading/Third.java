@@ -4,7 +4,7 @@
 package org.pantsbuild.testproject.shading;
 
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.HashMap;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -15,7 +15,7 @@ import com.google.gson.GsonBuilder;
 public class Third {
 
   public static void main(String[] args) {
-    Map<String, String> classNames = new TreeMap<>();
+    Map<String, String> classNames = new HashMap<>();
     classNames.put(Third.class.getSimpleName(), Third.class.getName());
     classNames.put(Second.class.getSimpleName(), Second.class.getName());
     classNames.put(Gson.class.getSimpleName(), Gson.class.getName());

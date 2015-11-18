@@ -65,29 +65,27 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
   def test_no_deployjar_run(self):
     """When shading is used, --no-deployjar is effectively disabled and behaves like --deployjar.
     """
-    self.assertEquals(
-      json.dumps({
+    self.assertEquals({
           'Gson': 'moc.elgoog.nosg.Gson',
           'Third': 'org.pantsbuild.testproject.shading.Third',
           'Second': 'hello.org.pantsbuild.testproject.shading.Second',
-        }, sort_keys=True, separators=(',', ':')) + '\n',
-      self.bundle_and_run(
+      },
+      json.loads(self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/shading:third',
         'third',
         bundle_options=['--no-deployjar'],
         expected_bundle_content=[
-          'third.jar']))
+          'third.jar']).strip()))
 
   def test_deployjar_run(self):
-    self.assertEquals(
-      json.dumps({
+    self.assertEquals({
           'Gson': 'moc.elgoog.nosg.Gson',
           'Third': 'org.pantsbuild.testproject.shading.Third',
           'Second': 'hello.org.pantsbuild.testproject.shading.Second',
-        }, sort_keys=True, separators=(',', ':')) + '\n',
-      self.bundle_and_run(
+      },
+      json.loads(self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/shading:third',
         'third',
         bundle_options=['--deployjar'],
         expected_bundle_content=[
-          'third.jar']))
+          'third.jar']).strip()))
