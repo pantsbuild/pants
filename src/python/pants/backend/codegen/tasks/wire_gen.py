@@ -5,16 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import logging
 import os
-from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
-from pants.backend.codegen.tasks.protobuf_gen import check_duplicate_conflicting_protos
-from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -66,23 +62,12 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
   def is_gentarget(self, target):
     return isinstance(target, JavaWireLibrary)
 
-  def sources_generated_by_target(self, target):
-    genfiles = []
-    for source in target.sources_relative_to_source_root():
-      path = os.path.join(target.target_base, source)
-      genfiles.extend(self.calculate_genfiles(
-        path,
-        source,
-        target.payload.service_writer))
-    return genfiles
-
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     wire_runtime_deps_spec = self.get_options().javadeps
     return self.resolve_deps([wire_runtime_deps_spec])
 
   def format_args_for_target(self, target, target_workdir):
     """Calculate the arguments to pass to the command line for a single target."""
-    sources_by_base = self._calculate_sources([target])
     sources = OrderedSet(target.sources_relative_to_buildroot())
 
     relative_sources = OrderedSet()
@@ -92,7 +77,6 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
         source_root = self.context.source_roots.find(target)
       relative_source = os.path.relpath(source, source_root.path)
       relative_sources.add(relative_source)
-    check_duplicate_conflicting_protos(self, sources_by_base, relative_sources, self.context.log)
 
     args = ['--java_out={0}'.format(target_workdir)]
 
@@ -209,41 +193,3 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     collect_proto_paths(target)
     target.walk(collect_proto_paths)
     return proto_paths
-
-  def _calculate_sources(self, targets):
-    def add_to_gentargets(target):
-      if self.is_gentarget(target):
-        gentargets.add(target)
-    gentargets = OrderedSet()
-    self.context.build_graph.walk_transitive_dependency_graph(
-      [target.address for target in targets],
-      add_to_gentargets,
-      postorder=True)
-    sources_by_base = OrderedDict()
-    for target in gentargets:
-      base, sources = target.target_base, target.sources_relative_to_buildroot()
-      if base not in sources_by_base:
-        sources_by_base[base] = OrderedSet()
-      sources_by_base[base].update(sources)
-    return sources_by_base
-
-  def calculate_genfiles(self, path, source, service_writer):
-    protobuf_parse = ProtobufParse(path, source)
-    protobuf_parse.parse()
-
-    types = protobuf_parse.messages | protobuf_parse.enums
-    if service_writer:
-      types |= protobuf_parse.services
-
-    # Wire generates a single type for all of the 'extends' declarations in this file.
-    if protobuf_parse.extends:
-      types |= {"Ext_{0}".format(protobuf_parse.filename)}
-
-    java_files = self.calculate_java_genfiles(protobuf_parse.package, types)
-    logger.debug('Path {path} yielded types {types} got files {java_files}'
-                 .format(path=path, types=types, java_files=java_files))
-    return set(java_files)
-
-  def calculate_java_genfiles(self, package, types):
-    basepath = package.replace('.', '/')
-    return [os.path.join(basepath, '{0}.java'.format(t)) for t in types]
