@@ -271,9 +271,9 @@ python_tests(
   dependencies = [
     ':task_test_base',
     'src/python/pants/backend/core/tasks:list_goals',
-    'src/python/pants/backend/core/tasks:common',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/task',
   ],
 )
 

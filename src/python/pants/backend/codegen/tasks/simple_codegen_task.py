@@ -12,12 +12,12 @@ from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
 
 

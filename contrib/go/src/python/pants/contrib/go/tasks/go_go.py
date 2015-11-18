@@ -10,8 +10,8 @@ import subprocess
 from abc import abstractmethod
 
 from colors import green, red, yellow
-from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.base.exceptions import TaskError
+from pants.task.task import QuietTaskMixin
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask

@@ -9,9 +9,9 @@ import os
 import subprocess
 from collections import namedtuple
 
-from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.task.task import Task
 
 
 class RunPrepCommand(Task):

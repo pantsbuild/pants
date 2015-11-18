@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.android.distribution.android_distribution import AndroidDistribution
-from pants.backend.core.tasks.task import Task
+from pants.task.task import Task
 
 
 class AndroidTask(Task):

@@ -20,8 +20,8 @@ python_library(
   name = 'android_task',
   sources = ['android_task.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:common',
     'src/python/pants/backend/android:android_distribution',
+    'src/python/pants/task',
   ],
 )
 
@@ -82,10 +82,10 @@ python_library(
     'src/python/pants/backend/android:android_config_util',
     'src/python/pants/backend/android:keystore_resolver',
     'src/python/pants/backend/android/targets:android',
-    'src/python/pants/backend/core/tasks:common',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/java/distribution:distribution',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -95,7 +95,6 @@ python_library(
   sources = ['unpack_libraries.py'],
   dependencies = [
     'src/python/pants/backend/android/targets:android',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_import_products',
     'src/python/pants/backend/jvm:jar_dependency_utils',
@@ -103,6 +102,7 @@ python_library(
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
+    'src/python/pants/task',
   ],
 )
 
