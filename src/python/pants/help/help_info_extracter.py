@@ -72,7 +72,7 @@ class HelpInfoExtracter(object):
       else:
         return 'None'
 
-    if typ == list_option or action == 'append':
+    if typ == list_option:
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
     elif typ == dict_option:
       default_str = '{{ {} }}'.format(
@@ -88,12 +88,13 @@ class HelpInfoExtracter(object):
     metavar = kwargs.get('metavar')
     if not metavar:
       typ = kwargs.get('type', str)
-      if typ == list_option or action == 'append':
+      if typ == list_option:
         metavar = '"[\'str1\',\'str2\',...]"'
       elif typ == dict_option:
         metavar = '"{\'key1\':val1,\'key2\':val2,...}"'
       else:
         metavar = '<{}>'.format(typ.__name__)
+
     return metavar
 
   def __init__(self, scope):

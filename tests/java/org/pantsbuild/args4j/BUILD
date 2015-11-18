@@ -5,6 +5,7 @@ junit_tests(
   name='args4j',
   sources=globs('*.java'),
   dependencies=[
+    '3rdparty:args4j',
     '3rdparty:guava',
     '3rdparty:junit',
     'src/java/org/pantsbuild/args4j',

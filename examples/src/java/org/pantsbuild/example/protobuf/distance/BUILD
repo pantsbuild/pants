@@ -10,4 +10,3 @@ jvm_binary(name='distance',
   source='ExampleProtobuf.java',
   main='org.pantsbuild.example.protobuf.distance.ExampleProtobuf',
 )
-

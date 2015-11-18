@@ -14,7 +14,7 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     # Should fail with strict deps.
     self.do_test_success_and_failure(
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      [],
+      ['--no-java-strict-deps'],
       ['--java-strict-deps'],
     )
 
@@ -22,7 +22,7 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
     # Should fail with strict deps.
     self.do_test_success_and_failure(
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
-      [],
+      ['--no-java-strict-deps'],
       ['--java-strict-deps'],
     )
 
@@ -33,7 +33,10 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
       target,
       ['--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(target)],
       [],
-      shared_args=['--compile-jvm-dep-check-missing-direct-deps=fatal']
+      shared_args=[
+        '--compile-jvm-dep-check-missing-direct-deps=fatal',
+        '--no-java-strict-deps',
+      ],
     )
 
   def test_missing_jar_dep_whitelist(self):
@@ -43,5 +46,8 @@ class DeclaredDepsIntegrationTest(BaseCompileIT):
       target,
       ['--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(target)],
       [],
-      shared_args=['--compile-jvm-dep-check-missing-direct-deps=fatal']
+      shared_args=[
+        '--compile-jvm-dep-check-missing-direct-deps=fatal',
+        '--no-java-strict-deps',
+      ],
     )

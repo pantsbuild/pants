@@ -61,6 +61,7 @@ python_library(
   dependencies = [
     ':compile_context',
     ':execution_graph',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
@@ -73,6 +74,7 @@ python_library(
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',

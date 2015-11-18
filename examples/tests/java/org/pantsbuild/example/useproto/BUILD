@@ -7,6 +7,7 @@ junit_tests(name='useproto',
   sources=['UseProtoTest.java',],
   dependencies=[
     '3rdparty:junit',
-    'examples/src/java/org/pantsbuild/example/protobuf/distance',
+    '3rdparty:protobuf-java',
+    'examples/src/protobuf/org/pantsbuild/example/distance',
   ],
 )

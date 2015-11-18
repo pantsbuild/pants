@@ -6,5 +6,6 @@ java_tests(
   dependencies=[
     'tests/java/org/pantsbuild/tools/junit/lib:test-dep',
   ],
-  sources=globs('*.java')
+  sources=globs('*.java'),
+  strict_deps=False,
 )
