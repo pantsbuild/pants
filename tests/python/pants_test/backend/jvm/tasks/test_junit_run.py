@@ -143,7 +143,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (1,))
 
-  def execute_junit_runner(self, content):
+  def execute_junit_runner(self, content, **kwargs):
     # Create the temporary base test directory
     test_rel_path = 'tests/java/org/pantsbuild/foo'
     test_abs_path = self.create_dir(test_rel_path)
@@ -174,8 +174,13 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     subprocess.check_call(
       [javac, '-d', test_classes_abs_path, '-cp', classpath, test_java_file_abs_path])
 
-    # Create a java_tests target and a synthetic resource target.
-    java_tests = self.create_library(test_rel_path, 'java_tests', 'foo_test', ['FooTest.java'])
+    # If a target_name is specified, create a target with it, otherwise create a java_tests target.
+    if 'target_name' in kwargs:
+      target = self.target(kwargs['target_name'])
+    else:
+      target = self.create_library(test_rel_path, 'java_tests', 'foo_test', ['FooTest.java'])
+
+    # Create a synthetic resource target.
     resources = self.make_target('some_resources', Resources)
 
     # Set the context with the two targets, one java_tests target and
@@ -183,7 +188,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # The synthetic resources target is to make sure we won't regress
     # in the future with bug like https://github.com/pantsbuild/pants/issues/508. Note
     # in that bug, the resources target must be the first one in the list.
-    context = self.context(target_roots=[resources, java_tests])
+    context = self.context(target_roots=[resources, target])
 
     # Before we run the task, we need to inject the "runtime_classpath" with
     # the compiled test java classes that JUnitRun will know which test
@@ -247,3 +252,49 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     safe_file_dump(srcfile, 'content!')
     self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
     self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
+
+  def test_junit_runner_extra_jvm_options(self):
+    self.make_target(
+      spec='foo:foo_test',
+      target_type=JavaTests,
+      sources=['FooTest.java'],
+      extra_jvm_options=['-Dexample.property=1'],
+    )
+    self.execute_junit_runner(dedent("""
+        import org.junit.Test;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest {
+          @Test
+          public void testFoo() {
+            String exampleProperty = System.getProperty("example.property");
+            assertTrue(exampleProperty != null && exampleProperty.equals("1"));
+          }
+        }
+      """),
+      target_name='foo:foo_test'
+    )
+
+  def test_junit_runner_multiple_extra_jvm_options(self):
+    self.make_target(
+      spec='foo:foo_test',
+      target_type=JavaTests,
+      sources=['FooTest.java'],
+      extra_jvm_options=['-Dexample.property1=1','-Dexample.property2=2'],
+    )
+    self.execute_junit_runner(dedent("""
+        import org.junit.Test;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest {
+          @Test
+          public void testFoo() {
+            String exampleProperty1 = System.getProperty("example.property1");
+            assertTrue(exampleProperty1 != null && exampleProperty1.equals("1"));
+            String exampleProperty2 = System.getProperty("example.property2");
+            assertTrue(exampleProperty2 != null && exampleProperty2.equals("2"));
+            String exampleProperty3 = System.getProperty("example.property3");
+            assertTrue(exampleProperty3 == null);
+          }
+        }
+      """),
+    target_name='foo:foo_test'
+    )
