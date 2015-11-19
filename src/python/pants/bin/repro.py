@@ -30,6 +30,8 @@ class Reproducer(Subsystem):
     register('--capture', metavar='<repro_path>', default=None,
              help='Capture information about this pants run (including the entire workspace) '
                   'into a tar.gz file that can be used to help debug build problems.')
+    register('--ignore', action='append',
+             help='Any paths specified here will not be included in repro tarballs.')
 
   def create_repro(self):
     """Return a Repro instance for capturing a repro of the current workspace state.
@@ -44,6 +46,8 @@ class Reproducer(Subsystem):
     # Ignore a couple of common cases. Note: If we support SCMs other than git in the future,
     # add their (top-level only) metadata dirs here if relevant.
     ignore = ['.git', os.path.relpath(self.get_options().pants_distdir, buildroot)]
+    if self.get_options().ignore:
+      ignore.extend(self.get_options().ignore)
     return Repro(path, buildroot, ignore)
 
 
@@ -55,7 +59,8 @@ class Repro(object):
     :param string buildroot: Capture the workspace at this buildroot.
     :param ignore: Ignore these top-level files/dirs under buildroot.
     """
-    if os.path.realpath(os.path.expanduser(path)).startswith(buildroot):
+    path = os.path.expanduser(path)
+    if os.path.realpath(path).startswith(buildroot):
       raise ReproError('Repro capture file location must be outside the build root.')
     if not path.endswith('tar.gz') and not path.endswith('.tgz'):
       path += '.tar.gz'

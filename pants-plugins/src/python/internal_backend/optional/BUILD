@@ -7,8 +7,6 @@ python_library(
   dependencies = [
     'src/python/pants/backend/jvm/tasks:checkstyle',
     'src/python/pants/backend/jvm/tasks:scalastyle',
-    'src/python/pants/backend/python/tasks/checkstyle:all',
-    'src/python/pants/backend/python/tasks:python',
     'src/python/pants/goal:task_registrar',
   ]
 )

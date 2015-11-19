@@ -168,16 +168,19 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           java_tests(name='one',
             sources=['OneTest.java'],
             dependencies=[':base'],
+            strict_deps=False,
           )
 
           java_tests(name='two',
             sources=['TwoTest.java'],
             dependencies=[':base'],
+            strict_deps=False,
           )
 
           java_tests(name='three',
             sources=['subtest/ThreeTest.java'],
             dependencies=[':base'],
+            strict_deps=False,
           )
         '''))
       with open(os.path.join(tests_subdir, 'OneTest.java'), 'w+') as f:

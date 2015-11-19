@@ -26,7 +26,7 @@ from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError, TestFailedTaskError
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
@@ -73,7 +73,9 @@ class PytestRun(TestTaskMixin, PythonTask):
     # to avoid confusion when debugging pants tests.
     # TODO: make these an option, so any pants install base can pick their pytest version.
     PythonRequirement('pytest>=2.6,<2.7'),
-    PythonRequirement('pytest-timeout'),
+    # NB, pytest-timeout 1.0.0 introduces a conflicting pytest>=2.8.0 requirement, see:
+    #   https://github.com/pantsbuild/pants/issues/2566
+    PythonRequirement('pytest-timeout<1.0.0'),
     PythonRequirement('pytest-cov>=1.8,<1.9'),
     PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))

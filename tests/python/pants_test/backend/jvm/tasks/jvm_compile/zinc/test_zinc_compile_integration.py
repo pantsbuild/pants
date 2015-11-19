@@ -124,3 +124,28 @@ class ZincCompileIntegrationTest(BaseCompileIT):
       return analysis.partition("stamps")[0].split("\n")
 
     self.assertListEqual(extract_content(analysis1), extract_content(analysis2))
+
+  def test_zinc_fatal_warning(self):
+    def test_combination(target, default_fatal_warnings, expect_success):
+      with self.temporary_workdir() as workdir:
+        with self.temporary_cachedir() as cachedir:
+          if default_fatal_warnings:
+            arg = '--scala-platform-fatal-warnings'
+          else:
+            arg = '--no-scala-platform-fatal-warnings'
+          pants_run = self.run_test_compile(
+              workdir,
+              cachedir,
+              'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}'.format(target),
+              extra_args=[arg])
+
+          if expect_success:
+            self.assert_success(pants_run)
+          else:
+            self.assert_failure(pants_run)
+    test_combination('defaultfatal', default_fatal_warnings=True, expect_success=False)
+    test_combination('defaultfatal', default_fatal_warnings=False, expect_success=True)
+    test_combination('fatal', default_fatal_warnings=True, expect_success=False)
+    test_combination('fatal', default_fatal_warnings=False, expect_success=False)
+    test_combination('nonfatal', default_fatal_warnings=True, expect_success=True)
+    test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)

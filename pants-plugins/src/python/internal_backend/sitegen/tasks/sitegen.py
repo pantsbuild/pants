@@ -12,7 +12,6 @@ import os
 import re
 import shutil
 
-import bs4
 import pystache
 from six.moves import range
 
@@ -26,6 +25,16 @@ Suggested use:
   cd pants
   ./build-support/bin/publish_docs.sh  # invokes sitegen.py
 """
+
+
+def beautiful_soup(*args, **kwargs):
+  """Indirection function so we can lazy-import bs4.
+
+  It's an expensive import that invokes re.compile a lot, so we don't want to incur that cost
+  unless we must.
+  """
+  import bs4
+  return bs4.BeautifulSoup(*args, **kwargs)
 
 
 class SiteGen(Task):
@@ -61,7 +70,7 @@ def load_soups(config):
   soups = {}
   for page, path in config['sources'].items():
     with open(path, 'rb') as orig_file:
-      soups[page] = bs4.BeautifulSoup(orig_file.read().decode('utf-8'))
+      soups[page] = beautiful_soup(orig_file.read().decode('utf-8'))
   return soups
 
 
@@ -218,7 +227,7 @@ def add_here_links(soups):
       anchor = tag.get('id') or tag.get('name')
       if not anchor:
         continue
-      new_table = bs4.BeautifulSoup('''
+      new_table = beautiful_soup("""
       <table class="h-plus-pilcrow">
         <tbody>
         <tr>
@@ -229,7 +238,7 @@ def add_here_links(soups):
         </tr>
         </tbody>
       </table>
-      '''.format(anchor=anchor))
+      """.format(anchor=anchor))
       tag.replace_with(new_table)
       header_holder = new_table.find(attrs={'class': 'h-plus-pilcrow-holder'})
       header_holder.append(tag)
