@@ -143,6 +143,7 @@ class BundleCreate(JvmBinaryTask):
       for jar_path in classpath:
         # In case `jar_path` is a symlink, this is still safe, shaded jar will overwrite jar_path,
         # original file `jar_path` linked to remains untouched.
+        # TODO run in parallel to speed up
         self.shade_jar(shading_rules=app.binary.shading_rules, jar_path=jar_path)
 
     for bundle in app.bundles:
