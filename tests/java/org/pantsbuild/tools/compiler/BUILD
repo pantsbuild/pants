@@ -6,6 +6,8 @@ java_tests(name='compiler',
   dependencies=[
     '3rdparty:easymock',
     '3rdparty:guava',
+    '3rdparty:guava-testlib',
+    '3rdparty:jsr305',
     '3rdparty:junit',
     'src/java/org/pantsbuild/testing',
     'src/java/org/pantsbuild/tools/compiler:compiler'
