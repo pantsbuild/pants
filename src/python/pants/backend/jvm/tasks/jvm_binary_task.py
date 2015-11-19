@@ -104,25 +104,24 @@ class JvmBinaryTask(JarBuilderTask):
 
       if binary.shading_rules:
         with self.context.new_workunit('shade-monolithic-jar'):
-          self.shade_jar(binary=binary, jar_id=binary.address.reference(), jar_path=path)
+          self.shade_jar(binary.shading_rules, jar_path=path)
 
   @memoized_property
   def shader(self):
     return Shader.Factory.create(self.context)
 
-  def shade_jar(self, binary, jar_id, jar_path):
+  def shade_jar(self, shading_rules, jar_path):
     """Shades a jar using the shading rules from the given jvm_binary.
 
     This *overwrites* the existing jar file at ``jar_path``.
 
-    :param binary: The jvm_binary target the jar is being shaded for.
-    :param jar_id: The id of the jar being shaded (used for logging).
+    :param shading_rules: predefined rules for shading
     :param jar_path: The filepath to the jar that should be shaded.
     """
-    self.context.log.debug('Shading {} at {}.'.format(jar_id, jar_path))
+    self.context.log.debug('Shading {}.'.format(jar_path))
     with temporary_dir() as tempdir:
       output_jar = os.path.join(tempdir, os.path.basename(jar_path))
-      rules = [rule.rule() for rule in binary.shading_rules]
+      rules = [rule.rule() for rule in shading_rules]
       with self.shader.binary_shader_for_rules(output_jar, jar_path, rules) as shade_runner:
         result = execute_runner(shade_runner, workunit_factory=self.context.new_workunit,
                                 workunit_name='jarjar')

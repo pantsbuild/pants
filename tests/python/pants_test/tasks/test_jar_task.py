@@ -49,7 +49,7 @@ class BaseJarTaskTest(JarTaskTestBase):
 
   @contextmanager
   def jarfile(self):
-    with temporary_file() as fd:
+    with temporary_file(root_dir=self.workdir, suffix='.jar') as fd:
       fd.close()
       yield fd.name
 
@@ -162,15 +162,16 @@ class JarTaskTest(BaseJarTaskTest):
         # To verify this, first add a random classpath, and verify it's overwritten by
         # the supplied classpath value.
         with self.jar_task.open_jar(existing_jarfile) as jar:
-          jar.append_classpath('something_should_be_overwritten.jar')
+          # prefix with workdir since Class-Path is relative to jarfile.path
+          jar.append_classpath(os.path.join(self.workdir, 'something_should_be_overwritten.jar'))
 
         with self.jar_task.open_jar(existing_jarfile) as jar:
-          jar.append_classpath(classpath)
+          jar.append_classpath([os.path.join(self.workdir, jar_path) for jar_path in classpath])
 
         with open_zip(existing_jarfile) as jar:
           self.assertEqual(manifest_content(classpath), jar.read('META-INF/MANIFEST.MF'))
 
-    assert_classpath('a.jar')
+    assert_classpath(['a.jar'])
     assert_classpath(['a.jar', 'b.jar'])
 
   def test_update_jars(self):

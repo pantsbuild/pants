@@ -92,6 +92,16 @@ class Jar(object):
     self._main = None
     self._classpath = []
 
+  @property
+  def classpath(self):
+    """The Class-Path entry of jar's Manifest."""
+    return self._classpath
+
+  @property
+  def path(self):
+    """The path to jar itself."""
+    return self._path
+
   def main(self, main):
     """Specifies a Main-Class entry for this jar's manifest.
 
@@ -172,7 +182,11 @@ class Jar(object):
     args = []
 
     with temporary_dir() as manifest_stage_dir:
-      classpath = self._classpath or []
+      # relativize urls in canonical classpath, this needs to be stable too therefore
+      # do not follow the symlinks because symlinks may vary from platform to platform.
+      classpath = relativize_classpath(self.classpath,
+                                       os.path.dirname(self._path),
+                                       followlinks=False)
 
       def as_cli_entry(entry):
         src = entry.materialize(manifest_stage_dir)
@@ -399,12 +413,7 @@ class JarBuilderTask(JarTask):
       if canonical_classpath_base_dir:
         canonical_classpath = ClasspathUtil.create_canonical_classpath(
             classpath_products, targets, canonical_classpath_base_dir)
-        # relativize urls in canonical classpath, this needs to be stable too therefore
-        # do not follow the symlinks because symlinks may vary from platform to platform.
-        bundle_classpath = relativize_classpath(canonical_classpath,
-                                                os.path.dirname(self._jar._path),
-                                                followlinks=False)
-        self._jar.append_classpath(bundle_classpath)
+        self._jar.append_classpath(canonical_classpath)
         products_added = True
       else:
         target_classpath = ClasspathUtil.internal_classpath(targets,

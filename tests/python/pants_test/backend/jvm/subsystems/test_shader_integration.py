@@ -63,7 +63,9 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
     self.assertEqual(expected_classes, received_classes)
 
   def test_no_deployjar_run(self):
-    """When shading is used, --no-deployjar is effectively disabled and behaves like --deployjar.
+    """Shading continues to work with --no-deployjar.
+
+    All jars including the main jar as well as libraries will run through shader.
     """
     self.assertEquals({
           'Gson': 'moc.elgoog.nosg.Gson',
@@ -75,6 +77,8 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
         'third',
         bundle_options=['--no-deployjar'],
         expected_bundle_content=[
+          'libs/com.google.code.gson-gson-2.3.1.jar',
+          'libs/testprojects/src/java/org/pantsbuild/testproject/shading/third_lib/0-z.jar',
           'third.jar']).strip()))
 
   def test_deployjar_run(self):
