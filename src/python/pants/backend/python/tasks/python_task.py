@@ -40,11 +40,6 @@ class PythonTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
-    # TODO: fix pex so that it doesn't mutate environment state
-    # https://github.com/pantsbuild/pex/issues/180
-    # Ideally this would be done in goal_runner or somewhere earlier but pex invocations
-    # alter the environment state when we call it so we need to do this for each task.
-    os.environ['PEX_ROOT'] = os.path.join(self.get_options().pants_workdir, '.pex')
     self._compatibilities = self.get_options().interpreter or [b'']
     self._interpreter_cache = None
     self._interpreter = None
@@ -72,6 +67,11 @@ class PythonTask(Task):
     if self._interpreter is None:
       self._interpreter = self.select_interpreter(self._compatibilities)
     return self._interpreter
+
+  def _wrap_pex_info(self, pex_info):
+    pex_info = pex_info or PexInfo.default()
+    pex_info.pex_root = os.path.join(self.get_options().pants_workdir, '.pex')
+    return pex_info
 
   def select_interpreter_for_targets(self, targets):
     """Pick an interpreter compatible with all the specified targets."""
@@ -146,12 +146,12 @@ class PythonTask(Task):
     """
     # This PexInfo contains any customizations specified by the caller.
     # The process of building a pex modifies it further.
-    pex_info = pex_info or PexInfo.default()
-
+    pex_info = self._wrap_pex_info(pex_info)
     path = self._chroot_path(interpreter, pex_info, targets, platforms, extra_requirements,
                              executable_file_content)
     if not os.path.exists(path):
       path_tmp = path + '.tmp'
+
       self._build_chroot(path_tmp, interpreter, pex_info, targets, platforms,
                          extra_requirements, executable_file_content)
       shutil.move(path_tmp, path)
@@ -159,6 +159,7 @@ class PythonTask(Task):
     # We must read the PexInfo that was frozen into the pex, so we get the modifications
     # created when that pex was built.
     pex_info = PexInfo.from_pex(path)
+    pex_info = self._wrap_pex_info(pex_info)
     # Now create a PythonChroot wrapper without dumping it.
     builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
     return self.create_chroot(interpreter=interpreter,
@@ -171,7 +172,7 @@ class PythonTask(Task):
   def temporary_chroot(self, interpreter, pex_info, targets, platforms,
                        extra_requirements=None, executable_file_content=None):
     path = tempfile.mkdtemp()  # Not a contextmanager: chroot.delete() will clean this up anyway.
-    pex_info = pex_info or PexInfo.default()
+    pex_info = self._wrap_pex_info(pex_info)
     chroot = self._build_chroot(path, interpreter, pex_info, targets, platforms,
                                 extra_requirements, executable_file_content)
     yield chroot
