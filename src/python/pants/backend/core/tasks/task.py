@@ -462,7 +462,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         cached_vts.append(vt)
         uncached_vts.discard(vt)
       elif isinstance(was_in_cache, UnreadableArtifact):
-        self._cache_key_errors.update(was_in_cache.key)
+        self._cache_key_errors.add(was_in_cache.key)
 
     self._maybe_create_results_dirs(vts)
 
