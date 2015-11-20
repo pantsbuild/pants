@@ -31,7 +31,6 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     ]
     expected_outputs = [
       'Compiling proto source file',
-      'Created output directory',
       'Writing generated code',
     ]
     for expected_output in expected_outputs:
