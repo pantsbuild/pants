@@ -46,8 +46,9 @@ class GlobalOptionsRegistrar(Optionable):
              help='Squelches most console output.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', action='store_true', default=True, recursive=True,
-             help='Set whether log messages are displayed in color.')
+    register('--colors', '--color', action='store_true', default=True, recursive=True,
+             help='Set whether log messages are displayed in color. NB: The singular `color` form '
+                  'is deprecated until 0.0.63: prefer `colors`.')
 
     # Pants code uses this only to verify that we are of the requested version. However
     # setup scripts, runner scripts, IDE plugins, etc., may grep this out of pants.ini
