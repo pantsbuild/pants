@@ -216,11 +216,11 @@ class Options(object):
       return []
 
   def register(self, scope, *args, **kwargs):
-    """Register an option in the given scope, using argparse params."""
+    """Register an option in the given scope."""
     self.get_parser(scope).register(*args, **kwargs)
 
   def registration_function_for_optionable(self, optionable_class):
-    """Returns a function for registering argparse args on the given scope."""
+    """Returns a function for registering options on the given scope."""
     # TODO(benjy): Make this an instance of a class that implements __call__, so we can
     # docstring it, and so it's less weird than attatching properties to a function.
     def register(*args, **kwargs):

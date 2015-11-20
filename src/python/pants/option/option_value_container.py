@@ -22,9 +22,6 @@ class OptionValueContainer(object):
      the inner one from config).
 
      See ranked_value.py for more details.
-
-  Note that this container is suitable for passing as the namespace argument to argparse's
-  parse_args() method.
   """
 
   def __init__(self):
@@ -35,11 +32,7 @@ class OptionValueContainer(object):
 
     Returns one of the constants in RankedValue.
     """
-    val = self._value_map.get(key)
-    if isinstance(val, RankedValue):
-      return val.rank
-    else:  # Values without rank are assumed to be flag values set by argparse.
-      return RankedValue.FLAG
+    return self._value_map.get(key).rank
 
   def is_flagged(self, key):
     """Returns `True` if the value for the specified key was supplied via a flag.
@@ -94,19 +87,14 @@ class OptionValueContainer(object):
   def _set(self, key, value):
     if key in self._value_map:
       existing_value = self._value_map[key]
-      if isinstance(existing_value, RankedValue):
-        existing_rank = existing_value.rank
-      else:
-        # Values without rank are assumed to be flag values set by argparse.
-        existing_rank = RankedValue.FLAG
+      existing_rank = existing_value.rank
     else:
       existing_rank = RankedValue.NONE
 
     if isinstance(value, RankedValue):
       new_rank = value.rank
     else:
-      # Values without rank are assumed to be flag values set by argparse.
-      new_rank = RankedValue.FLAG
+      raise AttributeError('Value must be of type RankedValue: {}'.format(value))
 
     if new_rank >= existing_rank:
       # We set values from outer scopes before values from inner scopes, so
@@ -118,7 +106,6 @@ class OptionValueContainer(object):
     return getattr(self, key)
 
   # Support attribute setting, e.g., opts.foo = 42.
-  # This is necessary so that we can be used as an argparse namespace.
   def __setattr__(self, key, value):
     if key == '_value_map':
       return super(OptionValueContainer, self).__setattr__(key, value)

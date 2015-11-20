@@ -48,21 +48,24 @@ class ClasspathProductsTest(BaseTest):
 
     copied = classpath_product.copy()
 
-    self.assertEqual([('default', resolved_jar.pants_path),
-                      ('default', self.path('a/path'))], classpath_product.get_for_target(a))
-    self.assertEqual([('default', resolved_jar.pants_path),
-                      ('default', self.path('a/path'))], copied.get_for_target(a))
+    a_closure = a.closure(bfs=True)
+
+    self.assertEqual([('default', resolved_jar.pants_path), ('default', self.path('a/path'))],
+                     classpath_product.get_for_targets(a_closure))
+    self.assertEqual([('default', resolved_jar.pants_path), ('default', self.path('a/path'))],
+                     copied.get_for_targets(a_closure))
 
     self.add_excludes_for_targets(copied, b, a)
-    self.assertEqual([('default', resolved_jar.pants_path),
-                      ('default', self.path('a/path'))], classpath_product.get_for_target(a))
-    self.assertEqual([('default', self.path('a/path'))], copied.get_for_target(a))
+    self.assertEqual([('default', resolved_jar.pants_path), ('default', self.path('a/path'))],
+                     classpath_product.get_for_targets(a_closure))
+    self.assertEqual([('default', self.path('a/path'))],
+                     copied.get_for_targets(a_closure))
 
     copied.add_for_target(b, [('default', self.path('b/path'))])
-    self.assertEqual([('default', resolved_jar.pants_path),
-                      ('default', self.path('a/path'))], classpath_product.get_for_target(a))
-    self.assertEqual([('default', self.path('a/path')),
-                      ('default', self.path('b/path'))], copied.get_for_target(a))
+    self.assertEqual([('default', resolved_jar.pants_path), ('default', self.path('a/path'))],
+                     classpath_product.get_for_targets(a_closure))
+    self.assertEqual([('default', self.path('a/path')), ('default', self.path('b/path'))],
+                     copied.get_for_targets(a_closure))
 
   def test_fails_if_paths_outside_buildroot(self):
     a = self.make_target('a', JvmTarget)
@@ -72,7 +75,7 @@ class ClasspathProductsTest(BaseTest):
       classpath_product.add_for_target(a, [('default', '/dev/null')])
 
     self.assertEqual(
-      'Classpath entry /dev/null for target a:a is located outside the working directory.',
+      'Classpath entry /dev/null for target a:a is located outside the working directory "{}".'.format(self.pants_workdir),
       str(cm.exception))
 
   def test_fails_if_jar_paths_outside_buildroot(self):
@@ -83,7 +86,7 @@ class ClasspathProductsTest(BaseTest):
       classpath_product.add_jars_for_targets([a], 'default', [(resolved_example_jar_at('/dev/null'))])
 
     self.assertEqual(
-      'Classpath entry /dev/null for target a:a is located outside the working directory.',
+      'Classpath entry /dev/null for target a:a is located outside the working directory "{}".'.format(self.pants_workdir),
       str(cm.exception))
 
   def test_excluded_classpath_element(self):
@@ -118,7 +121,7 @@ class ClasspathProductsTest(BaseTest):
     classpath_product.add_for_target(a, [('default', example_jar_path)])
     classpath_product.add_excludes_for_targets([a, b])
 
-    intransitive_classpath = classpath_product.get_for_target(a, transitive=False)
+    intransitive_classpath = classpath_product.get_for_target(a)
     self.assertEqual([('default', example_jar_path)], intransitive_classpath)
 
   def test_parent_exclude_excludes_dependency_jar(self):
@@ -184,7 +187,7 @@ class ClasspathProductsTest(BaseTest):
     self.add_example_jar_classpath_element_for(classpath_product, b)
     self.add_excludes_for_targets(classpath_product, a)
 
-    classpath = classpath_product.get_for_target(a)
+    classpath = classpath_product.get_for_targets(a.closure(bfs=True))
 
     self.assertEqual([('default', self._example_jar_path())], classpath)
 
@@ -251,7 +254,7 @@ class ClasspathProductsTest(BaseTest):
     classpath_product.add_for_target(b, [('default', example_jar_path)])
     self.add_excludes_for_targets(classpath_product, a)
 
-    classpath = classpath_product.get_for_target(a)
+    classpath = classpath_product.get_for_targets(a.closure(bfs=True))
 
     self.assertEqual([('default', example_jar_path)], classpath)
 
@@ -308,7 +311,7 @@ class ClasspathProductsTest(BaseTest):
     classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
                                          ('default', self.path('an/internally/generated.jar'))])
 
-    classpath = classpath_product.get_classpath_entries_for_targets([a])
+    classpath = classpath_product.get_classpath_entries_for_targets(a.closure(bfs=True))
     self.assertEqual([('default', ArtifactClasspathEntry(example_jar_path,
                                                          resolved_jar.coordinate,
                                                          resolved_jar.cache_path)),
@@ -329,7 +332,7 @@ class ClasspathProductsTest(BaseTest):
     classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
                                          ('default', self.path('an/internally/generated.jar'))])
 
-    classpath = classpath_product.get_classpath_entries_for_targets([a], transitive=False)
+    classpath = classpath_product.get_classpath_entries_for_targets([a])
     self.assertEqual([('default', ArtifactClasspathEntry(example_jar_path,
                                                          resolved_jar.coordinate,
                                                          resolved_jar.cache_path)),
@@ -370,7 +373,7 @@ class ClasspathProductsTest(BaseTest):
     classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
                                          ('default', self.path('an/internally/generated.jar'))])
 
-    classpath = classpath_product.get_internal_classpath_entries_for_targets([a])
+    classpath = classpath_product.get_internal_classpath_entries_for_targets(a.closure(bfs=True))
     self.assertEqual([('default', ClasspathEntry(self.path('a/loose/classes/dir'))),
                       ('default', ClasspathEntry(self.path('an/internally/generated.jar'))),
                       ('default', ClasspathEntry(self.path('b/loose/classes/dir')))],

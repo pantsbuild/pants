@@ -100,7 +100,7 @@ class Coverage(object):
     for target in targets:
       if not self.is_coverage_target(target):
         continue
-      paths = instrumentation_classpath.get_for_target(target, False)
+      paths = instrumentation_classpath.get_for_target(target)
       for (config, path) in paths:
         # there are two sorts of classpath entries we see in the compile classpath: jars and dirs
         # the branches below handle the cloning of those respectively.

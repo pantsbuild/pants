@@ -72,9 +72,9 @@ class JvmDependencyAnalyzer(Task):
     self.context.log.debug('Mapping classpath...')
     for target in self.context.targets():
       # Classpath content.
-      files = ClasspathUtil.classpath_contents((target,), runtime_classpath, transitive=False)
+      files = ClasspathUtil.classpath_contents((target,), runtime_classpath)
       # And jars; for binary deps, zinc doesn't emit precise deps (yet).
-      cp_entries = ClasspathUtil.classpath((target,), runtime_classpath, transitive=False)
+      cp_entries = ClasspathUtil.classpath((target,), runtime_classpath)
       jars = [cpe for cpe in cp_entries if ClasspathUtil.is_jar(cpe)]
       for coll in [files, jars]:
         for f in coll:

@@ -6,16 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import re
+import unittest
 from contextlib import contextmanager
 
-import pytest
 from mock import MagicMock, mock_open, patch
 
 from pants.backend.authentication.netrc_util import Netrc
 
 
 @patch('os.path')
-class TestNetrcUtil(object):
+class TestNetrcUtil(unittest.TestCase):
 
   class MockOsPath(MagicMock):
     def __init__(self):
@@ -33,21 +33,21 @@ class TestNetrcUtil(object):
   def test_netrc_file_missing_error(self, MockOsPath):
     MockOsPath.exists.return_value = False
     netrc = Netrc()
-    with pytest.raises(netrc.NetrcError) as exc:
+    with self.assertRaises(netrc.NetrcError) as exc:
       netrc._ensure_loaded()
-    assert str(exc.value) == 'A ~/.netrc file is required to authenticate'
+    assert str(exc.exception) == 'A ~/.netrc file is required to authenticate'
 
   def test_netrc_parse_error(self, MockOsPath):
     with self.netrc('machine test') as netrc:
-      with pytest.raises(netrc.NetrcError) as exc:
+      with self.assertRaises(netrc.NetrcError) as exc:
         netrc._ensure_loaded()
-      assert re.search(r'Problem parsing', exc.value.message)
+      assert re.search(r'Problem parsing', exc.exception.message)
 
   def test_netrc_no_usable_blocks(self, MockOsPath):
     with self.netrc('') as netrc:
-      with pytest.raises(netrc.NetrcError) as exc:
+      with self.assertRaises(netrc.NetrcError) as exc:
         netrc._ensure_loaded()
-      assert str(exc.value) == 'Found no usable authentication blocks in ~/.netrc'
+      assert str(exc.exception) == 'Found no usable authentication blocks in ~/.netrc'
 
   @contextmanager
   def netrc(self, netrc_contents):

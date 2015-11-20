@@ -8,15 +8,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 import functools
 import multiprocessing
-import Queue
+import os
 from abc import abstractmethod
-from threading import Thread
+from Queue import Queue
 
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.engine.exp.scheduler import Promise
 from pants.util.meta import AbstractClass
+
+
+try:
+  import cPickle as pickle
+except ImportError:
+  import pickle
 
 
 class FailedToProduce(object):
@@ -322,112 +328,164 @@ class LocalSerialEngine(FailSlowHelper, Engine):
     return self.collect_root_outputs(products_by_promise, execution_graph)
 
 
-def _execute_plan(func, promise, subjects, *args, **kwargs):
+class SerializationError(Exception):
+  """Indicates an error serializing input or outputs of an execution node.
+
+  The `LocalMultiprocessEngine` uses this exception to communicate incompatible planner code when
+  run in debug mode.  Both the plans and the products they produce must be picklable to be executed
+  by the multiprocess engine.
+  """
+
+
+def _try_pickle(obj):
+  with open(os.devnull, 'w') as devnull:
+    try:
+      pickle.dump(obj, devnull)
+    except Exception as e:
+      # Unfortunately, pickle can raise things other than PickleError instances.  For example it
+      # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
+      # `Exception` type here.
+      raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
+
+
+def _execute_plan(func, promise, subjects, debug, *args, **kwargs):
   # A picklable top-level function to help support local multiprocessing uses.
-  product = func(*args, **kwargs)
-  return promise, subjects, product
+  try:
+    product = func(*args, **kwargs)
+  except Exception as e:
+    # Trap any exception raised by the execution node that bubbles up past the fail slow guards
+    # (if enabled) and pass this back to our main thread for handling.
+    return e
+
+  result = (promise, subjects, product)
+  if debug:
+    try:
+      _try_pickle(result)
+    except SerializationError as e:
+      return e
+  return result
 
 
 class LocalMultiprocessEngine(Engine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, local_scheduler, pool_size=0):
+  def __init__(self, local_scheduler, pool_size=None, debug=False):
     """
     :param local_scheduler: The local scheduler for creating execution graphs.
     :type local_scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
-    :param pool: A multiprocessing process pool.
-    :type pool: :class:`multiprocessing.Pool`
+    :param int pool_size: The number of worker processes to use; by default 1 process per core will
+                          be used.
+    :param bool debug: `True` to turn on pickling error debug mode (slower); false by default.
     """
     super(LocalMultiprocessEngine, self).__init__(local_scheduler)
-    self._pool_size = pool_size if pool_size > 0 else multiprocessing.cpu_count()
+    self._pool_size = pool_size if pool_size and pool_size > 0 else multiprocessing.cpu_count()
     self._pool = multiprocessing.Pool(self._pool_size)
+    self._debug = debug
 
-  class Executor(FailSlowHelper, Thread):
-    LAST_PLAN = object()
-
-    def __init__(self, pool, pool_size, fail_slow=False):
+  class Executor(FailSlowHelper):
+    def __init__(self, pool, pool_size, fail_slow=False, debug=False):
       super(LocalMultiprocessEngine.Executor, self).__init__()
 
       self._pool = pool
       self._pool_size = pool_size
       self._fail_slow = fail_slow
+      self._debug = debug
 
-      self._waiting = []
-      self._plans = Queue.Queue(self._pool_size)
-      self._results = Queue.Queue()
+      self._results = Queue()
       self._products_by_promise = {}
 
-      self.name = 'LocalMultiprocessEngine.Executor'
-      self.daemon = True
-      self.start()
+    def submit(self, promise, plan):
+      inputs = self.collect_inputs(self._products_by_promise, promise, plan)
+      if isinstance(inputs, FailedToProduce):
+        # Short circuit plan execution since we don't have all the inputs it needs.
+        result = (promise, plan.subjects, inputs)
+        self._results.put(result)
+      else:
+        func, args, kwargs = plan.bind(inputs)
 
-    def enqueue(self, promise, plan):
-      self._plans.put((promise, plan))
+        # A no-arg callable that, when executed, produces the promised product.
+        executable = functools.partial(func, *args, **kwargs)
+
+        # A wrapper of executable that handles failing slow as needed.
+        maybe_fail_slow_executor = functools.partial(maybe_fail_slow,
+                                                     executable,
+                                                     promise,
+                                                     plan,
+                                                     self._fail_slow)
+
+        # A picklable execution that returns the promise and subjects in addition to the
+        # product produced by executable.  We need this triple to feed the consume side of the
+        # _results queue.
+        execute_plan = functools.partial(_execute_plan,
+                                         maybe_fail_slow_executor,
+                                         promise,
+                                         plan.subjects,
+                                         self._debug)
+
+        if self._debug:
+          _try_pickle(execute_plan)
+        self._pool.apply_async(execute_plan, callback=self._results.put)
+
+    def gather_one_result(self):
+      results = self._results.get()
+      if isinstance(results, Exception):
+        # If we get an exception here from an execution node, we're either in fail-slow mode and the
+        # exception was uncontrolled (not a TaskError), or else we're not in fail slow mode in which
+        # case any exception should bubble to higher layers.
+        raise results
+
+      promise, subjects, product = results
+      for subject in subjects:
+        promised = promise.rebind(subject)
+        self._products_by_promise[promised] = product
+        yield promised
 
     def finish(self, execution_graph):
-      self._plans.put(self.LAST_PLAN)
-      self.join()
       return self.collect_root_outputs(self._products_by_promise, execution_graph)
 
-    def run(self):
-      while True:
-        done = self._fill_waiting()
-        while self._waiting:
-          self._submit_all_satisfied()
-          self._gather_one()
-          if not done:
-            break
-        if done:
-          break
-
-    def _fill_waiting(self):
-      while len(self._waiting) < self._pool_size:
-        plan = self._plans.get()
-        if plan is self.LAST_PLAN:
-          return True
-        else:
-          self._waiting.append(plan)
-
-    def _submit_all_satisfied(self):
-      for index, (promise, plan) in enumerate(self._waiting):
-        if all(pr in self._products_by_promise for pr in plan.promises):
-          self._waiting.pop(index)
-          inputs = self.collect_inputs(self._products_by_promise, promise, plan)
-          if isinstance(inputs, FailedToProduce):
-            # Short circuit plan execution since we don't have all the inputs it needs.
-            self._results.put((promise, plan.subjects, inputs))
-          else:
-            func, args, kwargs = plan.bind(inputs)
-
-            # A no-arg callable that, when executed, produces the promised product.
-            executable = functools.partial(func, *args, **kwargs)
-
-            # A wrapper of executable that handles failing slow as needed.
-            maybe_fail_slow_executor = functools.partial(maybe_fail_slow,
-                                                         executable,
-                                                         promise,
-                                                         plan,
-                                                         self._fail_slow)
-
-            # A picklable execution that returns the promise and subjects in addition to the
-            # product produced by executable.  We need this triple to feed the consume side of the
-            # _results queue.
-            execute_plan = functools.partial(_execute_plan,
-                                             maybe_fail_slow_executor,
-                                             promise,
-                                             plan.subjects)
-
-            self._pool.apply_async(execute_plan, callback=self._results.put)
-
-    def _gather_one(self):
-      promise, subjects, product = self._results.get()
-      for subject in subjects:
-        self._products_by_promise[promise.rebind(subject)] = product
-
   def reduce(self, execution_graph, fail_slow=False):
-    executor = self.Executor(self._pool, self._pool_size, fail_slow=fail_slow)
+    executor = self.Executor(self._pool, self._pool_size, fail_slow=fail_slow, debug=self._debug)
+
+    # ExecutionGraph nodes move from `pending_submission` to `in_flight` to `satisfied_promises`.
+    pending_submission = {}
+    in_flight = {}
+    satisfied_promises = set()
+
+    def submit_satisfied_pending():
+      for promise, plan in pending_submission.items():
+        if plan.promises.issubset(satisfied_promises):
+          in_flight[promise] = pending_submission.pop(promise)
+          executor.submit(promise, plan)
+
+    def process_one_result():
+      # One result can satisfy many promises when a planner has scheduled bulk operations so index
+      # them all.
+      for satisfied_promise in executor.gather_one_result():
+        if satisfied_promise in in_flight:
+          in_flight.pop(satisfied_promise)
+        satisfied_promises.add(satisfied_promise)
+
+    # The main reduction loop:
+    # 1. Mark nodes that are pending submission to the worker pool.
+    # 2. Submit nodes to the worker pool when their inputs are satisfied.
+    # 3. Gather a single result when the pool is full to free up a processing slot.
+    #
+    # Of note here is the fact that we need build no node-readiness data structures up front and
+    # we limit pending submissions to the number of pool workers.  This gives us a bounded number
+    # of items to check for submission readiness, ie: we'll never need to scan more than the pool
+    # size, commonly the number of cores, no matter the size and shape of the execution graph.
     for promise, plan in execution_graph.walk():
-      executor.enqueue(promise, plan)
+      pending_submission[promise] = plan
+      submit_satisfied_pending()
+      # Saturate the pool before we block on a result for maximum processing parallelism.
+      if len(in_flight) == self._pool_size:
+        process_one_result()
+
+    # Consume the tail of pending submissions and nodes in_flight.
+    while pending_submission or in_flight:
+      submit_satisfied_pending()
+      process_one_result()
+
     return executor.finish(execution_graph)
 
   def close(self):

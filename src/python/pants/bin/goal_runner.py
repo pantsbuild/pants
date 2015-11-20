@@ -52,7 +52,7 @@ class SourceRootBootstrapper(Subsystem):
     super(SourceRootBootstrapper, cls).register_options(register)
     # TODO: Get rid of this in favor of source root registration at backend load time.
     register('--bootstrap-buildfiles', advanced=True, type=list_option, default=[],
-             deprecated_version='0.0.59',
+             deprecated_version='0.0.60',
              deprecated_hint='bootstrap BUILD files are no longer necessary or supported. '
                              'Source roots are configured in pants.ini or by default.',
              help='Initialize state by evaluating these buildfiles.')
@@ -295,7 +295,8 @@ class GoalRunnerFactory(object):
                       goals=self._goals,
                       kill_nailguns=self._kill_nailguns,
                       run_tracker=self._run_tracker,
-                      invalidation_report=invalidation_report)
+                      invalidation_report=invalidation_report,
+                      exiter=self._exiter)
 
 
 class GoalRunner(object):

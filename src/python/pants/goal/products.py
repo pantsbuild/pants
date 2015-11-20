@@ -18,7 +18,10 @@ class ProductError(Exception): pass
 
 
 class UnionProducts(object):
-  """Here, products for a target are the ordered union of the products for its transitive deps."""
+  """Here, products for a target are an insertion ordered set.
+
+  When products for multiple targets are requested, an ordered union is provided.
+  """
 
   def __init__(self, products_by_target=None):
     # A map of target to OrderedSet of product members.
@@ -53,24 +56,15 @@ class UnionProducts(object):
     for product in products:
       self._products_by_target[target].discard(product)
 
-  def get_for_target(self, target, transitive=True):
-    """Gets the transitive product deps for the given target."""
-    return self.get_for_targets([target], transitive=transitive)
+  def get_for_target(self, target):
+    """Gets the products for the given target."""
+    return self.get_for_targets([target])
 
-  def get_for_targets(self, targets, transitive=True):
-    """Gets the transitive product deps for the given targets, in order."""
+  def get_for_targets(self, targets):
+    """Gets the union of the products for the given targets, preserving the input order."""
     products = OrderedSet()
-    visited = set()
-    # Walk the targets transitively to aggregate their products. We do a breadth-first
     for target in targets:
-      if transitive:
-        deps = target.closure(bfs=True)
-      else:
-        deps = [target]
-      for dep in deps:
-        if dep not in visited:
-          products.update(self._products_by_target[dep])
-          visited.add(dep)
+      products.update(self._products_by_target[target])
     return products
 
   def target_for_product(self, product):

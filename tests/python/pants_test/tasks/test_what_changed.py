@@ -365,6 +365,19 @@ class WhatChangedTest(BaseWhatChangedTest):
       workspace=self.workspace(files=['root/proto/BUILD'])
     )
 
+  def test_globs_in_resources(self):
+    self.add_to_build_file('root/resources', dedent("""
+      resources(
+        name='resources',
+        sources=globs('*')
+      )
+    """))
+
+    self.assert_console_output(
+      'root/resources:resources',
+      workspace=self.workspace(files=['root/resources/foo/bar/baz.yml'])
+    )
+
   def test_root_config(self):
     self.assert_console_output(
       ':pants-config',

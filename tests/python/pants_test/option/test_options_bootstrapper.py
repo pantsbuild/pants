@@ -136,15 +136,16 @@ class BootstrapOptionsTest(unittest.TestCase):
       """))
       fp.close()
 
-      bootstrapper_single_config = OptionsBootstrapper(configpath=fp.name,
-                                                       args=['--config-override={}'.format(fp.name)])
+      bootstrapper_single_config = OptionsBootstrapper(
+        configpath=fp.name, args=['--config-override={}'.format(fp.name)])
 
       opts_single_config  = bootstrapper_single_config.get_full_options(known_scope_infos=[
           ScopeInfo('', ScopeInfo.GLOBAL),
           ScopeInfo('compile.apt', ScopeInfo.TASK),
           ScopeInfo('fruit', ScopeInfo.TASK),
       ])
-      opts_single_config.register('', '--config-override')  # So we don't choke on it on the cmd line.
+      # So we don't choke on it on the cmd line.
+      opts_single_config.register('', '--config-override', action='append')
       opts_single_config.register('compile.apt', '--worker-count')
       opts_single_config.register('fruit', '--apple')
 
@@ -168,7 +169,8 @@ class BootstrapOptionsTest(unittest.TestCase):
           ScopeInfo('compile.apt', ScopeInfo.TASK),
           ScopeInfo('fruit', ScopeInfo.TASK),
         ])
-        opts_double_config.register('', '--config-override')  # So we don't choke on it on the cmd line.
+        # So we don't choke on it on the cmd line.
+        opts_double_config.register('', '--config-override', action='append')
         opts_double_config.register('compile.apt', '--worker-count')
         opts_double_config.register('fruit', '--apple')
 

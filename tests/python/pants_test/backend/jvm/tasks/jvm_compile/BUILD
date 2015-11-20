@@ -4,7 +4,20 @@
 target(
   name='jvm_compile',
   dependencies=[
+    ':jvm_classpath_published',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile/java',
+  ],
+)
+
+python_tests(
+  name = 'jvm_classpath_published',
+  sources = ['test_jvm_classpath_published.py'],
+  dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/backend/jvm/tasks/jvm_compile:jvm_classpath_publisher',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test/tasks:task_test_base',
   ],
 )
 
@@ -14,5 +27,13 @@ python_library(
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
+  ]
+)
+
+python_tests(
+  name='declared_deps_integration',
+  sources=['test_declared_deps_integration.py'],
+  dependencies=[
+    ':base_compile_integration_test',
   ]
 )

@@ -23,10 +23,10 @@ class ClasspathUtilTest(BaseTest):
     path = os.path.join(self.build_root, 'jar/path')
     classpath_product.add_for_target(a, [('default', path)])
 
-    classpath = ClasspathUtil.compute_classpath_for_target(a,
-                                                           classpath_product,
-                                                           extra_classpath_tuples=[],
-                                                           confs=['not-default'])
+    classpath = ClasspathUtil.compute_classpath([a],
+                                                classpath_product,
+                                                extra_classpath_tuples=[],
+                                                confs=['not-default'])
 
     self.assertEqual([], classpath)
 
@@ -38,10 +38,10 @@ class ClasspathUtilTest(BaseTest):
     path = os.path.join(self.build_root, 'jar/path')
     classpath_product.add_for_target(a, [('default', path)])
 
-    classpath = ClasspathUtil.compute_classpath_for_target(a,
-                                                           classpath_product,
-                                                           extra_classpath_tuples=[],
-                                                           confs=['not-default', 'default'])
+    classpath = ClasspathUtil.compute_classpath([a],
+                                                classpath_product,
+                                                extra_classpath_tuples=[],
+                                                confs=['not-default', 'default'])
 
     self.assertEqual([path], classpath)
 
@@ -55,10 +55,10 @@ class ClasspathUtilTest(BaseTest):
 
     extra_path = 'new-path'
     extra_cp_tuples = [('default', extra_path)]
-    classpath = ClasspathUtil.compute_classpath_for_target(a,
-                                                           classpath_product,
-                                                           extra_classpath_tuples=extra_cp_tuples,
-                                                           confs=['default'])
+    classpath = ClasspathUtil.compute_classpath([a],
+                                                classpath_product,
+                                                extra_classpath_tuples=extra_cp_tuples,
+                                                confs=['default'])
 
     self.assertEqual([path, extra_path], classpath)
 
@@ -68,9 +68,9 @@ class ClasspathUtilTest(BaseTest):
     classpath_product = UnionProducts()
     classpath_product.add_for_target(a, [('default', '/dev/null')])
 
-    classpath = ClasspathUtil.compute_classpath_for_target(a,
-                                                           classpath_product,
-                                                           extra_classpath_tuples=[],
-                                                           confs=['default'])
+    classpath = ClasspathUtil.compute_classpath([a],
+                                                classpath_product,
+                                                extra_classpath_tuples=[],
+                                                confs=['default'])
 
     self.assertEqual(['/dev/null'], classpath)

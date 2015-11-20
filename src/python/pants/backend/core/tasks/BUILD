@@ -231,7 +231,7 @@ python_library(
 
 python_library(
   name = 'markdown_to_html',
-  sources = ['markdown_to_html.py'],
+  sources = ['markdown_to_html.py', 'markdown_to_html_utils.py'],
   resource_targets = [
     ':markdown_to_html_resources',
   ],
@@ -372,7 +372,6 @@ python_library(
   dependencies = [
     ':common',
     ':console_task',
-    '3rdparty/python/twitter/commons:twitter.common.util',
     'src/python/pants/build_graph',
   ],
 )

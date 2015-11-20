@@ -4,9 +4,6 @@
 python_library(
   name='python',
   sources=globs('*.py'),
-  resource_targets=[
-    ':resources'
-  ],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
@@ -20,7 +17,7 @@ python_library(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/backend/python/tasks/checkstyle:all',
+    'src/python/pants/backend/core/tasks:test_task_mixin',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:antlr_builder',
     'src/python/pants/backend/python:interpreter_cache',
@@ -45,9 +42,4 @@ python_library(
     'src/python/pants/util:xml_parser',
     'src/python/pants/util:timeout',
   ]
-)
-
-resources(
-  name='resources',
-  sources=globs('templates/python_eval/*.mustache'),
 )

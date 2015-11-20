@@ -97,6 +97,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
+    'src/python/pants/option',
     'src/python/pants/util:memo',
   ],
 )

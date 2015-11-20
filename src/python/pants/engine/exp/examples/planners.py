@@ -251,6 +251,42 @@ def gen_apache_thrift(sources, rev, gen, strict):
                             'gen:{}, strict: {}'.format(sources, rev, gen, strict))
 
 
+class BuildPropertiesConfiguration(Configuration):
+  pass
+
+
+class BuildPropertiesPlanner(TaskPlanner):
+  """A planner that adds a Classpath entry for all targets configured for build_properties.
+
+  NB: In the absence of support for merging multiple Promises for a particular product_type,
+  this serves as a valid example that explodes when it should succeed.
+  """
+
+  @property
+  def goal_name(self):
+    return None
+
+  @property
+  def product_types(self):
+    yield Classpath
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
+    if not isinstance(subject, Target):
+      return
+    name_config = filter(lambda x: isinstance(x, BuildPropertiesConfiguration), subject.configurations)
+    if not name_config:
+      return
+    assert product_type == Classpath
+
+    return Plan(func_or_task_type=write_name_file, subjects=(subject,), name=subject.name)
+
+
+def write_name_file(name):
+  # Write a file containing the name in CWD
+  with safe_open('build.properties') as f:
+    f.write('name={}\n'.format(name))
+
+
 class ScroogeConfiguration(ThriftConfiguration):
   def __init__(self, rev=None, lang=None, strict=True, **kwargs):
     """
@@ -397,6 +433,43 @@ class Scalac(PrintingTask):
     return super(Scalac, self).execute(sources=sources, classpath=classpath)
 
 
+# TODO(John Sirois): When https://github.com/pantsbuild/pants/issues/2413 is resolved, move the
+# unpickleable input and output test planners below to engine test.  There will be less setup
+# required at that point since no target addresses will need to be supplied in the build_request.
+class UnpickleableInputsPlanner(TaskPlanner):
+  @property
+  def goal_name(self):
+    return 'unpickleable_inputs'
+
+  @property
+  def product_types(self):
+    # A convenient product type only, will never be used outside engine internals.
+    yield Sources.of('unpickleable_inputs')
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
+    # Nested functions like this lambda are unpicklable.
+    return Plan(lambda: None, (subject,))
+
+
+def unpickable_result_func():
+  # Nested functions like this lambda are unpicklable.
+  return lambda: None
+
+
+class UnpickleableResultPlanner(TaskPlanner):
+  @property
+  def goal_name(self):
+    return 'unpickleable_result'
+
+  @property
+  def product_types(self):
+    # A convenient product type only, will never be used outside engine internals.
+    yield Sources.of('unpickleable_result')
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
+    return Plan(unpickable_result_func, (subject,))
+
+
 def setup_json_scheduler(build_root):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
@@ -408,16 +481,20 @@ def setup_json_scheduler(build_root):
                   'requirement': Requirement,
                   'scrooge_configuration': ScroogeConfiguration,
                   'sources': AddressableSources,
-                  'target': Target}
+                  'target': Target,
+                  'build_properties': BuildPropertiesConfiguration}
   json_parser = functools.partial(parse_json, symbol_table=symbol_table)
   graph = Graph(AddressMapper(build_root=build_root,
                               build_pattern=r'^BLD.json$',
                               parser=json_parser))
 
   planners = Planners([ApacheThriftPlanner(),
+                       BuildPropertiesPlanner(),
                        GlobalIvyResolvePlanner(),
                        JavacPlanner(),
                        ScalacPlanner(),
-                       ScroogePlanner()])
+                       ScroogePlanner(),
+                       UnpickleableInputsPlanner(),
+                       UnpickleableResultPlanner()])
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler

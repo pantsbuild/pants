@@ -244,7 +244,7 @@ class JarPublishTest(TaskTestBase):
     self.assertEquals(1, task.scm.push.call_count)
 
   def test_publish_local_only(self):
-    with pytest.raises(TaskError):
+    with self.assertRaises(TaskError):
       self.create_task(self.context())
 
 

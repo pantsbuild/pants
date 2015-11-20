@@ -13,7 +13,6 @@ from hashlib import sha1
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.tasks.protobuf_parse import ProtobufParse
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -23,6 +22,7 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
+from pants.option.custom_types import list_option
 from pants.util.memo import memoized_property
 
 
@@ -47,12 +47,11 @@ class ProtobufGen(SimpleCodegenTask):
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
                   'update --javadeps.',
              default='2.4.1')
-    register('--protoc-plugins', advanced=True, fingerprint=True, action='append',
+    register('--protoc-plugins', advanced=True, fingerprint=True, type=list_option,
              help='Names of protobuf plugins to invoke.  Protoc will look for an executable '
-                  'named protoc-gen-$NAME on PATH.',
-             default=[])
+                  'named protoc-gen-$NAME on PATH.')
 
-    register('--extra_path', advanced=True, action='append',
+    register('--extra_path', advanced=True, type=list_option,
              help='Prepend this path onto PATH in the environment before executing protoc. '
                   'Intended to help protoc find its plugins.',
              default=None)
@@ -60,7 +59,7 @@ class ProtobufGen(SimpleCodegenTask):
              help='Path to use for the protoc binary.  Used as part of the path to lookup the'
                   'tool under --pants-bootstrapdir.',
              default='bin/protobuf')
-    register('--javadeps', advanced=True, action='append',
+    register('--javadeps', advanced=True, type=list_option,
              help='Dependencies to bootstrap this task for generating java code.  When changing '
                   'this parameter you may also need to update --version.',
              default=['3rdparty:protobuf-java'])
@@ -76,8 +75,8 @@ class ProtobufGen(SimpleCodegenTask):
   def __init__(self, *args, **kwargs):
     """Generates Java files from .proto files using the Google protobuf compiler."""
     super(ProtobufGen, self).__init__(*args, **kwargs)
-    self.plugins = self.get_options().plugins
-    self._extra_paths = self.get_options().extra_path
+    self.plugins = self.get_options().protoc_plugins or []
+    self._extra_paths = self.get_options().extra_path or []
 
   @memoized_property
   def protobuf_binary(self):
@@ -88,7 +87,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @property
   def javadeps(self):
-    return self.resolve_deps(self.get_options().javadeps)
+    return self.resolve_deps(self.get_options().javadeps or [])
 
   def synthetic_target_type(self, target):
     return JavaLibrary
@@ -116,7 +115,6 @@ class ProtobufGen(SimpleCodegenTask):
 
     bases = OrderedSet(sources_by_base.keys())
     bases.update(self._proto_path_imports([target]))
-    check_duplicate_conflicting_protos(self, sources_by_base, sources, self.context.log)
 
     gen_flag = '--java_out'
 
@@ -201,67 +199,3 @@ class ProtobufGen(SimpleCodegenTask):
     for target in proto_targets:
       for path in self._jars_to_directories(target):
         yield os.path.relpath(path, get_buildroot())
-
-  def calculate_genfiles(self, path, source):
-    protobuf_parse = ProtobufParse(path, source)
-    protobuf_parse.parse()
-    return OrderedSet(self.calculate_java_genfiles(protobuf_parse))
-
-  def calculate_java_genfiles(self, protobuf_parse):
-    basepath = protobuf_parse.package.replace('.', os.path.sep)
-
-    classnames = {protobuf_parse.outer_class_name}
-    if protobuf_parse.multiple_files:
-      classnames |= protobuf_parse.enums | protobuf_parse.messages | protobuf_parse.services | \
-        set(['{name}OrBuilder'.format(name=m) for m in protobuf_parse.messages])
-
-    for classname in classnames:
-      yield os.path.join(basepath, '{0}.java'.format(classname))
-
-
-def _same_contents(a, b):
-  """Perform a comparison of the two files"""
-  with open(a, 'rb') as fp_a, open(b, 'rb') as fp_b:
-    return fp_a.read() == fp_b.read()
-
-
-def check_duplicate_conflicting_protos(task, sources_by_base, sources, log):
-  """Checks if proto files are duplicate or conflicting.
-
-  There are sometimes two files with the same name on the .proto path.  This causes the protobuf
-  compiler to stop with an error.  Some repos have legitimate cases for this, and so this task
-  decides to just choose one to keep the entire build from failing.  Sometimes, they are identical
-  copies.  That is harmless, but if there are two files with the same name with different contents,
-  that is ambiguous and we want to complain loudly.
-
-  :param task: provides an implementation of the method calculate_genfiles()
-  :param dict sources_by_base: mapping of base to path
-  :param set|OrderedSet sources: set of sources
-  :param Context.Log log: writes error messages to the console for conflicts
-  """
-  sources_by_genfile = {}
-  for base in sources_by_base.keys():  # Need to iterate over /original/ bases.
-    for path in sources_by_base[base]:
-      if not path in sources:
-        continue  # Check to make sure we haven't already removed it.
-      source = path[len(base):]
-
-      genfiles = task.calculate_genfiles(path, source)
-      for genfile in genfiles:
-        if genfile in sources_by_genfile:
-          # Possible conflict!
-          prev = sources_by_genfile[genfile]
-          if not prev in sources:
-            # Must have been culled by an earlier pass.
-            continue
-          if not _same_contents(path, prev):
-            log.error('Proto conflict detected (.proto files are different):\n'
-                      '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
-          else:
-            log.warn('Proto duplication detected (.proto files are identical):\n'
-                     '1: {prev}\n2: {curr}'.format(prev=prev, curr=path))
-          log.warn('  Arbitrarily favoring proto 1.')
-          if path in sources:
-            sources.remove(path)  # Favor the first version.
-          continue
-        sources_by_genfile[genfile] = path

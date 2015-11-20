@@ -124,37 +124,23 @@ class JavaCompileIntegrationTest(BaseCompileIT):
              'org.pantsbuild.testproject.annotation.main.Main$TestInnerClass'},
             set(annotated_classes))
 
-  def _whitelist_test(self, target, whitelist_target, fatal_flag, args=None):
-    """Ensure that a project missing dependencies fails if it is not whitelisted."""
+  def test_java_compile_with_changes_in_resources_dependencies(self):
+    with self.source_clone('testprojects/src/java/org/pantsbuild/testproject/resdependency') as resdependency:
+      with self.temporary_workdir() as workdir:
+        with self.temporary_cachedir() as cachedir:
+          target = os.path.join(resdependency, 'java:testsources')
 
-    # First check that without the whitelist we do break the build.
-    extra_args = (args if args else []) + [fatal_flag]
-    with self.do_test_compile(target, extra_args=extra_args, expect_failure=True):
-      # run failed as expected
-      pass
+          first_run = self.run_test_compile(workdir, cachedir, target, clean_all=True)
+          self.assert_success(first_run)
+          self.assertTrue("Compiling" in first_run.stdout_data)
 
-    # Now let's use the target whitelist, this should succeed.
-    extra_args = (args if args else []) + [
-        fatal_flag,
-        '--compile-jvm-dep-check-missing-deps-whitelist=["{}"]'.format(whitelist_target)
-      ]
-    with self.do_test_compile(target, extra_args=extra_args):
-      # run succeeded as expected
-      pass
+          with open(os.path.join(resdependency, 'resources/resource.xml'), 'w') as xml_resource:
+            xml_resource.write('<xml>Changed Hello World</xml>\n')
 
-  def test_java_compile_missing_direct_dep_analysis_whitelist_zinc(self):
-    self._whitelist_test(
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist',
-      '--compile-jvm-dep-check-missing-direct-deps=fatal'
-    )
-
-  def test_java_compile_missing_jar_dep_analysis_whitelist_zinc(self):
-    self._whitelist_test(
-      'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
-      'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist',
-      '--compile-jvm-dep-check-missing-direct-deps=fatal',
-    )
+          second_run = self.run_test_compile(workdir, cachedir, target, clean_all=False)
+          self.assert_success(second_run)
+          self.assertTrue("Compiling" not in second_run.stdout_data,
+                          "In case of resources change nothing should be recompiled")
 
   def test_java_compile_with_different_resolved_jars_produce_different_artifacts(self):
     # Since unforced dependencies resolve to the highest version including transitive jars,

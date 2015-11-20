@@ -16,13 +16,13 @@ from collections import OrderedDict, defaultdict, namedtuple
 from copy import copy
 
 from twitter.common.collections import OrderedSet
-from twitter.common.config import Properties
 
 from pants.backend.core.tasks.scm_publish import Namedver, ScmPublishMixin, Semver
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
+from pants.backend.jvm.tasks.properties import Properties
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
@@ -701,7 +701,7 @@ class JarPublish(ScmPublishMixin, JarTask):
           ))
         newentry = oldentry.with_sem_ver(sem_ver)
 
-      newfingerprint = self.fingerprint(target, fingerprint_internal)
+      newfingerprint = self.entry_fingerprint(target, fingerprint_internal)
       newentry = newentry.with_sha_and_fingerprint(head_sha, newfingerprint)
       no_changes = newentry.fingerprint == oldentry.fingerprint
 
@@ -848,7 +848,7 @@ class JarPublish(ScmPublishMixin, JarTask):
     return OrderedSet(filter(exportable,
                              reversed(sort_targets(filter(exportable, candidates)))))
 
-  def fingerprint(self, target, fingerprint_internal):
+  def entry_fingerprint(self, target, fingerprint_internal):
     sha = hashlib.sha1()
     sha.update(target.invalidation_hash())
 
@@ -871,8 +871,9 @@ class JarPublish(ScmPublishMixin, JarTask):
     return sha.hexdigest()
 
   def changelog(self, target, sha):
-    return ensure_text(self.scm.changelog(from_commit=sha,
-                                          files=target.sources_relative_to_buildroot()))
+    # Filter synthetic files.
+    files = filter(lambda filename: not filename.startswith(os.pardir), target.sources_relative_to_buildroot())
+    return ensure_text(self.scm.changelog(from_commit=sha, files=files))
 
   def fetch_ivysettings(self, ivy):
     if self.get_options().ivy_settings:

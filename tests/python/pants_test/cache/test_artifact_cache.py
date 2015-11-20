@@ -258,3 +258,20 @@ class TestArtifactCache(unittest.TestCase):
             map(call_use_cached_files, [(cache, key, results_dir)]),
             [False])
           self.assertTrue(os.path.exists(canary))
+
+  def test_corruptted_cached_file_cleaned_up(self):
+    key = CacheKey('muppet_key', 'fake_hash', 42)
+
+    with self.setup_local_cache() as artifact_cache:
+      with self.setup_test_file(artifact_cache.artifact_root) as path:
+        artifact_cache.insert(key, [path])
+        tarfile = artifact_cache._cache_file_for_key(key)
+
+        self.assertTrue(artifact_cache.use_cached_files(key))
+        self.assertTrue(os.path.exists(tarfile))
+
+        with open(tarfile, 'w') as outfile:
+          outfile.write('not a valid tgz any more')
+
+        self.assertFalse(artifact_cache.use_cached_files(key))
+        self.assertFalse(os.path.exists(tarfile))

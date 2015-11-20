@@ -11,7 +11,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/util:eval',
-    'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:strutil',
   ]

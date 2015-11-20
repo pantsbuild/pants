@@ -8,10 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
+import pytest
+
 from pants.build_graph.address import Address
 from pants.engine.exp.examples.planners import (Classpath, IvyResolve, Jar, Javac, Sources,
                                                 gen_apache_thrift, setup_json_scheduler)
-from pants.engine.exp.scheduler import BuildRequest, Plan, Promise
+from pants.engine.exp.scheduler import BuildRequest, ConflictingProducersError, Plan, Promise
 
 
 class SchedulerTest(unittest.TestCase):
@@ -22,6 +24,7 @@ class SchedulerTest(unittest.TestCase):
     self.guava = self.graph.resolve(Address.parse('3rdparty/jvm:guava'))
     self.thrift = self.graph.resolve(Address.parse('src/thrift/codegen/simple'))
     self.java = self.graph.resolve(Address.parse('src/java/codegen/simple'))
+    self.java_multi = self.graph.resolve(Address.parse('src/java/multiple_classpath_entries'))
 
   def extract_product_type_and_plan(self, plan):
     promise, plan = plan
@@ -114,3 +117,9 @@ class SchedulerTest(unittest.TestCase):
                            classpath=[Promise(Classpath, self.guava),
                                       Promise(Classpath, self.thrift)])),
                      self.extract_product_type_and_plan(plans[3]))
+
+  @pytest.mark.xfail(raises=ConflictingProducersError)
+  def test_multiple_classpath_entries(self):
+    """Multiple Classpath products for a single subject currently cause a failure."""
+    build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java_multi.address])
+    execution_graph = self.scheduler.execution_graph(build_request)

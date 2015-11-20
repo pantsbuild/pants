@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.util.contextutil import temporary_dir
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
@@ -35,7 +34,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
         target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
         pants_run = self.run_test_compile(
           workdir, cachedir, target,
-          extra_args=['--no-color'], clean_all=True
+          extra_args=['--no-colors'], clean_all=True
         )
         self.assertIn('[warn] import sun.security.x509.X500Name;', pants_run.stdout_data)
         self.assertIn('[error]     System2.out.println("Hello World!");', pants_run.stdout_data)
@@ -122,3 +121,28 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           cachedir,
           'testprojects/src/java/org/pantsbuild/testproject/annotation/processor::',
           clean_all=False))
+
+  def test_fatal_warning(self):
+    def test_combination(target, default_fatal_warnings, expect_success):
+      with self.temporary_workdir() as workdir:
+        with self.temporary_cachedir() as cachedir:
+          if default_fatal_warnings:
+            arg = '--java-fatal-warnings'
+          else:
+            arg = '--no-java-fatal-warnings'
+          pants_run = self.run_test_compile(
+              workdir,
+              cachedir,
+              'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:{}'.format(target),
+              extra_args=[arg, '--compile-zinc-warning-args=-C-Xlint:all'])
+
+          if expect_success:
+            self.assert_success(pants_run)
+          else:
+            self.assert_failure(pants_run)
+    test_combination('defaultfatal', default_fatal_warnings=True, expect_success=False)
+    test_combination('defaultfatal', default_fatal_warnings=False, expect_success=True)
+    test_combination('fatal', default_fatal_warnings=True, expect_success=False)
+    test_combination('fatal', default_fatal_warnings=False, expect_success=False)
+    test_combination('nonfatal', default_fatal_warnings=True, expect_success=True)
+    test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)

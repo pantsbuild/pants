@@ -8,6 +8,7 @@ target(
     ':analysis_parser',
     ':analysis_tools',
     ':anonymizer',
+    ':jvm_classpath_publisher',
     ':jvm_compile',
     ':zinc',
   ],
@@ -44,13 +45,27 @@ python_library(
 )
 
 python_library(
+  name = 'jvm_classpath_publisher',
+  sources = ['jvm_classpath_publisher.py'],
+  dependencies = [
+    ':jvm_compile',
+    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:fileutil',
+  ]
+)
+
+python_library(
   name = 'jvm_compile',
   sources = ['jvm_compile.py'],
   dependencies = [
     ':compile_context',
     ':execution_graph',
+    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:group_task',
+    'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
@@ -59,6 +74,7 @@ python_library(
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:products',
     'src/python/pants/option',
     'src/python/pants/reporting',

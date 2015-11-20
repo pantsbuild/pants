@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import multiprocessing
 import os
 import sys
 import threading
@@ -63,9 +64,11 @@ class RunTracker(Subsystem):
              help='Upload stats to this URL on run completion.')
     register('--stats-upload-timeout', advanced=True, type=int, default=2,
              help='Wait at most this many seconds for the stats upload to complete.')
-    register('--num-foreground-workers', advanced=True, type=int, default=8,
+    register('--num-foreground-workers', advanced=True, type=int,
+             default=multiprocessing.cpu_count(),
              help='Number of threads for foreground work.')
-    register('--num-background-workers', advanced=True, type=int, default=8,
+    register('--num-background-workers', advanced=True, type=int,
+             default=multiprocessing.cpu_count(),
              help='Number of threads for background work.')
 
   def __init__(self, *args, **kwargs):
@@ -122,6 +125,7 @@ class RunTracker(Subsystem):
     self._background_root_workunit = None
 
     # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring).
+    SubprocPool.set_num_processes(self._num_foreground_workers)
     SubprocPool.foreground()
 
     self._aborted = False

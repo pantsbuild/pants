@@ -96,12 +96,12 @@ your `pants.ini` file contains
 `test.junit --coverage-html-open`. If an environment variable and an `.ini` configuration both
 specify a value for some option, the environment variable "wins".
 
-### Overlay `.ini` Files with `--config-overrides`
+### Overlay `.ini` Files with `--config-override`
 
 Sometimes it's convenient to keep `.ini` settings in more than one file. Perhaps you usually
 operate Pants in one "mode", but occasionally need to use a tweaked set of settings.
 
-Use the `--config-overrides` command-line option to specify a second `.ini` file. Each of
+Use the `--config-override` command-line option to specify a second `.ini` file. Each of
 this `.ini` file's values override the corresponding value in `pants.ini`, if any.
 For example, if your `pants.ini` contains the section
 
@@ -109,7 +109,7 @@ For example, if your `pants.ini` contains the section
     coverage_html_open: True
     debug: False
 
-...and you invoke `--config-overrides=quick.ini` and your `quick.ini` says
+...and you invoke `--config-override=quick.ini` and your `quick.ini` says
 
     [test.junit]
     coverage_html_open: False

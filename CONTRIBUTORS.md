@@ -55,6 +55,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
++ Karin Lundberg
 + Ken Kawamoto
 + Kevin Sweeney
 + Kris Wilson
@@ -70,6 +71,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Mark McBride
 + Mateo Rodriguez
 + Mathew Jennings
++ Matt Landis
 + Matt Olsen
 + Matthew Jeffryes
 + Maxim Khutornenko
@@ -97,6 +99,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tejal Desai
 + Tianshuo Deng
 + Tien Nguyen
++ Timur Abishev
 + Tina Huang
 + Todd Stumpf
 + Tom Dyas

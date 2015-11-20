@@ -77,17 +77,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     for arg in self.get_options().args:
       self._args.extend(safe_shlex_split(arg))
 
-  @memoized_property
-  def confs(self):
-    # TODO(John Sirois): This supports `IdeGen` and `Resolve` signalling their resolve confs needs.
-    # Fix those tasks to do their own resolves.
-    # See: https://github.com/pantsbuild/pants/issues/2177
-    confs = set(self.get_options().confs)
-    for conf in ('default', 'sources', 'javadoc'):
-      if self.context.products.isrequired('jar_map_{conf}'.format(conf=conf)):
-        confs.add(conf)
-    return confs
-
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
@@ -95,11 +84,11 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     executor = self.create_java_executor()
     targets = self.context.targets()
     compile_classpath = self.context.products.get_data('compile_classpath',
-                                                       init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
+        init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
     resolve_hash_name = self.resolve(executor=executor,
                                      targets=targets,
                                      classpath_products=compile_classpath,
-                                     confs=self.confs,
+                                     confs=self.get_options().confs,
                                      extra_args=self._args)
     if self._report:
       self._generate_ivy_report(resolve_hash_name)
@@ -143,7 +132,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     # points.
     safe_mkdir(self._outdir, clean=False)
 
-    for conf in self.confs:
+    for conf in self.get_options().confs:
       xml_path = self._get_report_path(conf, resolve_hash_name)
       if not os.path.exists(xml_path):
         # Make it clear that this is not the original report from Ivy by changing its name.

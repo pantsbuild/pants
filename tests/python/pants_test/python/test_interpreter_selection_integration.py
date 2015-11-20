@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 
-import pytest
-
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -36,7 +34,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
       self.assertEquals(version, '%s.%s' % (v[0], v[1]))
     else:
       print('No python %s found. Skipping.' % version)
-      pytest.skip('No python %s on system' % version)
+      self.skipTest('No python %s on system' % version)
 
   def _echo_version(self, version):
     with temporary_dir() as distdir:

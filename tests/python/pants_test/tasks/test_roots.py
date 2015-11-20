@@ -23,21 +23,18 @@ class ListRootsTest(ConsoleTaskTestBase):
     os.makedirs(os.path.join(get_buildroot(), path))
     source_root_config.get_source_roots().add_source_root(path, langs)
 
-  def _assert_output(self, expected):
-    self.assertEqual(expected, self.execute_console_task())
-
   def test_no_langs(self):
     with subsystem_instance(SourceRootConfig) as source_root_config:
       self._add_source_root(source_root_config, 'fakeroot', tuple())
-      self._assert_output(['fakeroot: *'])
+      self.assert_console_output('fakeroot: *')
 
   def test_single_source_root(self):
     with subsystem_instance(SourceRootConfig) as source_root_config:
       self._add_source_root(source_root_config, 'fakeroot', ('lang1', 'lang2'))
-      self._assert_output(['fakeroot: lang1,lang2'])
+      self.assert_console_output('fakeroot: lang1,lang2')
 
-  def test_multiple_source_root(self):
+  def test_multiple_source_roots(self):
     with subsystem_instance(SourceRootConfig) as source_root_config:
       self._add_source_root(source_root_config, 'fakerootA', ('lang1',))
       self._add_source_root(source_root_config, 'fakerootB', ('lang2',))
-      self._assert_output(['fakerootA: lang1', 'fakerootB: lang2'])
+      self.assert_console_output('fakerootA: lang1', 'fakerootB: lang2')

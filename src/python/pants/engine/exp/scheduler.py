@@ -262,6 +262,26 @@ class SchedulingError(Exception):
   """Indicates inability to make a required scheduling promise."""
 
 
+class NoProducersError(SchedulingError):
+  """Indicates no planners were able to promise a required product for a given subject."""
+
+  def __init__(self, product_type, subject=None):
+    msg = ('No plans to generate {!r}{} could be made.'
+            .format(product_type.__name__, ' {!r}'.format(subject) if subject else ''))
+    super(NoProducersError, self).__init__(msg)
+
+
+class ConflictingProducersError(SchedulingError):
+  """Indicates more than one planner was able to promise a product for a given subject."""
+
+  def __init__(self, product_type, subject, planners):
+    msg = ('Collected the following plans for generating {!r} from {!r}\n\t{}'
+            .format(product_type.__name__,
+                    subject,
+                    '\n\t'.join(type(p).__name__ for p in planners)))
+    super(ConflictingProducersError, self).__init__(msg)
+
+
 class Scheduler(AbstractClass):
   """Schedule the creation of products."""
 
@@ -604,24 +624,6 @@ class ProductMapper(object):
 class LocalScheduler(Scheduler):
   """A scheduler that formulates an execution graph locally."""
 
-  class NoProducersError(SchedulingError):
-    """Indicates no planners were able to promise a required product for a given subject."""
-
-    def __init__(self, product_type, subject=None):
-      msg = ('No plans to generate {!r}{} could be made.'
-             .format(product_type.__name__, ' {!r}'.format(subject) if subject else ''))
-      super(LocalScheduler.NoProducersError, self).__init__(msg)
-
-  class ConflictingProducersError(SchedulingError):
-    """Indicates more than one planner was able to promise a product for a given subject."""
-
-    def __init__(self, product_type, subject, planners):
-      msg = ('Collected the following plans for generating {!r} from {!r}\n\t{}'
-             .format(product_type.__name__,
-                     subject,
-                     '\n\t'.join(type(p).__name__ for p in planners)))
-      super(LocalScheduler.ConflictingProducersError, self).__init__(msg)
-
   def __init__(self, graph, planners):
     """
     :param graph: The BUILD graph build requests will execute against.
@@ -694,12 +696,12 @@ class LocalScheduler(Scheduler):
     if plan is not None:
       # The `NO_PLAN` plan may have been decided in a non-required round.
       if required and promise is self.NO_PLAN:
-        raise self.NoProducersError(product_type, subject)
+        raise NoProducersError(product_type, subject)
       return None if promise is self.NO_PLAN else promise
 
     planners = self._planners.for_product_type(product_type)
     if required and not planners:
-      raise self.NoProducersError(product_type)
+      raise NoProducersError(product_type)
 
     plans = []
     for planner in planners:
@@ -709,10 +711,10 @@ class LocalScheduler(Scheduler):
 
     if len(plans) > 1:
       planners = [planner for planner, plan in plans]
-      raise self.ConflictingProducersError(product_type, subject, planners)
+      raise ConflictingProducersError(product_type, subject, planners)
     elif not plans:
       if required:
-        raise self.NoProducersError(product_type, subject)
+        raise NoProducersError(product_type, subject)
       self._product_mapper.register_promises(product_type, self.NO_PLAN)
       return None
 
