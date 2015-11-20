@@ -49,6 +49,15 @@ python_tests(
 )
 
 python_tests(
+  name='pex_root',
+  sources=['test_pexroot.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
   name='repro',
   sources=['test_repro.py'],
   dependencies=[

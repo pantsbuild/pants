@@ -8,7 +8,6 @@ target(
     ':apache_thrift_gen',
     ':jaxb_gen',
     ':protobuf_gen',
-    ':protobuf_parse',
     ':ragel_gen',
     ':simple_codegen_task',
     ':wire_gen',
@@ -60,15 +59,6 @@ python_tests(
     'src/python/pants/backend/core:plugin',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
-  ],
-)
-
-python_tests(
-  name = 'protobuf_parse',
-  sources = ['test_protobuf_parse.py'],
-  dependencies = [
-    'src/python/pants/backend/codegen/tasks:protobuf_parse',
-    'src/python/pants/util:contextutil',
   ],
 )
 
