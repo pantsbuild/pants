@@ -87,8 +87,7 @@ class StackTask(Task):
     :raises: :class:`pants.base.exceptions.TaskError` when the target's
              dependency graph specifies multiple different resolvers.
     """
-    packages = [target] + list(target.closure())
-
+    packages = list(target.closure())
     hackage_packages = filter(StackTask.is_haskell_hackage_package, packages)
     source_packages  = filter(StackTask.is_haskell_source_package , packages)
 
@@ -141,6 +140,13 @@ class StackTask(Task):
     bin_path = os.path.join(vt.results_dir, 'bin')
     safe_mkdir(bin_path)
 
+    packages = list(vt.target.closure())
+    hackage_packages  = filter(StackTask.is_haskell_hackage_package , packages)
+    stackage_packages = filter(StackTask.is_haskell_stackage_package, packages)
+    source_packages   = filter(StackTask.is_haskell_source_package  , packages)
+    haskell_packages = hackage_packages + stackage_packages + source_packages
+    haskell_package_names = map(lambda p: p.package, haskell_packages)
+
     args = [
       'stack',
       '--verbosity', 'error',
@@ -148,8 +154,7 @@ class StackTask(Task):
       '--install-ghc',
       '--stack-yaml=' + stack_yaml_path,
       command,
-#     vt.target.package
-    ] + extra_args
+    ] + haskell_package_names + extra_args
 
     try:
       with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL], cmd=' '.join(args)) as workunit:

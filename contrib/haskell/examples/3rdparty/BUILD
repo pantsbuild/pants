@@ -16,7 +16,17 @@ haskell_hackage_package(
   version='0.1',
   dependencies=[
     ':promises'
-  ]
+  ],
+)
+
+haskell_project(
+  name='headless-project',
+  resolver='lts-3.1',
+  dependencies=[
+    ':discrimination',
+    ':mmorph',
+    ':pipes',
+  ],
 )
 
 haskell_source_package(
@@ -25,7 +35,7 @@ haskell_source_package(
 )
 
 haskell_project(
-  name='example',
+  name='stack-project',
   resolver='lts-3.1',
   dependencies=[
     ':stack',
