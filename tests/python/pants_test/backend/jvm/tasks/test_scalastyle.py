@@ -158,8 +158,7 @@ class ScalastyleTest(NailgunTaskTestBase):
         ]
       )
 
-      # Remember, we have the extra 'scala-library' dep target.
-      self.assertEqual(3, len(context.targets()))
+      self.assertEqual(2, len(context.targets()))
 
       # Now create the task and run the scala source and exclusion filtering.
       task = self.prepare_execute(context)

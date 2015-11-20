@@ -349,7 +349,6 @@ class BuildGraph(object):
     :param Address address: The address to inject.  Must be resolvable by `self._address_mapper` or
                             else be the address of an already injected entity.
     """
-
     if self.contains_address(address):
       # The address was either mapped in or synthetically injected already.
       return
@@ -392,6 +391,7 @@ class BuildGraph(object):
         inject_spec_closure(traversable_spec)
         traversable_spec_target = self.get_target_from_spec(traversable_spec,
                                                             relative_to=target_address.spec_path)
+
         if traversable_spec_target not in target.dependencies:
           self.inject_dependency(dependent=target.address,
                                  dependency=traversable_spec_target.address)

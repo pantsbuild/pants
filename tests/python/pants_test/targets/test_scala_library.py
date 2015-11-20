@@ -35,7 +35,8 @@ class ScalaLibraryTest(BaseTest):
     super(ScalaLibraryTest, self).setUp()
     self.context(options={
       'scala-platform': {
-        'runtime': []
+        'runtime': [],
+        'version': '2.10'
       }
     })
 
@@ -82,6 +83,10 @@ class ScalaLibraryTest(BaseTest):
     self.java_library_no_dep = self.target('java:no_scala_dep')
 
   def test_mixed_linkage(self):
+    from pprint import pprint
+    pprint(set(self.lib_hub_and_spoke.jar_dependencies))
+
+    pprint(set(self.scala_library.jar_dependencies))
     self.assertEqual(set(self.lib_hub_and_spoke.jar_dependencies),
                      set(self.scala_library.jar_dependencies),
                      'The scala end of a mixed language logical lib should be linked with the java'

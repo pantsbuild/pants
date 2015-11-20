@@ -6,6 +6,5 @@ scalac_plugin(name='plugin',
   classname='org.pantsbuild.testproject.scalac.plugin.HelloScalac',
   sources=['HelloScalac.scala'],
   dependencies=[
-    '//:scala-compiler',
   ],
 )

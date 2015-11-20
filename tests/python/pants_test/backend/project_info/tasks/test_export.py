@@ -259,6 +259,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       'pants_target_type': 'scala_library',
       'platform': 'java6',
     }
+    from pprint import pprint
     self.assertEqual(jvm_target, expected_jvm_target)
 
   def test_no_libraries(self):
