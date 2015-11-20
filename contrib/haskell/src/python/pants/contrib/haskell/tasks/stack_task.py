@@ -14,9 +14,10 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
-from pants.contrib.haskell.targets.cabal import Cabal
-from pants.contrib.haskell.targets.hackage import Hackage
-from pants.contrib.haskell.targets.haskell_package import HaskellPackage
+from pants.contrib.haskell.targets.haskell_hackage_package import HaskellHackagePackage
+from pants.contrib.haskell.targets.haskell_project import HaskellProject
+from pants.contrib.haskell.targets.haskell_source_package import HaskellSourcePackage
+from pants.contrib.haskell.targets.haskell_stackage_package import HaskellStackagePackage
 
 
 class StackTask(Task):
@@ -27,37 +28,48 @@ class StackTask(Task):
     return True
 
   @staticmethod
-  def is_hackage(target):
-    """Test if the given `Target` is a `Hackage` target
+  def is_haskell_stackage_package(target):
+    """Test if the given `Target` is a `HaskellStackagePackage` target
 
     :param target: The target to test
     :type target: :class:`pants.build_graph.target.Target`
-    :returns: `True` if the target is a :class:`pants.contrib.haskell.targets.hackage.Hackage` target, `False` otherwise
+    :returns: `True` if the target is a :class:`pants.contrib.haskell.targets.haskell_stackage_package.HaskellStackagePackage` target, `False` otherwise
     :rtype: bool
     """
-    return isinstance(target, Hackage)
+    return isinstance(target, HaskellStackagePackage)
 
   @staticmethod
-  def is_cabal(target):
-    """Test if the given `Target` is a `Cabal` target
+  def is_haskell_hackage_package(target):
+    """Test if the given `Target` is a `HaskellHackagePackage` target
 
     :param target: The target to test
     :type target: :class:`pants.build_graph.target.Target`
-    :returns: `True` if the target is a :class:`pants.contrib.haskell.targets.cabal.Cabal` target, `False` otherwise
+    :returns: `True` if the target is a :class:`pants.contrib.haskell.targets.haskell_hackage_package.HaskellHackagePackage` target, `False` otherwise
     :rtype: bool
     """
-    return isinstance(target, Cabal)
+    return isinstance(target, HaskellHackagePackage)
 
   @staticmethod
-  def is_haskell_package(target):
-    """Test if the given `Target` is a `HaskellPackage` target
+  def is_haskell_source_package(target):
+    """Test if the given `Target` is a `HaskellSourcePackage` target
 
     :param target: The target to test
     :type target: :class:`pants.build_graph.target.Target`
-    :returns: `True` if the target is a :class:`pants.contrib.haskell.targets.haskell_package.HaskellPackage` target, `False` otherwise
+    :returns: `True` if the target is a :class:`pants.contrib.haskell.targets.haskell_source_package.HaskellSourcePackage` target, `False` otherwise
     :rtype: bool
     """
-    return isinstance(target, HaskellPackage)
+    return isinstance(target, HaskellSourcePackage)
+
+  @staticmethod
+  def is_haskell_project(target):
+    """Test if the given `Target` is a `HaskellProject` target
+
+    :param target: The target to test
+    :type target: :class:`pants.build_graph.target.Target`
+    :returns: `True` if the target is a :class:`pants.contrib.haskell.targets.haskell_project.HaskellProject` target, `False` otherwise
+    :rtype: bool
+    """
+    return isinstance(target, HaskellProject)
 
   @staticmethod
   def make_stack_yaml(target):
@@ -75,30 +87,16 @@ class StackTask(Task):
     :raises: :class:`pants.base.exceptions.TaskError` when the target's
              dependency graph specifies multiple different resolvers.
     """
-    for dependency in filter(StackTask.is_haskell_package, target.closure()):
-      if target.resolver != dependency.resolver:
-        raise TaskError("""
-Every package in a Haskell build graph must use the same resolver.
+    packages = [target] + list(target.closure())
 
-Root target : {root}
-  - Resolver: {root_resolver}
-Dependency  : {dep}
-  - Resolver: {dep_resolver}
-""".strip().format(root=target.address.spec,
-                   root_resolver=target.resolver,
-                   dep=dependency.address.spec,
-                   dep_resolver=dependency.resolver))
-
-    packages = [target] + target.dependencies
-
-    hackage_packages = filter(StackTask.is_hackage, packages)
-    cabal_packages = filter(StackTask.is_cabal, packages)
+    hackage_packages = filter(StackTask.is_haskell_hackage_package, packages)
+    source_packages  = filter(StackTask.is_haskell_source_package , packages)
 
     yaml = 'flags: {}\n'
 
-    if cabal_packages:
+    if source_packages:
       yaml += 'packages:\n'
-      for pkg in cabal_packages:
+      for pkg in source_packages:
         path = pkg.path or os.path.join(get_buildroot(), pkg.target_base)
         yaml += '- ' + path + '\n'
     else:
@@ -150,7 +148,7 @@ Dependency  : {dep}
       '--install-ghc',
       '--stack-yaml=' + stack_yaml_path,
       command,
-      vt.target.package
+#     vt.target.package
     ] + extra_args
 
     try:

@@ -1,30 +1,33 @@
-stackage(
+haskell_stackage_package(
   name='pipes',
-  resolver='lts-3.1',
 )
 
-stackage(
+haskell_stackage_package(
   name='mmorph',
-  resolver='lts-3.1',
 )
 
-hackage(
+haskell_hackage_package(
   name='promises',
-  resolver='lts-3.1',
   version='0.2',
 )
 
-hackage(
+haskell_hackage_package(
   name='discrimination',
-  resolver='lts-3.1',
   version='0.1',
   dependencies=[
     ':promises'
   ]
 )
 
-cabal(
+haskell_source_package(
   name='stack',
-  resolver='lts-3.1',
   path='https://github.com/commercialhaskell/stack/archive/v0.1.3.1.tar.gz',
+)
+
+haskell_project(
+  name='example',
+  resolver='lts-3.1',
+  dependencies=[
+    ':stack',
+  ]
 )
