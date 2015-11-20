@@ -14,6 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
+from pants.contrib.haskell.subsystems.stack_distribution import StackDistribution
 from pants.contrib.haskell.targets.haskell_hackage_package import HaskellHackagePackage
 from pants.contrib.haskell.targets.haskell_project import HaskellProject
 from pants.contrib.haskell.targets.haskell_source_package import HaskellSourcePackage
@@ -22,6 +23,10 @@ from pants.contrib.haskell.targets.haskell_stackage_package import HaskellStacka
 
 class StackTask(Task):
   """Abstract class that all other `stack` tasks inherit from"""
+
+  @classmethod
+  def global_subsystems(cls):
+    return super(StackTask, cls).global_subsystems() + (StackDistribution.Factory,)
 
   @property
   def cache_target_dirs(self):
@@ -112,7 +117,7 @@ class StackTask(Task):
 
     return yaml
 
-  def stack_task(self, command, vt, extra_args = []):
+  def stack_task(self, command, vt, cmd_args = []):
     """
     This function provides shared logic for all `StackTask` sub-classes, which
     consists of:
@@ -126,8 +131,8 @@ class StackTask(Task):
     :param str command: The `stack` sub-command to run (i.e. "build" or "ghci").
     :param vt: The root target that `stack` should operate on.
     :type vt: :class:`pants.invalidation.cache_manager.VersionedTarget`
-    :param extra_args: Additional flags to pass through to the `stack` command.
-    :type extra_args: list of strings
+    :param cmd_args: Additional flags to pass through to the `stack` subcommand.
+    :type cmd_args: list of strings
     :raises: :class:`pants.base.exceptions.TaskError` when the `stack`
              subprocess returns a non-zero exit code
     """
@@ -147,18 +152,23 @@ class StackTask(Task):
     haskell_packages = hackage_packages + stackage_packages + source_packages
     haskell_package_names = map(lambda p: p.package, haskell_packages)
 
-    args = [
-      'stack',
-      '--verbosity', 'error',
+    stack_args = [
       '--local-bin-path', bin_path,
-      '--install-ghc',
-      '--stack-yaml=' + stack_yaml_path,
-      command,
-    ] + haskell_package_names + extra_args
+      '--stack-yaml', stack_yaml_path,
+    ]
+
+    cmd_args = haskell_package_names + cmd_args
 
     try:
-      with self.context.new_workunit(name='stack-run', labels=[WorkUnitLabel.TOOL], cmd=' '.join(args)) as workunit:
-        subprocess.check_call(args, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+      stack_distribution = StackDistribution.Factory.create()
+      stack_distribution.execute_stack_cmd(
+        command,
+        stack_args=stack_args,
+        cmd_args=cmd_args,
+        workunit_factory=self.context.new_workunit,
+        workunit_name='stack-run',
+        workunit_labels=[WorkUnitLabel.TOOL],
+        )
     except subprocess.CalledProcessError:
       raise TaskError("""
 `stack` subprocess failed with the following inputs:
