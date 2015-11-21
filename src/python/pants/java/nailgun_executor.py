@@ -31,7 +31,7 @@ class NailgunProcessGroup(ProcessGroup):
   _NAILGUN_KILL_LOCK = threading.Lock()
 
   def __init__(self):
-    ProcessGroup.__init__(self, name='nailgun')
+    super(NailgunProcessGroup, self).__init__(name='nailgun')
     # TODO: this should enumerate the .pids dir first, then fallback to ps enumeration (& warn).
 
   def _iter_nailgun_instances(self, everywhere=False):

@@ -52,7 +52,8 @@ class PythonChroot(object):
 
   class InvalidDependencyException(Exception):
     def __init__(self, target):
-      Exception.__init__(self, "Not a valid Python dependency! Found: {}".format(target))
+      super(PythonChroot.InvalidDependencyException, self).__init__(
+        'Not a valid Python dependency! Found: {}'.format(target))
 
   @staticmethod
   def get_platforms(platform_list):
