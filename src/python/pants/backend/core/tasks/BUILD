@@ -64,7 +64,6 @@ python_library(
     ':bash_completion_resources',
   ],
   dependencies = [
-    ':console_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/goal',
@@ -123,11 +122,11 @@ python_library(
   name = 'cloc',
   sources = ['cloc.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/task',
     'src/python/pants/util:contextutil',
   ],
 )
@@ -149,8 +148,8 @@ python_library(
   name = 'console_task',
   sources = ['console_task.py'],
   dependencies = [
+    'src/python/pants/base:deprecated',
     'src/python/pants/task',
-    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -168,9 +167,9 @@ python_library(
   name = 'dependees',
   sources = ['dependees.py'],
   dependencies = [
-    ':console_task',
     ':target_filter_task_mixin',
     'src/python/pants/base:build_environment',
+    'src/python/pants/task',
   ],
 )
 
@@ -179,8 +178,8 @@ python_library(
   sources = ['explain_options_task.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
-    ':console_task',
     'src/python/pants/option',
+    'src/python/pants/task',
   ],
 )
 
@@ -188,7 +187,7 @@ python_library(
   name = 'filemap',
   sources = ['filemap.py'],
   dependencies = [
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -196,12 +195,12 @@ python_library(
   name = 'filter',
   sources = ['filter.py'],
   dependencies = [
-    ':console_task',
     ':target_filter_task_mixin',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:filtering',
   ],
 )
@@ -223,8 +222,8 @@ python_library(
   name = 'list_goals',
   sources = ['list_goals.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/goal',
+    'src/python/pants/task',
   ],
 )
 
@@ -233,7 +232,7 @@ python_library(
   sources = ['listtargets.py'],
   dependencies = [
     'src/python/pants/base:exceptions',
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -269,7 +268,7 @@ python_library(
   name = 'minimal_cover',
   sources = ['minimal_cover.py'],
   dependencies = [
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -294,7 +293,7 @@ python_library(
   name = 'pathdeps',
   sources = ['pathdeps.py'],
   dependencies = [
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -302,8 +301,8 @@ python_library(
   name = 'paths',
   sources = ['paths.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/task',
     'src/python/pants/util:strutil',
   ],
 )
@@ -350,7 +349,7 @@ python_library(
   name = 'roots',
   sources = ['roots.py'],
   dependencies = [
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -378,7 +377,6 @@ python_library(
   name = 'sorttargets',
   sources = ['sorttargets.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/build_graph',
     'src/python/pants/task',
   ],
@@ -400,8 +398,8 @@ python_library(
     ':targets_help_resources',
   ],
   dependencies = [
-    ':console_task',
     ':reflect',
+    'src/python/pants/task',
   ],
 )
 
@@ -423,8 +421,8 @@ python_library(
   name = 'list_owners',
   sources = ['list_owners.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
   ],
 )
 
@@ -432,11 +430,11 @@ python_library(
   name = 'what_changed',
   sources = ['what_changed.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/goal:workspace',
+    'src/python/pants/task',
   ],
 )
 

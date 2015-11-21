@@ -102,7 +102,7 @@ python_library(
   dependencies = [
     ':jar_publish',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/core/tasks:console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -391,7 +391,6 @@ python_library(
   sources = ['jvm_platform_analysis.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
-    'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/task',

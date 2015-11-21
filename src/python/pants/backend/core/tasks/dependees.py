@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import defaultdict
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.build_environment import get_buildroot
+from pants.task.console_task import ConsoleTask
 
 
 class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):

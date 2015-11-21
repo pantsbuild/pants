@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.task.console_task import ConsoleTask
 from pants.util.filtering import create_filters, wrap_filters
 
 

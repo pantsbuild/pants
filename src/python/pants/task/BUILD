@@ -4,7 +4,7 @@
 
 python_library(
   name = 'task',
-  sources = ['task.py'],
+  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:exceptions',
@@ -15,6 +15,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
   ],
 )
