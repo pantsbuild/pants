@@ -261,7 +261,9 @@ class ClasspathProducts(object):
     # set of targets was included here, their closure must be included.
     closure = set()
     for root_target in root_targets:
-      closure.update(root_target.closure(bfs=True))
+      # If we have already collected a subgraph, skip it.
+      if root_target not in closure:
+        closure.update(root_target.closure(bfs=True))
     excludes = self._excludes.get_for_targets(closure)
     return filter(_not_excluded_filter(excludes), classpath_tuples)
 
