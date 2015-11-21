@@ -10,11 +10,11 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
 
 
-class NpmPackage(Target):
-  """Represents an abstract NPM package.
+class NodePackage(Target):
+  """Represents an abstract Node package, currently handled by NPM internally.
 
-  All NPM packages have a package name whether they are local or remote so this serves as a base
-  class for all concrete manifestations of NPM packages.
+  All Node packages have a package name whether they are local or remote so this serves as a base
+  class for all concrete manifestations of packages.
   """
 
   def __init__(self, package_name=None, address=None, payload=None, **kwargs):
@@ -26,7 +26,7 @@ class NpmPackage(Target):
     payload.add_fields({
       'package_name': PrimitiveField(package_name or address.target_name),
     })
-    super(NpmPackage, self).__init__(address=address, payload=payload, **kwargs)
+    super(NodePackage, self).__init__(address=address, payload=payload, **kwargs)
 
   @property
   def package_name(self):

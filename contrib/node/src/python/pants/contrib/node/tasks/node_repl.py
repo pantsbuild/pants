@@ -28,7 +28,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
 
   @classmethod
   def select_targets(cls, target):
-    return cls.is_npm_package(target)
+    return cls.is_node_package(target)
 
   @classmethod
   def supports_passthru_args(cls):
@@ -52,7 +52,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
       'name': self.SYNTHETIC_NODE_TARGET_NAME,
       'version': '0.0.0',
       'dependencies': {
-        dep.package_name: self.render_npm_package_dependency(node_paths, dep) for dep in targets
+        dep.package_name: self.render_node_package_dependency(node_paths, dep) for dep in targets
       }
     }
     with open(package_json_path, 'wb') as fp:

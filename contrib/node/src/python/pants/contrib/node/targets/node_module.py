@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.payload import Payload
 
-from pants.contrib.node.targets.npm_package import NpmPackage
+from pants.contrib.node.targets.node_package import NodePackage
 
 
-class NodeModule(NpmPackage):
+class NodeModule(NodePackage):
   """Represents a Node module."""
 
   def __init__(self, sources=None, address=None, payload=None, **kwargs):

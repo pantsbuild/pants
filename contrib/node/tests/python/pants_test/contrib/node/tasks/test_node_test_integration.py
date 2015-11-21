@@ -10,7 +10,7 @@ from textwrap import dedent
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class NpmTestIntegrationTest(PantsRunIntegrationTest):
+class NodeTestIntegrationTest(PantsRunIntegrationTest):
 
   def test_test_simple(self):
     command = ['test',

@@ -13,15 +13,15 @@ from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
-class NpmTest(NodeTask):
-  """Runs a test script from package.json, via "npm run [script name]"."""
+class NodeTest(NodeTask):
+  """Runs a test script from package.json, currently via "npm run [script name]"."""
 
   @classmethod
   def supports_passthru_args(cls):
     return True
 
   def execute(self):
-    targets = set(self.context.targets(predicate=self.is_npm_test))
+    targets = set(self.context.targets(predicate=self.is_node_test))
     if not targets:
       return
 

@@ -5,9 +5,9 @@ target(
   name='tasks',
   dependencies=[
     ':node_repl',
+    ':node_run',
+    ':node_test',
     ':npm_resolve',
-    ':npm_run',
-    ':npm_test',
   ]
 )
 
@@ -33,8 +33,8 @@ python_library(
     'contrib/node/src/python/pants/contrib/node/subsystems:node_distribution',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
-    'contrib/node/src/python/pants/contrib/node/targets:npm_package',
-    'contrib/node/src/python/pants/contrib/node/targets:npm_test',
+    'contrib/node/src/python/pants/contrib/node/targets:node_package',
+    'contrib/node/src/python/pants/contrib/node/targets:node_test',
     'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:workunit',
     'src/python/pants/util:memo',
@@ -56,8 +56,8 @@ python_library(
 )
 
 python_library(
-  name='npm_run',
-  sources=['npm_run.py'],
+  name='node_run',
+  sources=['node_run.py'],
   dependencies=[
     ':node_paths',
     ':node_task',
@@ -68,8 +68,8 @@ python_library(
 )
 
 python_library(
-  name='npm_test',
-  sources=['npm_test.py'],
+  name='node_test',
+  sources=['node_test.py'],
   dependencies=[
     ':node_paths',
     ':node_task',

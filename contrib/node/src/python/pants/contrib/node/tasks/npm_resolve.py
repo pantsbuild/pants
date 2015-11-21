@@ -19,16 +19,16 @@ from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
-def _copy_sources(buildroot, node_module, dest_dir):
-  source_relative_to = node_module.address.spec_path
-  for source in node_module.sources_relative_to_buildroot():
-    dest = os.path.join(dest_dir, os.path.relpath(source, source_relative_to))
+def _copy_sources(buildroot, target, results_dir):
+  source_relative_to = target.address.spec_path
+  for source in target.sources_relative_to_buildroot():
+    dest = os.path.join(results_dir, os.path.relpath(source, source_relative_to))
     safe_mkdir(os.path.dirname(dest))
     shutil.copyfile(os.path.join(buildroot, source), dest)
 
 
 class NpmResolve(NodeTask):
-  """Resolves node modules to isolated chroots.
+  """Resolves node_package targets to isolated chroots using NPM.
 
   See: see `npm install <https://docs.npmjs.com/cli/install>`_
   """
@@ -62,30 +62,31 @@ class NpmResolve(NodeTask):
       with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
           target = vt.target
-          chroot = vt.results_dir
+          results_dir = vt.results_dir
           if not vt.valid:
-            safe_mkdir(chroot, clean=True)
-            self._resolve(target, chroot, node_paths)
-          node_paths.resolved(target, chroot)
+            safe_mkdir(results_dir, clean=True)
+            self._resolve(target, results_dir, node_paths)
+          node_paths.resolved(target, results_dir)
 
-  def _resolve(self, node_module, node_path, node_paths):
-    _copy_sources(buildroot=get_buildroot(), node_module=node_module, dest_dir=node_path)
-    self._emit_package_descriptor(node_module, node_path, node_paths)
-    with pushd(node_path):
+  def _resolve(self, target, results_dir, node_paths):
+    _copy_sources(get_buildroot(), target, results_dir)
+    self._emit_package_descriptor(target, results_dir, node_paths)
+    with pushd(results_dir):
       # TODO(John Sirois): Handle dev dependency resolution.
       result, npm_install = self.execute_npm(args=['install'],
-                                             workunit_name=node_module.address.reference())
+                                             workunit_name=target.address.reference(),
+                                             workunit_labels=[WorkUnitLabel.COMPILER])
       if result != 0:
         raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
-                        .format(node_module.address.reference(), npm_install, result))
+                        .format(target.address.reference(), npm_install, result))
 
-  def _emit_package_descriptor(self, npm_package, node_path, node_paths):
+  def _emit_package_descriptor(self, target, results_dir, node_paths):
     dependencies = {
-      dep.package_name: self.render_npm_package_dependency(node_paths, dep)
-                        for dep in npm_package.dependencies
+      dep.package_name: self.render_node_package_dependency(node_paths, dep)
+                        for dep in target.dependencies
     }
 
-    package_json_path = os.path.join(node_path, 'package.json')
+    package_json_path = os.path.join(results_dir, 'package.json')
 
     if os.path.isfile(package_json_path):
       with open(package_json_path, 'r') as fp:
@@ -94,10 +95,10 @@ class NpmResolve(NodeTask):
       package = {}
 
     if not package.has_key('name'):
-      package['name'] = npm_package.package_name
-    elif package['name'] != npm_package.package_name:
+      package['name'] = target.package_name
+    elif package['name'] != target.package_name:
       raise TaskError('Package name in the corresponding package.json is not the same '
-                      'as the BUILD target name for {}'.format(npm_package.address.reference()))
+                      'as the BUILD target name for {}'.format(target.address.reference()))
 
     if not package.has_key('version'):
       package['version'] = '0.0.0'

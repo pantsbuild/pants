@@ -10,8 +10,8 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
 
 
-class NpmTest(Target):
-  """A target for running JS tests through NPM."""
+class NodeTest(Target):
+  """A target for running JS tests via a script specified in a package.json file."""
 
   def __init__(self, script_name=None, address=None, payload=None, **kwargs):
     """
@@ -21,7 +21,7 @@ class NpmTest(Target):
     payload.add_fields({
       'script_name': PrimitiveField(script_name or 'test'),
     })
-    super(NpmTest, self).__init__(address=address, payload=payload, **kwargs)
+    super(NodeTest, self).__init__(address=address, payload=payload, **kwargs)
 
   @property
   def script_name(self):
