@@ -9,6 +9,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.build_graph.build_graph import BuildGraph
 from pants.task.task import Task
 
 
@@ -50,9 +51,7 @@ class JvmTask(Task):
 
     classpath_product = classpath_product or self.context.products.get_data('runtime_classpath')
 
-    closure = OrderedSet()
-    for target in targets:
-      closure.update(target.closure(bfs=True))
+    closure = BuildGraph.closure(targets, bfs=True)
 
     classpath_for_targets = ClasspathUtil.classpath(closure, classpath_product, self.confs)
     classpath.extend(classpath_for_targets)

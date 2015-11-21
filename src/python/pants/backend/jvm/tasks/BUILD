@@ -138,6 +138,7 @@ python_library(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:products',
   ],
 )
@@ -421,6 +422,7 @@ python_library(
   dependencies = [
     ':classpath_util',
     'src/python/pants/backend/jvm/subsystems:jvm',
+    'src/python/pants/build_graph',
     'src/python/pants/task',
   ],
 )

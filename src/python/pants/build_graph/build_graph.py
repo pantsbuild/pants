@@ -27,6 +27,20 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
+  @staticmethod
+  def closure(targets, bfs=False):
+    targets = OrderedSet(targets)
+    if not targets:
+      return OrderedSet()
+
+    build_graph = next(iter(targets))._build_graph
+    if bfs:
+      transitive_subgraph_fn = build_graph.transitive_subgraph_of_addresses_bfs
+    else:
+      transitive_subgraph_fn = build_graph.transitive_subgraph_of_addresses
+
+    return transitive_subgraph_fn(t.address for t in targets)
+
   def __init__(self, address_mapper):
     self._address_mapper = address_mapper
     self.reset()
