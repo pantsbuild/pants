@@ -9,8 +9,8 @@ import errno
 import os
 from contextlib import contextmanager
 
-from pants.backend.core.tasks.task import QuietTaskMixin, Task
 from pants.base.exceptions import TaskError
+from pants.task.task import QuietTaskMixin, Task
 from pants.util.dirutil import safe_open
 
 

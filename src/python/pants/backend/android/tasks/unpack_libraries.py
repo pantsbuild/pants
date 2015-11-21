@@ -10,7 +10,6 @@ from hashlib import sha1
 
 from pants.backend.android.targets.android_library import AndroidLibrary
 from pants.backend.android.targets.android_resources import AndroidResources
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -19,6 +18,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
+from pants.task.task import Task
 
 
 class AndroidLibraryFingerprintStrategy(DefaultFingerprintStrategy):

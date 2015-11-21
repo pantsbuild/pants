@@ -38,10 +38,10 @@ python_tests(
   sources = ['test_cache_setup.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/cache',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
+    'src/python/pants/task',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/testutils',
   ]

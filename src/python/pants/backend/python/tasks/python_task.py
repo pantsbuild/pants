@@ -15,7 +15,6 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.task import Task
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
@@ -24,6 +23,7 @@ from pants.base.exceptions import TaskError
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.task.task import Task
 
 
 class PythonTask(Task):

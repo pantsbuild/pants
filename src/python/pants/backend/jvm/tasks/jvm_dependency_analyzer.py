@@ -11,13 +11,13 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.build_graph import sort_targets
 from pants.java.distribution.distribution import DistributionLocator
+from pants.task.task import Task
 from pants.util.contextutil import open_zip
 from pants.util.memo import memoized_property
 

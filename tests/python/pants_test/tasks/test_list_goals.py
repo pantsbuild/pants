@@ -8,9 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from unittest import expectedFailure
 
 from pants.backend.core.tasks.list_goals import ListGoals
-from pants.backend.core.tasks.task import Task
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
+from pants.task.task import Task
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 

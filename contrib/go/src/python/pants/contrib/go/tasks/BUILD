@@ -75,8 +75,8 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:ansicolors',
     'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/task',
   ]
 )
 
@@ -100,7 +100,7 @@ python_library(
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
-    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/task',
     'src/python/pants/util:memo',
   ]
 )
