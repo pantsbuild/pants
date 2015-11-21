@@ -76,18 +76,23 @@ class StackDistribution(object):
     """Encapsulates a stack command that can be executed."""
 
     @classmethod
-    def _create(cls, base_dir, cmd, args=None):
+    def _create(cls, base_dir, cmd, stack_args=None, cmd_args=None):
       # TODO(John Sirois): Right now we take full control of stack flags and only allow the caller
       # to pass sub-command args.  Consider opening this up as the need arises.
 
       stack_exe = os.path.join(base_dir, 'stack')
       cmdline = [stack_exe]
       # Ensure we always run with a hermetic ghc
-      cmdline.extend(['--no-system-ghc', '--install-ghc'])
+      cmdline.extend([
+        '--no-system-ghc',
+        '--install-ghc',
+      ])
 
+      if stack_args:
+        cmdline.extend(stack_args)
       cmdline.append(cmd)
-      if args:
-        cmdline.extend(args)
+      if cmd_args:
+        cmdline.extend(cmd_args)
 
       # We isolate our stack root from the default (~/.stack) using STACK_ROOT.
       # See: https://github.com/commercialhaskell/stack/issues/1178
@@ -127,7 +132,7 @@ class StackDistribution(object):
               ' ' +
               ' '.join(self.cmdline))
 
-  def create_stack_cmd(self, cmd, args=None):
+  def create_stack_cmd(self, cmd, stack_args=None, cmd_args=None):
     """Creates a stack command that can be executed later.
 
     :param string cmd: The stack command to execute, e.g. 'setup' for `stack setup`
@@ -135,9 +140,13 @@ class StackDistribution(object):
     :returns: A stack command that can be executed later.
     :rtype: :class:`StackDistribution.StackCommand`
     """
-    return self.StackCommand._create(self.base_dir, cmd, args=args)
+    return self.StackCommand._create(
+      self.base_dir,
+      cmd,
+      stack_args=stack_args,
+      cmd_args=cmd_args)
 
-  def execute_stack_cmd(self, cmd, args=None,
+  def execute_stack_cmd(self, cmd, stack_args=None, cmd_args=None,
                         workunit_factory=None, workunit_name=None, workunit_labels=None, **kwargs):
     """Runs a stack command.
 
@@ -152,7 +161,11 @@ class StackDistribution(object):
     :returns: A tuple of the exit code and the stack command that was run.
     :rtype: (int, :class:`StackDistribution.StackCommand`)
     """
-    stack_cmd = self.StackCommand._create(self.base_dir, cmd, args=args)
+    stack_cmd = self.StackCommand._create(
+      self.base_dir,
+      cmd,
+      stack_args=stack_args,
+      cmd_args=cmd_args)
     if workunit_factory is None:
       return stack_cmd.spawn(**kwargs).wait()
     else:
