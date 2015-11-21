@@ -76,6 +76,8 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
         'testprojects/src/java/org/pantsbuild/testproject/shading:third',
         'third',
         bundle_options=['--no-deployjar'],
+        # The shaded jars are no longer symlinks to .pants.d, they are actual files.
+        library_jars_are_symlinks=False,
         expected_bundle_content=[
           'libs/com.google.code.gson-gson-2.3.1.jar',
           'libs/testprojects/src/java/org/pantsbuild/testproject/shading/third_lib/0-z.jar',

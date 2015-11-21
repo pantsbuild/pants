@@ -169,7 +169,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
   def bundle_and_run(self, target, bundle_name, bundle_options=None, args=None,
                      expected_bundle_jar_content=None,
-                     expected_bundle_content=None):
+                     expected_bundle_content=None,
+                     library_jars_are_symlinks=True):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
 
     :param target: target name to compile
@@ -178,6 +179,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param args: optional arguments to pass to executable
     :param expected_bundle_content: verify the bundle zip content
     :param expected_bundle_jar_content: verify the bundle jar content
+    :param library_jars_are_symlinks: verify library jars are symlinks if True, and actual
+      files if False. Default `True` because we always create symlinks for both external and internal
+      dependencies, only exception is when shading is used.
     :return: stdout as a string on success, raises an Exception on error
     """
     bundle_options = bundle_options or []
@@ -185,6 +189,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
     pants_run = self.run_pants(bundle_options)
     self.assert_success(pants_run)
 
+    self.assert_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
+                         library_jars_are_symlinks)
     # TODO(John Sirois): We need a zip here to suck in external library classpath elements
     # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
     # contextmanager that yields its results while the tmpdir workdir is still active and change
@@ -258,6 +264,19 @@ class PantsRunIntegrationTest(unittest.TestCase):
         found.append(os.path.relpath(p, directory))
 
     self.assertEqual(sorted(expected_files), sorted(found))
+
+  def assert_symlinks(self, directory, symlinks=True):
+    """Asserts files under directory are symlinks.
+
+    :param str directory: Path to directory to search.
+    :param bool symlinks: If true, verify files are symlinks, if false, verify files are actual files.
+    """
+    for root, _, files in os.walk(directory):
+      for f in files:
+        p = os.path.join(root, f)
+        if symlinks ^ os.path.islink(p):
+          return False
+    return True
 
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""

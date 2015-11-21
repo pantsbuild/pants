@@ -75,7 +75,7 @@ class JvmBinaryTask(JarBuilderTask):
     :param binary: The jvm_binary target to operate on.
     :param path: Write the output jar here, overwriting an existing file, if any.
     :param string canonical_classpath_base_dir: If set, instead of directly adding targets
-      to the jar bundle, create canonical symlinks to the targets' classpath from this baseDir
+      to the jar bundle, create canonical symlinks to the targets' classpath from this base_dir
       and save to jar's Manifest attribute Class-Path. Note this includes external dependencies.
     """
     # TODO(benjy): There's actually nothing here that requires 'binary' to be a jvm_binary.

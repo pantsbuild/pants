@@ -21,11 +21,14 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
         'bundle-example',
+        # this is the only thing bundle jar has, which means Class-Path must be properly
+        # set for its Manifest.
         expected_bundle_jar_content=[
           'META-INF/MANIFEST.MF'
         ],
         expected_bundle_content=[
           'bundle-example.jar',
+          'libs/com.google.guava-guava-18.0.jar',
           'libs/testprojects/src/java/org/pantsbuild/testproject/bundle/bundle-bin/0-z.jar']))
 
   def test_bundle_deployjar(self):
@@ -39,10 +42,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
         'bundle-example',
         bundle_options=['--deployjar'],
-        expected_bundle_jar_content=[
-          'META-INF/MANIFEST.MF',
-          'org/pantsbuild/testproject/bundle/BundleMain.class'
-        ],
+        # this is the only thing bundle zip has, all class files must be there.
         expected_bundle_content=[
           'bundle-example.jar']))
 
