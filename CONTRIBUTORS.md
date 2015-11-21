@@ -1,5 +1,6 @@
 Created by running `./build-support/bin/contributors.sh`.
 
++ Alan Paulin
 + Alexander Johnson
 + Alyssa Pohahau
 + Andy Reitz

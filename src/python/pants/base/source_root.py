@@ -220,44 +220,6 @@ class SourceRoot(object):
     cls._SOURCE_ROOT_TREE = SourceRootTree()
 
   @classmethod
-  @deprecated('0.0.60', 'use context.source_roots.find() or '
-                        'SourceRootConfig.global_instance().get_source_roots().find().')
-  def find(cls, target):
-    """Finds the source root for the given target.
-
-    :param Target target: the target whose source_root you are querying.
-    :returns: the source root that is a prefix of the target, or the parent directory of the
-    target's BUILD file if none is registered.
-    """
-    target_path = target.address.spec_path
-    found_source_root, allowed_types = cls._SOURCE_ROOT_TREE.get_root_and_types(target_path)
-    if found_source_root is None:  # NB: '' represents the buildroot, so we explicitly check None.
-      # If the source root is not registered, use the path from the spec.
-      found_source_root = target_path
-
-    if allowed_types and not isinstance(target, allowed_types):
-      raise TargetDefinitionException(target,
-                                      'Target type {target_type} not allowed under {source_root}'
-                                      .format(target_type=target.type_alias,
-                                              source_root=found_source_root))
-    return found_source_root
-
-  @classmethod
-  @deprecated('0.0.60', 'use context.source_roots.find_by_path() or '
-                        'SourceRootConfig.global_instance().get_source_roots().find_by_path().')
-  def find_by_path(cls, path):
-    """Finds a registered source root for a given path
-
-    :param string path: a path containing sources to query
-    :returns: the source_root that has been registered as a prefix of the specified path, or None if
-    no matching source root was registered.
-    """
-    if os.path.isabs(path):
-      path = SourceRoot._relative_to_buildroot(path)
-    found_source_root, _ = cls._SOURCE_ROOT_TREE.get_root_and_types(path)
-    return found_source_root
-
-  @classmethod
   def types(cls, root):
     """:returns: the set of target types rooted at root."""
     return cls._TYPES_BY_ROOT[root]
