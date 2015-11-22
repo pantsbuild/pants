@@ -370,7 +370,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
       # Register products for valid targets.
       valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
-      self._register_vts(compile_contexts[t] for t in valid_targets)
+      self._register_vts([compile_contexts[t] for t in valid_targets])
 
       # Build any invalid targets (which will register products in the background).
       if invalidation_check.invalid_vts:
