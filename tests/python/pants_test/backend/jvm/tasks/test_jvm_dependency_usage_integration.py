@@ -5,9 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 import json
+import os
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -45,4 +44,3 @@ class TestJvmDependencyUsageIntegration(PantsRunIntegrationTest):
       # Confirm that usage is non-zero, and that the reports match.
       self._assert_non_zero_usage(run_two)
       self.assertEquals(run_one, run_two)
-
