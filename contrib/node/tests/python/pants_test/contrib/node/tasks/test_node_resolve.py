@@ -15,14 +15,14 @@ from pants_test.tasks.task_test_base import TaskTestBase
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.tasks.node_paths import NodePaths
-from pants.contrib.node.tasks.npm_resolve import NpmResolve
+from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
-class NpmResolveTest(TaskTestBase):
+class NodeResolveTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return NpmResolve
+    return NodeResolve
 
   def test_noop(self):
     task = self.create_task(self.context())

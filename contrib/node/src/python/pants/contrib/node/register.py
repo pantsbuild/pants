@@ -9,18 +9,20 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest as NodeTestTarget
 from pants.contrib.node.tasks.node_repl import NodeRepl
+from pants.contrib.node.tasks.node_resolve import NodeResolve
 from pants.contrib.node.tasks.node_run import NodeRun
 from pants.contrib.node.tasks.node_test import NodeTest as NodeTestTask
-from pants.contrib.node.tasks.npm_resolve import NpmResolve
 
 
 def build_file_aliases():
   return BuildFileAliases(
     targets={
       'node_module': NodeModule,
+      'node_preinstalled_module': NodePreinstalledModule,
       'node_remote_module': NodeRemoteModule,
       'node_test': NodeTestTarget,
     },
@@ -29,6 +31,6 @@ def build_file_aliases():
 
 def register_goals():
   task(name='node', action=NodeRepl).install('repl')
+  task(name='node', action=NodeResolve).install('resolve')
   task(name='node', action=NodeRun).install('run')
   task(name='node', action=NodeTestTask).install('test')
-  task(name='node', action=NpmResolve).install('resolve')

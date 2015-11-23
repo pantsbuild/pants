@@ -27,11 +27,8 @@ def _copy_sources(buildroot, target, results_dir):
     shutil.copyfile(os.path.join(buildroot, source), dest)
 
 
-class NpmResolve(NodeTask):
-  """Resolves node_package targets to isolated chroots using NPM.
-
-  See: see `npm install <https://docs.npmjs.com/cli/install>`_
-  """
+class NodeResolve(NodeTask):
+  """Resolves node_package targets to isolated chroots using different registered resolvers."""
 
   @classmethod
   def product_types(cls):
@@ -42,11 +39,6 @@ class NpmResolve(NodeTask):
     return True
 
   def execute(self):
-    # TODO(John Sirois): Is there a way to avoid a naive re-resolve for each target, ie bulk
-    # resolve and then post-resolve analyze the results locally to create a separate NODE_PATH
-    # for each target participating in the bulk resolve?  This is unlikely since versions are often
-    # unconstrained or partially constrained in the npm community.
-    # See TODO in NodePaths re: UnionProducts.
     targets = set(self.context.targets(predicate=self.is_node_module))
     if not targets:
       return

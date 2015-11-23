@@ -5,9 +5,9 @@ target(
   name='tasks',
   dependencies=[
     ':node_repl',
+    ':node_resolve',
     ':node_run',
     ':node_test',
-    ':npm_resolve',
   ]
 )
 
@@ -42,8 +42,8 @@ python_library(
 )
 
 python_library(
-  name='npm_resolve',
-  sources=['npm_resolve.py'],
+  name='node_resolve',
+  sources=['node_resolve.py'],
   dependencies=[
     ':node_paths',
     ':node_task',

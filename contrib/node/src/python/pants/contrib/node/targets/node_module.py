@@ -11,7 +11,7 @@ from pants.contrib.node.targets.node_package import NodePackage
 
 
 class NodeModule(NodePackage):
-  """Represents a Node module."""
+  """Represents a Node module with local sources."""
 
   def __init__(self, sources=None, address=None, payload=None, **kwargs):
     """

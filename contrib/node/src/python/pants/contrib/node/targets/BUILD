@@ -5,6 +5,7 @@ target(
   name='targets',
   dependencies=[
     ':node_module',
+    ':node_preinstalled_module',
     ':node_remote_module',
     ':node_test',
   ]
@@ -16,6 +17,16 @@ python_library(
   dependencies=[
     ':node_package',
     'src/python/pants/base:payload',
+  ],
+)
+
+python_library(
+  name='node_preinstalled_module',
+  sources=['node_preinstalled_module.py'],
+  dependencies=[
+    ':node_module',
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
   ],
 )
 

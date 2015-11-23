@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class NpmResolveIntegrationTest(PantsRunIntegrationTest):
+class NodeResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_resolve_with_prepublish(self):
     command = ['resolve',
