@@ -615,7 +615,7 @@ public class ConsoleRunnerImpl {
 
       @Option(name = "-output-mode", usage = "Specify what part of output should be passed " +
           "to stdout. In case of FAILURE_ONLY and parallel tests execution " +
-          "output can be partial or even wrong. (default: ALL)")
+          "output can be partial or even wrong. (default: NONE)")
       private OutputMode outputMode;
 
       @Option(name = "-xmlreport",
@@ -712,7 +712,7 @@ public class ConsoleRunnerImpl {
 
     ConsoleRunnerImpl runner =
         new ConsoleRunnerImpl(options.failFast,
-            options.outputMode != null ? options.outputMode : OutputMode.ALL,
+            options.outputMode != null ? options.outputMode : OutputMode.NONE,
             options.xmlReport,
             options.perTestTimer,
             options.outdir,
