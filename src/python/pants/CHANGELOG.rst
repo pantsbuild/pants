@@ -1,6 +1,32 @@
 RELEASE HISTORY
 ===============
 
+0.0.61 (11/23/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release to fix two regressions in 0.0.60.  It also happens to
+include a small UX improvement for the console output of isolated compiles.
+
+Bugfixes
+~~~~~~~~
+
+* Make sure the deprecated pants.backend.core.tasks.task module is bundled.
+  `RB #3164 <https://rbcommons.com/s/twitter/r/3164>`_
+
+* Revert "Isolate .pex dir"
+  `Issue #2610 <https://github.com/pantsbuild/pants/issues/2610>`_
+  `RB #3135 <https://rbcommons.com/s/twitter/r/3135>`_
+  `RB #3163 <https://rbcommons.com/s/twitter/r/3163>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* During a jvm compile, include a running count in the printed log.
+  `RB #3153 <https://rbcommons.com/s/twitter/r/3153>`_
+
 0.0.60 (11/21/2015)
 -------------------
 
@@ -19,6 +45,7 @@ removes several deprecated options and methods:
 * `pants.build_graph.target._set_no_cache`.
 
 The following modules have been moved, with their old locations now deprecated:
+
 * `pants.backend.core.tasks.console_task` -> `pants.task.console_task`.
 * `pants.backend.core.tasks.task` -> `pants.task.task`.
 

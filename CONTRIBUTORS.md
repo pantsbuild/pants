@@ -15,6 +15,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Cody Gibb
 + Craig Schertz
 + Dan Davydov
++ Dan Harrison
 + Daniel Anderson
 + David Taylor
 + David Turner
