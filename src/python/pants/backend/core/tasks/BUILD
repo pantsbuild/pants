@@ -52,6 +52,7 @@ target(
     ':scm_publish',
     ':sorttargets',
     ':targets_help',
+    ':task',
     ':test_task_mixin',
     ':what_changed',
   ]
