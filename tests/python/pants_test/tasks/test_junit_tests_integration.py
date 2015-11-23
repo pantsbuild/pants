@@ -113,7 +113,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
   def test_junit_test_output_flag(self):
     def run_test(suppress_mode):
-      args = ['test.junit', '--no-test-junit-fail-fast', '--output=' + suppress_mode,
+      args = ['test.junit', '--no-test-junit-fail-fast', '--output-mode=' + suppress_mode,
               'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests']
       return self.run_pants(args)
 
