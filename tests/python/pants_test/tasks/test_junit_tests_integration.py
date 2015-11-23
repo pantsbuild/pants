@@ -103,13 +103,31 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
-  def test_junit_test_suppress_output_flag(self):
+  def test_junit_test_deprecated_suppress_output_flag(self):
     pants_run = self.run_pants([
         'test.junit',
         '--no-suppress-output',
         'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
     self.assertIn('Hello from test1!', pants_run.stdout_data)
     self.assertIn('Hello from test2!', pants_run.stdout_data)
+
+  def test_junit_test_output_flag(self):
+    def run_test(suppress_mode):
+      args = ['test.junit', '--no-test-junit-fail-fast', '--output=' + suppress_mode,
+              'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests']
+      return self.run_pants(args)
+
+    run_with_all_output = run_test('ALL')
+    self.assertIn('Failure output', run_with_all_output.stdout_data)
+    self.assertIn('Success output', run_with_all_output.stdout_data)
+
+    run_with_failure_only_output = run_test('FAILURE_ONLY')
+    self.assertIn('Failure output', run_with_failure_only_output.stdout_data)
+    self.assertNotIn('Success output', run_with_failure_only_output.stdout_data)
+
+    run_with_none_output = run_test('NONE')
+    self.assertNotIn('Failure output', run_with_none_output)
+    self.assertNotIn('Success output', run_with_none_output)
 
   def test_junit_test_target_cwd(self):
     pants_run = self.run_pants([
