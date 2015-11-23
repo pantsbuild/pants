@@ -111,10 +111,19 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('Hello from test1!', pants_run.stdout_data)
     self.assertIn('Hello from test2!', pants_run.stdout_data)
 
+    pants_run = self.run_pants([
+        'test.junit',
+        '--suppress-output',
+        'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
+    self.assertNotIn('Hello from test1!', pants_run.stdout_data)
+    self.assertNotIn('Hello from test2!', pants_run.stdout_data)
+
   def test_junit_test_output_flag(self):
-    def run_test(suppress_mode):
-      args = ['test.junit', '--no-test-junit-fail-fast', '--output-mode=' + suppress_mode,
-              'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests']
+    def run_test(output_mode):
+      args = ['test.junit', '--no-test-junit-fail-fast']
+      if output_mode is not None:
+        args.append('--output-mode=' + output_mode)
+      args.append('testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests')
       return self.run_pants(args)
 
     run_with_all_output = run_test('ALL')
@@ -128,6 +137,10 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     run_with_none_output = run_test('NONE')
     self.assertNotIn('Failure output', run_with_none_output)
     self.assertNotIn('Success output', run_with_none_output)
+
+    run_with_default_output = run_test(None)
+    self.assertNotIn('Failure output', run_with_default_output)
+    self.assertNotIn('Success output', run_with_default_output)
 
   def test_junit_test_target_cwd(self):
     pants_run = self.run_pants([
