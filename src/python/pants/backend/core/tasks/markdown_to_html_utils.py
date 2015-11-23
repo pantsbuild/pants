@@ -31,6 +31,7 @@ WIKILINKS_PATTERN = r'\[\[([^\]]+)\]\]'
 
 class WikilinksPattern(markdown.inlinepatterns.Pattern):
   def __init__(self, build_url, markdown_instance=None):
+    # Old-style class, so we must invoke __init__ this way.
     markdown.inlinepatterns.Pattern.__init__(self, WIKILINKS_PATTERN, markdown_instance)
     self.build_url = build_url
 
@@ -44,6 +45,7 @@ class WikilinksPattern(markdown.inlinepatterns.Pattern):
 
 class WikilinksExtension(markdown.Extension):
   def __init__(self, build_url, configs=None):
+    # Old-style class, so we must invoke __init__ this way.
     markdown.Extension.__init__(self, configs or {})
     self.build_url = build_url
 
@@ -122,6 +124,7 @@ class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
     """
     :param string source_path: Path to source `.md` file.
     """
+    # Old-style class, so we must invoke __init__ this way.
     markdown.inlinepatterns.Pattern.__init__(self, INCLUDE_PATTERN)
     self.source_path = source_path
 
@@ -163,6 +166,7 @@ class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
 
 class IncludeExcerptExtension(markdown.Extension):
   def __init__(self, source_path, configs=None):
+    # Old-style class, so we must invoke __init__ this way.
     markdown.Extension.__init__(self, configs or {})
     self.source_path = source_path
 

@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import pkgutil
-import urlparse
 
 import pystache
 import six
@@ -17,7 +16,7 @@ class MustacheRenderer(object):
   """Renders text using mustache templates."""
 
   class MustacheError(Exception):
-    """Indicates failure rendering mustache templates"""
+    """Indicates failure rendering mustache templates."""
 
   @staticmethod
   def expand(args):
