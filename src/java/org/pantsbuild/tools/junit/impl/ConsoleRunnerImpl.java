@@ -616,8 +616,8 @@ public class ConsoleRunnerImpl {
       private boolean failFast;
 
       // TODO: make -output-mode required after removing -suppress-output option
-      @Option(name = "-suppress-output", usage = "Deprecated, will be removed after 0.6.4 release, " +
-          "use -output-mode instead. Suppresses test output.")
+      @Option(name = "-suppress-output", usage = "Deprecated, will be removed after 0.6.4 " +
+          "release, use -output-mode instead. Suppresses test output.")
       private boolean suppressOutput;
 
       @Option(name = "-output-mode", usage = "Specify what part of output should be passed " +
