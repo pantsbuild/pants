@@ -110,9 +110,23 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           def test_three():
             assert 1 == core.one()
         """))
+    self.create_file(
+      'tests/test_error.py',
+      dedent("""
+        def test_error(bad_fixture):
+          pass
+      """)
+    )
     self.add_to_build_file(
         'tests',
         dedent("""
+          python_tests(
+            name='error',
+            sources=[
+              'test_error.py'
+            ],
+          )
+
           python_tests(
             name='green',
             sources=[
@@ -211,8 +225,15 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.red_in_class = self.target('tests:red_in_class')
     self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
     self.sleep_timeout = self.target('tests:sleep_timeout')
+    self.error = self.target('tests:error')
+
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
+
+  def test_error(self):
+    """Test that a test that errors rather than fails shows up in TestFailedTaskError."""
+
+    self.run_failing_tests(targets=[self.red, self.green, self.error], failed_targets=[self.red, self.error])
 
   def test_green(self):
     self.run_tests(targets=[self.green])
