@@ -113,8 +113,8 @@ python_tests(
   name='mutex_task_mixin',
   sources=['test_mutex_task_mixin.py'],
   dependencies=[
-    'src/python/pants/backend/core/tasks:mutex_task_mixin',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
   ]

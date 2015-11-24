@@ -510,9 +510,9 @@ python_library(
   dependencies = [
     ':jvm_task',
     ':jvm_tool_task_mixin',
-    'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/java/distribution',
+    'src/python/pants/task',
   ],
 )
 

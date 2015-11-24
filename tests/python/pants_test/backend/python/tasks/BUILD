@@ -46,11 +46,11 @@ python_tests(
   sources=['test_python_repl.py'],
   dependencies=[
     ':python_task_test_base',
-    'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:all_utils',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:contextutil',
   ]
 )
