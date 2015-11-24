@@ -79,9 +79,8 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
              deprecated_hint='Use --output-mode instead.',
              deprecated_version='0.0.64',
              help='Redirect test output to files in .pants.d/test/junit.')
-    register('--output-mode', default='NONE',
+    register('--output-mode', default='NONE', choices=['ALL', 'FAILURE_ONLY', 'NONE'],
              help='Specify what part of output should be passed to stdout. '
-                  'There are three options: ALL, FAILURE_ONLY and NONE. '
                   'In case of FAILURE_ONLY and parallel tests execution '
                   'output can be partial or even wrong. '
                   'All tests output also redirected to files in .pants.d/test/junit.')
@@ -162,9 +161,6 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     self._strict_jvm_version = options.strict_jvm_version
     self._args = copy.copy(self.args)
     self._failure_summary = options.failure_summary
-
-    if options.output_mode not in ['ALL', 'FAILURE_ONLY', 'NONE']:
-      raise TaskError('unknown output mode {0}'.format(options.output_mode))
 
     if (not options.suppress_output) or options.output_mode == 'ALL':
       self._args.append('-output-mode=ALL')
