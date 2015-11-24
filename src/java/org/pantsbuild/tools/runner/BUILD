@@ -1,0 +1,18 @@
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+java_library(
+  name='runner-library',
+  provides=artifact(
+    org='org.pantsbuild',
+    name='pants-runner',
+    repo=public,
+    publication_metadata=pants_library("""
+      A command line tool for simulating classpath from jar provided classpath as real
+    """)
+  ),
+  dependencies=[
+    # DO NOT ADD ANY DEPS.
+  ],
+  sources=globs('*.java')
+)
