@@ -455,7 +455,9 @@ class PytestRun(TestTaskMixin, PythonTask):
   # Pattern for lines such as ones below.  The second one is from a test inside a class.
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
   # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
-  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+?)::(.+)')
+
+  # 'E' is here as well to catch test errors, not just test failures
+  RESULTLOG_FAILED_PATTERN = re.compile(r'[EF] +(.+?)::(.+)')
 
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):
