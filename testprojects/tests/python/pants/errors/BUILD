@@ -1,22 +1,22 @@
 target(
-  name='fixtures',
+  name='errors',
   dependencies=[
-    ':bad',
-    ':good',
-    ':fail',
+    ':error',
+    ':pass',
+    ':failure',
   ]
 )
 python_tests(
-  name='bad',
+  name='error',
   sources=['test_bad_fixtures.py'],
 )
 
 python_tests(
-  name='good',
+  name='pass',
   sources=['test_pass.py'],
 )
 
 python_tests(
-  name='fail',
+  name='failure',
   sources=['test_fail.py'],
 )
