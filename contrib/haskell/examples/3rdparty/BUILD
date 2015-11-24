@@ -28,3 +28,16 @@ haskell_project(
     ':pipes',
   ],
 )
+
+haskell_source_package(
+  name='lens-family-core',
+  path='http://hackage.haskell.org/package/lens-family-core-1.2.0/lens-family-core-1.2.0.tar.gz',
+)
+
+haskell_project(
+  name='lens-family-core-project',
+  resolver='lts-3.1',
+  dependencies=[
+    ':lens-family-core',
+  ]
+)
