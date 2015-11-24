@@ -615,9 +615,14 @@ public class ConsoleRunnerImpl {
       @Option(name = "-fail-fast", usage = "Causes the test suite run to fail fast.")
       private boolean failFast;
 
+      // TODO: make -output-mode required after removing -suppress-output option
+      @Option(name = "-suppress-output", usage = "Deprecated, will be removed after 0.6.4 release, " +
+          "use -output-mode instead. Suppresses test output.")
+      private boolean suppressOutput;
+
       @Option(name = "-output-mode", usage = "Specify what part of output should be passed " +
           "to stdout. In case of FAILURE_ONLY and parallel tests execution " +
-          "output can be partial or even wrong. (default: NONE)")
+          "output can be partial or even wrong. (default: ALL)")
       private OutputMode outputMode;
 
       @Option(name = "-xmlreport",
@@ -712,9 +717,16 @@ public class ConsoleRunnerImpl {
       exit(1);
     }
 
+    OutputMode outputMode;
+    if (options.outputMode != null) {
+      outputMode = options.outputMode;
+    } else {
+      outputMode = options.suppressOutput ? OutputMode.NONE : OutputMode.ALL;
+    }
+
     ConsoleRunnerImpl runner =
         new ConsoleRunnerImpl(options.failFast,
-            options.outputMode != null ? options.outputMode : OutputMode.NONE,
+            outputMode,
             options.xmlReport,
             options.perTestTimer,
             options.outdir,
