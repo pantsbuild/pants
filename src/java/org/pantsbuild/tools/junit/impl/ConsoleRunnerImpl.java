@@ -280,6 +280,8 @@ public class ConsoleRunnerImpl {
           SWAPPABLE_OUT.swap(suiteOut);
           SWAPPABLE_ERR.swap(suiteErr);
           break;
+        default:
+          throw new IllegalStateException();
       }
 
       super.testStarted(description);
