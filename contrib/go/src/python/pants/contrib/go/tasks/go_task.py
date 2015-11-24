@@ -129,7 +129,7 @@ class ImportOracle(object):
     """
     go_cmd = self._go_dist.create_go_cmd('list', args=['-json', pkg], gopath=gopath)
     with self._workunit_factory(pkg, cmd=str(go_cmd), labels=[WorkUnitLabel.TOOL]) as workunit:
-      # TODO(John Sirois): It would be nice to be able to tee the stdout to the workunit to we have
+      # TODO(John Sirois): It would be nice to be able to tee the stdout to the workunit so we have
       # a capture of the json available for inspection in the server console.
       process = go_cmd.spawn(stdout=subprocess.PIPE, stderr=workunit.output('stderr'))
       out, _ = process.communicate()
