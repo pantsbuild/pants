@@ -370,7 +370,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
       # Register products for valid targets.
       valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
-      self._register_vts(compile_contexts[t] for t in valid_targets)
+      self._register_vts([compile_contexts[t] for t in valid_targets])
 
       # Build any invalid targets (which will register products in the background).
       if invalidation_check.invalid_vts:
@@ -423,7 +423,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       raise TaskError("Compilation failure: {}".format(e))
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings, fatal_warnings):
+                   log_file, progress_message, settings, fatal_warnings, counter):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -441,8 +441,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
                             .format(self.name(), vts.targets))
     else:
+      counter_val = str(counter()).rjust(counter.format_length(), b' ')
+      counter_str = '[{}/{}] '.format(counter_val, counter.size)
       # Do some reporting.
       self.context.log.info(
+        counter_str,
         'Compiling ',
         items_to_report_element(sources, '{} source'.format(self.name())),
         ' in ',
@@ -624,6 +627,19 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         return True
       return os.path.exists(compile_context.analysis_file)
 
+    class Counter(object):
+      def __init__(self, size, initial=0):
+        self.size = size
+        self.count = initial
+
+      def __call__(self):
+        self.count += 1
+        return self.count
+
+      def format_length(self):
+        return len(str(self.size))
+
+    counter = Counter(len(invalid_vts_partitioned))
     def work_for_vts(vts, compile_context):
       progress_message = compile_context.target.address.spec
 
@@ -663,7 +679,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           log_file,
                           progress_message,
                           target.platform,
-                          fatal_warnings)
+                          fatal_warnings,
+                          counter)
         os.rename(tmp_analysis_file, compile_context.analysis_file)
         self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
 

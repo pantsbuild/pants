@@ -111,7 +111,7 @@ class VersionedTarget(VersionedTargetSet):
     self.target = target
     self.cache_key = cache_key
     # Must come after the assignments above, as they are used in the parent's __init__.
-    VersionedTargetSet.__init__(self, cache_manager, [self])
+    super(VersionedTarget, self).__init__(cache_manager, [self])
     self.id = target.id
 
   def create_results_dir(self, root_dir, allow_incremental):

@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jar_publish import PushDb
+from pants.task.console_task import ConsoleTask
 
 
 class CheckPublishedDeps(ConsoleTask):

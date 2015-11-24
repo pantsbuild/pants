@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
-from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
+from pants.task.task import Task
 from pants_test.tasks.task_test_base import TaskTestBase
 
 

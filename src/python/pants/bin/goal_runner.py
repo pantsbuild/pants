@@ -10,7 +10,6 @@ import sys
 
 import pkg_resources
 
-from pants.backend.core.tasks.task import QuietTaskMixin
 from pants.base.build_environment import get_scm, pants_version
 from pants.base.build_file import FilesystemBuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
@@ -37,35 +36,11 @@ from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
+from pants.task.task import QuietTaskMixin
 from pants.util.filtering import create_filters, wrap_filters
 
 
 logger = logging.getLogger(__name__)
-
-
-class SourceRootBootstrapper(Subsystem):
-  # This is an odd name, but we maintain the legacy scope until we kill this subsystem outright.
-  options_scope = 'goals'
-
-  @classmethod
-  def register_options(cls, register):
-    super(SourceRootBootstrapper, cls).register_options(register)
-    # TODO: Get rid of this in favor of source root registration at backend load time.
-    register('--bootstrap-buildfiles', advanced=True, type=list_option, default=[],
-             deprecated_version='0.0.60',
-             deprecated_hint='bootstrap BUILD files are no longer necessary or supported. '
-                             'Source roots are configured in pants.ini or by default.',
-             help='Initialize state by evaluating these buildfiles.')
-
-  def bootstrap(self, address_mapper, build_file_parser):
-    for path in self.get_options().bootstrap_buildfiles:
-      build_file = address_mapper.from_cache(root_dir=build_file_parser.root_dir, relpath=path)
-      # TODO(pl): This is an unfortunate interface leak, but I don't think
-      # in the long run that we should be relying on "bootstrap" BUILD files
-      # that do nothing except modify global state.  That type of behavior
-      # (e.g. source roots, goal registration) should instead happen in
-      # project plugins, or specialized configuration files.
-      build_file_parser.parse_build_file_family(build_file)
 
 
 class OptionsInitializer(object):
@@ -260,11 +235,6 @@ class GoalRunnerFactory(object):
     return any(goal.has_task_of_type(QuietTaskMixin) for goal in self._goals) or self._explain
 
   def _setup_context(self):
-    # TODO(John Sirois): Kill when source root registration is lifted out of BUILD files.
-    with self._run_tracker.new_workunit(name='bootstrap', labels=[WorkUnitLabel.SETUP]):
-      source_root_bootstrapper = SourceRootBootstrapper.global_instance()
-      source_root_bootstrapper.bootstrap(self._address_mapper, self._build_file_parser)
-
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._expand_goals(self._requested_goals)
       self._expand_specs(self._target_specs, self._fail_fast)
@@ -324,7 +294,7 @@ class GoalRunner(object):
   @classmethod
   def subsystems(cls):
     # Subsystems used outside of any task.
-    return {SourceRootBootstrapper, SourceRootConfig, Reporting, Reproducer, RunTracker}
+    return {SourceRootConfig, Reporting, Reproducer, RunTracker}
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir

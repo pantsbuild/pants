@@ -5,10 +5,10 @@ python_library(
   name = 'task_test_base',
   sources = ['task_test_base.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/goal:context',
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
+    'src/python/pants/task',
     'tests/python/pants_test:base_test',
   ]
 )
@@ -166,7 +166,7 @@ python_tests(
   sources = ['test_console_task.py'],
   dependencies = [
     ':task_test_base',
-    'src/python/pants/backend/core/tasks:console_task',
+    'src/python/pants/task',
   ]
 )
 
@@ -271,9 +271,9 @@ python_tests(
   dependencies = [
     ':task_test_base',
     'src/python/pants/backend/core/tasks:list_goals',
-    'src/python/pants/backend/core/tasks:common',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
+    'src/python/pants/task',
   ],
 )
 
@@ -364,7 +364,6 @@ python_tests(
   name = 'list_owners',
   sources = ['test_list_owners.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/backend/core/tasks:list_owners',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:exceptions',

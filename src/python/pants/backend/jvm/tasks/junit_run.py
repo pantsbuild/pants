@@ -76,7 +76,14 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
     register('--suppress-output', action='store_true', default=True,
+             deprecated_hint='Use --output-mode instead.',
+             deprecated_version='0.0.64',
              help='Redirect test output to files in .pants.d/test/junit.')
+    register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
+             help='Specify what part of output should be passed to stdout. '
+                  'In case of FAILURE_ONLY and parallel tests execution '
+                  'output can be partial or even wrong. '
+                  'All tests output also redirected to files in .pants.d/test/junit.')
     register('--cwd', advanced=True,
              help='Set the working directory. If no argument is passed, use the build root. '
                   'If cwd is set on a target, it will supersede this argument.')
@@ -93,12 +100,12 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.12'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.13'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
-                          # Clearly both tests and the runner need access to the same @Test, 
-                          # @Before, as well as other annotations, but there is also the Assert 
+                          # Clearly both tests and the runner need access to the same @Test,
+                          # @Before, as well as other annotations, but there is also the Assert
                           # class and some subset of the @Rules, @Theories and @RunWith APIs.
                           custom_rules=[
                             Shader.exclude_package('junit.framework', recursive=True),
@@ -154,8 +161,14 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     self._strict_jvm_version = options.strict_jvm_version
     self._args = copy.copy(self.args)
     self._failure_summary = options.failure_summary
-    if options.suppress_output:
-      self._args.append('-suppress-output')
+
+    if (not options.suppress_output) or options.output_mode == 'ALL':
+      self._args.append('-output-mode=ALL')
+    elif options.output_mode == 'FAILURE_ONLY':
+      self._args.append('-output-mode=FAILURE_ONLY')
+    else:
+      self._args.append('-output-mode=NONE')
+
     if self._fail_fast:
       self._args.append('-fail-fast')
     self._args.append('-outdir')

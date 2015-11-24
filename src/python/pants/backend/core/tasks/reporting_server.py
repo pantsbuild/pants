@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.backend.core.tasks.task import QuietTaskMixin, Task
 from pants.binaries import binary_util
 from pants.reporting.reporting_server import ReportingServerManager
+from pants.task.task import QuietTaskMixin, Task
 
 
 logger = logging.getLogger(__name__)

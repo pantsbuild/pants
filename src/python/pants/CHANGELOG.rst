@@ -1,6 +1,106 @@
 RELEASE HISTORY
 ===============
 
+0.0.61 (11/23/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release to fix two regressions in 0.0.60.  It also happens to
+include a small UX improvement for the console output of isolated compiles.
+
+Bugfixes
+~~~~~~~~
+
+* Make sure the deprecated pants.backend.core.tasks.task module is bundled.
+  `RB #3164 <https://rbcommons.com/s/twitter/r/3164>`_
+
+* Revert "Isolate .pex dir"
+  `Issue #2610 <https://github.com/pantsbuild/pants/issues/2610>`_
+  `RB #3135 <https://rbcommons.com/s/twitter/r/3135>`_
+  `RB #3163 <https://rbcommons.com/s/twitter/r/3163>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* During a jvm compile, include a running count in the printed log.
+  `RB #3153 <https://rbcommons.com/s/twitter/r/3153>`_
+
+0.0.60 (11/21/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release is primarily small bug fixes and minor improvements.  It also
+removes several deprecated options and methods:
+
+* `ReverseDepmap.type`.
+* `pants.backend.maven_layout`.
+* `Depmap.path_to`.
+* `SourceRoot.find`.
+* `SourceRoot.find_by_path`.
+* `pants.bin.goal_runner.SourceRootBootstrapper` and its option `[goals] bootstrap_buildfiles`.
+* `pants.build_graph.target._set_no_cache`.
+
+The following modules have been moved, with their old locations now deprecated:
+
+* `pants.backend.core.tasks.console_task` -> `pants.task.console_task`.
+* `pants.backend.core.tasks.task` -> `pants.task.task`.
+
+
+API Changes
+~~~~~~~~~~~
+
+* Move ConsoleTask to pants/task.
+  `RB #3157 <https://rbcommons.com/s/twitter/r/3157>`_
+
+* Move task.py out of backend/core.
+  `RB #3130 <https://rbcommons.com/s/twitter/r/3130>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* Add a helper staticmethod `closure()` to `BuildGraph`.
+  `RB #3160 <https://rbcommons.com/s/twitter/r/3160>`_
+
+* Fix a bug preventing re-upload artifacts that encountered read-errors
+  `RB #1361 <https://rbcommons.com/s/twitter/r/1361>`_
+  `RB #3141 <https://rbcommons.com/s/twitter/r/3141>`_
+
+* Fix `gopkg.in` fetcher to handle subpackages.
+  `RB #3139 <https://rbcommons.com/s/twitter/r/3139>`_
+
+* Update scalac_plugin_args call to the new option name.
+  `RB #3132 <https://rbcommons.com/s/twitter/r/3132>`_
+
+* Fix cases where transitivity is required despite strict_deps; enable within the repo for Java
+  `RB #3125 <https://rbcommons.com/s/twitter/r/3125>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Isolate .pex dir
+  `RB #3135 <https://rbcommons.com/s/twitter/r/3135>`_
+
+* Group cache hits/misses by their task names
+  `RB #3137 <https://rbcommons.com/s/twitter/r/3137>`_
+
+* Add back the --[no-]color flag as deprecated.
+  `RB #3150 <https://rbcommons.com/s/twitter/r/3150>`_
+
+* Add support for extra_jvm_options to java_tests
+  `Issue #2383 <https://github.com/pantsbuild/pants/issues/2383>`_
+  `RB #3140 <https://rbcommons.com/s/twitter/r/3140>`_
+
+* Removed Wire 2.0 support.  Update default Wire library to 1.8.0
+  `RB #3124 <https://rbcommons.com/s/twitter/r/3124>`_
+
+* Remove legacy code in wire_gen and protobuf_gen designed for global codegen strategy
+  `RB #3123 <https://rbcommons.com/s/twitter/r/3123>`_
+
 0.0.59 (11/15/2015)
 -------------------
 
