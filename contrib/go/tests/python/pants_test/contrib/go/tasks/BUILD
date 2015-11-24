@@ -139,3 +139,12 @@ python_tests(
     'tests/python/pants_test:int-test',
   ]
 )
+
+python_tests(
+  name='go_task',
+  sources=['test_go_task.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/tasks:go_task',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
