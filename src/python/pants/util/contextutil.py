@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+import sys
 import tarfile
 import tempfile
 import time
@@ -45,6 +46,17 @@ def environment_as(**kwargs):
   finally:
     for key, val in old_environment.items():
       setenv(key, val)
+
+
+@contextmanager
+def stdio_as(stdout, stderr, stdin=None):
+  """Redirect sys.{stdout, stderr, stdin} to alternate file-like objects."""
+  old_stdout, sys.stdout = sys.stdout, stdout
+  old_stderr, sys.stderr = sys.stderr, stderr
+  if stdin: old_stdin, sys.stdin = sys.stdin, stdin
+  yield
+  sys.stdout, sys.stderr = old_stdout, old_stderr
+  if stdin: sys.stdin = old_stdin
 
 
 @contextmanager

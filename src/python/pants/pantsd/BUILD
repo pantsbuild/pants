@@ -12,6 +12,16 @@ python_library(
 )
 
 python_library(
+  name = 'pailgun_server',
+  sources = ['pailgun_server.py'],
+  dependencies = [
+    'src/python/pants/java:nailgun_protocol',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:socket'
+  ]
+)
+
+python_library(
   name = 'watchman',
   sources = ['watchman.py'],
   dependencies = [
