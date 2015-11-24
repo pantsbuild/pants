@@ -16,3 +16,15 @@ java_library(
   ],
   sources=globs('*.java')
 )
+
+jvm_binary(
+  name='runner-binary',
+  basename='pants-runner',
+  main='org.pantsbuild.tools.runner.FileClassPathRunner',
+  dependencies=[
+    ':runner-library',
+  ],
+  description="""
+  	A command line tool for simulating classpath from jar provided classpath as real
+  """
+)
