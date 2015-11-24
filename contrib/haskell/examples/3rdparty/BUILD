@@ -28,16 +28,3 @@ haskell_project(
     ':pipes',
   ],
 )
-
-haskell_source_package(
-  name='stack',
-  path='https://github.com/commercialhaskell/stack/archive/v0.1.3.1.tar.gz',
-)
-
-haskell_project(
-  name='stack-project',
-  resolver='lts-3.1',
-  dependencies=[
-    ':stack',
-  ]
-)
