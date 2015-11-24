@@ -456,7 +456,7 @@ class PytestRun(TestTaskMixin, PythonTask):
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
   # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
 
-  # 'E' is here as well to catch test errors, not just test failures
+  # 'E' is here as well to catch test errors, not just test failures.
   RESULTLOG_FAILED_PATTERN = re.compile(r'[EF] +(.+?)::(.+)')
 
   @classmethod
@@ -464,11 +464,9 @@ class PytestRun(TestTaskMixin, PythonTask):
     with open(filename, 'r') as fp:
       lines = fp.readlines()
 
-    print(lines)
     failed_files = {
       m.groups()[0] for m in map(cls.RESULTLOG_FAILED_PATTERN.match, lines) if m and m.groups()
     }
-    print(failed_files)
 
     failed_targets = set()
     for failed_file in failed_files:
@@ -505,7 +503,6 @@ class PytestRun(TestTaskMixin, PythonTask):
       def run_and_analyze(resultlog_path):
         result = self._do_run_tests_with_args(pex, workunit, args)
         failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
-        print(failed_targets)
         return result.with_failed_targets(failed_targets)
 
       args = []
