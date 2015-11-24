@@ -79,7 +79,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
              deprecated_hint='Use --output-mode instead.',
              deprecated_version='0.0.64',
              help='Redirect test output to files in .pants.d/test/junit.')
-    register('--output-mode', default='NONE', choices=['ALL', 'FAILURE_ONLY', 'NONE'],
+    register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
              help='Specify what part of output should be passed to stdout. '
                   'In case of FAILURE_ONLY and parallel tests execution '
                   'output can be partial or even wrong. '
