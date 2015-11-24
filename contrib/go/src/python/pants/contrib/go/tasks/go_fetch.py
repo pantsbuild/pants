@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
 import os
 import shutil
 from collections import defaultdict
@@ -14,8 +13,7 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.memo import memoized_property
+from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.go.subsystems.fetchers import Fetchers
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
@@ -192,32 +190,15 @@ class GoFetch(GoTask):
         raise self.UndeclaredRemoteLibError(address)
     return self.context.build_graph.get_target(address)
 
-  @memoized_property
-  def go_stdlib(self):
-    out = self.go_dist.create_go_cmd('list', args=['std']).check_output()
-    return frozenset(out.strip().split())
-
   @staticmethod
   def _is_relative(import_path):
     return import_path.startswith('.')
 
   def _get_remote_import_paths(self, pkg, gopath=None):
     """Returns the remote import paths declared by the given Go `pkg`."""
-    out = self.go_dist.create_go_cmd('list', args=['-json', pkg], gopath=gopath).check_output()
-    try:
-      data = json.loads(out)
-      imports = data.get('Imports', [])
-      imports.extend(data.get('TestImports', []))
-
-      return [imp for imp in imports
-              if (imp not in self.go_stdlib and
-                  # We assume relative imports are local to the package and skip attempts to
-                  # recursively resolve them.
-                  not self._is_relative(imp))]
-    except ValueError as e:
-      save_file = os.path.join(gopath, '.errors', pkg, 'list.json')
-      with safe_open(save_file, 'w') as fp:
-        fp.write(out)
-      self.context.log.error('Problem determining imports for {}, saved json response to {}'
-                             .format(pkg, save_file))
-      raise TaskError(e)
+    import_listing = self.import_oracle.list_imports(pkg, gopath=gopath)
+    return [imp for imp in import_listing.all_imports
+            if (not self.import_oracle.is_go_internal_import(imp) and
+                # We assume relative imports are local to the package and skip attempts to
+                # recursively resolve them.
+                not self._is_relative(imp))]

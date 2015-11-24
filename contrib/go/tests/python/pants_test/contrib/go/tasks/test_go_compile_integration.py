@@ -31,3 +31,8 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
                              for libname in ('libA', 'libB', 'libC', 'libD', 'libE'))
         self.assert_contains_exact_files(os.path.join(workdir, 'compile', 'go'),
                                          expected_files)
+
+  def test_go_compile_cgo(self):
+    args = ['compile', 'contrib/go/examples/src/go/cgo']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
