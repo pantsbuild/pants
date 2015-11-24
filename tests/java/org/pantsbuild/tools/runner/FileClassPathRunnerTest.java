@@ -89,13 +89,16 @@ public class FileClassPathRunnerTest {
 
     URL url = new URL("file:@" + urlsAreHere.toAbsolutePath());
 
-    try (URLClassLoader loader = new URLClassLoader(new URL[] { url })) {
+    URLClassLoader loader = new URLClassLoader(new URL[] { url });
+    try {
       FileClassPathRunner.modifyClassLoader(loader, false);
 
       List<URL> allUrls = Arrays.asList(loader.getURLs());
 
       assertTrue(allUrls.contains(urlify("vegetables.jar")));
       assertTrue(allUrls.contains(urlify("cheese.jar")));
+    } finally {
+      loader.close();
     }
   }
 

@@ -98,7 +98,7 @@ public class FileClassPathRunner {
   // @VisibileForTesting
   @SuppressWarnings("PMD.EmptyCatchBlock")
   static List<Path> getClasspathFiles(URL[] urls) throws IOException {
-    List<Path> paths = new LinkedList<>();
+    List<Path> paths = new LinkedList<Path>();
 
     for (URL url : urls) {
       if (!"file".equals(url.getProtocol())) {
@@ -129,9 +129,9 @@ public class FileClassPathRunner {
   @SuppressWarnings("PMD.EmptyCatchBlock")
   static List<URL> readUrls(List<Path> paths, boolean modifySystemClassPathProperty)
       throws IOException {
-    List<URL> readUrls = new LinkedList<>();
+    List<URL> readUrls = new LinkedList<URL>();
 
-    List<String> classPathEntries = new LinkedList<>();
+    List<String> classPathEntries = new LinkedList<String>();
 
     for (Path path : paths) {
       if (!Files.exists(path)) {
