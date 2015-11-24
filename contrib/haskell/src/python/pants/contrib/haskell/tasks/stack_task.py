@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 
-from pants.backend.core.tasks.task import Task
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.haskell.subsystems.stack_distribution import StackDistribution
