@@ -196,3 +196,13 @@ class TestNailgunProtocol(unittest.TestCase):
       }),
       (False, True, False)
     )
+
+  def test_construct_chunk(self):
+    with self.assertRaises(TypeError):
+      NailgunProtocol.construct_chunk(ChunkType.STDOUT, 1111)
+
+  def test_construct_chunk_unicode(self):
+    NailgunProtocol.construct_chunk(ChunkType.STDOUT, u'Ø')
+
+  def test_construct_chunk_bytes(self):
+    NailgunProtocol.construct_chunk(ChunkType.STDOUT, b'yes')

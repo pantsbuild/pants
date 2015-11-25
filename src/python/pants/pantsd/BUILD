@@ -16,7 +16,6 @@ python_library(
   sources = ['pailgun_server.py'],
   dependencies = [
     'src/python/pants/java:nailgun_protocol',
-    'src/python/pants/util:meta',
     'src/python/pants/util:socket'
   ]
 )

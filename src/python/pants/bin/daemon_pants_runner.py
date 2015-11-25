@@ -13,15 +13,15 @@ import traceback
 from contextlib import contextmanager
 
 from pants.bin.exiter import Exiter
-from pants.bin.pants_runner import LocalPantsRunner, PantsRunner
+from pants.bin.pants_runner import LocalPantsRunner
 from pants.java.nailgun_io import NailgunStreamReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import stdio_as
 
 
-class DaemonExiter(Exiter, NailgunProtocol):
-  """An Exiter that speaks the nailgun protocol."""
+class DaemonExiter(Exiter):
+  """An Exiter that emits unhandled tracebacks and exit codes via the Nailgun protocol."""
 
   def __init__(self, socket):
     super(DaemonExiter, self).__init__()
@@ -40,10 +40,10 @@ class DaemonExiter(Exiter, NailgunProtocol):
     """Exit the runtime."""
     try:
       # Write a final message to stderr if present.
-      if msg: self.write_chunk(self._socket, ChunkType.STDERR, msg)
+      if msg: NailgunProtocol.write_chunk(self._socket, ChunkType.STDERR, msg)
 
       # Send an Exit chunk with the result.
-      self.write_chunk(self._socket, ChunkType.EXIT, bytes(result))
+      NailgunProtocol.write_chunk(self._socket, ChunkType.EXIT, bytes(result))
 
       # Shutdown the connected socket.
       self._shutdown_socket()
@@ -52,7 +52,7 @@ class DaemonExiter(Exiter, NailgunProtocol):
       os._exit(0)
 
 
-class DaemonPantsRunner(ProcessManager, PantsRunner, NailgunProtocol):
+class DaemonPantsRunner(ProcessManager):
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
   N.B. this class is primarily used by the PailgunService in pantsd.
@@ -74,15 +74,15 @@ class DaemonPantsRunner(ProcessManager, PantsRunner, NailgunProtocol):
   def _make_identity(self):
     """Generate a ProcessManager identity for a given pants run.
 
-    This provides for a reasonably unique name e.g. 'pantsd-run-2015-09-16T23:17:56.581899'.
+    This provides for a reasonably unique name e.g. 'pantsd-run-2015-09-16T23_17_56_581899'.
     """
-    return 'pantsd-run-{}'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f'))
+    return 'pantsd-run-{}'.format(datetime.datetime.now().strftime('%Y-%m-%dT%H_%M_%S_%f'))
 
   @contextmanager
   def _nailgunned_stdio(self, sock):
     """Redirects stdio to the connected socket speaking the nailgun protocol."""
     # Determine output tty capabilities from the environment.
-    _, stdout_isatty, stderr_isatty = self.isatty_from_env(self._env)
+    _, stdout_isatty, stderr_isatty = NailgunProtocol.isatty_from_env(self._env)
 
     # Construct a StreamReader for stdin.
     stdin_reader = NailgunStreamReader(sys.stdin, sock)

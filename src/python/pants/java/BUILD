@@ -35,6 +35,9 @@ python_library(
 python_library(
   name = 'nailgun_protocol',
   sources = ['nailgun_protocol.py'],
+  dependencies = [
+    '3rdparty/python:six',
+  ]
 )
 
 python_library(

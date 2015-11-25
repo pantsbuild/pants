@@ -8,15 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import socket
 import traceback
-from abc import abstractmethod
 from SocketServer import BaseRequestHandler, BaseServer, TCPServer
 
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
-from pants.util.meta import AbstractClass
 from pants.util.socket import RecvBufferedSocket
 
 
-class PailgunHandlerBase(AbstractClass, BaseRequestHandler):
+class PailgunHandlerBase(BaseRequestHandler):
   """Base class for nailgun protocol handlers for use with SocketServer-based servers."""
 
   def __init__(self, request, client_address, server):
@@ -42,16 +40,14 @@ class PailgunHandlerBase(AbstractClass, BaseRequestHandler):
     finally:
       self.finish()
 
-  @abstractmethod
   def handle(self):
     """Main request handler entrypoint for subclasses."""
 
-  @abstractmethod
   def handle_error(self, exc):
     """Main error handler entrypoint for subclasses."""
 
 
-class PailgunHandler(PailgunHandlerBase, NailgunProtocol):
+class PailgunHandler(PailgunHandlerBase):
   """A nailgun protocol handler for use with forking, SocketServer-based servers."""
 
   def _run_pants(self, sock, arguments, environment):
@@ -60,12 +56,9 @@ class PailgunHandler(PailgunHandlerBase, NailgunProtocol):
     runner.run()
 
   def handle(self):
-    """Reqest handler for a single Pailgun request."""
-    # Send a banner over stderr to inform the remote client they're running in-daemon.
-    self.write_chunk(self.request, ChunkType.STDERR, '[pantsd]\n')
-
+    """Request handler for a single Pailgun request."""
     # Parse the Nailgun request portion.
-    _, _, arguments, environment = self.parse_request(self.request)
+    _, _, arguments, environment = NailgunProtocol.parse_request(self.request)
 
     # N.B. the first and second nailgun request arguments (working_dir and command) are currently
     # ignored in favor of a get_buildroot() call within LocalPantsRunner.run() and an assumption
@@ -79,15 +72,16 @@ class PailgunHandler(PailgunHandlerBase, NailgunProtocol):
     self.logger.debug('pailgun request environment: %s', environment)
 
     # Instruct the client to send stdin (if applicable).
-    self.send_start_reading_input(self.request)
+    NailgunProtocol.send_start_reading_input(self.request)
 
     # Execute the requested command.
     self._run_pants(self.request, arguments, environment)
 
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""
-    if exc: self.write_chunk(self.request, ChunkType.STDERR, traceback.format_exc())
-    self.write_chunk(self.request, ChunkType.EXIT, 1)
+    if exc:
+      NailgunProtocol.write_chunk(self.request, ChunkType.STDERR, traceback.format_exc())
+    NailgunProtocol.write_chunk(self.request, ChunkType.EXIT, '1')
 
 
 class PailgunServer(TCPServer):

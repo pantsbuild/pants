@@ -35,11 +35,11 @@ class PailgunService(PantsService):
 
   @property
   def pailgun_port(self):
-    return getattr(self.pailgun, 'server_port', None)
+    return getattr(self.pailgun, 'server_port')
 
   def _setup_pailgun(self):
     """Sets up a PailgunServer instance."""
-    # Constructs and returns a runnable [Daemon]PantsRunner.
+    # Constructs and returns a runnable PantsRunner.
     def runner_factory(sock, arguments, environment):
       exiter = self._exiter_class(sock)
       return self._runner_class(sock, exiter, arguments, environment)

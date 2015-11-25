@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import struct
 
+import six
+
 
 class ChunkType(object):
   """Nailgun protocol chunk types.
@@ -126,9 +128,13 @@ class NailgunProtocol(object):
     sock.sendall(chunk)
 
   @classmethod
-  def construct_chunk(cls, chunk_type, payload):
-    """Construct and return single chunk."""
-    payload = bytes(payload)
+  def construct_chunk(cls, chunk_type, payload, encoding='utf-8'):
+    """Construct and return a single chunk."""
+    if isinstance(payload, six.text_type):
+      payload = payload.encode(encoding)
+    elif not isinstance(payload, six.binary_type):
+      raise TypeError('cannot encode type: {}'.format(type(payload)))
+
     header = struct.pack(cls.HEADER_FMT, len(payload), chunk_type)
     return header + payload
 
