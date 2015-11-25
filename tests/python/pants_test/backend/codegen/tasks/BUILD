@@ -42,8 +42,9 @@ python_tests(
   name = 'jaxb_gen',
   sources = ['test_jaxb_gen.py'],
   dependencies = [
-    'src/python/pants/backend/codegen/tasks:jaxb_gen',
+    'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/tasks:jaxb_gen',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
