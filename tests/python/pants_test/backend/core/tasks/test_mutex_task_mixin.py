@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 from contextlib import contextmanager
 
-from pants.backend.core.tasks.mutex_task_mixin import MutexTaskMixin
 from pants.build_graph.target import Target
+from pants.task.mutex_task_mixin import MutexTaskMixin
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 

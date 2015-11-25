@@ -18,6 +18,25 @@ python_library(
     'src/python/pants/task',
   ],
 )
+
+python_library(
+  name = 'console_task',
+  sources = ['console_task.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+    'src/python/pants/task',
+  ],
+)
+
+python_library(
+  name = 'repl_task_mixin',
+  sources = ['repl_task_mixin.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+    'src/python/pants/task'
+  ]
+)
+
 # <======
 
 target(
@@ -41,7 +60,6 @@ target(
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
-    ':mutex_task_mixin',
     ':noop',
     ':pathdeps',
     ':paths',
@@ -141,15 +159,6 @@ python_library(
     'src/python/pants/binaries:binary_util',
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
-  name = 'console_task',
-  sources = ['console_task.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/task',
   ],
 )
 
@@ -273,15 +282,6 @@ python_library(
 )
 
 python_library(
-  name = 'mutex_task_mixin',
-  sources = ['mutex_task_mixin.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/task',
-  ]
-)
-
-python_library(
   name = 'noop',
   sources = ['noop.py'],
   dependencies = [
@@ -305,16 +305,6 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:strutil',
   ],
-)
-
-python_library(
-  name = 'repl_task_mixin',
-  sources = ['repl_task_mixin.py'],
-  dependencies = [
-    ':mutex_task_mixin',
-    'src/python/pants/base:workunit',
-    'src/python/pants/console:stty_utils',
-  ]
 )
 
 python_library(
