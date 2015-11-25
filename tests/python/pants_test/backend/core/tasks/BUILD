@@ -11,7 +11,7 @@ target(
     ':mutex_task_mixin',
     ':scm_publish',
     ':target_filter_task_mixin',
-    ':test_task_mixin',
+    ':testrunner_task_mixin',
   ],
 )
 
@@ -161,10 +161,11 @@ python_tests(
 )
 
 python_tests(
-  name='test_task_mixin',
-  sources=['test_test_task_mixin.py'],
+  name='testrunner_task_mixin',
+  sources=['test_testrunner_task_mixin.py'],
   dependencies=[
-    'src/python/pants/backend/core/tasks:test_task_mixin',
+    'src/python/pants/task',
+    'src/python/pants/util:timeout',
     'tests/python/pants_test/tasks:task_test_base',
     '3rdparty/python:mock',
   ]
