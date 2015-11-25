@@ -68,8 +68,8 @@ class NailgunStreamReader(threading.Thread, NailgunProtocol):
           else:
             self.write_chunk(self._socket, ChunkType.STDIN_EOF)
             try:
-              self._socket.shutdown(socket.SHUT_WR)           # Shutdown socket sends.
-            except socket.error:                              # Can happen if response is quick.
+              self._socket.shutdown(socket.SHUT_WR)  # Shutdown socket sends.
+            except socket.error:  # Can happen if response is quick.
               pass
             finally:
               self.stop()

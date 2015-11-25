@@ -221,6 +221,6 @@ class NailgunProtocol(object):
     :returns: A tuple of boolean values indicating istty or not for (stdin, stdout, stderr).
     """
     def str_int_bool(i):
-      return i.isdigit() and bool(int(i))    # Environment variable values should always be strings.
+      return i.isdigit() and bool(int(i))  # Environment variable values should always be strings.
 
     return tuple(str_int_bool(env.get('NAILGUN_TTY_{}'.format(fd_id), '0')) for fd_id in range(3))
