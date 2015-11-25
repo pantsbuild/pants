@@ -11,8 +11,8 @@ import re
 import pystache
 from pkg_resources import resource_string
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.reflect import assemble_buildsyms
+from pants.task.console_task import ConsoleTask
 
 
 class TargetsHelp(ConsoleTask):

@@ -27,6 +27,20 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
+  @staticmethod
+  def closure(targets, bfs=False):
+    targets = OrderedSet(targets)
+    if not targets:
+      return OrderedSet()
+
+    build_graph = next(iter(targets))._build_graph
+    if bfs:
+      transitive_subgraph_fn = build_graph.transitive_subgraph_of_addresses_bfs
+    else:
+      transitive_subgraph_fn = build_graph.transitive_subgraph_of_addresses
+
+    return transitive_subgraph_fn(t.address for t in targets)
+
   def __init__(self, address_mapper):
     self._address_mapper = address_mapper
     self.reset()
@@ -195,14 +209,14 @@ class BuildGraph(object):
     """
     walked = set()
 
-    def _walk_rec(address):
-      if address not in walked:
-        walked.add(address)
-        target = self._target_by_address[address]
+    def _walk_rec(addr):
+      if addr not in walked:
+        walked.add(addr)
+        target = self._target_by_address[addr]
         if not predicate or predicate(target):
           if not postorder:
             work(target)
-          for dep_address in self._target_dependencies_by_address[address]:
+          for dep_address in self._target_dependencies_by_address[addr]:
             _walk_rec(dep_address)
           if postorder:
             work(target)
@@ -218,14 +232,14 @@ class BuildGraph(object):
     """
     walked = set()
 
-    def _walk_rec(address):
-      if address not in walked:
-        walked.add(address)
-        target = self._target_by_address[address]
+    def _walk_rec(addr):
+      if addr not in walked:
+        walked.add(addr)
+        target = self._target_by_address[addr]
         if not predicate or predicate(target):
           if not postorder:
             work(target)
-          for dep_address in self._target_dependees_by_address[address]:
+          for dep_address in self._target_dependees_by_address[addr]:
             _walk_rec(dep_address)
           if postorder:
             work(target)
@@ -243,7 +257,8 @@ class BuildGraph(object):
     :param function predicate: The predicate passed through to `walk_transitive_dependee_graph`.
     """
     ret = OrderedSet()
-    self.walk_transitive_dependee_graph(addresses, ret.add, predicate=predicate, postorder=False)
+    self.walk_transitive_dependee_graph(addresses, ret.add, predicate=predicate,
+                                        postorder=postorder)
     return ret
 
   def transitive_subgraph_of_addresses(self, addresses, predicate=None, postorder=False):
@@ -361,8 +376,8 @@ class BuildGraph(object):
         target = self.get_target(target_address)
 
       def inject_spec_closure(spec):
-        address = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
-        self.inject_address_closure(address)
+        addr = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
+        self.inject_address_closure(addr)
 
       for traversable_spec in target.traversable_dependency_specs:
         inject_spec_closure(traversable_spec)
@@ -417,7 +432,7 @@ class CycleException(Exception):
   """Thrown when a circular dependency is detected."""
 
   def __init__(self, cycle):
-    Exception.__init__(self, 'Cycle detected:\n\t{}'.format(
+    super(CycleException, self).__init__('Cycle detected:\n\t{}'.format(
         ' ->\n\t'.join(target.address.spec for target in cycle)
     ))
 
@@ -429,23 +444,23 @@ def invert_dependencies(targets):
   visited = set()
   path = OrderedSet()
 
-  def invert(target):
-    if target in path:
+  def invert(tgt):
+    if tgt in path:
       path_list = list(path)
-      cycle_head = path_list.index(target)
-      cycle = path_list[cycle_head:] + [target]
+      cycle_head = path_list.index(tgt)
+      cycle = path_list[cycle_head:] + [tgt]
       raise CycleException(cycle)
-    path.add(target)
-    if target not in visited:
-      visited.add(target)
-      if target.dependencies:
-        for dependency in target.dependencies:
-          inverted_deps[dependency].add(target)
+    path.add(tgt)
+    if tgt not in visited:
+      visited.add(tgt)
+      if tgt.dependencies:
+        for dependency in tgt.dependencies:
+          inverted_deps[dependency].add(tgt)
           invert(dependency)
       else:
-        roots.add(target)
+        roots.add(tgt)
 
-    path.remove(target)
+    path.remove(tgt)
 
   for target in targets:
     invert(target)

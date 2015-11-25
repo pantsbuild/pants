@@ -11,6 +11,7 @@ import itertools
 import os
 from collections import defaultdict
 
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.java import Java
@@ -27,6 +28,7 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.target import Target
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
 from pants.reporting.reporting_utils import items_to_report_element
@@ -175,6 +177,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   @classmethod
   def name(cls):
     return cls._name
+
+  @property
+  def compiler_plugin_types(cls):
+    """A tuple of target types which are compiler plugins."""
+    return ()
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -363,7 +370,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
       # Register products for valid targets.
       valid_targets = [vt.target for vt in invalidation_check.all_vts if vt.valid]
-      self._register_vts(compile_contexts[t] for t in valid_targets)
+      self._register_vts([compile_contexts[t] for t in valid_targets])
 
       # Build any invalid targets (which will register products in the background).
       if invalidation_check.invalid_vts:
@@ -416,7 +423,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       raise TaskError("Compilation failure: {}".format(e))
 
   def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings, fatal_warnings):
+                   log_file, progress_message, settings, fatal_warnings, counter):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -434,8 +441,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
                             .format(self.name(), vts.targets))
     else:
+      counter_val = str(counter()).rjust(counter.format_length(), b' ')
+      counter_str = '[{}/{}] '.format(counter_val, counter.size)
       # Do some reporting.
       self.context.log.info(
+        counter_str,
         'Compiling ',
         items_to_report_element(sources, '{} source'.format(self.name())),
         ' in ',
@@ -530,6 +540,27 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         product_deps_by_src[compile_context.target] = \
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
 
+  def _compute_strict_dependencies(self, target):
+    """Compute the 'strict' compile target dependencies for the given target.
+
+    Recursively resolves target aliases, and includes the transitive deps of compiler plugins,
+    since compiletime is actually runtime for them.
+    """
+    def resolve(t):
+      for declared in t.dependencies:
+        if isinstance(declared, Dependencies) or type(declared) == Target:
+          for r in resolve(declared):
+            yield r
+        elif isinstance(declared, self.compiler_plugin_types):
+          for r in declared.closure(bfs=True):
+            yield r
+        else:
+          yield declared
+
+    yield target
+    for dep in resolve(target):
+      yield dep
+
   def _compute_classpath_entries(self,
                                  classpath_products,
                                  compile_context,
@@ -537,7 +568,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     # Generate a classpath specific to this compile and target.
     target = compile_context.target
     if compile_context.strict_deps:
-      classpath_targets = [target] + target.dependencies
+      classpath_targets = list(self._compute_strict_dependencies(target))
       pruned = [t.address.spec for t in target.closure(bfs=True) if t not in classpath_targets]
       self.context.log.debug(
           'Using strict classpath for {}, which prunes the following dependencies: {}'.format(
@@ -596,6 +627,19 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         return True
       return os.path.exists(compile_context.analysis_file)
 
+    class Counter(object):
+      def __init__(self, size, initial=0):
+        self.size = size
+        self.count = initial
+
+      def __call__(self):
+        self.count += 1
+        return self.count
+
+      def format_length(self):
+        return len(str(self.size))
+
+    counter = Counter(len(invalid_vts_partitioned))
     def work_for_vts(vts, compile_context):
       progress_message = compile_context.target.address.spec
 
@@ -635,7 +679,8 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           log_file,
                           progress_message,
                           target.platform,
-                          fatal_warnings)
+                          fatal_warnings,
+                          counter)
         os.rename(tmp_analysis_file, compile_context.analysis_file)
         self._analysis_tools.relativize(compile_context.analysis_file, compile_context.portable_analysis_file)
 

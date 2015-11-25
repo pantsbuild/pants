@@ -1,6 +1,25 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+# =======>
+# TODO: Remove these after task.py's deprecation cycle is over.
+target(
+  name = 'common',
+  dependencies = [
+    'src/python/pants/task',
+  ]
+)
+
+python_library(
+  name = 'task',
+  sources = ['task.py'],
+  dependencies = [
+    'src/python/pants/base:deprecated',
+    'src/python/pants/task',
+  ],
+)
+# <======
+
 target(
   name = 'all',
   dependencies = [
@@ -9,7 +28,6 @@ target(
     ':changed_target_goals',
     ':clean',
     ':cloc',
-    ':common',
     ':confluence_publish',
     ':console_task',
     ':deferred_sources_mapper',
@@ -40,14 +58,6 @@ target(
   ]
 )
 
-target(
-  name = 'common',
-  dependencies = [
-    ':task',
-    'src/python/pants/base:exceptions',
-  ]
-)
-
 python_library(
   name = 'bash_completion',
   sources = ['bash_completion.py'],
@@ -55,13 +65,12 @@ python_library(
     ':bash_completion_resources',
   ],
   dependencies = [
-    ':console_task',
-    ':task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/goal',
     'src/python/pants/help',
     'src/python/pants/option',
+    'src/python/pants/task',
   ],
 )
 
@@ -77,13 +86,10 @@ python_library(
     ':builddictionary_resources',
   ],
   dependencies = [
-    ':common',
     ':reflect',
-    ':task',
     '3rdparty/python:docutils',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/maven_layout',
     'src/python/pants/backend/python:python_requirements',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_manual',
@@ -91,6 +97,7 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/build_graph',
     'src/python/pants/goal',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -105,8 +112,8 @@ python_library(
   name = 'clean',
   sources = ['clean.py'],
   dependencies = [
-    ':task',
     'src/python/pants/base:build_environment',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -115,11 +122,11 @@ python_library(
   name = 'cloc',
   sources = ['cloc.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/task',
     'src/python/pants/util:contextutil',
   ],
 )
@@ -129,10 +136,10 @@ python_library(
   sources = ['confluence_publish.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.confluence',
-    ':task',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -141,8 +148,8 @@ python_library(
   name = 'console_task',
   sources = ['console_task.py'],
   dependencies = [
-    ':common',
-    'src/python/pants/util:dirutil',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/task',
   ],
 )
 
@@ -150,9 +157,9 @@ python_library(
   name = 'deferred_sources_mapper',
   sources= ['deferred_sources_mapper.py'],
   dependencies = [
-    ':task',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
   ],
 )
 
@@ -160,9 +167,9 @@ python_library(
   name = 'dependees',
   sources = ['dependees.py'],
   dependencies = [
-    ':console_task',
     ':target_filter_task_mixin',
     'src/python/pants/base:build_environment',
+    'src/python/pants/task',
   ],
 )
 
@@ -171,8 +178,8 @@ python_library(
   sources = ['explain_options_task.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
-    ':console_task',
     'src/python/pants/option',
+    'src/python/pants/task',
   ],
 )
 
@@ -180,7 +187,7 @@ python_library(
   name = 'filemap',
   sources = ['filemap.py'],
   dependencies = [
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -188,12 +195,12 @@ python_library(
   name = 'filter',
   sources = ['filter.py'],
   dependencies = [
-    ':console_task',
     ':target_filter_task_mixin',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:filtering',
   ],
 )
@@ -203,11 +210,11 @@ python_library(
   sources = ['group_task.py'],
   dependencies = [
     '3rdparty/python:six',
-    ':task',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/option',
+    'src/python/pants/task',
   ],
 )
 
@@ -215,8 +222,8 @@ python_library(
   name = 'list_goals',
   sources = ['list_goals.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/goal',
+    'src/python/pants/task',
   ],
 )
 
@@ -225,7 +232,7 @@ python_library(
   sources = ['listtargets.py'],
   dependencies = [
     'src/python/pants/base:exceptions',
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -240,7 +247,6 @@ python_library(
     '3rdparty/python:Pygments',
     '3rdparty/python:docutils',
     '3rdparty/python:six',
-    ':task',
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
@@ -248,6 +254,7 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -261,7 +268,7 @@ python_library(
   name = 'minimal_cover',
   sources = ['minimal_cover.py'],
   dependencies = [
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -269,8 +276,8 @@ python_library(
   name = 'mutex_task_mixin',
   sources = ['mutex_task_mixin.py'],
   dependencies = [
-    ':task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/task',
   ]
 )
 
@@ -278,7 +285,7 @@ python_library(
   name = 'noop',
   sources = ['noop.py'],
   dependencies = [
-    ':common',
+    'src/python/pants/task',
   ],
 )
 
@@ -286,7 +293,7 @@ python_library(
   name = 'pathdeps',
   sources = ['pathdeps.py'],
   dependencies = [
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -294,8 +301,8 @@ python_library(
   name = 'paths',
   sources = ['paths.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/task',
     'src/python/pants/util:strutil',
   ],
 )
@@ -314,11 +321,11 @@ python_library(
   name = 'reporting_server',
   sources = ['reporting_server.py'],
   dependencies = [
-    ':task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/reporting',
+    'src/python/pants/task',
   ],
 )
 
@@ -342,7 +349,7 @@ python_library(
   name = 'roots',
   sources = ['roots.py'],
   dependencies = [
-    ':console_task',
+    'src/python/pants/task',
   ],
 )
 
@@ -350,9 +357,9 @@ python_library(
   name = 'run_prep_command',
   sources = ['run_prep_command.py'],
   dependencies = [
-    ':task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/task',
   ],
 )
 
@@ -370,9 +377,8 @@ python_library(
   name = 'sorttargets',
   sources = ['sorttargets.py'],
   dependencies = [
-    ':common',
-    ':console_task',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
   ],
 )
 
@@ -380,8 +386,8 @@ python_library(
   name = 'target_filter_task_mixin',
   sources = ['target_filter_task_mixin.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/task',
   ]
 )
 
@@ -392,10 +398,8 @@ python_library(
     ':targets_help_resources',
   ],
   dependencies = [
-    ':builddictionary',
-    ':common',
-    ':console_task',
     ':reflect',
+    'src/python/pants/task',
   ],
 )
 
@@ -405,29 +409,11 @@ resources(
 )
 
 python_library(
-  name = 'task',
-  sources = ['task.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:hash_utils',
-    'src/python/pants/base:worker_pool',
-    'src/python/pants/base:workunit',
-    'src/python/pants/cache',
-    'src/python/pants/invalidation',
-    'src/python/pants/ivy',
-    'src/python/pants/java:executor',
-    'src/python/pants/reporting',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:meta',
-  ],
-)
-
-python_library(
   name = 'test_task_mixin',
   sources = ['test_task_mixin.py'],
   dependencies = [
-    ':task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/util:timeout',
   ],
 )
 
@@ -435,8 +421,8 @@ python_library(
   name = 'list_owners',
   sources = ['list_owners.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
   ],
 )
 
@@ -444,11 +430,11 @@ python_library(
   name = 'what_changed',
   sources = ['what_changed.py'],
   dependencies = [
-    ':console_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/goal:workspace',
+    'src/python/pants/task',
   ],
 )
 

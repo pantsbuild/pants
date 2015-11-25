@@ -12,16 +12,16 @@ import pystache
 from pants.base.mustache import MustacheRenderer
 
 
+# TODO(benjy): Get rid of this class? It just adds complexity, and a regular dict should be fine.
+# Unfortunately we first have to fix external uses of this should-be-internal-only class.
 class TemplateData(dict):
-  """Encapsulates data for a mustache template as a property-addressable read-only map-like struct.
-  """
+  """Encapsulates mustache template arguments as a property-addressable read-only object."""
 
   def __init__(self, **kwargs):
-    dict.__init__(self, MustacheRenderer.expand(kwargs))
+    super(TemplateData, self).__init__(MustacheRenderer.expand(kwargs))
 
   def extend(self, **kwargs):
-    """Returns a new TemplateData with this template's data overlayed by the key value pairs
-    specified as keyword arguments."""
+    """Returns a new instance with this instance's data overlayed by the key-value args."""
 
     props = self.copy()
     props.update(kwargs)
@@ -40,6 +40,7 @@ class TemplateData(dict):
     return 'TemplateData({})'.format(pprint.pformat(self))
 
 
+# TODO(benjy): Get rid of this class? It adds basically nothing over the MustacheRenderer.
 class Generator(object):
   """Generates pants intermediary output files using a configured mustache template."""
 

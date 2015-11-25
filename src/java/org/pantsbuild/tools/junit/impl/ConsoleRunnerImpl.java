@@ -10,6 +10,7 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -42,6 +43,7 @@ import org.junit.runner.Result;
 import org.junit.runner.RunWith;
 import org.junit.runner.Runner;
 import org.junit.runner.manipulation.Filter;
+import org.junit.runner.notification.Failure;
 import org.junit.runners.model.InitializationError;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -93,7 +95,7 @@ public class ConsoleRunnerImpl {
   }
 
   /**
-   * Captures a tests stderr and stdout streams, restoring the previous streams on {@link #close()}.
+   * Holder for a tests stderr and stdout streams.
    */
   static class StreamCapture {
     private final File out;
@@ -102,39 +104,30 @@ public class ConsoleRunnerImpl {
     private final File err;
     private OutputStream errstream;
 
-    /**
-     *  If true capture stdout and stderr to original System.out and System.err
-     *  as well as to out and err files.
-    **/
-    private final boolean printToOriginalOutputs;
-
     private int useCount;
     private boolean closed;
 
-    StreamCapture(File out, File err, boolean printToOriginalOutputs) throws IOException {
+    StreamCapture(File out, File err) throws IOException {
       this.out = out;
       this.err = err;
-      this.printToOriginalOutputs = printToOriginalOutputs;
     }
 
     void incrementUseCount() {
       this.useCount++;
     }
 
-    void open() throws FileNotFoundException {
+    OutputStream getOutputStream() throws FileNotFoundException {
       if (outstream == null) {
         outstream = new FileOutputStream(out);
       }
+      return outstream;
+    }
+
+    OutputStream getErrorStream() throws FileNotFoundException {
       if (errstream == null) {
         errstream = new FileOutputStream(err);
       }
-      if (printToOriginalOutputs) {
-        SWAPPABLE_OUT.swap(new TeeOutputStream(SWAPPABLE_OUT.getOriginal(), outstream));
-        SWAPPABLE_ERR.swap(new TeeOutputStream(SWAPPABLE_ERR.getOriginal(), errstream));
-      } else {
-        SWAPPABLE_OUT.swap(outstream);
-        SWAPPABLE_ERR.swap(errstream);
-      }
+      return errstream;
     }
 
     void close() throws IOException {
@@ -168,19 +161,66 @@ public class ConsoleRunnerImpl {
     }
   }
 
+  static class InMemoryStreamCapture {
+    private ByteArrayOutputStream outstream;
+    private ByteArrayOutputStream errstream;
+
+    private boolean closed;
+
+    OutputStream getOutputStream() {
+      if (outstream == null) {
+        outstream = new ByteArrayOutputStream();
+      }
+      return outstream;
+    }
+
+    OutputStream getErrorStream() {
+      if (errstream == null) {
+        errstream = new ByteArrayOutputStream();
+      }
+      return errstream;
+    }
+
+    void close() throws IOException {
+      if (!closed) {
+        if (outstream != null) {
+          Closeables.close(outstream, /* swallowIOException */ true);
+        }
+        if (errstream != null) {
+          Closeables.close(errstream, /* swallowIOException */ true);
+        }
+        closed = true;
+      }
+    }
+
+    byte[] readOut() throws IOException {
+      return read(outstream);
+    }
+
+    byte[] readErr() throws IOException {
+      return read(errstream);
+    }
+
+    private byte[] read(ByteArrayOutputStream stream) throws IOException {
+      Preconditions.checkState(closed, "Capture must be closed by all users before it can be read");
+      return stream.toByteArray();
+    }
+  }
+
   /**
-   * A run listener that captures the output and error streams for each test class and makes the
-   * content of these available.
+   * A run listener that suiteCaptures the output and error streams for each test class
+   * and makes the content of these available.
    */
   static class StreamCapturingListener extends ForwardingListener implements StreamSource {
-    private final Map<Class<?>, StreamCapture> captures = Maps.newHashMap();
+    private final Map<Class<?>, StreamCapture> suiteCaptures = Maps.newHashMap();
+    private final Map<Description, InMemoryStreamCapture> caseCaptures = Maps.newHashMap();
 
     private final File outdir;
-    private final boolean printToOriginalOutputs;
+    private final OutputMode outputMode;
 
-    StreamCapturingListener(File outdir, boolean printToOriginalOutputs) {
+    StreamCapturingListener(File outdir, OutputMode outputMode) {
       this.outdir = outdir;
-      this.printToOriginalOutputs = printToOriginalOutputs;
+      this.outputMode = outputMode;
     }
 
     @Override
@@ -193,8 +233,8 @@ public class ConsoleRunnerImpl {
       for (Description test : tests) {
         registerTests(test.getChildren());
         if (Util.isRunnable(test)) {
-          StreamCapture capture = captures.get(test.getTestClass());
-          if (capture == null) {
+          StreamCapture suiteCapture = suiteCaptures.get(test.getTestClass());
+          if (suiteCapture == null) {
             String prefix = test.getClassName();
 
             File out = new File(outdir, prefix + ".out.txt");
@@ -202,49 +242,90 @@ public class ConsoleRunnerImpl {
 
             File err = new File(outdir, prefix + ".err.txt");
             Files.createParentDirs(err);
-            capture = new StreamCapture(out, err, printToOriginalOutputs);
-            captures.put(test.getTestClass(), capture);
+            suiteCapture = new StreamCapture(out, err);
+            suiteCaptures.put(test.getTestClass(), suiteCapture);
           }
-          capture.incrementUseCount();
+          suiteCapture.incrementUseCount();
         }
       }
     }
 
     @Override
     public void testRunFinished(Result result) throws Exception {
-      for (StreamCapture capture : captures.values()) {
+      for (StreamCapture capture : suiteCaptures.values()) {
         capture.dispose();
       }
+      caseCaptures.clear();
       super.testRunFinished(result);
     }
 
     @Override
     public void testStarted(Description description) throws Exception {
-      captures.get(description.getTestClass()).open();
+      StreamCapture suiteCapture = suiteCaptures.get(description.getTestClass());
+      OutputStream suiteOut = suiteCapture.getOutputStream();
+      OutputStream suiteErr = suiteCapture.getErrorStream();
+
+      switch (outputMode) {
+        case ALL:
+          SWAPPABLE_OUT.swap(new TeeOutputStream(SWAPPABLE_OUT.getOriginal(), suiteOut));
+          SWAPPABLE_ERR.swap(new TeeOutputStream(SWAPPABLE_ERR.getOriginal(), suiteErr));
+          break;
+        case FAILURE_ONLY:
+          InMemoryStreamCapture caseCapture = new InMemoryStreamCapture();
+          caseCaptures.put(description, caseCapture);
+          SWAPPABLE_OUT.swap(new TeeOutputStream(caseCapture.getOutputStream(), suiteOut));
+          SWAPPABLE_ERR.swap(new TeeOutputStream(caseCapture.getErrorStream(), suiteErr));
+          break;
+        case NONE:
+          SWAPPABLE_OUT.swap(suiteOut);
+          SWAPPABLE_ERR.swap(suiteErr);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+
       super.testStarted(description);
     }
 
     @Override
+    public void testFailure(Failure failure) throws Exception {
+      if (outputMode == OutputMode.FAILURE_ONLY) {
+        InMemoryStreamCapture capture = caseCaptures.remove(failure.getDescription());
+        capture.close();
+        SWAPPABLE_OUT.getOriginal().append(new String(capture.readOut()));
+        SWAPPABLE_ERR.getOriginal().append(new String(capture.readErr()));
+      }
+      super.testFailure(failure);
+    }
+
+    @Override
     public void testFinished(Description description) throws Exception {
-      captures.get(description.getTestClass()).close();
+      suiteCaptures.get(description.getTestClass()).close();
+      if (caseCaptures.containsKey(description)) {
+        caseCaptures.remove(description).close();
+      }
       super.testFinished(description);
     }
 
     @Override
     public byte[] readOut(Class<?> testClass) throws IOException {
-      return captures.get(testClass).readOut();
+      return suiteCaptures.get(testClass).readOut();
     }
 
     @Override
     public byte[] readErr(Class<?> testClass) throws IOException {
-      return captures.get(testClass).readErr();
+      return suiteCaptures.get(testClass).readErr();
     }
+  }
+
+  enum OutputMode {
+    ALL, FAILURE_ONLY, NONE
   }
 
   private static final Pattern METHOD_PARSER = Pattern.compile("^([^#]+)#([^#]+)$");
 
   private final boolean failFast;
-  private final boolean suppressOutput;
+  private final OutputMode outputMode;
   private final boolean xmlReport;
   private final File outdir;
   private final boolean perTestTimer;
@@ -256,7 +337,7 @@ public class ConsoleRunnerImpl {
 
   ConsoleRunnerImpl(
       boolean failFast,
-      boolean suppressOutput,
+      OutputMode outputMode,
       boolean xmlReport,
       boolean perTestTimer,
       File outdir,
@@ -267,7 +348,7 @@ public class ConsoleRunnerImpl {
       int numRetries) {
 
     this.failFast = failFast;
-    this.suppressOutput = suppressOutput;
+    this.outputMode = outputMode;
     this.xmlReport = xmlReport;
     this.perTestTimer = perTestTimer;
     this.outdir = outdir;
@@ -304,7 +385,7 @@ public class ConsoleRunnerImpl {
         }
       }
       StreamCapturingListener streamCapturingListener =
-        new StreamCapturingListener(outdir, !suppressOutput);
+        new StreamCapturingListener(outdir, outputMode);
       abortableListener.addListener(streamCapturingListener);
 
       AntJunitXmlReportListener xmlReportListener =
@@ -534,16 +615,22 @@ public class ConsoleRunnerImpl {
       @Option(name = "-fail-fast", usage = "Causes the test suite run to fail fast.")
       private boolean failFast;
 
-      @Option(name = "-suppress-output", usage = "Suppresses test output.")
+      // TODO: make -output-mode required after removing -suppress-output option
+      @Option(name = "-suppress-output", usage = "Deprecated, will be removed after 0.6.4 " +
+          "release, use -output-mode instead. Suppresses test output.")
       private boolean suppressOutput;
+
+      @Option(name = "-output-mode", usage = "Specify what part of output should be passed " +
+          "to stdout. In case of FAILURE_ONLY and parallel tests execution " +
+          "output can be partial or even wrong. (default: ALL)")
+      private OutputMode outputMode;
 
       @Option(name = "-xmlreport",
               usage = "Create ant compatible junit xml report files in -outdir.")
       private boolean xmlReport;
 
       @Option(name = "-outdir",
-              usage = "Directory to output test captures too.  Only used if -suppress-output or "
-                      + "-xmlreport is set.")
+              usage = "Directory to output test captures too.")
       private File outdir = new File(System.getProperty("java.io.tmpdir"));
 
       @Option(name = "-per-test-timer",
@@ -630,9 +717,16 @@ public class ConsoleRunnerImpl {
       exit(1);
     }
 
+    OutputMode outputMode;
+    if (options.outputMode != null) {
+      outputMode = options.outputMode;
+    } else {
+      outputMode = options.suppressOutput ? OutputMode.NONE : OutputMode.ALL;
+    }
+
     ConsoleRunnerImpl runner =
         new ConsoleRunnerImpl(options.failFast,
-            options.suppressOutput,
+            outputMode,
             options.xmlReport,
             options.perTestTimer,
             options.outdir,

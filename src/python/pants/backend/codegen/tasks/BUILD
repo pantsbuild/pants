@@ -8,7 +8,6 @@ python_library(
     ':apache_thrift_gen',
     ':jaxb_gen',
     ':protobuf_gen',
-    ':protobuf_parse',
     ':ragel_gen',
     ':simple_codegen_task',
     ':wire_gen',
@@ -19,8 +18,8 @@ python_library(
   name = 'common',
   sources = ['__init__.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:exceptions',
+    'src/python/pants/task',
   ]
 )
 
@@ -81,7 +80,6 @@ python_library(
   sources = ['protobuf_gen.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':protobuf_parse',
     ':simple_codegen_task',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
@@ -94,15 +92,6 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/util:memo',
   ],
-)
-
-python_library(
-  name = 'protobuf_parse',
-  sources = ['protobuf_parse.py'],
-  dependencies = [
-    'src/python/pants/util:memo',
-    'src/python/pants/util:strutil',
-  ]
 )
 
 python_library(
@@ -126,11 +115,11 @@ python_library(
   sources = ['simple_codegen_task.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -141,7 +130,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':protobuf_gen',
-    ':protobuf_parse',
     ':simple_codegen_task',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',

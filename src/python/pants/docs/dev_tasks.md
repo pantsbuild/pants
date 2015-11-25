@@ -17,7 +17,7 @@ Hello Task
 ----------
 
 To implement a Task, you define a subclass of
-[pants.backend.core.tasks.task.Task](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/core/tasks/task.py)
+[pants.task.task.Task](https://github.com/pantsbuild/pants/blob/master/src/python/pants/task/task.py)
 and define an `execute` method for that class. The `execute` method does
 the work.
 

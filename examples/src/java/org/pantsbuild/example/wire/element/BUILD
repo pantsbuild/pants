@@ -8,5 +8,8 @@ jvm_binary(name='element',
   ],
   source='WireElementExample.java',
   main='org.pantsbuild.example.wire.element.WireElementExample',
+  # TODO: The 'wire' library is not actually defined in a BUILD file: it comes in
+  # via the tool classpath of the sythetic target.
+  strict_deps=False,
 )
 

@@ -56,6 +56,9 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       ('/latestrunid', self._handle_latest_runid),  # Return id of latest pants run.
       ('/favicon.ico', self._handle_favicon)  # Return favicon.
     ]
+    # Note: BaseHTTPServer.BaseHTTPRequestHandler is an old-style class, so we must
+    # invoke its __init__ like this.
+    # TODO: Replace this entirely with a proper server as part of the pants daemon.
     BaseHTTPServer.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def do_GET(self):

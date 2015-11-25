@@ -22,6 +22,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec',
       # This will fail until we release and upgrade to junit runner 0.0.11.
       'testprojects/tests/java/org/pantsbuild/testproject/cucumber',
+      # TODO: This one has a missing dependency, but is intended to succeed... should it?
+      'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
     ]
 
     # Targets that are intended to fail
@@ -32,6 +34,9 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/cycle1',
       'testprojects/src/java/org/pantsbuild/testproject/cycle2',
       'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
+      'testprojects/src/java/org/pantsbuild/testproject/junit/failing/tests/org/pantsbuild/tmp/tests',
+      'testprojects/src/java/org/pantsbuild/testproject/junit/mixed/tests/org/pantsbuild/tmp/tests',
+      'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput',
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*',
       'testprojects/src/python/antlr:test_antlr_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure',
@@ -40,6 +45,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target',
       'testprojects/tests/java/org/pantsbuild/testproject/empty:',
       'testprojects/tests/python/pants/dummies:failing_target',
+      'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
+      'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
     ]
 
     # May not succeed without java8 installed
