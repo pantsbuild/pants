@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.codegen.register import build_file_aliases as register_codegen
+from pants.backend.codegen.targets.jaxb_library import JaxbLibrary
 from pants.backend.codegen.tasks.jaxb_gen import JaxbGen
 from pants.backend.core.register import build_file_aliases as register_core
-from pants.util.contextutil import temporary_file
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -20,12 +22,6 @@ class JaxbGenJavaTest(TaskTestBase):
   @property
   def alias_groups(self):
     return register_core().merge(register_codegen())
-
-  def assert_files(self, package, contents, *expected_files):
-    with temporary_file() as fp:
-      fp.write(contents)
-      fp.close()
-      self.assertEqual(set(expected_files), set(JaxbGen._sources_to_be_generated(package, fp.name)))
 
   def create_schema(self, *component_names):
     return ('<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n'
@@ -42,39 +38,6 @@ class JaxbGenJavaTest(TaskTestBase):
                 <xsd:element name="tasty" type="xsd:boolean"/>
               </xsd:sequence>
             </xsd:complexType>'''.format(name=name)
-    )
-
-  def test_plain(self):
-    self.assert_files(
-      'com.actual.package',
-      self.create_schema('ComplicatedVegetable', 'Orange', 'Apple', 'Aardvark'),
-      'com/actual/package/ObjectFactory.java',
-      'com/actual/package/ComplicatedVegetable.java',
-      'com/actual/package/Orange.java',
-      'com/actual/package/Aardvark.java',
-      'com/actual/package/Apple.java'
-    )
-
-  def test_slashes(self):
-    self.assert_files(
-      'com/actual/package',
-      self.create_schema('ComplicatedVegetable', 'Orange', 'Apple', 'Aardvark'),
-      'com/actual/package/ObjectFactory.java',
-      'com/actual/package/ComplicatedVegetable.java',
-      'com/actual/package/Orange.java',
-      'com/actual/package/Aardvark.java',
-      'com/actual/package/Apple.java'
-    )
-
-  def test_leadtail(self):
-    self.assert_files(
-      '/com/actual/package/',
-      self.create_schema('ComplicatedVegetable', 'Orange', 'Apple', 'Aardvark'),
-      'com/actual/package/ObjectFactory.java',
-      'com/actual/package/ComplicatedVegetable.java',
-      'com/actual/package/Orange.java',
-      'com/actual/package/Aardvark.java',
-      'com/actual/package/Apple.java'
     )
 
   def test_correct_package(self):
@@ -114,3 +77,24 @@ class JaxbGenJavaTest(TaskTestBase):
     self.assertEqual(guess('pantsbuild/potato/Potato.java'),
                      'pantsbuild.potato',
                      'Failed with no prefix: {0}'.format(guess_history[-1]))
+
+  def test_simple(self):
+    self.set_options(use_nailgun=False)
+    self.create_file('foo/vegetable.xml', self.create_schema('Vegetable'))
+    jaxblib = self.make_target('foo:jaxblib', JaxbLibrary, sources=['vegetable.xml'])
+    context = self.context(target_roots=[jaxblib])
+    task = self.create_task(context)
+    task.execute()
+    files = []
+    for (dirpath, dirnames, filenames) in os.walk(task.workdir):
+      for filename in filenames:
+        if filename.endswith('.java'):
+          files.append(os.path.join(dirpath, filename))
+    self.assertEquals(sorted(['ObjectFactory.java', 'Vegetable.java']),
+                      sorted([os.path.basename(f) for f in files]))
+
+    # Make sure there is no header with a timestamp in the generated file
+    for f in files:
+      with open(f) as jaxb_file:
+        contents = jaxb_file.read()
+        self.assertNotIn('// Generated on:', contents)
