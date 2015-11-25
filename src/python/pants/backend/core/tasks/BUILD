@@ -71,7 +71,6 @@ target(
     ':sorttargets',
     ':targets_help',
     ':task',
-    ':test_task_mixin',
     ':what_changed',
   ]
 )
@@ -396,15 +395,6 @@ python_library(
 resources(
   name = 'targets_help_resources',
   sources = globs('templates/targets_help/*.mustache'),
-)
-
-python_library(
-  name = 'test_task_mixin',
-  sources = ['test_task_mixin.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/util:timeout',
-  ],
 )
 
 python_library(

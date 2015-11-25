@@ -13,7 +13,6 @@ from collections import defaultdict
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -30,6 +29,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -56,7 +56,7 @@ def interpret_test_spec(test_spec):
     return (None, (classname_or_srcfile, methodname))
 
 
-class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
+class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
@@ -369,7 +369,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
   def _partition_by_jvm_options(self, tests_to_targets, tests):
     """Partitions a list of tests by the jvm options to run them with.
 
-    :param dict tests_to_target: A mapping from each test to its target.
+    :param dict tests_to_targets: A mapping from each test to its target.
     :param list tests: The list of tests to run.
     :returns: A list of tuples where the first element is an array of jvm options and the second
       is a list of tests to run with the jvm options. Each test in tests will appear in exactly
@@ -448,7 +448,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
 
   def _execute(self, targets):
     """
-    Implements the primary junit test execution. This method is called by the TestTaskMixin,
+    Implements the primary junit test execution. This method is called by the TestRunnerTaskMixin,
     which contains the primary Task.execute function and wraps this method in timeouts.
     """
 
@@ -458,7 +458,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     # and report on all the original targets, not just the test targets.
     #
     # We've already filtered out the non-test targets in the
-    # TestTaskMixin, so the mixin passes to us both the test
+    # TestRunnerTaskMixin, so the mixin passes to us both the test
     # targets and the unfiltered list of targets
     tests_and_targets = self._collect_test_targets(self._get_test_targets())
 

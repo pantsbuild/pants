@@ -231,7 +231,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_one_timeout(self):
     """When we have two targets, any of them doesn't have a timeout, and we have no default, then no timeout is set."""
 
-    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
 
       # Ensures that Timeout is instantiated with no timeout.
@@ -241,7 +241,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_timeout(self):
     """Check that a failed timeout returns the right results."""
 
-    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       mock_timeout().__exit__.side_effect = TimeoutReached(1)
       self.run_failing_tests(targets=[self.sleep_timeout],
                              failed_targets=[self.sleep_timeout])
