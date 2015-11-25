@@ -13,7 +13,8 @@ import pytest
 from pants.build_graph.address import Address
 from pants.engine.exp.examples.planners import (Classpath, IvyResolve, Jar, Javac, Sources,
                                                 gen_apache_thrift, setup_json_scheduler)
-from pants.engine.exp.scheduler import BuildRequest, ConflictingProducersError, Plan, Promise
+from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError,
+                                        NoProducersForCategoryError, Plan, Promise)
 
 
 class SchedulerTest(unittest.TestCase):
@@ -25,6 +26,7 @@ class SchedulerTest(unittest.TestCase):
     self.thrift = self.graph.resolve(Address.parse('src/thrift/codegen/simple'))
     self.java = self.graph.resolve(Address.parse('src/java/codegen/simple'))
     self.java_multi = self.graph.resolve(Address.parse('src/java/multiple_classpath_entries'))
+    self.unconfigured_thrift = self.graph.resolve(Address.parse('src/thrift/codegen/unconfigured'))
 
   def extract_product_type_and_plan(self, plan):
     promise, plan = plan
@@ -123,3 +125,13 @@ class SchedulerTest(unittest.TestCase):
     """Multiple Classpath products for a single subject currently cause a failure."""
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java_multi.address])
     execution_graph = self.scheduler.execution_graph(build_request)
+
+  @pytest.mark.xfail
+  def test_no_configured_thrift_planner(self):
+    """Tests that even though the BuildPropertiesPlanner is able to produce a Classpath,
+    we still fail when a target with thrift sources doesn't have a thrift config.
+    """
+    build_request = BuildRequest(goals=['compile'],
+                                 addressable_roots=[self.unconfigured_thrift.address])
+    with self.assertRaises(NoProducersForCategoryError):
+      execution_graph = self.scheduler.execution_graph(build_request)
