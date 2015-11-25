@@ -44,7 +44,6 @@ target(
   dependencies = [
     ':antlr_integration',
     ':bootstrap_jvm_tools_integration',
-    ':ivy_resolve_integration',
     ':jar_publish_integration',
     ':junit_tests_integration',
     ':jvm_bundle_integration',
@@ -201,15 +200,6 @@ python_tests(
     'src/python/pants/backend/core/tasks:filemap',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
-  ],
-)
-
-python_tests(
-  name = 'ivy_resolve_integration',
-  sources = ['test_ivy_resolve_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
   ],
 )
 
