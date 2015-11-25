@@ -52,7 +52,8 @@ class NodeRepl(ReplTaskMixin, NodeTask):
       'name': self.SYNTHETIC_NODE_TARGET_NAME,
       'version': '0.0.0',
       'dependencies': {
-        dep.package_name: self.render_node_package_dependency(node_paths, dep) for dep in targets
+        target.package_name: node_paths.node_path(target) if self.is_node_module(target)
+                             else target.version for target in targets
       }
     }
     with open(package_json_path, 'wb') as fp:

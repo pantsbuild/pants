@@ -82,22 +82,6 @@ class NodeTaskTest(TaskTestBase):
 
     return dict(type_check_results)
 
-  def test_render_node_package_dependency(self):
-    node_module_target = self.make_target(':a', NodeModule)
-    node_remote_module_target = self.make_target(':b', NodeRemoteModule, version='1.2.3')
-
-    node_paths = NodePaths()
-    node_paths.resolved(node_module_target, '/path/to/node_module_target')
-    node_paths.resolved(node_remote_module_target, '/path/to/node_remote_module_target')
-
-    self.assertEqual(
-      '/path/to/node_module_target',
-      NodeTask.render_node_package_dependency(node_paths, node_module_target))
-
-    self.assertEqual(
-      '1.2.3',
-      NodeTask.render_node_package_dependency(node_paths, node_remote_module_target))
-
   def test_execute_node(self):
     task = self.create_task(self.context())
     with temporary_dir() as chroot:

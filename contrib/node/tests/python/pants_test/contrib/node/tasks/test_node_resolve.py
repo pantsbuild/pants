@@ -12,7 +12,11 @@ from textwrap import dedent
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
+from pants.contrib.node.resolvers.node_preinstalled_module_resolver import \
+  NodePreinstalledModuleResolver
+from pants.contrib.node.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_resolve import NodeResolve
@@ -23,6 +27,11 @@ class NodeResolveTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return NodeResolve
+
+  def setUp(self):
+    super(NodeResolveTest, self).setUp()
+    NodeResolve.register_resolver_for_type(NodePreinstalledModule, NodePreinstalledModuleResolver)
+    NodeResolve.register_resolver_for_type(NodeModule, NpmResolver)
 
   def test_noop(self):
     task = self.create_task(self.context())

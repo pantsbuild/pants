@@ -6,6 +6,7 @@ contrib_plugin(
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/targets',
     'contrib/node/src/python/pants/contrib/node/tasks',
+    'contrib/node/src/python/pants/contrib/node/resolvers',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],

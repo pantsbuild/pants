@@ -47,10 +47,8 @@ python_library(
   dependencies=[
     ':node_paths',
     ':node_task',
-    'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]
 )

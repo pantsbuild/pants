@@ -47,16 +47,6 @@ class NodeTask(Task):
     """Returns `True` if the given target is a `NodeTest`."""
     return isinstance(target, NodeTest)
 
-  @classmethod
-  def render_node_package_dependency(cls, node_paths, target):
-    """Return representation string of an NodePackage target for a package.json dependencies hash.
-
-    :param node_paths: A NodePaths object
-    :param target: An NodePackage target
-    :return: String to be used as the value for the NodePackage in a package.json dependencies hash
-    """
-    return node_paths.node_path(target) if cls.is_node_module(target) else target.version
-
   def execute_node(self, args, workunit_name=None, workunit_labels=None, **kwargs):
     """Executes node passing the given args.
 
