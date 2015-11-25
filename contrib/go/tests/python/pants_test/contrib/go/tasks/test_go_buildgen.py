@@ -333,3 +333,39 @@ class GoBuildgenTest(TaskTestBase):
     self.build_graph.reset()  # Force targets to be loaded off disk
     self.assertEqual('v4.5.6', self.target('3rdparty/go/pantsbuild.org/fake').rev)
     self.assertEqual(pre_execute_files, self.buildroot_files())
+
+  def test_issues_2616(self):
+    self.set_options(remote=False)
+
+    self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
+        package jane
+
+        var PublicConstant = 42
+      """))
+    self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
+        package main
+
+        /*
+        #include <stdlib.h>
+        */
+        import "C" // C was erroneously categorized as a remote lib in issue 2616.
+
+        import (
+          "fmt"
+          "jane"
+        )
+
+        func main() {
+          fmt.Printf("Hello %s!", jane.PublicConstant)
+          fmt.Printf("Random from C: %d", int(C.random()))
+        }
+      """))
+    fred = self.make_target('src/go/fred', GoBinary)
+    context = self.context(target_roots=[fred])
+    task = self.create_task(context)
+    task.execute()
+
+    jane = self.target('src/go/jane')
+    self.assertIsNotNone(jane)
+    self.assertEqual([jane], fred.dependencies)
+    self.assertEqual({jane, fred}, set(self.build_graph.targets()))

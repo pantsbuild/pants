@@ -22,7 +22,10 @@ python_library(
   dependencies=[
     ':node_paths',
     ':node_task',
-    'src/python/pants/backend/core/tasks:repl_task_mixin',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/task',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
   ]
 )
 

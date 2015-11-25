@@ -64,6 +64,7 @@
     { "page": "index",
       "children": [
         { "page": "first_concepts" },
+        { "page": "install" },
         { "page": "first_tutorial" },
         { "page": "target_addresses" },
         { "page": "JVMProjects",
@@ -93,7 +94,6 @@
         { "page": "publish" },
         { "page": "with_emacs" },
         { "page": "with_intellij" },
-        { "page": "install" },
         { "page": "setup_repo" },
         { "page": "build_dictionary" },
         { "page": "options_reference" },

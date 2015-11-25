@@ -11,7 +11,7 @@ from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout, TimeoutReached
 
 
-class TestTaskMixin(object):
+class TestRunnerTaskMixin(object):
   """A mixin to combine with test runner tasks.
 
   The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
@@ -20,7 +20,7 @@ class TestTaskMixin(object):
 
   @classmethod
   def register_options(cls, register):
-    super(TestTaskMixin, cls).register_options(register)
+    super(TestRunnerTaskMixin, cls).register_options(register)
     register('--skip', action='store_true', help='Skip running tests.')
     register('--timeouts', action='store_true', default=True,
              help='Enable test target timeouts. If timeouts are enabled then tests with a timeout= parameter '

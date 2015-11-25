@@ -31,7 +31,7 @@ class StackDistributionTest(unittest.TestCase):
 
   def assert_stack_root(self):
     with self.distribution() as stack_distribution:
-      stack_cmd = stack_distribution.create_stack_cmd(cmd='path', args=['--global-stack-root'])
+      stack_cmd = stack_distribution.create_stack_cmd(cmd='path', cmd_args=['--global-stack-root'])
 
       self.assertIn('STACK_ROOT', stack_cmd.env)
       expected_stack_root = stack_cmd.env['STACK_ROOT']

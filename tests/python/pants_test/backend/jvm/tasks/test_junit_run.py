@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import subprocess
-from collections import defaultdict
 from textwrap import dedent
 
 from mock import patch
@@ -18,7 +17,6 @@ from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.goal.products import MultipleRootedProducts
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
@@ -95,7 +93,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def test_junit_runner_timeout_success(self):
     """When we set a timeout and don't force failure, succeed."""
 
-    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       self.set_options(timeout_default=1)
       self.set_options(timeouts=True)
       self.execute_junit_runner(
@@ -118,7 +116,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
   def test_junit_runner_timeout_fail(self):
     """When we set a timeout and force a failure, fail."""
 
-    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       mock_timeout().__exit__.side_effect = TimeoutReached(1)
 
       self.set_options(timeout_default=1)

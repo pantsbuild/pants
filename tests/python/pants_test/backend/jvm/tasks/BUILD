@@ -229,6 +229,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'jvm_dependency_usage_integration',
+  sources = ['test_jvm_dependency_usage_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ]
+)
+
+python_tests(
   name = 'jvm_platform_analysis',
   sources = ['test_jvm_platform_analysis.py'],
   dependencies = [
@@ -266,6 +275,7 @@ python_tests(
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:timeout',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
