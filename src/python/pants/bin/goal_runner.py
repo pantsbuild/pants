@@ -211,8 +211,8 @@ class GoalRunnerFactory(object):
 
     if self._help_request:
       help_printer = HelpPrinter(self._options)
-      help_printer.print_help()
-      self._exiter(0)
+      result = help_printer.print_help()
+      self._exiter(result)
 
     self._goals.extend([Goal.by_name(goal) for goal in goals])
 
