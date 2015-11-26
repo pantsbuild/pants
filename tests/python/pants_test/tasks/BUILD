@@ -18,7 +18,6 @@ target(
   dependencies = [
     ':builddict',
     ':check_published_deps',
-    ':console_task',
     ':detect_duplicates',
     ':execution_graph',
     ':group_task',
@@ -158,15 +157,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:check_published_deps',
     'src/python/pants/build_graph',
-  ]
-)
-
-python_tests(
-  name = 'console_task',
-  sources = ['test_console_task.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/task',
   ]
 )
 
