@@ -39,6 +39,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'antlr_integration',
+  sources = ['test_antlr_integration.py'],
+  dependencies = [
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+    ]
+)
+
+python_tests(
   name = 'jaxb_gen',
   sources = ['test_jaxb_gen.py'],
   dependencies = [
@@ -60,6 +70,14 @@ python_tests(
     'src/python/pants/backend/core:plugin',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+python_tests(
+  name = 'protobuf_integration',
+  sources = ['test_protobuf_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
   ],
 )
 
