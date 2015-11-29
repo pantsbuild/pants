@@ -181,6 +181,10 @@ class _Goal(object):
     """Returns the task types in this goal, unordered."""
     return self._task_type_by_name.values()
 
+  def task_items(self):
+    for name, task_type in self._task_type_by_name.items():
+      yield name, task_type
+
   def has_task_of_type(self, typ):
     """Returns True if this goal has a task of the given type (or a subtype of it)."""
     for task_type in self.task_types():

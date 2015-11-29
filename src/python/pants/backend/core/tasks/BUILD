@@ -322,6 +322,7 @@ python_library(
   name = 'reflect',
   sources = ['reflect.py'],
   dependencies = [
+    ':group_task',
     '3rdparty/python:docutils',
     '3rdparty/python:six',
     'src/python/pants/base:build_environment',
