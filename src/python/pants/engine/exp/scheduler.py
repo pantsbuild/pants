@@ -401,25 +401,14 @@ class TaskPlanner(AbstractClass):
     :rtype: string
     """
 
-  # TODO(John Sirois): This method is only needed to short-circuit asking every planner for every
-  # promise request, perhaps kill this and/or do a perf compare and drop if negligible.  Right now
-  # it's boilerplate that can be done wrong.
   @abstractproperty
   def product_types(self):
-    """Return an iterator over the product types this planner's task can produce."""
+    """Return a dict from output products to input products for this planner.
 
-  @property
-  def product_category(self):
-    """May be overridden to specify the category of product type that this planner produces.
-
-    The tuple of (product_type, category) should be thought of as representing a unique slot into
-    which Planners can produce.
-
-    TODO: Should likely be merged with the `product_types` method, and it should not have a default.
-
-    :rtype: string
+    TODO: Currently the scheduler treats multiple dict-entries/edges returned by this method as
+    a boolean OR: if any input product is present on a subject, it is required for the planner
+    to produce a plan for that subject.
     """
-    return 'default'
 
   @abstractmethod
   def plan(self, scheduler, product_type, subject, configuration=None):
@@ -470,8 +459,8 @@ class Planners(object):
     self._planners_by_product_type = defaultdict(set)
     for planner in planners:
       self._planners_by_goal_name[planner.goal_name].add(planner)
-      for product_type in planner.product_types:
-        self._planners_by_product_type[product_type].add(planner)
+      for output_type in planner.product_types.keys():
+        self._planners_by_product_type[output_type].add(planner)
 
   def for_goal(self, goal_name):
     """Return the set of task planners installed in the given goal.
@@ -712,7 +701,7 @@ class LocalScheduler(Scheduler):
     root_promises = []
     for goal in goals:
       for planner in self._planners.for_goal(goal):
-        for product_type in planner.product_types:
+        for output_type in planner.product_types.keys():
           # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
           # ng-killall, and buildgen.go.
           #
@@ -730,7 +719,7 @@ class LocalScheduler(Scheduler):
           # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
           # a TaskPlanner baseclass.
           for subject in subjects:
-            promise = self.promise(subject, product_type, required=False)
+            promise = self.promise(subject, output_type, required=False)
             if promise:
               root_promises.append(promise)
 
@@ -768,7 +757,8 @@ class LocalScheduler(Scheduler):
     for planner in planners:
       planning_result = planner.plan(self, product_type, subject, configuration=configuration)
       if planning_result:
-        planning_results_by_category[planner.product_category].append(planning_result)
+        input_product_type = planner.product_types[product_type]
+        planning_results_by_category[input_product_type].append(planning_result)
 
     plans = []
     for category, planning_results in planning_results_by_category.items():

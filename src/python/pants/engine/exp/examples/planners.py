@@ -55,6 +55,13 @@ class Requirement(Configuration):
     super(Requirement, self).__init__(req=req, repo=repo, **kwargs)
 
 
+class Unit(object):
+  # The empty product.
+  # TODO: 90% of the time, planners claiming to consume Unit actually consume configuration
+  # or sources... which should probably be products.
+  pass
+
+
 class Classpath(object):
   # Placeholder product.
   pass
@@ -80,7 +87,7 @@ class GlobalIvyResolvePlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    yield Classpath
+    return {Classpath: Unit}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     if isinstance(subject, Jar):
@@ -152,10 +159,6 @@ class ThriftPlanner(TaskPlanner):
   @property
   def goal_name(self):
     return 'gen'
-
-  @property
-  def product_category(self):
-    return 'thrift'
 
   @abstractproperty
   def config_type(self):
@@ -247,7 +250,8 @@ class ApacheThriftPlanner(ThriftPlanner):
 
   @property
   def product_types(self):
-    return self._product_type_by_lang.values()
+    # TODO actually consumes config
+    return {source_product: Unit for source_product in self._product_type_by_lang.values()}
 
   def product_type_for_config(self, config):
     lang = config.gen.partition(':')[0]
@@ -287,7 +291,7 @@ class BuildPropertiesPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    yield Classpath
+    return {Classpath: Unit}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     if not isinstance(subject, Target):
@@ -336,7 +340,8 @@ class ScroogePlanner(ThriftPlanner):
 
   @property
   def product_types(self):
-    return self._product_type_by_lang.values()
+    # TODO actually consumes config
+    return {source_product: Unit for source_product in self._product_type_by_lang.values()}
 
   def product_type_for_config(self, config):
     return self._product_type_by_lang.get(config.lang)
@@ -363,7 +368,7 @@ class JvmCompilerPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    yield Classpath
+    return {Classpath: Sources.of(self.source_ext)}
 
   @abstractproperty
   def compile_task_type(self):
@@ -461,7 +466,7 @@ class UnpickleableInputsPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    yield Sources.of('unpickleable_inputs')
+    return {Sources.of('unpickleable_inputs'): Unit}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     # Nested functions like this lambda are unpicklable.
@@ -481,7 +486,7 @@ class UnpickleableResultPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    yield Sources.of('unpickleable_result')
+    return {Sources.of('unpickleable_result'): Sources.of('unpickleable_inputs')}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     return PlanningResult.complete(self, unpickable_result_func, (subject,))
