@@ -87,7 +87,7 @@ class GlobalIvyResolvePlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: Unit}
+    return {Classpath: Jar}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     if isinstance(subject, Jar):
@@ -250,8 +250,9 @@ class ApacheThriftPlanner(ThriftPlanner):
 
   @property
   def product_types(self):
-    # TODO actually consumes config
-    return {source_product: Unit for source_product in self._product_type_by_lang.values()}
+    # TODO actually consumes config AND sources
+    return {source_product: Sources.of('.thrift')
+            for source_product in self._product_type_by_lang.values()}
 
   def product_type_for_config(self, config):
     lang = config.gen.partition(':')[0]
@@ -291,7 +292,7 @@ class BuildPropertiesPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: Unit}
+    return {Classpath: BuildPropertiesConfiguration}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     if not isinstance(subject, Target):
@@ -340,8 +341,9 @@ class ScroogePlanner(ThriftPlanner):
 
   @property
   def product_types(self):
-    # TODO actually consumes config
-    return {source_product: Unit for source_product in self._product_type_by_lang.values()}
+    # TODO actually consumes config AND sources
+    return {source_product: Sources.of('.thrift')
+            for source_product in self._product_type_by_lang.values()}
 
   def product_type_for_config(self, config):
     return self._product_type_by_lang.get(config.lang)
