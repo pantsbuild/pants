@@ -13,7 +13,6 @@ from docutils.core import publish_parts
 from six import string_types
 from six.moves import range
 
-from pants.backend.core.tasks.group_task import GroupTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
@@ -498,10 +497,6 @@ def gen_tasks_options_reference_data(options):
       # task_type may actually be a synthetic subclass of the authored class from the source code.
       # We want to display the authored class's name in the docs.
       tasks[task_name] = fill_template(options, task_type)
-
-      if issubclass(task_type, GroupTask):
-        for member_type in task_type._member_types():
-          tasks[member_type.name()] = fill_template(options, member_type)
     sorted_tasks = [ tasks[k] for k in sorted(tasks.keys()) ]
     goal_dict[goal.name] = TemplateData(goal=goal, tasks=sorted_tasks)
     goal_names.append(goal.name)

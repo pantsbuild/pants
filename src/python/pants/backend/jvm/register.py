@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.group_task import GroupTask
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
@@ -118,6 +117,9 @@ def register_goals():
 
   task(name='bootstrap-jvm-tools', action=BootstrapJvmTools).install('bootstrap')
 
+  # Compile
+  task(name='zinc', action=ZincCompile).install('compile')
+
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve')
   task(name='ivy-imports', action=IvyImports).install('imports')
@@ -126,17 +128,6 @@ def register_goals():
   # Resource preparation.
   task(name='prepare', action=PrepareResources).install('resources')
   task(name='services', action=PrepareServices).install('resources')
-
-  # Compilation.
-  # NB: Despite being the only member, ZincCompile should continue to use GroupTask until
-  # post engine refactor. It's possible that someone will want to rush in an additional
-  # jvm language.
-  jvm_compile = GroupTask.named(
-      'jvm-compilers',
-      product_type=['runtime_classpath', 'classes_by_source', 'product_deps_by_src'],
-      flag_namespace=['compile'])
-  jvm_compile.add_member(ZincCompile)
-  task(name='jvm', action=jvm_compile).install('compile')
 
   task(name='export-classpath', action=RuntimeClasspathPublisher).install()
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
