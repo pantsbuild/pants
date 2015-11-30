@@ -9,7 +9,7 @@ import os
 import sys
 
 from pants.backend.core.from_target import FromTarget
-from pants.backend.core.targets.dependencies import Dependencies, DeprecatedDependencies
+from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
@@ -42,6 +42,7 @@ from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.source_root import SourceRoot
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
@@ -58,12 +59,11 @@ class BuildFilePath(object):
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      # NB: the 'dependencies' alias is deprecated in favor of the 'target' alias
-      'dependencies': DeprecatedDependencies,
+      'dependencies': Dependencies,  # Deprecated, will be removed soon.
       'page': Page,
       'prep_command': PrepCommand,
       'resources': Resources,
-      'target': Dependencies,
+      'target': Target,
     },
     objects={
       'ConfluencePublish': ConfluencePublish,

@@ -11,7 +11,6 @@ import itertools
 import os
 from collections import defaultdict
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.java import Java
@@ -548,7 +547,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     def resolve(t):
       for declared in t.dependencies:
-        if isinstance(declared, Dependencies) or type(declared) == Target:
+        if type(declared) == Target:
           for r in resolve(declared):
             yield r
         elif isinstance(declared, self.compiler_plugin_types):
