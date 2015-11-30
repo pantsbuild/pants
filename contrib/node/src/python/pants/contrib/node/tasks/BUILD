@@ -24,7 +24,6 @@ python_library(
     ':node_task',
     'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/base:exceptions',
-    'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]
@@ -39,7 +38,6 @@ python_library(
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_package',
     'contrib/node/src/python/pants/contrib/node/targets:node_test',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/base:workunit',
     'src/python/pants/task',
     'src/python/pants/util:memo',

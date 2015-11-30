@@ -37,8 +37,8 @@ python_library(
   name='node_resolver_base',
   sources=['node_resolver_base.py'],
   dependencies=[
-    'src/python/pants/base:workunit',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
   ]
 )
