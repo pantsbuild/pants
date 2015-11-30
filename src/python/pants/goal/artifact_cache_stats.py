@@ -31,7 +31,7 @@ class ArtifactCacheStats(object):
   def add_hits(self, cache_name, targets):
     self._add_stat(0, cache_name, targets)
 
-  # any cache misses, each target is paired with its cause.
+  # any cache misses, each target is paired with its cause for the miss.
   def add_misses(self, cache_name, targets, causes):
     self._add_stat(1, cache_name, targets, causes=causes)
 
@@ -51,16 +51,16 @@ class ArtifactCacheStats(object):
   # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss.
   def _add_stat(self, hit_or_miss, cache_name, targets, causes=None):
     def format_vts(tgt, cause=None):
-      """Format into (target, category, cause) tuple."""
+      """Format into (target, cause) tuple."""
       target_address = tgt.address.reference()
       if isinstance(cause, UnreadableArtifact):
-        return [target_address, cause.err.message]
+        return (target_address, cause.err.message)
       elif cause == False:
-        return [target_address, 'uncached']
+        return (target_address, 'uncached')
       else:
-        return [target_address, '']
+        return (target_address, '')
 
-    causes = causes or [True]*len(targets)
+    causes = causes or [True] * len(targets)
     target_with_causes = [format_vts(tgt, cause) for tgt, cause in zip(targets, causes)]
     self.stats_per_cache[cache_name][hit_or_miss].extend(target_with_causes)
     suffix = 'misses' if hit_or_miss else 'hits'
