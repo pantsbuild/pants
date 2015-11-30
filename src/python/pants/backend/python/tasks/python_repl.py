@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pex.pex_info import PexInfo
 
-from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.option.custom_types import list_option
+from pants.task.repl_task_mixin import ReplTaskMixin
 
 
 class PythonRepl(ReplTaskMixin, PythonTask):

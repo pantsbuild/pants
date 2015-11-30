@@ -15,8 +15,8 @@ import shutil
 import pystache
 from six.moves import range
 
-from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
+from pants.task.task import Task
 
 
 """Static Site Generator for the Pants Build documentation site.

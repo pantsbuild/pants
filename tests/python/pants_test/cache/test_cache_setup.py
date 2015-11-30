@@ -9,7 +9,6 @@ import os
 
 from mock import Mock
 
-from pants.backend.core.tasks.task import Task
 from pants.cache.cache_setup import (CacheFactory, CacheSetup, CacheSpec, CacheSpecFormatError,
                                      EmptyCacheSpecError, InvalidCacheSpecError,
                                      LocalCacheSpecRequiredError, RemoteCacheSpecRequiredError,
@@ -18,6 +17,7 @@ from pants.cache.local_artifact_cache import LocalArtifactCache
 from pants.cache.resolver import Resolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
+from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 from pants_test.testutils.mock_logger import MockLogger

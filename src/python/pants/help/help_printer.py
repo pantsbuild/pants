@@ -32,7 +32,10 @@ class HelpPrinter(object):
     return self._options.known_scope_to_info
 
   def print_help(self):
-    """Print help to the console."""
+    """Print help to the console.
+
+    :return: 0 on success, 1 on failure
+    """
     def print_hint():
       print('Use `pants goals` to list goals.')
       print('Use `pants help` to get help.')
@@ -43,11 +46,12 @@ class HelpPrinter(object):
     elif isinstance(self._help_request, UnknownGoalHelp):
       print('Unknown goals: {}'.format(', '.join(self._help_request.unknown_goals)))
       print_hint()
-      # TODO: Should probably cause a non-zero exit code.
+      return 1
     elif isinstance(self._help_request, NoGoalHelp):
       print('No goals specified.')
       print_hint()
-      # TODO: Should probably cause a non-zero exit code.
+      return 1
+    return 0
 
   def _print_options_help(self):
     """Print a help screen.

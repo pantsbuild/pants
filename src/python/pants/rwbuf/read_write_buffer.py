@@ -56,7 +56,7 @@ class InMemoryRWBuf(_RWBuf):
   situations that require a real file (e.g., redirecting stdout/stderr of subprocess.Popen())."""
 
   def __init__(self):
-    _RWBuf.__init__(self, StringIO())
+    super(InMemoryRWBuf, self).__init__(StringIO())
     self._writepos = 0
 
   def do_write(self, s):

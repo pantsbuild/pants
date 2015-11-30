@@ -10,12 +10,12 @@ import sys
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
+from pants.task.repl_task_mixin import ReplTaskMixin
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 

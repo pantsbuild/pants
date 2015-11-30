@@ -10,7 +10,6 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -21,6 +20,7 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_graph import sort_targets
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
+from pants.task.task import Task
 
 
 class JvmDependencyCheck(JvmDependencyAnalyzer):

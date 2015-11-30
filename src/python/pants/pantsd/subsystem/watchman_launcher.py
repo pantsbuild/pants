@@ -23,7 +23,7 @@ class WatchmanLauncher(Subsystem):
              help='Watchman binary location (defaults to $PATH discovery).')
 
   def __init__(self, *args, **kwargs):
-    Subsystem.__init__(self, *args, **kwargs)
+    super(WatchmanLauncher, self).__init__(*args, **kwargs)
 
     options = self.get_options()
     self._workdir = options.pants_workdir

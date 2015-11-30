@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.task.task import Task
 
 
 class RuntimeClasspathPublisher(Task):

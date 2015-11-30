@@ -23,7 +23,7 @@ class Watchman(ProcessManager):
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
   def __init__(self, work_dir, log_level=1, watchman_path=None):
-    ProcessManager.__init__(self, name='watchman', process_name='watchman', socket_type=str)
+    super(Watchman, self).__init__(name='watchman', process_name='watchman', socket_type=str)
     self._logger = logging.getLogger(__name__)
     self._log_level = log_level
     self.watchman_path = self._resolve_watchman_path(watchman_path)

@@ -10,10 +10,10 @@ from abc import abstractmethod, abstractproperty
 from collections import defaultdict, deque
 from contextlib import contextmanager
 
-from pants.backend.core.tasks.task import Task, TaskBase
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_graph import invert_dependencies
 from pants.goal.goal import Goal
+from pants.task.task import Task, TaskBase
 
 
 class GroupMember(TaskBase):

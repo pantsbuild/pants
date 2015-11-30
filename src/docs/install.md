@@ -2,9 +2,13 @@ Installing Pants
 ================
 
 There are a few ways to get a runnable version of pants set up for your workspace. Before
-beginning, please [consult the README](https://github.com/pantsbuild/pants/blob/master/README.md),
-to make sure your machine fits the requirements. In particular, you'll want to make sure that you
-have Python 2.7.x -- pants itself needs to be hosted on that version.
+beginning, make sure your machine fits the requirements. At a minimum, pants requires the following to run properly:
+
+* Linux or Mac OS X
+* Python 2.7.x (the latest stable version of 2.7 is recommended)
+* A C compiler, system headers, Python headers (to compile native Python modules)
+* OpenJDK 7 or greater, Oracle JDK 6 or greater
+* Internet access (so that pants can fully bootstrap itself)
 
 After you have pants installed, you'll need to
 [[Set up your code workspace to work with Pants|pants('src/docs:setup_repo')]].

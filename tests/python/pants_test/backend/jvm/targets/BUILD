@@ -5,6 +5,7 @@ target(
   name='targets',
   dependencies=[
     ':jar_dependency',
+    ':jar_library',
     ':jvm_app',
     ':jvm_binary',
     ':jvm_target',

@@ -11,7 +11,6 @@ import shutil
 import threading
 from hashlib import sha1
 
-from pants.backend.core.tasks.task import TaskBase
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.jar_dependency_utils import ResolvedJar
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -23,6 +22,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.util import execute_runner
+from pants.task.task import TaskBase
 from pants.util.memo import memoized_property
 
 
