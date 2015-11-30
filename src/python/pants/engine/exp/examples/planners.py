@@ -55,13 +55,6 @@ class Requirement(Configuration):
     super(Requirement, self).__init__(req=req, repo=repo, **kwargs)
 
 
-class Unit(object):
-  # The empty product.
-  # TODO: 90% of the time, planners claiming to consume Unit actually consume configuration
-  # or sources... which should probably be products.
-  pass
-
-
 class Classpath(object):
   # Placeholder product.
   pass
@@ -87,7 +80,7 @@ class GlobalIvyResolvePlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: Jar}
+    return {Classpath: [[Jar]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     if isinstance(subject, Jar):
@@ -169,6 +162,14 @@ class ThriftPlanner(TaskPlanner):
     """Given an instance of config with type config_type, return the generated product type."""
 
   @abstractproperty
+  def product_type_by_lang(self):
+    """A dict of languages to product types for this planner.
+
+    # This will come via an option default.
+    # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
+    """
+
+  @abstractproperty
   def gen_func(self):
     """Return the code gen function.
 
@@ -181,6 +182,11 @@ class ThriftPlanner(TaskPlanner):
 
     :rtype: dict
     """
+
+  @property
+  def product_types(self):
+    return {source_product: [[Sources.of('.thrift'), self.config_type]]
+            for source_product in self.product_type_by_lang.values()}
 
   def _extract_thrift_config(self, product_type, target, configuration=None):
     """Return the configuration to be used to produce the given product type for the given target.
@@ -243,20 +249,12 @@ class ApacheThriftPlanner(ThriftPlanner):
     return ApacheThriftConfiguration
 
   @memoized_property
-  def _product_type_by_lang(self):
-    # This will come via an option default.
-    # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
+  def product_type_by_lang(self):
     return {'java': Sources.of('.java'), 'py': Sources.of('.py')}
-
-  @property
-  def product_types(self):
-    # TODO actually consumes config AND sources
-    return {source_product: Sources.of('.thrift')
-            for source_product in self._product_type_by_lang.values()}
 
   def product_type_for_config(self, config):
     lang = config.gen.partition(':')[0]
-    return self._product_type_by_lang.get(lang)
+    return self.product_type_by_lang.get(lang)
 
   def plan_parameters(self, scheduler, product_type, subject, apache_thrift_config):
     return dict(rev=apache_thrift_config.rev,
@@ -292,7 +290,7 @@ class BuildPropertiesPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: BuildPropertiesConfiguration}
+    return {Classpath: [[BuildPropertiesConfiguration]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     if not isinstance(subject, Target):
@@ -334,19 +332,11 @@ class ScroogePlanner(ThriftPlanner):
     return ScroogeConfiguration
 
   @memoized_property
-  def _product_type_by_lang(self):
-    # This will come via an option default.
-    # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
+  def product_type_by_lang(self):
     return {'scala': Sources.of('.scala'), 'java': Sources.of('.java')}
 
-  @property
-  def product_types(self):
-    # TODO actually consumes config AND sources
-    return {source_product: Sources.of('.thrift')
-            for source_product in self._product_type_by_lang.values()}
-
   def product_type_for_config(self, config):
-    return self._product_type_by_lang.get(config.lang)
+    return self.product_type_by_lang.get(config.lang)
 
   def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
     # This will come via an option default.
@@ -370,7 +360,7 @@ class JvmCompilerPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: Sources.of(self.source_ext)}
+    return {Classpath: [[Sources.of(self.source_ext)]]}
 
   @abstractproperty
   def compile_task_type(self):
@@ -468,7 +458,7 @@ class UnpickleableInputsPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    return {Sources.of('unpickleable_inputs'): Unit}
+    return {Sources.of('unpickleable_inputs'): [[]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     # Nested functions like this lambda are unpicklable.
@@ -488,7 +478,7 @@ class UnpickleableResultPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    return {Sources.of('unpickleable_result'): Sources.of('unpickleable_inputs')}
+    return {Sources.of('unpickleable_result'): [[Sources.of('unpickleable_inputs')]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     return PlanningResult.complete(self, unpickable_result_func, (subject,))

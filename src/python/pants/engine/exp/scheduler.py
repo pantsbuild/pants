@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import inspect
+import os
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict, namedtuple
 
@@ -403,11 +404,13 @@ class TaskPlanner(AbstractClass):
 
   @abstractproperty
   def product_types(self):
-    """Return a dict from output products to input products for this planner.
+    """Return a dict from output products to input product requirements for this planner.
 
-    TODO: Currently the scheduler treats multiple dict-entries/edges returned by this method as
-    a boolean OR: if any input product is present on a subject, it is required for the planner
-    to produce a plan for that subject.
+    Product requirements are represented in disjunctive normal form (DNF). There are two
+    levels of nested lists: the outer list represents clauses that are ORed; the inner
+    list represents type matches that are ANDed.
+
+    TODO: dsl for this?
     """
 
   @abstractmethod
@@ -448,7 +451,11 @@ class Task(object):
 
 
 class Planners(object):
-  """A registry of task planners indexed by both product type and goal name."""
+  """A registry of task planners indexed by both product type and goal name.
+
+  Holds a set of input product requirements for each output product, which can be used
+  to validate the graph.
+  """
 
   def __init__(self, planners):
     """
@@ -457,10 +464,42 @@ class Planners(object):
     """
     self._planners_by_goal_name = defaultdict(set)
     self._planners_by_product_type = defaultdict(set)
+    self._product_requirements = defaultdict(list)
     for planner in planners:
       self._planners_by_goal_name[planner.goal_name].add(planner)
-      for output_type in planner.product_types.keys():
+      for input_type_requirements, output_type in planner.product_types.items():
         self._planners_by_product_type[output_type].add(planner)
+        self._product_requirements[output_type].extend(input_type_requirements)
+
+  # TODO: nuke
+  def _expand_requirements(self, _requirements):
+    """Expands the given product requirements by walking the product graph they represent.
+    
+    For example, if a product `C` is sufficient to produce a product `B`, and `B` is sufficient
+    to produce a product `A`, then transitively, `C` is sufficient to produce `A`.
+
+    TODO: This is relatively simplisitic currently, in that 
+    """
+    # The input requirements are recursively expanded into the output requirements.
+    requirements = dict()
+    def expand(product_type):
+      """Expands the given type (recursively expanding any other types encountered) and returns it.
+      
+      TODO: detect cycles and fail gracefully.
+      """
+      if product_type in requirements:
+        return
+      # Output requirements are a superset of the input, so begin by cloning.
+      requirements[product_type] = list(_requirements[product_type])
+      for anded_clause in _requirements[product_type]:
+        # For each condition in the anded clause 
+        requirements[product_type]
+      return requirements[product_type]
+
+    for product_type in _requirements.key():
+      expand(product_type)
+
+    return requirements
 
   def for_goal(self, goal_name):
     """Return the set of task planners installed in the given goal.
@@ -477,6 +516,53 @@ class Planners(object):
     :rtype: set of :class:`TaskPlanner`
     """
     return self._planners_by_product_type[product_type]
+
+  def _products_meet_requirements(self, output_product_type, input_products):
+    """Return true if the products satisfy our requirements for the given product type.
+
+    TODO: This is probably combinatorial in the number of planners. Optimize/memoize.
+    """
+    def product_available(product_type):
+      if product_type in input_products:
+        # The product is directly available in the inputs for the target.
+        return True
+      elif product_type in self._product_requirements:
+        # The product may be indirectly available via a planner.
+        return self._products_meet_requirements(product_type, input_products)
+      return False
+
+    for anded_clause in self._product_requirements[output_product_type]:
+      # If all product requirements in the clause are satisfied by the input products, then
+      # we've matched.
+      if all(product_available(product_type) for product_requirement in anded_clause)
+        return True
+    return False
+
+  def _products_for_subject(self, target):
+    """Return the products that are concretely present on the given target.
+
+    TODO: some of these are synthetic products, and should become "real" products.
+    """
+    # Source products.
+    source_extensions = {}
+    for source in target.sources.iter_paths(base_path=target.address.spec_path):
+      _, ext = os.path.splitext(source)
+      if ext not in source_extensions:
+        yield Sources.of(ext)
+        source_extensions.add(ext)
+    # Config products.
+    for configuration in target.configurations:
+      yield type(configuration)
+
+  def can_produce_type_for_subject(self, product_type, subject):
+    """True if it's possible for these planners to produce the given product for the given subject.
+
+    Note that this does not validate dependency subjects of the input subject, so it is necessary
+    to validate every call to `def promise` against these requirements.
+    """
+    if not isinstance(subject, Target):
+      raise Exception('TODO: cannot validate products for subject {}'.format(subject))
+    return self._products_meet_requirements(product_type, self._products_for_subject(subject))
 
 
 class BuildRequest(object):
@@ -698,30 +784,33 @@ class LocalScheduler(Scheduler):
     goals = build_request.goals
     subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
 
-    root_promises = []
+    # Collect the set of product types we're trying to produce.
+    output_product_types = OrderedSet()
     for goal in goals:
       for planner in self._planners.for_goal(goal):
-        for output_type in planner.product_types.keys():
-          # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
-          # ng-killall, and buildgen.go.
-          #
-          # 1. If not subjects check for a special Planner subtype with a special subject-less
-          #    promise method.
-          # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
-          #    looks for Target or Jar or ... will naturally just skip it and no-op.
-          #
-          # Option 1 allows for failing the build if no such subtypes are amongst the goals;
-          # ie: `./pants compile` would fail since there are no inputs and all compile registered
-          # planners require subjects (don't implement the subtype).
-          # Seems promising - but what about mixed goals and no subjects?
-          #
-          # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
-          # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
-          # a TaskPlanner baseclass.
-          for subject in subjects:
-            promise = self.promise(subject, output_type, required=False)
-            if promise:
-              root_promises.append(promise)
+        output_product_types.extend(planner.product_types.keys())
+
+    root_promises = []
+    for output_type in output_product_types:
+      # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
+      # ng-killall, and buildgen.go.
+      #
+      # 1. If not subjects check for a special Planner subtype with a special subject-less
+      #    promise method.
+      # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
+      #    looks for Target or Jar or ... will naturally just skip it and no-op.
+      #
+      # Option 1 allows for failing the build if no such subtypes are amongst the goals;
+      # ie: `./pants compile` would fail since there are no inputs and all compile registered
+      # planners require subjects (don't implement the subtype).
+      # Seems promising - but what about mixed goals and no subjects?
+      #
+      # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
+      # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
+      # a TaskPlanner baseclass.
+      for subject in subjects:
+        if self._planners.can_produce_type_for_subject(output_type, subject):
+          root_promises.append(self.promise(subject, output_type, required=True))
 
     # Give aggregating planners a chance to aggregate plans.
     for planner, plans_by_product_type in self._plans_by_product_type_by_planner.items():
@@ -757,6 +846,8 @@ class LocalScheduler(Scheduler):
     for planner in planners:
       planning_result = planner.plan(self, product_type, subject, configuration=configuration)
       if planning_result:
+        # TODO: validate promise requests against the product graph to determine whether to
+        # fail fast.
         input_product_type = planner.product_types[product_type]
         planning_results_by_category[input_product_type].append(planning_result)
 
