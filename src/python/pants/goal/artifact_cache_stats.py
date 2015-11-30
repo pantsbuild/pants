@@ -29,11 +29,11 @@ class ArtifactCacheStats(object):
     safe_mkdir(self._dir)
 
   def add_hits(self, cache_name, targets):
-    self._add_stat(0, cache_name, targets)
+    self._add_stat(0, cache_name, targets, None)
 
   # any cache misses, each target is paired with its cause for the miss.
   def add_misses(self, cache_name, targets, causes):
-    self._add_stat(1, cache_name, targets, causes=causes)
+    self._add_stat(1, cache_name, targets, causes)
 
   def get_all(self):
     """Returns the cache stats as a list of dicts."""
@@ -49,8 +49,8 @@ class ArtifactCacheStats(object):
     return ret
 
   # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss.
-  def _add_stat(self, hit_or_miss, cache_name, targets, causes=None):
-    def format_vts(tgt, cause=None):
+  def _add_stat(self, hit_or_miss, cache_name, targets, causes):
+    def format_vts(tgt, cause):
       """Format into (target, cause) tuple."""
       target_address = tgt.address.reference()
       if isinstance(cause, UnreadableArtifact):

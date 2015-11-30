@@ -434,7 +434,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def check_artifact_cache(self, vts):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
-    Returns a pair (cached, uncached) of VersionedTargets that were
+    Returns a tuple (cached, uncached, uncached_causes) of VersionedTargets that were
     satisfied/unsatisfied from the cache. Uncached VTS are also attached with their
     causes for the miss: `False` indicates a legit miss while `UnreadableArtifact`
     is due to either local or remote cache failures.
