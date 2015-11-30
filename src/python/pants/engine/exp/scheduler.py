@@ -17,6 +17,7 @@ from twitter.common.collections import OrderedSet
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable
+from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -467,7 +468,7 @@ class Planners(object):
     self._product_requirements = defaultdict(list)
     for planner in planners:
       self._planners_by_goal_name[planner.goal_name].add(planner)
-      for input_type_requirements, output_type in planner.product_types.items():
+      for output_type, input_type_requirements in planner.product_types.items():
         self._planners_by_product_type[output_type].add(planner)
         self._product_requirements[output_type].extend(input_type_requirements)
 
@@ -492,19 +493,19 @@ class Planners(object):
 
     TODO: This is probably combinatorial in the number of planners. Optimize/memoize.
     """
-    def product_available(product_type):
-      if product_type in input_products:
+    def product_available(product_requirement):
+      if product_requirement in input_products:
         # The product is directly available in the inputs for the target.
         return True
-      elif product_type in self._product_requirements:
-        # The product may be indirectly available via a planner.
-        return self._products_meet_requirements(product_type, input_products)
+      elif product_requirement in self._product_requirements:
+        # The product may be indirectly available via a planner: recurse.
+        return self._products_meet_requirements(product_requirement, input_products)
       return False
 
     for anded_clause in self._product_requirements[output_product_type]:
       # If all product requirements in the clause are satisfied by the input products, then
       # we've matched.
-      if all(product_available(product_type) for product_requirement in anded_clause)
+      if all(product_available(product_requirement) for product_requirement in anded_clause):
         return True
     return False
 
@@ -758,7 +759,7 @@ class LocalScheduler(Scheduler):
     output_product_types = OrderedSet()
     for goal in goals:
       for planner in self._planners.for_goal(goal):
-        output_product_types.extend(planner.product_types.keys())
+        output_product_types.update(planner.product_types.keys())
 
     root_promises = []
     for output_type in output_product_types:

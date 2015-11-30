@@ -82,6 +82,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:addressable',
     'src/python/pants/engine/exp:objects',
+    'src/python/pants/engine/exp:targets',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ]
