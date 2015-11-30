@@ -412,7 +412,10 @@ class JarBuilderTask(JarTask):
       # We only gather internal classpath elements per our contract.
       if canonical_classpath_base_dir:
         canonical_classpath = ClasspathUtil.create_canonical_classpath(
-            classpath_products, targets, canonical_classpath_base_dir)
+          classpath_products,
+          targets,
+          canonical_classpath_base_dir
+        )
         self._jar.append_classpath(canonical_classpath)
         products_added = True
       else:
