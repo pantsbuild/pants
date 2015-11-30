@@ -13,6 +13,7 @@ from docutils.core import publish_parts
 from six import string_types
 from six.moves import range
 
+from pants.backend.core.tasks.group_task import GroupTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
@@ -475,27 +476,34 @@ def gen_tasks_options_reference_data(options):
   """Generate the template data for the options reference rst doc."""
   goal_dict = {}
   goal_names = []
+
+  def fill_template(options, task_type):
+    for authored_task_type in task_type.mro():
+      if authored_task_type.__module__ != 'abc':
+        break
+    doc_rst = indent_docstring_by_n(authored_task_type.__doc__ or '', 2)
+    doc_html = rst_to_html(dedent_docstring(authored_task_type.__doc__))
+    parser = options.get_parser(task_type.options_scope)
+    oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
+    impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
+    return TemplateData(
+      impl=impl,
+      doc_html=doc_html,
+      doc_rst=doc_rst,
+      ogroup=oref_template_data_from_help_info(oschi))
+
   for goal in Goal.all():
-    tasks = []
-    for task_name in goal.ordered_task_names():
-      task_type = goal.task_type_by_name(task_name)
+    tasks = {}
+    for task_name, task_type in goal.task_items():
       # task_type may actually be a synthetic subclass of the authored class from the source code.
       # We want to display the authored class's name in the docs.
-      for authored_task_type in task_type.mro():
-        if authored_task_type.__module__ != 'abc':
-          break
+      tasks[task_name] = fill_template(options, task_type)
 
-      doc_rst = indent_docstring_by_n(authored_task_type.__doc__ or '', 2)
-      doc_html = rst_to_html(dedent_docstring(authored_task_type.__doc__))
-      parser = options.get_parser(task_type.options_scope)
-      oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
-      impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
-      tasks.append(TemplateData(
-          impl=impl,
-          doc_html=doc_html,
-          doc_rst=doc_rst,
-          ogroup=oref_template_data_from_help_info(oschi)))
-    goal_dict[goal.name] = TemplateData(goal=goal, tasks=tasks)
+      if issubclass(task_type, GroupTask):
+        for member_type in task_type._member_types():
+          tasks[member_type.name()] = fill_template(options, member_type)
+    sorted_tasks = [ tasks[k] for k in sorted(tasks.keys()) ]
+    goal_dict[goal.name] = TemplateData(goal=goal, tasks=sorted_tasks)
     goal_names.append(goal.name)
 
   goals = [goal_dict[name] for name in sorted(goal_names, key=lambda x: x.lower())]

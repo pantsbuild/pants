@@ -66,6 +66,11 @@ class IvyModuleRef(object):
     return ('IvyModuleRef(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
             .format(*self._id))
 
+  def __cmp__(self, other):
+    # We can't just re-use __repr__ or __str_ because we want to order rev last
+    return cmp((self.org, self.name, self.classifier, self.ext, self.rev),
+               (other.org, other.name, other.classifier, other.ext, other.rev))
+
   @property
   def caller_key(self):
     """This returns an identifier for an IvyModuleRef that only retains the caller org and name.
@@ -130,7 +135,11 @@ class IvyInfo(object):
 
     visited.add(ref)
     acc = collector(ref)
-    for dep in self._deps_by_caller.get(ref.caller_key, ()):
+    # NB(zundel): ivy does not return deps in a consistent order for the same module for
+    # different resolves.  Sort them to get consistency and prevent cache invalidation.
+    # See https://github.com/pantsbuild/pants/issues/2607
+    deps = sorted(self._deps_by_caller.get(ref.caller_key, ()))
+    for dep in deps:
       acc.update(self._do_traverse_dependency_graph(dep, collector, memo, visited))
     memo[ref] = acc
     return acc

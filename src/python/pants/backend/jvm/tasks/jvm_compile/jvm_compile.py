@@ -598,6 +598,19 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   def _create_compile_jobs(self, classpath_products, compile_contexts, extra_compile_time_classpath,
                            invalid_targets, invalid_vts_partitioned):
+    class Counter(object):
+      def __init__(self, size, initial=0):
+        self.size = size
+        self.count = initial
+
+      def __call__(self):
+        self.count += 1
+        return self.count
+
+      def format_length(self):
+        return len(str(self.size))
+    counter = Counter(len(invalid_vts_partitioned))
+
     def check_cache(vts):
       """Manually checks the artifact cache (usually immediately before compilation.)
 
@@ -614,6 +627,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
           'Cache returned unexpected target: {} vs {}'.format(cached_vts, [vts])
       )
       self.context.log.info('Hit cache during double check for {}'.format(vts.target.address.spec))
+      counter()
       return True
 
     def should_compile_incrementally(vts):
@@ -627,19 +641,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
         return True
       return os.path.exists(compile_context.analysis_file)
 
-    class Counter(object):
-      def __init__(self, size, initial=0):
-        self.size = size
-        self.count = initial
-
-      def __call__(self):
-        self.count += 1
-        return self.count
-
-      def format_length(self):
-        return len(str(self.size))
-
-    counter = Counter(len(invalid_vts_partitioned))
     def work_for_vts(vts, compile_context):
       progress_message = compile_context.target.address.spec
 
