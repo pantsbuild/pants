@@ -33,3 +33,10 @@ class NodeTestIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
+
+  def test_test_preinstalled_node_module_project(self):
+    command = ['test',
+               'contrib/node/examples/src/node/preinstalled-project:unit']
+    pants_run = self.run_pants(command=command)
+
+    self.assert_success(pants_run)
