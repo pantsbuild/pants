@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
+import io
 import os
 import select
 import socket
@@ -15,13 +16,12 @@ from contextlib import contextmanager
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
-class NailgunStreamReader(threading.Thread, NailgunProtocol):
+class NailgunStreamReader(threading.Thread):
   """Reads input from stdin and emits Nailgun 'stdin' chunks over a socket."""
 
-  BUF_SIZE = 8192
   SELECT_TIMEOUT = 1
 
-  def __init__(self, in_fd, sock, buf_size=BUF_SIZE, select_timeout=SELECT_TIMEOUT):
+  def __init__(self, in_fd, sock, buf_size=io.DEFAULT_BUFFER_SIZE, select_timeout=SELECT_TIMEOUT):
     """
     :param file in_fd: the input file descriptor (e.g. sys.stdin) to read from.
     :param socket sock: the socket to emit nailgun protocol chunks over.
@@ -58,15 +58,16 @@ class NailgunStreamReader(threading.Thread, NailgunProtocol):
 
       if self._stdin in errored:
         self.stop()
+        return
 
       if not self.is_stopped and self._stdin in readable:
         data = os.read(self._stdin.fileno(), self._buf_size)
 
         if not self.is_stopped:
           if data:
-            self.write_chunk(self._socket, ChunkType.STDIN, data)
+            NailgunProtocol.write_chunk(self._socket, ChunkType.STDIN, data)
           else:
-            self.write_chunk(self._socket, ChunkType.STDIN_EOF)
+            NailgunProtocol.write_chunk(self._socket, ChunkType.STDIN_EOF)
             try:
               self._socket.shutdown(socket.SHUT_WR)  # Shutdown socket sends.
             except socket.error:  # Can happen if response is quick.
@@ -75,7 +76,7 @@ class NailgunStreamReader(threading.Thread, NailgunProtocol):
               self.stop()
 
 
-class NailgunStreamWriter(NailgunProtocol):
+class NailgunStreamWriter(object):
   """A sys.{stdout,stderr} replacement that writes output to a socket using the nailgun protocol."""
 
   def __init__(self, sock, chunk_type, isatty=True, mask_broken_pipe=False):
@@ -94,7 +95,7 @@ class NailgunStreamWriter(NailgunProtocol):
 
   def write(self, payload):
     try:
-      self.write_chunk(self._socket, self._chunk_type, payload)
+      NailgunProtocol.write_chunk(self._socket, self._chunk_type, payload)
     except IOError as e:
       # If the remote client disconnects and we try to perform a write (e.g. socket.send/sendall),
       # an 'error: [Errno 32] Broken pipe' exception can be thrown. Setting mask_broken_pipe=True
@@ -105,9 +106,6 @@ class NailgunStreamWriter(NailgunProtocol):
         raise
 
   def flush(self):
-    return
-
-  def fileno(self):
     return
 
   def isatty(self):

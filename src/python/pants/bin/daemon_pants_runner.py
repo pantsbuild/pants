@@ -40,10 +40,11 @@ class DaemonExiter(Exiter):
     """Exit the runtime."""
     try:
       # Write a final message to stderr if present.
-      if msg: NailgunProtocol.write_chunk(self._socket, ChunkType.STDERR, msg)
+      if msg:
+        NailgunProtocol.write_chunk(self._socket, ChunkType.STDERR, msg)
 
       # Send an Exit chunk with the result.
-      NailgunProtocol.write_chunk(self._socket, ChunkType.EXIT, bytes(result))
+      NailgunProtocol.write_chunk(self._socket, ChunkType.EXIT, str(result).encode('ascii'))
 
       # Shutdown the connected socket.
       self._shutdown_socket()

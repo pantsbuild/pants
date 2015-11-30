@@ -35,7 +35,7 @@ class PailgunService(PantsService):
 
   @property
   def pailgun_port(self):
-    return getattr(self.pailgun, 'server_port')
+    return self.pailgun.server_port
 
   def _setup_pailgun(self):
     """Sets up a PailgunServer instance."""

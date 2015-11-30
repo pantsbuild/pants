@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import socket
 import traceback
-from SocketServer import BaseRequestHandler, BaseServer, TCPServer
+
+from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer
 
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.socket import RecvBufferedSocket

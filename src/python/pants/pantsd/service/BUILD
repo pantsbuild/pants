@@ -23,6 +23,7 @@ python_library(
   name = 'pailgun_service',
   sources = ['pailgun_service.py'],
   dependencies = [
-    ':pants_service'
+    ':pants_service',
+    'src/python/pants/pantsd:pailgun_server'
   ]
 )
