@@ -146,8 +146,7 @@ def register_goals():
 
   task(name='export-classpath', action=RuntimeClasspathPublisher).install().with_description(
       'Create stable symlinks for runtime classpath entries for JVM targets.')
-  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile').with_description(
-      'Check that used dependencies have been requested.')
+  task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage').with_description(
       'Collect target dependency usage data.')
