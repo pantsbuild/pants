@@ -2,7 +2,6 @@ target(
   name='tasks',
   dependencies=[
     ':pytest_run',
-    ':python_eval',
     ':python_repl',
     ':python_task',
     ':setup_py',
@@ -39,16 +38,7 @@ python_tests(
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:python_setup',
     'src/python/pants/util:contextutil',
-  ]
-)
-
-
-python_tests(
-  name='python_eval',
-  sources=['test_python_eval.py'],
-  dependencies=[
-    ':python_task_test_base',
-    'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/util:timeout',
   ]
 )
 
@@ -57,11 +47,11 @@ python_tests(
   sources=['test_python_repl.py'],
   dependencies=[
     ':python_task_test_base',
-    'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python:all_utils',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/task',
     'src/python/pants/util:contextutil',
   ]
 )

@@ -8,10 +8,8 @@ target(
     ':dependees',
     ':filter',
     ':markdown_to_html',
-    ':mutex_task_mixin',
     ':scm_publish',
     ':target_filter_task_mixin',
-    ':test_task_mixin',
   ],
 )
 
@@ -110,17 +108,6 @@ python_tests(
 )
 
 python_tests(
-  name='mutex_task_mixin',
-  sources=['test_mutex_task_mixin.py'],
-  dependencies=[
-    'src/python/pants/backend/core/tasks:mutex_task_mixin',
-    'src/python/pants/build_graph',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
   name='paths',
   sources=['test_paths.py'],
   dependencies=[
@@ -147,25 +134,5 @@ python_tests(
     'src/python/pants/backend/core/tasks:target_filter_task_mixin',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
-  name='task',
-  sources=['test_task.py'],
-  dependencies=[
-    'src/python/pants/backend/core/tasks:task',
-    'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
-  name='test_task_mixin',
-  sources=['test_test_task_mixin.py'],
-  dependencies=[
-    'src/python/pants/backend/core/tasks:test_task_mixin',
-    'tests/python/pants_test/tasks:task_test_base',
-    '3rdparty/python:mock',
   ]
 )

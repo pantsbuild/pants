@@ -1,7 +1,7 @@
 Set up Your Source Tree for Pants
 =================================
 
-**As of September 2014, this much more complex than it should be.**
+**As of November 2015, this more complex than it should be.**
 **The Pants community is actively working to simplify it.**
 If you're setting up the Pants build tool to work in your source tree, you need to
 configure Pants' behavior. (Once it's set up, most folks should be able
@@ -12,15 +12,15 @@ Configuring with `pants.ini`
 ----------------------------
 
 Pants Build is very configurable. Your source tree's top-level directory
-should contain a `pants.ini` file that sets various options. You can
-modify a broad range of options here, including specific binaries to
-use in your toolchain, arguments to pass to tools, etc.
+contains a `pants.ini` file that can set various options,
+specify binaries to
+use in your toolchain, set arguments to pass to tools, etc.
 
-These files are formatted as [Python config
+This file is a [Python config
 files](http://docs.python.org/install/index.html#inst-config-syntax),
 parsed by
 [ConfigParser](http://docs.python.org/library/configparser.html). Thus,
-they look something like:
+it looks something like:
 
     :::ini
     [section]
@@ -195,7 +195,7 @@ refers to the `public` repository defined above. (Notice it's a Python object, n
 If you get an error that the repo name (here, `public`) isn't defined, your plugin didn't register
 with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.
 
-In your config file (usually `pants.ini`), set up a `[publish.jar]` section. In that section,
+In your `pants.ini` file, set up a `[publish.jar]` section. In that section,
 create a `dict` called `repos`. It should contain a section for each `Repository` object that you
 defined in your plugin:
 
@@ -278,7 +278,7 @@ the custom Ivy settings when publishing:
 Your organization might have a notion of a special "release branch": you want [[artifact
 publishing|pants('src/docs:publish')]] to happen on this source control branch, which you maintain
 extra-carefully. You can set this branch using the `restrict_push_branches` option of the
-`[publish.jar]` section of your config file (usually `pants.ini`).
+`[publish.jar]` section of your `pants.ini` file.
 
 ### Task to Publish "Extra" Artifacts
 

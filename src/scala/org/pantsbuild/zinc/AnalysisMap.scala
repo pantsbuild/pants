@@ -21,7 +21,10 @@ import sbt.inc.{
   Locate
 }
 
-import org.pantsbuild.zinc.cache.Cache
+import org.pantsbuild.zinc.cache.{
+  Cache,
+  FileFPrint
+}
 import org.pantsbuild.zinc.cache.Cache.Implicits
 
 /**

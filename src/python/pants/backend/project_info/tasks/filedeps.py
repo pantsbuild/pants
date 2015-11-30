@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import os
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
+from pants.task.console_task import ConsoleTask
 
 
 class FileDeps(ConsoleTask):

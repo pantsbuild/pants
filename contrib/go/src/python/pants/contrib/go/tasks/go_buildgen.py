@@ -5,21 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
 import os
-import subprocess
 from collections import defaultdict, namedtuple
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.memo import memoized_property
 
 from pants.contrib.go.subsystems.fetchers import Fetchers
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -44,10 +41,9 @@ class GoTargetGenerator(object):
   class NewRemoteEncounteredButRemotesNotAllowedError(GenerationError):
     """Indicates a new remote library dependency was found but --remote was not enabled."""
 
-  def __init__(self, workunit_factory, go_distribution, build_graph, local_root, fetchers,
+  def __init__(self, import_oracle, build_graph, local_root, fetchers,
                generate_remotes=False, remote_root=None):
-    self._workunit_factory = workunit_factory
-    self._go_distribution = go_distribution
+    self._import_oracle = import_oracle
     self._build_graph = build_graph
     self._local_source_root = local_root
     self._fetchers = fetchers
@@ -63,12 +59,12 @@ class GoTargetGenerator(object):
     visited = {l.import_path: l.address for l in local_go_targets}
     with temporary_dir() as gopath:
       for local_go_target in local_go_targets:
-        name, import_paths = self._list_deps(gopath, local_go_target.address)
-        self._generate_missing(gopath, local_go_target.address, name, import_paths, visited)
+        deps = self._list_deps(gopath, local_go_target.address)
+        self._generate_missing(gopath, local_go_target.address, deps, visited)
     return visited.items()
 
-  def _generate_missing(self, gopath, local_address, name, import_paths, visited):
-    target_type = GoBinary if name == 'main' else GoLibrary
+  def _generate_missing(self, gopath, local_address, import_listing, visited):
+    target_type = GoBinary if import_listing.pkg_name == 'main' else GoLibrary
     existing = self._build_graph.get_target(local_address)
     if not existing:
       self._build_graph.inject_synthetic_target(address=local_address, target_type=target_type)
@@ -76,8 +72,8 @@ class GoTargetGenerator(object):
       raise self.WrongLocalSourceTargetTypeError('{} should be a {}'
                                                  .format(existing, target_type.__name__))
 
-    for import_path in import_paths:
-      if import_path not in self._go_stdlib:
+    for import_path in import_listing.all_imports:
+      if not self._import_oracle.is_go_internal_import(import_path):
         if import_path not in visited:
           fetcher = self._fetchers.maybe_get_fetcher(import_path)
           if fetcher:
@@ -98,16 +94,11 @@ class GoTargetGenerator(object):
             # Recurse on local targets.
             address = Address(os.path.join(self._local_source_root, import_path),
                               os.path.basename(import_path))
-            name, import_paths = self._list_deps(gopath, address)
-            self._generate_missing(gopath, address, name, import_paths, visited)
+            deps = self._list_deps(gopath, address)
+            self._generate_missing(gopath, address, deps, visited)
           visited[import_path] = address
         dependency_address = visited[import_path]
         self._build_graph.inject_dependency(local_address, dependency_address)
-
-  @memoized_property
-  def _go_stdlib(self):
-    out = self._go_distribution.create_go_cmd('list', args=['std']).check_output()
-    return frozenset(out.strip().split())
 
   def _list_deps(self, gopath, local_address):
     # TODO(John Sirois): Lift out a local go sources target chroot util - GoWorkspaceTask and
@@ -122,23 +113,7 @@ class GoTargetGenerator(object):
         dest_path = os.path.join(src_path, source_file)
         os.symlink(source_path, dest_path)
 
-    # TODO(John Sirois): Lift up a small `go list utility` - GoFetch and GoTargetGenerator both use
-    # this go command now as well as a version of the stdlib gathering done above in _go_stdlib.
-    go_cmd = self._go_distribution.create_go_cmd('list', args=['-json', import_path], gopath=gopath)
-    with self._workunit_factory(local_address.reference(),
-                                cmd=str(go_cmd),
-                                labels=[WorkUnitLabel.TOOL]) as workunit:
-      # TODO(John Sirois): It would be nice to be able to tee the stdout to the workunit to we have
-      # a capture of the json available for inspection in the server console.
-      process = go_cmd.spawn(stdout=subprocess.PIPE, stderr=workunit.output('stderr'))
-      out, _ = process.communicate()
-      returncode = process.returncode
-      workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
-      if returncode != 0:
-        raise self.GenerationError('Problem listing imports for {}: {} failed with exit code {}'
-                                   .format(local_address, go_cmd, returncode))
-      data = json.loads(out)
-      return data.get('Name'), data.get('Imports', []) + data.get('TestImports', [])
+    return self._import_oracle.list_imports(import_path, gopath=gopath)
 
 
 class GoBuildgen(GoTask):
@@ -392,8 +367,7 @@ class GoBuildgen(GoTask):
                                          .format('\n\t'.join(sorted(remote_roots))))
     remote_root = remote_roots.pop() if remote_roots else None
 
-    generator = GoTargetGenerator(self.context.new_workunit,
-                                  self.go_dist,
+    generator = GoTargetGenerator(self.import_oracle,
                                   self.context.build_graph,
                                   local_root,
                                   Fetchers.global_instance(),

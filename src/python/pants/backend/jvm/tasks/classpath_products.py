@@ -12,6 +12,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_graph import BuildGraph
 from pants.goal.products import UnionProducts
 
 
@@ -259,9 +260,7 @@ class ClasspathProducts(object):
   def _filter_by_excludes(self, classpath_tuples, root_targets):
     # Excludes are always applied transitively, so regardless of whether a transitive
     # set of targets was included here, their closure must be included.
-    closure = set()
-    for root_target in root_targets:
-      closure.update(root_target.closure(bfs=True))
+    closure = BuildGraph.closure(root_targets, bfs=True)
     excludes = self._excludes.get_for_targets(closure)
     return filter(_not_excluded_filter(excludes), classpath_tuples)
 

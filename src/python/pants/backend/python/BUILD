@@ -5,6 +5,7 @@ python_library(
   name = 'plugin',
   sources = ['__init__.py', 'register.py'],
   dependencies = [
+    ':pants_requirement',
     ':python_artifact',
     ':python_requirement',
     ':python_requirements',
@@ -81,6 +82,17 @@ python_library(
     'src/python/pants/util:dirutil',
   ]
 )
+
+python_library(
+  name = 'pants_requirement',
+  sources = ['pants_requirement.py'],
+  dependencies = [
+    'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/backend/python/targets:python',
+    'src/python/pants/base:build_environment',
+  ]
+)
+
 
 python_library(
   name = 'python_artifact',

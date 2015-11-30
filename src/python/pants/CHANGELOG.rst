@@ -1,6 +1,214 @@
 RELEASE HISTORY
 ===============
 
+0.0.61 (11/23/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release to fix two regressions in 0.0.60.  It also happens to
+include a small UX improvement for the console output of isolated compiles.
+
+Bugfixes
+~~~~~~~~
+
+* Make sure the deprecated pants.backend.core.tasks.task module is bundled.
+  `RB #3164 <https://rbcommons.com/s/twitter/r/3164>`_
+
+* Revert "Isolate .pex dir"
+  `Issue #2610 <https://github.com/pantsbuild/pants/issues/2610>`_
+  `RB #3135 <https://rbcommons.com/s/twitter/r/3135>`_
+  `RB #3163 <https://rbcommons.com/s/twitter/r/3163>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* During a jvm compile, include a running count in the printed log.
+  `RB #3153 <https://rbcommons.com/s/twitter/r/3153>`_
+
+0.0.60 (11/21/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release is primarily small bug fixes and minor improvements.  It also
+removes several deprecated options and methods:
+
+* `ReverseDepmap.type`.
+* `pants.backend.maven_layout`.
+* `Depmap.path_to`.
+* `SourceRoot.find`.
+* `SourceRoot.find_by_path`.
+* `pants.bin.goal_runner.SourceRootBootstrapper` and its option `[goals] bootstrap_buildfiles`.
+* `pants.build_graph.target._set_no_cache`.
+
+The following modules have been moved, with their old locations now deprecated:
+
+* `pants.backend.core.tasks.console_task` -> `pants.task.console_task`.
+* `pants.backend.core.tasks.task` -> `pants.task.task`.
+
+
+API Changes
+~~~~~~~~~~~
+
+* Move ConsoleTask to pants/task.
+  `RB #3157 <https://rbcommons.com/s/twitter/r/3157>`_
+
+* Move task.py out of backend/core.
+  `RB #3130 <https://rbcommons.com/s/twitter/r/3130>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* Add a helper staticmethod `closure()` to `BuildGraph`.
+  `RB #3160 <https://rbcommons.com/s/twitter/r/3160>`_
+
+* Fix a bug preventing re-upload artifacts that encountered read-errors
+  `RB #1361 <https://rbcommons.com/s/twitter/r/1361>`_
+  `RB #3141 <https://rbcommons.com/s/twitter/r/3141>`_
+
+* Fix `gopkg.in` fetcher to handle subpackages.
+  `RB #3139 <https://rbcommons.com/s/twitter/r/3139>`_
+
+* Update scalac_plugin_args call to the new option name.
+  `RB #3132 <https://rbcommons.com/s/twitter/r/3132>`_
+
+* Fix cases where transitivity is required despite strict_deps; enable within the repo for Java
+  `RB #3125 <https://rbcommons.com/s/twitter/r/3125>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Isolate .pex dir
+  `RB #3135 <https://rbcommons.com/s/twitter/r/3135>`_
+
+* Group cache hits/misses by their task names
+  `RB #3137 <https://rbcommons.com/s/twitter/r/3137>`_
+
+* Add back the --[no-]color flag as deprecated.
+  `RB #3150 <https://rbcommons.com/s/twitter/r/3150>`_
+
+* Add support for extra_jvm_options to java_tests
+  `Issue #2383 <https://github.com/pantsbuild/pants/issues/2383>`_
+  `RB #3140 <https://rbcommons.com/s/twitter/r/3140>`_
+
+* Removed Wire 2.0 support.  Update default Wire library to 1.8.0
+  `RB #3124 <https://rbcommons.com/s/twitter/r/3124>`_
+
+* Remove legacy code in wire_gen and protobuf_gen designed for global codegen strategy
+  `RB #3123 <https://rbcommons.com/s/twitter/r/3123>`_
+
+0.0.59 (11/15/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release that pins an internal pants python requirement to prevent failures running
+`./pants test` against `python_tests` targets.
+See more details here: http://github.com/pantsbuild/pants/issues#issue/2566
+
+Bugfixes
+~~~~~~~~
+
+* Fixup floating `pytest-timeout` dep.
+  `RB #3126 <https://rbcommons.com/s/twitter/r/3126>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow bundle to run for all targets, rather than just target roots
+  `RB #3119 <https://rbcommons.com/s/twitter/r/3119>`_
+
+* Allow per-jvm-target configuration of fatal warnings
+  `RB #3080 <https://rbcommons.com/s/twitter/r/3080>`_
+
+* Add options to repro and expand user on output file
+  `RB #3109 <https://rbcommons.com/s/twitter/r/3109>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove use of twitter.common.util.topological_sort in SortTargets
+  `RB #3121 <https://rbcommons.com/s/twitter/r/3121>`_
+
+* Delay many re.compile calls.
+  `RB #3122 <https://rbcommons.com/s/twitter/r/3122>`_
+
+0.0.58 (11/13/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release completes the deprecated cycle for two options and removes them:
+
+* `--infer-test-from-siblings` for `eclipse` and `idea` goals
+* `--strategy` for various code generation tasks like protoc
+
+Two existing tasks not installed by default have been moved from `pantsbuild.pants` to
+`pantsbuild.pants.contrib.python.checks`.  You can add `pantsbuild.pants.contrib.python.checks` to
+your `plugins` list in `pants.ini` to get these tasks installed and start verifying your python
+BUILD deps and to check that your python code conforms to pep8 and various other lints.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove `--strategy` `--infer-test-from-siblings`.
+  `RB #3116 <https://rbcommons.com/s/twitter/r/3116>`_
+
+* Extract `python-eval` and `pythonstyle` to plugin.
+  `RB #3114 <https://rbcommons.com/s/twitter/r/3114>`_
+
+Bugfixes
+~~~~~~~~
+
+* Do not invalidate jvm targets in zinc for resource dependencies change
+  `RB #3106 <https://rbcommons.com/s/twitter/r/3106>`_
+
+* Updated junit-runner to version 0.0.12
+  `RB #3092 <https://rbcommons.com/s/twitter/r/3092>`_
+
+* Fixing malformatted xml report names from junit runner.
+  `RB #3090 <https://rbcommons.com/s/twitter/r/3090>`_
+  `RB #3103 <https://rbcommons.com/s/twitter/r/3103>`_
+
+* Clean up corrupted local cache for errors that are not retryable
+  `RB #3045 <https://rbcommons.com/s/twitter/r/3045>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `pants_requirement()` for plugin authors.
+  `RB #3112 <https://rbcommons.com/s/twitter/r/3112>`_
+
+* Allow for zinc analysis portability with the workdir located either inside or outside of the buildroot
+  `RB #3083 <https://rbcommons.com/s/twitter/r/3083>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fixup invoking.md to refer to `--config-override`.
+  `RB #3115 <https://rbcommons.com/s/twitter/r/3115>`_
+
+* docfix: pants.ini must exist with that name. Not some other name.
+  `RB #3110 <https://rbcommons.com/s/twitter/r/3110>`_
+
+* Inline twitter.common.config.Properties and remove t.c.config dep
+  `RB #3113 <https://rbcommons.com/s/twitter/r/3113>`_
+
+* Run coverage instrumentation once for each target, streamline command line parameters
+  `RB #3107 <https://rbcommons.com/s/twitter/r/3107>`_
+
+* Break out core runtime logic into a PantsRunner
+  `RB #3054 <https://rbcommons.com/s/twitter/r/3054>`_
+
+* Improve exception handling for bad option values, such as when PANTS_CONFIG_OVERRIDE="pants.ini" exists in the environment.
+  `RB #3087 <https://rbcommons.com/s/twitter/r/3087>`_
+
 0.0.57 (11/09/2015)
 -------------------
 

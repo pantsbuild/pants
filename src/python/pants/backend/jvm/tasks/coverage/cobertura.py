@@ -15,6 +15,7 @@ from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
+from pants.util.contextutil import temporary_file
 from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch
 
 
@@ -85,24 +86,32 @@ class Cobertura(Coverage):
         for (name, path) in paths:
           files_to_instrument.append(path)
 
-      if len(files_to_instrument) > 0:
-        self._nothing_to_instrument = False
-        args = [
-          '--datafile',
-          self._coverage_datafile,
-          '--auxClasspath',
-          aux_classpath,
-        ]
-        # apply class incl/excl filters
-        if len(self._include_classes) > 0:
-          for pattern in self._include_classes:
-            args += ["--includeClasses", pattern]
-        else:
-          args += ["--includeClasses", '.*']  # default to instrumenting all classes
-        for pattern in self._exclude_classes:
-          args += ["--excludeClasses", pattern]
+    if len(files_to_instrument) > 0:
+      self._nothing_to_instrument = False
 
-        args += files_to_instrument
+      unique_files = list(set(files_to_instrument))
+      relativize_paths(unique_files, self._settings.workdir)
+
+      args = [
+        '--basedir',
+        self._settings.workdir,
+        '--datafile',
+        self._coverage_datafile,
+      ]
+      # apply class incl/excl filters
+      if len(self._include_classes) > 0:
+        for pattern in self._include_classes:
+          args += ["--includeClasses", pattern]
+      else:
+        args += ["--includeClasses", '.*']  # default to instrumenting all classes
+      for pattern in self._exclude_classes:
+        args += ["--excludeClasses", pattern]
+
+      with temporary_file() as tmp_file:
+        tmp_file.write("\n".join(unique_files))
+        tmp_file.flush()
+
+        args += ["--listOfFilesToInstrument", tmp_file.name]
 
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
         self._context.log.debug(

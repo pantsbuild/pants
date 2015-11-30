@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 
-from pants.backend.core.tasks.task import Task
 from pants.engine.round_engine import RoundEngine
+from pants.task.task import Task
 from pants_test.base_test import BaseTest
 from pants_test.engine.base_engine_test import EngineTestBase
 

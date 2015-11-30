@@ -6,6 +6,7 @@ jvm_binary(name='unpacked_jars',
   source='ExampleProtobufExternalArchive.java',
   main='org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive',
   dependencies=[
-    'examples/src/protobuf/org/pantsbuild/example/unpacked_jars'
+    '3rdparty:protobuf-java',
+    'examples/src/protobuf/org/pantsbuild/example/unpacked_jars',
   ],
 )

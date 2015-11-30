@@ -20,14 +20,14 @@ from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError, TestFailedTaskError
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
+from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -67,13 +67,15 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
-class PytestRun(TestTaskMixin, PythonTask):
+class PytestRun(TestRunnerTaskMixin, PythonTask):
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
     # to avoid confusion when debugging pants tests.
     # TODO: make these an option, so any pants install base can pick their pytest version.
     PythonRequirement('pytest>=2.6,<2.7'),
-    PythonRequirement('pytest-timeout'),
+    # NB, pytest-timeout 1.0.0 introduces a conflicting pytest>=2.8.0 requirement, see:
+    #   https://github.com/pantsbuild/pants/issues/2566
+    PythonRequirement('pytest-timeout<1.0.0'),
     PythonRequirement('pytest-cov>=1.8,<1.9'),
     PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
@@ -453,7 +455,9 @@ class PytestRun(TestTaskMixin, PythonTask):
   # Pattern for lines such as ones below.  The second one is from a test inside a class.
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
   # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
-  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+?)::(.+)')
+
+  # 'E' is here as well to catch test errors, not just test failures.
+  RESULTLOG_FAILED_PATTERN = re.compile(r'[EF] +(.+?)::(.+)')
 
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):

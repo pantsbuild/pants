@@ -6,11 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
-class ScalaPlatform(JvmToolMixin, Subsystem):
+class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """A scala platform.
 
   TODO: Rework so there's a way to specify a default as direct pointers to jar coordinates,

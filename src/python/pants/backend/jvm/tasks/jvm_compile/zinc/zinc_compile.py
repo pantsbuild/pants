@@ -15,6 +15,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
@@ -79,6 +80,11 @@ class ZincCompile(JvmCompile):
   @classmethod
   def subsystem_dependencies(cls):
     return super(ZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
+
+  @property
+  def compiler_plugin_types(cls):
+    """A tuple of target types which are compiler plugins."""
+    return (AnnotationProcessor, ScalacPlugin)
 
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
@@ -240,7 +246,7 @@ class ZincCompile(JvmCompile):
     if not self.get_options().scalac_plugins:
       return []
 
-    plugin_args = self.get_options().plugin_args
+    plugin_args = self.get_options().scalac_plugin_args
     active_plugins = self._find_plugins()
     ret = []
     for name, jar in active_plugins.items():
@@ -294,7 +300,7 @@ class ZincCompile(JvmCompile):
         f.write('{}\n'.format(processor.strip()))
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings):
+              log_file, settings, fatal_warnings):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
@@ -338,6 +344,9 @@ class ZincCompile(JvmCompile):
       '-C-target', '-C{}'.format(settings.target_level),
     ])
     zinc_args.extend(settings.args)
+
+    if fatal_warnings:
+      zinc_args.extend(['-S-Xfatal-warnings', '-C-Werror'])
 
     jvm_options = list(self._jvm_options)
 

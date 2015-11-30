@@ -4,6 +4,7 @@
 junit_tests(name='cwdexample',
   sources=['CwdTest.java'],
   dependencies=[
+    '3rdparty:guava',
     '3rdparty:junit',
     'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
   ],

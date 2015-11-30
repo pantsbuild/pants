@@ -202,3 +202,34 @@ class GoFetchTest(TaskTestBase):
         expected[r1] = {('localzip/r3', self.address('3rdparty/go/localzip/r3'))}
         expected[r2] = {('localzip/r4', self.address('3rdparty/go/localzip/r4'))}
         self.assertEqual(undeclared_deps, expected)
+
+  def test_issues_2616(self):
+    go_fetch = self.create_task(self.context())
+    self.create_file('src/github.com/u/a/a.go', contents="""
+      package a
+
+      import (
+        "fmt"
+        "math"
+        "sync"
+
+        "bitbucket.org/u/b"
+      )
+    """)
+    self.create_file('src/github.com/u/a/b.go', contents="""
+      package a
+
+      /*
+       #include <stdlib.h>
+       */
+      import "C" // C was erroneously categorized as a remote lib in issue 2616.
+
+      import (
+        "fmt"
+
+        "github.com/u/c"
+      )
+    """)
+    remote_import_ids = go_fetch._get_remote_import_paths('github.com/u/a',
+                                                          gopath=self.build_root)
+    self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
