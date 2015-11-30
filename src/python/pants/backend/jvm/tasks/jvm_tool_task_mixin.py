@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.task import TaskBase
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
+from pants.task.task import TaskBase
 
 
 class JvmToolTaskMixin(JvmToolMixin, TaskBase):

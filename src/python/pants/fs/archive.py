@@ -43,7 +43,7 @@ class TarArchiver(Archiver):
       tar.extractall(outdir)
 
   def __init__(self, mode, extension):
-    Archiver.__init__(self)
+    super(TarArchiver, self).__init__()
     self.mode = mode
     self.extension = extension
 
@@ -81,7 +81,7 @@ class ZipArchiver(Archiver):
             archive_file.extract(name, outdir)
 
   def __init__(self, compression):
-    Archiver.__init__(self)
+    super(ZipArchiver, self).__init__()
     self.compression = compression
 
   def create(self, basedir, outdir, name, prefix=None):

@@ -14,7 +14,6 @@ from contextlib import contextmanager
 from pkg_resources import (Distribution, EmptyProvider, VersionConflict, WorkingSet, working_set,
                            yield_lines)
 
-from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import BuildConfigurationError
 from pants.bin.extension_loader import (PluginLoadOrderError, PluginNotFound, load_backend,
                                         load_plugins)
@@ -24,6 +23,7 @@ from pants.build_graph.target import Target
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.subsystem.subsystem import Subsystem
+from pants.task.task import Task
 
 
 class MockMetadata(EmptyProvider):

@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import defaultdict
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.core.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.base.build_environment import get_buildroot
+from pants.task.console_task import ConsoleTask
 
 
 class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
@@ -22,13 +22,6 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
              help='List transitive dependees.')
     register('--closed', default=False, action='store_true',
              help='Include the input targets in the output along with the dependees.')
-    register('--type', default=[], action='append',
-             deprecated_version='0.0.60',
-             deprecated_hint='This never worked anyway. Do not use for now. May be reimplemented '
-                             'in the future.',
-             help="Identifies target types to include. Multiple type inclusions "
-                  "can be specified at once in a comma separated list or else by "
-                  "using multiple instances of this flag.")
 
   def __init__(self, *args, **kwargs):
     super(ReverseDepmap, self).__init__(*args, **kwargs)

@@ -5,14 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from twitter.common.collections import OrderedSet
-
-from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.java.distribution.distribution import DistributionLocator
+from pants.task.repl_task_mixin import ReplTaskMixin
 
 
 class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):

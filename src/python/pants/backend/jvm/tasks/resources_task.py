@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
-from pants.backend.core.tasks.task import Task
 from pants.option.custom_types import list_option
+from pants.task.task import Task
 
 
 class ResourcesTask(Task):
