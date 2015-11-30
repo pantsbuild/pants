@@ -23,6 +23,7 @@ python_library(
     ':node_paths',
     ':node_task',
     'src/python/pants/backend/core/tasks:repl_task_mixin',
+    'src/python/pants/util:dirutil',
   ]
 )
 
