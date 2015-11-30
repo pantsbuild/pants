@@ -91,7 +91,6 @@ location:
     :::bash
     $ ./pants list tests/python/pants_test/:
     tests/python/pants_test:base-test
-    tests/python/pants_test:test_maven_layout
     tests/python/pants_test:test_thrift_util
     tests/python/pants_test:all
 
@@ -101,7 +100,6 @@ specified location:
     :::bash
     $ ./pants list tests/python/pants_test/::
     tests/python/pants_test:base-test
-    tests/python/pants_test:test_maven_layout
     tests/python/pants_test:all
     tests/python/pants_test/base:base-test
     tests/python/pants_test/base:all

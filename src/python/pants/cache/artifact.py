@@ -52,7 +52,7 @@ class DirectoryArtifact(Artifact):
   """An artifact stored as loose files under a directory."""
 
   def __init__(self, artifact_root, directory):
-    Artifact.__init__(self, artifact_root)
+    super(DirectoryArtifact, self).__init__(artifact_root)
     self._directory = directory
 
   def exists(self):
@@ -83,9 +83,9 @@ class DirectoryArtifact(Artifact):
 class TarballArtifact(Artifact):
   """An artifact stored in a tarball."""
 
-  def __init__(self, artifact_root, tarfile, compression=9):
-    Artifact.__init__(self, artifact_root)
-    self._tarfile = tarfile
+  def __init__(self, artifact_root, tarfile_, compression=9):
+    super(TarballArtifact, self).__init__(artifact_root)
+    self._tarfile = tarfile_
     self._compression = compression
 
   def exists(self):
@@ -96,8 +96,7 @@ class TarballArtifact(Artifact):
     # but decompression times are much faster.
     mode = 'w:gz'
 
-    tar_kwargs = {'dereference': True, 'errorlevel': 2}
-    tar_kwargs['compresslevel'] = self._compression
+    tar_kwargs = {'dereference': True, 'errorlevel': 2, 'compresslevel': self._compression}
 
     with open_tar(self._tarfile, mode, **tar_kwargs) as tarout:
       for path in paths or ():

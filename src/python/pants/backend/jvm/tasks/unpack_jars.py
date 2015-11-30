@@ -13,12 +13,12 @@ from hashlib import sha1
 
 from twitter.common.dirutil.fileset import fnmatch_translate_extended
 
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.fs.archive import ZIP
+from pants.task.task import Task
 
 
 logger = logging.getLogger(__name__)

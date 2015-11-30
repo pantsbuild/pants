@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.tasks.task import Task
+from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree
 
 

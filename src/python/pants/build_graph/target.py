@@ -257,12 +257,6 @@ class Target(AbstractTarget):
     if kwargs:
       self.UnknownArguments.check(self, kwargs)
 
-  @deprecated('0.0.60',
-              'The `no_cache` property is generally ambiguous, and is no longer necessary '
-              'for jvm compiles.')
-  def _set_no_cache(self):
-    self.add_labels('no_cache')
-
   @property
   def type_alias(self):
     """Returns the type alias this target was constructed via.

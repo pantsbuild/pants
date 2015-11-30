@@ -24,6 +24,7 @@ from pants.util.dirutil import safe_mkdir
 class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def __init__(self, request, client_address, server):
     # The base class implements GET and HEAD.
+    # Old-style class, so we must invoke __init__ this way.
     SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def do_HEAD(self):
@@ -53,6 +54,7 @@ class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   """Reject all requests"""
 
   def __init__(self, request, client_address, server):
+    # Old-style class, so we must invoke __init__ this way.
     SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def _return_failed(self):
@@ -72,8 +74,8 @@ class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     return self._return_failed()
 
 
-TEST_CONTENT1 = 'muppet'
-TEST_CONTENT2 = 'kermit'
+TEST_CONTENT1 = b'muppet'
+TEST_CONTENT2 = b'kermit'
 
 
 class TestArtifactCache(unittest.TestCase):
@@ -239,7 +241,7 @@ class TestArtifactCache(unittest.TestCase):
       with temporary_dir() as results_dir:
         with temporary_file_path(root_dir=results_dir) as canary:
           map(call_insert, [(cache, key, [path], False)])
-          results = map(call_use_cached_files, [(cache, key, results_dir)])
+          map(call_use_cached_files, [(cache, key, results_dir)])
           # Results content should have been deleted.
           self.assertFalse(os.path.exists(canary))
 
@@ -271,7 +273,7 @@ class TestArtifactCache(unittest.TestCase):
         self.assertTrue(os.path.exists(tarfile))
 
         with open(tarfile, 'w') as outfile:
-          outfile.write('not a valid tgz any more')
+          outfile.write(b'not a valid tgz any more')
 
         self.assertFalse(artifact_cache.use_cached_files(key))
         self.assertFalse(os.path.exists(tarfile))

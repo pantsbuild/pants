@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 
-from pants.backend.core.tasks.repl_task_mixin import ReplTaskMixin
+from pants.base.exceptions import TaskError
+from pants.task.repl_task_mixin import ReplTaskMixin
 from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdtemp
 

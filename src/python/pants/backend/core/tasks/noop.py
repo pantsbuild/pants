@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.task import Task
+from pants.task.task import Task
 
 
 class NoopExecTask(Task):

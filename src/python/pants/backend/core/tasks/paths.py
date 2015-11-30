@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 from collections import deque
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.base.exceptions import TaskError
+from pants.task.console_task import ConsoleTask
 from pants.util.strutil import pluralize
 
 

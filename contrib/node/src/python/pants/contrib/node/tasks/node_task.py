@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.task import Task
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.task.task import Task
 from pants.util.memo import memoized_property
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution

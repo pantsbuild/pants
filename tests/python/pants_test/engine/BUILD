@@ -36,7 +36,7 @@ python_tests(
   dependencies = [
     ':engine_test_base',
     'src/python/pants/engine',
-    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/task',
     'tests/python/pants_test:base_test',
   ],
 )

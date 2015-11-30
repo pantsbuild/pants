@@ -14,7 +14,6 @@ from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
 from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -33,6 +32,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.option.errors import OptionsError
 from pants.option.ranked_value import RankedValue
+from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
 
 
