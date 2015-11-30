@@ -22,10 +22,10 @@ class ChangeCalculator(object):
                workspace,
                address_mapper,
                build_graph,
+               include_dependees,
                fast=False,
                changes_since=None,
                diffspec=None,
-               include_dependees=None,
                exclude_target_regexp=None,
                spec_excludes=None):
 
@@ -33,11 +33,11 @@ class ChangeCalculator(object):
     self._workspace = workspace
     self._address_mapper = address_mapper
     self._build_graph = build_graph
+    self._include_dependees = include_dependees
 
     self._fast = fast
     self._changes_since = changes_since
     self._diffspec = diffspec
-    self._include_dependees = include_dependees
     self._exclude_target_regexp = exclude_target_regexp
     self._spec_excludes = spec_excludes
 
@@ -140,10 +140,10 @@ class ChangedFileTaskMixin(object):
                             workspace,
                             address_mapper,
                             build_graph,
+                            options.include_dependees,
                             fast=options.fast,
                             changes_since=options.changes_since,
                             diffspec=options.diffspec,
-                            include_dependees=options.include_dependees,
                             # NB: exclude_target_regexp is a global scope option registered
                             # elsewhere
                             exclude_target_regexp=options.exclude_target_regexp,
