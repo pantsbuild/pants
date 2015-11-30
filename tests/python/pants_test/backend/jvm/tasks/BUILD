@@ -12,6 +12,7 @@ target(
     ':check_published_deps',
     ':classpath_products',
     ':classpath_util',
+    ':detect_duplicates',
     ':ivy_imports',
     ':ivy_resolve',
     ':ivy_utils',
@@ -170,6 +171,21 @@ python_tests(
     'src/python/pants/goal:products',
     'tests/python/pants_test:base_test',
   ]
+)
+
+python_tests(
+  name = 'detect_duplicates',
+  sources = ['test_detect_duplicates.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/tasks:detect_duplicates',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/jvm:jvm_task_test_base'
+  ],
 )
 
 python_tests(
