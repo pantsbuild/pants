@@ -40,14 +40,14 @@ class ArtifactCacheStatsTest(BaseTest):
         'num_hits': 0,
         'num_misses': 1,
         'hits': [],
-        'misses': [[self.TEST_SPEC_A, self.TEST_LOCAL_ERROR.err.message]]
+        'misses': [(self.TEST_SPEC_A, self.TEST_LOCAL_ERROR.err.message)]
       },
       {
         'cache_name': self.TEST_CACHE_NAME_1,
         'num_hits': 1,
         'num_misses': 1,
-        'hits': [[self.TEST_SPEC_B, '']],
-        'misses': [[self.TEST_SPEC_C, self.TEST_REMOTE_ERROR.err.message]]
+        'hits': [(self.TEST_SPEC_B, '')],
+        'misses': [(self.TEST_SPEC_C, self.TEST_REMOTE_ERROR.err.message)]
       },
     ]
 
