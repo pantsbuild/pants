@@ -17,7 +17,7 @@ python_library(
   ]
 )
 
-# why is this in goal?
+# this is in goal because of run_tracker
 python_library(
   name = 'artifact_cache_stats',
   sources = ['artifact_cache_stats.py'],
