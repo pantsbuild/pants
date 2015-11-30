@@ -471,36 +471,6 @@ class Planners(object):
         self._planners_by_product_type[output_type].add(planner)
         self._product_requirements[output_type].extend(input_type_requirements)
 
-  # TODO: nuke
-  def _expand_requirements(self, _requirements):
-    """Expands the given product requirements by walking the product graph they represent.
-    
-    For example, if a product `C` is sufficient to produce a product `B`, and `B` is sufficient
-    to produce a product `A`, then transitively, `C` is sufficient to produce `A`.
-
-    TODO: This is relatively simplisitic currently, in that 
-    """
-    # The input requirements are recursively expanded into the output requirements.
-    requirements = dict()
-    def expand(product_type):
-      """Expands the given type (recursively expanding any other types encountered) and returns it.
-      
-      TODO: detect cycles and fail gracefully.
-      """
-      if product_type in requirements:
-        return
-      # Output requirements are a superset of the input, so begin by cloning.
-      requirements[product_type] = list(_requirements[product_type])
-      for anded_clause in _requirements[product_type]:
-        # For each condition in the anded clause 
-        requirements[product_type]
-      return requirements[product_type]
-
-    for product_type in _requirements.key():
-      expand(product_type)
-
-    return requirements
-
   def for_goal(self, goal_name):
     """Return the set of task planners installed in the given goal.
 
