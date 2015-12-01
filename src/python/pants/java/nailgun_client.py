@@ -13,66 +13,12 @@ import sys
 import threading
 from contextlib import contextmanager
 
+from pants.java.nailgun_io import NailgunStreamReader
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.socket import RecvBufferedSocket
 
 
 logger = logging.getLogger(__name__)
-
-
-class InputReader(threading.Thread):
-  """Reads input from stdin and emits Nailgun 'stdin' chunks over a socket."""
-
-  SELECT_TIMEOUT = 1
-
-  def __init__(self, in_fd, sock, chunk_writer, buf_size, select_timeout=SELECT_TIMEOUT):
-    """
-    :param file in_fd: the input file descriptor (e.g. sys.stdin) to read from.
-    :param socket sock: the socket to emit nailgun protocol chunks over.
-    :param func chunk_writer: a callable to be used for writing the chunks to the socket.
-    :param int buf_size: the buffer size for reads from the file descriptor.
-    :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
-    """
-    super(InputReader, self).__init__()
-    self.daemon = True
-    self._stdin = in_fd
-    self._sock = sock
-    self._chunk_writer = chunk_writer
-    self._buf_size = buf_size
-    self._select_timeout = select_timeout
-    # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
-    self._stopped = threading.Event()
-
-  @property
-  def is_stopped(self):
-    """Indicates whether or not the InputReader is stopped."""
-    return self._stopped.is_set()
-
-  def stop(self):
-    """Stops the InputReader."""
-    self._stopped.set()
-
-  def run(self):
-    while not self.is_stopped:
-      readable, _, errored = select.select([self._stdin], [], [self._stdin], self._select_timeout)
-
-      if self._stdin in errored:
-        self.stop()
-
-      if not self.is_stopped and self._stdin in readable:
-        data = os.read(self._stdin.fileno(), self._buf_size)
-
-        if not self.is_stopped:
-          if data:
-            self._chunk_writer(self._sock, ChunkType.STDIN, data)
-          else:
-            self._chunk_writer(self._sock, ChunkType.STDIN_EOF)
-            try:
-              self._sock.shutdown(socket.SHUT_WR)
-            except socket.error:                            # Can happen if response is quick.
-              pass
-            finally:
-              self.stop()
 
 
 class NailgunClientSession(NailgunProtocol):
@@ -82,15 +28,12 @@ class NailgunClientSession(NailgunProtocol):
 
   def __init__(self, sock, in_fd, out_fd, err_fd):
     self._sock = sock
-    self._input_reader = InputReader(in_fd,
-                                     self._sock,
-                                     self.write_chunk,
-                                     self.BUF_SIZE) if in_fd else None
+    self._input_reader = NailgunStreamReader(in_fd, self._sock, self.BUF_SIZE) if in_fd else None
     self._stdout = out_fd
     self._stderr = err_fd
 
   @contextmanager
-  def _input_reader_running(self):
+  def _maybe_input_reader_running(self):
     if self._input_reader: self._input_reader.start()
     yield
     if self._input_reader: self._input_reader.stop()
@@ -115,8 +58,8 @@ class NailgunClientSession(NailgunProtocol):
     # Send the nailgun request.
     self.send_request(self._sock, working_dir, main_class, *arguments, **environment)
 
-    # Launch the InputReader if applicable and process the remainder of the nailgun session.
-    with self._input_reader_running():
+    # Launch the NailgunStreamReader if applicable and process the remainder of the nailgun session.
+    with self._maybe_input_reader_running():
       return self._process_session()
 
 

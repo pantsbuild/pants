@@ -34,6 +34,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'nailgun_io',
+  sources = ['test_nailgun_io.py'],
+  coverage = ['pants.java.nailgun_io'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/java:nailgun_io',
+  ]
+)
+
+python_tests(
   name = 'nailgun_protocol',
   sources = ['test_nailgun_protocol.py'],
   coverage = ['pants.java.nailgun_protocol'],
