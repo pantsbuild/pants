@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import struct
 
+import six
+
 
 class ChunkType(object):
   """Nailgun protocol chunk types.
@@ -126,10 +128,15 @@ class NailgunProtocol(object):
     sock.sendall(chunk)
 
   @classmethod
-  def construct_chunk(cls, chunk_type, payload):
-    """Construct and return single chunk."""
+  def construct_chunk(cls, chunk_type, payload, encoding='utf-8'):
+    """Construct and return a single chunk."""
+    if isinstance(payload, six.text_type):
+      payload = payload.encode(encoding)
+    elif not isinstance(payload, six.binary_type):
+      raise TypeError('cannot encode type: {}'.format(type(payload)))
+
     header = struct.pack(cls.HEADER_FMT, len(payload), chunk_type)
-    return header + bytes(payload)
+    return header + payload
 
   @classmethod
   def _read_until(cls, sock, desired_size):
@@ -205,3 +212,15 @@ class NailgunProtocol(object):
   def send_exit(cls, sock, payload=''):
     """Send the Exit chunk over the specified socket."""
     cls.write_chunk(sock, ChunkType.EXIT, payload)
+
+  @staticmethod
+  def isatty_from_env(env):
+    """Determine whether remote file descriptors are tty capable using std nailgunned env variables.
+
+    :param dict env: A dictionary representing the environment.
+    :returns: A tuple of boolean values indicating istty or not for (stdin, stdout, stderr).
+    """
+    def str_int_bool(i):
+      return i.isdigit() and bool(int(i))  # Environment variable values should always be strings.
+
+    return tuple(str_int_bool(env.get('NAILGUN_TTY_{}'.format(fd_id), '0')) for fd_id in range(3))

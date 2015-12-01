@@ -17,7 +17,6 @@ target(
   name = 'tasks',
   dependencies = [
     ':builddict',
-    ':detect_duplicates',
     ':execution_graph',
     ':group_task',
     ':list_goals',
@@ -36,7 +35,6 @@ target(
   name = 'integration',
   dependencies = [
     ':bootstrap_jvm_tools_integration',
-    ':ivy_resolve_integration',
     ':scalastyle_integration',
   ],
 )
@@ -97,21 +95,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'detect_duplicates',
-  sources = ['test_detect_duplicates.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm:jar_dependency_utils',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/tasks:detect_duplicates',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jvm_task_test_base'
-  ],
-)
-
-python_tests(
   name = 'execution_graph',
   sources = ['test_execution_graph.py'],
   dependencies = [
@@ -127,15 +110,6 @@ python_tests(
     'src/python/pants/backend/core/tasks:filemap',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
-  ],
-)
-
-python_tests(
-  name = 'ivy_resolve_integration',
-  sources = ['test_ivy_resolve_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
   ],
 )
 

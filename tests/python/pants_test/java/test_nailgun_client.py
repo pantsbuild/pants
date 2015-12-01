@@ -13,7 +13,8 @@ from contextlib import contextmanager
 
 import mock
 
-from pants.java.nailgun_client import InputReader, NailgunClient, NailgunClientSession
+from pants.java.nailgun_client import NailgunClient, NailgunClientSession
+from pants.java.nailgun_io import NailgunStreamReader
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
@@ -32,61 +33,6 @@ class FakeFile(object):
 
   def flush(self):
     return
-
-
-class TestInputReader(unittest.TestCase):
-  def setUp(self):
-    self.in_fd = FakeFile()
-    self.mock_socket = mock.Mock()
-    self.mock_writer = mock.Mock()
-    self.buf_size = NailgunClientSession.BUF_SIZE
-
-    self.input_reader = InputReader(in_fd=self.in_fd,
-                                    sock=self.mock_socket,
-                                    chunk_writer=self.mock_writer,
-                                    buf_size=self.buf_size)
-
-  def test_stop(self):
-    self.assertFalse(self.input_reader.is_stopped)
-    self.input_reader.stop()
-    self.assertTrue(self.input_reader.is_stopped)
-    self.input_reader.run()
-
-  def test_startable(self):
-    self.assertTrue(inspect.ismethod(self.input_reader.start))
-
-  @mock.patch('select.select')
-  def test_run_stop_on_error(self, mock_select):
-    mock_select.return_value = ([], [], [self.in_fd])
-    self.input_reader.run()
-    self.assertTrue(self.input_reader.is_stopped)
-    self.assertEquals(mock_select.call_count, 1)
-
-  @mock.patch('os.read')
-  @mock.patch('select.select')
-  def test_run_read_write(self, mock_select, mock_read):
-    mock_select.side_effect = [
-      ([self.in_fd], [], []),
-      ([self.in_fd], [], [])
-    ]
-    mock_read.side_effect = [
-      b'A' * 300,
-      b''          # Simulate EOF.
-    ]
-
-    self.input_reader.run()
-
-    self.assertTrue(self.input_reader.is_stopped)
-
-    mock_read.assert_called_with(-1, self.buf_size)
-    self.assertEquals(mock_read.call_count, 2)
-
-    self.mock_socket.shutdown.assert_called_once_with(socket.SHUT_WR)
-
-    self.mock_writer.assert_has_calls([
-      mock.call(mock.ANY, ChunkType.STDIN, b'A' * 300),
-      mock.call(mock.ANY, ChunkType.STDIN_EOF)
-    ])
 
 
 class TestNailgunClientSession(unittest.TestCase):
@@ -110,15 +56,15 @@ class TestNailgunClientSession(unittest.TestCase):
       err_fd=self.fake_stderr
     )
 
-    self.mock_reader = mock.create_autospec(InputReader, spec_set=True)
+    self.mock_reader = mock.create_autospec(NailgunStreamReader, spec_set=True)
     self.nailgun_client_session._input_reader = self.mock_reader
 
   def tearDown(self):
     self.server_sock.close()
     self.client_sock.close()
 
-  def test_input_reader_running(self):
-    with self.nailgun_client_session._input_reader_running():
+  def test_maybe_input_reader_running(self):
+    with self.nailgun_client_session._maybe_input_reader_running():
       self.mock_reader.start.assert_called_once_with()
     self.mock_reader.stop.assert_called_once_with()
 
@@ -140,7 +86,7 @@ class TestNailgunClientSession(unittest.TestCase):
       self.nailgun_client_session._process_session()
 
   @mock.patch.object(NailgunClientSession, '_process_session', **PATCH_OPTS)
-  @mock.patch.object(NailgunClientSession, '_input_reader_running', **PATCH_OPTS)
+  @mock.patch.object(NailgunClientSession, '_maybe_input_reader_running', **PATCH_OPTS)
   def test_execute(self, mctx, mproc):
     mproc.return_value = self.TEST_PAYLOAD
     out = self.nailgun_client_session.execute(
