@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import errno
 import inspect
+import io
 import os
 import socket
 import time
@@ -15,7 +16,7 @@ import unittest
 import mock
 
 from pants.java.nailgun_io import NailgunStreamReader, NailgunStreamWriter
-from pants.java.nailgun_protocol import ChunkType
+from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -59,7 +60,7 @@ class TestNailgunStreamReader(unittest.TestCase):
 
   @mock.patch('os.read')
   @mock.patch('select.select')
-  @mock.patch.object(NailgunStreamReader, 'write_chunk')
+  @mock.patch.object(NailgunProtocol, 'write_chunk')
   def test_run_read_write(self, mock_writer, mock_select, mock_read):
     mock_select.side_effect = [
       ([self.in_fd], [], []),
@@ -77,7 +78,7 @@ class TestNailgunStreamReader(unittest.TestCase):
 
     self.assertTrue(self.reader.is_stopped)
 
-    mock_read.assert_called_with(-1, self.reader.BUF_SIZE)
+    mock_read.assert_called_with(-1, io.DEFAULT_BUFFER_SIZE)
     self.assertEquals(mock_read.call_count, 2)
 
     self.mock_socket.shutdown.assert_called_once_with(socket.SHUT_WR)
@@ -96,18 +97,18 @@ class TestNailgunStreamWriter(unittest.TestCase):
     self.mock_socket = mock.Mock()
     self.writer = NailgunStreamWriter(self.mock_socket, self.chunk_type)
 
-  @mock.patch.object(NailgunStreamWriter, 'write_chunk')
+  @mock.patch.object(NailgunProtocol, 'write_chunk')
   def test_write(self, mock_writer):
     self.writer.write(self.TEST_VALUE)
     mock_writer.assert_called_once_with(self.mock_socket, self.chunk_type, self.TEST_VALUE)
 
-  @mock.patch.object(NailgunStreamWriter, 'write_chunk')
+  @mock.patch.object(NailgunProtocol, 'write_chunk')
   def test_write_broken_pipe_unmasked(self, mock_writer):
     mock_writer.side_effect = IOError(errno.EPIPE, os.strerror(errno.EPIPE))
     with self.assertRaises(IOError):
       self.writer.write(self.TEST_VALUE)
 
-  @mock.patch.object(NailgunStreamWriter, 'write_chunk')
+  @mock.patch.object(NailgunProtocol, 'write_chunk')
   def test_write_broken_pipe_masked(self, mock_writer):
     self.writer = NailgunStreamWriter(self.mock_socket, self.chunk_type, mask_broken_pipe=True)
     mock_writer.side_effect = IOError(errno.EPIPE, os.strerror(errno.EPIPE))
@@ -122,4 +123,3 @@ class TestNailgunStreamWriter(unittest.TestCase):
 
   def test_misc(self):
     self.writer.flush()
-    self.writer.fileno()
