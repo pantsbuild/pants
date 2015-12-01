@@ -25,6 +25,6 @@ jvm_binary(
     ':runner-library',
   ],
   description="""
-  	A command line tool for simulating classpath from jar provided classpath as real
+    A command line tool for simulating classpath from jar provided classpath as real
   """
 )
