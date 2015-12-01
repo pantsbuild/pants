@@ -15,7 +15,6 @@ from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.bash_completion import BashCompletionTask
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
-from pants.backend.core.tasks.changed_target_goals import CompileChanged, TestChanged
 from pants.backend.core.tasks.clean import Cleaner, Invalidator
 from pants.backend.core.tasks.cloc import CountLinesOfCode
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
@@ -29,7 +28,6 @@ from pants.backend.core.tasks.list_owners import ListOwners
 from pants.backend.core.tasks.listtargets import ListTargets
 from pants.backend.core.tasks.markdown_to_html import MarkdownToHtml
 from pants.backend.core.tasks.minimal_cover import MinimalCover
-from pants.backend.core.tasks.noop import NoopCompile, NoopTest
 from pants.backend.core.tasks.pathdeps import PathDeps
 from pants.backend.core.tasks.paths import Path, Paths
 from pants.backend.core.tasks.reporting_server import KillServer, RunServer
@@ -37,7 +35,6 @@ from pants.backend.core.tasks.roots import ListRoots
 from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.core.tasks.targets_help import TargetsHelp
-from pants.backend.core.tasks.what_changed import WhatChanged
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.source_root import SourceRoot
@@ -161,21 +158,8 @@ def register_goals():
   task(name='cloc', action=CountLinesOfCode).install('cloc').with_description(
     "Print counts of lines of code.")
 
-  task(name='changed', action=WhatChanged).install().with_description(
-      'Print the targets changed since some prior commit.')
-
   task(name='list-owners', action=ListOwners).install().with_description(
       'Print targets that own the specified source')
-
-  # Stub for other goals to schedule 'compile'. See noop.py for more on why this is useful.
-  task(name='compile', action=NoopCompile).install('compile')
-  task(name='compile-changed', action=CompileChanged).install().with_description(
-    'Compile changed targets.')
-
-  # Stub for other goals to schedule 'test'. See noop.py for more on why this is useful.
-  task(name='test', action=NoopTest).install('test')
-  task(name='test-changed', action=TestChanged).install().with_description(
-    'Test changed targets.')
 
   task(name='deferred-sources', action=DeferredSourcesMapper).install().with_description(
     'Map unpacked sources from archives.')

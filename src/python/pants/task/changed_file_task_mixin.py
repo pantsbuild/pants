@@ -11,7 +11,6 @@ from pants.base.build_environment import get_scm
 from pants.base.exceptions import TaskError
 from pants.build_graph.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
-from pants.task.console_task import ConsoleTask
 
 
 class ChangeCalculator(object):
@@ -148,29 +147,3 @@ class ChangedFileTaskMixin(object):
                             # elsewhere
                             exclude_target_regexp=options.exclude_target_regexp,
                             spec_excludes=spec_excludes)
-
-
-class WhatChanged(ChangedFileTaskMixin, ConsoleTask):
-  """Emits the targets that have been modified since a given commit."""
-
-  @classmethod
-  def register_options(cls, register):
-    super(WhatChanged, cls).register_options(register)
-    cls.register_change_file_options(register)
-    register('--files', action='store_true', default=False,
-             help='Show changed files instead of the targets that own them.')
-
-  def console_output(self, _):
-    spec_excludes = self.get_options().spec_excludes
-    change_calculator = self.change_calculator(self.get_options(),
-                                               self.context.address_mapper,
-                                               self.context.build_graph,
-                                               scm=self.context.scm,
-                                               workspace=self.context.workspace,
-                                               spec_excludes=spec_excludes)
-    if self.get_options().files:
-      for f in sorted(change_calculator.changed_files()):
-        yield f
-    else:
-      for addr in sorted(change_calculator.changed_target_addresses()):
-        yield addr.spec
