@@ -37,8 +37,8 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     return isinstance(target, (JarLibrary, JvmTarget))
 
   def setup_repl_session(self, targets):
-    tools_classpath = self.tool_classpath('scala-repl')
-    return self.tool_classpath('pants-runner'), self.classpath(targets, classpath_prefix=tools_classpath)
+    repl_classpath = self.tool_classpath('scala-repl')
+    return self.tool_classpath('pants-runner'), self.classpath(targets, classpath_prefix=repl_classpath)
 
   def launch_repl(self, session_setup):
     runner_classpath, repl_classpath = session_setup
