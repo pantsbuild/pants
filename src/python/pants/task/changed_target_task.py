@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.backend.core.tasks.noop import NoopCompile, NoopExecTask, NoopTest
-from pants.backend.core.tasks.what_changed import ChangedFileTaskMixin
+from pants.task.changed_file_task_mixin import ChangedFileTaskMixin
+from pants.task.noop_exec_task import NoopExecTask
 
 
 logger = logging.getLogger(__name__)
@@ -53,21 +53,3 @@ class ChangedTargetTask(ChangedFileTaskMixin, NoopExecTask):
     readable = ''.join(sorted('\n\t* {}'.format(addr.reference()) for addr in changed_addresses))
     logger.info('Operating on changed {} target(s): {}'.format(len(changed_addresses), readable))
     return [build_graph.get_target(addr) for addr in changed_addresses]
-
-
-class CompileChanged(ChangedTargetTask):
-  """Find and compile changed targets."""
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(CompileChanged, cls).prepare(options, round_manager)
-    round_manager.require_data(NoopCompile.product_types()[0])
-
-
-class TestChanged(ChangedTargetTask):
-  """Find and test changed targets."""
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(TestChanged, cls).prepare(options, round_manager)
-    round_manager.require_data(NoopTest.product_types()[0])

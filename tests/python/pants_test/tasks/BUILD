@@ -27,7 +27,6 @@ target(
     ':roots',
     ':sorttargets',
     ':targets_help',
-    ':what_changed',
   ],
 )
 
@@ -180,22 +179,6 @@ python_tests(
     'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:targets_help',
     'src/python/pants/base:build_environment',
-    'src/python/pants/build_graph',
-  ],
-)
-
-python_tests(
-  name = 'what_changed',
-  sources = ['test_what_changed.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/targets:python',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/core/tasks:what_changed',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
   ],
 )
