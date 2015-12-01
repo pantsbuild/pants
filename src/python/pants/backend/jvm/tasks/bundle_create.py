@@ -110,6 +110,7 @@ class BundleCreate(JvmBinaryTask):
     safe_mkdir(bundle_dir, clean=True)
 
     classpath = OrderedSet()
+
     # If creating a deployjar, we add the external dependencies to the bundle as
     # loose classes, and have no classpath. Otherwise we add the external dependencies
     # to the bundle as jars in a libs directory.
@@ -117,35 +118,33 @@ class BundleCreate(JvmBinaryTask):
       lib_dir = os.path.join(bundle_dir, 'libs')
       os.mkdir(lib_dir)
 
-      jarmap = self.context.products.get('jars')
-
-      def add_jars(target):
-        generated = jarmap.get(target)
-        if generated:
-          for base_dir, internal_jars in generated.items():
-            for internal_jar in internal_jars:
-              verbose_symlink(os.path.join(base_dir, internal_jar),
-                              os.path.join(lib_dir, internal_jar))
-              classpath.add(internal_jar)
-
-      app.binary.walk(add_jars, lambda t: t != app.binary)
-
       # Add external dependencies to the bundle.
       for path, coordinate in self.list_external_jar_dependencies(app.binary):
         external_jar = coordinate.artifact_filename
         destination = os.path.join(lib_dir, external_jar)
         verbose_symlink(path, destination)
-        if app.binary.shading_rules:
-          self.shade_jar(binary=app.binary, jar_id=coordinate, jar_path=destination)
-        classpath.add(external_jar)
+        classpath.add(destination)
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
+    canonical_classpath_base_dir = lib_dir if not self._create_deployjar else None
     with self.monolithic_jar(app.binary, bundle_jar,
-                             with_external_deps=self._create_deployjar) as jar:
+                             canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
       self.add_main_manifest_entry(jar, app.binary)
       if classpath:
-        jar.classpath([os.path.join('libs', jar) for jar in classpath])
+        # append external dependencies to monolithic jar's classpath,
+        # eventually will be saved in the Class-Path entry of its Manifest.
+        jar.append_classpath([os.path.join('libs', jar_path) for jar_path in classpath])
+
+      # Make classpath complete by adding internal classpath and monolithic jar.
+      classpath.update(jar.classpath + [jar.path])
+
+    if app.binary.shading_rules:
+      for jar_path in classpath:
+        # In case `jar_path` is a symlink, this is still safe, shaded jar will overwrite jar_path,
+        # original file `jar_path` linked to remains untouched.
+        # TODO run in parallel to speed up
+        self.shade_jar(shading_rules=app.binary.shading_rules, jar_path=jar_path)
 
     for bundle in app.bundles:
       for path, relpath in bundle.filemap.items():
