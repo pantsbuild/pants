@@ -45,7 +45,7 @@ class Goal(object):
   def clear(cls):
     """Remove all goals and tasks.
 
-    This method is EXCLUSIVELY for use in tests.
+    This method is EXCLUSIVELY for use in tests and during pantsd startup.
     """
     cls._goal_by_name.clear()
 

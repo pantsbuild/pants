@@ -85,18 +85,17 @@ class DaemonPantsRunner(ProcessManager):
     # Determine output tty capabilities from the environment.
     _, stdout_isatty, stderr_isatty = NailgunProtocol.isatty_from_env(self._env)
 
-    # Construct a StreamReader for stdin.
-    stdin_reader = NailgunStreamReader(sys.stdin, sock)
+    # TODO(kwlzn): Implement remote input reading and fix the non-fork()-safe sys.stdin reference
+    # in NailgunClient to enable support for interactive goals like `repl` etc.
 
     # Construct StreamWriters for stdout, stderr.
     streams = (
       NailgunStreamWriter(sock, ChunkType.STDOUT, isatty=stdout_isatty),
-      NailgunStreamWriter(sock, ChunkType.STDERR, isatty=stderr_isatty),
-      stdin_reader
+      NailgunStreamWriter(sock, ChunkType.STDERR, isatty=stderr_isatty)
     )
 
     # Launch the stdin StreamReader and redirect stdio.
-    with stdin_reader.running(), stdio_as(*streams):
+    with stdio_as(*streams):
       yield
 
   def run(self):

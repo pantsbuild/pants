@@ -96,6 +96,12 @@ class GlobalOptionsRegistrar(Optionable):
     register('-d', '--logdir', advanced=True, metavar='<dir>',
              help='Write logs to files under this directory.')
 
+    # This facilitates bootstrap-time configuration of pantsd usage such that we can
+    # determine whether or not to use the Pailgun client to invoke a given pants run
+    # without resorting to heavier options parsing.
+    register('--enable-pantsd', advanced=True, action='store_true', default=False,
+             help='Enables use of the pants daemon. (Beta)')
+
   @classmethod
   def register_options(cls, register):
     """Register options not tied to any particular task or subsystem."""
