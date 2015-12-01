@@ -30,14 +30,14 @@ haskell_project(
 )
 
 haskell_source_package(
-  name='stack',
-  path='https://github.com/commercialhaskell/stack/archive/v0.1.3.1.tar.gz',
+  name='lens-family-core',
+  path='http://hackage.haskell.org/package/lens-family-core-1.2.0/lens-family-core-1.2.0.tar.gz',
 )
 
 haskell_project(
-  name='stack-project',
+  name='lens-family-core-project',
   resolver='lts-3.1',
   dependencies=[
-    ':stack',
+    ':lens-family-core',
   ]
 )

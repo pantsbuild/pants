@@ -153,7 +153,9 @@ python_library(
     '3rdparty/python:pex',
     'src/python/pants/base:exceptions',
     'src/python/pants/java/jar:manifest',
+    'src/python/pants/option',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
   ],
 )
 

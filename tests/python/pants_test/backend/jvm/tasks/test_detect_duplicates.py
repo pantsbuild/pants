@@ -69,9 +69,7 @@ class DuplicateDetectorTest(JvmTaskTestBase):
     self.no_dups_jarlib, self.no_dups_resolved_jar = resolved_jarlib('no_dups', self.no_dups_jar)
     self.unicode_jarlib, self.unicode_resolved_jar = resolved_jarlib('unicode', self.unicode_jar)
 
-  def test_duplicate_found_external(self):
-    self.set_options(fail_fast=False)
-
+  def _setup_external_duplicate(self):
     jvm_binary = self.make_target(spec='src/java/com/twitter:thing',
                                   target_type=JvmBinary,
                                   dependencies=[self.test_jarlib, self.dups_jarlib])
@@ -81,7 +79,11 @@ class DuplicateDetectorTest(JvmTaskTestBase):
     classpath = self.get_runtime_classpath(context)
     classpath.add_jars_for_targets([self.test_jarlib], 'default', [self.test_resolved_jar])
     classpath.add_jars_for_targets([self.dups_jarlib], 'default', [self.dups_resolved_jar])
+    return task, jvm_binary
 
+  def test_duplicate_found_external(self):
+    self.set_options(fail_fast=False)
+    task, jvm_binary = self._setup_external_duplicate()
     conflicts_by_binary = task.execute()
     expected = {
       jvm_binary: {
@@ -91,9 +93,19 @@ class DuplicateDetectorTest(JvmTaskTestBase):
     }
     self.assertEqual(expected, conflicts_by_binary)
 
-  def test_duplicate_found_internal(self):
-    self.set_options(fail_fast=False)
+  def test_duplicate_skip(self):
+    self.set_options(fail_fast=False, skip=True)
+    task, _ = self._setup_external_duplicate()
+    conflicts_by_binary = task.execute()
+    self.assertEqual(None, conflicts_by_binary)
 
+  def test_duplicate_excluded_file(self):
+    self.set_options(fail_fast=False, excludes=[], exclude_files=['Duplicate.class'])
+    task, jvm_binary = self._setup_external_duplicate()
+    conflicts_by_binary = task.execute()
+    self.assertEqual({}, conflicts_by_binary)
+
+  def _setup_internal_duplicate(self):
     java_library = self.make_target(spec='src/java/com/twitter:lib',
                                     target_type=JavaLibrary)
     jvm_binary = self.make_target(spec='src/java/com/twitter:thing',
@@ -105,7 +117,11 @@ class DuplicateDetectorTest(JvmTaskTestBase):
     classpath = self.get_runtime_classpath(context)
     classpath.add_for_target(java_library, [('default', self.classes_dir)])
     classpath.add_for_target(jvm_binary, [('default', self.classes_dir)])
+    return task, jvm_binary
 
+  def test_duplicate_found_internal(self):
+    self.set_options(fail_fast=False)
+    task, jvm_binary = self._setup_internal_duplicate()
     conflicts_by_binary = task.execute()
 
     expected = {
@@ -115,6 +131,20 @@ class DuplicateDetectorTest(JvmTaskTestBase):
            'com/twitter/commons/Duplicate.class',
            'org/apache/Unique.class',
            'cucumber/api/java/zh_cn/假如.class'}
+      }
+    }
+    self.assertEqual(expected, conflicts_by_binary)
+
+  def test_duplicate_excluded_internal(self):
+    self.set_options(fail_fast=False, excludes=[], exclude_files=['Duplicate.class', '假如.class'])
+    task, jvm_binary = self._setup_internal_duplicate()
+    conflicts_by_binary = task.execute()
+
+    expected = {
+      jvm_binary: {
+        ('src/java/com/twitter:lib', 'src/java/com/twitter:thing'):
+          {'com/twitter/Test.class',
+           'org/apache/Unique.class'}
       }
     }
     self.assertEqual(expected, conflicts_by_binary)
@@ -174,3 +204,39 @@ class DuplicateDetectorTest(JvmTaskTestBase):
 
     with self.assertRaises(TaskError):
       task.execute()
+
+  def test_is_excluded_default(self):
+    task = self.create_task(self.context())
+    self.assertFalse(task._is_excluded('foo'))
+    self.assertFalse(task._is_excluded('foo/BCKEY.DSA'))
+    # excluded_files: No directroy
+    self.assertTrue(task._is_excluded('.DS_Store'))
+    # excluded_files: Mixed case
+    self.assertTrue(task._is_excluded('NOTICE.txt'))
+    # excluded_files: Leading directory
+    self.assertTrue(task._is_excluded('/foo/bar/dependencies'))
+    # excluded_dirs:
+    self.assertTrue(task._is_excluded('META-INF/services/foo'))
+    # excluded_patterns:
+    self.assertTrue(task._is_excluded('META-INF/BCKEY.RSA'))
+
+  def test_is_excluded_pattern(self):
+    self.set_options(exclude_patterns=[r'.*/garbage\.'])
+    task = self.create_task(self.context())
+    self.assertTrue(task._is_excluded('foo/garbage.txt'))
+
+  def test_is_excluded_files(self):
+    self.set_options(excludes=None, exclude_files=['bckey.dsa'])
+    task = self.create_task(self.context())
+    self.assertTrue(task._is_excluded('foo/BCKEY.DSA'))
+
+    # Defaults are now overridden
+    self.assertFalse(task._is_excluded('NOTICE.txt'))
+
+  def test_is_excluded_files(self):
+    self.set_options(exclude_dirs=['org/duplicated'])
+    task = self.create_task(self.context())
+    self.assertTrue(task._is_excluded('org/duplicated/FOO'))
+
+    # Defaults are now overridden
+    self.assertFalse(task._is_excluded('META-INF/services/foo'))
