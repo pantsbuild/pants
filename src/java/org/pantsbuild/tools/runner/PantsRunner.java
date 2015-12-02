@@ -51,7 +51,7 @@ public class PantsRunner {
       throws ReflectiveOperationException {
     Method main = Class.forName(mainClass).getDeclaredMethod("main", String[].class);
     if (!Modifier.isStatic(main.getModifiers())) {
-      throw new IllegalArgumentException("main class should be static");
+      throw new IllegalArgumentException("Main class should be static.");
     }
     main.invoke(null, new Object[]{args});
   }
