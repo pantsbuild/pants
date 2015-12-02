@@ -1,6 +1,19 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
+python_tests(
+  name = 'roots',
+  sources = ['test_roots.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/core_tasks',
+    'src/python/pants/source',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
 python_tests(
   name = 'what_changed',
   sources = ['test_what_changed.py'],
