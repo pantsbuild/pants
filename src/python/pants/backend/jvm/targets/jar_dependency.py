@@ -56,6 +56,16 @@ class JarDependency(object):
                                       key_arg='excludes',
                                       allowable=(tuple, list,)))
 
+  def copy(self):
+    """Returns a deep copy of this JarDependency.
+
+    :rtype: :class:`JarDependency`
+    """
+    return JarDependency(self.org, name=self._base_name, rev=self.rev, force=self.force,
+                         ext=self.ext, url=self.url, apidocs=self.apidocs,
+                         classifier=self.classifier, mutable=self.mutable,
+                         intransitive=(not self.transitive), excludes=list(self.excludes))
+
   @property
   def name(self):
     return self._base_name
@@ -63,6 +73,15 @@ class JarDependency(object):
   @name.setter
   def name(self, value):
     self._base_name = value
+
+  def __eq__(self, other):
+    return isinstance(other, JarDependency) and self.__dict__ == other.__dict__
+
+  def __ne__(self, other):
+    return not self == other
+
+  def __hash__(self):
+    return hash((self.org, self.name))
 
   def __str__(self):
     return 'JarDependency({})'.format(self.coordinate)

@@ -417,8 +417,11 @@ class IvyUtils(object):
       # See: https://github.com/pantsbuild/pants/issues/2239
       coordinate = (jar.org, jar.name, jar.classifier)
       existing = jars.get(coordinate)
-      jars[coordinate] = jar if not existing else cls._resolve_conflict(existing=existing,
+      candidate = jar if not existing else cls._resolve_conflict(existing=existing,
                                                                         proposed=jar)
+      # Clone the JarDependency object so that any mutations occuring in the context of this method
+      # do not effect the graph.
+      jars[coordinate] = candidate.copy()
 
     def collect_jars(target):
       if isinstance(target, JarLibrary):
