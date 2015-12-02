@@ -24,7 +24,6 @@ target(
     ':listtargets',
     ':minimal_cover',
     ':reflect',
-    ':roots',
     ':sorttargets',
     ':targets_help',
   ],
@@ -145,18 +144,6 @@ python_tests(
     'src/python/pants/backend/core/tasks:minimal_cover',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
-  ],
-)
-
-python_tests(
-  name = 'roots',
-  sources = ['test_roots.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/core/tasks:roots',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/source',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
 

@@ -9,7 +9,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class ListRoots(ConsoleTask):
-  """List the registered source roots of the repo."""
+  """List the repo's registered source roots."""
 
   def console_output(self, targets):
     for src_root in self.context.source_roots.all_roots():
