@@ -465,12 +465,12 @@ class Planners(object):
     """
     self._planners_by_goal_name = defaultdict(set)
     self._planners_by_product_type = defaultdict(set)
-    self._product_requirements = defaultdict(list)
+    self._product_requirements = defaultdict(dict)
     for planner in planners:
       self._planners_by_goal_name[planner.goal_name].add(planner)
       for output_type, input_type_requirements in planner.product_types.items():
         self._planners_by_product_type[output_type].add(planner)
-        self._product_requirements[output_type].extend(input_type_requirements)
+        self._product_requirements[output_type][planner] = input_type_requirements
 
   def for_goal(self, goal_name):
     """Return the set of task planners installed in the given goal.
@@ -489,9 +489,7 @@ class Planners(object):
     return self._planners_by_product_type[product_type]
 
   def _products_meet_requirements(self, output_product_type, input_products):
-    """Return true if the products satisfy our requirements for the given product type.
-
-    TODO: This is probably combinatorial in the number of planners. Optimize/memoize.
+    """Return true if the input products satisfy our requirements for the given product type.
     """
     def product_available(product_requirement):
       if product_requirement in input_products:
@@ -527,6 +525,9 @@ class Planners(object):
 
   def can_produce_type_for_subject(self, product_type, subject):
     """True if it's possible for these planners to produce the given product for the given subject.
+
+    This method additionally validates that there are no "partially consumed" input products.
+    A partially consumed product is a product where no planner 
 
     Note that this does not validate dependency subjects of the input subject, so it is necessary
     to validate every call to `def promise` against these requirements.
