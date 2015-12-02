@@ -18,6 +18,10 @@ class TestRunnerTaskMixin(object):
   expressed can support both languages, and any additional languages that are added to pants.
   """
 
+  @staticmethod
+  def _timeout_for_target(target):
+    return getattr(target, 'timeout', None)
+
   @classmethod
   def register_options(cls, register):
     super(TestRunnerTaskMixin, cls).register_options(register)
@@ -42,16 +46,34 @@ class TestRunnerTaskMixin(object):
       for target in test_targets:
         self._validate_target(target)
 
-      timeout = self._timeout_for_targets(test_targets)
+      self._execute(all_targets)
 
-      try:
-        with Timeout(timeout, abort_handler=self._timeout_abort_handler):
-          self._execute(all_targets)
-      except TimeoutReached as e:
-        raise TestFailedTaskError(str(e), failed_targets=test_targets)
+  def _spawn_and_wait(self, *args, **kwargs):
+    """Spawn the actual test runner process, and wait for it to complete."""
 
-  def _timeout_for_target(self, target):
-    return getattr(target, 'timeout', None)
+    test_targets = self._get_test_targets()
+    timeout = self._timeout_for_targets(test_targets)
+
+    print("calling spawn with %s %s" % (args, kwargs))
+    process_handler = self._spawn(*args, **kwargs)
+
+    print ("running process_handler.wait() with timeout %s" % timeout)
+    # process_handler.kill to be aggressive or process_handler.terminate to be graceful
+    try:
+      with Timeout(timeout, abort_handler=process_handler.kill):
+        return process_handler.wait()
+    except TimeoutReached as e:
+      raise TestFailedTaskError(str(e), failed_targets=test_targets)
+
+  @abstractmethod
+  def _spawn(self, *args, **kwargs):
+    """Spawn the actual test runner process.
+
+    :return: ProcessHandler: The handle to control (wait, kill, etc) the process. This must be an object
+    which supports kill(), wait(), and terminate() calls.
+    """
+
+    raise NotImplementedError
 
   def _timeout_for_targets(self, targets):
     """Calculate the total timeout based on the timeout configuration for all the targets.
@@ -98,10 +120,6 @@ class TestRunnerTaskMixin(object):
 
     test_targets = list(filter(self._test_target_filter(), self._get_targets()))
     return test_targets
-
-  @abstractmethod
-  def _timeout_abort_handler(self):
-    """Abort the test process when it has been timed out."""
 
   @abstractmethod
   def _test_target_filter(self):

@@ -103,7 +103,8 @@ python_tests(
   dependencies = [
     'src/python/pants/util:xml_parser',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  timeout = 2
 )
 
 python_tests(

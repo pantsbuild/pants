@@ -40,6 +40,7 @@ class Timeout(object):
 
   def _handle_timeout(self):
     self._triggered = True
+    print("calling abort handler")
     self._abort_handler()
 
   def __enter__(self):

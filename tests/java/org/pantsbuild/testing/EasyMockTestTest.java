@@ -41,7 +41,8 @@ public class EasyMockTestTest extends EasyMockTest {
   }
 
   @Test
-  public void testSimplyParametrizedMock() {
+  public void testSimplyParametrizedMock() throws InterruptedException {
+    Thread.sleep(3000);
     assertSimplyParametrizedMockWorks(createMock(new TypeToken<Runnable>() { }));
   }
 

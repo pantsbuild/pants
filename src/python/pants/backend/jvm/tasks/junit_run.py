@@ -185,8 +185,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
 
-    self._executor = None
-
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
                                             if isinstance(target, JvmTarget)])
@@ -199,10 +197,24 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     max_version = Revision(*(min_version.components + [9999])) if self._strict_jvm_version else None
     return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
 
+  def _spawn(self, executor=None, distribution=None, *args, **kwargs):
+    actual_executor = executor or SubprocessExecutor(distribution)
+
+    class ProcessHandler(object):
+      def wait(_):
+        return distribution.execute_java(*args, executor=actual_executor, **kwargs)
+
+      def kill(_):
+        return actual_executor.kill()
+
+      def terminate(_):
+        return actual_executor.terminate()
+
+    return ProcessHandler()
+
   def execute_java_for_targets(self, targets, executor=None, *args, **kwargs):
     distribution = self.preferred_jvm_distribution_for_targets(targets)
-    self._executor = executor or SubprocessExecutor(distribution)
-    return distribution.execute_java(*args, executor=self._executor, **kwargs)
+    return self._spawn_and_wait(targets, executor=executor, distribution=distribution, *args, **kwargs)
 
   def _collect_test_targets(self, targets):
     """Returns a mapping from test names to target objects for all tests that
@@ -316,9 +328,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           with binary_util.safe_args(batch, self.get_options()) as batch_tests:
             self.context.log.debug('CWD = {}'.format(workdir))
             self.context.log.debug('platform = {}'.format(platform))
-            self._executor = SubprocessExecutor(distribution)
-            result += abs(distribution.execute_java(
-              executor=self._executor,
+            result += abs(self._spawn_and_wait(
+              executor=SubprocessExecutor(distribution),
+              distribution=distribution,
               classpath=complete_classpath,
               main=JUnitRun._MAIN,
               jvm_options=self.jvm_options + extra_jvm_options + target_jvm_options,

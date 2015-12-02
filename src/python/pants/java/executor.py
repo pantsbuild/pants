@@ -222,6 +222,10 @@ class SubprocessExecutor(Executor):
     if self._process is not None:
       self._process.kill()
 
+  def terminate(self):
+    if self._process is not None:
+      self._process.terminate()
+
   def _spawn(self, cmd, cwd=None, **subprocess_args):
     with self._maybe_scrubbed_env():
       cwd = cwd or self._buildroot
