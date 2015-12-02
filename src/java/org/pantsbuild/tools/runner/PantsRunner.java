@@ -16,7 +16,7 @@ import java.nio.file.Files;
  * Helper class to run java code with too long classpath.
  * Usage: java -cp classpath_with_pants_runner
  * org.pantsbuild.tools.runner.PantsRunner
- * file_with_classpath_separated_using_os_delimiter main_class_to_execute args_to_main_class
+ * file_with_classpath_separated_using_os_delimiter main_class_to_execute args_to_main_class.
  */
 public class PantsRunner {
   public static void main(String[] args) throws ReflectiveOperationException, IOException {
