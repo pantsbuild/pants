@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import uuid
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.tasks.group_task import GroupIterator, GroupMember, GroupTask
 from pants.build_graph.target import Target
 from pants.engine.round_manager import RoundManager
@@ -274,7 +273,7 @@ class EmptyGroupTaskTest(BaseGroupTaskTest):
 class TransitiveGroupTaskTest(BaseGroupTaskTest):
   def create_targets(self):
     self.a = self.make_target('src/scala:a', self.ScalaLibrary)
-    self.b = self.make_target('src/deps:b', Dependencies, dependencies=[self.a])
+    self.b = self.make_target('src/deps:b', Target, dependencies=[self.a])
     self.c = self.make_target('src/java:c', self.JavaLibrary, dependencies=[self.b])
     self.d = self.make_target('src/scala:d', self.ScalaLibrary, dependencies=[self.c])
     return [self.d]
