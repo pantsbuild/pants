@@ -5,7 +5,6 @@ target(
   name='core',
   dependencies=[
     ':wrapped_globs',
-    ':prep',
     'tests/python/pants_test/backend/core/tasks',
   ],
 )
