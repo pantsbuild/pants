@@ -2,9 +2,10 @@
   "name": "server-project",
   "version": "1.0.0",
   "devDependencies": {
+    "react": "0.13.3",
     "mocha": "2.3.0"
   },
   "scripts": {
-    "test": "mocha ./test/CalculatorTest.js"
+    "test": "mocha ./test/*.js"
   }
 }
