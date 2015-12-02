@@ -3,6 +3,21 @@
 
 
 python_tests(
+  name = 'run_prep_command',
+  sources = ['test_run_prep_command.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'src/python/pants/core_tasks',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
   name = 'roots',
   sources = ['test_roots.py'],
   dependencies = [
