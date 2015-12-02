@@ -29,6 +29,7 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/base:exceptions',
     'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]
 )
