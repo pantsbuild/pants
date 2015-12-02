@@ -54,7 +54,7 @@ class ArtifactCacheStats(object):
       """Format into (target, cause) tuple."""
       target_address = tgt.address.reference()
       if isinstance(cause, UnreadableArtifact):
-        return (target_address, cause.err.message)
+        return (target_address, str(cause.err))
       elif cause == False:
         return (target_address, 'uncached')
       else:
