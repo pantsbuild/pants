@@ -26,7 +26,7 @@ if you provide one, it might clobber another).
 
 **Option help** When registering a `Task` option, pass a `help` parameter to describe that option.
 
-!inc[start-at=register_options&end-at=help=](../backend/core/tasks/list_goals.py)
+!inc[start-at=register_options&end-at=help=](../core_tasks/list_goals.py)
 
 ### Targets and other `BUILD` File Things
 

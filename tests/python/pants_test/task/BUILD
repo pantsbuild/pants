@@ -5,6 +5,7 @@ target(
   name='tasks',
   dependencies=[
     ':mutex_task_mixin',
+    ':scm_publish',
     ':task',
     ':testrunner_task_mixin',
   ],
@@ -27,6 +28,16 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name='scm_publish',
+  sources=['test_scm_publish_mixin.py'],
+  coverage=['pants.task.scm_publish_mixin'],
+  dependencies=[
+    '3rdparty/python:mock',
+    'src/python/pants/task',
   ]
 )
 

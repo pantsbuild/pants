@@ -1,6 +1,28 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+python_tests(
+  name='bash_completion',
+  sources=['test_bash_completion.py'],
+  coverage=['pants.core_tasks.bash_completion'],
+  dependencies=[
+    '3rdparty/python:mock',
+    'src/python/pants/core_tasks',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'list_goals',
+  sources = ['test_list_goals.py'],
+  dependencies = [
+    'src/python/pants/core_tasks',
+    'src/python/pants/goal',
+    'src/python/pants/goal:task_registrar',
+    'src/python/pants/task',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
 
 python_tests(
   name = 'run_prep_command',

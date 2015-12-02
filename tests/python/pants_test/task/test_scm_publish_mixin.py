@@ -9,7 +9,7 @@ import unittest
 
 import mock
 
-from pants.backend.core.tasks.scm_publish import ScmPublishMixin
+from pants.task.scm_publish_mixin import ScmPublishMixin
 
 
 class ScmPublishMixinTest(unittest.TestCase):
