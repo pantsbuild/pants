@@ -4,7 +4,7 @@
 node_preinstalled_module(
   name='preinstalled-project',
   sources=globs('package.json', 'src/*.js', 'test/*.js'),
-  url='https://github.com/chrispesto/pants/blob/new_module_module_class_binary/contrib/node/examples/bin/node_modules.tar.gz?raw=true',
+  dependencies_archive_url='https://github.com/chrispesto/pants/blob/new_module_module_class_binary/contrib/node/examples/bin/node_modules.tar.gz?raw=true',
   dependencies=[
     'contrib/node/examples/3rdparty/node/react',
     'contrib/node/examples/3rdparty/node/mocha',
