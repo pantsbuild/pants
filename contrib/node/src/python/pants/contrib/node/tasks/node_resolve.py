@@ -65,7 +65,7 @@ class NodeResolve(NodeTask):
     return self.is_node_package(target) and self._resolver_for_target(target) != None
 
   def execute(self):
-    targets = set(self.context.targets(predicate=self._can_resolve_target))
+    targets = self.context.targets(predicate=self._can_resolve_target)
     if not targets:
       return
 
