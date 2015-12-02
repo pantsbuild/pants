@@ -61,10 +61,10 @@ class JarDependency(object):
 
     :rtype: :class:`JarDependency`
     """
-    return JarDependency(self.org, name=self._base_name, rev=self.rev, force=self.force,
-                         ext=self.ext, url=self.url, apidocs=self.apidocs,
-                         classifier=self.classifier, mutable=self.mutable,
-                         intransitive=(not self.transitive), excludes=list(self.excludes))
+    return type(self)(self.org, name=self._base_name, rev=self.rev, force=self.force,
+                      ext=self.ext, url=self.url, apidocs=self.apidocs,
+                      classifier=self.classifier, mutable=self.mutable,
+                      intransitive=(not self.transitive), excludes=tuple(self.excludes))
 
   @property
   def name(self):
@@ -75,7 +75,7 @@ class JarDependency(object):
     self._base_name = value
 
   def __eq__(self, other):
-    return isinstance(other, JarDependency) and self.__dict__ == other.__dict__
+    return type(self) == type(other) and self.__dict__ == other.__dict__
 
   def __ne__(self, other):
     return not self == other

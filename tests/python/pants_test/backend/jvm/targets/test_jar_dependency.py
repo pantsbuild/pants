@@ -9,6 +9,7 @@ import unittest
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 
 
 class JarDependencyTest(unittest.TestCase):
@@ -19,11 +20,17 @@ class JarDependencyTest(unittest.TestCase):
     self.assertNotEqual(with_excludes.cache_key(), without_excludes.cache_key())
 
   def test_jar_dependency_copy(self):
-    original = self._mkjardep()
+    self._test_copy(self._mkjardep())
+
+  def test_scala_jar_dependency_copy(self):
+    self._test_copy(self._mkjardep(tpe=ScalaJarDependency))
+
+  def _test_copy(self, original):
     clone = original.copy()
     self.assertEqual(original, clone)
     original.excludes += (Exclude(org='com.blah', name='blah'),)
     self.assertNotEqual(original, clone)
 
-  def _mkjardep(self, org='foo', name='foo', excludes=(Exclude(org='example.com', name='foo-lib'),)):
-    return JarDependency(org=org, name=name, excludes=excludes)
+  def _mkjardep(self, org='foo', name='foo',
+                excludes=(Exclude(org='example.com', name='foo-lib'),), tpe=JarDependency):
+    return tpe(org=org, name=name, excludes=excludes)
