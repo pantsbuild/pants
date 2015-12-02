@@ -33,6 +33,29 @@ class NodeResolveTest(TaskTestBase):
     NodeResolve.register_resolver_for_type(NodePreinstalledModule, NodePreinstalledModuleResolver)
     NodeResolve.register_resolver_for_type(NodeModule, NpmResolver)
 
+  def tearDown(self):
+    super(NodeResolveTest, self).tearDown()
+    NodeResolve._clear_resolvers()
+
+  def test_register_resolver_for_type(self):
+    NodeResolve._clear_resolvers()
+
+    self.assertIsNone(NodeResolve._resolver_for_target(NodePreinstalledModule))
+    self.assertIsNone(NodeResolve._resolver_for_target(NodeModule))
+
+    node_preinstalled__module_target = self.make_target(
+      spec=':empty_fake_node_preinstalled_module_target',
+      target_type=NodePreinstalledModule)
+    NodeResolve.register_resolver_for_type(NodePreinstalledModule, NodePreinstalledModuleResolver)
+    self.assertEqual(NodePreinstalledModuleResolver,
+                     type(NodeResolve._resolver_for_target(node_preinstalled__module_target)))
+
+    node_module_target = self.make_target(spec=':empty_fake_node_module_target',
+                                          target_type=NodeModule)
+    NodeResolve.register_resolver_for_type(NodeModule, NpmResolver)
+    self.assertEqual(NpmResolver,
+                     type(NodeResolve._resolver_for_target(node_module_target)))
+
   def test_noop(self):
     task = self.create_task(self.context())
     task.execute()

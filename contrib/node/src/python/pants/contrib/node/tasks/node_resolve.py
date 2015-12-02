@@ -29,16 +29,18 @@ class NodeResolve(NodeTask):
     return True
 
   @classmethod
-  def register_resolver_for_type(cls, type, resolver):
-    """Register a NodeResolver subclass for a particular subclass of NodePackage.
+  def register_resolver_for_type(cls, node_package_type, resolver):
+    """Register a particular subclass of NodeResolver for a particular subclass of NodePackage.
+    Implementation uses a hash on node_package_type, so the resolver will only be used on the
+    exact NodePackage subclass (not further subclasses of it).
 
-    :param class type: A NodePackage subclass
+    :param class node_package_type: A NodePackage subclass
     :param class resolver: A NodeResolverBase subclass
     """
-    cls._resolver_by_type[type] = resolver()
+    cls._resolver_by_type[node_package_type] = resolver()
 
   @classmethod
-  def clear_resolvers(cls):
+  def _clear_resolvers(cls):
     """Remove all resolvers.
 
     This method is EXCLUSIVELY for use in tests.
@@ -46,7 +48,7 @@ class NodeResolve(NodeTask):
     cls._resolver_by_type.clear()
 
   @classmethod
-  def resolver_for_target(cls, target):
+  def _resolver_for_target(cls, target):
     """Get the resolver registered for a target's type, or None if there is none.
 
     :param NodePackage target: A subclass of NodePackage.
@@ -60,7 +62,7 @@ class NodeResolve(NodeTask):
     :param target: A Target
     :rtype: Boolean
     """
-    return self.is_node_package(target) and self.resolver_for_target(target) != None
+    return self.is_node_package(target) and self._resolver_for_target(target) != None
 
   def execute(self):
     targets = set(self.context.targets(predicate=self._can_resolve_target))
@@ -78,7 +80,7 @@ class NodeResolve(NodeTask):
       with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
           target = vt.target
-          resolver_for_target_type = self.resolver_for_target(target)
+          resolver_for_target_type = self._resolver_for_target(target)
           results_dir = vt.results_dir
           if not vt.valid:
             safe_mkdir(results_dir, clean=True)
