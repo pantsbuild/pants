@@ -13,16 +13,19 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 
 /**
- * Helper class to run java code with too long classpath.
- * Usage: java -cp classpath_with_pants_runner
- * org.pantsbuild.tools.runner.PantsRunner
- * file_with_classpath_separated_using_os_delimiter main_class_to_execute args_to_main_class.
+ * Helper class for running java code against a classpath read from a file.
+ * Useful for very long classpaths that exceed the shell's command length.
  */
 public class PantsRunner {
   public static void main(String[] args) throws ReflectiveOperationException, IOException {
     if (args.length < 2) {
-      throw new IllegalArgumentException("Should be at least two arguments to runner: " +
-          "file with os delimiter separated classpath and main class to execute.");
+      System.out.println("Usage: java -cp classpath_to_pants_runner " +
+          "org.pantsbuild.tools.runner.PantsRunner " +
+          "classpath_file main_class args.\n" +
+          "Classpath file should consist of the classpath entries. " +
+          "Classpath entries should be specified in a single line, " +
+          "each entry being separated by the system's path delimiter.");
+      System.exit(1);
     }
     String classpath = new String(Files.readAllBytes(new File(args[0]).toPath())).trim();
     updateClassPathProperty(classpath);

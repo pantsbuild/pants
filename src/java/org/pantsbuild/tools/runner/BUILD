@@ -8,7 +8,7 @@ java_library(
     name='pants-runner',
     repo=public,
     publication_metadata=pants_library("""
-      A command line tool for simulating classpath from jar provided classpath as real
+      A command line tool for injecting a classpath read from a file into the system classpath.
     """)
   ),
   dependencies=[
@@ -25,6 +25,6 @@ jvm_binary(
     ':runner-library',
   ],
   description="""
-    A command line tool for simulating classpath from jar provided classpath as real
+    A command line tool for injecting a classpath read from a file into the system classpath.
   """
 )
