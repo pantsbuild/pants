@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -16,7 +18,7 @@ from pants.util.contextutil import temporary_file
 
 
 class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
-  _RUNNER_MAIN = 'org.pantsbuild.tools.runner.FileClassPathRunner'
+  _RUNNER_MAIN = 'org.pantsbuild.tools.runner.PantsRunner'
 
   @classmethod
   def register_options(cls, register):
@@ -59,12 +61,11 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
   @staticmethod
   def execute_java_with_runner(runner_classpath, classpath, main, jvm_options, args):
     with temporary_file() as classpath_file:
-      for classpath_element in classpath:
-        classpath_file.write(classpath_element + '\n')
+      classpath_file.write(os.pathsep.join(classpath))
       classpath_file.close()
 
-      DistributionLocator.cached().execute_java(classpath=runner_classpath + ['@' + classpath_file.name],
+      DistributionLocator.cached().execute_java(classpath=runner_classpath,
                                                 main=ScalaRepl._RUNNER_MAIN,
                                                 jvm_options=jvm_options,
-                                                args=[main] + args,
+                                                args=[classpath_file.name, main] + args,
                                                 create_synthetic_jar=False)
