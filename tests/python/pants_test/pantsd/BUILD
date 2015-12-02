@@ -39,3 +39,13 @@ python_tests(
     'src/python/pants/pantsd:watchman_client'
   ]
 )
+
+python_tests(
+  name = 'pailgun_server',
+  sources = ['test_pailgun_server.py'],
+  coverage = ['pants.pantsd.pailgun_server'],
+  dependencies = [
+    ':test_deps',
+    'src/python/pants/pantsd:pailgun_server'
+  ]
+)

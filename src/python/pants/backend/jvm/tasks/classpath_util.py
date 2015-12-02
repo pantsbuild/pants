@@ -10,7 +10,7 @@ import os
 from twitter.common.collections import OrderedSet
 
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import fast_relpath, safe_walk
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open, safe_rmtree, safe_walk
 
 
 class ClasspathUtil(object):
@@ -146,3 +146,53 @@ class ClasspathUtil(object):
   def is_dir(cls, path):
     """True if the given path represents an existing directory."""
     return os.path.isdir(path)
+
+  @classmethod
+  def create_canonical_classpath(cls, classpath_products, targets, basedir,
+                                 save_classpath_file=False):
+    """Create a stable classpath of symlinks with standardized names.
+
+    :param classpath_products: Classpath products.
+    :param targets: Targets to create canonical classpath for.
+    :param basedir: Directory to create symlinks.
+    :param save_classpath_file: An optional file with original classpath entries that symlinks
+      are created from.
+
+    :returns: Converted canonical classpath.
+    :rtype: list of strings
+    """
+    def _stable_output_folder(basedir, target):
+      address = target.address
+      return os.path.join(
+        basedir,
+        # target.address.spec is used in export goal to identify targets
+        address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
+      )
+
+    canonical_classpath = []
+    for target in targets:
+      folder_for_target_symlinks = _stable_output_folder(basedir, target)
+      safe_rmtree(folder_for_target_symlinks)
+
+      classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
+        [target])
+
+      if len(classpath_entries_for_target) > 0:
+        safe_mkdir(folder_for_target_symlinks)
+
+        classpath = []
+        for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
+          classpath.append(entry.path)
+          # Create a unique symlink path by prefixing the base file name with a monotonic
+          # increasing `index` to avoid name collisions.
+          file_name = os.path.basename(entry.path)
+          symlink_path = os.path.join(folder_for_target_symlinks, '{}-{}'.format(index, file_name))
+          os.symlink(entry.path, symlink_path)
+          canonical_classpath.append(symlink_path)
+
+        if save_classpath_file:
+          with safe_open(os.path.join(folder_for_target_symlinks, 'classpath.txt'), 'w') as classpath_file:
+            classpath_file.write(os.pathsep.join(classpath))
+            classpath_file.write('\n')
+
+    return canonical_classpath

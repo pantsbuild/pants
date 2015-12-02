@@ -91,6 +91,7 @@ class RESTfulArtifactCache(ArtifactCache):
         return self._localcache.store_and_use_artifact(cache_key, byte_iter, results_dir)
     except Exception as e:
       logger.warn('\nError while reading from remote artifact cache: {0}\n'.format(e))
+      # TODO(peiyu): clean up partially downloaded local file if any
       return UnreadableArtifact(cache_key, e)
 
     return False

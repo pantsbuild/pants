@@ -618,7 +618,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       """
       if not self.artifact_cache_reads_enabled():
         return False
-      cached_vts, uncached_vts = self.check_artifact_cache([vts])
+      cached_vts, _, _ = self.check_artifact_cache([vts])
       if not cached_vts:
         self.context.log.debug('Missed cache during double check for {}'
                                .format(vts.target.address.spec))

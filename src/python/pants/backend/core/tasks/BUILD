@@ -44,7 +44,6 @@ target(
   dependencies = [
     ':bash_completion',
     ':builddictionary',
-    ':changed_target_goals',
     ':clean',
     ':cloc',
     ':confluence_publish',
@@ -60,7 +59,6 @@ target(
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
-    ':noop',
     ':pathdeps',
     ':paths',
     ':repl_task_mixin',
@@ -71,7 +69,6 @@ target(
     ':sorttargets',
     ':targets_help',
     ':task',
-    ':what_changed',
   ]
 )
 
@@ -281,14 +278,6 @@ python_library(
 )
 
 python_library(
-  name = 'noop',
-  sources = ['noop.py'],
-  dependencies = [
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
   name = 'pathdeps',
   sources = ['pathdeps.py'],
   dependencies = [
@@ -404,26 +393,5 @@ python_library(
   dependencies = [
     'src/python/pants/build_graph',
     'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'what_changed',
-  sources = ['what_changed.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
-    'src/python/pants/goal:workspace',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name='changed_target_goals',
-  sources=['changed_target_goals.py'],
-  dependencies=[
-    ':noop',
-    ':what_changed',
   ],
 )

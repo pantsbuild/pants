@@ -13,9 +13,9 @@ from collections import namedtuple
 
 from six.moves import range
 
-from pants.rwbuf.read_write_buffer import FileBackedRWBuf
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_method
+from pants.util.rwbuf import FileBackedRWBuf
 
 
 class WorkUnitLabel(object):

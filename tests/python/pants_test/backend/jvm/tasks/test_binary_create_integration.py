@@ -43,9 +43,24 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
     )
 
   def test_manifest_entries_bundle(self):
+    # package level manifest entry, in this case, `Implementation-Version`, no longer work
+    # because package files are not included in the bundle jar, instead they are referenced
+    # through its manifest's Class-Path.
     self.build_and_run(
       pants_args=['bundle',
                   'testprojects/src/java/org/pantsbuild/testproject/manifest:manifest-app'],
+      rel_out_path=os.path.join('dist', 'manifest-app-bundle'),
+      java_args=['-cp', 'manifest-no-source.jar', 'org.pantsbuild.testproject.manifest.Manifest'],
+      expected_output='Hello World!  Version: null',
+    )
+
+    # If we still want to get package level manifest entries, we need to include packages files
+    # in the bundle jar through `--deployjar`. However use that with caution because the monolithic
+    # jar may have multiple packages.
+    self.build_and_run(
+      pants_args=['bundle',
+                  'testprojects/src/java/org/pantsbuild/testproject/manifest:manifest-app',
+                  '--bundle-jvm-deployjar'],
       rel_out_path=os.path.join('dist', 'manifest-app-bundle'),
       java_args=['-cp', 'manifest-no-source.jar', 'org.pantsbuild.testproject.manifest.Manifest'],
       expected_output='Hello World!  Version: 4.5.6',
@@ -85,11 +100,11 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
 
   def build_and_run(self, pants_args, rel_out_path, java_args, expected_output):
     self.assert_success(self.run_pants(['clean-all']))
-    pants_run = self.run_pants(pants_args, {})
-    self.assert_success(pants_run)
+    with self.pants_results(pants_args, {}) as pants_run:
+      self.assert_success(pants_run)
 
-    out_path = os.path.join(get_buildroot(), rel_out_path)
-    self.run_java(java_args=java_args, expected_output=expected_output, cwd=out_path)
+      out_path = os.path.join(get_buildroot(), rel_out_path)
+      self.run_java(java_args=java_args, expected_output=expected_output, cwd=out_path)
 
   def run_java(self, java_args, expected_returncode=0, expected_output=None, cwd=None):
     command = ['java'] + java_args
