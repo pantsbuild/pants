@@ -15,12 +15,12 @@ from pants.task.task import QuietTaskMixin, Task
 logger = logging.getLogger(__name__)
 
 
-class RunServer(QuietTaskMixin, Task):
-  """Runs the reporting server."""
+class ReportingServerRun(QuietTaskMixin, Task):
+  """Run the reporting server."""
 
   @classmethod
   def register_options(cls, register):
-    super(RunServer, cls).register_options(register)
+    super(ReportingServerRun, cls).register_options(register)
     register('--port', type=int, default=0,
              help='Serve on this port. Leave unset to choose a free port '
                   'automatically (recommended if using pants concurrently in '
@@ -55,23 +55,3 @@ class RunServer(QuietTaskMixin, Task):
                   .format(pid=manager.pid, port=manager.socket))
 
     self._maybe_open(manager.socket)
-
-
-class KillServer(QuietTaskMixin, Task):
-  """Kills the reporting server."""
-
-  def execute(self):
-    server = ReportingServerManager(self.context, self.get_options())
-
-    if not server.is_alive():
-      logger.info('No server found.')
-      return
-
-    pid = server.pid
-
-    try:
-      logger.info('Killing server with {pid} at http://localhost:{port}'
-                  .format(pid=pid, port=server.socket))
-      server.terminate()
-    except ReportingServerManager.NonResponsiveProcess:
-      logger.info('Failed to kill server with pid {pid}!'.format(pid=pid))

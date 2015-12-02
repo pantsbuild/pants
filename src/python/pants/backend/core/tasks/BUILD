@@ -44,7 +44,6 @@ target(
   dependencies = [
     ':bash_completion',
     ':builddictionary',
-    ':clean',
     ':cloc',
     ':confluence_publish',
     ':console_task',
@@ -62,9 +61,6 @@ target(
     ':pathdeps',
     ':paths',
     ':repl_task_mixin',
-    ':reporting_server',
-    ':roots',
-    ':run_prep_command',
     ':scm_publish',
     ':sorttargets',
     ':targets_help',
@@ -119,17 +115,6 @@ python_library(
 resources(
   name = 'builddictionary_resources',
   sources = globs('templates/builddictionary/*.mustache'),
-)
-
-
-python_library(
-  name = 'clean',
-  sources = ['clean.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/task',
-    'src/python/pants/util:dirutil',
-  ],
 )
 
 python_library(
@@ -296,18 +281,6 @@ python_library(
 )
 
 python_library(
-  name = 'reporting_server',
-  sources = ['reporting_server.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:run_info',
-    'src/python/pants/binaries:binary_util',
-    'src/python/pants/reporting',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
   name = 'reflect',
   sources = ['reflect.py'],
   dependencies = [
@@ -321,24 +294,6 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/help',
     'src/python/pants/option',
-  ],
-)
-
-python_library(
-  name = 'roots',
-  sources = ['roots.py'],
-  dependencies = [
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'run_prep_command',
-  sources = ['run_prep_command.py'],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:workunit',
-    'src/python/pants/task',
   ],
 )
 

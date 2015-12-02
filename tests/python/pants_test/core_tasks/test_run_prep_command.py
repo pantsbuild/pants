@@ -10,15 +10,15 @@ import os
 from six.moves import range
 
 from pants.backend.core.targets.prep_command import PrepCommand
-from pants.backend.core.tasks.run_prep_command import RunPrepCommand
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.core_tasks.run_prep_command import RunPrepCommand
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class PrepTest(TaskTestBase):
+class RunPrepCommandTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     return RunPrepCommand

@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.tasks.roots import ListRoots
 from pants.base.build_environment import get_buildroot
+from pants.core_tasks.roots import ListRoots
 from pants.source.source_root import SourceRootConfig
 from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
