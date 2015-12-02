@@ -15,8 +15,9 @@ class Dependencies(Target):
 
   NB: This class is commonly referred to by the alias 'target' in BUILD files.
   """
-  
+
   @deprecated('0.0.64', 'Replace dependencies(...) with target(...) in your BUILD files. '
                         'Replace uses of Dependencies with Target in your code.')
   def __init__(self, *args, **kwargs):
-    super(Dependencies, self).__init__(*args, **kwargs)
+    raise RuntimeError('For {}: dependencies(...) targets no longer work. Replace with '
+                       'target(...) in your BUILD files.'.format(kwargs['address'].spec))
