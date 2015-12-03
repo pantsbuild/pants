@@ -72,49 +72,20 @@ def build_file_aliases():
 
 
 def register_goals():
-  # TODO: Most of these (and most tasks in other backends) can probably have their
-  # with_description() removed, as their docstring will be used instead.
-
-  # Getting help.
-
-  task(name='targets', action=TargetsHelp).install().with_description(
-      'List target types and BUILD file symbols (python_tests, jar, etc).')
-
+  task(name='targets', action=TargetsHelp).install()
   task(name='builddict', action=BuildBuildDictionary).install()
+  task(name='markdown', action=MarkdownToHtml).install()
 
-  task(name='markdown', action=MarkdownToHtml).install('markdown').with_description(
-      'Generate html from markdown docs.')
-
-  # Linting.
-  task(name='pathdeps', action=PathDeps).install('pathdeps').with_description(
-      'Print out all paths containing BUILD files the target depends on.')
-
-  task(name='list', action=ListTargets).install('list').with_description(
-      'List available BUILD targets.')
+  task(name='pathdeps', action=PathDeps).install()
+  task(name='list', action=ListTargets).install()
 
   # Build graph information.
-  task(name='path', action=Path).install().with_description(
-      'Find a dependency path from one target to another.')
-
-  task(name='paths', action=Paths).install().with_description(
-      'Find all dependency paths from one target to another.')
-
-  task(name='dependees', action=ReverseDepmap).install().with_description(
-      "Print the target's dependees.")
-
-  task(name='filemap', action=Filemap).install().with_description(
-      'Outputs a mapping from source file to owning target.')
-
-  task(name='minimize', action=MinimalCover).install().with_description(
-      'Print the minimal cover of the given targets.')
-
+  task(name='path', action=Path).install()
+  task(name='paths', action=Paths).install()
+  task(name='dependees', action=ReverseDepmap).install()
+  task(name='filemap', action=Filemap).install()
+  task(name='minimize', action=MinimalCover).install()
   task(name='filter', action=Filter).install()
-
-  task(name='sort', action=SortTargets).install().with_description(
-      'Topologically sort the targets.')
-
-  task(name='cloc', action=CountLinesOfCode).install('cloc').with_description(
-    "Print counts of lines of code.")
-
-  task(name='list-owners', action=ListOwners).install().with_description(
-      'Print targets that own the specified source')
+  task(name='sort', action=SortTargets).install()
+  task(name='cloc', action=CountLinesOfCode).install()
+  task(name='list-owners', action=ListOwners).install()

@@ -18,10 +18,34 @@ from pants.core_tasks.reporting_server_run import ReportingServerRun
 from pants.core_tasks.roots import ListRoots
 from pants.core_tasks.run_prep_command import RunPrepCommand
 from pants.core_tasks.what_changed import WhatChanged
+from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
+  # Register descriptions for the standard multiple-task goals.  Single-task goals get
+  # their descriptions from their single task.
+  Goal.register('buildgen', 'Automatically generate BUILD files.')
+  Goal.register('bootstrap', 'Bootstrap tools needed by subsequent build steps.')
+  Goal.register('imports', 'Resolve external source dependencies.')
+  Goal.register('gen', 'Generate code.')
+  Goal.register('resolve', 'Resolve external binary dependencies.')
+  Goal.register('compile', 'Compile source code.')
+  Goal.register('binary', 'Create a runnable binary.')
+  Goal.register('resources', 'Prepare resources.')
+  Goal.register('bundle', 'Create a deployable application bundle.')
+  Goal.register('test', 'Run tests.')
+  Goal.register('bench', 'Run benchmarks.')
+  Goal.register('repl', 'Run a REPL.')
+  Goal.register('repl-dirty', 'Run a REPL, skipping compilation.')
+  Goal.register('run', 'Invoke a binary.')
+  Goal.register('run-dirty', 'Invoke a binary, skipping compilation.')
+  Goal.register('doc', 'Generate documentation.')
+  Goal.register('publish', 'Publish a build artifact.')
+  Goal.register('dep-usage', 'Collect target dependency usage data.')
+
+  # Register tasks.
+
   # Cleaning.
   task(name='invalidate', action=Invalidate).install()
   task(name='clean-all', action=Clean).install()
