@@ -12,16 +12,12 @@ from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.bash_completion import BashCompletionTask
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.cloc import CountLinesOfCode
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
-from pants.backend.core.tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.backend.core.tasks.dependees import ReverseDepmap
-from pants.backend.core.tasks.explain_options_task import ExplainOptionsTask
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.core.tasks.filter import Filter
-from pants.backend.core.tasks.list_goals import ListGoals
 from pants.backend.core.tasks.list_owners import ListOwners
 from pants.backend.core.tasks.listtargets import ListTargets
 from pants.backend.core.tasks.markdown_to_html import MarkdownToHtml
@@ -80,7 +76,6 @@ def register_goals():
   # with_description() removed, as their docstring will be used instead.
 
   # Getting help.
-  task(name='goals', action=ListGoals).install().with_description('List all documented goals.')
 
   task(name='targets', action=TargetsHelp).install().with_description(
       'List target types and BUILD file symbols (python_tests, jar, etc).')
@@ -123,12 +118,3 @@ def register_goals():
 
   task(name='list-owners', action=ListOwners).install().with_description(
       'Print targets that own the specified source')
-
-  task(name='deferred-sources', action=DeferredSourcesMapper).install().with_description(
-    'Map unpacked sources from archives.')
-
-  task(name='bash-completion', action=BashCompletionTask).install().with_description(
-    'Dump bash shell script for autocompletion of pants command lines.')
-
-  task(name='options', action=ExplainOptionsTask).install().with_description(
-    'List what options pants has set.')

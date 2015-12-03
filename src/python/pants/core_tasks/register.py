@@ -5,9 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.core_tasks.bash_completion import BashCompletion
 from pants.core_tasks.changed_target_tasks import CompileChanged, TestChanged
 from pants.core_tasks.clean import Clean
+from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
+from pants.core_tasks.explain_options_task import ExplainOptionsTask
 from pants.core_tasks.invalidate import Invalidate
+from pants.core_tasks.list_goals import ListGoals
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.reporting_server_kill import ReportingServerKill
 from pants.core_tasks.reporting_server_run import ReportingServerRun
@@ -27,6 +31,10 @@ def register_goals():
   task(name='server', action=ReportingServerRun, serialize=False).install()
   task(name='killserver', action=ReportingServerKill, serialize=False).install()
 
+  # Getting help.
+  task(name='goals', action=ListGoals).install()
+  task(name='options', action=ExplainOptionsTask).install()
+
   # Stub for other goals to schedule 'compile'. See noop_exec_task.py for why this is useful.
   task(name='compile', action=NoopCompile).install('compile')
 
@@ -42,3 +50,7 @@ def register_goals():
 
   # Workspace information.
   task(name='roots', action=ListRoots).install()
+  task(name='bash-completion', action=BashCompletion).install()
+
+  # Handle sources that aren't loose files in the repo.
+  task(name='deferred-sources', action=DeferredSourcesMapper).install()

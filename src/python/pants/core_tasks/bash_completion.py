@@ -20,7 +20,7 @@ from pants.task.console_task import ConsoleTask
 from pants.task.task import TaskBase
 
 
-class BashCompletionTask(ConsoleTask):
+class BashCompletion(ConsoleTask):
   """Generate a Bash shell script that teaches Bash how to autocomplete pants command lines."""
 
   def get_all_cmd_line_scopes(self):

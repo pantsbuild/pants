@@ -19,7 +19,6 @@ target(
     ':builddict',
     ':execution_graph',
     ':group_task',
-    ':list_goals',
     ':list_owners',
     ':listtargets',
     ':minimal_cover',
@@ -108,18 +107,6 @@ python_tests(
     'src/python/pants/backend/core/tasks:filemap',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
-  ],
-)
-
-python_tests(
-  name = 'list_goals',
-  sources = ['test_list_goals.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/core/tasks:list_goals',
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
-    'src/python/pants/task',
   ],
 )
 

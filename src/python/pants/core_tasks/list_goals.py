@@ -10,6 +10,8 @@ from pants.task.console_task import ConsoleTask
 
 
 class ListGoals(ConsoleTask):
+  """List available goals."""
+
   @classmethod
   def register_options(cls, register):
     super(ListGoals, cls).register_options(register)
