@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
+
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.base.deprecated import deprecated
@@ -61,10 +63,7 @@ class JarDependency(object):
 
     :rtype: :class:`JarDependency`
     """
-    return type(self)(self.org, name=self._base_name, rev=self.rev, force=self.force,
-                      ext=self.ext, url=self.url, apidocs=self.apidocs,
-                      classifier=self.classifier, mutable=self.mutable,
-                      intransitive=(not self.transitive), excludes=tuple(self.excludes))
+    return copy.deepcopy(self)
 
   @property
   def name(self):

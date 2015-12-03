@@ -420,7 +420,7 @@ class IvyUtils(object):
       candidate = jar if not existing else cls._resolve_conflict(existing=existing,
                                                                         proposed=jar)
       # Clone the JarDependency object so that any mutations occuring in the context of this method
-      # do not effect the graph.
+      # do not affect the graph.
       jars[coordinate] = candidate.copy()
 
     def collect_jars(target):
