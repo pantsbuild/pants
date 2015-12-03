@@ -30,14 +30,14 @@ class NodeResolve(NodeTask):
 
   @classmethod
   def register_resolver_for_type(cls, node_package_type, resolver):
-    """Register a particular subclass of NodeResolver for a particular subclass of NodePackage.
+    """Register a NodeResolver instance for a particular subclass of NodePackage.
     Implementation uses a hash on node_package_type, so the resolver will only be used on the
     exact NodePackage subclass (not further subclasses of it).
 
     :param class node_package_type: A NodePackage subclass
     :param class resolver: A NodeResolverBase subclass
     """
-    cls._resolver_by_type[node_package_type] = resolver()
+    cls._resolver_by_type[node_package_type] = resolver
 
   @classmethod
   def _clear_resolvers(cls):
@@ -80,7 +80,7 @@ class NodeResolve(NodeTask):
       with self.context.new_workunit(name='install', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
           target = vt.target
-          resolver_for_target_type = self._resolver_for_target(target)
+          resolver_for_target_type = self._resolver_for_target(target).global_instance()
           results_dir = vt.results_dir
           if not vt.valid:
             safe_mkdir(results_dir, clean=True)

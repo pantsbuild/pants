@@ -14,16 +14,25 @@ import six.moves.urllib.parse as urllib_parse
 import six.moves.urllib.request as urllib_request
 from pants.base.exceptions import TaskError
 from pants.fs.archive import archiver_for_path
+from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 
-from pants.contrib.node.resolvers.node_resolver_base import NodeResolverBase
+from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
+from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
+from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
 logger = logging.getLogger(__name__)
 
 
-class NodePreinstalledModuleResolver(NodeResolverBase):
+class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
+  options_scope = 'node-preinstalled-module-resolver'
+
+  @classmethod
+  def register_options(cls, register):
+    super(NodePreinstalledModuleResolver, cls).register_options(register)
+    NodeResolve.register_resolver_for_type(NodePreinstalledModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
     self._copy_sources(target, results_dir)

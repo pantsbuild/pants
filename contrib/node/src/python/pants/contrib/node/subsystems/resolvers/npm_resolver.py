@@ -10,13 +10,21 @@ import os
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import pushd
 
-from pants.contrib.node.resolvers.node_resolver_base import NodeResolverBase
+from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
-class NpmResolver(NodeResolverBase):
+class NpmResolver(Subsystem, NodeResolverBase):
+  options_scope = 'npm-resolver'
+
+  @classmethod
+  def register_options(cls, register):
+    super(NpmResolver, cls).register_options(register)
+    NodeResolve.register_resolver_for_type(NodeModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
     self._copy_sources(target, results_dir)

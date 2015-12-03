@@ -8,9 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.node.resolvers.node_preinstalled_module_resolver import \
+from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
   NodePreinstalledModuleResolver
-from pants.contrib.node.resolvers.npm_resolver import NpmResolver
+from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
@@ -38,5 +38,6 @@ def register_goals():
   task(name='node', action=NodeRun).install('run')
   task(name='node', action=NodeTestTask).install('test')
 
-  NodeResolve.register_resolver_for_type(NodePreinstalledModule, NodePreinstalledModuleResolver)
-  NodeResolve.register_resolver_for_type(NodeModule, NpmResolver)
+
+def global_subsystems():
+  return (NodePreinstalledModuleResolver, NpmResolver)

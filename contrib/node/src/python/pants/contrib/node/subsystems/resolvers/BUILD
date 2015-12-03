@@ -16,8 +16,10 @@ python_library(
     ':node_resolver_base',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
+    'contrib/node/src/python/pants/contrib/node/tasks:node_task',
   ]
 )
 
@@ -29,8 +31,11 @@ python_library(
     '3rdparty/python:six',
     'src/python/pants/base:exceptions',
     'src/python/pants/fs',
+    'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'contrib/node/src/python/pants/contrib/node/targets:node_preinstalled_module',
+    'contrib/node/src/python/pants/contrib/node/tasks:node_task',
   ]
 )
 
