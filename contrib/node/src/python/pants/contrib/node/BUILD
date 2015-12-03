@@ -14,4 +14,5 @@ contrib_plugin(
   description='Node.js support for pants.',
   build_file_aliases=True,
   register_goals=True,
+  global_subsystems=True
 )

@@ -10,8 +10,7 @@ import os
 
 from pants.base.exceptions import TaskError
 from pants.task.repl_task_mixin import ReplTaskMixin
-from pants.util.contextutil import pushd
-from pants.util.dirutil import safe_mkdtemp
+from pants.util.contextutil import pushd, temporary_dir
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
@@ -44,31 +43,30 @@ class NodeRepl(ReplTaskMixin, NodeTask):
     return [target for target in targets if target in self.context.target_roots]
 
   def launch_repl(self, targets):
-    temp_dir = safe_mkdtemp()
+    with temporary_dir() as temp_dir:
+      node_paths = self.context.products.get_data(NodePaths)
 
-    node_paths = self.context.products.get_data(NodePaths)
-
-    package_json_path = os.path.join(temp_dir, 'package.json')
-    package = {
-      'name': self.SYNTHETIC_NODE_TARGET_NAME,
-      'version': '0.0.0',
-      'dependencies': {
-        target.package_name: node_paths.node_path(target) if self.is_node_module(target)
-                             else target.version for target in targets
+      package_json_path = os.path.join(temp_dir, 'package.json')
+      package = {
+        'name': self.SYNTHETIC_NODE_TARGET_NAME,
+        'version': '0.0.0',
+        'dependencies': {
+          target.package_name: node_paths.node_path(target) if self.is_node_module(target)
+                               else target.version for target in targets
+        }
       }
-    }
-    with open(package_json_path, 'wb') as fp:
-      json.dump(package, fp, indent=2)
+      with open(package_json_path, 'wb') as fp:
+        json.dump(package, fp, indent=2)
 
-    args = self.get_passthru_args()
-    node_repl = self.node_distribution.node_command(args=args)
+      args = self.get_passthru_args()
+      node_repl = self.node_distribution.node_command(args=args)
 
-    with pushd(temp_dir):
-      result, npm_install = self.execute_npm(args=['install'],
-                                             workunit_name=self.SYNTHETIC_NODE_TARGET_NAME)
-      if result != 0:
-        raise TaskError('npm install of synthetic REPL module failed:\n'
-                        '\t{} failed with exit code {}'.format(npm_install, result))
+      with pushd(temp_dir):
+        result, npm_install = self.execute_npm(args=['install'],
+                                               workunit_name=self.SYNTHETIC_NODE_TARGET_NAME)
+        if result != 0:
+          raise TaskError('npm install of synthetic REPL module failed:\n'
+                          '\t{} failed with exit code {}'.format(npm_install, result))
 
-      repl_session = node_repl.run()
-      repl_session.wait()
+        repl_session = node_repl.run()
+        repl_session.wait()

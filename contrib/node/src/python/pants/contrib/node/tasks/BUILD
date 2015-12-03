@@ -25,7 +25,6 @@ python_library(
     'src/python/pants/backend/core/tasks:repl_task_mixin',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
   ]
 )
 
