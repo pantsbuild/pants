@@ -12,9 +12,9 @@ from textwrap import dedent
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
-from pants.contrib.node.resolvers.node_preinstalled_module_resolver import \
+from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
   NodePreinstalledModuleResolver
-from pants.contrib.node.resolvers.npm_resolver import NpmResolver
+from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
@@ -48,13 +48,13 @@ class NodeResolveTest(TaskTestBase):
       target_type=NodePreinstalledModule)
     NodeResolve.register_resolver_for_type(NodePreinstalledModule, NodePreinstalledModuleResolver)
     self.assertEqual(NodePreinstalledModuleResolver,
-                     type(NodeResolve._resolver_for_target(node_preinstalled__module_target)))
+                     NodeResolve._resolver_for_target(node_preinstalled__module_target))
 
     node_module_target = self.make_target(spec=':empty_fake_node_module_target',
                                           target_type=NodeModule)
     NodeResolve.register_resolver_for_type(NodeModule, NpmResolver)
     self.assertEqual(NpmResolver,
-                     type(NodeResolve._resolver_for_target(node_module_target)))
+                     NodeResolve._resolver_for_target(node_module_target))
 
   def test_noop(self):
     task = self.create_task(self.context())

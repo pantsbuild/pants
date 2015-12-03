@@ -19,7 +19,7 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
-    'contrib/node/src/python/pants/contrib/node/tasks:node_task',
+    'contrib/node/src/python/pants/contrib/node/tasks:node_resolve',
   ]
 )
 
@@ -35,7 +35,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'contrib/node/src/python/pants/contrib/node/targets:node_preinstalled_module',
-    'contrib/node/src/python/pants/contrib/node/tasks:node_task',
+    'contrib/node/src/python/pants/contrib/node/tasks:node_resolve',
   ]
 )
 

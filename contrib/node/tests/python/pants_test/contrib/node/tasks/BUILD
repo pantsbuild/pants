@@ -84,8 +84,8 @@ python_tests(
     'contrib/node/src/python/pants/contrib/node/targets:node_test',
     'contrib/node/src/python/pants/contrib/node/tasks:node_paths',
     'contrib/node/src/python/pants/contrib/node/tasks:node_resolve',
-    'contrib/node/src/python/pants/contrib/node/resolvers:npm_resolver',
-    'contrib/node/src/python/pants/contrib/node/resolvers:node_preinstalled_module_resolver',
+    'contrib/node/src/python/pants/contrib/node/subsystems/resolvers:npm_resolver',
+    'contrib/node/src/python/pants/contrib/node/subsystems/resolvers:node_preinstalled_module_resolver',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]

@@ -50,7 +50,6 @@ python_library(
   dependencies=[
     ':node_paths',
     ':node_task',
-    'contrib/node/src/python/pants/contrib/node/subsystems/resolvers',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
