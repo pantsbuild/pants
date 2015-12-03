@@ -41,7 +41,7 @@ class TestNetrcUtil(unittest.TestCase):
     with self.netrc('machine test') as netrc:
       with self.assertRaises(netrc.NetrcError) as exc:
         netrc._ensure_loaded()
-      assert re.search(r'Problem parsing', exc.exception.message)
+      assert re.search(r'Problem parsing', str(exc.exception))
 
   def test_netrc_no_usable_blocks(self, MockOsPath):
     with self.netrc('') as netrc:
