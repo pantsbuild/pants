@@ -25,7 +25,6 @@ from pants.backend.core.tasks.minimal_cover import MinimalCover
 from pants.backend.core.tasks.pathdeps import PathDeps
 from pants.backend.core.tasks.paths import Path, Paths
 from pants.backend.core.tasks.sorttargets import SortTargets
-from pants.backend.core.tasks.targets_help import TargetsHelp
 from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.source_root import SourceRoot
@@ -72,7 +71,6 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='targets', action=TargetsHelp).install()
   task(name='builddict', action=BuildBuildDictionary).install()
   task(name='markdown', action=MarkdownToHtml).install()
 

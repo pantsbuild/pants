@@ -9,7 +9,7 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 
 
 class ScalacPlugin(ScalaLibrary):
-  """Defines a target that produces a scalac_plugin."""
+  """A Scala compiler plugin."""
 
   def __init__(self, classname=None, plugin=None, *args, **kwargs):
 

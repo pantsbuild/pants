@@ -11,7 +11,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 
 
 class PythonTests(PythonTarget):
-  """Tests a Python library."""
+  """Python tests."""
 
   def __init__(self, coverage=None, timeout=None, **kwargs):
     """

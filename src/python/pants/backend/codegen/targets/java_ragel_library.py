@@ -9,7 +9,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 
 class JavaRagelLibrary(JvmTarget):
-  """Generates a stub Java library from a Ragel file."""
+  """A Java library generated from a Ragel file."""
 
   def __init__(self, **kwargs):
     super(JavaRagelLibrary, self).__init__(**kwargs)

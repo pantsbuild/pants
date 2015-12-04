@@ -11,7 +11,7 @@ from pants.build_graph.target import Target
 
 
 class NodeTest(Target):
-  """A target for running JS tests via a script specified in a package.json file."""
+  """Javascript tests run via a script specified in a package.json file."""
 
   def __init__(self, script_name=None, address=None, payload=None, **kwargs):
     """

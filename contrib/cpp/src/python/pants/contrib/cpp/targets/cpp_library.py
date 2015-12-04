@@ -9,7 +9,7 @@ from pants.contrib.cpp.targets.cpp_target import CppTarget
 
 
 class CppLibrary(CppTarget):
-  """Represents a statically linked c++ library."""
+  """A statically linked C++ library."""
 
   # TODO: public headers
   def __init__(self,
