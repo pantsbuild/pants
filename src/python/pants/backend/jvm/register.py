@@ -24,6 +24,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
+from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
@@ -49,6 +50,9 @@ from pants.backend.jvm.tasks.jvm_run import JvmRun
 from pants.backend.jvm.tasks.nailgun_task import NailgunKillall
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
 from pants.backend.jvm.tasks.prepare_services import PrepareServices
+from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepCommand,
+                                                          RunCompileJvmPrepCommand,
+                                                          RunTestJvmPrepCommand)
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
@@ -71,6 +75,7 @@ def build_file_aliases():
       'junit_tests': JavaTests,
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
+      'jvm_prep_command' : JvmPrepCommand,
       'scala_library': ScalaLibrary,
       'scalac_plugin': ScalacPlugin,
     },
@@ -177,3 +182,6 @@ def register_goals():
   task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty')
   task(name='scala', action=ScalaRepl, serialize=False).install('repl')
   task(name='scala-dirty', action=ScalaRepl, serialize=False).install('repl-dirty')
+  task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
+  task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
+  task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)

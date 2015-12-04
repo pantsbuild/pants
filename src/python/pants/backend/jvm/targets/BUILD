@@ -21,6 +21,7 @@ python_library(
     'jarable.py',
     'jvm_app.py',
     'jvm_binary.py',
+    'jvm_prep_command.py',
     'jvm_target.py',
     'unpacked_jars.py',
   ],
