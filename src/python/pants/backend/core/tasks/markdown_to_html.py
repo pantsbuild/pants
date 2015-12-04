@@ -35,6 +35,7 @@ def util():
 
 
 class MarkdownToHtml(Task):
+  """Generate HTML from Markdown docs."""
 
   @classmethod
   def register_options(cls, register):

@@ -38,6 +38,8 @@ def beautiful_soup(*args, **kwargs):
 
 
 class SiteGen(Task):
+  """Generate the Pants static web site."""
+
   @classmethod
   def register_options(cls, register):
     super(SiteGen, cls).register_options(register)

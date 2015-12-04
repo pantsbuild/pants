@@ -108,26 +108,20 @@ def global_subsystems():
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals
 def register_goals():
   ng_killall = task(name='ng-killall', action=NailgunKillall)
-  ng_killall.install().with_description('Kill running nailgun servers.')
+  ng_killall.install()
 
   Goal.by_name('invalidate').install(ng_killall, first=True)
   Goal.by_name('clean-all').install(ng_killall, first=True)
-  Goal.by_name('clean-all-async').install(ng_killall, first=True)
 
   task(name='jvm-platform-explain', action=JvmPlatformExplain).install('jvm-platform-explain')
   task(name='jvm-platform-validate', action=JvmPlatformValidate).install('jvm-platform-validate')
 
-  task(name='bootstrap-jvm-tools', action=BootstrapJvmTools).install('bootstrap').with_description(
-      'Bootstrap tools needed for building.')
+  task(name='bootstrap-jvm-tools', action=BootstrapJvmTools).install('bootstrap')
 
   # Dependency resolution.
-  task(name='ivy', action=IvyResolve).install('resolve').with_description(
-      'Resolve dependencies and produce dependency reports.')
-
+  task(name='ivy', action=IvyResolve).install('resolve')
   task(name='ivy-imports', action=IvyImports).install('imports')
-
-  task(name='unpack-jars', action=UnpackJars).install().with_description(
-    'Unpack artifacts specified by unpacked_jars() targets.')
+  task(name='unpack-jars', action=UnpackJars).install()
 
   # Resource preparation.
   task(name='prepare', action=PrepareResources).install('resources')
@@ -142,56 +136,44 @@ def register_goals():
       product_type=['runtime_classpath', 'classes_by_source', 'product_deps_by_src'],
       flag_namespace=['compile'])
   jvm_compile.add_member(ZincCompile)
-  task(name='jvm', action=jvm_compile).install('compile').with_description('Compile source code.')
+  task(name='jvm', action=jvm_compile).install('compile')
 
-  task(name='export-classpath', action=RuntimeClasspathPublisher).install().with_description(
-      'Create stable symlinks for runtime classpath entries for JVM targets.')
+  task(name='export-classpath', action=RuntimeClasspathPublisher).install()
   task(name='jvm-dep-check', action=JvmDependencyCheck).install('compile')
 
-  task(name='jvm', action=JvmDependencyUsage).install('dep-usage').with_description(
-      'Collect target dependency usage data.')
+  task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
 
   # Generate documentation.
-  task(name='javadoc', action=JavadocGen).install('doc').with_description('Create documentation.')
+  task(name='javadoc', action=JavadocGen).install('doc')
   task(name='scaladoc', action=ScaladocGen).install('doc')
 
   # Bundling.
+  Goal.register('jar', 'Create a JAR file.')
   task(name='create', action=JarCreate).install('jar')
   detect_duplicates = task(name='dup', action=DuplicateDetector)
 
-  task(name='jvm', action=BinaryCreate).install('binary').with_description('Create a runnable binary.')
+  task(name='jvm', action=BinaryCreate).install('binary')
   detect_duplicates.install('binary')
 
-  task(name='jvm', action=BundleCreate).install('bundle').with_description(
-      'Create an application bundle from binary targets.')
+  task(name='jvm', action=BundleCreate).install('bundle')
   detect_duplicates.install('bundle')
 
-  task(name='detect-duplicates', action=DuplicateDetector).install().with_description(
-      'Detect duplicate classes and resources on the classpath.')
+  task(name='detect-duplicates', action=DuplicateDetector).install()
 
   # Publishing.
   task(
     name='check_published_deps',
     action=CheckPublishedDeps,
-  ).install('check_published_deps').with_description('Find references to outdated artifacts.')
+  ).install('check_published_deps')
 
-  task(name='jar', action=JarPublish).install('publish').with_description(
-      'Publish artifacts.')
+  task(name='jar', action=JarPublish).install('publish')
 
   # Testing.
-  task(name='junit', action=JUnitRun).install('test').with_description('Test compiled code.')
-  task(name='bench', action=BenchmarkRun).install('bench').with_description('Run benchmark tests.')
+  task(name='junit', action=JUnitRun).install('test')
+  task(name='bench', action=BenchmarkRun).install('bench')
 
   # Running.
-  task(name='jvm', action=JvmRun, serialize=False).install('run').with_description(
-      'Run a binary target.')
-  task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty').with_description(
-      'Run a binary target, skipping compilation.')
-
-  task(name='scala', action=ScalaRepl, serialize=False).install('repl').with_description(
-      'Run a REPL.')
-  task(
-    name='scala-dirty',
-    action=ScalaRepl,
-    serialize=False
-  ).install('repl-dirty').with_description('Run a REPL, skipping compilation.')
+  task(name='jvm', action=JvmRun, serialize=False).install('run')
+  task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty')
+  task(name='scala', action=ScalaRepl, serialize=False).install('repl')
+  task(name='scala-dirty', action=ScalaRepl, serialize=False).install('repl-dirty')

@@ -43,7 +43,7 @@ registers goals in its `register_goals` function. Here's an excerpt from
 [Pants' own Python
 backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/python/register.py):
 
-!inc[start-at=def register_goals&end-at=Python projects from python_library](../backend/python/register.py)
+!inc[start-at=def register_goals](../backend/python/register.py)
 
 That `task(...)` is a name for
 `pants.goal.task_registrar.TaskRegistrar`. Calling its `install` method
