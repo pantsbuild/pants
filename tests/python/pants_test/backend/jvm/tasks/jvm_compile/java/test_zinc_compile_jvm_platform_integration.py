@@ -15,6 +15,3 @@ class ZincCompileJvmPlatformIntegrationTest(JvmPlatformIntegrationMixin,
 
   def get_pants_compile_args(self):
     return ['compile.zinc']
-
-  def test_compile_stale_platform_settings(self):
-    super(ZincCompileJvmPlatformIntegrationTest, self).test_compile_stale_platform_settings()
