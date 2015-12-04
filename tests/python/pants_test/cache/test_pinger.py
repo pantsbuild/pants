@@ -5,13 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import threading
-import time
-
-from six.moves import SimpleHTTPServer, socketserver
-
 from pants.cache.pinger import Pinger
 from pants_test.base_test import BaseTest
+from pants_test.cache.delay_server import setup_delayed_server
 
 
 def get_delayed_handler(delay):
@@ -29,17 +25,10 @@ class TestPinger(BaseTest):
   slow_seconds = .05
   fast_seconds = 0
 
-  def setup_delayed_server(self, delay):
-    server = socketserver.TCPServer(("", 0), get_delayed_handler(delay))
-    thread = threading.Thread(target=server.serve_forever)
-    thread.daemon = True
-    thread.start()
-    return server
-
   def setUp(self):
-    timeout = self.setup_delayed_server(self.timeout_seconds)
-    slow = self.setup_delayed_server(self.slow_seconds)
-    fast = self.setup_delayed_server(self.fast_seconds)
+    timeout = setup_delayed_server(self.timeout_seconds)
+    slow = setup_delayed_server(self.slow_seconds)
+    fast = setup_delayed_server(self.fast_seconds)
     self.servers = [timeout, slow, fast]
     self.fast_netloc = 'localhost:{}'.format(fast.socket.getsockname()[1])
     self.slow_netloc = 'localhost:{}'.format(slow.socket.getsockname()[1])

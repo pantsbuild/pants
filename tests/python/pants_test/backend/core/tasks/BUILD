@@ -4,30 +4,16 @@
 target(
   name='tasks',
   dependencies=[
-    ':bash_completion',
     ':dependees',
     ':filter',
     ':markdown_to_html',
-    ':scm_publish',
     ':target_filter_task_mixin',
   ],
 )
 
 python_tests(
-  name='bash_completion',
-  sources=['test_bash_completion.py'],
-  coverage=['pants.backend.core.tasks.bash_completion'],
-  dependencies=[
-    '3rdparty/python:mock',
-    'src/python/pants/backend/core/tasks:bash_completion',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
   name='cache_cleanup',
   sources=['test_cache_cleanup.py'],
-  coverage=['pants.backend.core.tasks.bash_completion'],
   dependencies=[
     'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
     'src/python/pants/util:dirutil',
@@ -114,16 +100,6 @@ python_tests(
     'src/python/pants/backend/core/tasks:paths',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
-  name='scm_publish',
-  sources=['test_scm_publish.py'],
-  coverage=['pants.backend.core.tasks.scm_publish'],
-  dependencies=[
-    '3rdparty/python:mock',
-    'src/python/pants/backend/core/tasks:scm_publish',
   ]
 )
 

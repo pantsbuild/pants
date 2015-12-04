@@ -5,12 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.bash_completion import BashCompletionTask
+from pants.core_tasks.bash_completion import BashCompletion
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
-class MockedBashCompletionTask(BashCompletionTask):
-  """A version of the BashCompletionTask, with the help introspection mocked out."""
+class MockedBashCompletion(BashCompletion):
+  """A version of the BashCompletion, with the help introspection mocked out."""
 
   def get_autocomplete_options_by_scope(self):
     return {'': []}
@@ -19,7 +19,7 @@ class MockedBashCompletionTask(BashCompletionTask):
 class BashCompletionTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
-    return MockedBashCompletionTask
+    return MockedBashCompletion
 
   def test_bash_completion_loads_template(self):
     self.assert_console_output_contains("# Pants Autocompletion Support")

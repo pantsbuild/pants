@@ -12,7 +12,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class ExplainOptionsTask(ConsoleTask):
-  """Console task to display meta-information about options.
+  """Display meta-information about options.
 
   This "meta-information" includes what values options have, and what values they *used* to have
   before they were overridden by a higher-rank value (eg, a HARDCODED value overridden by a CONFIG
