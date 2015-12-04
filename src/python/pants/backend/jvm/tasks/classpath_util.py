@@ -10,7 +10,7 @@ import os
 from twitter.common.collections import OrderedSet
 
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open, safe_rmtree, safe_walk
+from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_open, safe_walk
 
 
 class ClasspathUtil(object):
@@ -172,7 +172,6 @@ class ClasspathUtil(object):
     canonical_classpath = []
     for target in targets:
       folder_for_target_symlinks = _stable_output_folder(basedir, target)
-      safe_rmtree(folder_for_target_symlinks)
 
       classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
         [target])
@@ -187,6 +186,7 @@ class ClasspathUtil(object):
           # increasing `index` to avoid name collisions.
           file_name = os.path.basename(entry.path)
           symlink_path = os.path.join(folder_for_target_symlinks, '{}-{}'.format(index, file_name))
+          safe_delete(symlink_path)
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
 
