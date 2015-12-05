@@ -4,7 +4,8 @@
 node_preinstalled_module(
   name='preinstalled-project',
   sources=globs('package.json', 'src/*.js', 'test/*.js'),
-  dependencies_archive_url='https://github.com/chrispesto/pants/blob/new_module_module_class_binary/contrib/node/examples/bin/node_modules.tar.gz?raw=true'
+  dependencies_archive_url=('https://raw.githubusercontent.com/pantsbuild/'
+    'node-preinstalled-modules/master/node_modules.tar.gz')
 )
 
 node_test(
