@@ -7,18 +7,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants_test.base_test import BaseTest
 
-from pants.contrib.node.targets.npm_package import NpmPackage
+from pants.contrib.node.targets.node_package import NodePackage
 
 
-class NpmPackageTest(BaseTest):
+class NodePackageTest(BaseTest):
   def test_implicit_package_name(self):
-    target = self.make_target(spec=':name', target_type=NpmPackage)
+    target = self.make_target(spec=':name', target_type=NodePackage)
     self.assertEqual('name', target.address.target_name)
     self.assertEqual('name', target.package_name)
 
   def test_explicit_package_name(self):
-    target1 = self.make_target(spec=':name', target_type=NpmPackage)
-    target2 = self.make_target(spec=':name2', target_type=NpmPackage, package_name='name')
+    target1 = self.make_target(spec=':name', target_type=NodePackage)
+    target2 = self.make_target(spec=':name2', target_type=NodePackage, package_name='name')
     self.assertNotEqual(target1, target2)
     self.assertEqual('name', target1.address.target_name)
     self.assertEqual('name', target1.package_name)

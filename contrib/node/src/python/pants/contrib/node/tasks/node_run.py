@@ -13,12 +13,12 @@ from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
-class NpmRun(NodeTask):
-  """Runs a script from package.json like "npm run [script name]"."""
+class NodeRun(NodeTask):
+  """Runs a script specified in a package.json file, currently through "npm run [script name]"."""
 
   @classmethod
   def register_options(cls, register):
-    super(NpmRun, cls).register_options(register)
+    super(NodeRun, cls).register_options(register)
     register('--script-name', default='start',
              help='The script name to run.')
 
