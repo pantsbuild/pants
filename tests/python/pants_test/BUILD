@@ -40,25 +40,18 @@ python_library(
 )
 
 python_library(
-  name = 'file_test_util_mixin',
-  sources = [
-    'file_test_util_mixin.py',
-  ],
-)
-
-python_library(
   name = 'int-test',
   sources = [
     'pants_run_integration_test.py'
   ],
   dependencies = [
-    ':file_test_util_mixin',
     '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/testutils:file_test_util',
   ]
 )
 

@@ -20,7 +20,7 @@ from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants_test.file_test_util_mixin import FileTestUtilMixin
+from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
 PantsResult = namedtuple(
@@ -57,7 +57,7 @@ def ensure_cached(expected_num_artifacts=None):
   return decorator
 
 
-class PantsRunIntegrationTest(unittest.TestCase, FileTestUtilMixin):
+class PantsRunIntegrationTest(unittest.TestCase):
   """A base class useful for integration tests for targets in the same repo."""
 
   PANTS_SUCCESS_CODE = 0
@@ -190,8 +190,8 @@ class PantsRunIntegrationTest(unittest.TestCase, FileTestUtilMixin):
     pants_run = self.run_pants(bundle_options)
     self.assert_success(pants_run)
 
-    self.assert_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
-                         library_jars_are_symlinks)
+    self.assertTrue(check_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
+                                   library_jars_are_symlinks))
     # TODO(John Sirois): We need a zip here to suck in external library classpath elements
     # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
     # contextmanager that yields its results while the tmpdir workdir is still active and change
@@ -199,14 +199,14 @@ class PantsRunIntegrationTest(unittest.TestCase, FileTestUtilMixin):
     with temporary_dir() as workdir:
       ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
       if expected_bundle_content:
-        self.assert_contains_exact_files(workdir, expected_bundle_content)
+        self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
       if expected_bundle_jar_content:
         with temporary_dir() as check_bundle_jar_dir:
           bundle_jar = os.path.join(workdir, '{bundle_name}.jar')
           ZIP.extract('{workdir}/{bundle_name}.jar'.format(workdir=workdir,
                                                            bundle_name=bundle_name),
                       check_bundle_jar_dir)
-          self.assert_contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content)
+          self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
 
       optional_args = []
       if args:

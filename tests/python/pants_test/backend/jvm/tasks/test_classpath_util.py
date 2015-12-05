@@ -14,10 +14,10 @@ from pants.goal.products import UnionProducts
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import relativize_paths
 from pants_test.base_test import BaseTest
-from pants_test.file_test_util_mixin import FileTestUtilMixin
+from pants_test.testutils.file_test_util import check_file_content, contains_exact_files
 
 
-class ClasspathUtilTest(BaseTest, FileTestUtilMixin):
+class ClasspathUtilTest(BaseTest):
 
   def test_path_with_differing_conf_ignored(self):
     a = self.make_target('a', JvmTarget)
@@ -149,14 +149,14 @@ class ClasspathUtilTest(BaseTest, FileTestUtilMixin):
                         relativize_paths(canonical_classpath, base_dir))
 
       # check canonical path created contain the exact set of files, no more, no less
-      self.assert_contains_exact_files(base_dir,
-                                       expected_canonical_classpath +
-                                       expected_classspath_files.keys())
+      self.assertTrue(contains_exact_files(base_dir,
+                                           expected_canonical_classpath +
+                                           expected_classspath_files.keys()))
 
       # check the content of classpath.txt
       for classpath_file in expected_classspath_files:
-        self.assert_file_content(os.path.join(base_dir, classpath_file),
-                                 expected_classspath_files[classpath_file])
+        self.assertTrue(check_file_content(os.path.join(base_dir, classpath_file),
+                                           expected_classspath_files[classpath_file]))
 
   def _path(self, p):
     return os.path.join(self.pants_workdir, p)

@@ -170,6 +170,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/goal:products',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test/testutils:file_test_util',
   ]
 )
 
@@ -277,7 +278,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
-    'tests/python/pants_test/testutils',
+    'tests/python/pants_test/testutils:mock_logger',
   ],
 )
 
