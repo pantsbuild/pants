@@ -17,6 +17,7 @@ from pants.core_tasks.reporting_server_kill import ReportingServerKill
 from pants.core_tasks.reporting_server_run import ReportingServerRun
 from pants.core_tasks.roots import ListRoots
 from pants.core_tasks.run_prep_command import RunPrepCommand
+from pants.core_tasks.targets_help import TargetsHelp
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -58,6 +59,7 @@ def register_goals():
   # Getting help.
   task(name='goals', action=ListGoals).install()
   task(name='options', action=ExplainOptionsTask).install()
+  task(name='targets', action=TargetsHelp).install()
 
   # Stub for other goals to schedule 'compile'. See noop_exec_task.py for why this is useful.
   task(name='compile', action=NoopCompile).install('compile')

@@ -17,7 +17,7 @@ from pants.build_graph.target import Target
 
 
 class JarLibrary(Target):
-  """A set of jars that may be depended upon."""
+  """A set of external JAR files."""
 
   class WrongTargetTypeError(Exception):
     """Thrown if the wrong type of target is encountered."""

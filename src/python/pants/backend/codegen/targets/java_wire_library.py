@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class JavaWireLibrary(ExportableJvmLibrary):
-  """Generates a stub Java library from protobuf IDL files.
+  """A Java library generated from Wire IDL files.
 
   Supports Wire 1.x only.
 

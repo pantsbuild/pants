@@ -11,6 +11,8 @@ from pants.build_graph.target import Target
 
 
 class HaskellProject(Target):
+  """A Haskell project."""
+
   def __init__(self, resolver, **kwargs):
     """
     :param str resolver: The `stack` resolver (i.e. "lts-3.1" or "nightly-2015-08-29")

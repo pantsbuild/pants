@@ -12,7 +12,7 @@ from pants.contrib.node.targets.node_package import NodePackage
 
 
 class NodeRemoteModule(NodePackage):
-  """Represents a remote Node module."""
+  """A remote Node module."""
 
   def __init__(self, version=None, address=None, payload=None, **kwargs):
     """
