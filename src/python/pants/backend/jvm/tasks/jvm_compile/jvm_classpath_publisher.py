@@ -15,6 +15,14 @@ class RuntimeClasspathPublisher(Task):
   """Creates symlinks in pants_distdir to classpath entries per target."""
 
   @classmethod
+  def register_options(cls, register):
+    super(Task, cls).register_options(register)
+    register('--use-old-naming-style', advanced=True, default=True, action='store_true',
+             deprecated_version='0.0.65',
+             deprecated_hint='Switch to use the safe identifier to construct canonical classpath.',
+             help='Use the old (unsafe) naming style construct canonical classpath.')
+
+  @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data('runtime_classpath')
 
@@ -29,4 +37,4 @@ class RuntimeClasspathPublisher(Task):
                                              self.context.targets(),
                                              basedir,
                                              save_classpath_file=True,
-                                             use_target_id=False)
+                                             use_target_id=not self.get_options().use_old_name_style)
