@@ -108,6 +108,7 @@ class ClasspathUtilTest(BaseTest):
 
     TODO(peiyu) Remove once we switch to use `target.id`.
     """
+    # a and c' canonical classpath share a common prefix: a/b/b
     a = self.make_target('a/b', JvmTarget)
     c = self.make_target('a/b/b/c', JvmTarget)
 
@@ -116,6 +117,7 @@ class ClasspathUtilTest(BaseTest):
     classpath_products.add_for_target(a, [('default', self._path('a.jar'))])
     classpath_products.add_for_target(c, [('default', self._path('c.jar'))])
 
+    # target c first to verify its first created canonical classpath is preserved
     self._test_canonical_classpath_helper(classpath_products, [c, a],
                                           [
                                             'a/b/b/c/c/0-c.jar',
