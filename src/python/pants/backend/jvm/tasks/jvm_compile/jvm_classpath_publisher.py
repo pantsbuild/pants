@@ -9,7 +9,6 @@ import os
 
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.task.task import Task
-from pants.util.dirutil import safe_mkdir
 
 
 class RuntimeClasspathPublisher(Task):
@@ -25,7 +24,6 @@ class RuntimeClasspathPublisher(Task):
 
   def execute(self):
     basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
-    safe_mkdir(basedir, clean=True)
     runtime_classpath = self.context.products.get_data('runtime_classpath')
     ClasspathUtil.create_canonical_classpath(runtime_classpath,
                                              self.context.targets(),

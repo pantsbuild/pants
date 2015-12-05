@@ -20,6 +20,7 @@ from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants_test.file_test_util_mixin import FileTestUtilMixin
 
 
 PantsResult = namedtuple(
@@ -56,7 +57,7 @@ def ensure_cached(expected_num_artifacts=None):
   return decorator
 
 
-class PantsRunIntegrationTest(unittest.TestCase):
+class PantsRunIntegrationTest(unittest.TestCase, FileTestUtilMixin):
   """A base class useful for integration tests for targets in the same repo."""
 
   PANTS_SUCCESS_CODE = 0
@@ -247,36 +248,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
-
-  def assert_contains_exact_files(self, directory, expected_files, ignore_links=False):
-    """Asserts that the only files which directory contains are expected_files.
-
-    :param str directory: Path to directory to search.
-    :param set expected_files: Set of filepaths relative to directory to search for.
-    :param bool ignore_links: Indicates to ignore any file links.
-    """
-    found = []
-    for root, _, files in os.walk(directory):
-      for f in files:
-        p = os.path.join(root, f)
-        if ignore_links and os.path.islink(p):
-          continue
-        found.append(os.path.relpath(p, directory))
-
-    self.assertEqual(sorted(expected_files), sorted(found))
-
-  def assert_symlinks(self, directory, symlinks=True):
-    """Asserts files under directory are symlinks.
-
-    :param str directory: Path to directory to search.
-    :param bool symlinks: If true, verify files are symlinks, if false, verify files are actual files.
-    """
-    for root, _, files in os.walk(directory):
-      for f in files:
-        p = os.path.join(root, f)
-        if symlinks ^ os.path.islink(p):
-          return False
-    return True
 
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""

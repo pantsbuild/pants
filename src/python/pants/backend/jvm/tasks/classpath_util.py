@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
 import os
 
 from twitter.common.collections import OrderedSet
@@ -169,9 +170,21 @@ class ClasspathUtil(object):
         address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
       )
 
+    def safe_delete_current_directory(directory):
+      """Delete only the files or symlinks under the current directory."""
+      try:
+        for name in os.listdir(directory):
+          path = os.path.join(directory, name)
+          if os.path.islink(path) or os.path.isfile(path):
+            safe_delete(path)
+      except OSError as e:
+        if e.errno != errno.ENOENT:
+          raise
+
     canonical_classpath = []
     for target in targets:
       folder_for_target_symlinks = _stable_output_folder(basedir, target)
+      safe_delete_current_directory(folder_for_target_symlinks)
 
       classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
         [target])
@@ -186,7 +199,6 @@ class ClasspathUtil(object):
           # increasing `index` to avoid name collisions.
           file_name = os.path.basename(entry.path)
           symlink_path = os.path.join(folder_for_target_symlinks, '{}-{}'.format(index, file_name))
-          safe_delete(symlink_path)
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
 
