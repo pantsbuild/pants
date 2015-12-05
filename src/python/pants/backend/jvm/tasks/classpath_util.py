@@ -150,7 +150,8 @@ class ClasspathUtil(object):
 
   @classmethod
   def create_canonical_classpath(cls, classpath_products, targets, basedir,
-                                 save_classpath_file=False):
+                                 save_classpath_file=False,
+                                 use_target_id=True):
     """Create a stable classpath of symlinks with standardized names.
 
     :param classpath_products: Classpath products.
@@ -163,6 +164,9 @@ class ClasspathUtil(object):
     :rtype: list of strings
     """
     def _stable_output_folder(basedir, target):
+      if use_target_id:
+        return target.id
+
       address = target.address
       return os.path.join(
         basedir,

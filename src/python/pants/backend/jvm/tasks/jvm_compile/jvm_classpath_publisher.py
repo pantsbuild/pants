@@ -28,4 +28,5 @@ class RuntimeClasspathPublisher(Task):
     ClasspathUtil.create_canonical_classpath(runtime_classpath,
                                              self.context.targets(),
                                              basedir,
-                                             save_classpath_file=True)
+                                             save_classpath_file=True,
+                                             use_target_id=False)
