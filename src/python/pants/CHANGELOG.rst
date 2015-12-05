@@ -1,6 +1,71 @@
 RELEASE HISTORY
 ===============
 
+0.0.63 (12/04/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release contains a few deprecations and refactorings to help prepare for 1.0.0. It
+also includes the first release of the new Haskell module contributed by Gabriel Gonzalez.
+Thanks Gabriel!
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate calling with_description() when registering a task.
+  `RB #3207 <https://rbcommons.com/s/twitter/r/3207>`_
+
+* Create a core_tasks top-level dir.
+  `RB #3197 <https://rbcommons.com/s/twitter/r/3197>`_
+
+* Move more tasks to core_tasks.
+  `RB #3199 <https://rbcommons.com/s/twitter/r/3199>`_
+
+* Move remaining core tasks to core_tasks.
+  `RB #3204 <https://rbcommons.com/s/twitter/r/3204>`_
+
+* Upgrade PEX to 1.1.1
+  `RB #3200 <https://rbcommons.com/s/twitter/r/3200>`_
+
+* Properly deprecate the Dependencies alias.
+  `RB #3196 <https://rbcommons.com/s/twitter/r/3196>`_
+
+* Move the rwbuf code under util/.
+  `RB #3193 <https://rbcommons.com/s/twitter/r/3193>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix cache_setup.py so build doesn't fail if configured cache is empty.
+  `RB #3142 <https://rbcommons.com/s/twitter/r/3142>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add Haskell plugin to `contrib/release_packages.sh`; now included in the release!
+  `RB #3198 <https://rbcommons.com/s/twitter/r/3198>`_
+
+* Refine cache stats: distinguish legit misses from miss errors
+  `RB #3190 <https://rbcommons.com/s/twitter/r/3190>`_
+
+* [pantsd] Initial implementation of the pants nailgun service.
+  `RB #3171 <https://rbcommons.com/s/twitter/r/3171>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove references to jmake
+  `RB #3210 <https://rbcommons.com/s/twitter/r/3210>`_
+
+* Deprecate exception.message usages
+  `RB #3201 <https://rbcommons.com/s/twitter/r/3201>`_
+
+* Make monolithic jars produced by bundle/binary slimmer
+  `RB #3133 <https://rbcommons.com/s/twitter/r/3133>`_
+
+
 0.0.62 (11/30/2015)
 -------------------
 
