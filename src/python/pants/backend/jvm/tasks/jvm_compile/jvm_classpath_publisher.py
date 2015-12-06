@@ -33,8 +33,9 @@ class RuntimeClasspathPublisher(Task):
   def execute(self):
     basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
     runtime_classpath = self.context.products.get_data('runtime_classpath')
+    use_target_id = not self.get_options().use_old_naming_style
     ClasspathUtil.create_canonical_classpath(runtime_classpath,
                                              self.context.targets(),
                                              basedir,
                                              save_classpath_file=True,
-                                             use_target_id=not self.get_options().use_old_naming_style)
+                                             use_target_id=use_target_id)
