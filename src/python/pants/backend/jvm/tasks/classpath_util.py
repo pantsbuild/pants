@@ -165,7 +165,7 @@ class ClasspathUtil(object):
     """
     def _stable_output_folder(basedir, target):
       if use_target_id:
-        return target.id
+        return os.path.join(basedir, target.id)
 
       address = target.address
       return os.path.join(

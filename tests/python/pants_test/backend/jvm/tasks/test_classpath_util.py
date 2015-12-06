@@ -89,14 +89,15 @@ class ClasspathUtilTest(BaseTest):
 
     self._test_canonical_classpath_helper(classpath_products, [a],
                                           [
-                                            'a/b/b/0-a.jar',
-                                            'a/b/b/1-resources'
+                                            'a.b.b/0-a.jar',
+                                            'a.b.b/1-resources'
                                           ],
                                           {
-                                            'a/b/b/classpath.txt':
+                                            'a.b.b/classpath.txt':
                                               '{}/a.jar:{}/resources\n'.format(self.pants_workdir,
                                                                                self.pants_workdir)
-                                           })
+                                           },
+                                          True)
 
   def test_create_canonical_classpath_with_common_prefix(self):
     """
@@ -106,7 +107,7 @@ class ClasspathUtilTest(BaseTest):
     This is such a regression test case added for a bug discovered in
     https://github.com/pantsbuild/pants/pull/2664
 
-    TODO(peiyu) Remove once we switch to use `target.id`.
+    TODO(peiyu) Remove once we fully migrate to use `target.id`.
     """
     # a and c' canonical classpath share a common prefix: a/b/b
     a = self.make_target('a/b', JvmTarget)
@@ -128,11 +129,13 @@ class ClasspathUtilTest(BaseTest):
                                               '{}/a.jar\n'.format(self.pants_workdir),
                                             'a/b/b/c/c/classpath.txt':
                                               '{}/c.jar\n'.format(self.pants_workdir),
-                                          })
+                                          },
+                                          False)
 
   def _test_canonical_classpath_helper(self, classpath_products, targets,
                                        expected_canonical_classpath,
-                                       expected_classspath_files):
+                                       expected_classspath_files,
+                                       use_target_id):
     """
     Helper method to call `create_canonical_classpath` and verify generated canonical classpath.
 
@@ -145,7 +148,8 @@ class ClasspathUtilTest(BaseTest):
       canonical_classpath = ClasspathUtil.create_canonical_classpath(classpath_products,
                                                                      targets,
                                                                      base_dir,
-                                                                     save_classpath_file=True)
+                                                                     save_classpath_file=True,
+                                                                     use_target_id=use_target_id)
       # check canonical path returned
       self.assertEquals(expected_canonical_classpath,
                         relativize_paths(canonical_classpath, base_dir))
