@@ -37,4 +37,4 @@ class RuntimeClasspathPublisher(Task):
                                              self.context.targets(),
                                              basedir,
                                              save_classpath_file=True,
-                                             use_target_id=not self.get_options().use_old_name_style)
+                                             use_target_id=not self.get_options().use_old_naming_style)
