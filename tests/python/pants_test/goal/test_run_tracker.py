@@ -10,6 +10,8 @@ import json
 import threading
 import urlparse
 
+from mock import mock_open, patch
+
 from pants.goal.run_tracker import RunTracker
 from pants_test.base_test import BaseTest
 
@@ -45,3 +47,15 @@ class RunTrackerTest(BaseTest):
 
     server.shutdown()
     server.server_close()
+
+  def test_write_stats_to_json_file(self):
+    # Set up
+    stats = {'stats': {'foo': 'bar', 'baz': 42}}
+    m = mock_open()
+
+    # Execute
+    with patch('__builtin__.open', m, create=True):
+      self.assertTrue(RunTracker.write_stats_to_json('foo', stats))
+
+    m.assert_called_once_with('foo', 'w')
+    m().write.assert_called_once_with('{"stats": {"foo": "bar", "baz": 42}}')
