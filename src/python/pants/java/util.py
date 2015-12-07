@@ -23,7 +23,8 @@ logger = logging.getLogger(__name__)
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                  workunit_factory=None, workunit_name=None, workunit_labels=None,
                  cwd=None, workunit_log_config=None, distribution=None,
-                 create_synthetic_jar=True, synthetic_jar_dir=None):
+                 create_synthetic_jar=True, synthetic_jar_dir=None,
+                 wait=True):
   """Executes the java program defined by the classpath and main.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -43,8 +44,12 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     classpath in its manifest.
   :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
     a temporary directory will be provided and cleaned up upon process exit.
+  :param boolean wait: If true, waits for the return of the java program. If not just returns
 
-  Returns the exit code of the java program.
+  Returns the exit code of the java program if it waited for the return,
+  otherwise it returns a tuple of the process handle, and a callback to be called
+  with the return code when the process is done
+
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
   """
   executor = executor or SubprocessExecutor(distribution)
@@ -65,11 +70,12 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                         workunit_name=workunit_name,
                         workunit_labels=workunit_labels,
                         cwd=cwd,
-                        workunit_log_config=workunit_log_config)
+                        workunit_log_config=workunit_log_config,
+                        wait=wait)
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
-                   cwd=None, workunit_log_config=None):
+                   cwd=None, workunit_log_config=None, wait=True):
   """Executes the given java runner.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -89,7 +95,10 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
                      'given {} of type {}'.format(runner, type(runner)))
 
   if workunit_factory is None:
-    return runner.run()
+    if wait:
+      return runner.run()
+    else:
+      return runner.spawn(), lambda x: None
   else:
     workunit_labels = [
         WorkUnitLabel.TOOL,
@@ -98,9 +107,14 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
 
     with workunit_factory(name=workunit_name, labels=workunit_labels,
                           cmd=runner.cmd, log_config=workunit_log_config) as workunit:
-      ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
-      workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
-      return ret
+      if wait:
+        ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
+        workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
+        return ret
+      else:
+        process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
+        exit_handler = lambda ret: workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
+        return process, exit_handler
 
 
 def relativize_classpath(classpath, root_dir, followlinks=True):

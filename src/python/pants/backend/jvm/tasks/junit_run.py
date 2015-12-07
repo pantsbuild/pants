@@ -199,16 +199,20 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   def _spawn(self, executor=None, distribution=None, *args, **kwargs):
     actual_executor = executor or SubprocessExecutor(distribution)
+    (process, exit_handler) = distribution.execute_java(*args, executor=actual_executor, wait=False,
+                                                        **kwargs)
 
     class ProcessHandler(object):
       def wait(_):
-        return distribution.execute_java(*args, executor=actual_executor, **kwargs)
+        ret = process.wait()
+        exit_handler(ret)
+        return ret
 
       def kill(_):
-        return actual_executor.kill()
+        return process.kill()
 
       def terminate(_):
-        return actual_executor.terminate()
+        return process.terminate()
 
     return ProcessHandler()
 

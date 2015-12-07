@@ -70,6 +70,15 @@ class Executor(AbstractClass):
       """
 
     @abstractmethod
+    def spawn(self, stdout=None, stderr=None, cwd=None):
+      """Spawns the configured java command.
+
+      :param stdout: An optional stream to pump stdout to; defaults to `sys.stdout`.
+      :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
+      :param string cwd: optionally set the working directory
+      """
+
+    @abstractmethod
     def kill(self):
       """Terminates the java command."""
       raise NotImplementedError
@@ -147,14 +156,14 @@ class CommandLineGrabber(Executor):
       def run(_, stdout=None, stderr=None, cwd=None):
         return 0
 
+      def spawn(_, stdout=None, stderr=None, cwd=None):
+        return None
+
     return Runner()
 
   @property
   def cmd(self):
     return self._command
-
-  def kill(self):
-    pass
 
 
 class SubprocessExecutor(Executor):
@@ -205,8 +214,11 @@ class SubprocessExecutor(Executor):
       def command(_):
         return list(command)
 
+      def spawn(_, stdout=None, stderr=None, cwd=None):
+        return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd)
+
       def run(_, stdout=None, stderr=None, cwd=None):
-        return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()
+        return self.spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()
 
     return Runner()
 
@@ -218,21 +230,12 @@ class SubprocessExecutor(Executor):
     cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
     return self._spawn(cmd, cwd, **subprocess_args)
 
-  def kill(self):
-    if self._process is not None:
-      self._process.kill()
-
-  def terminate(self):
-    if self._process is not None:
-      self._process.terminate()
-
   def _spawn(self, cmd, cwd=None, **subprocess_args):
     with self._maybe_scrubbed_env():
       cwd = cwd or self._buildroot
       logger.debug('Executing: {cmd} args={args} at cwd={cwd}'
                    .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
       try:
-        self._process = subprocess.Popen(cmd, cwd=cwd, **subprocess_args)
-        return self._process
+        return subprocess.Popen(cmd, cwd=cwd, **subprocess_args)
       except OSError as e:
         raise self.Error('Problem executing {0}: {1}'.format(self._distribution.java, e))
