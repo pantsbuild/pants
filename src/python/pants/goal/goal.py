@@ -124,6 +124,7 @@ class _Goal(object):
                                       options_scope.replace('.', '_').replace('-', '_'))
     task_type = type(subclass_name, (superclass,), {
       '__doc__': superclass.__doc__,
+      '__module__': superclass.__module__,
       'options_scope': options_scope
     })
 
