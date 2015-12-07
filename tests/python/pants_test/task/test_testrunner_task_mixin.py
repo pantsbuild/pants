@@ -105,6 +105,14 @@ class TestRunnerTaskMixinTest(TaskTestBase):
     task = self.create_task(self.context())
     self.assertEquals(task._timeout_for_targets([targetC]), 1)
 
+  def test_default_maximum_conflict(self):
+    """If the default exceeds the maximum, throw an error."""
+
+    self.set_options(timeouts=True, timeout_maximum=1, timeout_default=10)
+    task = self.create_task(self.context())
+    with self.assertRaises(TestFailedTaskError):
+      task.execute()
+
 
 class TestRunnerTaskMixinTimeoutTest(TaskTestBase):
   @classmethod

@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import textwrap
+from abc import abstractmethod
 
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout, TimeoutReached
@@ -37,6 +38,17 @@ class TestRunnerTaskMixin(object):
 
   def execute(self):
     """Run the task."""
+
+    # Ensure that the timeout-maximum is higher than the timeout default
+    if self.get_options().timeout_maximum is not None \
+      and self.get_options().timeout_default is not None \
+        and self.get_options().timeout_maximum < self.get_options().timeout_default:
+      message = "Error: timeout-default: {} exceeds timeout-maximum: {}".format(
+        self.get_options().timeout_maximum,
+        self.get_options().timeout_default
+      )
+      self.context.log.error(message)
+      raise TestFailedTaskError(message)
 
     if not self.get_options().skip:
       test_targets = self._get_test_targets()
