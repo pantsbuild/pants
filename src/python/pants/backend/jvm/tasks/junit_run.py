@@ -216,9 +216,15 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
     return ProcessHandler()
 
-  def execute_java_for_targets(self, targets, executor=None, *args, **kwargs):
+  def execute_java_for_targets(self, targets, *args, **kwargs):
     distribution = self.preferred_jvm_distribution_for_targets(targets)
-    return self._spawn_and_wait(targets, executor=executor, distribution=distribution, *args, **kwargs)
+    executor = kwargs.get('executor') or SubprocessExecutor(distribution)
+    return self._spawn_and_wait(*args, executor=executor, distribution=distribution, **kwargs)
+
+  def execute_java_for_coverage(self, targets, executor=None, *args, **kwargs):
+    distribution = self.preferred_jvm_distribution_for_targets(targets)
+    actual_executor = executor or SubprocessExecutor(distribution)
+    return distribution.execute_java(*args, executor=actual_executor, **kwargs)
 
   def _collect_test_targets(self, targets):
     """Returns a mapping from test names to target objects for all tests that
@@ -489,12 +495,12 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     self.context.release_lock()
     if self._coverage:
       self._coverage.instrument(
-        targets, tests_and_targets.keys(), compute_complete_classpath, self.execute_java_for_targets)
+        targets, tests_and_targets.keys(), compute_complete_classpath, self.execute_java_for_coverage)
 
     def _do_report(exception=None):
       if self._coverage:
         self._coverage.report(
-          targets, tests_and_targets.keys(), self.execute_java_for_targets, tests_failed_exception=exception)
+          targets, tests_and_targets.keys(), self.execute_java_for_coverage, tests_failed_exception=exception)
 
     try:
       self._run_tests(tests_and_targets)

@@ -218,7 +218,7 @@ class SubprocessExecutor(Executor):
         return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd)
 
       def run(_, stdout=None, stderr=None, cwd=None):
-        return self.spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()
+        return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()
 
     return Runner()
 
