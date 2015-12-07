@@ -30,6 +30,7 @@ python_tests(
     'src/python/pants/backend/project_info/tasks:dependencies',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -80,6 +81,7 @@ python_tests(
     'src/python/pants/backend/project_info/tasks:export',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
   ]

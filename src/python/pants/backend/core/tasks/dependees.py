@@ -13,7 +13,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
-  """Outputs all targets whose dependencies include at least one of the input targets."""
+  """List all targets that depend on any of the input targets."""
 
   @classmethod
   def register_options(cls, register):

@@ -14,7 +14,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class Dependencies(ConsoleTask):
-  """Generates a textual list (using the target format) for the dependency set of a target."""
+  """Print the target's dependencies."""
 
   @staticmethod
   def _is_jvm(target):

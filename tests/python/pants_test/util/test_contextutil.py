@@ -11,7 +11,7 @@ import subprocess
 import sys
 import unittest
 
-from pants.util.contextutil import (Timer, environment_as, open_zip, pushd, temporary_dir,
+from pants.util.contextutil import (Timer, environment_as, open_zip, pushd, stdio_as, temporary_dir,
                                     temporary_file)
 
 
@@ -152,3 +152,26 @@ class ContextutilTest(unittest.TestCase):
     with temporary_dir() as tempdir:
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=False) as zf:
         self.assertFalse(zf._allowZip64)
+
+  def test_stdio_as(self):
+    old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
+
+    with stdio_as(stdout=1, stderr=2, stdin=3):
+      self.assertEquals(sys.stdout, 1)
+      self.assertEquals(sys.stderr, 2)
+      self.assertEquals(sys.stdin, 3)
+
+    self.assertEquals(sys.stdout, old_stdout)
+    self.assertEquals(sys.stderr, old_stderr)
+    self.assertEquals(sys.stdin, old_stdin)
+
+  def test_stdio_as_stdin_default(self):
+    old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
+
+    with stdio_as(stdout=1, stderr=2):
+      self.assertEquals(sys.stdout, 1)
+      self.assertEquals(sys.stderr, 2)
+      self.assertEquals(sys.stdin, old_stdin)
+
+    self.assertEquals(sys.stdout, old_stdout)
+    self.assertEquals(sys.stderr, old_stderr)

@@ -209,7 +209,8 @@ Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up compiles.
 JVM daemon that runs in the background. This means you don't need to start up a JVM and load
 classes for each JVM-based operation. Things go faster.
 
-Pants uses Jmake, a dependency tracking compiler facade.
+Pants uses Zinc, a dependency tracking compiler facade that supports sub-target incremental
+compilation for Java and Scala.
 
 Java7 vs Java6, Which Java
 --------------------------

@@ -285,12 +285,15 @@ class HtmlReporter(Reporter):
 
       msg_elements = []
       for cache_name, stat in artifact_cache_stats.stats_per_cache.items():
+        # TODO consider display causes for hit/miss targets
+        hit_targets = [tgt for tgt, cause in stat.hit_targets]
+        miss_targets = [tgt for tgt, cause in stat.miss_targets]
         msg_elements.extend([
           cache_name + ' artifact cache: ',
           # Explicitly set the detail ids, so their displayed/hidden state survives a refresh.
-          fix_detail_id(items_to_report_element(stat.hit_targets, 'hit'), 'cache-hit-details'),
+          fix_detail_id(items_to_report_element(hit_targets, 'hit'), 'cache-hit-details'),
           ', ',
-          fix_detail_id(items_to_report_element(stat.miss_targets, 'miss'), 'cache-miss-details'),
+          fix_detail_id(items_to_report_element(miss_targets, 'miss'), 'cache-miss-details'),
           '.'
         ])
       if not msg_elements:

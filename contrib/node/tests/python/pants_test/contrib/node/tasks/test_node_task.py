@@ -16,7 +16,7 @@ from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
-from pants.contrib.node.targets.npm_test import NpmTest
+from pants.contrib.node.targets.node_test import NodeTest
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
 
@@ -32,20 +32,20 @@ class NodeTaskTest(TaskTestBase):
   def task_type(cls):
     return cls.TestNodeTask
 
-  def test_is_npm_package(self):
+  def test_is_node_package(self):
     expected = {
       NodeRemoteModule: True,
       NodeModule: True,
-      NpmTest: False,
+      NodeTest: False,
       Target: False,
     }
-    self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_npm_package))
+    self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_node_package))
 
   def test_is_node_module(self):
     expected = {
       NodeRemoteModule: False,
       NodeModule: True,
-      NpmTest: False,
+      NodeTest: False,
       Target: False,
     }
     self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_node_module))
@@ -54,19 +54,19 @@ class NodeTaskTest(TaskTestBase):
     expected = {
       NodeRemoteModule: True,
       NodeModule: False,
-      NpmTest: False,
+      NodeTest: False,
       Target: False,
     }
     self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_node_remote_module))
 
-  def test_is_npm_test(self):
+  def test_is_node_test(self):
     expected = {
       NodeRemoteModule: False,
       NodeModule: False,
-      NpmTest: True,
+      NodeTest: True,
       Target: False,
     }
-    self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_npm_test))
+    self.assertEqual(expected, self._type_check(expected.keys(), NodeTask.is_node_test))
 
   def _type_check(self, types, type_check_function):
     # Make sure the diff display length is long enough for the test_is_* tests.
@@ -81,22 +81,6 @@ class NodeTaskTest(TaskTestBase):
                           for (type, target_name) in types_with_target_names]
 
     return dict(type_check_results)
-
-  def test_render_npm_package_dependency(self):
-    node_module_target = self.make_target(':a', NodeModule)
-    node_remote_module_target = self.make_target(':b', NodeRemoteModule, version='1.2.3')
-
-    node_paths = NodePaths()
-    node_paths.resolved(node_module_target, '/path/to/node_module_target')
-    node_paths.resolved(node_remote_module_target, '/path/to/node_remote_module_target')
-
-    self.assertEqual(
-      '/path/to/node_module_target',
-      NodeTask.render_npm_package_dependency(node_paths, node_module_target))
-
-    self.assertEqual(
-      '1.2.3',
-      NodeTask.render_npm_package_dependency(node_paths, node_remote_module_target))
 
   def test_execute_node(self):
     task = self.create_task(self.context())

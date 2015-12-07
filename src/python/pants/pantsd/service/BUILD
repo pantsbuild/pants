@@ -18,3 +18,12 @@ python_library(
     'src/python/pants/pantsd/subsystem:watchman_launcher'
   ]
 )
+
+python_library(
+  name = 'pailgun_service',
+  sources = ['pailgun_service.py'],
+  dependencies = [
+    ':pants_service',
+    'src/python/pants/pantsd:pailgun_server'
+  ]
+)

@@ -236,7 +236,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jar_task',
     ':properties',
-    'src/python/pants/backend/core/tasks:scm_publish',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ivy_utils',
@@ -249,6 +248,7 @@ python_library(
     'src/python/pants/ivy',
     'src/python/pants/option',
     'src/python/pants/scm',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
@@ -385,6 +385,7 @@ python_library(
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
     'src/python/pants/util:fileutil',
   ]
 )

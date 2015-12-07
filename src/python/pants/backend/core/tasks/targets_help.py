@@ -16,7 +16,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class TargetsHelp(ConsoleTask):
-  """Show online help for symbols usable in BUILD files (java_library, etc)."""
+  """List symbols usable in BUILD files."""
 
   @classmethod
   def register_options(cls, register):

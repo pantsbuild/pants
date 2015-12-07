@@ -8,10 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-import pytest
 from mock import Mock
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact
@@ -20,6 +18,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_publish import JarPublish
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants.scm.scm import Scm
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_walk
@@ -48,7 +47,7 @@ class JarPublishTest(TaskTestBase):
       targets={
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
-        'target': Dependencies,
+        'target': Target,
       },
       objects={
         'artifact': Artifact,

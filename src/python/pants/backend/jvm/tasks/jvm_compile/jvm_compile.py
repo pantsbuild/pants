@@ -11,7 +11,6 @@ import itertools
 import os
 from collections import defaultdict
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.java import Java
@@ -548,7 +547,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     def resolve(t):
       for declared in t.dependencies:
-        if isinstance(declared, Dependencies) or type(declared) == Target:
+        if type(declared) == Target:
           for r in resolve(declared):
             yield r
         elif isinstance(declared, self.compiler_plugin_types):
@@ -618,7 +617,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
       """
       if not self.artifact_cache_reads_enabled():
         return False
-      cached_vts, uncached_vts = self.check_artifact_cache([vts])
+      cached_vts, _, _ = self.check_artifact_cache([vts])
       if not cached_vts:
         self.context.log.debug('Missed cache during double check for {}'
                                .format(vts.target.address.spec))

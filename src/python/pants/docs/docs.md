@@ -17,16 +17,15 @@ When a user views a goal's options by entering `./pants compile -h` or browsing 
 <a pantsref="oref_goal_compile">Pants Options Reference</a>, they see text that "lives" in the
 Pants source code. If you [develop a `Task`](dev_tasks.html), document it:
 
-**Goal description:** When registering a `Task` with a goal, call
-`with_description('yadda yadda')` to set the goal's description to "yadda yadda". More than one
-Task can register with a goal; thus another description might "clobber" the one you provide (and
-if you provide one, it might clobber another).
+**Goal description:** If a goal will have multiple tasks in it, register its description
+using `Goal.register(name, description`.
 
-!inc[start-at=with_description&end-at=with_description](../backend/core/register.py)
+In the common case where a goal will contain only a single task with the same name as the goal,
+the goal will default to using the first sentence of the task's docstring as its description.
 
 **Option help** When registering a `Task` option, pass a `help` parameter to describe that option.
 
-!inc[start-at=register_options&end-at=help=](../backend/core/tasks/list_goals.py)
+!inc[start-at=register_options&end-at=help=](../core_tasks/list_goals.py)
 
 ### Targets and other `BUILD` File Things
 

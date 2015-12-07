@@ -79,17 +79,17 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
         rmtree(path)
 
     with self._handle_bundles(names) as (paths, jars):
-      pants_run = self.run_pants(['bundle'] + args, config=config)
-      self.assert_success(pants_run)
-      for path, jar, expected in zip(paths, jars, outputs):
-        java_run = subprocess.Popen(['java', '-jar', jar],
-                                    stdout=subprocess.PIPE,
-                                    cwd=path)
-        java_retcode = java_run.wait()
-        java_out = java_run.stdout.read()
-        self.assertEquals(java_retcode, 0)
-        self.assertTrue(expected in java_out, "Expected '{output}' from {jar}, not '{stdout}'."
-                                              .format(output=expected, jar=jar, stdout=java_out))
+      with self.pants_results(['bundle'] + args, config=config) as pants_run:
+        self.assert_success(pants_run)
+        for path, jar, expected in zip(paths, jars, outputs):
+          java_run = subprocess.Popen(['java', '-jar', jar],
+                                      stdout=subprocess.PIPE,
+                                      cwd=path)
+          java_retcode = java_run.wait()
+          java_out = java_run.stdout.read()
+          self.assertEquals(java_retcode, 0)
+          self.assertTrue(expected in java_out, "Expected '{output}' from {jar}, not '{stdout}'."
+                                                .format(output=expected, jar=jar, stdout=java_out))
 
     lingering = [path for path in all_paths if os.path.exists(path)]
     self.assertTrue(not lingering, "Left with unexpected bundles! {bundles}"

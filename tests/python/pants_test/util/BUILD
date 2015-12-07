@@ -20,6 +20,7 @@ target(
 python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],
+  coverage = ['pants.util.contextutil'],
   dependencies = [
     'src/python/pants/util:contextutil',
   ]

@@ -1,6 +1,151 @@
 RELEASE HISTORY
 ===============
 
+0.0.63 (12/04/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release contains a few deprecations and refactorings to help prepare for 1.0.0. It
+also includes the first release of the new Haskell module contributed by Gabriel Gonzalez.
+Thanks Gabriel!
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate calling with_description() when registering a task.
+  `RB #3207 <https://rbcommons.com/s/twitter/r/3207>`_
+
+* Create a core_tasks top-level dir.
+  `RB #3197 <https://rbcommons.com/s/twitter/r/3197>`_
+
+* Move more tasks to core_tasks.
+  `RB #3199 <https://rbcommons.com/s/twitter/r/3199>`_
+
+* Move remaining core tasks to core_tasks.
+  `RB #3204 <https://rbcommons.com/s/twitter/r/3204>`_
+
+* Upgrade PEX to 1.1.1
+  `RB #3200 <https://rbcommons.com/s/twitter/r/3200>`_
+
+* Properly deprecate the Dependencies alias.
+  `RB #3196 <https://rbcommons.com/s/twitter/r/3196>`_
+
+* Move the rwbuf code under util/.
+  `RB #3193 <https://rbcommons.com/s/twitter/r/3193>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix cache_setup.py so build doesn't fail if configured cache is empty.
+  `RB #3142 <https://rbcommons.com/s/twitter/r/3142>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add Haskell plugin to `contrib/release_packages.sh`; now included in the release!
+  `RB #3198 <https://rbcommons.com/s/twitter/r/3198>`_
+
+* Refine cache stats: distinguish legit misses from miss errors
+  `RB #3190 <https://rbcommons.com/s/twitter/r/3190>`_
+
+* [pantsd] Initial implementation of the pants nailgun service.
+  `RB #3171 <https://rbcommons.com/s/twitter/r/3171>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove references to jmake
+  `RB #3210 <https://rbcommons.com/s/twitter/r/3210>`_
+
+* Deprecate exception.message usages
+  `RB #3201 <https://rbcommons.com/s/twitter/r/3201>`_
+
+* Make monolithic jars produced by bundle/binary slimmer
+  `RB #3133 <https://rbcommons.com/s/twitter/r/3133>`_
+
+
+0.0.62 (11/30/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release is primarily small bug fixes and minor improvements.
+
+The following modules have been moved, with their old locations now deprecated:
+
+* `MutexTaskMixin` and `ReplTaskMixin` from `pants.backend.core` -> `pants.task`
+
+API Changes
+~~~~~~~~~~~
+
+* Move the test runner task mixin out of backend/core.
+  `RB #3181 <https://rbcommons.com/s/twitter/r/3181>`_
+
+* Move two generic task mixins out of backend/core.
+  `RB #3176 <https://rbcommons.com/s/twitter/r/3176>`_
+
+Bugfixes
+~~~~~~~~
+
+* Jvm compile counter should increment for double check cache hits
+  `RB #3188 <https://rbcommons.com/s/twitter/r/3188>`_
+
+* Exit with non-zero status when help fails
+  `RB #3184 <https://rbcommons.com/s/twitter/r/3184>`_
+
+* When a pytest errors rather than failures, make that target also show up in TestTaskFailedError
+  `Issue #2623 <https://github.com/pantsbuild/pants/issues/2623>`_
+  `RB #3175 <https://rbcommons.com/s/twitter/r/3175>`_
+
+* Add the -no-header argument to jaxb generator to give deterministic output
+  `RB #3179 <https://rbcommons.com/s/twitter/r/3179>`_
+
+* Fix bug that recognized "C" as a remote package.
+  `RB #3170 <https://rbcommons.com/s/twitter/r/3170>`_
+
+* Fix jvm_compile product publishing for cached builds
+  `RB #3161 <https://rbcommons.com/s/twitter/r/3161>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Minimal Haskell plugin for `pants`
+  `RB #2975 <https://rbcommons.com/s/twitter/r/2975>`_
+
+* Option to specify stdout from tests to ALL, NONE or FAILURE_ONLY: python part
+  `RB #3165 <https://rbcommons.com/s/twitter/r/3165>`_
+  `RB #3145 <https://rbcommons.com/s/twitter/r/3145>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update the dependencies returned from ivy to be in a stable (sorted) order.
+  `RB #3168 <https://rbcommons.com/s/twitter/r/3168>`_
+
+* Refactor detect_duplicates with some user friendly features
+  `RB #3178 <https://rbcommons.com/s/twitter/r/3178>`_
+
+* Updating some documentation for pants.ini Update some settings in pants.ini which used `=` instead of `:`
+  `RB #3189 <https://rbcommons.com/s/twitter/r/3189>`_
+
+* Add the compile.zinc options to the options reference
+  `RB #3186 <https://rbcommons.com/s/twitter/r/3186>`_
+
+* include_dependees no longer an optional argument.
+  `RB #1997 <https://rbcommons.com/s/twitter/r/1997>`_
+
+* Relocate task tests from tests/python/pants_test/task/ to the appropriate backend
+  `RB #3183 <https://rbcommons.com/s/twitter/r/3183>`_
+
+* Move tests corresponding to pants/task code.
+  `RB #3182 <https://rbcommons.com/s/twitter/r/3182>`_
+
+* Add error message when a JDK is not installed, add minimum requirements to documentation.
+  `RB #3136 <https://rbcommons.com/s/twitter/r/3136>`_
+
 0.0.61 (11/23/2015)
 -------------------
 

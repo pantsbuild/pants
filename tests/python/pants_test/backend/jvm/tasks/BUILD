@@ -399,7 +399,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
-    'src/python/pants/util:contextutil',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
