@@ -72,14 +72,14 @@ class TestRunnerTaskMixin(object):
                  This usage is deprecated and will change to actually set the timeout to 0.
                  (In which case your test will fail due to time out.) To use the default
                  timeout remove the timeout parameter from your test target.
-      """.format(target=target)))
+      """.format(target=target.address.spec)))
 
     timeout_maximum = self.get_options().timeout_maximum
     if timeout is not None and timeout_maximum is not None:
       if timeout > timeout_maximum:
         self.context.log.warn(textwrap.dedent(
           "Warning: Timeout for {target} ({timeout}s) exceeds {timeout_maximum}s. Capping.".format(
-            target=target,
+            target=target.address.spec,
             timeout=timeout,
             timeout_maximum=timeout_maximum)))
         return timeout_maximum

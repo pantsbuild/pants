@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import collections
+
 from mock import patch
 
 from pants.base.exceptions import TestFailedTaskError
@@ -18,6 +20,7 @@ class DummyTestTarget(object):
   def __init__(self, name, timeout=None):
     self.name = name
     self.timeout = timeout
+    self.address = collections.namedtuple('address', ['spec'])(name)
 
 targetA = DummyTestTarget('TargetA')
 targetB = DummyTestTarget('TargetB', timeout=1)
