@@ -21,6 +21,7 @@ class DummyTestTarget(object):
 
 targetA = DummyTestTarget('TargetA')
 targetB = DummyTestTarget('TargetB', timeout=1)
+targetC = DummyTestTarget('TargetC', timeout=10)
 
 
 class TestRunnerTaskMixinTest(TaskTestBase):
@@ -96,6 +97,13 @@ class TestRunnerTaskMixinTest(TaskTestBase):
     task = self.create_task(self.context())
 
     self.assertEquals(task._timeout_for_targets([targetA, targetB]), 3)
+
+  def test_get_timeouts_w_maximum(self):
+    """If a timeout exceeds the maximum, set it to that."""
+
+    self.set_options(timeouts=True, timeout_maximum=1)
+    task = self.create_task(self.context())
+    self.assertEquals(task._timeout_for_targets([targetC]), 1)
 
 
 class TestRunnerTaskMixinTimeoutTest(TaskTestBase):

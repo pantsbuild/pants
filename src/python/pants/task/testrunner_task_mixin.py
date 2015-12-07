@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from abc import abstractmethod
+import textwrap
 
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout, TimeoutReached
@@ -30,8 +30,10 @@ class TestRunnerTaskMixin(object):
              'all tests are run with the total timeout covering the entire run of tests. If a single target '
              'in a test run has no timeout and there is no default, the entire run will have no timeout. This '
              'should change in the future to provide more granularity.')
-    register('--timeout-default', action='store', default=0, type=int,
+    register('--timeout-default', action='store', type=int, advanced=True,
              help='The default timeout (in seconds) for a test if timeout is not set on the target.')
+    register('--timeout-maximum', action='store', type=int, advanced=True,
+             help='The maximum timeout (in seconds) for a test target that can be set')
 
   def execute(self):
     """Run the task."""
@@ -51,7 +53,26 @@ class TestRunnerTaskMixin(object):
         raise TestFailedTaskError(str(e), failed_targets=test_targets)
 
   def _timeout_for_target(self, target):
-    return getattr(target, 'timeout', None)
+    timeout = getattr(target, 'timeout', None)
+    if timeout == 0:
+      self.context.log.warn(textwrap.dedent("""
+        Warning: Timeout for {target} is 0. This currently sets the timeout to the default.
+                 This usage is deprecated and will change to actually set the timeout to 0.
+                 (In which case your test will fail due to time out.) To use the default
+                 timeout remove the timeout parameter from your test target.
+      """.format(target=target)))
+
+    timeout_maximum = self.get_options().timeout_maximum
+    if timeout is not None and timeout_maximum is not None:
+      if timeout > timeout_maximum:
+        self.context.log.warn(textwrap.dedent(
+          "Warning: Timeout for {target} ({timeout}s) exceeds {timeout_maximum}s. Capping.".format(
+            target=target,
+            timeout=timeout,
+            timeout_maximum=timeout_maximum)))
+        return timeout_maximum
+
+    return timeout
 
   def _timeout_for_targets(self, targets):
     """Calculate the total timeout based on the timeout configuration for all the targets.
@@ -61,6 +82,10 @@ class TestRunnerTaskMixin(object):
     have no timeout configured (or set to 0), their timeout will be set to the default timeout.
     If there is no default timeout, or if it is set to zero, there will be no timeout, if any of the test targets
     have a timeout set to 0 or no timeout configured.
+
+    TODO(sbrenn): This behavior where timeout=0 is the same as timeout=None has turned out to be very confusing,
+    and should change so that timeout=0 actually sets the timeout to 0, and only timeout=None
+    should set the timeout to the default timeout. This will require a deprecation cycle.
 
     :param targets: list of test targets
     :return: timeout to cover all the targets, in seconds
@@ -75,11 +100,13 @@ class TestRunnerTaskMixin(object):
     timeouts = [self._timeout_for_target(target) for target in targets]
 
     # If any target's timeout is None or 0, then set it to the default timeout
+    # TODO(sbrenn): Change this so that only if the timeout is None, set it to default timeout.
     timeouts_w_default = [timeout or timeout_default for timeout in timeouts]
 
     # Even after we've done that, there may be a 0 or None in the timeout list if the
     # default timeout is set to 0 or None. So if that's the case, then the timeout is
     # disabled
+    # TODO(sbrenn): Change this so that if the timeout is 0, it is actually 0.
     if 0 in timeouts_w_default or None in timeouts_w_default:
       return None
     else:
