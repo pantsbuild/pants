@@ -68,7 +68,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       # Should cause NotMain.class to be removed
       self.run_compile(cachetest_spec, config, workdir)
 
-      root = os.path.join(workdir, 'compile', 'jvm', 'zinc')
+      root = os.path.join(workdir, 'compile', 'zinc')
       # One target.
       self.assertEqual(len(os.listdir(root)), 1)
       target_workdir_root = os.path.join(root, os.listdir(root)[0])

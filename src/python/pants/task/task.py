@@ -53,8 +53,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   """
   options_scope_category = ScopeInfo.TASK
 
-  # Tests may override this to provide a stable name despite the class name being a unique,
-  # synthetic name.
+  # We set this explicitly on the synthetic subclass, so that it shares a stable name with
+  # its superclass, which is not necessary for regular use, but can be convenient in tests.
   _stable_name = None
 
   @classmethod
