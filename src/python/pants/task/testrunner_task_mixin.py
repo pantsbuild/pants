@@ -6,8 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import textwrap
+import warnings
 from abc import abstractmethod
 
+from pants.base.deprecated import deprecated_predicate
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout, TimeoutReached
 
@@ -34,15 +36,15 @@ class TestRunnerTaskMixin(object):
     register('--timeout-default', action='store', type=int, advanced=True,
              help='The default timeout (in seconds) for a test if timeout is not set on the target.')
     register('--timeout-maximum', action='store', type=int, advanced=True,
-             help='The maximum timeout (in seconds) for a test target that can be set')
+             help='The maximum timeout (in seconds) that can be set on a test target.')
 
   def execute(self):
     """Run the task."""
 
-    # Ensure that the timeout-maximum is higher than the timeout default
-    if self.get_options().timeout_maximum is not None \
-      and self.get_options().timeout_default is not None \
-        and self.get_options().timeout_maximum < self.get_options().timeout_default:
+    # Ensure that the timeout_maximum is higher than the timeout default.
+    if (self.get_options().timeout_maximum is not None
+        and self.get_options().timeout_default is not None
+        and self.get_options().timeout_maximum < self.get_options().timeout_default):
       message = "Error: timeout-default: {} exceeds timeout-maximum: {}".format(
         self.get_options().timeout_maximum,
         self.get_options().timeout_default
@@ -66,13 +68,11 @@ class TestRunnerTaskMixin(object):
 
   def _timeout_for_target(self, target):
     timeout = getattr(target, 'timeout', None)
-    if timeout == 0:
-      self.context.log.warn(textwrap.dedent("""
-        Warning: Timeout for {target} is 0. This currently sets the timeout to the default.
-                 This usage is deprecated and will change to actually set the timeout to 0.
-                 (In which case your test will fail due to time out.) To use the default
-                 timeout remove the timeout parameter from your test target.
-      """.format(target=target.address.spec)))
+    deprecated_predicate(
+      "0.0.65",
+      lambda: timeout == 0,
+      "Timeout for {} is 0".format(target.address.spec),
+      hint_message="To use the default timeout remove the 'timeout' parameter from your test target.")
 
     timeout_maximum = self.get_options().timeout_maximum
     if timeout is not None and timeout_maximum is not None:

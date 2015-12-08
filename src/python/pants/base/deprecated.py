@@ -62,6 +62,36 @@ def check_deprecated_semver(removal_version):
                                   'version of {} - given {}'.format(VERSION, removal_version))
 
 
+def deprecated_predicate(removal_version, predicate, predicate_description, hint_message=None):
+  """Marks a certain configuration as deprecated.
+
+  The predicate is used to determine if that configuration is deprecated. It is a function that
+  will be called, if true, then the deprecation warning will issue.
+
+  :param unicode removal_version: The pantsbuild.pants version which will remove the deprecated
+                              function.
+  :param () -> bool predicate: A function that returns true if the deprecation warning should be on.
+  :param unicode predicate_description: A string describing what the predicate means.
+  :param unicode hint_message: An optional hint pointing to alternatives to the deprecation.
+  :raises DeprecationApplicationError if the @deprecation is applied improperly.
+  """
+  if removal_version is None:
+    raise MissingRemovalVersionError('A removal_version must be specified for this deprecation.')
+
+  check_deprecated_semver(removal_version)
+
+  if predicate():
+    warning_message = ('\n"{predicate_description}" is deprecated and will be removed in version '
+                       '{removal_version}').format(predicate_description=predicate_description,
+                                                   removal_version=removal_version)
+    if hint_message:
+      warning_message += (':\n' + hint_message)
+    else:
+      warning_message += '.'
+
+    warnings.warn(warning_message, DeprecationWarning, stacklevel=2)
+
+
 def deprecated(removal_version, hint_message=None):
   """Marks a function or method as deprecated.
 

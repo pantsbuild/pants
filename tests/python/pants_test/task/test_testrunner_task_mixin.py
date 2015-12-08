@@ -93,7 +93,7 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
     self.assertIsNone(task._timeout_for_targets([targetA, targetB]))
 
-  def test_get_timeouts_w_default(self):
+  def test_get_timeouts_with_default(self):
     """If there is a default timeout, use that for targets which have no timeout set."""
 
     self.set_options(timeouts=True, timeout_default=2)
@@ -101,7 +101,7 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
     self.assertEquals(task._timeout_for_targets([targetA, targetB]), 3)
 
-  def test_get_timeouts_w_maximum(self):
+  def test_get_timeouts_with_maximum(self):
     """If a timeout exceeds the maximum, set it to that."""
 
     self.set_options(timeouts=True, timeout_maximum=1)
