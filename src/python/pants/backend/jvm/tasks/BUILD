@@ -32,6 +32,7 @@ python_library(
     ':prepare_services',
     ':properties',
     ':resources_task',
+    ':run_jvm_prep_command',
     ':scala_repl',
     ':scaladoc_gen',
     ':scalastyle',
@@ -503,6 +504,20 @@ python_library(
   sources = ['resources_task.py'],
   dependencies = [
     'src/python/pants/option',
+    'src/python/pants/task',
+  ],
+)
+
+python_library(
+  name = 'run_jvm_prep_command',
+  sources = ['run_jvm_prep_command.py'],
+  dependencies = [
+    ':classpath_util',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
     'src/python/pants/task',
   ],
 )
