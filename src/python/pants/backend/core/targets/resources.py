@@ -10,7 +10,7 @@ from pants.build_graph.target import Target
 
 
 class Resources(Target):
-  """A set of files accessible as resources from the JVM classpath.
+  """JVM resource files.
 
   Looking for loose files in your application bundle? Those are
   `bundle <#bundle>`_\s.

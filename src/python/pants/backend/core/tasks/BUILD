@@ -58,7 +58,6 @@ target(
     ':repl_task_mixin',
     ':scm_publish',
     ':sorttargets',
-    ':targets_help',
     ':task',
   ]
 )
@@ -253,23 +252,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
   ]
-)
-
-python_library(
-  name = 'targets_help',
-  sources = ['targets_help.py'],
-  resource_targets = [
-    ':targets_help_resources',
-  ],
-  dependencies = [
-    ':reflect',
-    'src/python/pants/task',
-  ],
-)
-
-resources(
-  name = 'targets_help_resources',
-  sources = globs('templates/targets_help/*.mustache'),
 )
 
 python_library(

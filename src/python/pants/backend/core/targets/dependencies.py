@@ -10,11 +10,7 @@ from pants.build_graph.target import Target
 
 
 class Dependencies(Target):
-  """A set of dependencies that may be depended upon,
-  as if depending upon the set of dependencies directly.
-
-  NB: This class is commonly referred to by the alias 'target' in BUILD files.
-  """
+  """Deprecated. Use target() instead."""
 
   @deprecated('0.0.64', 'Replace dependencies(...) with target(...) in your BUILD files. '
                         'Replace uses of Dependencies with Target in your code.')

@@ -25,6 +25,8 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 class PythonTestSuite(Target):
+  """Deprecated. Use target() instead."""
+
   @deprecated('0.0.64', 'Replace python_test_suite(...) with target(...) in your BUILD files. '
                         'Replace uses of PythonTestSuite with Target in your code.')
   def __init__(self, *args, **kwargs):

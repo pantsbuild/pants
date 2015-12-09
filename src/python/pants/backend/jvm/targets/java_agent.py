@@ -12,7 +12,7 @@ from pants.base.exceptions import TargetDefinitionException
 
 
 class JavaAgent(JavaLibrary):
-  """Defines a java agent entrypoint."""
+  """A Java agent entrypoint."""
 
   def __init__(self,
                name,

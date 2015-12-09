@@ -119,7 +119,9 @@ class AbstractTarget(object):
 
 
 class Target(AbstractTarget):
-  """The baseclass for all pants targets.
+  """A generic target used to group dependencies.
+
+  The baseclass for all pants targets.
 
   Handles registration of a target amongst all parsed targets as well as location of the target
   parse context.

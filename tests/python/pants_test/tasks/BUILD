@@ -23,7 +23,6 @@ target(
     ':minimal_cover',
     ':reflect',
     ':sorttargets',
-    ':targets_help',
   ],
 )
 
@@ -140,18 +139,6 @@ python_tests(
     ':task_test_base',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/core/tasks:sorttargets',
-    'src/python/pants/build_graph',
-  ],
-)
-
-python_tests(
-  name = 'targets_help',
-  sources = ['test_targets_help.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/core/tasks:targets_help',
-    'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
   ],
 )
