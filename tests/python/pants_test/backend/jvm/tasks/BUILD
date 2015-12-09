@@ -12,6 +12,7 @@ target(
     ':check_published_deps',
     ':classpath_products',
     ':classpath_util',
+    ':coverage',
     ':detect_duplicates',
     ':ivy_imports',
     ':ivy_resolve',
@@ -172,6 +173,16 @@ python_tests(
     'src/python/pants/goal:products',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/testutils:file_test_util',
+  ]
+)
+
+python_tests(
+  name = 'coverage',
+  sources = ['coverage/test_base.py'],
+  dependencies = [
+    ':jvm_binary_task_test_base',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/tasks:coverage',
   ]
 )
 
