@@ -44,7 +44,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/task',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/testutils',
+    'tests/python/pants_test/testutils:mock_logger',
   ]
 )
 

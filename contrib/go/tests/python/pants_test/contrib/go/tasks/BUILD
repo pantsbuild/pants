@@ -112,6 +112,7 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/testutils:file_test_util',
     'tests/python/pants_test:int-test',
   ]
 )
