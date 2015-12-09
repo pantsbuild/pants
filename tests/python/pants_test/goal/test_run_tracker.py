@@ -7,10 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import BaseHTTPServer
 import json
+import os
+import random
+import string
 import threading
 import urlparse
-
-from mock import mock_open, patch
 
 from pants.goal.run_tracker import RunTracker
 from pants_test.base_test import BaseTest
@@ -51,11 +52,13 @@ class RunTrackerTest(BaseTest):
   def test_write_stats_to_json_file(self):
     # Set up
     stats = {'stats': {'foo': 'bar', 'baz': 42}}
-    m = mock_open()
+    file_name = '/tmp/{}.json'.format(''.join(random.sample(string.lowercase, 10)))
 
-    # Execute
-    with patch('__builtin__.open', m, create=True):
-      self.assertTrue(RunTracker.write_stats_to_json('foo', stats))
-
-    m.assert_called_once_with('foo', 'w')
-    m().write.assert_called_once_with('{"stats": {"foo": "bar", "baz": 42}}')
+    # Execute & verify
+    try:
+      self.assertTrue(RunTracker.write_stats_to_json(file_name, stats))
+      with open(file_name) as f:
+        result = json.load(f)
+        self.assertEquals(stats, result)
+    finally:
+      os.remove(file_name)
