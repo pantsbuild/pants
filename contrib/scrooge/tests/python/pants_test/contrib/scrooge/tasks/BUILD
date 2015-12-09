@@ -57,7 +57,7 @@ python_tests(
      'src/python/pants/backend/codegen/targets:java',
      'src/python/pants/build_graph',
      'tests/python/pants_test/tasks:task_test_base',
-     'tests/python/pants_test/testutils',
+     'tests/python/pants_test/testutils:mock_logger',
   ],
 )
 

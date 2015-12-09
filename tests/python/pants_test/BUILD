@@ -41,7 +41,9 @@ python_library(
 
 python_library(
   name = 'int-test',
-  sources = ['pants_run_integration_test.py'],
+  sources = [
+    'pants_run_integration_test.py'
+  ],
   dependencies = [
     '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
@@ -49,6 +51,7 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/testutils:file_test_util',
   ]
 )
 

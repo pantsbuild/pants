@@ -5,27 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
-
+from pants.base.deprecated import deprecated
 from pants.build_graph.target import Target
 
 
-logger = logging.getLogger(__name__)
-
-
 class Dependencies(Target):
-  """A set of dependencies that may be depended upon,
-  as if depending upon the set of dependencies directly.
+  """Deprecated. Use target() instead."""
 
-  NB: This class is commonly referred to by the alias 'target' in BUILD files.
-  """
-
-
-class DeprecatedDependencies(Dependencies):
-  """A subclass for Dependencies that warns that the 'dependencies' alias is deprecated."""
-
+  @deprecated('0.0.64', 'Replace dependencies(...) with target(...) in your BUILD files. '
+                        'Replace uses of Dependencies with Target in your code.')
   def __init__(self, *args, **kwargs):
-    logger.warn("For {0} : The alias 'dependencies(..)' has been deprecated in favor of "
-                "'target(..)'"
-                .format(kwargs['address'].spec))
-    super(DeprecatedDependencies, self).__init__(*args, **kwargs)
+    raise RuntimeError('For {}: dependencies(...) targets no longer work. Replace with '
+                       'target(...) in your BUILD files.'.format(kwargs['address'].spec))

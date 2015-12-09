@@ -12,6 +12,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class CheckPublishedDeps(ConsoleTask):
+  """Find references to outdated JVM artifacts."""
 
   @classmethod
   def register_options(cls, register):

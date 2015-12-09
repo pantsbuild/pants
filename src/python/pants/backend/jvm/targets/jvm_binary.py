@@ -276,7 +276,7 @@ class ManifestEntries(FingerprintedMixin):
 
 
 class JvmBinary(JvmTarget):
-  """Produces a JVM binary optionally identifying a launcher main class.
+  """A JVM binary.
 
   Below are a summary of how key goals affect targets of this type:
 

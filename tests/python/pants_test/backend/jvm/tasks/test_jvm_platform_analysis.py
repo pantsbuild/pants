@@ -5,9 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_platform_analysis import JvmPlatformExplain, JvmPlatformValidate
+from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -27,7 +27,7 @@ class JvmPlatformAnalysisTestMixin(object):
   def _plain(self, name, deps=None):
     """Make a non-jvm target, useful for testing non-jvm intermediate dependencies."""
     return self.make_target(spec='java:{}'.format(name),
-                            target_type=Dependencies,
+                            target_type=Target,
                             dependencies=deps or [],)
 
   def simple_task(self, targets, **options):

@@ -53,6 +53,7 @@ class TaskRegistrar(object):
     """Install the task in the specified goal (or a new goal with the same name as the task).
 
     The placement of the task in the execution list of the goal defaults to the end but can be
+    :rtype : object
     influence by specifying exactly one of the following arguments:
 
     :param first: Places this task 1st in the goal's execution list.

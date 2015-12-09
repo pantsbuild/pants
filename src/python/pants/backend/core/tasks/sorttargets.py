@@ -5,13 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import defaultdict
-
 from pants.build_graph.build_graph import sort_targets
 from pants.task.console_task import ConsoleTask
 
 
 class SortTargets(ConsoleTask):
+  """Topologically sort the targets."""
+
   @classmethod
   def register_options(cls, register):
     super(SortTargets, cls).register_options(register)

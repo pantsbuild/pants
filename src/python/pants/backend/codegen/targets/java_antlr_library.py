@@ -9,7 +9,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 
 class JavaAntlrLibrary(JvmTarget):
-  """Generates a stub Java library from Antlr grammar files."""
+  """A Java library generated from Antlr grammar files."""
 
   def __init__(self,
                name=None,

@@ -15,7 +15,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class FileDeps(ConsoleTask):
-  """List all transitive file dependencies of the targets specified on the command line.
+  """List all source and BUILD files a target transitively depends on.
 
   Files are listed with absolute paths and any BUILD files implied in the transitive closure of
   targets are also included.

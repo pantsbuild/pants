@@ -101,6 +101,8 @@ def load_build_configuration_from_source(build_configuration, additional_backend
   :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
     the build configuration.
   """
+  # Note: pants.core_tasks must be first in this list, as it registers various stubs
+  # that other tasks can use for scheduling against.
   # TODO: Allow repos to opt in to any backend (but not to core_tasks, which must always
   # be loaded).
   backend_packages = ['pants.core_tasks',

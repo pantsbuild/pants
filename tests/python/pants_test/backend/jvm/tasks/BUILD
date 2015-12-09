@@ -23,13 +23,14 @@ target(
     ':junit_run',
     ':jvm_dependency_usage',
     ':jvm_platform_analysis',
+    ':jvm_prep_command',
     ':jvm_run',
     ':jvm_task',
     ':jvmdoc_gen',
-    ':resources_task',
     ':prepare_resources',
     ':prepare_services',
     ':properties',
+    ':resources_task',
     ':scalastyle',
     ':unpack_jars',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
@@ -171,6 +172,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/goal:products',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test/testutils:file_test_util',
   ]
 )
 
@@ -288,7 +290,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
-    'tests/python/pants_test/testutils',
+    'tests/python/pants_test/testutils:mock_logger',
   ],
 )
 
@@ -410,7 +412,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
-    'src/python/pants/util:contextutil',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -426,6 +428,26 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'jvm_prep_command',
+  sources = ['test_jvm_prep_command.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:run_jvm_prep_command',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/jvm:jvm_task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'jvm_prep_command_integration',
+  sources = ['test_jvm_prep_command_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
 
 python_tests(
   name = 'jvm_task',

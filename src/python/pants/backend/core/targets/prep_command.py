@@ -11,7 +11,7 @@ from pants.build_graph.target import Target
 
 
 class PrepCommand(Target):
-  """A command that must be run before some other target can be tested.
+  """A command to be run prior to running tests.
 
   For example, you can use `prep_command()` to execute a script that sets up tunnels to database
   servers. These tunnels could then be leveraged by integration tests.

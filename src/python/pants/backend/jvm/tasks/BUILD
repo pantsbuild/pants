@@ -32,6 +32,7 @@ python_library(
     ':prepare_services',
     ':properties',
     ':resources_task',
+    ':run_jvm_prep_command',
     ':scala_repl',
     ':scaladoc_gen',
     ':scalastyle',
@@ -236,7 +237,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':jar_task',
     ':properties',
-    'src/python/pants/backend/core/tasks:scm_publish',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ivy_utils',
@@ -249,6 +249,7 @@ python_library(
     'src/python/pants/ivy',
     'src/python/pants/option',
     'src/python/pants/scm',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
@@ -385,6 +386,7 @@ python_library(
     ':jvm_dependency_analyzer',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
     'src/python/pants/util:fileutil',
   ]
 )
@@ -502,6 +504,20 @@ python_library(
   sources = ['resources_task.py'],
   dependencies = [
     'src/python/pants/option',
+    'src/python/pants/task',
+  ],
+)
+
+python_library(
+  name = 'run_jvm_prep_command',
+  sources = ['run_jvm_prep_command.py'],
+  dependencies = [
+    ':classpath_util',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
     'src/python/pants/task',
   ],
 )

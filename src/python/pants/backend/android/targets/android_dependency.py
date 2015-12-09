@@ -9,4 +9,4 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 
 
 class AndroidDependency(JarLibrary):
-  """A set of artifacts that may be depended upon by Android targets."""
+  """Artifacts that Android targets depend on."""

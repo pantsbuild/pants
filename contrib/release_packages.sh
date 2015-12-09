@@ -61,20 +61,28 @@ function pkg_go_install_test() {
       test.go contrib/go/examples::
 }
 
+# TODO (ggonzalez): Change the `compile.stack-build` goal to `test.stack-test`
+# once the Haskell plugins adds support for the `test` goal.
+PKG_HASKELL=(
+  "pantsbuild.pants.contrib.haskell"
+  "//contrib/haskell/src/python/pants/contrib/haskell:plugin"
+  "pkg_haskell_install_test"
+)
+function pkg_haskell_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.haskell==$(local_version)']" \
+      compile.stack-build contrib/haskell/examples::
+}
+
 PKG_NODE=(
   "pantsbuild.pants.contrib.node"
   "//contrib/node/src/python/pants/contrib/node:plugin"
   "pkg_node_install_test"
 )
 function pkg_node_install_test() {
-  (cat << EOF
-var typ = require('typ');
-console.log("type of boolean is: " + typ.BOOLEAN);
-EOF
-  ) | \
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.node==$(local_version)']" \
-      repl.node contrib/node/examples::
+      test.node contrib/node/examples::
 }
 
 PKG_PYTHON_CHECKS=(
@@ -97,6 +105,7 @@ CONTRIB_PACKAGES=(
   PKG_BUILDGEN
   PKG_SPINDLE
   PKG_GO
+  PKG_HASKELL
   PKG_NODE
   PKG_PYTHON_CHECKS
 )

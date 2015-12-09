@@ -40,6 +40,7 @@ _SCALA_VERSIONS = {
 
 
 class IdeaGen(IdeGen):
+  """Create an IntelliJ IDEA project from the given targets."""
 
   @classmethod
   def register_options(cls, register):

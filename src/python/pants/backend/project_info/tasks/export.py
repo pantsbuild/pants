@@ -351,7 +351,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
 
 class Export(ExportTask, ConsoleTask):
-  """Generates a JSON description of the targets as configured in pants.
+  """Export project information in JSON format.
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
   """

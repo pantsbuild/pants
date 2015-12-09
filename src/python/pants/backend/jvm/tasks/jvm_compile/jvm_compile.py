@@ -11,9 +11,7 @@ import itertools
 import os
 from collections import defaultdict
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -69,7 +67,7 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
             super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__eq__(other))
 
 
-class JvmCompile(NailgunTaskBase, GroupMember):
+class JvmCompile(NailgunTaskBase):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods
@@ -144,8 +142,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
 
   @classmethod
   def product_types(cls):
-    raise TaskError('Expected to be installed in GroupTask, which has its own '
-                    'product_types implementation.')
+    return ['runtime_classpath', 'classes_by_source', 'product_deps_by_src']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -167,7 +164,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   # Subclasses must implement.
   # --------------------------
   _name = None
-  _file_suffix = None
   _supports_concurrent_execution = None
 
   @classmethod
@@ -208,12 +204,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def cache_target_dirs(self):
     return True
 
-  def select(self, target):
-    return target.has_sources(self._file_suffix)
+  def select(self):
+    raise NotImplementedError()
 
   def select_source(self, source_file_path):
-    """Source predicate for this task."""
-    return source_file_path.endswith(self._file_suffix)
+    raise NotImplementedError()
 
   def create_analysis_tools(self):
     """Returns an AnalysisTools implementation.
@@ -310,27 +305,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def _fingerprint_strategy(self, classpath_products):
     return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
 
-  def pre_execute(self):
-    # In case we have no relevant targets and return early create the requested product maps.
-    self._create_empty_products()
-
-  def prepare_execute(self, chunks):
-    relevant_targets = list(itertools.chain(*chunks))
-
-    # Clone the compile_classpath to the runtime_classpath.
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
-
-    # This ensures the workunit for the worker pool is set
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
-            as workunit:
-      # This uses workunit.parent as the WorkerPool's parent so that child workunits
-      # of different pools will show up in order in the html output. This way the current running
-      # workunit is on the bottom of the page rather than possibly in the middle.
-      self._worker_pool = WorkerPool(workunit.parent,
-                                     self.context.run_tracker,
-                                     self._worker_count)
-
   def _compile_context(self, target, target_workdir):
     analysis_file = JvmCompile._analysis_for_target(target_workdir, target)
     portable_analysis_file = JvmCompile._portable_analysis_for_target(target_workdir, target)
@@ -347,9 +321,33 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           self._compute_sources_for_target(target),
                           strict_deps)
 
-  def execute_chunk(self, relevant_targets):
+  def execute(self):
+    # In case we have no relevant targets and return early create the requested product maps.
+    self._create_empty_products()
+
+    def select_target(target):
+      return self.select(target)
+
+    relevant_targets = list(self.context.targets(predicate=select_target))
+
     if not relevant_targets:
       return
+
+    # Clone the compile_classpath to the runtime_classpath.
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+
+    # This ensures the workunit for the worker pool is set
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
+            as workunit:
+      # This uses workunit.parent as the WorkerPool's parent so that child workunits
+      # of different pools will show up in order in the html output. This way the current running
+      # workunit is on the bottom of the page rather than possibly in the middle.
+      self._worker_pool = WorkerPool(workunit.parent,
+                                     self.context.run_tracker,
+                                     self._worker_count)
+
+
 
     classpath_product = self.context.products.get_data('runtime_classpath')
     fingerprint_strategy = self._fingerprint_strategy(classpath_product)
@@ -548,7 +546,7 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     """
     def resolve(t):
       for declared in t.dependencies:
-        if isinstance(declared, Dependencies) or type(declared) == Target:
+        if type(declared) == Target:
           for r in resolve(declared):
             yield r
         elif isinstance(declared, self.compiler_plugin_types):

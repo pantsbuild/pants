@@ -18,15 +18,11 @@ target(
   dependencies = [
     ':builddict',
     ':execution_graph',
-    ':group_task',
-    ':list_goals',
     ':list_owners',
     ':listtargets',
     ':minimal_cover',
     ':reflect',
-    ':roots',
     ':sorttargets',
-    ':targets_help',
   ],
 )
 
@@ -113,18 +109,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'list_goals',
-  sources = ['test_list_goals.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/core/tasks:list_goals',
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
-    'src/python/pants/task',
-  ],
-)
-
-python_tests(
   name = 'listtargets',
   sources = ['test_listtargets.py'],
   dependencies = [
@@ -149,36 +133,12 @@ python_tests(
 )
 
 python_tests(
-  name = 'roots',
-  sources = ['test_roots.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/core/tasks:roots',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/source',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-  ],
-)
-
-python_tests(
   name = 'sorttargets',
   sources = ['test_sorttargets.py'],
   dependencies = [
     ':task_test_base',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/core/tasks:sorttargets',
-    'src/python/pants/build_graph',
-  ],
-)
-
-python_tests(
-  name = 'targets_help',
-  sources = ['test_targets_help.py'],
-  dependencies = [
-    ':task_test_base',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/core/tasks:targets_help',
-    'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
   ],
 )
@@ -192,18 +152,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
   ],
-)
-
-python_tests(
-  name = 'group_task',
-  sources = ['test_group_task.py'],
-  dependencies = [
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/core/tasks:group_task',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine',
-    'tests/python/pants_test:base_test',
-  ]
 )
 
 python_tests(
