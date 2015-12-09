@@ -107,8 +107,8 @@ class Coverage(object):
     """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
     paths.
 
-    :param targets: the targets which should be mutated.
-    :returns the instrument_classpath ClasspathProducts containing the mutated paths.
+    :param targets: the targets for which we should create an instrumentation_classpath entry based
+    on their runtime_classpath entry.
     """
     self._safe_makedir(self._settings.coverage_instrument_dir, clean=True)
 
@@ -133,4 +133,4 @@ class Coverage(object):
         instrumentation_classpath.remove_for_target(target, [(config, path)])
         instrumentation_classpath.add_for_target(target, [(config, new_path)])
         self._settings.log.debug(
-          "runtime_classpath ({}) mutated to instrument_classpath ({})".format(path, new_path))
+          "runtime_classpath ({}) cloned to instrument_classpath ({})".format(path, new_path))
