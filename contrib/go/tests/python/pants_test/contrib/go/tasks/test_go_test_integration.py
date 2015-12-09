@@ -22,6 +22,6 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(args)
     self.assert_failure(pants_run)
 
-    args = ['test', '--compile-go-skip=true', 'contrib/go/examples/src/go/libUnstyle']
+    args = ['test', '--compile-gocheckstyle-skip=true', 'contrib/go/examples/src/go/libUnstyle']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)

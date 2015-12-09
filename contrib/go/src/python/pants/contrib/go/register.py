@@ -39,8 +39,8 @@ def register_goals():
   task(name='go-env', action=GoEnv).install()
   task(name='go', action=GoFetch).install('resolve')
   task(name='go', action=GoCompile).install('compile')
-  task(name='go', action=GoCheckStyle).install('compile')
   task(name='go', action=GoBinaryCreate).install('binary')
   task(name='go', action=GoRun).install('run')
+  task(name='gocheckstyle', action=GoCheckStyle).install('compile')
   task(name='go', action=GoTest).install('test')
   
