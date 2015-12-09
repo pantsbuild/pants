@@ -13,19 +13,19 @@ from pants.base.exceptions import TaskError
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
-class GoCheckStyle(GoWorkspaceTask):
-  """Checks Go code matches style."""
-  
+class GoFmt(GoWorkspaceTask):
+  """Checks Go code matches gofmt style."""
+
   @classmethod
   def register_options(cls, register):
-    super(GoCheckStyle, cls).register_options(register)
+    super(GoFmt, cls).register_options(register)
     register('--skip', action='store_true', fingerprint=True, help='Skip checkstyle.')
-    
+
   _GO_SOURCE_EXTENSION = '.go'
-    
+
   def _is_checked(self, target):
     return target.has_sources(self._GO_SOURCE_EXTENSION) and not target.is_synthetic
-    
+
   def execute(self):
     if self.get_options().skip:
       return
@@ -40,11 +40,11 @@ class GoCheckStyle(GoWorkspaceTask):
         except subprocess.CalledProcessError as e:
           raise TaskError('{} failed with exit code {}'.format(args, result), exit_code=e.returncode)
         if output:
-          raise TaskError('{} failed with output {}'.format(args, output))
+          raise TaskError('gofmt command {} failed with output {}'.format(args, output))
 
   def calculate_sources(self, targets):
     sources = set()
     for target in targets:
       sources.update(source for source in target.sources_relative_to_buildroot()
-                     if source.endswith(self._GO_SOURCE_EXTENSION))  
+                     if source.endswith(self._GO_SOURCE_EXTENSION))
     return sources
