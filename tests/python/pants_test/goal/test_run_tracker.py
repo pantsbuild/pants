@@ -13,8 +13,6 @@ import string
 import threading
 import urlparse
 
-from mock import mock_open, patch
-
 from pants.goal.run_tracker import RunTracker
 from pants_test.base_test import BaseTest
 
