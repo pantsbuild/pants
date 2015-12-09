@@ -254,7 +254,7 @@ class RunTracker(Subsystem):
   def write_stats_to_json(cls, file_name, stats):
     """Write stats to a local json file.
 
-    :return: True if successfully writen, False otherwise.
+    :return: True if successfully written, False otherwise.
     """
     params = json.dumps(stats)
     try:
