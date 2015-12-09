@@ -14,6 +14,7 @@ from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_binary_create import GoBinaryCreate
 from pants.contrib.go.tasks.go_buildgen import GoBuildgen
 from pants.contrib.go.tasks.go_compile import GoCompile
+from pants.contrib.go.tasks.go_checkstyle import GoCheckStyle
 from pants.contrib.go.tasks.go_fetch import GoFetch
 from pants.contrib.go.tasks.go_go import GoEnv, GoGo
 from pants.contrib.go.tasks.go_run import GoRun
@@ -38,6 +39,8 @@ def register_goals():
   task(name='go-env', action=GoEnv).install()
   task(name='go', action=GoFetch).install('resolve')
   task(name='go', action=GoCompile).install('compile')
+  task(name='go', action=GoCheckStyle).install('compile')
   task(name='go', action=GoBinaryCreate).install('binary')
   task(name='go', action=GoRun).install('run')
   task(name='go', action=GoTest).install('test')
+  
