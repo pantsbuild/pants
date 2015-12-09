@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.deprecated import deprecated
 from pants.goal.error import GoalError
 
 
@@ -17,6 +18,21 @@ class Goal(object):
 
   def __new__(cls, *args, **kwargs):
     raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
+
+  @classmethod
+  def register(cls, name, description):
+    """Register a goal description.
+
+    Otherwise the description must be set when registering some task on the goal,
+    which is clunky, and dependent on things like registration order of tasks in the goal.
+
+    A goal that isn't explicitly registered with a description will fall back to the description
+    of the task in that goal with the same name (if any).  So singleton goals (e.g., 'clean-all')
+    need not be registered explicitly.  This method is primarily useful for setting a
+    description on a generic goal like 'compile' or 'test', that multiple backends will
+    register tasks on.
+    """
+    cls.by_name(name)._description = description
 
   @classmethod
   def by_name(cls, name):
@@ -108,7 +124,9 @@ class _Goal(object):
                                       options_scope.replace('.', '_').replace('-', '_'))
     task_type = type(subclass_name, (superclass,), {
       '__doc__': superclass.__doc__,
-      'options_scope': options_scope
+      '__module__': superclass.__module__,
+      'options_scope': options_scope,
+      '_stable_name': superclass.stable_name()
     })
 
     otn = self._ordered_task_names
@@ -133,6 +151,9 @@ class _Goal(object):
 
     return self
 
+  @deprecated('0.0.66', "Single-task goals will take their description from the first sentence "
+                        "of that task's docstring.  Multiple-task goals can register a description "
+                        "explicitly using Goal.register(name, description).")
   def with_description(self, description):
     """Add a description to this goal."""
     self._description = description

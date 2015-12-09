@@ -12,17 +12,49 @@ from textwrap import dedent
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
+from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
+  NodePreinstalledModuleResolver
+from pants.contrib.node.subsystems.resolvers.npm_resolver import NpmResolver
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.tasks.node_paths import NodePaths
-from pants.contrib.node.tasks.npm_resolve import NpmResolve
+from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
-class NpmResolveTest(TaskTestBase):
+class NodeResolveTest(TaskTestBase):
 
   @classmethod
   def task_type(cls):
-    return NpmResolve
+    return NodeResolve
+
+  def setUp(self):
+    super(NodeResolveTest, self).setUp()
+    NodeResolve.register_resolver_for_type(NodePreinstalledModule, NodePreinstalledModuleResolver)
+    NodeResolve.register_resolver_for_type(NodeModule, NpmResolver)
+
+  def tearDown(self):
+    super(NodeResolveTest, self).tearDown()
+    NodeResolve._clear_resolvers()
+
+  def test_register_resolver_for_type(self):
+    NodeResolve._clear_resolvers()
+
+    self.assertIsNone(NodeResolve._resolver_for_target(NodePreinstalledModule))
+    self.assertIsNone(NodeResolve._resolver_for_target(NodeModule))
+
+    node_preinstalled__module_target = self.make_target(
+      spec=':empty_fake_node_preinstalled_module_target',
+      target_type=NodePreinstalledModule)
+    NodeResolve.register_resolver_for_type(NodePreinstalledModule, NodePreinstalledModuleResolver)
+    self.assertEqual(NodePreinstalledModuleResolver,
+                     NodeResolve._resolver_for_target(node_preinstalled__module_target))
+
+    node_module_target = self.make_target(spec=':empty_fake_node_module_target',
+                                          target_type=NodeModule)
+    NodeResolve.register_resolver_for_type(NodeModule, NpmResolver)
+    self.assertEqual(NpmResolver,
+                     NodeResolve._resolver_for_target(node_module_target))
 
   def test_noop(self):
     task = self.create_task(self.context())

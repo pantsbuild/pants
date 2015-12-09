@@ -49,7 +49,6 @@ target(
     ':dependees',
     ':filemap',
     ':filter',
-    ':group_task',
     ':list_owners',
     ':listtargets',
     ':markdown_to_html',
@@ -151,19 +150,6 @@ python_library(
 )
 
 python_library(
-  name = 'group_task',
-  sources = ['group_task.py'],
-  dependencies = [
-    '3rdparty/python:six',
-    'src/python/pants/base:workunit',
-    'src/python/pants/build_graph',
-    'src/python/pants/goal',
-    'src/python/pants/option',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
   name = 'listtargets',
   sources = ['listtargets.py'],
   dependencies = [
@@ -230,7 +216,6 @@ python_library(
   name = 'reflect',
   sources = ['reflect.py'],
   dependencies = [
-    ':group_task',
     '3rdparty/python:docutils',
     '3rdparty/python:six',
     'src/python/pants/base:build_environment',

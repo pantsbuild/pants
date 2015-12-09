@@ -18,7 +18,6 @@ target(
   dependencies = [
     ':builddict',
     ':execution_graph',
-    ':group_task',
     ':list_owners',
     ':listtargets',
     ':minimal_cover',
@@ -166,18 +165,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
   ],
-)
-
-python_tests(
-  name = 'group_task',
-  sources = ['test_group_task.py'],
-  dependencies = [
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/core/tasks:group_task',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine',
-    'tests/python/pants_test:base_test',
-  ]
 )
 
 python_tests(

@@ -10,7 +10,7 @@ from textwrap import dedent
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class NpmTestIntegrationTest(PantsRunIntegrationTest):
+class NodeTestIntegrationTest(PantsRunIntegrationTest):
 
   def test_test_simple(self):
     command = ['test',
@@ -30,6 +30,13 @@ class NpmTestIntegrationTest(PantsRunIntegrationTest):
     command = ['test',
                'contrib/node/examples/src/node/web-component-button:unit',
                'contrib/node/examples/src/node/web-component-button:integration']
+    pants_run = self.run_pants(command=command)
+
+    self.assert_success(pants_run)
+
+  def test_test_preinstalled_node_module_project(self):
+    command = ['test',
+               'contrib/node/examples/src/node/preinstalled-project:unit']
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)

@@ -12,7 +12,7 @@ from pants.task.task import Task
 
 
 class RuntimeClasspathPublisher(Task):
-  """Creates symlinks in pants_distdir to classpath entries per target."""
+  """Create stable symlinks for runtime classpath entries for JVM targets."""
 
   @classmethod
   def register_options(cls, register):

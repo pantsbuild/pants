@@ -9,8 +9,6 @@ from unittest import expectedFailure
 
 from pants.core_tasks.list_goals import ListGoals
 from pants.goal.goal import Goal
-from pants.goal.task_registrar import TaskRegistrar
-from pants.task.task import Task
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -18,7 +16,7 @@ class ListGoalsTest(ConsoleTaskTestBase):
   _INSTALLED_HEADER = 'Installed goals:'
   _UNDOCUMENTED_HEADER = 'Undocumented goals:'
   _LIST_GOALS_NAME = 'goals'
-  _LIST_GOALS_DESC = 'List all documented goals.'
+  _LIST_GOALS_DESC = 'List available goals.'
   _LLAMA_NAME = 'llama'
   _LLAMA_DESC = 'With such handsome fiber, no wonder everyone loves Llamas.'
   _ALPACA_NAME = 'alpaca'
@@ -27,33 +25,24 @@ class ListGoalsTest(ConsoleTaskTestBase):
   def task_type(cls):
     return ListGoals
 
-  class LlamaTask(Task):
-    pass
-
-  class AlpacaTask(Task):
-    pass
-
   def test_list_goals(self):
     Goal.clear()
     self.assert_console_output(self._INSTALLED_HEADER)
 
-    TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
-      .install().with_description(self._LIST_GOALS_DESC)
+    Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
     self.assert_console_output(
       self._INSTALLED_HEADER,
       '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
     )
 
-    TaskRegistrar(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
-      .install().with_description(self._LLAMA_DESC)
+    Goal.register(self._LLAMA_NAME, self._LLAMA_DESC)
     self.assert_console_output(
       self._INSTALLED_HEADER,
       '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
       '  {0}: {1}'.format(self._LLAMA_NAME, self._LLAMA_DESC),
     )
 
-    TaskRegistrar(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
-      .install()
+    Goal.register(self._ALPACA_NAME, description='')
     self.assert_console_output(
       self._INSTALLED_HEADER,
       '  {0}: {1}'.format(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC),
@@ -63,12 +52,9 @@ class ListGoalsTest(ConsoleTaskTestBase):
   def test_list_goals_all(self):
     Goal.clear()
 
-    TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
-      .install().with_description(self._LIST_GOALS_DESC)
-    TaskRegistrar(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
-      .install().with_description(self._LLAMA_DESC)
-    TaskRegistrar(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
-      .install()
+    Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
+    Goal.register(self._LLAMA_NAME, self._LLAMA_DESC)
+    Goal.register(self._ALPACA_NAME, description='')
 
     self.assert_console_output(
       self._INSTALLED_HEADER,
@@ -86,12 +72,10 @@ class ListGoalsTest(ConsoleTaskTestBase):
   def test_list_goals_graph(self):
     Goal.clear()
 
-    TaskRegistrar(name=self._LIST_GOALS_NAME, action=ListGoals)\
-      .install().with_description(self._LIST_GOALS_DESC)
-    TaskRegistrar(name=self._LLAMA_NAME, action=ListGoalsTest.LlamaTask)\
-      .install().with_description(self._LLAMA_DESC)
-    TaskRegistrar(name=self._ALPACA_NAME, action=ListGoalsTest.AlpacaTask, dependencies=[self._LLAMA_NAME])\
-      .install()
+
+    Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
+    Goal.register(self._LLAMA_NAME, self._LLAMA_DESC)
+    Goal.register(self._ALPACA_NAME, description='')
 
     self.assert_console_output(
       'digraph G {\n  rankdir=LR;\n  graph [compound=true];',

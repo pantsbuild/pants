@@ -80,7 +80,7 @@ class Path(PathFinder):
 
 
 class Paths(PathFinder):
-  """Find all dependency paths from one target to another."""
+  """List all dependency paths from one target to another."""
 
   def console_output(self, ignored_targets):
     self.validate_target_roots()

@@ -17,7 +17,7 @@ from pants.util.contextutil import temporary_dir
 
 
 class CountLinesOfCode(ConsoleTask):
-  """Counts lines of code for specified targets and their dependencies."""
+  """Print counts of lines of code."""
 
   @classmethod
   def global_subsystems(cls):

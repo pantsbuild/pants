@@ -10,12 +10,12 @@ from textwrap import dedent
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class NpmRunIntegrationTest(PantsRunIntegrationTest):
+class NodeRunIntegrationTest(PantsRunIntegrationTest):
 
   def test_run_simple(self):
     command = ['run',
                'contrib/node/examples/src/node/web-component-button',
-               '--run-npm-script-name=build']
+               '--run-node-script-name=build']
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
