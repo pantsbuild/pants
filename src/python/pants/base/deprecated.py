@@ -62,7 +62,11 @@ def check_deprecated_semver(removal_version):
                                   'version of {} - given {}'.format(VERSION, removal_version))
 
 
-def deprecated_predicate(removal_version, predicate, predicate_description, hint_message=None):
+def deprecated_predicate(removal_version,
+                         predicate,
+                         predicate_description,
+                         stacklevel,
+                         hint_message=None):
   """Marks a certain configuration as deprecated.
 
   The predicate is used to determine if that configuration is deprecated. It is a function that
@@ -73,7 +77,7 @@ def deprecated_predicate(removal_version, predicate, predicate_description, hint
   :param () -> bool predicate: A function that returns true if the deprecation warning should be on.
   :param unicode predicate_description: A string describing what the predicate means.
   :param unicode hint_message: An optional hint pointing to alternatives to the deprecation.
-  :raises DeprecationApplicationError if the @deprecation is applied improperly.
+  :raises DeprecationApplicationError if the deprecation is applied improperly.
   """
   if removal_version is None:
     raise MissingRemovalVersionError('A removal_version must be specified for this deprecation.')
@@ -89,7 +93,7 @@ def deprecated_predicate(removal_version, predicate, predicate_description, hint
     else:
       warning_message += '.'
 
-    warnings.warn(warning_message, DeprecationWarning, stacklevel=2)
+    warnings.warn(warning_message, DeprecationWarning, stacklevel=stacklevel)
 
 
 def deprecated(removal_version, hint_message=None):

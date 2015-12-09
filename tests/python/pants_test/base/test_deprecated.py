@@ -12,7 +12,8 @@ import pytest
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
                                    MissingRemovalVersionError, PastRemovalVersionError,
-                                   check_deprecated_semver, deprecated, deprecated_module)
+                                   check_deprecated_semver, deprecated, deprecated_module,
+                                   deprecated_predicate)
 from pants.version import VERSION
 
 
@@ -55,6 +56,12 @@ def test_deprecated_method():
 
   with _test_deprecation():
     assert expected_return == Test().deprecated_method()
+
+
+def test_deprecated_predicate():
+  predicate = lambda: True
+  with _test_deprecation():
+    deprecated_predicate(FUTURE_VERSION, predicate, "test predicate", stacklevel=0)
 
 
 def test_deprecated_property():

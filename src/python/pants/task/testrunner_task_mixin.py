@@ -72,6 +72,7 @@ class TestRunnerTaskMixin(object):
       "0.0.65",
       lambda: timeout == 0,
       "Timeout for {} is 0".format(target.address.spec),
+      stacklevel=3,
       hint_message="To use the default timeout remove the 'timeout' parameter from your test target.")
 
     timeout_maximum = self.get_options().timeout_maximum
