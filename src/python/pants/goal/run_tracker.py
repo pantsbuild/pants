@@ -254,13 +254,13 @@ class RunTracker(Subsystem):
   def write_stats_to_json(cls, file_name, stats):
     """Write stats to a local json file.
 
-    :return: True if successfully written, False otherwise.
+    :return: True if successfully writen, False otherwise.
     """
     params = json.dumps(stats)
     try:
       with open(file_name, 'w') as f:
         f.write(params)
-    except Exception as e:  # Broad catch - we don't want to fail the build in stats failure.
+    except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
       print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
             file=sys.stderr)
       return False
