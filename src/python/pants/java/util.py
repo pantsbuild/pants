@@ -44,11 +44,12 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     classpath in its manifest.
   :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
     a temporary directory will be provided and cleaned up upon process exit.
-  :param boolean wait: If true, waits for the return of the java program. If not just returns
+  :param boolean wait: If true, waits for the return of the java program. If not just returns with
+    the process handle and a callback which should be called with the return value from wait().
 
   Returns the exit code of the java program if it waited for the return,
   otherwise it returns a tuple of the process handle, and a callback to be called
-  with the return code when the process is done
+  with the return code when the process is done.
 
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
   """
@@ -113,8 +114,8 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
         return ret
       else:
         process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
-        exit_handler = lambda ret: workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
-        return process, exit_handler
+        return_code_handler = lambda ret: workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
+        return process, return_code_handler
 
 
 def relativize_classpath(classpath, root_dir, followlinks=True):

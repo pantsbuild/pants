@@ -78,10 +78,6 @@ class Executor(AbstractClass):
       :param string cwd: optionally set the working directory
       """
 
-    @abstractmethod
-    def kill(self):
-      """Terminates the java command."""
-      raise NotImplementedError
 
   def __init__(self, distribution):
     """Constructs an Executor that can be used to launch java programs.

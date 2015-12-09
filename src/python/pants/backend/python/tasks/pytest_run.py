@@ -447,7 +447,11 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
         rc = self._spawn_and_wait(pex, workunit, args=args, setsid=True)
         return PythonTestResult.rc(rc)
     except TestFailedTaskError:
-      # pass through
+      # _spawn_and_wait wraps the test runner in a timeout, so it could
+      # fail with a TestFailedTaskError. We can't just set PythonTestResult
+      # to a failure because the resultslog doesn't have all the failures
+      # when tests are killed with a timeout. Therefore we need to re-raise
+      # here.
       raise
     except Exception:
       self.context.log.error('Failed to run test!')

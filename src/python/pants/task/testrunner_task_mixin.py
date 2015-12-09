@@ -54,10 +54,8 @@ class TestRunnerTaskMixin(object):
     test_targets = self._get_test_targets()
     timeout = self._timeout_for_targets(test_targets)
 
-    print("calling spawn with %s %s" % (args, kwargs))
     process_handler = self._spawn(*args, **kwargs)
 
-    print ("running process_handler.wait() with timeout %s" % timeout)
     # process_handler.kill to be aggressive or process_handler.terminate to be graceful
     try:
       with Timeout(timeout, abort_handler=process_handler.kill):

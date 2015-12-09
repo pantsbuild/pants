@@ -199,18 +199,23 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   def _spawn(self, executor=None, distribution=None, *args, **kwargs):
     actual_executor = executor or SubprocessExecutor(distribution)
-    (process, exit_handler) = distribution.execute_java(*args, executor=actual_executor, wait=False,
-                                                        **kwargs)
+    (process, return_code_handler) = distribution.execute_java(*args,
+                                                               executor=actual_executor,
+                                                               wait=False,
+                                                               **kwargs)
 
     class ProcessHandler(object):
+      @staticmethod
       def wait(_):
         ret = process.wait()
-        exit_handler(ret)
+        return_code_handler(ret)
         return ret
 
+      @staticmethod
       def kill(_):
         return process.kill()
 
+      @staticmethod
       def terminate(_):
         return process.terminate()
 
@@ -457,16 +462,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if not target.payload.sources.source_paths and not self.get_options().allow_empty_sources:
       msg = 'JavaTests target must include a non-empty set of sources.'
       raise TargetDefinitionException(target, msg)
-
-  def _timeout_abort_handler(self):
-    """Kills the test run."""
-
-    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
-    #   storing the process handle here, the test mixin class will call the start_test() fn
-    #   on the language specific class which will return an object that can kill/monitor/etc
-    #   the test process.
-    if self._executor is not None:
-      self._executor.kill()
 
   def _execute(self, targets):
     """
