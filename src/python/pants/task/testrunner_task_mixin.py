@@ -5,11 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import textwrap
-import warnings
 from abc import abstractmethod
+from textwrap import dedent
 
-from pants.base.deprecated import deprecated_predicate
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout, TimeoutReached
 
@@ -68,12 +67,13 @@ class TestRunnerTaskMixin(object):
 
   def _timeout_for_target(self, target):
     timeout = getattr(target, 'timeout', None)
-    deprecated_predicate(
-      "0.0.65",
+    deprecated_conditional(
       lambda: timeout == 0,
-      "Timeout for {} is 0".format(target.address.spec),
-      stacklevel=3,
-      hint_message="To use the default timeout remove the 'timeout' parameter from your test target.")
+      "0.0.65",
+      hint_message=dedent("""
+        Target {target} has parameter: 'timeout=0', which is deprecated.
+        To use the default timeout remove the 'timeout' parameter from your test target.
+      """.format(target=target.address.spec)))
 
     timeout_maximum = self.get_options().timeout_maximum
     if timeout is not None and timeout_maximum is not None:
