@@ -78,11 +78,11 @@ class TestRunnerTaskMixin(object):
     timeout_maximum = self.get_options().timeout_maximum
     if timeout is not None and timeout_maximum is not None:
       if timeout > timeout_maximum:
-        self.context.log.warn(textwrap.dedent(
+        self.context.log.warn(
           "Warning: Timeout for {target} ({timeout}s) exceeds {timeout_maximum}s. Capping.".format(
             target=target.address.spec,
             timeout=timeout,
-            timeout_maximum=timeout_maximum)))
+            timeout_maximum=timeout_maximum))
         return timeout_maximum
 
     return timeout
@@ -112,18 +112,18 @@ class TestRunnerTaskMixin(object):
     # Gather up all the timeouts.
     timeouts = [self._timeout_for_target(target) for target in targets]
 
-    # If any target's timeout is None or 0, then set it to the default timeout
+    # If any target's timeout is None or 0, then set it to the default timeout.
     # TODO(sbrenn): Change this so that only if the timeout is None, set it to default timeout.
     timeouts_w_default = [timeout or timeout_default for timeout in timeouts]
 
     # Even after we've done that, there may be a 0 or None in the timeout list if the
     # default timeout is set to 0 or None. So if that's the case, then the timeout is
-    # disabled
+    # disabled.
     # TODO(sbrenn): Change this so that if the timeout is 0, it is actually 0.
     if 0 in timeouts_w_default or None in timeouts_w_default:
       return None
     else:
-      # Sum the timeouts for all the targets, using the default timeout where one is not set
+      # Sum the timeouts for all the targets, using the default timeout where one is not set.
       return sum(timeouts_w_default)
 
   def _get_targets(self):
