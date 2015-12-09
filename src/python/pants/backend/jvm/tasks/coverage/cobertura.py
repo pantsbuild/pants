@@ -12,7 +12,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
 from pants.util.contextutil import temporary_file
@@ -74,10 +73,12 @@ class Cobertura(Coverage):
     self._nothing_to_instrument = True
 
   def instrument(self, targets, tests, compute_junit_classpath, execute_java_for_targets):
-    instrumentation_classpath = self.initialize_instrument_classpath(targets)
-    junit_classpath = compute_junit_classpath()
+    # Setup an instrumentation classpath based on the existing runtime classpath.
+    runtime_classpath = self._context.products.get_data('runtime_classpath')
+    instrumentation_classpath = self._context.products.safe_create_data('instrument_classpath', runtime_classpath.copy)
+    self.initialize_instrument_classpath(targets, instrumentation_classpath)
+
     cobertura_cp = self._settings.tool_classpath('cobertura-instrument')
-    aux_classpath = os.pathsep.join(relativize_paths(junit_classpath, get_buildroot()))
     safe_delete(self._coverage_datafile)
     files_to_instrument = []
     for target in targets:

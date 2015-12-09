@@ -149,7 +149,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.coverage or options.is_flagged('coverage_open'):
       coverage_processor = options.coverage_processor
       if coverage_processor == 'cobertura':
-        settings = CoberturaTaskSettings(self)
+        settings = CoberturaTaskSettings.from_task(self)
         self._coverage = Cobertura(settings)
       else:
         raise TaskError('unknown coverage processor {0}'.format(coverage_processor))
