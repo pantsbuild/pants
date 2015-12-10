@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from collections import namedtuple
+
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.backend.jvm.targets.jar_dependency import JarDependency
@@ -14,9 +16,11 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized
 
 
-SCALA_211 = '2.11.7'
-SCALA_210 = '2.10.4'
-
+major_version_info = namedtuple(major_version_info, 'full_version compiler_name runtime_name')
+scala_build_info = {
+  '2.10': major_version_info('2.10.4', 'scalac_2_10', 'runtime_2_10'),
+  '2.11': major_version_info('2.11.7', 'scalac_2_11', 'runtime_2_11'),
+}
 
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """A scala platform.
@@ -28,21 +32,22 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   runtime_2_10 = JarDependency(org = 'org.scala-lang',
                                name = 'scala-library',
-                               rev = SCALA_210)
+                               rev = scala_build_info['2.10'].full_version)
 
   runtime_2_11 = JarDependency(org = 'org.scala-lang',
                                name = 'scala-library',
-                               rev = SCALA_211)
+                               rev = scala_build_info['2.11'].full_version)
 
   runtime_default = '//:scala-library'
 
   @classmethod
   def register_options(cls, register):
     super(ScalaPlatform, cls).register_options(register)
-    # No need to fingerprint --runtime, because it is automatically inserted as a
-    # dependency for the scala_library target.
-
-    register('--version', advanced=True, default='2.10', choices=['2.10', '2.11'],
+    # Version specified will allow the user provide some sane defaults for common
+    # versions of scala. If version is something other than one of the common
+    # versions the user will be able to overrride the defaults by specifying
+    # custom build targets for //:scalac and //:scala-library
+    register('--version', advanced=True, default='2.10',
              help='The scala "platform version", which is suffixed onto all published '
                   'libraries. This should match the declared compiler/library versions.')
 
@@ -52,7 +57,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                           classpath=[
                             JarDependency(org = 'org.scala-lang',
                                           name = 'scala-compiler',
-                                          rev = SCALA_210),
+                                          rev = scala_build_info['2.10'].full_version),
                           ])
 
 
@@ -62,24 +67,21 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                           classpath=[
                             JarDependency(org = 'org.scala-lang',
                                           name = 'scala-compiler',
-                                          rev = SCALA_211),
+                                          rev = scala_build_info['2.11'].full_version),
                           ])
 
-    # Scala Default if scala-compiler isn't specified and no version was specified.
+    # Provide a default so that if scala-compiler since all jvm tools are bootstrapped.
     cls.register_jvm_tool(register,
                           'scalac',
                           classpath=[
                             JarDependency(org = 'org.scala-lang',
                                           name = 'scala-compiler',
-                                          rev = SCALA_210),
+                                          rev = scala_build_info['2.10'].full_version),
                           ])
 
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    compiler_name = {
-      '2.10': 'scalac_2_10',
-      '2.11': 'scalac_2_11',
-    }.get(self.get_options().version, 'scalac')
+    compiler_name = scala_build_info.get(self.get_options().version, scalac)
     return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
 
   @property
@@ -101,11 +103,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper runtime based on scala version.
     :return iterator: list with single runtime.
     """
-    runtime_name = {
-      '2.11': 'runtime_2_11',
-      '2.10': 'runtime_2_10',
-      'runtime_default': 'runtime_default',
-    }.get(self.get_options().version, 'runtime_default')
+    runtime_name = scala_build_info.get(self.get_options().version, 'runtime_default')
     return [getattr(self, runtime_name)]
 
 
