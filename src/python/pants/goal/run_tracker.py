@@ -70,6 +70,8 @@ class RunTracker(Subsystem):
     register('--num-background-workers', advanced=True, type=int,
              default=multiprocessing.cpu_count(),
              help='Number of threads for background work.')
+    register('--stats-local-json-file', advanced=True, default=None,
+             help='Write stats to this local json file on run completion.')
 
   def __init__(self, *args, **kwargs):
     super(RunTracker, self).__init__(*args, **kwargs)
@@ -248,6 +250,22 @@ class RunTracker(Subsystem):
       return error("Error: {}".format(e))
     return True
 
+  @classmethod
+  def write_stats_to_json(cls, file_name, stats):
+    """Write stats to a local json file.
+
+    :return: True if successfully written, False otherwise.
+    """
+    params = json.dumps(stats)
+    try:
+      with open(file_name, 'w') as f:
+        f.write(params)
+    except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
+      print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
+            file=sys.stderr)
+      return False
+    return True
+
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
     stats = {
@@ -269,6 +287,11 @@ class RunTracker(Subsystem):
     stats_url = self.get_options().stats_upload_url
     if stats_url:
       self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
+
+    # Write stats to local json file.
+    stats_json_file_name = self.get_options().stats_local_json_file
+    if stats_json_file_name:
+      self.write_stats_to_json(stats_json_file_name, stats)
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
