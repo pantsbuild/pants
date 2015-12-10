@@ -24,7 +24,6 @@ python_tests(
   name = 'dependencies',
   sources = ['test_dependencies.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/project_info/tasks:dependencies',
@@ -70,7 +69,6 @@ python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:java',

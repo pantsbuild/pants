@@ -61,7 +61,6 @@ python_library(
   dependencies = [
     ':compile_context',
     ':execution_graph',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',

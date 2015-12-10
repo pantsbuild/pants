@@ -42,7 +42,6 @@ python_tests(
   sources = ['test_sort_targets.py'],
   dependencies = [
     ':base',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/build_graph',
   ]
 )
@@ -100,12 +99,12 @@ python_tests(
   name = 'python_target',
   sources = ['test_python_target.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test'
   ]
 )
@@ -115,7 +114,8 @@ python_tests(
   sources = ['test_wiki_page.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.confluence',
-    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/targets:doc',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )

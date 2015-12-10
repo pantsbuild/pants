@@ -16,14 +16,14 @@ from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
-# TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
-# in pants java since non-jvm backends depend on it to run things.
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+# TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
+# in pants java since non-jvm backends depend on it to run things.
+from pants.build_graph.resources import Resources
 from pants.fs.archive import TGZ
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir
