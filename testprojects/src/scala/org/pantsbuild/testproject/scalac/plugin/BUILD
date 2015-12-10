@@ -5,6 +5,4 @@ scalac_plugin(name='plugin',
   plugin='hello_scalac',
   classname='org.pantsbuild.testproject.scalac.plugin.HelloScalac',
   sources=['HelloScalac.scala'],
-  dependencies=[
-  ],
 )
