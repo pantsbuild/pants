@@ -72,7 +72,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                           ])
 
   def compiler_classpath(self, products):
-    """ Return the proper classpath based on products and scala version. """
+    """Return the proper classpath based on products and scala version."""
     compiler_name = {
       '2.10': 'scalac_2_10',
       '2.11': 'scalac_2_11',
@@ -95,7 +95,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   @property
   def runtime(self):
-    """ Return the proper runtime based on scala version.
+    """Return the proper runtime based on scala version.
     :return iterator: list with single runtime.
     """
     runtime_name = {
