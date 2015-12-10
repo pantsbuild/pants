@@ -7,13 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import BaseHTTPServer
 import json
-import os
-import random
-import string
 import threading
 import urlparse
 
 from pants.goal.run_tracker import RunTracker
+from pants.util.contextutil import temporary_file_path
 from pants_test.base_test import BaseTest
 
 
@@ -52,13 +50,10 @@ class RunTrackerTest(BaseTest):
   def test_write_stats_to_json_file(self):
     # Set up
     stats = {'stats': {'foo': 'bar', 'baz': 42}}
-    file_name = '/tmp/{}.json'.format(''.join(random.sample(string.lowercase, 10)))
 
     # Execute & verify
-    try:
+    with temporary_file_path() as file_name:
       self.assertTrue(RunTracker.write_stats_to_json(file_name, stats))
       with open(file_name) as f:
         result = json.load(f)
         self.assertEquals(stats, result)
-    finally:
-      os.remove(file_name)
