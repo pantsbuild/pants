@@ -37,44 +37,64 @@ public class PantsRunnerTest {
   static final String MAIN_CLASS = "org.pantsbuild.tools.runner.testproject.MainClass";
 
   @Test
-  public void testPantsRunnerWorkingWithSyntheticJarWithArg() throws Exception {
-    assertOutputIsExpected("Hello! [arg1]",
+  public void testSyntheticJarWithArg() throws Exception {
+    assertOutputIsExpected("Hello!\n" +
+            "Args: [arg1]\n" +
+            "URL: synthetic.jar\nURL: main-class.jar\nURL: dependent-class.jar\n",
         new URL[]{SYNTHETIC_JAR.toURI().toURL()}, new String[]{MAIN_CLASS, "arg1"});
   }
 
   @Test
-  public void testPantsRunnerWorkingWithSyntheticJarWithoutArg() throws Exception {
-    assertOutputIsExpected("Hello! []",
+  public void testSyntheticJarWithoutArg() throws Exception {
+    assertOutputIsExpected("Hello!\n" +
+            "Args: []\n" +
+            "URL: synthetic.jar\nURL: main-class.jar\nURL: dependent-class.jar\n",
         new URL[]{SYNTHETIC_JAR.toURI().toURL()}, new String[]{MAIN_CLASS});
   }
 
   @Test()
-  public void testPantsRunnerWorkingWithSyntheticJarWithWrongMainClass() throws Exception {
-    assertExceptionWasThrown("There is no com.wow Main class",
+  public void testSyntheticJarWithWrongMainClass() throws Exception {
+    assertExceptionWasThrown(
+        ClassNotFoundException.class, "com.wow",
         new URL[]{SYNTHETIC_JAR.toURI().toURL()}, new String[]{"com.wow"});
   }
 
+  @Test()
+  public void testSyntheticJarWithNonStaticMainClass() throws Exception {
+    assertExceptionWasThrown(
+        IllegalArgumentException.class,
+        "Method 'main' for org.pantsbuild.tools.runner.testproject.DependentClass is not static.",
+        new URL[]{SYNTHETIC_JAR.toURI().toURL()},
+        new String[]{"org.pantsbuild.tools.runner.testproject.DependentClass"});
+  }
+
   @Test
-  public void testPantsRunnerWithTwoJars() throws Exception {
-    assertExceptionWasThrown("Should be only one jar in classpath",
+  public void testTwoJars() throws Exception {
+    assertExceptionWasThrown(
+        IllegalArgumentException.class, "Should be only one jar in a classpath.",
         new URL[]{SYNTHETIC_JAR.toURI().toURL(), MAIN_JAR.toURI().toURL()},
         new String[]{MAIN_CLASS});
   }
 
-  public void testPantsRunnerWithoutSyntheticJar() throws Exception {
-    assertExceptionWasThrown("jar should be synthetic with classpath attr",
+  @Test
+  public void testRunWithoutSyntheticJar() throws Exception {
+    assertExceptionWasThrown(
+        IllegalArgumentException.class,
+        "Supplied META-INF/MANIFEST.MF doesn't contains Class-Path section.",
         new URL[]{MAIN_JAR.toURI().toURL()},
         new String[]{MAIN_CLASS});
   }
 
-  private static void assertExceptionWasThrown(String expectedMessage,
+  private static void assertExceptionWasThrown(Class<? extends Exception> exceptionClass,
+                                               String exceptionMessage,
                                                URL[] classpath, String[] args) {
     boolean failed = true;
     try {
       runRunner(classpath, args);
       failed = false;
     } catch (Exception e) {
-      assertEquals(expectedMessage, e.getMessage());
+      assertEquals(exceptionClass, e.getClass());
+      assertEquals(exceptionMessage, e.getMessage());
     }
 
     if (!failed) {
