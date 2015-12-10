@@ -48,7 +48,7 @@ public class PantsRunner {
     Manifest manifest = jar.getManifest();
     if (manifest == null) {
       throw new IllegalArgumentException("Supplied jar file doesn't contains " +
-          "META-INF/MANIFEST.MF file.");
+          "manifest file.");
     }
     String classpath = manifest.getMainAttributes().getValue("Class-Path");
     if (classpath == null) {
