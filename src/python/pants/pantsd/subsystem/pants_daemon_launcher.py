@@ -6,9 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import os
 
+from pants.base.build_environment import get_buildroot
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.service.pailgun_service import PailgunService
+from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -30,12 +33,14 @@ class PantsDaemonLauncher(Subsystem):
     super(PantsDaemonLauncher, self).__init__(*args, **kwargs)
     self.options = self.get_options()
     self._logger = logging.getLogger(__name__)
+    self._buildroot = get_buildroot()
     self._pants_workdir = self.options.pants_workdir
     self._log_dir = self.options.log_dir
     self._log_level = self.options.level.upper()
     self._pailgun_host = self.options.pailgun_host
     self._pailgun_port = self.options.pailgun_port
     self._pantsd = None
+    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._buildroot, '.pantsd.startup'))
 
   @property
   def pantsd(self):
@@ -77,9 +82,12 @@ class PantsDaemonLauncher(Subsystem):
     self.pantsd.await_pid(10)
 
   def maybe_launch(self):
-    if not self.pantsd.is_alive():
-      self._logger.debug('launching pantsd')
-      self._launch_pantsd()
+    self._logger.debug('acquiring lock: {}'.format(self._lock))
+    with self._lock:
+      if not self.pantsd.is_alive():
+        self._logger.debug('launching pantsd')
+        self._launch_pantsd()
+    self._logger.debug('released lock: {}'.format(self._lock))
 
     self._logger.debug('pantsd is running at pid {}'.format(self.pantsd.pid))
 

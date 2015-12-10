@@ -111,7 +111,8 @@ class PantsDaemon(ProcessManager):
     self._close_fds()
 
     # Redirect stdio to the root logger.
-    sys.stdout = sys.stderr = _StreamLogger(logging.getLogger(), log_level)
+    sys.stdout = _StreamLogger(logging.getLogger(), logging.INFO)
+    sys.stderr = _StreamLogger(logging.getLogger(), logging.WARN)
 
     self._logger.debug('logging initialized')
 

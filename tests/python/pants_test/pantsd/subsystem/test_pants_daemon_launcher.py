@@ -13,11 +13,11 @@ from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import create_subsystem
 
 
-class TestPantsDaemonLauncher(BaseTest):
+class PantsDaemonLauncherTest(BaseTest):
   PDL_PATCH_OPTS = dict(autospec=True, spec_set=True, return_value=(None, None))
 
   def setUp(self):
-    super(TestPantsDaemonLauncher, self).setUp()
+    super(PantsDaemonLauncherTest, self).setUp()
     self.launcher = create_subsystem(PantsDaemonLauncher,
                                      pants_workdir='/pants_workdir',
                                      level='info')

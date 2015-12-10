@@ -15,7 +15,7 @@ from pants.util.contextutil import stdio_as
 from pants_test.base_test import BaseTest
 
 
-class TestStreamLogger(BaseTest):
+class StreamLoggerTest(BaseTest):
 
   TEST_LOG_LEVEL = logging.INFO
 
@@ -38,9 +38,9 @@ class TestStreamLogger(BaseTest):
     _StreamLogger(mock.Mock(), self.TEST_LOG_LEVEL).flush()
 
 
-class TestPantsDaemon(BaseTest):
+class PantsDaemonTest(BaseTest):
   def setUp(self):
-    super(TestPantsDaemon, self).setUp()
+    super(PantsDaemonTest, self).setUp()
     self.pantsd = PantsDaemon('test_work_dir', logging.INFO, log_dir='/non_existent')
     self.pantsd.set_services([])
     self.pantsd.set_socket_map({})
