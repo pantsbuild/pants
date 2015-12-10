@@ -6,16 +6,22 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import namedtuple
 from textwrap import dedent
 
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import safe_mkdir, safe_open
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
+class Compile(namedtuple('Compile', ['srcfiles', 'config', 'artifact_count'])):
+  pass
+
+
 class CacheCompileIntegrationTest(BaseCompileIT):
+
   def run_compile(self, target_spec, config, workdir):
     args = ['compile', target_spec]
     pants_run = self.run_pants_with_workdir(args, workdir, config)
@@ -86,38 +92,54 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
   def test_incremental_caching(self):
     """Tests that with --no-incremental-caching, we don't write incremental artifacts."""
+
+    srcfile = 'A.java'
+    def config(incremental_caching):
+      return { 'compile.zinc': {'incremental_caching': incremental_caching} }
+
+    self._do_test_caching(
+        Compile({srcfile: "class A {}"}, config(False), 1),
+        Compile({srcfile: "final class A {}"}, config(False), 1),
+        Compile({srcfile: "public final class A {}"}, config(True), 2),
+    )
+
+  def test_incremental(self):
+    """Tests that with --no-incremental and --no-incremental-caching, we always write artifacts."""
+
+    srcfile = 'A.java'
+    config = {'compile.zinc': {'incremental': False, 'incremental_caching': False}}
+
+    self._do_test_caching(
+        Compile({srcfile: "class A {}"}, config, 1),
+        Compile({srcfile: "final class A {}"}, config, 2),
+        Compile({srcfile: "public final class A {}"}, config, 3),
+    )
+
+  def _do_test_caching(self, *compiles):
+    """Tests that the given compiles within the same workspace produce the given artifact counts."""
     with temporary_dir() as cache_dir, \
         self.temporary_workdir() as workdir, \
         temporary_dir(root_dir=get_buildroot()) as src_dir:
 
-      def config(incremental_caching):
-        return {
-          'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-          'compile.zinc': {'incremental_caching': incremental_caching},
-        }
+      def complete_config(config):
+        # Clone the input config and add cache settings.
+        cache_settings = {'write_to': [cache_dir], 'read_from': [cache_dir]}
+        return dict(config.items() + [('cache.compile.zinc', cache_settings)])
 
-      srcfile = os.path.join(src_dir, 'A.java')
       buildfile = os.path.join(src_dir, 'BUILD')
       spec = os.path.join(src_dir, ':cachetest')
       artifact_dir = os.path.join(cache_dir,
                                   ZincCompile.stable_name(),
                                   '{}.cachetest'.format(os.path.basename(src_dir)))
 
-      self.create_file(srcfile, """class A {}""")
-      self.create_file(buildfile, """java_library(name='cachetest', sources=['A.java'])""")
+      for c in compiles:
+        # Clear the src directory and recreate the files.
+        safe_mkdir(src_dir, clean=True)
+        self.create_file(buildfile,
+                        """java_library(name='cachetest', sources=rglobs('*.java', '*.scala'))""")
+        for name, content in c.srcfiles.items():
+          self.create_file(os.path.join(src_dir, name), content)
 
-
-      # Confirm that the result is one cached artifact.
-      self.run_compile(spec, config(False), workdir)
-      clean_artifacts = os.listdir(artifact_dir)
-      self.assertEquals(1, len(clean_artifacts))
-
-      # Modify the file, and confirm that artifacts haven't changed.
-      self.create_file(srcfile, """final class A {}""")
-      self.run_compile(spec, config(False), workdir)
-      self.assertEquals(clean_artifacts, os.listdir(artifact_dir))
-
-      # Modify again, this time with incremental and confirm that we have a second artifact.
-      self.create_file(srcfile, """public final class A {}""")
-      self.run_compile(spec, config(True), workdir)
-      self.assertEquals(2, len(os.listdir(artifact_dir)))
+        # Compile, and confirm that we have the right count of artifacts.
+        self.run_compile(spec, complete_config(c.config), workdir)
+        self.assertEquals(c.artifact_count, len(os.listdir(artifact_dir)))

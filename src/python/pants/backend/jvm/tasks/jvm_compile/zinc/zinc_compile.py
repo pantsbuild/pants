@@ -121,6 +121,12 @@ class ZincCompile(JvmCompile):
                   'Options not listed here are subject to change/removal. The value of the dict '
                   'indicates that an option accepts an argument.')
 
+    register('--incremental', advanced=True, action='store_true', default=True,
+             help='When set, zinc will use sub-target incremental compilation, which dramatically '
+                  'improves compile performance while changing large targets. When unset, '
+                  'changed targets will be compiled with an empty output directory, as if after '
+                  'running clean-all.')
+
     # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
     #  https://github.com/sbt/sbt/pull/2085
     #  https://github.com/sbt/sbt/pull/2160
@@ -182,7 +188,7 @@ class ZincCompile(JvmCompile):
     Setting this property causes the task infrastructure to clone the previous
     results_dir for a target into the new results_dir for a target.
     """
-    return True
+    return self.get_options().incremental
 
   @property
   def cache_incremental(self):
