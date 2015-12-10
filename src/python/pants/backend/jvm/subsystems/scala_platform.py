@@ -16,7 +16,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized
 
 
-major_version_info = namedtuple(major_version_info, 'full_version compiler_name runtime_name')
+major_version_info = namedtuple('major_version_info', 'full_version compiler_name runtime_name')
 scala_build_info = {
   '2.10': major_version_info('2.10.4', 'scalac_2_10', 'runtime_2_10'),
   '2.11': major_version_info('2.11.7', 'scalac_2_11', 'runtime_2_11'),
@@ -110,11 +110,23 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
   @classmethod
   @memoized
   def _synthetic_runtime_target(cls, buildgraph):
-    resource_address = Address.parse('//:scala-library')
-    if not buildgraph.contains_address(resource_address):
-      runtime = ScalaPlatform.global_instance().runtime
-      buildgraph.inject_synthetic_target(resource_address, JarLibrary,
-                                               derived_from=cls,
-                                               jars=runtime)
+    """Insert synthetic target for scala runtime into the buildgraph
+    :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object
+    :return pants.build_graph.address.Address:
+    """
+    # If scala-library is already defined return it instead of synthetic target
+    # This will pull in user defined scala-library defs
+    library_address = Address.parse('//:scala-library')
+    if buildgraph.contains_address(library_address):
+      return buildgraph.get_target(library_address)
+    else:
+      # Create an address for the synthetic target if needed
+      synth_library_address = Address.parse('//:scala_library_synthetic_resource')
+      if not buildgraph.contains_address(synth_library_address):
+        runtime = ScalaPlatform.global_instance().runtime
+        buildgraph.inject_synthetic_target(synth_library_address, JarLibrary,
+                                                 derived_from=cls,
+                                                 jars=runtime)
+      return buildgraph.get_target(synth_library_address)
 
-    return buildgraph.get_target(resource_address)
+    return buildgraph.get_target(library_address)
