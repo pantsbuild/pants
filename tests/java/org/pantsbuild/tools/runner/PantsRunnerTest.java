@@ -71,7 +71,7 @@ public class PantsRunnerTest {
   @Test
   public void testTwoJars() throws Exception {
     assertExceptionWasThrown(
-        IllegalArgumentException.class, "Should be only one jar in a classpath.",
+        IllegalArgumentException.class, "Should be exactly one jar file in the classpath.",
         new URL[]{SYNTHETIC_JAR.toURI().toURL(), MAIN_JAR.toURI().toURL()},
         new String[]{MAIN_CLASS});
   }
@@ -80,7 +80,7 @@ public class PantsRunnerTest {
   public void testRunWithoutSyntheticJar() throws Exception {
     assertExceptionWasThrown(
         IllegalArgumentException.class,
-        "Supplied META-INF/MANIFEST.MF doesn't contains Class-Path section.",
+        "Supplied jar file's manifest doesn't contains Class-Path section.",
         new URL[]{MAIN_JAR.toURI().toURL()},
         new String[]{MAIN_CLASS});
   }
