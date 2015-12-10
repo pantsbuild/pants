@@ -42,7 +42,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     # No need to fingerprint --runtime, because it is automatically inserted as a
     # dependency for the scala_library target.
 
-    register('--version', advanced=True, default='2.10',
+    register('--version', advanced=True, default='2.10', choices=['2.10', '2.11'],
              help='The scala "platform version", which is suffixed onto all published '
                   'libraries. This should match the declared compiler/library versions.')
 
