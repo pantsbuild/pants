@@ -9,38 +9,35 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class PantsRunnerTest {
-  /**
-   * Contains:
-   * <PRE>
-   * META-INF/MANIFEST.MF
-   * org/pantsbuild/tools/runner/testproject/MainClass.class
-   * </PRE>
-   */
-  static final File MAIN_JAR =
-      new File("tests/resources/org/pantsbuild/tools/runner/main-class.jar");
-
-  /**
-   * Contains:
-   * <PRE>
-   * META-INF/MANIFEST.MF
-   * </PRE>
-   */
+  static final String TEST_PROJECT =
+      "tests/java/org/pantsbuild/tools/runner/testproject/:pants-runner-testproject";
   static final File SYNTHETIC_JAR =
-      new File("tests/resources/org/pantsbuild/tools/runner/synthetic.jar");
-
+      new File("dist/pants-runner-testproject-bundle/pants-runner-testproject.jar");
+  static final File MAIN_JAR =
+      new File("dist/pants-runner-testproject-bundle/libs/" +
+          "tests.java.org.pantsbuild.tools.runner.testproject.main-class/0-z.jar");
   static final String MAIN_CLASS = "org.pantsbuild.tools.runner.testproject.MainClass";
+
+  @BeforeClass
+  public static void setup() throws Exception {
+    assertEquals(0, Runtime.getRuntime().exec("./pants bundle " + TEST_PROJECT).waitFor());
+    assertTrue(SYNTHETIC_JAR.exists());
+    assertTrue(MAIN_JAR.exists());
+  }
 
   @Test
   public void testSyntheticJarWithArg() throws Exception {
     assertOutputIsExpected("Hello!\n" +
             "Args: [arg1]\n" +
-            "URL: synthetic.jar\nURL: main-class.jar\nURL: dependent-class.jar\n",
+            "URL: pants-runner-testproject.jar\nURL: 0-z.jar\nURL: 0-z.jar\n",
         new URL[]{SYNTHETIC_JAR.toURI().toURL()}, new String[]{MAIN_CLASS, "arg1"});
   }
 
@@ -48,7 +45,7 @@ public class PantsRunnerTest {
   public void testSyntheticJarWithoutArg() throws Exception {
     assertOutputIsExpected("Hello!\n" +
             "Args: []\n" +
-            "URL: synthetic.jar\nURL: main-class.jar\nURL: dependent-class.jar\n",
+            "URL: pants-runner-testproject.jar\nURL: 0-z.jar\nURL: 0-z.jar\n",
         new URL[]{SYNTHETIC_JAR.toURI().toURL()}, new String[]{MAIN_CLASS});
   }
 
@@ -80,7 +77,7 @@ public class PantsRunnerTest {
   public void testRunWithoutSyntheticJar() throws Exception {
     assertExceptionWasThrown(
         IllegalArgumentException.class,
-        "Supplied jar file's manifest doesn't contains Class-Path section.",
+        "Supplied jar file doesn't contains manifest file.",
         new URL[]{MAIN_JAR.toURI().toURL()},
         new String[]{MAIN_CLASS});
   }

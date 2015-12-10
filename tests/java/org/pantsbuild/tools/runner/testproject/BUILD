@@ -6,11 +6,18 @@ java_library(
   dependencies=[
     ':dependent-class',
   ],
-  sources=globs('MainClass.java')
+  sources=['MainClass.java']
 )
 
 java_library(
   name='dependent-class',
   dependencies=[],
-  sources=globs('DependentClass.java')
+  sources=['DependentClass.java']
+)
+
+jvm_binary(
+  name='pants-runner-testproject',
+  dependencies=[
+    ':main-class',
+  ]
 )
