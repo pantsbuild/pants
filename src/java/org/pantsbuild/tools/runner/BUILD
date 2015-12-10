@@ -8,7 +8,7 @@ java_library(
     name='pants-runner',
     repo=public,
     publication_metadata=pants_library("""
-      A command line tool for injecting a classpath read from a file into the system classpath.
+      A command line tool for fixing problems with custom classloading and synthetic jar.
     """)
   ),
   dependencies=[
@@ -20,11 +20,11 @@ java_library(
 jvm_binary(
   name='runner-binary',
   basename='pants-runner',
-  main='org.pantsbuild.tools.runner.FileClassPathRunner',
+  main='org.pantsbuild.tools.runner.PantsRunner',
   dependencies=[
     ':runner-library',
   ],
   description="""
-    A command line tool for injecting a classpath read from a file into the system classpath.
+    A command line tool for fixing problems with custom classloading and synthetic jar.
   """
 )
