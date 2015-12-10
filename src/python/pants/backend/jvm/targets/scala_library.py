@@ -7,11 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
-from pants.util.memo import memoized_property
 
 
 class ScalaLibrary(ExportableJvmLibrary):
@@ -62,8 +59,7 @@ class ScalaLibrary(ExportableJvmLibrary):
     for java_source_target in self.java_sources:
       for jar in java_source_target.jar_dependencies:
         yield jar
-
-    yield self._synthetic_runtime_target().address.spec
+    yield ScalaPlatform._synthetic_runtime_target(self._build_graph).address.spec
 
   @property
   def java_sources(self):
@@ -73,13 +69,3 @@ class ScalaLibrary(ExportableJvmLibrary):
       if target is None:
         raise TargetDefinitionException(self, 'No such java target: {}'.format(spec))
       yield target
-
-  def _synthetic_runtime_target(self):
-    resource_address = Address.parse('//:scala-library')
-    if not self._build_graph.contains_address(resource_address):
-      runtime = ScalaPlatform.global_instance().runtime
-      self._build_graph.inject_synthetic_target(resource_address, JarLibrary,
-                                                derived_from=self,
-                                                jars=runtime)
-
-    return self._build_graph.get_target(resource_address)

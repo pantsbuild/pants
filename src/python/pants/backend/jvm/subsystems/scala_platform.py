@@ -8,7 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.build_graph.address import Address
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized
 
 
 SCALA_211 = '2.11.7'
@@ -104,3 +107,16 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       'runtime_default': 'runtime_default',
     }.get(self.get_options().version, 'runtime_default')
     return [getattr(self, runtime_name)]
+
+
+  @classmethod
+  @memoized
+  def _synthetic_runtime_target(cls, buildgraph):
+    resource_address = Address.parse('//:scala-library')
+    if not buildgraph.contains_address(resource_address):
+      runtime = ScalaPlatform.global_instance().runtime
+      buildgraph.inject_synthetic_target(resource_address, JarLibrary,
+                                               derived_from=cls,
+                                               jars=runtime)
+
+    return buildgraph.get_target(resource_address)
