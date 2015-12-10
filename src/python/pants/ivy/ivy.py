@@ -66,7 +66,7 @@ class Ivy(object):
     # (because it's just a plain old object), because Ivy is only constructed by Bootstrapper, which
     # makes an explicit call to IvySubsystem.global_instance() in its constructor, which in turn has
     # a declared dependency on DistributionLocator.
-    executor = executor or SubprocessExecutor(DistributionLocator.cached())
+    executor = executor or SubprocessExecutor(DistributionLocator.cached(minimum_version='1.6'))
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
       result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
@@ -80,7 +80,7 @@ class Ivy(object):
     """Creates an ivy commandline client runner for the given args."""
     args = args or []
     jvm_options = jvm_options or []
-    executor = executor or SubprocessExecutor(DistributionLocator.cached())
+    executor = executor or SubprocessExecutor(DistributionLocator.cached(minimum_version='1.6'))
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))
