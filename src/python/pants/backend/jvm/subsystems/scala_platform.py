@@ -20,6 +20,7 @@ major_version_info = namedtuple('major_version_info', 'full_version compiler_nam
 scala_build_info = {
   '2.10': major_version_info('2.10.4', 'scalac_2_10', 'runtime_2_10'),
   '2.11': major_version_info('2.11.7', 'scalac_2_11', 'runtime_2_11'),
+  'custom': major_version_info(None, 'scalac', 'runtime_default'),
 }
 
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
@@ -45,9 +46,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     super(ScalaPlatform, cls).register_options(register)
     # Version specified will allow the user provide some sane defaults for common
     # versions of scala. If version is something other than one of the common
-    # versions the user will be able to overrride the defaults by specifying
+    # versions the user will be able to override the defaults by specifying
     # custom build targets for //:scalac and //:scala-library
-    register('--version', advanced=True, default='2.10',
+    register('--version', advanced=True, default='2.10', choices=['2.10', '2.11', 'custom'],
              help='The scala "platform version", which is suffixed onto all published '
                   'libraries. This should match the declared compiler/library versions.')
 
@@ -81,7 +82,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    compiler_name = scala_build_info.get(self.get_options().version, scalac)
+    compiler_name = scala_build_info.get(self.get_options().version, 'scalac')
     return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
 
   @property
