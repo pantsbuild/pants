@@ -41,7 +41,10 @@ class StreamLoggerTest(BaseTest):
 class PantsDaemonTest(BaseTest):
   def setUp(self):
     super(PantsDaemonTest, self).setUp()
-    self.pantsd = PantsDaemon('test_work_dir', logging.INFO, log_dir='/non_existent')
+    self.pantsd = PantsDaemon('test_buildroot',
+                              'test_work_dir',
+                              logging.INFO,
+                              log_dir='/non_existent')
     self.pantsd.set_services([])
     self.pantsd.set_socket_map({})
 

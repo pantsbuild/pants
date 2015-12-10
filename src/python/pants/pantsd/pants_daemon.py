@@ -47,8 +47,9 @@ class PantsDaemon(ProcessManager):
   class StartupFailure(Exception): pass
   class RuntimeFailure(Exception): pass
 
-  def __init__(self, work_dir, log_level, log_dir=None, services=None):
+  def __init__(self, build_root, work_dir, log_level, log_dir=None, services=None):
     """
+    :param string build_root: The pants build root.
     :param string work_dir: The pants work directory.
     :param int log_level: The log level to use for daemon logging.
     :param string log_dir: The directory to use for file-based logging via the daemon. (Optional)
@@ -56,6 +57,7 @@ class PantsDaemon(ProcessManager):
     """
     super(PantsDaemon, self).__init__(name='pantsd')
     self._logger = logging.getLogger(__name__)
+    self._build_root = build_root
     self._work_dir = work_dir
     self._log_level = log_level
     self._log_dir = log_dir or os.path.join(work_dir, self.name)
@@ -118,6 +120,9 @@ class PantsDaemon(ProcessManager):
 
   def _clean_runtime_state(self):
     """Resets the runtime state from running ./pants -> running in the fork()'d daemon context."""
+    # TODO(kwlzn): Make this logic available to PantsRunner et al for inline state reset before
+    # pants runs to improve testability and avoid potential bitrot.
+
     # Reset RunTracker state.
     RunTracker.global_instance().reset(reset_options=False)
 
@@ -169,7 +174,7 @@ class PantsDaemon(ProcessManager):
     self._clean_runtime_state()
 
     # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
-    set_process_title('pantsd')
+    set_process_title('pantsd [{}]'.format(self._build_root))
 
     # Write service socket information to .pids.
     self._write_named_sockets(self._socket_map)

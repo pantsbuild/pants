@@ -33,19 +33,22 @@ class PantsDaemonLauncher(Subsystem):
     super(PantsDaemonLauncher, self).__init__(*args, **kwargs)
     self.options = self.get_options()
     self._logger = logging.getLogger(__name__)
-    self._buildroot = get_buildroot()
+    self._build_root = get_buildroot()
     self._pants_workdir = self.options.pants_workdir
     self._log_dir = self.options.log_dir
     self._log_level = self.options.level.upper()
     self._pailgun_host = self.options.pailgun_host
     self._pailgun_port = self.options.pailgun_port
     self._pantsd = None
-    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._buildroot, '.pantsd.startup'))
+    self._lock = OwnerPrintingPIDLockFile(os.path.join(self._build_root, '.pantsd.startup'))
 
   @property
   def pantsd(self):
     if not self._pantsd:
-      self._pantsd = PantsDaemon(self._pants_workdir, self._log_level, self._log_dir)
+      self._pantsd = PantsDaemon(self._build_root,
+                                 self._pants_workdir,
+                                 self._log_level,
+                                 self._log_dir)
     return self._pantsd
 
   def _setup_services(self):
