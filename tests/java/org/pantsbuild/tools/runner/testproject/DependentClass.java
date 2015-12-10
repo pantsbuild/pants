@@ -7,4 +7,7 @@ public class DependentClass {
   public static String getDependentClassMessage() {
     return "Hello!";
   }
+
+  public void main(String[] args) {
+  }
 }
