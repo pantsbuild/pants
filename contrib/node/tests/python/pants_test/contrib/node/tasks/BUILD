@@ -12,6 +12,7 @@ target(
 target(
   name='integration',
   dependencies=[
+    ':node_bundle_integration',
     ':node_repl_integration',
     ':node_run_integration',
     ':node_test_integration',
@@ -24,6 +25,16 @@ target(
   dependencies=[
     ':node_task',
     ':node_resolve',
+  ]
+)
+
+python_tests(
+  name='node_bundle_integration',
+  sources=['test_node_bundle_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+    'src/python/pants/fs',
+    'src/python/pants/util:contextutil',
   ]
 )
 
