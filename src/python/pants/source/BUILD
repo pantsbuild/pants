@@ -6,7 +6,9 @@ python_library(
   sources=globs('*.py'),
   dependencies=[
     '3rdparty/python:six',
+    'src/python/pants/backend/core:wrapped_globs',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:validation',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',

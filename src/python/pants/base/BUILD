@@ -112,7 +112,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':build_environment',
-    ':validation',
     'src/python/pants/util:meta',
   ]
 )
@@ -182,9 +181,9 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    '3rdparty/python:six',
     'src/python/pants/backend/core:wrapped_globs',
   ],
 )

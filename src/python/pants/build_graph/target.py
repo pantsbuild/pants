@@ -18,11 +18,11 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
-from pants.base.payload_field import DeferredSourcesField, SourcesField
 from pants.base.validation import assert_list
 from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
+from pants.source.payload_fields import DeferredSourcesField, SourcesField
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
