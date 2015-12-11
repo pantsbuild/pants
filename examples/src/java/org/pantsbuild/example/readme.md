@@ -165,10 +165,10 @@ must compile before it can test.
     $ ./pants test examples/src/java/org/pantsbuild/example/hello/:: examples/tests/java/org/pantsbuild/example/hello/::
 
 Assuming you use `junit_test` targets, output from the `junit` run is written to
-`.pants.d/test/junit/`; you can see it on the console with `--no--suppress-output`:
+`.pants.d/test/junit/`; you can see it on the console with `--output-mode=ALL`:
 
     :::bash
-    $ ./pants test.junit --no-suppress-output examples/tests/java/org/pantsbuild/example/hello::
+    $ ./pants test.junit --output-mode=ALL examples/tests/java/org/pantsbuild/example/hello::
 
 
 **Run just that one troublesome test class:** (assuming a JUnit test;

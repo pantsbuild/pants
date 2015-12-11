@@ -380,10 +380,6 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
-  'dependencies': {'defn':
-                     msg_entry('dependencies',
-                               'Old name for `target`_',
-                               'Old name for <a href="#target">target</a>')},
   'egg': {'defn': msg_entry('egg',
                             'In older Pants, loads a pre-built Python egg '
                             'from file system. Undefined in newer Pants.',
@@ -400,12 +396,6 @@ PREDEFS = {  # some hardwired entries
                         """In old Pants versions, a reference to a Pants targets.
                         (In new Pants versions, just use strings.)""")},
   'python_artifact': {'suppress': True},  # unused alias for PythonArtifact
-  'python_test_suite': {'defn':
-                          msg_entry('python_test_suite',
-                                    'Deprecated way to group Python tests;'
-                                    ' use `target`_',
-                                    'Deprecated way to group Python tests;'
-                                    ' use <a href="#target">target</a>')},
 }
 
 
