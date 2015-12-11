@@ -189,7 +189,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
         'roots': [],
         'id': current_target.id,
         'target_type': get_target_type(current_target),
-        'is_code_gen': current_target.is_codegen,
+        'is_code_gen': current_target.is_synthetic,
+        'is_synthetic': current_target.is_synthetic,
         'pants_target_type': self._get_pants_target_alias(type(current_target))
       }
 
