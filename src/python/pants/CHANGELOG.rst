@@ -1,6 +1,71 @@
 RELEASE HISTORY
 ===============
 
+0.0.64 (12/11/2015)
+-------------------
+
+Reviewers: Soliciting opinions on noteworthy items for the past week!
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to junit-runner 1.0.0.
+  `RB #3232 <https://rbcommons.com/s/twitter/r/3232>`_
+
+* Remove deprecated `-suppress-output` flag.
+  `RB #3229 <https://rbcommons.com/s/twitter/r/3229>`_
+
+* Kill `dependencies`, `python_test_suite` and old task base class aliases.
+  `RB #3228 <https://rbcommons.com/s/twitter/r/3228>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix problem with too long classpath while starting scala repl: python part
+  `RB #3195 <https://rbcommons.com/s/twitter/r/3195>`_
+
+* Fix problem with too long classpath while starting scala repl: java part
+  `RB #3194 <https://rbcommons.com/s/twitter/r/3194>`_
+
+* Fixing instrumentation classpath mutation to support multiple targets and entries.
+  `RB #3108 <https://rbcommons.com/s/twitter/r/3108>`_
+
+* Use target.id to create the stable classpath for bundle and export-classpath
+  `RB #3211 <https://rbcommons.com/s/twitter/r/3211>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add an option to write build stats into a local json file.
+  `RB #3218 <https://rbcommons.com/s/twitter/r/3218>`_
+
+* Make incremental compile optional for zinc
+  `RB #3226 <https://rbcommons.com/s/twitter/r/3226>`_
+
+* Create a test timeout_maximum flag so that we can prevent people from setting an insanely huge timeout
+  `RB #3219 <https://rbcommons.com/s/twitter/r/3219>`_
+
+* Add a jvm_prep_command that can work in compile, test, and binary goals
+  `RB #3209 <https://rbcommons.com/s/twitter/r/3209>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Implement PantsDaemon et al.
+  `RB #3224 <https://rbcommons.com/s/twitter/r/3224>`_
+
+* New implementation of `./pants targets`.
+  `RB #3214 <https://rbcommons.com/s/twitter/r/3214>`_
+
+* Allow alternate_target_roots to specify an empty collection
+  `RB #3216 <https://rbcommons.com/s/twitter/r/3216>`_
+
+* Remove group task and register zinc_compile directly
+  `RB #3215 <https://rbcommons.com/s/twitter/r/3215>`_
+
+* Bump the default Go distribution to 1.5.2.
+  `RB #3208 <https://rbcommons.com/s/twitter/r/3208>`_
+
 0.0.63 (12/04/2015)
 -------------------
 
