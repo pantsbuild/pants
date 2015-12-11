@@ -18,13 +18,13 @@ import static org.junit.Assert.fail;
 
 public class PantsRunnerTest {
   static final String TEST_PROJECT =
-      "tests/java/org/pantsbuild/tools/runner/testproject/:pants-runner-testproject";
+      "testprojects/src/java/org/pantsbuild/testproject/runner:pants-runner-testproject";
   static final File SYNTHETIC_JAR =
       new File("dist/pants-runner-testproject-bundle/pants-runner-testproject.jar");
   static final File MAIN_JAR =
       new File("dist/pants-runner-testproject-bundle/libs/" +
-          "tests.java.org.pantsbuild.tools.runner.testproject.main-class/0-z.jar");
-  static final String MAIN_CLASS = "org.pantsbuild.tools.runner.testproject.MainClass";
+          "testprojects.src.java.org.pantsbuild.testproject.runner.main-class/0-z.jar");
+  static final String MAIN_CLASS = "org.pantsbuild.testproject.runner.MainClass";
 
   @BeforeClass
   public static void setup() throws Exception {
@@ -60,9 +60,9 @@ public class PantsRunnerTest {
   public void testSyntheticJarWithNonStaticMainClass() throws Exception {
     assertExceptionWasThrown(
         IllegalArgumentException.class,
-        "Method 'main' for org.pantsbuild.tools.runner.testproject.DependentClass is not static.",
+        "Method 'main' for org.pantsbuild.testproject.runner.DependentClass is not static.",
         new URL[]{SYNTHETIC_JAR.toURI().toURL()},
-        new String[]{"org.pantsbuild.tools.runner.testproject.DependentClass"});
+        new String[]{"org.pantsbuild.testproject.runner.DependentClass"});
   }
 
   @Test

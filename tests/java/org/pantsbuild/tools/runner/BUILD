@@ -8,7 +8,4 @@ junit_tests(
     '3rdparty:junit',
     'src/java/org/pantsbuild/tools/runner:runner-library',
   ],
-  resources=[
-    'tests/resources/org/pantsbuild/tools/runner',
-  ],
 )
