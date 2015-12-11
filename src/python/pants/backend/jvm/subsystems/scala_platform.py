@@ -83,7 +83,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    compiler_name = scala_build_info.get(self.get_options().version, 'scalac')
+    compiler_name = scala_build_info.get(self.get_options().version, 'custom').compiler_name
     return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
 
   @property
