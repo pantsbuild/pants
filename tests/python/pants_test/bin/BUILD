@@ -1,17 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='bin',
-  dependencies=[
-    ':extension_loader',
-    ':goal_runner',
-    ':plugin_resolver',
-    ':repro',
-    ':repro_ignore',
-  ]
-)
-
 python_tests(
   name = 'extension_loader',
   sources = ['test_extension_loader.py'],

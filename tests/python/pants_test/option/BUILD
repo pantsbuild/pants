@@ -1,13 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='option',
-  dependencies=[
-    ':testing'
-  ],
-)
-
 python_tests(
   name='testing',
   sources=globs('*.py', exclude=[globs('*_integration.py')]),
@@ -30,6 +23,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -41,4 +35,5 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )

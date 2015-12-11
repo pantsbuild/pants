@@ -1,14 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='targets',
-  dependencies=[
-    ':node_package',
-    ':node_remote_module',
-  ]
-)
-
 python_tests(
   name='node_remote_module',
   sources=['test_node_remote_module.py'],

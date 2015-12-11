@@ -1,18 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='targets',
-  dependencies=[
-    ':jar_dependency',
-    ':jar_library',
-    ':jvm_app',
-    ':jvm_binary',
-    ':jvm_target',
-    ':unpacked_jars',
-  ]
-)
-
 python_tests(
   name='jar_dependency',
   sources=['test_jar_dependency.py'],

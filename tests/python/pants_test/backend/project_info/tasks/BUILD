@@ -2,17 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'all',
-  dependencies = [
-    ':dependencies',
-    ':depmap',
-    ':export',
-    ':filedeps',
-    ':ide_gen',
-  ],
-)
-
-python_library(
   name = 'resolve_jars_test_mixin',
   sources = ['resolve_jars_test_mixin.py'],
   dependencies = [
@@ -54,6 +43,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -63,6 +53,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -97,7 +88,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -133,4 +125,5 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
