@@ -104,7 +104,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper runtime based on scala version.
     :return iterator: list with single runtime.
     """
-    runtime_name = scala_build_info.get(self.get_options().version, 'runtime_default')
+    runtime_name = scala_build_info.get(self.get_options().version, 'runtime_default').runtime_name
     return [getattr(self, runtime_name)]
 
 
@@ -125,9 +125,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       synth_library_address = Address.parse('//:scala_library_synthetic_resource')
       if not buildgraph.contains_address(synth_library_address):
         runtime = ScalaPlatform.global_instance().runtime
-        buildgraph.inject_synthetic_target(synth_library_address, JarLibrary,
-                                                 derived_from=cls,
-                                                 jars=runtime)
+        buildgraph.inject_synthetic_target(synth_library_address,
+                                           JarLibrary,
+                                           jars=runtime)
       return buildgraph.get_target(synth_library_address)
 
     return buildgraph.get_target(library_address)
