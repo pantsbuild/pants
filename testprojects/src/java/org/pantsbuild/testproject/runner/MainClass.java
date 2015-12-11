@@ -14,7 +14,7 @@ public class MainClass {
     System.out.println("Args: " + Arrays.toString(args));
     for (URL url : ((URLClassLoader) MainClass.class.getClassLoader()).getURLs()) {
       System.out.println("URL: " + url.toString().substring(url.toString().lastIndexOf("/") + 1));
-      // all urls should be openable
+      // All urls should be openable.
       url.openStream().close();
     }
   }
