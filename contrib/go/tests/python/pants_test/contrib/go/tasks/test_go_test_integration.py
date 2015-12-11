@@ -18,10 +18,10 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
 
   def test_go_test_unstyle(self):
     args = ['test',
-            'contrib/go/examples/src/go/libUnstyle']
+            'contrib/go/testprojects/src/go/libUnstyle']
     pants_run = self.run_pants(args)
     self.assert_failure(pants_run)
 
-    args = ['compile.gofmt', '--skip', 'contrib/go/examples/src/go/libUnstyle']
+    args = ['compile.gofmt', '--skip', 'contrib/go/testprojects/src/go/libUnstyle']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
