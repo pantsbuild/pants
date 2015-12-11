@@ -3,6 +3,8 @@
 
 package org.pantsbuild.tools.runner;
 
+import com.google.common.base.Joiner;
+
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -11,6 +13,8 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
@@ -30,7 +34,7 @@ public class PantsRunner {
           "with properly declared Class-Path property.");
       System.exit(1);
     }
-    String classpath = readClasspath();
+    List<File> classpath = readClasspath();
     updateClassPathProperty(classpath);
     updateClassLoader(getClassLoader(), classpath);
     String[] mainArgs = new String[args.length - 1];
@@ -38,13 +42,14 @@ public class PantsRunner {
     runMainMethod(args[0], mainArgs);
   }
 
-  private static String readClasspath() throws IOException, URISyntaxException {
+  private static List<File> readClasspath() throws IOException, URISyntaxException {
     URL[] urls = getClassLoader().getURLs();
     if (urls.length != 1 || !urls[0].getProtocol().equals("file") ||
         !urls[0].toString().endsWith(".jar")) {
       throw new IllegalArgumentException("Should be exactly one jar file in the classpath.");
     }
-    JarFile jar = new JarFile(new File(urls[0].toURI()));
+    File jarFile = new File(urls[0].toURI());
+    JarFile jar = new JarFile(jarFile);
     Manifest manifest = jar.getManifest();
     if (manifest == null) {
       throw new IllegalArgumentException("Supplied jar file doesn't contains " +
@@ -55,7 +60,11 @@ public class PantsRunner {
       throw new IllegalArgumentException("Supplied jar file's manifest " +
           "doesn't contains Class-Path section.");
     }
-    return classpath.replace(" ", File.pathSeparator);
+    List<File> classpathFiles = new ArrayList<File>();
+    for (String path : classpath.split("\\s")) {
+      classpathFiles.add(new File(jarFile.getParent(), path));
+    }
+    return classpathFiles;
   }
 
   private static URLClassLoader getClassLoader() {
@@ -64,17 +73,18 @@ public class PantsRunner {
     return (URLClassLoader) Thread.currentThread().getContextClassLoader();
   }
 
-  private static void updateClassPathProperty(String classpath) {
+  private static void updateClassPathProperty(List<File> classpath) {
     System.setProperty("java.class.path",
-        System.getProperty("java.class.path") + File.pathSeparator + classpath);
+        System.getProperty("java.class.path") + File.pathSeparator +
+            Joiner.on(':').join(classpath));
   }
 
-  private static void updateClassLoader(URLClassLoader classLoader, String classpath)
+  private static void updateClassLoader(URLClassLoader classLoader, List<File> classpath)
       throws ReflectiveOperationException, MalformedURLException {
     Method addUrl = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
     addUrl.setAccessible(true);
-    for (String entry : classpath.split(File.pathSeparator)) {
-      addUrl.invoke(classLoader, new File(entry).toURI().toURL());
+    for (File entry : classpath) {
+      addUrl.invoke(classLoader, entry.toURI().toURL());
     }
   }
 

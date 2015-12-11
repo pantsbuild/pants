@@ -11,6 +11,8 @@ java_library(
       A command line tool for fixing problems with custom classloading and synthetic jar.
     """)
   ),
-  dependencies=[],
+  dependencies=[
+    '3rdparty:guava',
+  ],
   sources=globs('*.java')
 )
