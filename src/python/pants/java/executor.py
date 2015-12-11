@@ -78,7 +78,6 @@ class Executor(AbstractClass):
       :param string cwd: optionally set the working directory
       """
 
-
   def __init__(self, distribution):
     """Constructs an Executor that can be used to launch java programs.
 
@@ -112,9 +111,9 @@ class Executor(AbstractClass):
     Returns the exit code of the java program.
     Raises Executor.Error if there was a problem launching java itself.
     """
-    executor = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args,
+    runner = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args,
                            cwd=cwd)
-    return executor.run(stdout=stdout, stderr=stderr, cwd=cwd)
+    return runner.run(stdout=stdout, stderr=stderr, cwd=cwd)
 
   @abstractmethod
   def _runner(self, classpath, main, jvm_options, args, cwd=None):

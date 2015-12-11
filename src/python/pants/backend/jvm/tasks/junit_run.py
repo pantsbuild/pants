@@ -205,17 +205,14 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                                                                **kwargs)
 
     class ProcessHandler(object):
-      @staticmethod
       def wait(_):
         ret = process.wait()
         return_code_handler(ret)
         return ret
 
-      @staticmethod
       def kill(_):
         return process.kill()
 
-      @staticmethod
       def terminate(_):
         return process.terminate()
 
