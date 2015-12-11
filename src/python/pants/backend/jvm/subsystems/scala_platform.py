@@ -109,7 +109,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     return [getattr(self, runtime_name)]
 
   @classmethod
-  @memoized
   def _synthetic_runtime_target(cls, buildgraph):
     """Insert synthetic target for scala runtime into the buildgraph
     :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object
@@ -122,12 +121,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       return buildgraph.get_target(library_address)
     else:
       # Create an address for the synthetic target if needed
-      synth_library_address = Address.parse('//:scala_library_synthetic_resource')
+      synth_library_address = Address.parse('//:scala_library_synthetic')
       if not buildgraph.contains_address(synth_library_address):
         runtime = ScalaPlatform.global_instance().runtime
         buildgraph.inject_synthetic_target(synth_library_address,
                                            JarLibrary,
                                            jars=runtime)
       return buildgraph.get_target(synth_library_address)
-
-    return buildgraph.get_target(library_address)
