@@ -10,7 +10,6 @@ import os
 from textwrap import dedent
 
 from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_dependency import JarDependency
@@ -25,6 +24,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.base.exceptions import TaskError
+from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase

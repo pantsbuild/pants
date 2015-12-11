@@ -141,7 +141,6 @@ python_tests(
   name = 'check_published_deps',
   sources = ['test_check_published_deps.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
     'src/python/pants/backend/jvm/targets:java',
@@ -259,7 +258,6 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -327,7 +325,6 @@ python_tests(
   sources = ['test_junit_run.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',
     'src/python/pants/backend/python/tasks:python',
@@ -508,7 +505,6 @@ python_tests(
   name = 'prepare_resources',
   sources = ['test_prepare_resources.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:prepare_resources',

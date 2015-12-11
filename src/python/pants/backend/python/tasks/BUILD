@@ -14,7 +14,6 @@ python_library(
     '3rdparty/python:setuptools',
     '3rdparty/python:six',
     'src/python/pants/backend/codegen/targets:python',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:antlr_builder',
     'src/python/pants/backend/python:interpreter_cache',

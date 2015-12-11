@@ -5,8 +5,6 @@ python_library(
   name = 'mock_logger',
   sources = globs('mock_logger.py'),
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/build_graph',
     'src/python/pants/reporting',
   ],
 )

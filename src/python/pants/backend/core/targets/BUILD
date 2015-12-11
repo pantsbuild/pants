@@ -11,9 +11,20 @@ python_library(
 python_library(
   name = 'common',
   sources = [
-    'doc.py',
     'prep_command.py',
     'resources.py',
+  ],
+  dependencies = [
+    ':doc',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/build_graph',
+  ],
+)
+
+python_library(
+  name = 'doc',
+  sources = [
+    'doc.py',
   ],
   dependencies = [
     'src/python/pants/base:payload',

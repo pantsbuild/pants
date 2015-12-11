@@ -20,7 +20,6 @@ python_library(
   ],
   dependencies = [
     'src/python/pants/backend/android:android_manifest_parser',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',

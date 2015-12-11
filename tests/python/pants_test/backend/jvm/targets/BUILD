@@ -59,8 +59,8 @@ python_tests(
   name='jvm_target',
   sources=['test_jvm_target.py'],
   dependencies=[
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )

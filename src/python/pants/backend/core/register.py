@@ -9,8 +9,6 @@ import os
 
 from pants.backend.core.from_target import FromTarget
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
-from pants.backend.core.targets.prep_command import PrepCommand
-from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.cloc import CountLinesOfCode
 from pants.backend.core.tasks.confluence_publish import ConfluencePublish
@@ -28,6 +26,8 @@ from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.base.source_root import SourceRoot
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.prep_command import PrepCommand
+from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.goal.task_registrar import TaskRegistrar as task
 
