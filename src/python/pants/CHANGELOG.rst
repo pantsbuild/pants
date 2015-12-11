@@ -4,7 +4,22 @@ RELEASE HISTORY
 0.0.64 (12/11/2015)
 -------------------
 
-Reviewers: Soliciting opinions on noteworthy items for the past week!
+Release Notes
+~~~~~~~~~~~~~
+
+This release concludes the deprecation cycle of the following items, now removed:
+
+* `dependencies` and `python_test_suite` target aliases
+  BUILD file authors should use `target` instead.
+
+* `pants.backend.core.tasks.{Task,ConsoleTask,ReplTaskMixin}`
+  Custom task authors can update imports to the new homes in `pants.task`
+
+* The `test.junit` `--suppress-output` option
+  You now specify `--output-mode=ALL` in the `test.junit` scope instead.
+
+The release also fixes issues using the Scala REPL via `./pants repl` for very
+large classpaths.
 
 API Changes
 ~~~~~~~~~~~
@@ -50,6 +65,9 @@ New Features
 
 Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Move resources() and prep_command() out of backend/core.
+  `RB #3235 <https://rbcommons.com/s/twitter/r/3235>`_
 
 * [pantsd] Implement PantsDaemon et al.
   `RB #3224 <https://rbcommons.com/s/twitter/r/3224>`_
