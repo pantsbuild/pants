@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.from_target import FromTarget
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.core.targets.resources import Resources
@@ -46,7 +45,6 @@ class BuildFilePath(object):
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      'dependencies': Dependencies,  # Deprecated, will be removed soon.
       'page': Page,
       'prep_command': PrepCommand,
       'resources': Resources,

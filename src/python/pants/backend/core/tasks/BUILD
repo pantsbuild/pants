@@ -1,51 +1,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# =======>
-# TODO: Remove these after task.py's deprecation cycle is over.
-target(
-  name = 'common',
-  dependencies = [
-    'src/python/pants/task',
-  ]
-)
-
-python_library(
-  name = 'task',
-  sources = ['task.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'console_task',
-  sources = ['console_task.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'repl_task_mixin',
-  sources = ['repl_task_mixin.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/task'
-  ]
-)
-
-# <======
-
 target(
   name = 'all',
   dependencies = [
     ':builddictionary',
     ':cloc',
     ':confluence_publish',
-    ':console_task',
     ':dependees',
     ':filemap',
     ':filter',
@@ -55,10 +16,8 @@ target(
     ':minimal_cover',
     ':pathdeps',
     ':paths',
-    ':repl_task_mixin',
     ':scm_publish',
     ':sorttargets',
-    ':task',
   ]
 )
 

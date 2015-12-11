@@ -103,21 +103,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
-  def test_junit_test_deprecated_suppress_output_flag(self):
-    pants_run = self.run_pants([
-        'test.junit',
-        '--no-suppress-output',
-        'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
-    self.assertIn('Hello from test1!', pants_run.stdout_data)
-    self.assertIn('Hello from test2!', pants_run.stdout_data)
-
-    pants_run = self.run_pants([
-        'test.junit',
-        '--suppress-output',
-        'testprojects/tests/java/org/pantsbuild/testproject/dummies:passing_target'])
-    self.assertNotIn('Hello from test1!', pants_run.stdout_data)
-    self.assertNotIn('Hello from test2!', pants_run.stdout_data)
-
   def test_junit_test_output_flag(self):
     def run_test(output_mode):
       args = ['test.junit', '--no-test-junit-fail-fast']
