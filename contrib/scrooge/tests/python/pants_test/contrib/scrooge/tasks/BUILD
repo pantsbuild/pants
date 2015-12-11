@@ -1,16 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='tasks',
-  dependencies=[
-    ':java_thrift_library_fingerprint_strategy',
-    ':scrooge_gen',
-    ':thrift_linter_integration',
-    ':thrift_util',
-  ],
-)
-
 python_tests(
   name='java_thrift_library_fingerprint_strategy',
   sources=['test_java_thrift_library_fingerprint_strategy.py'],
@@ -45,6 +35,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  tags={'integration'},
 )
 
 python_tests(

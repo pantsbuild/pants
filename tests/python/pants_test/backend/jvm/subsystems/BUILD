@@ -25,4 +25,5 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )

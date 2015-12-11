@@ -80,7 +80,8 @@ python_tests(
   ],
   coverage=[
     'pants.backend.core.tasks.markdown_to_html',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

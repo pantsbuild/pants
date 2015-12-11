@@ -7,7 +7,8 @@ python_tests(
   dependencies=[
     ':base',
     'tests/python/pants_test/testutils:mock_logger',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -16,10 +17,11 @@ python_tests(
   dependencies=[
     ':base',
     'tests/python/pants_test/testutils:mock_logger',
-  ]
+  ],
+  tags = {'integration'},
 )
 
-python_tests(
+python_library(
   name='base',
   sources=['base_project_integration_test.py'],
   dependencies=[

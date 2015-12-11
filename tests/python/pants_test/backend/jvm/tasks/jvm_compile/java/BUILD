@@ -11,7 +11,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -19,7 +20,8 @@ python_tests(
   sources=['test_zinc_compile_integration.py'],
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -31,7 +33,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -39,7 +42,8 @@ python_tests(
   sources=['test_zinc_compile_jvm_platform_integration.py'],
   dependencies=[
     ':jvm_platform_integration_mixin',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

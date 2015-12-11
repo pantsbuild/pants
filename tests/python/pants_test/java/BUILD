@@ -57,5 +57,6 @@ python_tests(
   sources = ['test_nailgun_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test'
-  ]
+  ],
+  tags = {'integration'},
 )

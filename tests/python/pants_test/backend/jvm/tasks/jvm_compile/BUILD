@@ -19,7 +19,7 @@ python_library(
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-  ]
+  ],
 )
 
 python_tests(

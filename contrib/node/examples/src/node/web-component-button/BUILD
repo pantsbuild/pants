@@ -21,5 +21,6 @@ node_test(
   script_name='test_integration',
   dependencies=[
     ':web-component-button'
-  ]
+  ],
+  tags={'integration'},
 )

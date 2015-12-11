@@ -185,7 +185,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   (
     targets=$(
       ./pants.pex list tests/python:: | \
-      xargs ./pants.pex filter --filter-tag='-integration' --filter-type=python_tests
+      xargs ./pants.pex --tag='-integration' filter --filter-type=python_tests
     ) && \
     ./pants.pex ${PANTS_ARGS[@]} test.pytest \
       --fail-slow \
@@ -214,7 +214,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   (
     targets=$(
       ./pants.pex list tests/python:: | \
-      xargs ./pants.pex filter --filter-tag='+integration' --filter-type=python_tests
+      xargs ./pants.pex --tag='+integration' filter --filter-type=python_tests
     ) && \
     ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} ${targets}
   ) || die "Pants Integration test failure"

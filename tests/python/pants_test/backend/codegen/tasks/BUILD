@@ -32,7 +32,8 @@ python_tests(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-    ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -66,6 +67,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -119,4 +121,5 @@ python_tests(
     'src/python/pants/base:build_environment',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
