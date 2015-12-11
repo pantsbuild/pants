@@ -16,3 +16,15 @@ java_library(
   ],
   sources=globs('*.java')
 )
+
+jvm_binary(
+  name='runner-binary',
+  basename='pants-runner',
+  main='org.pantsbuild.tools.runner.PantsRunner',
+  dependencies=[
+    ':runner-library',
+  ],
+  description="""
+    A command line tool for fixing problems with custom classloading and synthetic jar.
+  """
+)
