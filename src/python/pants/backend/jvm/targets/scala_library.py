@@ -45,6 +45,8 @@ class ScalaLibrary(ExportableJvmLibrary):
   def traversable_dependency_specs(self):
     for spec in super(ScalaLibrary, self).traversable_dependency_specs:
       yield spec
+    yield '//{}'.format(
+      ScalaPlatform._synthetic_runtime_target(self._build_graph).address.spec)
 
   @property
   def traversable_specs(self):
@@ -59,7 +61,6 @@ class ScalaLibrary(ExportableJvmLibrary):
     for java_source_target in self.java_sources:
       for jar in java_source_target.jar_dependencies:
         yield jar
-    yield ScalaPlatform._synthetic_runtime_target(self._build_graph).address.spec
 
   @property
   def java_sources(self):
