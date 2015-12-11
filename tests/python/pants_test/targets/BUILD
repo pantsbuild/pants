@@ -8,21 +8,14 @@ python_library(
   ],
 )
 
-target(
-  name = 'integration',
-  dependencies = [
-    ':scala_library_integration',
-    ':unknown_arguments_integration',
-  ],
-)
-
 python_tests(
   name = 'unknown_arguments_integration',
   sources = ['test_unknown_arguments_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -51,7 +44,8 @@ python_tests(
   sources = ['test_jvm_app_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -81,7 +75,8 @@ python_tests(
   sources = ['test_scala_library_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

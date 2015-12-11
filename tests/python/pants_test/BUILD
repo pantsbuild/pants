@@ -65,14 +65,3 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
-
-target(
-  name = 'integration',
-  dependencies = [
-    'tests/python/pants_test/android:integration',
-    'tests/python/pants_test/base:integration',
-    'tests/python/pants_test/targets:integration',
-    'tests/python/pants_test/tasks:integration',
-    'tests/python/pants_test/python:integration',
-  ]
-)

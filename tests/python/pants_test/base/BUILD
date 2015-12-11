@@ -13,13 +13,6 @@ python_library(
   ]
 )
 
-target(
-  name = 'integration',
-  dependencies = [
-    ':test_spec_exclude_integration',
-  ]
-)
-
 python_tests(
   name = 'build_environment',
   sources = ['test_build_environment.py'],
@@ -170,7 +163,8 @@ python_tests(
   sources = [ 'test_spec_exclude_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

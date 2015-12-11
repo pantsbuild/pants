@@ -1,14 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'integration',
-  dependencies = [
-    ':interpreter_selection_integration',
-    ':python_run_integration',
-  ]
-)
-
 # XXX this tests the code running the test, not the code under test!
 python_tests(
   name = 'test_antlr_builder',
@@ -46,6 +38,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -55,6 +48,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(

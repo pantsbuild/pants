@@ -13,21 +13,14 @@ python_library(
   ]
 )
 
-target(
-  name = 'integration',
-  dependencies = [
-    ':bootstrap_jvm_tools_integration',
-    ':scalastyle_integration',
-  ],
-)
-
 python_tests(
   name = 'scalastyle_integration',
   sources = ['test_scalastyle_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -53,6 +46,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -62,6 +56,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -147,5 +142,6 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
     'src/python/pants/util:contextutil',
-  ]
+  ],
+  tags = {'integration'},
 )
