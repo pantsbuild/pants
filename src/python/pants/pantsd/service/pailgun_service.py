@@ -16,16 +16,16 @@ class PailgunService(PantsService):
 
   def __init__(self, bind_addr, exiter_class, runner_class):
     """
-    :param bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
-    :param exiter_class: The Exiter class to be used for Pailgun runs.
-    :param runner_class: The PantsRunner class to be used for Pailgun runs.
+    :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
+    :param class exiter_class: The Exiter class to be used for Pailgun runs.
+    :param class runner_class: The PantsRunner class to be used for Pailgun runs.
     """
     super(PailgunService, self).__init__()
-    self._bind_addr = bind_addr
     self._logger = logging.getLogger(__name__)
-    self._pailgun = None
+    self._bind_addr = bind_addr
     self._exiter_class = exiter_class
     self._runner_class = runner_class
+    self._pailgun = None
 
   @property
   def pailgun(self):

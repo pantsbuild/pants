@@ -81,8 +81,8 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     return super(RoundEngineTest,
                  self).install_task(name=name, action=task_type, goal=goal).task_types()
 
-  def create_context(self, for_task_types=None):
-    self._context = self.context(for_task_types=for_task_types)
+  def create_context(self, for_task_types=None, target_roots=None):
+    self._context = self.context(for_task_types=for_task_types, target_roots=target_roots)
     self.assertTrue(self._context.is_unlocked())
 
   def assert_actions(self, *expected_execute_ordering):
@@ -219,3 +219,13 @@ class RoundEngineTest(EngineTestBase, BaseTest):
     self.create_context(for_task_types=task1+task2)
     with self.assertRaises(self.engine.TargetRootsReplacement.ConflictingProposalsError):
       self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
+
+  def test_replace_target_roots_to_empty_list(self):
+    task1 = self.install_task('task1', goal='goal1')
+    task2 = self.install_task('task2', goal='goal2', alternate_target_roots=[])
+    target = self.make_target('t')
+    self.create_context(for_task_types=task1+task2, target_roots=[target])
+
+    self.engine.attempt(self._context, self.as_goals('goal1', 'goal2'))
+
+    self.assertEquals([], self._context.target_roots)

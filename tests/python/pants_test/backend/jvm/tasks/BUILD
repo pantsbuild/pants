@@ -12,6 +12,7 @@ target(
     ':check_published_deps',
     ':classpath_products',
     ':classpath_util',
+    ':coverage',
     ':detect_duplicates',
     ':ivy_imports',
     ':ivy_resolve',
@@ -22,13 +23,14 @@ target(
     ':junit_run',
     ':jvm_dependency_usage',
     ':jvm_platform_analysis',
+    ':jvm_prep_command',
     ':jvm_run',
     ':jvm_task',
     ':jvmdoc_gen',
-    ':resources_task',
     ':prepare_resources',
     ':prepare_services',
     ':properties',
+    ':resources_task',
     ':scalastyle',
     ':unpack_jars',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
@@ -51,13 +53,13 @@ python_tests(
   name = 'bootstrap_jvm_tools',
   sources = ['test_bootstrap_jvm_tools.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:bootstrap_jvm_tools',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
+    'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
@@ -170,6 +172,17 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/goal:products',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test/testutils:file_test_util',
+  ]
+)
+
+python_tests(
+  name = 'coverage',
+  sources = ['coverage/test_base.py'],
+  dependencies = [
+    ':jvm_binary_task_test_base',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/tasks:coverage',
   ]
 )
 
@@ -277,7 +290,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
-    'tests/python/pants_test/testutils',
+    'tests/python/pants_test/testutils:mock_logger',
   ],
 )
 
@@ -415,6 +428,26 @@ python_tests(
   ]
 )
 
+python_tests(
+  name = 'jvm_prep_command',
+  sources = ['test_jvm_prep_command.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:run_jvm_prep_command',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/jvm:jvm_task_test_base',
+  ]
+)
+
+python_tests(
+  name = 'jvm_prep_command_integration',
+  sources = ['test_jvm_prep_command_integration.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:int-test',
+  ],
+)
 
 python_tests(
   name = 'jvm_task',

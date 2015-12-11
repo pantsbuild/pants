@@ -16,7 +16,7 @@ from pants.contrib.go.targets.go_target import GoTarget
 
 
 class GoRemoteLibrary(GoTarget):
-  """Represents a remote Go package."""
+  """A remote Go package."""
   # TODO(John Sirois): Consider a re-name and a semantics scan in the Go tasks.  A GoRemoteLibrary's
   # package can in fact be a GoBinary when materialized locally.  This suggests a name of
   # GoRemoteSource and an alias of 'go_remote'.  This also raises questions about support for things

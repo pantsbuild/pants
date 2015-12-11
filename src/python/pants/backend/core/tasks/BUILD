@@ -1,92 +1,24 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# =======>
-# TODO: Remove these after task.py's deprecation cycle is over.
-target(
-  name = 'common',
-  dependencies = [
-    'src/python/pants/task',
-  ]
-)
-
-python_library(
-  name = 'task',
-  sources = ['task.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'console_task',
-  sources = ['console_task.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'repl_task_mixin',
-  sources = ['repl_task_mixin.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/task'
-  ]
-)
-
-# <======
-
 target(
   name = 'all',
   dependencies = [
-    ':bash_completion',
     ':builddictionary',
     ':cloc',
     ':confluence_publish',
-    ':console_task',
-    ':deferred_sources_mapper',
     ':dependees',
-    ':explain_options',
     ':filemap',
     ':filter',
-    ':group_task',
-    ':list_goals',
     ':list_owners',
     ':listtargets',
     ':markdown_to_html',
     ':minimal_cover',
     ':pathdeps',
     ':paths',
-    ':repl_task_mixin',
     ':scm_publish',
     ':sorttargets',
-    ':targets_help',
-    ':task',
   ]
-)
-
-python_library(
-  name = 'bash_completion',
-  sources = ['bash_completion.py'],
-  resource_targets = [
-    ':bash_completion_resources',
-  ],
-  dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:generator',
-    'src/python/pants/goal',
-    'src/python/pants/help',
-    'src/python/pants/option',
-    'src/python/pants/task',
-  ],
-)
-
-resources(
-  name = 'bash_completion_resources',
-  sources = globs('templates/bash_completion/*.mustache'),
 )
 
 python_library(
@@ -144,31 +76,11 @@ python_library(
 )
 
 python_library(
-  name = 'deferred_sources_mapper',
-  sources= ['deferred_sources_mapper.py'],
-  dependencies = [
-    'src/python/pants/base:payload_field',
-    'src/python/pants/build_graph',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
   name = 'dependees',
   sources = ['dependees.py'],
   dependencies = [
     ':target_filter_task_mixin',
     'src/python/pants/base:build_environment',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'explain_options',
-  sources = ['explain_options_task.py'],
-  dependencies = [
-    '3rdparty/python:ansicolors',
-    'src/python/pants/option',
     'src/python/pants/task',
   ],
 )
@@ -192,28 +104,6 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/task',
     'src/python/pants/util:filtering',
-  ],
-)
-
-python_library(
-  name = 'group_task',
-  sources = ['group_task.py'],
-  dependencies = [
-    '3rdparty/python:six',
-    'src/python/pants/base:workunit',
-    'src/python/pants/build_graph',
-    'src/python/pants/goal',
-    'src/python/pants/option',
-    'src/python/pants/task',
-  ],
-)
-
-python_library(
-  name = 'list_goals',
-  sources = ['list_goals.py'],
-  dependencies = [
-    'src/python/pants/goal',
-    'src/python/pants/task',
   ],
 )
 
@@ -284,7 +174,6 @@ python_library(
   name = 'reflect',
   sources = ['reflect.py'],
   dependencies = [
-    ':group_task',
     '3rdparty/python:docutils',
     '3rdparty/python:six',
     'src/python/pants/base:build_environment',
@@ -301,9 +190,8 @@ python_library(
   name = 'scm_publish',
   sources = ['scm_publish.py'],
   dependencies = [
-    'src/python/pants/base:exceptions',
-    'src/python/pants/option',
-    'src/python/pants/scm',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/task',
   ],
 )
 
@@ -323,23 +211,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
   ]
-)
-
-python_library(
-  name = 'targets_help',
-  sources = ['targets_help.py'],
-  resource_targets = [
-    ':targets_help_resources',
-  ],
-  dependencies = [
-    ':reflect',
-    'src/python/pants/task',
-  ],
-)
-
-resources(
-  name = 'targets_help_resources',
-  sources = globs('templates/targets_help/*.mustache'),
 )
 
 python_library(

@@ -11,7 +11,7 @@ node_module(
   ]
 )
 
-npm_test(
+node_test(
   name='unit',
   dependencies=[
     ':server-project'

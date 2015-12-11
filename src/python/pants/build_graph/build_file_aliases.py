@@ -228,7 +228,7 @@ class BuildFileAliases(object):
 
   @property
   def objects(self):
-    """Returns a mapping from string aliases arbitrary objects.
+    """Returns a mapping from string aliases to arbitrary objects.
 
     :rtype: dict
     """

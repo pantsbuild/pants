@@ -171,7 +171,6 @@ class JvmPlatformIntegrationMixin(object):
 
   def test_compile_stale_platform_settings(self):
     # Tests that targets are properly re-compiled when their source/target levels change.
-    # This currently fails because JMAKE doesn't realize that the old class files should be removed.
     with temporary_dir(root_dir=os.path.abspath('.')) as tmpdir:
       with open(os.path.join(tmpdir, 'BUILD'), 'w') as f:
         f.write(dedent('''

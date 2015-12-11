@@ -5,8 +5,9 @@ target(
   name='targets',
   dependencies=[
     ':node_module',
+    ':node_preinstalled_module',
     ':node_remote_module',
-    ':npm_test',
+    ':node_test',
   ]
 )
 
@@ -14,8 +15,18 @@ python_library(
   name='node_module',
   sources=['node_module.py'],
   dependencies=[
-    ':npm_package',
+    ':node_package',
     'src/python/pants/base:payload',
+  ],
+)
+
+python_library(
+  name='node_preinstalled_module',
+  sources=['node_preinstalled_module.py'],
+  dependencies=[
+    ':node_module',
+    'src/python/pants/base:payload',
+    'src/python/pants/base:payload_field',
   ],
 )
 
@@ -23,15 +34,15 @@ python_library(
   name='node_remote_module',
   sources=['node_remote_module.py'],
   dependencies=[
-    ':npm_package',
+    ':node_package',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
   ],
 )
 
 python_library(
-  name='npm_package',
-  sources=['npm_package.py'],
+  name='node_package',
+  sources=['node_package.py'],
   dependencies=[
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
@@ -40,8 +51,8 @@ python_library(
 )
 
 python_library(
-  name='npm_test',
-  sources=['npm_test.py'],
+  name='node_test',
+  sources=['node_test.py'],
   dependencies=[
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',

@@ -80,14 +80,9 @@ PKG_NODE=(
   "pkg_node_install_test"
 )
 function pkg_node_install_test() {
-  (cat << EOF
-var typ = require('typ');
-console.log("type of boolean is: " + typ.BOOLEAN);
-EOF
-  ) | \
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.node==$(local_version)']" \
-      repl.node contrib/node/examples::
+      test.node contrib/node/examples::
 }
 
 PKG_PYTHON_CHECKS=(

@@ -40,7 +40,7 @@ class UnpackJarsFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintS
 
 
 class UnpackJars(Task):
-  """Looks for UnpackedJars targets and unpacks them.
+  """Unpack artifacts specified by unpacked_jars() targets.
 
   Adds an entry to SourceRoot for the contents.
   """

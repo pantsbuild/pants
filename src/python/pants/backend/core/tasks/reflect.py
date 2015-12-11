@@ -13,7 +13,6 @@ from docutils.core import publish_parts
 from six import string_types
 from six.moves import range
 
-from pants.backend.core.tasks.group_task import GroupTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
@@ -381,10 +380,6 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
-  'dependencies': {'defn':
-                     msg_entry('dependencies',
-                               'Old name for `target`_',
-                               'Old name for <a href="#target">target</a>')},
   'egg': {'defn': msg_entry('egg',
                             'In older Pants, loads a pre-built Python egg '
                             'from file system. Undefined in newer Pants.',
@@ -401,12 +396,6 @@ PREDEFS = {  # some hardwired entries
                         """In old Pants versions, a reference to a Pants targets.
                         (In new Pants versions, just use strings.)""")},
   'python_artifact': {'suppress': True},  # unused alias for PythonArtifact
-  'python_test_suite': {'defn':
-                          msg_entry('python_test_suite',
-                                    'Deprecated way to group Python tests;'
-                                    ' use `target`_',
-                                    'Deprecated way to group Python tests;'
-                                    ' use <a href="#target">target</a>')},
 }
 
 
@@ -498,10 +487,6 @@ def gen_tasks_options_reference_data(options):
       # task_type may actually be a synthetic subclass of the authored class from the source code.
       # We want to display the authored class's name in the docs.
       tasks[task_name] = fill_template(options, task_type)
-
-      if issubclass(task_type, GroupTask):
-        for member_type in task_type._member_types():
-          tasks[member_type.name()] = fill_template(options, member_type)
     sorted_tasks = [ tasks[k] for k in sorted(tasks.keys()) ]
     goal_dict[goal.name] = TemplateData(goal=goal, tasks=sorted_tasks)
     goal_names.append(goal.name)

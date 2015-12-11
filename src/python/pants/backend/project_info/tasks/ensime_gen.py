@@ -30,6 +30,7 @@ _SCALA_VERSIONS = {
 
 
 class EnsimeGen(IdeGen):
+  """Create an Ensime project from the given targets."""
 
   @classmethod
   def register_options(cls, register):

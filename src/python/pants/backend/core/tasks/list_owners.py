@@ -11,7 +11,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class ListOwners(ConsoleTask):
-  """Given a source file, list all targets that own it::
+  """Print targets that own a source file.
 
       $ pants targets -- path/to/my/source.java
       path/to/my:target1

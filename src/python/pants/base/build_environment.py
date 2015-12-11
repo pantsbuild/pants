@@ -33,7 +33,7 @@ def get_buildroot():
   try:
     return BuildRoot().path
   except BuildRoot.NotFoundError as e:
-    print(e.message, file=sys.stderr)
+    print(str(e), file=sys.stderr)
     sys.exit(1)
 
 

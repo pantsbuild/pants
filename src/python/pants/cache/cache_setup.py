@@ -118,10 +118,10 @@ class CacheFactory(object):
                       NoopResolver())
 
   def read_cache_available(self):
-    return self._options.read and bool(self._options.read_from)
+    return self._options.read and bool(self._options.read_from) and self.get_read_cache()
 
   def write_cache_available(self):
-    return self._options.write and bool(self._options.write_to)
+    return self._options.write and bool(self._options.write_to) and self.get_write_cache()
 
   def overwrite(self):
     return self._options.overwrite

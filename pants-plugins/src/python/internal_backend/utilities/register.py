@@ -83,7 +83,7 @@ def contrib_setup_py(name, description, additional_classifiers=None, **kwargs):
 
 
 class PantsPlugin(PythonLibrary):
-  """Describes a pants plugin published by pantsbuild."""
+  """A pants plugin published by pantsbuild."""
 
   @classmethod
   def create_setup_py(cls, name, description, additional_classifiers=None):
@@ -151,7 +151,7 @@ class PantsPlugin(PythonLibrary):
 
 
 class ContribPlugin(PantsPlugin):
-  """Describes a contributed pants plugin published by pantsbuild."""
+  """A contributed pants plugin published by pantsbuild."""
 
   @classmethod
   def create_setup_py(cls, name, description, additional_classifiers=None):

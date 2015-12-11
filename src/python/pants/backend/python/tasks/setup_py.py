@@ -277,7 +277,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
 
 
 class SetupPy(PythonTask):
-  """Generate setup.py-based Python projects from python_library targets."""
+  """Generate setup.py-based Python projects."""
 
   SOURCE_ROOT = b'src'
 

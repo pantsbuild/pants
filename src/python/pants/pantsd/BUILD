@@ -38,3 +38,12 @@ python_library(
     '3rdparty/python:pywatchman'
   ]
 )
+
+python_library(
+  name = 'pants_daemon',
+  sources = ['pants_daemon.py'],
+  dependencies = [
+    '3rdparty/python:setproctitle',
+    'src/python/pants/goal:run_tracker'
+  ]
+)
