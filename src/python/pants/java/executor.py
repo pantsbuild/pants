@@ -47,6 +47,7 @@ class Executor(AbstractClass):
     @abstractproperty
     def executor(self):
       """Returns the executor this runner uses to run itself."""
+      raise NotImplementedError
 
     @property
     def cmd(self):
@@ -56,6 +57,7 @@ class Executor(AbstractClass):
     @abstractproperty
     def command(self):
       """Returns a copy of the command line that will be run as a list of command line tokens."""
+      raise NotImplementedError
 
     @abstractmethod
     def run(self, stdout=None, stderr=None, cwd=None):
@@ -68,6 +70,7 @@ class Executor(AbstractClass):
       :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
       :param string cwd: optionally set the working directory
       """
+      raise NotImplementedError
 
     @abstractmethod
     def spawn(self, stdout=None, stderr=None, cwd=None):
@@ -77,6 +80,7 @@ class Executor(AbstractClass):
       :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
       :param string cwd: optionally set the working directory
       """
+      raise NotImplementedError
 
   def __init__(self, distribution):
     """Constructs an Executor that can be used to launch java programs.

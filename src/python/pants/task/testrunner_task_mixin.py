@@ -125,6 +125,7 @@ class TestRunnerTaskMixin(object):
 
     :return: function from target->boolean
     """
+    raise NotImplementedError
 
   @abstractmethod
   def _validate_target(self, target):
@@ -132,10 +133,11 @@ class TestRunnerTaskMixin(object):
 
     We don't need the type check here because _get_targets() combines with _test_target_type to
     filter the list of targets to only the targets relevant for this test task.
-im
+
     :param target: the target to validate
     :raises: TargetDefinitionException
     """
+    raise NotImplementedError
 
   @abstractmethod
   def _execute(self, all_targets):
@@ -143,3 +145,4 @@ im
 
     :param targets: list of the targets whose tests are to be run
     """
+    raise NotImplementedError

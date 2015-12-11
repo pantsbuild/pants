@@ -198,12 +198,23 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
 
   def _spawn(self, executor=None, distribution=None, *args, **kwargs):
+    """Returns a processhandler to a process executing java.
+
+    :param Executor executor: the java subprocess executor to use. If not specified, construct
+      using the distribution passed in via the parameter.
+    :param Distribution distribution: The JDK or JRE installed.
+
+    Returns a process handler which supports wait(), kill() and terminate().
+    """
+
     actual_executor = executor or SubprocessExecutor(distribution)
     (process, return_code_handler) = distribution.execute_java(*args,
                                                                executor=actual_executor,
                                                                wait=False,
                                                                **kwargs)
 
+    # This ProcessHandler is created with a closure including the process and return_code_handler
+    # returned by execute_java.
     class ProcessHandler(object):
       def wait(_):
         ret = process.wait()
@@ -219,11 +230,20 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return ProcessHandler()
 
   def execute_java_for_targets(self, targets, *args, **kwargs):
+    """Execute java for targets, using the test mixin spawn and wait in order to activate timeouts
+    and other testmixin code common across test targets.
+    """
+
     distribution = self.preferred_jvm_distribution_for_targets(targets)
-    executor = kwargs.get('executor') or SubprocessExecutor(distribution)
-    return self._spawn_and_wait(*args, executor=executor, distribution=distribution, **kwargs)
+    actual_executor = kwargs.get('executor') or SubprocessExecutor(distribution)
+    return self._spawn_and_wait(*args, executor=actual_executor, distribution=distribution, **kwargs)
 
   def execute_java_for_coverage(self, targets, executor=None, *args, **kwargs):
+    """Execute java for targets directly and don't use the test mixin so that
+    this execution doesn't get wrapped with timeouts and other testmixin code common
+    across test targets. Used for coverage instrumentation.
+    """
+
     distribution = self.preferred_jvm_distribution_for_targets(targets)
     actual_executor = executor or SubprocessExecutor(distribution)
     return distribution.execute_java(*args, executor=actual_executor, **kwargs)

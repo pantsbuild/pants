@@ -44,7 +44,7 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     classpath in its manifest.
   :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
     a temporary directory will be provided and cleaned up upon process exit.
-  :param boolean wait: If true, waits for the return of the java program. If not just returns with
+  :param bool wait: If true, waits for the return of the java program. If not just returns with
     the process handle and a callback which should be called with the return value from wait().
 
   Returns the exit code of the java program if it waited for the return,
