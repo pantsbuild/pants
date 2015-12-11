@@ -1,42 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'tasks',
-  dependencies = [
-    ':benchmark_run',
-    ':binary_create',
-    ':bootstrap_jvm_tools',
-    ':bundle_create',
-    ':checkstyle',
-    ':check_published_deps',
-    ':classpath_products',
-    ':classpath_util',
-    ':coverage',
-    ':detect_duplicates',
-    ':ivy_imports',
-    ':ivy_resolve',
-    ':ivy_utils',
-    ':jar_create',
-    ':jar_publish',
-    ':jar_task',
-    ':junit_run',
-    ':jvm_dependency_usage',
-    ':jvm_platform_analysis',
-    ':jvm_prep_command',
-    ':jvm_run',
-    ':jvm_task',
-    ':jvmdoc_gen',
-    ':prepare_resources',
-    ':prepare_services',
-    ':properties',
-    ':resources_task',
-    ':scalastyle',
-    ':unpack_jars',
-    'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
-  ]
-)
-
 python_tests(
   name = 'binary_create',
   sources = ['test_binary_create.py'],

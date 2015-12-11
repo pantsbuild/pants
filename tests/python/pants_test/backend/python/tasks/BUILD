@@ -1,12 +1,5 @@
-target(
-  name='tasks',
-  dependencies=[
-    ':pytest_run',
-    ':python_repl',
-    ':python_task',
-    ':setup_py',
-  ]
-)
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
   name='python_task_test_base',

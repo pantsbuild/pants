@@ -2,19 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name='tasks',
-  dependencies=[
-    ':aapt_builder',
-    ':aapt_gen',
-    ':aapt_task',
-    ':dx_compile',
-    ':sign_apk',
-    ':unpack_libraries',
-    ':zipalign',
-  ],
-)
-
-target(
   name = 'integration',
   dependencies = [
     ':aapt_builder_integration',

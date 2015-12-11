@@ -14,19 +14,6 @@ python_library(
 )
 
 target(
-  name = 'tasks',
-  dependencies = [
-    ':builddict',
-    ':execution_graph',
-    ':list_owners',
-    ':listtargets',
-    ':minimal_cover',
-    ':reflect',
-    ':sorttargets',
-  ],
-)
-
-target(
   name = 'integration',
   dependencies = [
     ':bootstrap_jvm_tools_integration',

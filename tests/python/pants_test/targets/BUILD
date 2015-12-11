@@ -9,18 +9,6 @@ python_library(
 )
 
 target(
-  name = 'targets',
-  dependencies = [
-    ':java_agent',
-    ':python_binary',
-    ':python_target',
-    ':scala_library',
-    ':sort_targets',
-    ':wiki_page'
-  ]
-)
-
-target(
   name = 'integration',
   dependencies = [
     ':scala_library_integration',

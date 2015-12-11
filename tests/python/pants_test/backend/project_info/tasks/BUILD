@@ -2,17 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'all',
-  dependencies = [
-    ':dependencies',
-    ':depmap',
-    ':export',
-    ':filedeps',
-    ':ide_gen',
-  ],
-)
-
-python_library(
   name = 'resolve_jars_test_mixin',
   sources = ['resolve_jars_test_mixin.py'],
   dependencies = [

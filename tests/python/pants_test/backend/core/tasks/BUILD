@@ -1,16 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='tasks',
-  dependencies=[
-    ':dependees',
-    ':filter',
-    ':markdown_to_html',
-    ':target_filter_task_mixin',
-  ],
-)
-
 python_tests(
   name='cache_cleanup',
   sources=['test_cache_cleanup.py'],

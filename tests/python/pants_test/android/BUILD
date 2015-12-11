@@ -3,17 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name = 'android',
-  dependencies = [
-    ':android_config_util',
-    ':android_distribution',
-    ':android_manifest_parser',
-    ':keystore_resolver',
-    'tests/python/pants_test/android/tasks',
-  ]
-)
-
-target(
   name = 'integration',
   dependencies = [
     'tests/python/pants_test/android/tasks:integration',

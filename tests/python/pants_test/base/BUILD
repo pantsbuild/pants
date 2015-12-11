@@ -14,36 +14,9 @@ python_library(
 )
 
 target(
-  name = 'all',
-  dependencies = [
-    ':base',
-  ]
-)
-
-target(
   name = 'integration',
   dependencies = [
     ':test_spec_exclude_integration',
-  ]
-)
-
-target(
-  name = 'base',
-  dependencies = [
-    ':build_environment',
-    ':build_root',
-    ':cmd_line_spec_parser',
-    ':deprecated',
-    ':filesystem_build_file',
-    ':fingerprint_strategy',
-    ':generator',
-    ':hash_utils',
-    ':payload',
-    ':payload_field',
-    ':revision',
-    ':run_info',
-    ':validation',
-    ':worker_pool',
   ]
 )
 
