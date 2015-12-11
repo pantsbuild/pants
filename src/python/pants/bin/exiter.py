@@ -48,7 +48,7 @@ class Exiter(object):
     """
     self._should_print_backtrace = options.for_global_scope().print_exception_stacktrace
 
-  def exit(self, result=0, msg=None, out=sys.stderr):
+  def exit(self, result=0, msg=None, out=None):
     """Exits the runtime.
 
     :param result: The exit status. Typically a 0 indicating success or a 1 indicating failure, but
@@ -58,7 +58,7 @@ class Exiter(object):
     :param out: The file descriptor to emit `msg` to. (Optional)
     """
     if msg:
-      print(msg, file=out)
+      print(msg, file=out or sys.stderr)
     self._exit(result)
 
   def exit_and_fail(self, msg=None):

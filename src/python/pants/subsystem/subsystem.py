@@ -146,12 +146,13 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return cls._scoped_instances[key]
 
   @classmethod
-  def reset(cls):
+  def reset(cls, reset_options=True):
     """Forget all option values and cached subsystem instances.
 
-    Used for test isolation.
+    Used primarily for test isolation and to reset subsystem state for pantsd.
     """
-    cls._options = None
+    if reset_options:
+      cls._options = None
     cls._scoped_instances = {}
 
   def __init__(self, scope, scoped_options):

@@ -309,7 +309,7 @@ class RunTracker(Subsystem):
         self._background_worker_pool.shutdown()
       self.end_workunit(self._background_root_workunit)
 
-    SubprocPool.shutdown(self._aborted)
+    self.shutdown_worker_pool()
 
     # Run a dummy work unit to write out one last timestamp.
     with self.new_workunit("complete"):
@@ -351,3 +351,10 @@ class RunTracker(Subsystem):
                                                 run_tracker=self,
                                                 num_workers=self._num_background_workers)
     return self._background_worker_pool
+
+  def shutdown_worker_pool(self):
+    """Shuts down the SubprocPool.
+
+    N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
+    """
+    SubprocPool.shutdown(self._aborted)
