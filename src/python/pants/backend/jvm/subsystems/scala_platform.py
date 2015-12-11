@@ -23,6 +23,7 @@ scala_build_info = {
   'custom': major_version_info(None, 'scalac', 'runtime_default'),
 }
 
+
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """A scala platform.
 
@@ -106,7 +107,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """
     runtime_name = scala_build_info.get(self.get_options().version, 'runtime_default').runtime_name
     return [getattr(self, runtime_name)]
-
 
   @classmethod
   @memoized
