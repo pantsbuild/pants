@@ -168,7 +168,7 @@ class JvmCompile(NailgunTaskBase):
 
   @classmethod
   def global_subsystems(cls):
-    return super(JvmCompile, cls).task_subsystems() + (Java, JvmPlatform, ScalaPlatform)
+    return super(JvmCompile, cls).global_subsystems() + (Java, JvmPlatform, ScalaPlatform)
 
   @classmethod
   def name(cls):
