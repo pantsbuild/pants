@@ -10,7 +10,6 @@ python_library(
     'cpp_target.py',
   ],
   dependencies=[
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload_field',

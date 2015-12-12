@@ -1,13 +1,3 @@
-target(
-  name='targets',
-  dependencies=[
-    ':go_binary',
-    ':go_library',
-    ':go_local_source_test_base',
-    ':go_remote_library',
-  ]
-)
-
 python_tests(
   name='go_binary',
   sources=['test_go_binary.py'],

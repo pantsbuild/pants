@@ -43,7 +43,7 @@ class Wiki(object):
 
 
 class Page(Target):
-  """Describes a single documentation page.
+  """A documentation page.
 
   Here is an example, that shows a markdown page providing a wiki page on an Atlassian Confluence
   wiki: ::

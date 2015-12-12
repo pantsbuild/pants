@@ -8,7 +8,7 @@ node_module(
   ]
 )
 
-npm_test(
+node_test(
   name='unit',
   script_name='test_unit',
   dependencies=[
@@ -16,10 +16,11 @@ npm_test(
   ]
 )
 
-npm_test(
+node_test(
   name='integration',
   script_name='test_integration',
   dependencies=[
     ':web-component-button'
-  ]
+  ],
+  tags={'integration'},
 )

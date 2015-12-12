@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class UnpackedJars(ImportJarsMixin, Target):
-  """Describes a set of sources that are extracted from jar artifacts."""
+  """A set of sources extracted from JAR files."""
 
   class ExpectedLibrariesError(Exception):
     """Thrown when the target has no libraries defined."""

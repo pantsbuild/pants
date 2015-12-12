@@ -5,14 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import itertools
 import os
 import sys
 from abc import abstractmethod
 from contextlib import contextmanager
 from hashlib import sha1
-
-from twitter.common.collections.orderedset import OrderedSet
+from itertools import chain, repeat
 
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
@@ -55,8 +53,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   """
   options_scope_category = ScopeInfo.TASK
 
-  # Tests may override this to provide a stable name despite the class name being a unique,
-  # synthetic name.
+  # We set this explicitly on the synthetic subclass, so that it shares a stable name with
+  # its superclass, which is not necessary for regular use, but can be convenient in tests.
   _stable_name = None
 
   @classmethod
@@ -349,7 +347,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
-        cached_vts, uncached_vts = \
+        cached_vts, uncached_vts, uncached_causes = \
           self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
       if cached_vts:
         cached_targets = [vt.target for vt in cached_vts]
@@ -360,7 +358,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       if uncached_vts:
         uncached_targets = [vt.target for vt in uncached_vts]
         self.context.run_tracker.artifact_cache_stats.add_misses(cache_manager.task_name,
-                                                                 uncached_targets)
+                                                                 uncached_targets,
+                                                                 uncached_causes)
         if not silent:
           self._report_targets('No cached artifacts for ', uncached_targets, '.')
       # Now that we've checked the cache, re-partition whatever is still invalid.
@@ -435,8 +434,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def check_artifact_cache(self, vts):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
-    Returns a pair (cached, uncached) of VersionedTargets that were
-    satisfied/unsatisfied from the cache.
+    Returns a tuple (cached, uncached, uncached_causes) of VersionedTargets that were
+    satisfied/unsatisfied from the cache. Uncached VTS are also attached with their
+    causes for the miss: `False` indicates a legit miss while `UnreadableArtifact`
+    is due to either local or remote cache failures.
     """
     return self.do_check_artifact_cache(vts)
 
@@ -447,10 +448,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     satisfied/unsatisfied from the cache.
     """
     if not vts:
-      return [], []
-
-    cached_vts = []
-    uncached_vts = OrderedSet(vts)
+      return [], [], []
 
     read_cache = self._cache_factory.get_read_cache()
     items = [(read_cache, vt.cache_key, vt.results_dir if vt.has_results_dir else None)
@@ -458,25 +456,30 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     res = self.context.subproc_map(call_use_cached_files, items)
 
-    for vt, was_in_cache in zip(vts, res):
-      if was_in_cache:
-        cached_vts.append(vt)
-        uncached_vts.discard(vt)
-      elif isinstance(was_in_cache, UnreadableArtifact):
-        self._cache_key_errors.add(was_in_cache.key)
-
     self._maybe_create_results_dirs(vts)
+
+    cached_vts = []
+    uncached_vts = []
+    uncached_causes = []
 
     # Note that while the input vts may represent multiple targets (for tasks that overrride
     # check_artifact_cache_for), the ones we return must represent single targets.
-    def flatten(vts):
-      return list(itertools.chain.from_iterable([vt.versioned_targets for vt in vts]))
-    all_cached_vts, all_uncached_vts = flatten(cached_vts), flatten(uncached_vts)
+    # Once flattened, cached/uncached vts are in separate lists. Each uncached vts is paired
+    # with why it is missed for stat reporting purpose.
+    for vt, was_in_cache in zip(vts, res):
+      if was_in_cache:
+        cached_vts.extend(vt.versioned_targets)
+      else:
+        uncached_vts.extend(vt.versioned_targets)
+        uncached_causes.extend(repeat(was_in_cache, len(vt.versioned_targets)))
+        if isinstance(was_in_cache, UnreadableArtifact):
+          self._cache_key_errors.update(was_in_cache.key)
+
     if post_process_cached_vts:
-      post_process_cached_vts(all_cached_vts)
-    for vt in all_cached_vts:
+      post_process_cached_vts(cached_vts)
+    for vt in cached_vts:
       vt.update()
-    return all_cached_vts, all_uncached_vts
+    return cached_vts, uncached_vts, uncached_causes
 
   def update_artifact_cache(self, vts_artifactfiles_pairs):
     """Write to the artifact cache, if we're configured to.

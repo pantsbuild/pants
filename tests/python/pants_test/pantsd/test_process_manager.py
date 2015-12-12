@@ -198,6 +198,10 @@ class TestProcessManager(unittest.TestCase):
     self.assertEqual(self.pm.get_socket_path(),
                      os.path.join(self.pm._buildroot, '.pids', self.pm._name, 'socket'))
 
+  def test_get_named_socket_path(self):
+    self.assertEqual(self.pm._get_named_socket_path('test'),
+                     os.path.join(self.pm._buildroot, '.pids', self.pm._name, 'socket_test'))
+
   def test_write_pid(self):
     with mock.patch.object(ProcessManager, '_write_file') as patched_write, \
          mock.patch.object(ProcessManager, '_maybe_init_metadata_dir') as patched_init:
@@ -212,15 +216,27 @@ class TestProcessManager(unittest.TestCase):
       patched_write.assert_called_once_with(self.pm.get_socket_path(), '3333')
       patched_init.assert_called_once_with()
 
+  def test_write_named_socket(self):
+    with mock.patch.object(ProcessManager, '_write_file') as patched_write, \
+         mock.patch.object(ProcessManager, '_maybe_init_metadata_dir') as patched_init:
+      self.pm.write_named_socket('pailgun', 3333)
+      patched_write.assert_called_once_with(self.pm._get_named_socket_path('pailgun'), '3333')
+      patched_init.assert_called_once_with()
+
   def test_get_pid(self):
-    with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_pm:
-      patched_pm.return_value = '3333'
+    with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_read_file:
+      patched_read_file.return_value = '3333'
       self.assertEqual(self.pm._get_pid(), 3333)
 
   def test_get_socket(self):
-    with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_pm:
-      patched_pm.return_value = '3333'
+    with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_read_file:
+      patched_read_file.return_value = '3333'
       self.assertEqual(self.pm._get_socket(), 3333)
+
+  def test_get_named_socket(self):
+    with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_read_file:
+      patched_read_file.return_value = '3333'
+      self.assertEqual(self.pm.get_named_socket('test'), 3333)
 
   def test_is_alive_neg(self):
     with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:

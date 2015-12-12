@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.core.targets.resources import Resources
 from pants.backend.core.tasks.dependees import ReverseDepmap
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -18,6 +16,8 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -48,7 +48,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
   def alias_groups(self):
     return BuildFileAliases(
       targets={
-        'target': Dependencies,
+        'target': Target,
         'jar_library': JarLibrary,
         'java_library': JavaLibrary,
         'java_thrift_library': JavaThriftLibrary,

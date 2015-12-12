@@ -17,9 +17,9 @@ _HEADER = 'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key
 _REPORT_LOCATION = 'reports/latest/invalidation-report.csv'
 
 _ENTRY = re.compile(ur'^\d+,\S+,(init|pre-check|post-check),(True|False)')
-_INIT = re.compile(ur'^\d+,ZincCompile,\w+,\S+,init,(True|False)')
-_POST = re.compile(ur'^\d+,ZincCompile,\w+,\S+,post-check,(True|False)')
-_PRE = re.compile(ur'^\d+,ZincCompile,\w+,\S+,pre-check,(True|False)')
+_INIT = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,init,(True|False)')
+_POST = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,post-check,(True|False)')
+_PRE = re.compile(ur'^\d+,ZincCompile_compile_zinc,\w+,\S+,pre-check,(True|False)')
 
 
 class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
@@ -112,10 +112,11 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     self.assert_success(pants_run)
     self.assertIn('Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/greet:greet)',
                   pants_run.stdout_data)
-    # jmake's stdout should be suppressed
-    self.assertNotIn('Writing project database...  Done.', pants_run.stdout_data)
-    # jmake's label should be suppressed
-    self.assertNotIn('[jmake]\n', pants_run.stdout_data)
+    for line in pants_run.stdout_data:
+      # zinc's stdout should be suppressed
+      self.assertNotIn('Compile success at ', line)
+      # zinc's label should be suppressed
+      self.assertNotIn('[zinc]', line)
 
   def test_invalid_config(self):
     command = ['compile',

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.python.pants_requirement import pants_requirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
@@ -20,6 +19,7 @@ from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
@@ -29,7 +29,6 @@ def build_file_aliases():
       'python_binary': PythonBinary,
       'python_library': PythonLibrary,
       'python_requirement_library': PythonRequirementLibrary,
-      'python_test_suite': Dependencies,  # Legacy alias.
       'python_tests': PythonTests,
     },
     objects={
@@ -49,5 +48,4 @@ def register_goals():
   task(name='pytest', action=PytestRun).install('test')
   task(name='py', action=PythonRun).install('run')
   task(name='py', action=PythonRepl).install('repl')
-  task(name='setup-py', action=SetupPy).install().with_description(
-    'Build setup.py-based Python projects from python_library targets.')
+  task(name='setup-py', action=SetupPy).install()

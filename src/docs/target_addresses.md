@@ -106,6 +106,4 @@ specified location:
     tests/python/pants_test/base:base
     ...
     tests/python/pants_test/tasks:sorttargets
-    tests/python/pants_test/tasks:targets_help
-    tests/python/pants_test/tasks:what_changed
     tests/python/pants_test/testutils:testutils

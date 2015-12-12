@@ -1,14 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='java',
-  dependencies=[
-    ':java_compile_settings_partitioning',
-    ':jvm_platform_integration_mixin'
-  ],
-)
-
 python_tests(
   name='cache_compile_integration',
   sources=['test_cache_compile_integration.py'],
@@ -19,7 +11,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -27,7 +20,8 @@ python_tests(
   sources=['test_zinc_compile_integration.py'],
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -39,7 +33,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -47,7 +42,8 @@ python_tests(
   sources=['test_zinc_compile_jvm_platform_integration.py'],
   dependencies=[
     ':jvm_platform_integration_mixin',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

@@ -1,31 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='tasks',
-  dependencies=[
-    ':aapt_builder',
-    ':aapt_gen',
-    ':aapt_task',
-    ':dx_compile',
-    ':sign_apk',
-    ':unpack_libraries',
-    ':zipalign',
-  ],
-)
-
-target(
-  name = 'integration',
-  dependencies = [
-    ':aapt_builder_integration',
-    ':aapt_gen_integration',
-    ':dx_compile_integration',
-    ':sign_apk_integration',
-    ':unpack_libraries_integration',
-    ':zipalign_integration',
-  ],
-)
-
 python_tests(
   name = 'aapt_builder',
   sources = [
@@ -46,6 +21,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -68,6 +44,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -104,6 +81,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -127,6 +105,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -155,6 +134,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -177,4 +157,5 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )

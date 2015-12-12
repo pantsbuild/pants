@@ -49,7 +49,7 @@ class TestContext(Context):
     class DummyArtifactCacheStats(object):
       def add_hits(self, cache_name, targets): pass
 
-      def add_misses(self, cache_name, targets): pass
+      def add_misses(self, cache_name, targets, causes): pass
 
     artifact_cache_stats = DummyArtifactCacheStats()
 

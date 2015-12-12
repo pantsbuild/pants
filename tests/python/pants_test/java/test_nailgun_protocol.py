@@ -174,3 +174,35 @@ class TestNailgunProtocol(unittest.TestCase):
       (chunk_type, payload),
       (ChunkType.EXIT, self.TEST_OUTPUT)
     )
+
+  def test_isatty_from_empty_env(self):
+    self.assertEquals(NailgunProtocol.isatty_from_env({}), (False, False, False))
+
+  def test_isatty_from_env(self):
+    self.assertEquals(
+      NailgunProtocol.isatty_from_env({
+        'NAILGUN_TTY_0': '1',
+        'NAILGUN_TTY_1': '0',
+        'NAILGUN_TTY_2': '1'
+      }),
+      (True, False, True)
+    )
+
+  def test_isatty_from_env_mixed(self):
+    self.assertEquals(
+      NailgunProtocol.isatty_from_env({
+        'NAILGUN_TTY_0': '0',
+        'NAILGUN_TTY_1': '1'
+      }),
+      (False, True, False)
+    )
+
+  def test_construct_chunk(self):
+    with self.assertRaises(TypeError):
+      NailgunProtocol.construct_chunk(ChunkType.STDOUT, 1111)
+
+  def test_construct_chunk_unicode(self):
+    NailgunProtocol.construct_chunk(ChunkType.STDOUT, u'Ø')
+
+  def test_construct_chunk_bytes(self):
+    NailgunProtocol.construct_chunk(ChunkType.STDOUT, b'yes')

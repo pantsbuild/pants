@@ -22,6 +22,7 @@ python_tests(
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/subsystem:subsystem_utils',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-  ]
+  ],
+  tags = {'integration'},
 )
 

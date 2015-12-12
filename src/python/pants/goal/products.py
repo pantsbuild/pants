@@ -286,7 +286,7 @@ class Products(object):
   def safe_create_data(self, typename, init_func):
     """Ensures that a data item is created if it doesn't already exist."""
     # Basically just an alias for readability.
-    self.get_data(typename, init_func)
+    return self.get_data(typename, init_func)
 
   def get_data(self, typename, init_func=None):
     """ Returns a data product.

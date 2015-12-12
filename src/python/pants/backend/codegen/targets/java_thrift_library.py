@@ -10,7 +10,7 @@ from pants.base.exceptions import TargetDefinitionException
 
 
 class JavaThriftLibrary(JvmTarget):
-  """Generates a stub Java or Scala library from thrift IDL files."""
+  """A Java library generated from Thrift IDL files."""
 
   # TODO(John Sirois): Tasks should register the values they support in a plugin-registration goal.
   # In general a plugin will contribute a target and a task, but in this case we have a shared

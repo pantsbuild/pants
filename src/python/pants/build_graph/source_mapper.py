@@ -68,7 +68,7 @@ class SpecSourceMapper(SourceMapper):
         if target.has_resources:
           for resource in target.resources:
             """
-            :type resource: pants.backend.core.targets.resources.Resources
+            :type resource: pants.build_graph.resources.Resources
             """
             if resource.payload.sources.matches(source):
               yield address

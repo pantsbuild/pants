@@ -180,6 +180,7 @@ migrations = {
   ('binary', 'ng_daemons'): ('binary', 'use_nailgun'),
   ('binary.dex', 'ng_daemons'): ('binary.dex', 'use_nailgun'),
   ('binary.dup', 'ng_daemons'): ('binary.dup', 'use_nailgun'),
+  ('binary.dup', 'excludes'): ('binary.dup', 'exclude_files'),
 
   # NB: bundle.bundle -> bundle is a leaf scope
   ('bundle', 'ng_daemons'): ('bundle', 'use_nailgun'),

@@ -12,7 +12,7 @@ from pants.base.payload_field import PrimitiveField
 
 
 class JavaTests(JvmTarget):
-  """Tests JVM sources with JUnit."""
+  """JUnit tests."""
 
   def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None,
                extra_jvm_options=None, **kwargs):

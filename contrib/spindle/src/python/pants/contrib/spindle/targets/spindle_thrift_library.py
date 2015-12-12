@@ -9,7 +9,7 @@ from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrar
 
 
 class SpindleThriftLibrary(ExportableJvmLibrary):
-  """Defines a target that builds scala_record stubs from a thrift IDL file."""
+  """A Scala library generated from Spindle IDL files."""
 
   def __init__(self, *args, **kwargs):
     super(SpindleThriftLibrary, self).__init__(*args, **kwargs)

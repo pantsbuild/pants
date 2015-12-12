@@ -27,7 +27,6 @@ python_library(
     ':ossrh_publication_metadata',
     ':repository',
     ':scala_artifact',
-    'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/backend/jvm/tasks:all',

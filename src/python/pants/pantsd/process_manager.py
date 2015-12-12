@@ -248,6 +248,22 @@ class ProcessManager(object):
     except (IOError, OSError):
       return None
 
+  def _get_named_socket_path(self, name):
+    return '_'.join((self.get_socket_path(), name))
+
+  def get_named_socket(self, socket_name):
+    """Retrieve and return the running processes socket info."""
+    try:
+      return self._maybe_cast(self._read_file(self._get_named_socket_path(socket_name)),
+                              self._socket_type) or None
+    except (IOError, OSError):
+      return None
+
+  def write_named_socket(self, socket_name, socket_info):
+    """A multi-tenant, named alternative to ProcessManager.write_socket()."""
+    self._maybe_init_metadata_dir()
+    self._write_file(self._get_named_socket_path(socket_name), str(socket_info))
+
   def is_dead(self):
     """Return a boolean indicating whether the process is dead or not."""
     return not self.is_alive()
@@ -278,16 +294,19 @@ class ProcessManager(object):
     alive = self.is_alive()
     if alive:
       for signal_type in signal_chain:
+        pid = self.pid
         try:
+          logger.debug('sending signal {} to pid {}'.format(signal_type, pid))
           self._kill(signal_type)
         except OSError as e:
           logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
-                         .format(e=e, signal=signal_type, pid=self.pid))
+                         .format(e=e, signal=signal_type, pid=pid))
 
         # Wait up to kill_wait seconds to terminate or move onto the next signal.
         try:
           if self._deadline_until(self.is_dead, kill_wait):
             alive = False
+            logger.debug('successfully terminated pid {}'.format(pid))
             break
         except self.Timeout:
           # Loop to the next kill signal on timeout.

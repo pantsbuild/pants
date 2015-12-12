@@ -110,9 +110,23 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           def test_three():
             assert 1 == core.one()
         """))
+    self.create_file(
+      'tests/test_error.py',
+      dedent("""
+        def test_error(bad_fixture):
+          pass
+      """)
+    )
     self.add_to_build_file(
         'tests',
         dedent("""
+          python_tests(
+            name='error',
+            sources=[
+              'test_error.py'
+            ],
+          )
+
           python_tests(
             name='green',
             sources=[
@@ -211,8 +225,15 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.red_in_class = self.target('tests:red_in_class')
     self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
     self.sleep_timeout = self.target('tests:sleep_timeout')
+    self.error = self.target('tests:error')
+
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
+
+  def test_error(self):
+    """Test that a test that errors rather than fails shows up in TestFailedTaskError."""
+
+    self.run_failing_tests(targets=[self.red, self.green, self.error], failed_targets=[self.red, self.error])
 
   def test_green(self):
     self.run_tests(targets=[self.green])
@@ -231,7 +252,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_one_timeout(self):
     """When we have two targets, any of them doesn't have a timeout, and we have no default, then no timeout is set."""
 
-    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
 
       # Ensures that Timeout is instantiated with no timeout.
@@ -241,7 +262,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_timeout(self):
     """Check that a failed timeout returns the right results."""
 
-    with patch('pants.backend.core.tasks.test_task_mixin.Timeout') as mock_timeout:
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       mock_timeout().__exit__.side_effect = TimeoutReached(1)
       self.run_failing_tests(targets=[self.sleep_timeout],
                              failed_targets=[self.sleep_timeout])

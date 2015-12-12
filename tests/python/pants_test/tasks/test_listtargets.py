@@ -8,13 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.core.targets.dependencies import Dependencies
 from pants.backend.core.tasks.listtargets import ListTargets
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -39,7 +39,7 @@ class ListTargetsTest(BaseListTargetsTest):
   def alias_groups(self):
     return BuildFileAliases(
       targets={
-        'target': Dependencies,
+        'target': Target,
         'java_library': JavaLibrary,
       },
       objects={
