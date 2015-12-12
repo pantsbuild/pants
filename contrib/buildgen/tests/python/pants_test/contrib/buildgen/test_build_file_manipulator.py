@@ -274,6 +274,7 @@ class BuildFileManipulatorTest(BaseTest):
 
 
 
+
   def test_target_insertion_top(self):
     expected_build_string = dedent(
       """\
