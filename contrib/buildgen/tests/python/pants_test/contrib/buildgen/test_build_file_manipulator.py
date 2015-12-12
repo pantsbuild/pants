@@ -273,6 +273,7 @@ class BuildFileManipulatorTest(BaseTest):
     self.assertEqual(build_file_str, expected_build_string)
 
 
+
   def test_target_insertion_top(self):
     expected_build_string = dedent(
       """\
