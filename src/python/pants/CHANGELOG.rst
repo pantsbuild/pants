@@ -15,10 +15,10 @@ This release concludes the deprecation cycle of the following items, now removed
 * `pants.backend.core.tasks.{Task,ConsoleTask,ReplTaskMixin}`
   Custom task authors can update imports to the new homes in `pants.task`
 
-* The `test.junit` `--suppress-output` option
+* The `test.junit` `--no-suppress-output` option
   You now specify `--output-mode=ALL` in the `test.junit` scope instead.
 
-The release also fixes issues using the Scala REPL via `./pants repl` for very
+This release also fixes issues using the Scala REPL via `./pants repl` for very
 large classpaths.
 
 API Changes
