@@ -16,7 +16,8 @@ class OptionHelpFormatterTest(unittest.TestCase):
     ohi = OptionHelpInfo(registering_class=type(None), display_args=['--foo'],
                          scoped_cmd_line_args=['--foo'], unscoped_cmd_line_args=['--foo'],
                          typ=bool, fromfile=False, default=None, help='help for foo',
-                         deprecated_version=None, deprecated_message=None, deprecated_hint=None)
+                         deprecated_version=None, deprecated_message=None, deprecated_hint=None,
+                         choices=None)
     ohi = ohi._replace(**kwargs)
     lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
                           color=False).format_option(ohi)
@@ -42,3 +43,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
                           color=False).format_options('', '', [(args, kwargs)])
     print(lines)
     self.assertEquals(5, len(lines))
+
+  def test_format_help_choices(self):
+    line = self.format_help_for_foo(typ=str, default='kiwi', choices='apple, banana, kiwi')
+    self.assertEquals('--foo (one of: [apple, banana, kiwi] default: kiwi)', line)
