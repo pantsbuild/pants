@@ -78,6 +78,9 @@ div.oref_ogroup_section h3 {
 {{#fromfile}}
       (@fromfile value supported)
 {{/fromfile}}
+{{#choices}}
+      One of: <pre style="display: inline">[{{.}}]</pre>
+{{/choices}}
 {{#default}}
       (Default: <pre style="display: inline">{{.}}</pre>)
 {{/default}}
