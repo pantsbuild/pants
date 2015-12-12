@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
+from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
 from pants_test.tasks.task_test_base import TaskTestBase

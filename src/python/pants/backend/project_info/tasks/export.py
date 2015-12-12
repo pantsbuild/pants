@@ -13,7 +13,6 @@ import six
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -28,6 +27,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.option.errors import OptionsError

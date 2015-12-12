@@ -11,7 +11,6 @@ import itertools
 import os
 from collections import defaultdict
 
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -26,6 +25,7 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option

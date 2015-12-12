@@ -75,10 +75,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--test-shard', advanced=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
-    register('--suppress-output', action='store_true', default=True,
-             deprecated_hint='Use --output-mode instead.',
-             deprecated_version='0.0.64',
-             help='Redirect test output to files in .pants.d/test/junit.')
     register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
              help='Specify what part of output should be passed to stdout. '
                   'In case of FAILURE_ONLY and parallel tests execution '
@@ -100,7 +96,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.13'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.0'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
@@ -162,7 +158,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     self._args = copy.copy(self.args)
     self._failure_summary = options.failure_summary
 
-    if (not options.suppress_output) or options.output_mode == 'ALL':
+    if options.output_mode == 'ALL':
       self._args.append('-output-mode=ALL')
     elif options.output_mode == 'FAILURE_ONLY':
       self._args.append('-output-mode=FAILURE_ONLY')

@@ -1,16 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='tasks',
-  dependencies=[
-    ':dependees',
-    ':filter',
-    ':markdown_to_html',
-    ':target_filter_task_mixin',
-  ],
-)
-
 python_tests(
   name='cache_cleanup',
   sources=['test_cache_cleanup.py'],
@@ -40,7 +30,6 @@ python_tests(
   sources = ['test_dependees.py'],
   dependencies = [
     'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core/tasks:dependees',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -54,7 +43,7 @@ python_tests(
   name = 'filter',
   sources = ['test_filter.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/targets:doc',
     'src/python/pants/backend/core/tasks:filter',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets:python',
@@ -70,9 +59,10 @@ python_tests(
   dependencies = [
     '3rdparty/python:beautifulsoup4',
     '3rdparty/python:mock',
-    'src/python/pants/backend/core/targets:common',
+    'src/python/pants/backend/core/targets:doc',
     'src/python/pants/backend/core/tasks:markdown_to_html',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ],
   coverage=[
@@ -90,7 +80,8 @@ python_tests(
   ],
   coverage=[
     'pants.backend.core.tasks.markdown_to_html',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

@@ -18,20 +18,9 @@ from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.setup_py import SetupPy
-from pants.base.deprecated import deprecated
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.goal.task_registrar import TaskRegistrar as task
-
-
-class PythonTestSuite(Target):
-  """Deprecated. Use target() instead."""
-
-  @deprecated('0.0.64', 'Replace python_test_suite(...) with target(...) in your BUILD files. '
-                        'Replace uses of PythonTestSuite with Target in your code.')
-  def __init__(self, *args, **kwargs):
-    raise RuntimeError('For {}: python_test_suite(...) targets no longer work. Replace with '
-                       'target(...) in your BUILD files.'.format(kwargs['address'].spec))
 
 
 def build_file_aliases():
@@ -40,7 +29,6 @@ def build_file_aliases():
       'python_binary': PythonBinary,
       'python_library': PythonLibrary,
       'python_requirement_library': PythonRequirementLibrary,
-      'python_test_suite': PythonTestSuite,
       'python_tests': PythonTests,
     },
     objects={
