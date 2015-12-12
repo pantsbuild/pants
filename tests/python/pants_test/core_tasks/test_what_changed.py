@@ -380,6 +380,6 @@ class WhatChangedTest(BaseWhatChangedTest):
 
   def test_root_config(self):
     self.assert_console_output(
-      ':pants-config',
+      '//:pants-config',
       workspace=self.workspace(files=['pants.ini'])
     )

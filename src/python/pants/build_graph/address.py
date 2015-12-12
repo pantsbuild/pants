@@ -143,7 +143,13 @@ class Address(object):
 
   @property
   def spec(self):
-    return '{spec_path}:{target_name}'.format(spec_path=self._spec_path,
+    """The canonical string representation of the Address.
+
+    Prepends '//' if the target is at the root, to disambiguate root-level targets
+    from "relative" spec notation.
+    """
+    # TODO(pl): Maybe we should just always start with // for simplicity?
+    return '{spec_path}:{target_name}'.format(spec_path=self._spec_path or '//',
                                               target_name=self._target_name)
 
   @property
@@ -158,7 +164,7 @@ class Address(object):
 
   def reference(self, referencing_path=None):
     """How to reference this address in a BUILD file."""
-    if referencing_path and self._spec_path == referencing_path:
+    if referencing_path is not None and self._spec_path == referencing_path:
       return self.relative_spec
     elif os.path.basename(self._spec_path) != self._target_name:
       return self.spec

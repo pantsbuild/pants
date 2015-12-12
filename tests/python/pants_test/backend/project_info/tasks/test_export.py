@@ -214,7 +214,7 @@ class ExportTest(ConsoleTaskTestBase):
 
     self.assertEqual(
       sorted([
-        ':scala-library',
+        '//:scala-library',
         'java/project_info:java_lib',
         'project_info:jar_lib'
       ]),
@@ -247,7 +247,7 @@ class ExportTest(ConsoleTaskTestBase):
                           'project_info/this/is/a/source/Bar.scala']},
       'libraries': ['org.apache:apache-jar:12.12.2012', 'org.scala-lang:scala-library:2.10.5'],
       'is_code_gen': False,
-      'targets': ['project_info:jar_lib', ':scala-library'],
+      'targets': ['project_info:jar_lib', '//:scala-library'],
       'roots': [
          {
            'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),
