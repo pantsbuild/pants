@@ -36,6 +36,9 @@ API Changes
 Bugfixes
 ~~~~~~~~
 
+* Prepend '//' to Address.spec when the spec_path is empty.
+  `RB #3234 <https://rbcommons.com/s/twitter/r/3234>`_
+
 * Fix problem with too long classpath while starting scala repl: python part
   `RB #3195 <https://rbcommons.com/s/twitter/r/3195>`_
 
@@ -65,6 +68,9 @@ New Features
 
 Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove test target aliases for pants' tests
+  `RB #3233 <https://rbcommons.com/s/twitter/r/3233>`_
 
 * Move resources() and prep_command() out of backend/core.
   `RB #3235 <https://rbcommons.com/s/twitter/r/3235>`_
