@@ -307,14 +307,13 @@ class NoProducersError(SchedulingError):
     super(NoProducersError, self).__init__(msg)
 
 
-class NoProducersForCategoryError(SchedulingError):
-  """Indicates that no planner within a category was able to produce a complete plan."""
+class PartiallyConsumedProductsError(SchedulingError):
+  """No planner was able to produce a plan that consumed the given input products."""
 
-  def __init__(self, product_type, category, subject, planner_msgs):
-    formatted_msgs = ['{}: {}'.format(type(p).__name__, m) for p, m in planner_msgs.items()]
-    msg = ('Could not plan \'{} -> {}\' for {!r}\n\t{}'
-            .format(category, product_type.__name__, subject, '\n\t'.join(formatted_msgs)))
-    super(NoProducersForCategoryError, self).__init__(msg)
+  def __init__(self, output_product_type, subject, partially_consumed_products):
+    msg = ('While attempting to produce {} for {}, products were partially consumed: {}'.format(
+             output_product_type, subject, partially_consumed_products))
+    super(PartiallyConsumedProductsError, self).__init__(msg)
 
 
 class ConflictingProducersError(SchedulingError):
@@ -488,25 +487,6 @@ class Planners(object):
     """
     return self._planners_by_product_type[product_type]
 
-  def _products_meet_requirements(self, output_product_type, input_products):
-    """Return true if the input products satisfy our requirements for the given product type.
-    """
-    def product_available(product_requirement):
-      if product_requirement in input_products:
-        # The product is directly available in the inputs for the target.
-        return True
-      elif product_requirement in self._product_requirements:
-        # The product may be indirectly available via a planner: recurse.
-        return self._products_meet_requirements(product_requirement, input_products)
-      return False
-
-    for anded_clause in self._product_requirements[output_product_type]:
-      # If all product requirements in the clause are satisfied by the input products, then
-      # we've matched.
-      if all(product_available(product_requirement) for product_requirement in anded_clause):
-        return True
-    return False
-
   def _products_for_subject(self, target):
     """Return the products that are concretely present on the given target.
 
@@ -523,18 +503,59 @@ class Planners(object):
     for configuration in target.configurations:
       yield type(configuration)
 
-  def can_produce_type_for_subject(self, product_type, subject):
+  def can_produce_type_for_subject(self, output_product_type, subject):
     """True if it's possible for these planners to produce the given product for the given subject.
 
     This method additionally validates that there are no "partially consumed" input products.
-    A partially consumed product is a product where no planner 
+    A partially consumed input product is a product where no planner successfully consumes the
+    product, but at least one planner would consume it given some other missing input.
 
     Note that this does not validate dependency subjects of the input subject, so it is necessary
     to validate every call to `def promise` against these requirements.
     """
     if not isinstance(subject, Target):
       raise Exception('TODO: cannot validate products for subject {}'.format(subject))
-    return self._products_meet_requirements(product_type, self._products_for_subject(subject))
+    input_products = self._products_for_subject(subject)
+
+    def product_available(product_requirement):
+      if product_requirement in input_products:
+        # The product is directly available in the inputs for the target.
+        return True
+      elif product_requirement in self._product_requirements:
+        # The product may be indirectly available via a planner: recurse.
+        return self._products_meet_requirements(product_requirement, input_products)
+      return False
+
+    fully_consumed = defaultdict(list)
+    partially_consumed_candidates = defaultdict(dict)
+    for planner, anded_clause in self._product_requirements[output_product_type].items():
+      available = {product_requirement: product_available(product_requirement)
+                   for product_requirement in anded_clause}
+      # If all product requirements in the clause are satisfied by the input products, then
+      # we've matched. But we don't break the loop, because it's important to still detect
+      # partially consumed products.
+      if all(available.values()):
+        for requirement in anded_clause:
+          fully_consumed[requirement].append(planner)
+        continue
+      # On the other hand, if only some of the products from the clause were matched, collect
+      # the matched values as partially consumed.
+      if any(available.values()):
+        consumed = []
+        unconsumed = []
+        for requirement, was_consumed in available.items():
+          (consumed if was_consumed else unconsumed).append(requirement)
+        for consumed_product in consumed:
+          partially_consumed_candidates[consumed][planner] = unconsumed
+
+    # If any partially consumed candidate was not fully consumed by some planner, it's an error.
+    partially_consumed = {product: partials
+                          for product, partials in partially_consumed_candidates.items()
+                          if product not in fully_consumed}
+    if partially_consumed:
+      raise PartiallyConsumedProductsError(output_product_type, subject, partially_consumed)
+
+    return len(fully_consumed) > 0
 
 
 class BuildRequest(object):
