@@ -7,11 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.wrapped_globs import Globs
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.build_graph.address import Address
+from pants.source.wrapped_globs import Globs
 
 from pants.contrib.go.targets.go_target import GoTarget
 

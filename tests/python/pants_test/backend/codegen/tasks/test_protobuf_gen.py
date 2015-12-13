@@ -12,7 +12,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
-from pants.backend.core.register import build_file_aliases as register_core
+from pants.build_graph.register import build_file_aliases as register_core
 from pants.util.dirutil import safe_mkdir
 from pants_test.tasks.task_test_base import TaskTestBase
 

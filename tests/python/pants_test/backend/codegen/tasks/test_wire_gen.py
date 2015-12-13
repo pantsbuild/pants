@@ -8,13 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.targets.java_wire_library import JavaWireLibrary
 from pants.backend.codegen.tasks.wire_gen import WireGen
-from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.base.exceptions import TaskError
-from pants.base.revision import Revision
-from pants.build_graph.target import Target
+from pants.build_graph.register import build_file_aliases as register_core
 from pants_test.tasks.task_test_base import TaskTestBase
 
 

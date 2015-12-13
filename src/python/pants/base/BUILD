@@ -113,6 +113,8 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':build_environment',
     ':validation',
+    # TODO: Get rid of this dep, possibly by moving payload_field to source.
+    'src/python/pants/source',
     'src/python/pants/util:meta',
   ]
 )
@@ -185,6 +187,7 @@ python_library(
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    'src/python/pants/backend/core:wrapped_globs',
+    # TODO: Get rid of this dep, or move/delete this validation module.
+    'src/python/pants/source',
   ],
 )
