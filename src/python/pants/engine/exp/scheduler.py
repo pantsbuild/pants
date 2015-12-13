@@ -473,11 +473,13 @@ class Planners(object):
       if matched_count == len(anded_clause):
         # If all product requirements in the clause are satisfied by the input products, then
         # we've found a planner capable of producing this product.
+        print('>>> planner {} has required inputs {}'.format(planner, anded_clause))
         fully_consumed.update(anded_clause)
         return True
       elif matched_count > 0:
         # On the other hand, if only some of the products from the clause were matched, collect
         # the partially consumed values.
+        print('>>> planner {} has partial inputs {}'.format(planner, zip(anded_clause, matched)))
         consumed = set()
         unconsumed = set()
         for requirement, was_consumed in zip(anded_clause, matched):
@@ -498,9 +500,11 @@ class Planners(object):
     """
     if output_product_type in input_products:
       # Requirement is directly satisfied.
+      print('>>> product {} directly available in inputs'.format(output_product_type))
       return True
     elif output_product_type not in self._output_products:
       # Requirement can't be satisfied.
+      print('>>> product {} is not directly available in inputs ({}) and cannot be produced by the configured planners ({})'.format(output_product_type, input_products, self._output_products))
       return False
     else:
       # Requirement might be possible to satisfy by requesting additional products.
@@ -535,6 +539,10 @@ class Planners(object):
                                                     partially_consumed_candidates)
       if producible:
         producible_output_types.add(output_product_type)
+
+    print('>>> for {} (with inputs {}), producible types are: {}'.format(subject, input_products, producible_output_types))
+    print('>>> fully consumed products: {}'.format(fully_consumed))
+    print('>>> partially consumed candidates: {}'.format(partially_consumed_candidates))
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
     partially_consumed = {product: partials
