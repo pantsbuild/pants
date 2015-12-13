@@ -479,40 +479,38 @@ class Planners(object):
                                         ored_clauses,
                                         fully_consumed,
                                         partially_consumed_candidates):
-    def merge_partially_consumed_candidates(p):
-      # Nested dictionary merge.
-      for consumed, planners_dict in p.items():
-        for planner, unconsumed in planners_dict.items():
-          partially_consumed_candidates[consumed][planner].update(unconsumed)
-
     for anded_clause in ored_clauses:
       # Determine which of the anded clauses can be satisfied.
-      applied_requirements = [self._apply_product_requirements(product_req, input_products)
-                              for product_req in anded_clause]
-      matched_count = 0
-      for matched, _, p  in applied_requirements:
-        if matched:
-          matched_count += 1
-        merge_partially_consumed_candidates(p)
+      matched = [self._apply_product_requirements(product_req,
+                                                  input_products,
+                                                  fully_consumed,
+                                                  partially_consumed_candidates)
+                 for product_req in anded_clause]
+      matched_count = sum(1 for match in matched if match)
 
       if matched_count == len(anded_clause):
         # If all product requirements in the clause are satisfied by the input products, then
         # we've found a planner capable of producing this product.
         print('>>> planner {} has required inputs {}'.format(planner, anded_clause))
         fully_consumed.update(anded_clause)
-        return
+        return True
       elif matched_count > 0:
         # On the other hand, if only some of the products from the clause were matched, collect
         # the partially consumed values.
-        print('>>> planner {} has partial inputs {}'.format(planner, zip(anded_clause, (matched for matched, _, _ in applied_requirements))))
+        print('>>> planner {} has partial inputs {}'.format(planner, zip(anded_clause, matched)))
         consumed = set()
         unconsumed = set()
-        for requirement, (was_consumed, _, _) in zip(anded_clause, applied_requirements):
+        for requirement, was_consumed in zip(anded_clause, matched):
           (consumed if was_consumed else unconsumed).add(requirement)
         for consumed_product in consumed:
           partially_consumed_candidates[consumed_product][planner].update(unconsumed)
+    return False
 
-  def _apply_product_requirements(self, output_product_type, input_products):
+  def _apply_product_requirements(self,
+                                  output_product_type,
+                                  input_products,
+                                  fully_consumed,
+                                  partially_consumed_candidates):
     """Determines whether the output product can be computed by the planners with the given inputs.
 
     Returns a boolean indicating whether the value can be produced, a set of products that were fully
@@ -521,26 +519,24 @@ class Planners(object):
     if output_product_type in input_products:
       # Requirement is directly satisfied.
       print('>>> product {} directly available in inputs'.format(output_product_type))
-      return True, set([output_product_type]), dict()
+      return True
     elif output_product_type not in self._output_products:
       # Requirement can't be satisfied.
       print('>>> product {} is not directly available in inputs ({}) and cannot be produced by the configured planners ({})'.format(output_product_type, input_products, self._output_products))
-      return False, set(), dict()
+      return False
     else:
       # Requirement might be possible to satisfy by requesting additional products.
-      fully_consumed = set()
-      partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
+      matched = False
       for planner, ored_clauses in self._product_requirements[output_product_type].items():
-        self._apply_product_requirement_clause(input_products,
-                                               planner,
-                                               ored_clauses,
-                                               fully_consumed,
-                                               partially_consumed_candidates)
+        matched |= self._apply_product_requirement_clause(input_products,
+                                                          planner,
+                                                          ored_clauses,
+                                                          fully_consumed,
+                                                          partially_consumed_candidates)
+      return matched
 
-      return len(fully_consumed) > 0, fully_consumed, partially_consumed_candidates
-
-  def can_produce_type_for_subject(self, output_product_type, subject):
-    """True if it's possible for these planners to produce the given product for the given subject.
+  def produced_types_for_subject(self, subject, output_product_types):
+    """Filters the given list of output products to those that are actual possible to produce.
 
     This method additionally validates that there are no "partially consumed" input products.
     A partially consumed input product is a product where no planner successfully consumes the
@@ -553,8 +549,16 @@ class Planners(object):
       raise Exception('TODO: cannot validate products for subject {}'.format(subject))
     input_products = list(self._products_for_subject(subject))
 
-    _, fully_consumed, partially_consumed_candidates = \
-        self._apply_product_requirements(output_product_type, input_products)
+    producible_output_types = set()
+    fully_consumed = set()
+    partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
+    for output_product_type in output_product_types:
+      producible = self._apply_product_requirements(output_product_type,
+                                                    input_products,
+                                                    fully_consumed,
+                                                    partially_consumed_candidates)
+      if producible:
+        producible_output_types.add(output_product_type)
 
     print('>>> for {}, {} (with inputs {}):'.format(output_product_type, subject, input_products))
     print('>>> fully consumed products: {}'.format(fully_consumed))
@@ -567,7 +571,7 @@ class Planners(object):
     if partially_consumed:
       raise PartiallyConsumedInputsError(output_product_type, subject, partially_consumed)
 
-    return len(fully_consumed) > 0
+    return producible_output_types
 
 
 class BuildRequest(object):
@@ -789,14 +793,9 @@ class LocalScheduler(Scheduler):
     goals = build_request.goals
     subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
 
-    # Collect the set of product types we're trying to produce.
-    output_product_types = OrderedSet()
-    for goal in goals:
-      for planner in self._planners.for_goal(goal):
-        output_product_types.update(planner.product_types.keys())
 
     root_promises = []
-    for output_type in output_product_types:
+    for goal in goals:
       # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
       # ng-killall, and buildgen.go.
       #
@@ -813,9 +812,12 @@ class LocalScheduler(Scheduler):
       # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
       # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
       # a TaskPlanner baseclass.
+      product_types = OrderedSet()
+      for planner in self._planners.for_goal(goal):
+        product_types.update(planner.product_types.keys())
       for subject in subjects:
-        if self._planners.can_produce_type_for_subject(output_type, subject):
-          root_promises.append(self.promise(subject, output_type, required=True))
+        for product_type in self._planners.produced_types_for_subject(subject, product_types):
+          root_promises.append(self.promise(subject, product_type, required=True))
 
     # Give aggregating planners a chance to aggregate plans.
     for planner, plans_by_product_type in self._plans_by_product_type_by_planner.items():
