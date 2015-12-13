@@ -36,6 +36,9 @@ API Changes
 Bugfixes
 ~~~~~~~~
 
+* Fixup the `NodePreinstalledModuleResolver`.
+  `RB #3240 <https://rbcommons.com/s/twitter/r/3240>`_
+
 * Prepend '//' to Address.spec when the spec_path is empty.
   `RB #3234 <https://rbcommons.com/s/twitter/r/3234>`_
 
@@ -68,6 +71,12 @@ New Features
 
 Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A docgen backend.
+  `RB #3242 <https://rbcommons.com/s/twitter/r/3242>`_
+
+* Add formatting of choices to help output
+  `RB #3241 <https://rbcommons.com/s/twitter/r/3241>`_
 
 * Remove test target aliases for pants' tests
   `RB #3233 <https://rbcommons.com/s/twitter/r/3233>`_
