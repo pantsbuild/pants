@@ -13,7 +13,7 @@ from pkg_resources import resource_string
 from pygments.formatters.html import HtmlFormatter
 from pygments.styles import get_all_styles
 
-from pants.backend.core.targets.doc import Page
+from pants.backend.docgen.targets.doc import Page
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator
@@ -30,7 +30,7 @@ def util():
   It's an expensive import that invokes re.compile a lot (via markdown and pygments),
   so we don't want to incur that cost unless we must.
   """
-  from pants.backend.core.tasks import markdown_to_html_utils
+  from pants.backend.docgen.tasks import markdown_to_html_utils
   return markdown_to_html_utils
 
 

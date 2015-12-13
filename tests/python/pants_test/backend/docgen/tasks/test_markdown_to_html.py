@@ -12,9 +12,9 @@ from textwrap import dedent
 import bs4
 import mock
 
-from pants.backend.core.targets.doc import Page
-from pants.backend.core.tasks import markdown_to_html_utils
-from pants.backend.core.tasks.markdown_to_html import MarkdownToHtml
+from pants.backend.docgen.targets.doc import Page
+from pants.backend.docgen.tasks import markdown_to_html_utils
+from pants.backend.docgen.tasks.markdown_to_html import MarkdownToHtml
 from pants.base.exceptions import TaskError
 from pants_test.tasks.task_test_base import TaskTestBase
 

@@ -6,7 +6,6 @@ python_library(
   name = 'plugin',
   sources = ['register.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:doc',
     'src/python/pants/backend/core/tasks:all',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:source_root',
