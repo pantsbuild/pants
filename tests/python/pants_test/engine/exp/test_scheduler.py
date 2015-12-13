@@ -54,7 +54,7 @@ class SchedulerTest(unittest.TestCase):
                              root_specs=['3rdparty/jvm:guava'],
                              jars=[self.guava])
 
-  def test_noop_gen(self):
+  def test_gen_noop(self):
     # TODO(John Sirois): Ask around - is this OK?
     # This is different than today.  There is a gen'able target reachable from the java target, but
     # the scheduler 'pull-seeding' has ApacheThriftPlanner stopping short since the subject it's
