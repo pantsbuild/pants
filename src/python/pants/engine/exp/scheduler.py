@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 import inspect
 import itertools
-import os
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict, namedtuple
 
@@ -18,8 +17,7 @@ from twitter.common.collections import OrderedSet
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable
-from pants.engine.exp.products import Sources
-from pants.engine.exp.targets import Target
+from pants.engine.exp.products import Products, Sources
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -457,22 +455,6 @@ class Planners(object):
     """
     return self._planners_by_product_type[product_type]
 
-  def _products_for_subject(self, target):
-    """Return the products that are concretely present on the given target.
-
-    TODO: some of these are synthetic products, and should become "real" products.
-    """
-    # Source products.
-    source_extensions = set()
-    for source in target.sources.iter_paths(base_path=target.address.spec_path):
-      _, ext = os.path.splitext(source)
-      if ext not in source_extensions:
-        yield Sources.of(ext)
-        source_extensions.add(ext)
-    # Config products.
-    for configuration in target.configurations:
-      yield type(configuration)
-
   def _apply_product_requirement_clause(self,
                                         input_products,
                                         planner,
@@ -545,9 +527,7 @@ class Planners(object):
     Note that this does not validate dependency subjects of the input subject, so it is necessary
     to validate every call to `def promise` against these requirements.
     """
-    if not isinstance(subject, Target):
-      raise Exception('TODO: cannot validate products for subject {}'.format(subject))
-    input_products = list(self._products_for_subject(subject))
+    input_products = list(Products.for_subject(subject))
 
     producible_output_types = set()
     fully_consumed = set()
@@ -560,7 +540,7 @@ class Planners(object):
       if producible:
         producible_output_types.add(output_product_type)
 
-    print('>>> for {}, {} (with inputs {}):'.format(output_product_type, subject, input_products))
+    print('>>> for {} (with inputs {}), producible types are: {}'.format(subject, input_products, producible_output_types))
     print('>>> fully consumed products: {}'.format(fully_consumed))
     print('>>> partially consumed candidates: {}'.format(partially_consumed_candidates))
 
@@ -828,6 +808,10 @@ class LocalScheduler(Scheduler):
             self._product_mapper.register_promises(product_type, finalized_plan)
 
     return ExecutionGraph(root_promises, self._product_mapper)
+
+  # A synthetic planner that lifts products defined directly on targets into the product
+  # namespace.
+  NO_PLANNER = "<no planner>"
 
   # A sentinel that denotes a `None` planning result that was accepted.  This can happen for
   # promise requests that are not required.

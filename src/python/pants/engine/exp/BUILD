@@ -77,6 +77,7 @@ python_library(
   name='products',
   sources=['products.py'],
   dependencies=[
+    'src/python/pants/engine/exp:targets',
     'src/python/pants/util:memo',
   ],
 )
