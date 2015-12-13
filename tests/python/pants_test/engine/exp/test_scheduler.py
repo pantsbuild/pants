@@ -13,6 +13,7 @@ import pytest
 from pants.build_graph.address import Address
 from pants.engine.exp.examples.planners import (Classpath, IvyResolve, Jar, Javac, Sources,
                                                 gen_apache_thrift, setup_json_scheduler)
+from pants.engine.exp.products import lift_native_product
 from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError,
                                         PartiallyConsumedInputsError, Plan, Promise)
 
@@ -62,7 +63,14 @@ class SchedulerTest(unittest.TestCase):
     execution_graph = self.scheduler.execution_graph(build_request)
 
     plans = list(execution_graph.walk())
-    self.assertEqual(0, len(plans))
+    self.assertEqual(1, len(plans))
+
+    self.assertEqual((Sources.of('.java'),
+                      Plan(func_or_task_type=lift_native_product,
+                           subjects=[self.java],
+                           subject=self.java,
+                           product_type=Sources.of('.java'))),
+                     self.extract_product_type_and_plan(plans[0]))
 
   def test_gen(self):
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.thrift.address])

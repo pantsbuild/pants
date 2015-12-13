@@ -17,7 +17,7 @@ from twitter.common.collections import OrderedSet
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable
-from pants.engine.exp.products import Products, Sources
+from pants.engine.exp.products import Products, Sources, lift_native_product
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -811,7 +811,10 @@ class LocalScheduler(Scheduler):
 
   # A synthetic planner that lifts products defined directly on targets into the product
   # namespace.
-  NO_PLANNER = "<no planner>"
+  class NoPlanner(object):
+    @classmethod
+    def finalize_plans(cls, plans):
+      return plans
 
   # A sentinel that denotes a `None` planning result that was accepted.  This can happen for
   # promise requests that are not required.
@@ -838,6 +841,12 @@ class LocalScheduler(Scheduler):
       plan = planner.plan(self, product_type, subject, configuration=configuration)
       if plan:
         plans.append((planner, plan))
+    for native_product_type in Products.for_subject(subject):
+      if native_product_type == product_type:
+        plans.append((self.NoPlanner, Plan(func_or_task_type=lift_native_product,
+                                       subjects=(subject,),
+                                       subject=subject,
+                                       product_type=product_type)))
 
     # TODO: It should be legal to have multiple plans, and they should be merged.
     if len(plans) > 1:

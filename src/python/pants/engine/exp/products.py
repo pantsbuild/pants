@@ -37,6 +37,14 @@ class Products(object):
       yield type(subject)
 
 
+def lift_native_product(subject, product_type):
+  """Return's a subject's native products (as selected by Products.for_subject).
+
+  TODO: This is a placeholder to demonstrate the concept of lifting products off of targets
+  and into the product namespace.
+  """
+
+
 class Sources(object):
   @classmethod
   @memoized
