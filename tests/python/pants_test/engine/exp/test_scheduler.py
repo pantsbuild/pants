@@ -14,7 +14,7 @@ from pants.build_graph.address import Address
 from pants.engine.exp.examples.planners import (Classpath, IvyResolve, Jar, Javac, Sources,
                                                 gen_apache_thrift, setup_json_scheduler)
 from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError,
-                                        NoProducersForCategoryError, Plan, Promise)
+                                        PartiallyConsumedInputsError, Plan, Promise)
 
 
 class SchedulerTest(unittest.TestCase):
@@ -53,7 +53,7 @@ class SchedulerTest(unittest.TestCase):
                              root_specs=['3rdparty/jvm:guava'],
                              jars=[self.guava])
 
-  def test_gen_noop(self):
+  def test_noop_gen(self):
     # TODO(John Sirois): Ask around - is this OK?
     # This is different than today.  There is a gen'able target reachable from the java target, but
     # the scheduler 'pull-seeding' has ApacheThriftPlanner stopping short since the subject it's
@@ -126,12 +126,11 @@ class SchedulerTest(unittest.TestCase):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java_multi.address])
     execution_graph = self.scheduler.execution_graph(build_request)
 
-  @pytest.mark.xfail
   def test_no_configured_thrift_planner(self):
     """Tests that even though the BuildPropertiesPlanner is able to produce a Classpath,
     we still fail when a target with thrift sources doesn't have a thrift config.
     """
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.unconfigured_thrift.address])
-    with self.assertRaises(NoProducersForCategoryError):
+    with self.assertRaises(PartiallyConsumedInputsError):
       execution_graph = self.scheduler.execution_graph(build_request)
