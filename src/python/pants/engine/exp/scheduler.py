@@ -262,40 +262,6 @@ class Plan(Serializable):
             .format(self._func_or_task_type, self._subjects, self._inputs))
 
 
-class PartialPlan(namedtuple('PartialPlan', ['msg'])):
-  """Represents the failure to produce a Plan, due to incomplete configuration.
-
-  Rather than being an exception, it indicates that only some of the inputs needed to
-  produce a Plan were available.
-  """
-
-
-class PlanningResult(namedtuple('PlanningResult', ['planner', 'complete_plan', 'partial_plan'])):
-  """The union returned from `Planner.plan`: either a Plan or PartialPlan.
-
-  If only PartialPlans are produced within a particular category, then an error is reported
-  indicating that no Planner could produce a product in that category.
-  """
-
-  @classmethod
-  def complete(cls, planner, *args, **kwargs):
-    """Construct a PlanningResult for the given Plan args."""
-    return PlanningResult(planner, complete_plan=Plan(*args, **kwargs), partial_plan=None)
-
-  @classmethod
-  def partial(cls, planner, *args, **kwargs):
-    """Construct a PlanningResult for the given PartialPlan args."""
-    return PlanningResult(planner, complete_plan=None, partial_plan=PartialPlan(*args, **kwargs))
-
-  @classmethod
-  def is_complete(cls, pr):
-    return pr.complete_plan is not None
-
-  @classmethod
-  def is_partial(cls, pr):
-    return pr.partial_plan is not None
-
-
 class SchedulingError(Exception):
   """Indicates inability to make a required scheduling promise."""
 
@@ -881,25 +847,11 @@ class LocalScheduler(Scheduler):
     if required and not planners:
       raise NoProducersError(product_type)
 
-    planning_results_by_category = defaultdict(list)
-    for planner in planners:
-      planning_result = planner.plan(self, product_type, subject, configuration=configuration)
-      if planning_result:
-        # TODO: validate promise requests against the product graph to determine whether to
-        # fail fast.
-        input_product_type = planner.product_types[product_type]
-        planning_results_by_category[input_product_type].append(planning_result)
-
     plans = []
-    for category, planning_results in planning_results_by_category.items():
-      # For each category, we should have at least one complete Plan.
-      plan_results = [(pr.planner, pr.complete_plan)
-                      for pr in planning_results if PlanningResult.is_complete(pr)]
-      if required and not plan_results:
-        partial_plan_results = filter(PlanningResult.is_partial, planning_results)
-        planner_msgs = {pr.planner: pr.partial_plan.msg for pr in partial_plan_results}
-        raise NoProducersForCategoryError(product_type, category, subject, planner_msgs)
-      plans.extend(plan_results)
+    for planner in planners:
+      plan = planner.plan(self, product_type, subject, configuration=configuration)
+      if plan:
+        plans.append((planner, plan))
 
     # TODO: It should be legal to have multiple plans, and they should be merged.
     if len(plans) > 1:

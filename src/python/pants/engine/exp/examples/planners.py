@@ -18,8 +18,7 @@ from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
 from pants.engine.exp.products import Sources
-from pants.engine.exp.scheduler import (LocalScheduler, Plan, Planners, PlanningResult, Subject,
-                                        Task, TaskPlanner)
+from pants.engine.exp.scheduler import (LocalScheduler, Plan, Planners, Subject, Task, TaskPlanner)
 from pants.engine.exp.targets import Sources as AddressableSources
 from pants.engine.exp.targets import Target
 from pants.util.memo import memoized, memoized_property
@@ -86,7 +85,7 @@ class GlobalIvyResolvePlanner(TaskPlanner):
     if isinstance(subject, Jar):
       # This plan is only used internally, the finalized plan will s/jar/jars/ for a single global
       # resolve.
-      return PlanningResult.complete(self, func_or_task_type=IvyResolve, subjects=(subject,), jar=subject)
+      return Plan(func_or_task_type=IvyResolve, subjects=(subject,), jar=subject)
 
   def finalize_plans(self, plans):
     subjects = set()
@@ -191,16 +190,11 @@ class ThriftPlanner(TaskPlanner):
 
     config = self._extract_thrift_config(product_type, subject, configuration=configuration)
     if config is None:
-      msg = 'has {}, but no {}'.format(Sources.of('.thrift').__name__, self.config_type.__name__)
-      return PlanningResult.partial(self, msg=msg)
+      return None
 
     subject = Subject(subject, alternate=Target(dependencies=config.deps))
     inputs = self.plan_parameters(scheduler, product_type, subject, config)
-    return PlanningResult.complete(self,
-                                   func_or_task_type=self.gen_func,
-                                   subjects=(subject,),
-                                   sources=thrift_sources,
-                                   **inputs)
+    return Plan(func_or_task_type=self.gen_func, subjects=(subject,), sources=thrift_sources, **inputs)
 
 
 class ApacheThriftConfiguration(ThriftConfiguration):
@@ -275,10 +269,7 @@ class BuildPropertiesPlanner(TaskPlanner):
       return
     assert product_type == Classpath
 
-    return PlanningResult.complete(self,
-                                   func_or_task_type=write_name_file,
-                                   subjects=(subject,),
-                                   name=subject.name)
+    return Plan(func_or_task_type=write_name_file, subjects=(subject,), name=subject.name)
 
 
 def write_name_file(name):
@@ -385,11 +376,10 @@ class JvmCompilerPlanner(TaskPlanner):
       classpath = scheduler.promise(dep, Classpath, configuration=dep_config, required=True)
       classpath_promises.append(classpath)
 
-    return PlanningResult.complete(self,
-                                   func_or_task_type=self.compile_task_type,
-                                   subjects=(subject,),
-                                   sources=sources,
-                                   classpath=classpath_promises)
+    return Plan(func_or_task_type=self.compile_task_type,
+                subjects=(subject,),
+                sources=sources,
+                classpath=classpath_promises)
 
 
 class JavacPlanner(JvmCompilerPlanner):
@@ -437,7 +427,7 @@ class UnpickleableInputsPlanner(TaskPlanner):
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     # Nested functions like this lambda are unpicklable.
-    return PlanningResult.complete(self, lambda: None, (subject,))
+    return Plan(lambda: None, (subject,))
 
 
 def unpickable_result_func():
@@ -456,7 +446,7 @@ class UnpickleableResultPlanner(TaskPlanner):
     return {Sources.of('unpickleable_result'): [[Sources.of('unpickleable_inputs')]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    return PlanningResult.complete(self, unpickable_result_func, (subject,))
+    return Plan(unpickable_result_func, (subject,))
 
 
 def setup_json_scheduler(build_root):
