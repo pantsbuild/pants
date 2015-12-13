@@ -128,16 +128,8 @@ class ThriftPlanner(TaskPlanner):
     return 'gen'
 
   @abstractproperty
-  def config_type(self):
-    """The type of the configuration for this thrift compiler."""
-
-  @abstractmethod
-  def product_type_for_config(self, config):
-    """Given an instance of config with type config_type, return the generated product type."""
-
-  @abstractproperty
-  def product_type_by_lang(self):
-    """A dict of languages to product types for this planner.
+  def product_type_by_config_type(self):
+    """A dict of configuration types to product types for this planner.
 
     # This will come via an option default.
     # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
@@ -159,8 +151,8 @@ class ThriftPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {source_product: [[Sources.of('.thrift'), self.config_type]]
-            for source_product in self.product_type_by_lang.values()}
+    return {product_type: [[Sources.of('.thrift'), config_type]]
+            for config_type, product_type in self.product_type_by_config_type.items()}
 
   def _extract_thrift_config(self, product_type, target, configuration=None):
     """Return the configuration to be used to produce the given product type for the given target.
@@ -169,8 +161,7 @@ class ThriftPlanner(TaskPlanner):
     """
     configs = (configuration,) if configuration else target.configurations
     configs = tuple(config for config in configs
-                    if (isinstance(config, self.config_type) and
-                        product_type == self.product_type_for_config(config)))
+                    if (product_type == self.product_type_by_config_type.get(type(config))))
     if not configs:
       # We don't know how to generate these type of sources for this subject.
       return None
@@ -197,15 +188,25 @@ class ThriftPlanner(TaskPlanner):
     return Plan(func_or_task_type=self.gen_func, subjects=(subject,), sources=thrift_sources, **inputs)
 
 
-class ApacheThriftConfiguration(ThriftConfiguration):
-  def __init__(self, rev=None, gen=None, strict=True, **kwargs):
+class ApacheThriftJavaConfiguration(ThriftConfiguration):
+  def __init__(self, rev=None, strict=True, **kwargs):
     """
     :param string rev: The version of the apache thrift compiler to use.
-    :param string gen: The thrift compiler `--gen` argument specifying the type of code to generate
-                       and any options to pass to the generator.
     :param bool strict: `False` to turn strict compiler warnings off (not recommended).
     """
-    super(ApacheThriftConfiguration, self).__init__(rev=rev, gen=gen, strict=strict, **kwargs)
+    super(ApacheThriftJavaConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
+
+  @abstractproperty
+  def gen(self):
+    pass
+
+
+class ApacheThriftJavaConfiguration(ThriftConfiguration):
+  gen = 'java'
+
+
+class ApacheThriftPythonConfiguration(ThriftConfiguration):
+  gen = 'python'
 
 
 class ApacheThriftPlanner(ThriftPlanner):
@@ -213,17 +214,12 @@ class ApacheThriftPlanner(ThriftPlanner):
   def gen_func(self):
     return gen_apache_thrift
 
-  @property
-  def config_type(self):
-    return ApacheThriftConfiguration
-
   @memoized_property
-  def product_type_by_lang(self):
-    return {'java': Sources.of('.java'), 'py': Sources.of('.py')}
-
-  def product_type_for_config(self, config):
-    lang = config.gen.partition(':')[0]
-    return self.product_type_by_lang.get(lang)
+  def product_type_by_config_type(self):
+    return {
+        ApacheThriftJavaConfiguration: Sources.of('.java'),
+        ApacheThriftPythonConfiguration: Sources.of('.py'),
+      }
 
   def plan_parameters(self, scheduler, product_type, subject, apache_thrift_config):
     return dict(rev=apache_thrift_config.rev,
@@ -279,13 +275,24 @@ def write_name_file(name):
 
 
 class ScroogeConfiguration(ThriftConfiguration):
-  def __init__(self, rev=None, lang=None, strict=True, **kwargs):
+  def __init__(self, rev=None, strict=True, **kwargs):
     """
     :param string rev: The version of the scrooge compiler to use.
-    :param string lang: The language to target code generation to.
     :param bool strict: `False` to turn strict compiler warnings off (not recommended).
     """
-    super(ScroogeConfiguration, self).__init__(rev=rev, lang=lang, strict=strict, **kwargs)
+    super(ScroogeScalaConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
+
+  @abstractproperty
+  def lang(self):
+    pass
+
+
+class ScroogeScalaConfiguration(ThriftConfiguration):
+  lang = 'scala'
+
+
+class ScroogeJavaConfiguration(ThriftConfiguration):
+  lang = 'java'
 
 
 class ScroogePlanner(ThriftPlanner):
@@ -293,16 +300,12 @@ class ScroogePlanner(ThriftPlanner):
   def gen_func(self):
     return gen_scrooge_thrift
 
-  @property
-  def config_type(self):
-    return ScroogeConfiguration
-
   @memoized_property
-  def product_type_by_lang(self):
-    return {'scala': Sources.of('.scala'), 'java': Sources.of('.java')}
-
-  def product_type_for_config(self, config):
-    return self.product_type_by_lang.get(config.lang)
+  def product_type_by_config_type(self):
+    return {
+        ScroogeJavaConfiguration: Sources.of('.java'),
+        ScroogeScalaConfiguration: Sources.of('.scala'),
+      }
 
   def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
     # This will come via an option default.
@@ -455,10 +458,12 @@ def setup_json_scheduler(build_root):
   :rtype tuple of (:class:`pants.engine.exp.graph.Graph`,
                    :class:`pants.engine.exp.scheduler.LocalScheduler`)
   """
-  symbol_table = {'apache_thrift_configuration': ApacheThriftConfiguration,
+  symbol_table = {'apache_thrift_java_configuration': ApacheThriftJavaConfiguration,
+                  'apache_thrift_python_configuration': ApacheThriftPythonConfiguration,
                   'jar': Jar,
                   'requirement': Requirement,
-                  'scrooge_configuration': ScroogeConfiguration,
+                  'scrooge_java_configuration': ScroogeJavaConfiguration,
+                  'scrooge_scala_configuration': ScroogeScalaConfiguration,
                   'sources': AddressableSources,
                   'target': Target,
                   'build_properties': BuildPropertiesConfiguration}
