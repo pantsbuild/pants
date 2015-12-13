@@ -467,11 +467,13 @@ class Planners(object):
     self._planners_by_goal_name = defaultdict(set)
     self._planners_by_product_type = defaultdict(set)
     self._product_requirements = defaultdict(dict)
+    self._output_products = set()
     for planner in planners:
       self._planners_by_goal_name[planner.goal_name].add(planner)
       for output_type, input_type_requirements in planner.product_types.items():
         self._planners_by_product_type[output_type].add(planner)
         self._product_requirements[output_type][planner] = input_type_requirements
+        self._output_products.add(output_type)
 
   def for_goal(self, goal_name):
     """Return the set of task planners installed in the given goal.
@@ -524,14 +526,15 @@ class Planners(object):
       if product_requirement in input_products:
         # The product is directly available in the inputs for the target.
         return True
-      elif product_requirement in itertools.chain(*self._product_requirements.values()):
+      elif product_requirement in self._output_products:
         # The product may be indirectly available via a planner: recurse.
-        return self._products_meet_requirements(product_requirement, input_products)
+        return self.can_produce_type_for_subject(product_requirement, subject)
       return False
 
-    fully_consumed = defaultdict(list)
+    fully_consumed = set()
     partially_consumed_candidates = defaultdict(dict)
     for planner, ored_clauses in self._product_requirements[output_product_type].items():
+      print('>>>   for product {}: {}, {}:'.format(output_product_type, planner, ored_clauses))
       for anded_clause in ored_clauses:
         available = {product_requirement: product_available(product_requirement)
                     for product_requirement in anded_clause}
@@ -539,8 +542,7 @@ class Planners(object):
         # we've matched. But we don't break the loop, because it's important to still detect
         # partially consumed products.
         if all(available.values()):
-          for requirement in anded_clause:
-            fully_consumed[requirement].append(planner)
+          fully_consumed.update(anded_clause)
           continue
         # On the other hand, if only some of the products from the clause were matched, collect
         # the matched values as partially consumed.
@@ -550,7 +552,11 @@ class Planners(object):
           for requirement, was_consumed in available.items():
             (consumed if was_consumed else unconsumed).append(requirement)
           for consumed_product in consumed:
-            partially_consumed_candidates[consumed][planner] = unconsumed
+            partially_consumed_candidates[consumed_product][planner] = unconsumed
+
+    print('>>> for {}, {}:'.format(output_product_type, subject))
+    print('>>> fully consumed products: {}'.format(fully_consumed))
+    print('>>> partially consumed candidates: {}'.format(partially_consumed_candidates))
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
     partially_consumed = {product: partials
