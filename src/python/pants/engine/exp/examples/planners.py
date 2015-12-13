@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
-import sys
 from abc import abstractmethod, abstractproperty
 
 from twitter.common.collections import OrderedSet
@@ -18,6 +17,7 @@ from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
+from pants.engine.exp.products import Sources
 from pants.engine.exp.scheduler import (LocalScheduler, Plan, Planners, PlanningResult, Subject,
                                         Task, TaskPlanner)
 from pants.engine.exp.targets import Sources as AddressableSources
@@ -106,31 +106,6 @@ class IvyResolve(PrintingTask):
 def _create_sources(ext):
   # A pickle-compatible top-level function for custom unpickling of Sources per-extension types.
   return Sources.of(ext)
-
-
-class Sources(object):
-  @classmethod
-  @memoized
-  def of(cls, ext):
-    type_name = b'Sources({!r})'.format(ext)
-
-    class_dict = {'ext': ext,
-                  # We need custom serialization for the dynamic class type.
-                  '__reduce__': lambda self: (_create_sources, ext)}
-
-    ext_type = type(type_name, (cls,), class_dict)
-
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, ext_type)
-
-    return ext_type
-
-  @classmethod
-  def ext(cls):
-    raise NotImplementedError()
-
-  def __repr__(self):
-    return 'Sources(ext={!r})'.format(self.ext)
 
 
 class ThriftConfiguration(Configuration):

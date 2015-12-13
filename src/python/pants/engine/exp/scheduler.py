@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import inspect
+import itertools
 import os
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict, namedtuple
@@ -17,7 +18,8 @@ from twitter.common.collections import OrderedSet
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable
-from pants.engine.exp.targets import Sources, Target
+from pants.engine.exp.products import Sources
+from pants.engine.exp.targets import Target
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -493,7 +495,7 @@ class Planners(object):
     TODO: some of these are synthetic products, and should become "real" products.
     """
     # Source products.
-    source_extensions = {}
+    source_extensions = set()
     for source in target.sources.iter_paths(base_path=target.address.spec_path):
       _, ext = os.path.splitext(source)
       if ext not in source_extensions:
@@ -518,35 +520,37 @@ class Planners(object):
     input_products = self._products_for_subject(subject)
 
     def product_available(product_requirement):
+      """Recursively check whether the given product requirement can be produced for subject."""
       if product_requirement in input_products:
         # The product is directly available in the inputs for the target.
         return True
-      elif product_requirement in self._product_requirements:
+      elif product_requirement in itertools.chain(*self._product_requirements.values()):
         # The product may be indirectly available via a planner: recurse.
         return self._products_meet_requirements(product_requirement, input_products)
       return False
 
     fully_consumed = defaultdict(list)
     partially_consumed_candidates = defaultdict(dict)
-    for planner, anded_clause in self._product_requirements[output_product_type].items():
-      available = {product_requirement: product_available(product_requirement)
-                   for product_requirement in anded_clause}
-      # If all product requirements in the clause are satisfied by the input products, then
-      # we've matched. But we don't break the loop, because it's important to still detect
-      # partially consumed products.
-      if all(available.values()):
-        for requirement in anded_clause:
-          fully_consumed[requirement].append(planner)
-        continue
-      # On the other hand, if only some of the products from the clause were matched, collect
-      # the matched values as partially consumed.
-      if any(available.values()):
-        consumed = []
-        unconsumed = []
-        for requirement, was_consumed in available.items():
-          (consumed if was_consumed else unconsumed).append(requirement)
-        for consumed_product in consumed:
-          partially_consumed_candidates[consumed][planner] = unconsumed
+    for planner, ored_clauses in self._product_requirements[output_product_type].items():
+      for anded_clause in ored_clauses:
+        available = {product_requirement: product_available(product_requirement)
+                    for product_requirement in anded_clause}
+        # If all product requirements in the clause are satisfied by the input products, then
+        # we've matched. But we don't break the loop, because it's important to still detect
+        # partially consumed products.
+        if all(available.values()):
+          for requirement in anded_clause:
+            fully_consumed[requirement].append(planner)
+          continue
+        # On the other hand, if only some of the products from the clause were matched, collect
+        # the matched values as partially consumed.
+        if any(available.values()):
+          consumed = []
+          unconsumed = []
+          for requirement, was_consumed in available.items():
+            (consumed if was_consumed else unconsumed).append(requirement)
+          for consumed_product in consumed:
+            partially_consumed_candidates[consumed][planner] = unconsumed
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
     partially_consumed = {product: partials
