@@ -104,8 +104,12 @@ def load_build_configuration_from_source(build_configuration, additional_backend
   # Note: pants.core_tasks must be first in this list, as it registers various stubs
   # that other tasks can use for scheduling against.
   # TODO: Allow repos to opt in to any backend (but not to core_tasks, which must always
-  # be loaded).
+  # be loaded).  Note that some backends use targets from other backends in their own BUILD files,
+  # e.g., pants.backend.python uses the page() target type from pants.backend.docgen.  So we must
+  # ensure that depended-on backends are loaded first. We do so manually here, but when making these
+  # opt-in we'll require a facility for loading dependent backends in the right order.
   backend_packages = ['pants.core_tasks',
+                      'pants.backend.docgen',
                       'pants.backend.authentication',
                       'pants.backend.core',
                       'pants.backend.python',

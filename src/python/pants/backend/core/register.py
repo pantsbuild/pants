@@ -8,16 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.core.from_target import FromTarget
-from pants.backend.core.targets.doc import Page, Wiki, WikiArtifact
 from pants.backend.core.tasks.builddictionary import BuildBuildDictionary
 from pants.backend.core.tasks.cloc import CountLinesOfCode
-from pants.backend.core.tasks.confluence_publish import ConfluencePublish
 from pants.backend.core.tasks.dependees import ReverseDepmap
 from pants.backend.core.tasks.filemap import Filemap
 from pants.backend.core.tasks.filter import Filter
 from pants.backend.core.tasks.list_owners import ListOwners
 from pants.backend.core.tasks.listtargets import ListTargets
-from pants.backend.core.tasks.markdown_to_html import MarkdownToHtml
 from pants.backend.core.tasks.minimal_cover import MinimalCover
 from pants.backend.core.tasks.pathdeps import PathDeps
 from pants.backend.core.tasks.paths import Path, Paths
@@ -45,17 +42,13 @@ class BuildFilePath(object):
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      'page': Page,
       'prep_command': PrepCommand,
       'resources': Resources,
       'target': Target,
     },
     objects={
-      'ConfluencePublish': ConfluencePublish,
       'get_buildroot': get_buildroot,
       'pants_version': pants_version,
-      'wiki_artifact': WikiArtifact,
-      'Wiki': Wiki,
     },
     context_aware_object_factories={
       'buildfile_path': BuildFilePath,
@@ -70,7 +63,6 @@ def build_file_aliases():
 
 def register_goals():
   task(name='builddict', action=BuildBuildDictionary).install()
-  task(name='markdown', action=MarkdownToHtml).install()
 
   task(name='pathdeps', action=PathDeps).install()
   task(name='list', action=ListTargets).install()

@@ -10,13 +10,15 @@ import textwrap
 
 from twitter.common.confluence import Confluence, ConfluenceError
 
-from pants.backend.core.targets.doc import Page
+from pants.backend.docgen.targets.doc import Page
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
 from pants.task.task import Task
 from pants.util.dirutil import safe_open
 
 
+# TODO: Rethink this. We shouldn't require subclassing this. Instead, the wiki identity should come from options.
+# However if we decide against that, we should rename this ConfluencePublishBase.
 class ConfluencePublish(Task):
   """A task to publish Page targets to Confluence wikis."""
 

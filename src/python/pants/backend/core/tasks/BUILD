@@ -6,13 +6,11 @@ target(
   dependencies = [
     ':builddictionary',
     ':cloc',
-    ':confluence_publish',
     ':dependees',
     ':filemap',
     ':filter',
     ':list_owners',
     ':listtargets',
-    ':markdown_to_html',
     ':minimal_cover',
     ':pathdeps',
     ':paths',
@@ -63,20 +61,6 @@ python_library(
 )
 
 python_library(
-  name = 'confluence_publish',
-  sources = ['confluence_publish.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.confluence',
-    'src/python/pants/backend/core/targets:doc',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/binaries:binary_util',
-    'src/python/pants/build_graph',
-    'src/python/pants/task',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-python_library(
   name = 'dependees',
   sources = ['dependees.py'],
   dependencies = [
@@ -115,34 +99,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
   ],
-)
-
-python_library(
-  name = 'markdown_to_html',
-  sources = ['markdown_to_html.py', 'markdown_to_html_utils.py'],
-  resource_targets = [
-    ':markdown_to_html_resources',
-  ],
-  dependencies = [
-    '3rdparty/python:Markdown',
-    '3rdparty/python:Pygments',
-    '3rdparty/python:docutils',
-    '3rdparty/python:six',
-    'src/python/pants/backend/core/targets:doc',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:generator',
-    'src/python/pants/base:workunit',
-    'src/python/pants/binaries:binary_util',
-    'src/python/pants/build_graph',
-    'src/python/pants/task',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
-resources(
-  name = 'markdown_to_html_resources',
-  sources = globs('templates/markdown/*.mustache'),
 )
 
 python_library(

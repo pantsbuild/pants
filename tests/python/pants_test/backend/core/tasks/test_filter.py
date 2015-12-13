@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.core.targets.doc import Page
 from pants.backend.core.tasks.filter import Filter
+from pants.backend.docgen.targets.doc import Page
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -18,6 +18,7 @@ from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
+# TODO: This test should create some dummy target types, instead of depending on other backends.
 class BaseFilterTest(ConsoleTaskTestBase):
 
   @property
