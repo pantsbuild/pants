@@ -7,13 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.tasks.task import Task, TaskBase
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
+from pants.task.task import Task, TaskBase
 
 
 class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
@@ -22,13 +23,19 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
   @classmethod
   def register_options(cls, register):
     super(NailgunTaskBase, cls).register_options(register)
-    cls.register_jvm_tool(register, 'nailgun-server')
     register('--use-nailgun', action='store_true', default=True,
              help='Use nailgun to make repeated invocations of this task quicker.')
     register('--nailgun-timeout-seconds', advanced=True, default=10,
              help='Timeout (secs) for nailgun startup.')
     register('--nailgun-connect-attempts', advanced=True, default=5,
              help='Max attempts for nailgun connects.')
+    cls.register_jvm_tool(register,
+                          'nailgun-server',
+                          classpath=[
+                            JarDependency(org='com.martiansoftware',
+                                          name='nailgun-server',
+                                          rev='0.9.1'),
+                          ])
 
   @classmethod
   def global_subsystems(cls):
@@ -77,6 +84,11 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     amortized run times.
     """
     executor = self.create_java_executor()
+
+    # Creating synthetic jar to work around system arg length limit is not necessary
+    # when `NailgunExecutor` is used because args are passed through socket, therefore turning off
+    # creating synthetic jar if nailgun is used.
+    create_synthetic_jar = not self.get_options().use_nailgun
     try:
       return util.execute_java(classpath=classpath,
                                main=main,
@@ -86,7 +98,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
                                workunit_factory=self.context.new_workunit,
                                workunit_name=workunit_name,
                                workunit_labels=workunit_labels,
-                               workunit_log_config=workunit_log_config)
+                               workunit_log_config=workunit_log_config,
+                               create_synthetic_jar=create_synthetic_jar,
+                               synthetic_jar_dir=self._executor_workdir)
     except executor.Error as e:
       raise TaskError(e)
 
@@ -96,7 +110,8 @@ class NailgunTask(NailgunTaskBase, Task): pass
 
 
 class NailgunKillall(Task):
-  """A task to manually kill nailguns."""
+  """Kill running nailgun servers."""
+
   @classmethod
   def register_options(cls, register):
     super(NailgunKillall, cls).register_options(register)

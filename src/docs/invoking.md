@@ -35,7 +35,8 @@ Some goals are made up of tasks; to specify an option for that task, use the dot
 _goal.task_ notation:
 
     :::bash
-    ./pants compile.java --no-delete-scratch src:: # compile src, keeping Java compile's "scratch files"
+    # compile src, keeping Java compile's "scratch files"
+    ./pants compile.java --no-delete-scratch src::
 
 You can specify one or more targets to operate upon. Target specifications come after goals
 and goal options on the command line.
@@ -67,8 +68,8 @@ Instead of passing an option on the command line, you can set an environment var
 an option in an `.ini` file. Pants "looks" for an option value on the command line, environment
 variable, and `.ini` file; it uses the first it finds.
 For a complete, precedence-ordered list of places Pants looks for option values, see the
-`Options` docstring in
-[src/python/pants/option/options.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py).
+`Options` docstring in [src/python/pants/option/options.py]
+(https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/options.py).
 
 ### `PANTS_...` Environment Variables
 
@@ -83,20 +84,10 @@ commands opens a coverage report in your browser:
 Pants checks for an environment variable whose name is `PANTS` + the goal name (or goal+task name)
 + the option name; all of these in all-caps, joined by underscores (instead of dots or hyphens).
 
-Pants checks some environment variables that don't correspond to command-line options.
-E.g., though Pants uses the `PANTS_VERBOSE` environment variable, there's no `--verbose` flag
-to Pants.
-
-* `PANTS_BUILD_ROOT`
-* `PANTS_IVY_CACHE_DIR`
-* `PANTS_IVY_SETTINGS_XML`
-* `PANTS_LEAVE_CHROOT`
-* `PANTS_VERBOSE`
-
 ### `pants.ini` Settings File
 
-Pants can also read command-line options (and other options) from an `.ini` file. For example, if
-your `pants.ini` file contains
+Pants can also read command-line options (and other options) from a configuration file named
+`pants.ini` at the root of the repo. For example, if your `pants.ini` file contains
 
     [test.junit]
     coverage_html_open: True
@@ -105,16 +96,91 @@ your `pants.ini` file contains
 `test.junit --coverage-html-open`. If an environment variable and an `.ini` configuration both
 specify a value for some option, the environment variable "wins".
 
-Pants also checks some `.ini` settings that don't correspond to any command-line option.
-For example, though Pants uses the `PANTS_VERBOSE` environment variable, there's no `--verbose`
-flag to Pants.
+The format of the config file is similar to Microsoft Windows INI files. See the
+[ConfigParser](https://docs.python.org/2/library/configparser.html) Python documentation.
 
-### Overlay `.ini` Files with `--config-overrides`
+
+Some options are intended to only be set in the `pants.ini` file and are thus normally hidden from
+the online help output.  To see these options, use `./pants <goal> --help-advanced` or
+view them all with the `./pants --help-all --help-advanced` command.
+
+There are a few differences in using options in the config file compared to invoking them from the
+command line:
+
+  - Omit the leading double dash ('--')
+  - Dash characters ('-') are transposed to underscores ('_').
+  - Flag values are enabled and disabled by setting the value of the option to `True` or `False`
+  - The prefix for long form options is not specified. Instead, you must organize the options
+    into their appropriate sections.
+
+Sections in the .ini file are described in the help output:
+
+    ::bash
+    $ ./pants compile.zinc --help
+
+    compile.zinc options:
+    Compile Scala and Java code using Zinc.
+
+    --[no-]compile-zinc-debug-symbols (default: False)
+        Compile with debug symbol enabled.
+    --[no-]compile-zinc-use-nailgun (default: True)
+        Use nailgun to make repeated invocations of this task quicker.
+    --[no-]compile-zinc-warnings (default: True)
+        Compile with all configured warnings enabled.
+
+The section name is also used to form the long form command-line option prefixes, but you cannot
+arbitrarily strip off the first part of the option name and use it in a section.   Section names
+can have multiple parts.  You must be careful to use the correct section name as specified
+in the help output:
+
+    :::ini
+    # Wrong
+    [compile]  # The correct section name is compile.zinc for this option
+    zinc_warnings: False
+
+    # Right
+    [compile.zinc]
+    warnings: False
+
+Settings that span multiple lines should be indented.  To minimize problems, follow these
+conventions:
+
+  - Followon lines should be indented four spaces.
+  - The ending bracket for lists and dicts should be indented two spaces.
+
+Here are some examples of correctly and incorrectly formatted values:
+
+    :::ini
+    # Right
+    jvm_options: [ "foo", "bar" ]
+
+    # Right
+    jvm_options: [
+        "foo", "bar"
+      ]
+
+    # Wrong
+    jvm_options: [ "foo",
+    "bar" ]  # Followon line must be indented
+
+    # Wrong
+    jvm_options: [
+        "foo", "bar"
+    ] # closing bracket must be indented
+
+The `pants.ini` file allows string interpolation for variables defined in the `[DEFAULT]` section by
+using the syntax `%(<variable name>)s` inside of a string.
+
+    :::ini
+    local_artifact_cache = %(pants_bootstrapdir)s/artifact_cache
+    read_from = ["%(local_artifact_cache)s"]
+
+### Overlay `.ini` Files with `--config-override`
 
 Sometimes it's convenient to keep `.ini` settings in more than one file. Perhaps you usually
 operate Pants in one "mode", but occasionally need to use a tweaked set of settings.
 
-Use the `--config-overrides` command-line option to specify a second `.ini` file. Each of
+Use the `--config-override` command-line option to specify a second `.ini` file. Each of
 this `.ini` file's values override the corresponding value in `pants.ini`, if any.
 For example, if your `pants.ini` contains the section
 
@@ -122,7 +188,7 @@ For example, if your `pants.ini` contains the section
     coverage_html_open: True
     debug: False
 
-...and you invoke `--config-overrides=quick.ini` and your `quick.ini` says
+...and you invoke `--config-override=quick.ini` and your `quick.ini` says
 
     [test.junit]
     coverage_html_open: False

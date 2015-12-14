@@ -6,15 +6,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.java_agent import JavaAgent
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
 class JavaAgentTest(BaseTest):
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_agent': JavaAgent,
       },

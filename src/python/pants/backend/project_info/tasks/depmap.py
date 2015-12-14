@@ -5,13 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.exceptions import TaskError
+from pants.task.console_task import ConsoleTask
 
 
 class Depmap(ConsoleTask):
-  """Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
+  """Depict the target's dependencies.
+
+  Generates either a textual dependency tree or a graphviz digraph dot file for the dependency
   set of a target.
   """
   class SourceRootTypes(object):
@@ -45,8 +47,6 @@ class Depmap(ConsoleTask):
     register('--separator', default='-',
              help='Specifies the separator to use between the org/name/rev components of a '
                   'dependency\'s fully qualified name.')
-    register('--path-to',
-             help='Show only items on the path to the given target. This is a no-op for --graph.')
 
   def __init__(self, *args, **kwargs):
     super(Depmap, self).__init__(*args, **kwargs)
@@ -61,7 +61,6 @@ class Depmap(ConsoleTask):
     self.is_graph = self.get_options().graph
     self.should_tree = self.get_options().tree
     self.show_types = self.get_options().show_types
-    self.path_to = self.get_options().path_to
     self.separator = self.get_options().separator
     self.target_aliases_map = None
 
@@ -90,9 +89,12 @@ class Depmap(ConsoleTask):
             '{org}{sep}{name}').format(**params), is_internal_dep
 
   def _enumerate_visible_deps(self, dep, predicate):
-    dependencies = sorted([x for x in getattr(dep, 'dependencies', [])]) + sorted(
-      [x for x in getattr(dep, 'jar_dependencies', [])] if not self.is_internal_only else [])
-
+    # We present the dependencies out of classpath order and instead in alphabetized internal deps,
+    # then alphabetized external deps order for ease in scanning output.
+    dependencies = sorted(x for x in getattr(dep, 'dependencies', []))
+    if not self.is_internal_only:
+      dependencies.extend(sorted((x for x in getattr(dep, 'jar_dependencies', [])),
+                                 key=lambda x: (x.org, x.name, x.rev, x.classifier)))
     for inner_dep in dependencies:
       dep_id, internal = self._dep_id(inner_dep)
       if predicate(internal):
@@ -114,18 +116,14 @@ class Depmap(ConsoleTask):
     def output_deps(dep, indent, outputted, stack):
       dep_id, internal = self._dep_id(dep)
 
-      if self.path_to:
-        # If we hit the search target from self.path_to, yield the stack items and bail.
-        if dep_id == self.path_to:
-          for dep_id, indent in stack + [(dep_id, indent)]:
-            yield make_line(dep_id, indent)
-          return
-      else:
-        if not (dep_id in outputted and self.is_minimal) and self.output_candidate(internal):
-          yield make_line(dep_id,
-                          0 if self.is_external_only else indent,
-                          is_dupe=dep_id in outputted)
-          outputted.add(dep_id)
+      if self.is_minimal and dep_id in outputted:
+        return
+
+      if self.output_candidate(internal):
+        yield make_line(dep_id,
+                        0 if self.is_external_only else indent,
+                        is_dupe=dep_id in outputted)
+        outputted.add(dep_id)
 
       for sub_dep in self._enumerate_visible_deps(dep, self.output_candidate):
         for item in output_deps(sub_dep, indent + 1, outputted, stack + [(dep_id, indent)]):

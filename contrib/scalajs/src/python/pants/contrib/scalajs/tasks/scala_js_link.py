@@ -16,7 +16,7 @@ from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
 class ScalaJSLink(NailgunTask):
-  """Link intermediate scala outputs to a javascript binary."""
+  """Links intermediate scala.js representation outputs into a javascript binary."""
 
   _SCALA_JS_CLI_MAIN = 'org.scalajs.cli.Scalajsld'
 

@@ -1,31 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='tasks',
-  dependencies=[
-    ':aapt_builder',
-    ':aapt_gen',
-    ':aapt_task',
-    ':dx_compile',
-    ':sign_apk',
-    ':unpack_libraries',
-    ':zipalign',
-  ],
-)
-
-target(
-  name = 'integration',
-  dependencies = [
-    ':aapt_builder_integration',
-    ':aapt_gen_integration',
-    ':dx_compile_integration',
-    ':sign_apk_integration',
-    ':unpack_libraries_integration',
-    ':zipalign_integration',
-  ],
-)
-
 python_tests(
   name = 'aapt_builder',
   sources = [
@@ -46,6 +21,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -68,6 +44,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -88,6 +65,7 @@ python_tests(
   ],
   dependencies = [
     'src/python/pants/backend/android/tasks:all',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:build_environment',
     'src/python/pants/goal:products',
     'src/python/pants/util:dirutil',
@@ -103,6 +81,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -126,6 +105,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -136,10 +116,9 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/android/tasks:unpack_libraries',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/backend/jvm/tasks:jar_import_products',
+    'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/fs:fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -155,6 +134,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -177,4 +157,5 @@ python_tests(
   dependencies = [
     'tests/python/pants_test/android:android_integration_test',
   ],
+  tags = {'integration'},
 )

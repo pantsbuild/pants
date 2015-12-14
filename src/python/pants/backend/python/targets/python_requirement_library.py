@@ -8,12 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload import Payload
 from pants.base.payload_field import PythonRequirementsField
-from pants.base.target import Target
 from pants.base.validation import assert_list
+from pants.build_graph.target import Target
 
 
 class PythonRequirementLibrary(Target):
-  """Named target for some pip requirements."""
+  """A set of pip requirements."""
+
   def __init__(self, payload=None, requirements=None, **kwargs):
     """
     :param requirements: pip requirements as `python_requirement <#python_requirement>`_\s.

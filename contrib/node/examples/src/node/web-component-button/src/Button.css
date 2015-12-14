@@ -1,0 +1,7 @@
+.WebComponentButton {
+  width: 100px;
+  height: 50px;
+  background-color: #0000dd;
+  color: white;
+  border: 1px solid #000099;
+}

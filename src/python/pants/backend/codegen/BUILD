@@ -9,7 +9,7 @@ python_library(
     'src/python/pants/backend/codegen/tasks:all',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ]
 )

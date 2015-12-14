@@ -48,6 +48,13 @@ class PayloadField(AbstractClass):
       self._fingerprint_memo = self._compute_fingerprint()
     return self._fingerprint_memo
 
+  def mark_dirty(self):
+    """Invalidates the memoized fingerprint for this field.
+
+    Exposed for testing.
+    """
+    self._fingerprint_memo = None
+
   @abstractmethod
   def _compute_fingerprint(self):
     """This method will be called and the result memoized for ``PayloadField.fingerprint``."""
@@ -262,16 +269,6 @@ class ExcludesField(OrderedSet, PayloadField):
 
   def _compute_fingerprint(self):
     return stable_json_sha1(tuple(repr(exclude) for exclude in self))
-
-
-class ConfigurationsField(OrderedSet, PayloadField):
-  """An OrderedSet subclass that mixes in PayloadField.
-
-  Must be initialized with an iterable of strings.
-  """
-
-  def _compute_fingerprint(self):
-    return combine_hashes(sha1(s).hexdigest() for s in self)
 
 
 class JarsField(tuple, PayloadField):

@@ -12,19 +12,19 @@ import unittest
 from contextlib import contextmanager
 from threading import Thread
 
-from pants.base.build_invalidator import CacheKey
-from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
+from pants.cache.artifact_cache import call_insert, call_use_cached_files
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
-from pants.util.contextutil import pushd, temporary_dir, temporary_file
+from pants.invalidation.build_invalidator import CacheKey
+from pants.util.contextutil import pushd, temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir
-from pants_test.base.context_utils import create_context
 
 
 # A very trivial server that serves files under the cwd.
 class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   def __init__(self, request, client_address, server):
     # The base class implements GET and HEAD.
+    # Old-style class, so we must invoke __init__ this way.
     SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def do_HEAD(self):
@@ -52,7 +52,9 @@ class SimpleRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
   """Reject all requests"""
+
   def __init__(self, request, client_address, server):
+    # Old-style class, so we must invoke __init__ this way.
     SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def _return_failed(self):
@@ -72,8 +74,8 @@ class FailRESTHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     return self._return_failed()
 
 
-TEST_CONTENT1 = 'muppet'
-TEST_CONTENT2 = 'kermit'
+TEST_CONTENT1 = b'muppet'
+TEST_CONTENT2 = b'kermit'
 
 
 class TestArtifactCache(unittest.TestCase):
@@ -201,28 +203,77 @@ class TestArtifactCache(unittest.TestCase):
           self.assertTrue(bool(local.use_cached_files(key)))
 
   def test_multiproc(self):
-    context = create_context()
     key = CacheKey('muppet_key', 'fake_hash', 42)
 
     with self.setup_local_cache() as cache:
-      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [False])
+      self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [False])
       with self.setup_test_file(cache.artifact_root) as path:
-        context.subproc_map(call_insert, [(cache, key, [path], False)])
-      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
+        map(call_insert, [(cache, key, [path], False)])
+      self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [True])
 
     with self.setup_rest_cache() as cache:
-      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [False])
+      self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [False])
       with self.setup_test_file(cache.artifact_root) as path:
-        context.subproc_map(call_insert, [(cache, key, [path], False)])
-      self.assertEquals(context.subproc_map(call_use_cached_files, [(cache, key)]), [True])
+        map(call_insert, [(cache, key, [path], False)])
+      self.assertEquals(map(call_use_cached_files, [(cache, key, None)]), [True])
 
   def test_failed_multiproc(self):
-    context = create_context()
     key = CacheKey('muppet_key', 'fake_hash', 55)
 
     # Failed requests should return failure status, but not raise exceptions
     with self.setup_rest_cache(return_failed=True) as cache:
-      self.assertFalse(context.subproc_map(call_use_cached_files, [(cache, key)])[0])
+      self.assertFalse(map(call_use_cached_files, [(cache, key, None)])[0])
       with self.setup_test_file(cache.artifact_root) as path:
-        context.subproc_map(call_insert, [(cache, key, [path], False)])
-      self.assertFalse(context.subproc_map(call_use_cached_files, [(cache, key)])[0])
+        map(call_insert, [(cache, key, [path], False)])
+      self.assertFalse(map(call_use_cached_files, [(cache, key, None)])[0])
+
+  def test_successful_request_cleans_result_dir(self):
+    key = CacheKey('muppet_key', 'fake_hash', 42)
+
+    with self.setup_local_cache() as cache:
+      self._do_test_successful_request_cleans_result_dir(cache, key)
+
+    with self.setup_rest_cache() as cache:
+      self._do_test_successful_request_cleans_result_dir(cache, key)
+
+  def _do_test_successful_request_cleans_result_dir(self, cache, key):
+    with self.setup_test_file(cache.artifact_root) as path:
+      with temporary_dir() as results_dir:
+        with temporary_file_path(root_dir=results_dir) as canary:
+          map(call_insert, [(cache, key, [path], False)])
+          map(call_use_cached_files, [(cache, key, results_dir)])
+          # Results content should have been deleted.
+          self.assertFalse(os.path.exists(canary))
+
+  def test_failed_request_doesnt_clean_result_dir(self):
+    key = CacheKey('muppet_key', 'fake_hash', 55)
+    with temporary_dir() as results_dir:
+      with temporary_file_path(root_dir=results_dir) as canary:
+        with self.setup_local_cache() as cache:
+          self.assertEquals(
+            map(call_use_cached_files, [(cache, key, results_dir)]),
+            [False])
+          self.assertTrue(os.path.exists(canary))
+
+        with self.setup_rest_cache() as cache:
+          self.assertEquals(
+            map(call_use_cached_files, [(cache, key, results_dir)]),
+            [False])
+          self.assertTrue(os.path.exists(canary))
+
+  def test_corruptted_cached_file_cleaned_up(self):
+    key = CacheKey('muppet_key', 'fake_hash', 42)
+
+    with self.setup_local_cache() as artifact_cache:
+      with self.setup_test_file(artifact_cache.artifact_root) as path:
+        artifact_cache.insert(key, [path])
+        tarfile = artifact_cache._cache_file_for_key(key)
+
+        self.assertTrue(artifact_cache.use_cached_files(key))
+        self.assertTrue(os.path.exists(tarfile))
+
+        with open(tarfile, 'w') as outfile:
+          outfile.write(b'not a valid tgz any more')
+
+        self.assertFalse(artifact_cache.use_cached_files(key))
+        self.assertFalse(os.path.exists(tarfile))

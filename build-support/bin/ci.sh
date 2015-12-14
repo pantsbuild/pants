@@ -94,7 +94,7 @@ fi
 if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
   banner "Running pre-commit checks"
 
-  ./build-support/bin/pre-commit.sh || exit 1
+  FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
 fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
@@ -123,8 +123,8 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     ./pants ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
-    ./pants.pex --version && \
-    ./pants.pex --pants-version
+    ./pants.pex -V && \
+    ./pants.pex --version
   ) || die "Failed to bootstrap pants."
 fi
 
@@ -162,7 +162,7 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   banner "Running core jvm tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test {src,tests}/{java,scala}:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} doc test {src,tests}/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
 fi
 
@@ -185,8 +185,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   (
     targets=$(
       ./pants.pex list tests/python:: | \
-      xargs ./pants.pex filter --filter-type=python_tests | \
-      grep -v integration
+      xargs ./pants.pex --tag='-integration' filter --filter-type=python_tests
     ) && \
     ./pants.pex ${PANTS_ARGS[@]} test.pytest \
       --fail-slow \
@@ -215,8 +214,7 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   (
     targets=$(
       ./pants.pex list tests/python:: | \
-      xargs ./pants.pex filter --filter-type=python_tests | \
-      grep integration
+      xargs ./pants.pex --tag='+integration' filter --filter-type=python_tests
     ) && \
     ./pants.pex ${PANTS_ARGS[@]} test.pytest --fail-slow --shard=${python_intg_shard} ${targets}
   ) || die "Pants Integration test failure"

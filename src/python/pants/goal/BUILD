@@ -17,7 +17,7 @@ python_library(
   ]
 )
 
-# why is this in goal?
+# this is in goal because of run_tracker
 python_library(
   name = 'artifact_cache_stats',
   sources = ['artifact_cache_stats.py'],
@@ -33,14 +33,13 @@ python_library(
     ':products',
     ':workspace',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_graph',
-    'src/python/pants/base:source_root',
-    'src/python/pants/base:target', # XXX(fixme)
+    'src/python/pants/build_graph', # XXX(fixme)
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/process',
     'src/python/pants/reporting:report',
+    'src/python/pants/source',
   ],
 )
 
@@ -58,6 +57,7 @@ python_library(
   sources = ['goal.py'],
   dependencies = [
     ':error',
+    'src/python/pants/base:deprecated',
   ],
 )
 
@@ -82,6 +82,7 @@ python_library(
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
     'src/python/pants/reporting', # XXX(fixme)
+    'src/python/pants/stats',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],

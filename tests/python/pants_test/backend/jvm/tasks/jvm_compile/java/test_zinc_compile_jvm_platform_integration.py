@@ -12,8 +12,6 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ZincCompileJvmPlatformIntegrationTest(JvmPlatformIntegrationMixin,
                                             PantsRunIntegrationTest):
-  def get_pants_compile_args(self):
-    return ['--no-compile-java-use-jmake', 'compile.zinc']
 
-  def test_compile_stale_platform_settings(self):
-    super(ZincCompileJvmPlatformIntegrationTest, self).test_compile_stale_platform_settings()
+  def get_pants_compile_args(self):
+    return ['compile.zinc']

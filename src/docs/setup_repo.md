@@ -1,7 +1,7 @@
 Set up Your Source Tree for Pants
 =================================
 
-**As of September 2014, this much more complex than it should be.**
+**As of November 2015, this more complex than it should be.**
 **The Pants community is actively working to simplify it.**
 If you're setting up the Pants build tool to work in your source tree, you need to
 configure Pants' behavior. (Once it's set up, most folks should be able
@@ -12,15 +12,15 @@ Configuring with `pants.ini`
 ----------------------------
 
 Pants Build is very configurable. Your source tree's top-level directory
-should contain a `pants.ini` file that sets many, many options. You can
-modify a broad range of settings here, including specific binaries to
-use in your toolchain, arguments to pass to tools, etc.
+contains a `pants.ini` file that can set various options,
+specify binaries to
+use in your toolchain, set arguments to pass to tools, etc.
 
-These files are formatted as [Python config
+This file is a [Python config
 files](http://docs.python.org/install/index.html#inst-config-syntax),
 parsed by
 [ConfigParser](http://docs.python.org/library/configparser.html). Thus,
-they look something like:
+it looks something like:
 
     :::ini
     [section]
@@ -46,84 +46,37 @@ several contexts, as in these excerpts that define/use `thrift_workdir`:
 It's also handy for defining values that are used in several contexts,
 since these values will be available in all those contexts. The code
 that combines DEFAULT values with others is in Pants'
-[base/config.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/base/config.py).
+[option/config.py](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/config.py).
 
 Configure Pants' own Runtime Dependencies
 -----------------------------------------
 
-Pants calls out to other tools. E.g., it uses `jmake` for part of Java compilation.
-Some special files in your workspace specify versions of these to fetch.
-When setting up your Pants repo, you want to copy these files over from a working Pants
-repo and perhaps change some version numbers to fit your situation.
-
-**JVM** `BUILD.tools` has JVM dependencies. For example, when Pants fetches `jmake`, it looks in
+Pants calls out to other tools. E.g., it optionally uses `scalastyle` to check scala source code.
+Most tools come pre-configured by Pants. A few do require more setup though and these rely on
+special targets in your workspace to specify versions of the tools to fetch. These targets all live
+in the `BUILD.tools` file by convention. For example, when Pants fetches `scalastyle`, it looks in
 `BUILD.tools` for that target:
 
-!inc[start-at=jmake&end-before=java](../../BUILD.tools)
+!inc[start-at=scalastyle&end-before=scrooge-gen](../../BUILD.tools)
 
-**Python** `build-support/python/pants.requirements.txt` has Pants' runtime Python requirements,
-expressed as a `requirements.txt` file.
+When setting up your Pants repo, you may want to copy this file over from a working Pants repo and
+perhaps change some version numbers to fit your situation.
 
-Configure Code Layout with `source_root`, `maven_layout`
---------------------------------------------------------
+**Note**: pants ships expecting a specific main class and command line interface for all jvm tools
+it uses; so, if the version you specify does not match either of those expectations, pants will
+fail when it tries to call the tool.
 
-Maybe someday all the world's programmers will agree on the one true
-directory structure for source code. Until then, you'll want some
-<a pantsref="bdict_source_root">`source_root`</a>
-rules to specify which directories hold your code. A
-typical programming language has a notion of *base paths* for imports;
-you configure pants to tell it those base paths.
+Set up source roots
+-------------------
 
-If your project's source tree is laid out for Maven, there's a shortcut
-function
-<a pantsref="bdict_maven_layout">`maven_layout`</a>
-that configures source roots for Maven's expected
-source code tree structure. See
-[`testprojects/maven_layout`](https://github.com/pantsbuild/pants/tree/master/testprojects/maven_layout)
-for examples of using this style source tree.
+Maybe some day all the world's programmers will agree on the one true directory structure for
+source code. Until then, Pants must deduce where the 'root' of a source tree is, so it can
+correctly set up import paths, correctly bundle code etc.
 
-### Organized by Language
-
-If your top-level `BUILD` file is `top/BUILD` and your main Java code is
-in `top/src/java/com/foo/` and your Java tests are in
-`top/src/javatest/com/foo/`, then your top-level `BUILD` file might look
-like:
-
-    :::python
-    # top/BUILD
-    source_root('src/java')
-    source_root('src/javatest')
-    ...
-
-Pants can optionally enforce that only certain target types are allowed
-under each source root:
-
-    :::python
-    # top/BUILD
-    source_root('src/java', annotation_processor, doc, jvm_binary, java_library, page)
-    source_root('src/javatest', doc, java_library, java_tests, page)
-    ...
-
-### Organized by Project
-
-If your top-level `BUILD` file is `top/BUILD` and the Java code for your
-Theodore and Hank projects live in `top/theodore/src/java/com/foo/`,
-then your top-level `BUILD` file might not contain any `source_root`
-statements. Instead, `theodore/BUILD` and `hank/BUILD` might look like:
-
-    :::python
-    # top/(project)/BUILD
-    source_root('src/java')
-    source_root('src/javatest')
-    ...
-
-Or:
-
-    :::python
-    # top/(project)/BUILD
-    source_root('src/java', annotation_processor, doc, jvm_binary, java_library, page)
-    source_root('src/javatest', doc, java_library, java_tests, page)
-    ...
+In all typical cases, Pants can deduce the source roots automatically based on naming conventions.
+E.g., `src/<lang>`, `src/main/<lang>`, `test/<lang>`, `src/test/<lang>`, `3rdparty/lang` and so on.
+However if your source roots don't conform to any of the default patterns, you can add your own
+patterns.  See ` ./pants help-advanced source` for details.
 
 Setting up `BUILD` files
 ------------------------
@@ -242,7 +195,7 @@ refers to the `public` repository defined above. (Notice it's a Python object, n
 If you get an error that the repo name (here, `public`) isn't defined, your plugin didn't register
 with Pants successfully. Make sure you bootstrap Pants in a way that loads your `register.py`.
 
-In your config file (usually `pants.ini`), set up a `[publish.jar]` section. In that section,
+In your `pants.ini` file, set up a `[publish.jar]` section. In that section,
 create a `dict` called `repos`. It should contain a section for each `Repository` object that you
 defined in your plugin:
 
@@ -250,13 +203,11 @@ defined in your plugin:
       'public': {  # must match the name of the `Repository` object that you defined in your plugin.
         'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
                                          # in your custom ivysettings.xml.
-        'confs': ['default', 'sources', 'docs', 'changelog'],
         'auth': 'build-support:netrc',   # Pants spec to a 'credentials()' object.
         'help': 'Configure your ~/.netrc for maven.example.com access.'
       },
       'testing': {
         'resolver': 'artifactory.example.com',
-        'confs': ['default', 'sources', 'docs', 'changelog'],
         'auth': 'build-support:netrc',
         'help': 'Configure your ~/.netrc for artifactory.example.com access.'
       },
@@ -327,7 +278,7 @@ the custom Ivy settings when publishing:
 Your organization might have a notion of a special "release branch": you want [[artifact
 publishing|pants('src/docs:publish')]] to happen on this source control branch, which you maintain
 extra-carefully. You can set this branch using the `restrict_push_branches` option of the
-`[publish.jar]` section of your config file (usually `pants.ini`).
+`[publish.jar]` section of your `pants.ini` file.
 
 ### Task to Publish "Extra" Artifacts
 

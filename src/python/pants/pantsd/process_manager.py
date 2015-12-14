@@ -16,10 +16,21 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_open
+from pants.util.dirutil import rm_rf, safe_mkdir, safe_open
 
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def swallow_psutil_exceptions():
+  """A contextmanager that swallows standard psutil access exceptions."""
+  try:
+    yield
+  except (psutil.AccessDenied, psutil.NoSuchProcess):
+    # This masks common, but usually benign psutil process access exceptions that might be seen
+    # when accessing attributes/methods on psutil.Process objects.
+    pass
 
 
 class ProcessGroup(object):
@@ -28,23 +39,13 @@ class ProcessGroup(object):
   def __init__(self, name):
     self._name = name
 
-  @contextmanager
-  def _swallow_psutil_exceptions(self):
-    """A contextmanager that swallows standard psutil access exceptions."""
-    try:
-      yield
-    except (psutil.AccessDenied, psutil.NoSuchProcess):
-      # This masks common, but usually benign psutil process access exceptions that might be seen
-      # when accessing attributes/methods on psutil.Process objects.
-      pass
-
   def _instance_from_process(self, process):
     """Default converter from psutil.Process to process instance classes for subclassing."""
     return ProcessManager(name=process.name(), pid=process.pid, process_name=process.name())
 
   def iter_processes(self, proc_filter=None):
     proc_filter = proc_filter or (lambda x: True)
-    with self._swallow_psutil_exceptions():
+    with swallow_psutil_exceptions():
       for proc in (x for x in psutil.process_iter() if proc_filter(x)):
         yield proc
 
@@ -57,6 +58,7 @@ class ProcessManager(object):
   """Subprocess/daemon management mixin/superclass. Not intended to be thread-safe."""
 
   class ExecutionError(Exception): pass
+  class MetadataError(Exception): pass
   class InvalidCommandOutput(Exception): pass
   class NonResponsiveProcess(Exception): pass
   class Timeout(Exception): pass
@@ -91,13 +93,10 @@ class ProcessManager(object):
 
     :returns: The command line or else `None` if the underlying process has died.
     """
-    try:
+    with swallow_psutil_exceptions():
       process = self._as_process()
       if process:
         return process.cmdline()
-    except psutil.NoSuchProcess:
-      # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
-      pass
     return None
 
   @property
@@ -198,16 +197,21 @@ class ProcessManager(object):
     """
     return os.path.join(self._buildroot, '.pids', self._name)
 
-  def _purge_metadata(self):
-    assert not self.is_alive(), 'aborting attempt to purge metadata for a running process!'
+  def purge_metadata(self, force=False):
+    """Purge a processes metadata directory.
 
-    for f in (self.get_pid_path(), self.get_socket_path()):
-      if f and os.path.exists(f):
-        try:
-          logging.debug('purging {file}'.format(file=f))
-          safe_delete(f)
-        except OSError as e:
-          logging.warning('failed to unlink {file}: {exc}'.format(file=f, exc=e))
+    :param bool force: If True, skip process liveness check before purging metadata.
+    :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
+    """
+    if not force:
+      assert not self.is_alive(), 'aborting attempt to purge metadata for a running process!'
+
+    meta_dir = self.get_metadata_dir()
+    logging.debug('purging metadata directory: {}'.format(meta_dir))
+    try:
+      rm_rf(meta_dir)
+    except OSError as e:
+      raise self.MetadataError('failed to purge metadata directory {}: {!r}'.format(meta_dir, e))
 
   def get_pid_path(self):
     """Return the path to the file containing the processes pid."""
@@ -244,6 +248,22 @@ class ProcessManager(object):
     except (IOError, OSError):
       return None
 
+  def _get_named_socket_path(self, name):
+    return '_'.join((self.get_socket_path(), name))
+
+  def get_named_socket(self, socket_name):
+    """Retrieve and return the running processes socket info."""
+    try:
+      return self._maybe_cast(self._read_file(self._get_named_socket_path(socket_name)),
+                              self._socket_type) or None
+    except (IOError, OSError):
+      return None
+
+  def write_named_socket(self, socket_name, socket_info):
+    """A multi-tenant, named alternative to ProcessManager.write_socket()."""
+    self._maybe_init_metadata_dir()
+    self._write_file(self._get_named_socket_path(socket_name), str(socket_info))
+
   def is_dead(self):
     """Return a boolean indicating whether the process is dead or not."""
     return not self.is_alive()
@@ -258,7 +278,7 @@ class ProcessManager(object):
       if (process.status() == psutil.STATUS_ZOMBIE or                    # Check for walkers.
           (self.process_name and self.process_name != process.name())):  # Check for stale pids.
         return False
-    except psutil.NoSuchProcess:
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
       # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
       return False
 
@@ -274,16 +294,19 @@ class ProcessManager(object):
     alive = self.is_alive()
     if alive:
       for signal_type in signal_chain:
+        pid = self.pid
         try:
+          logger.debug('sending signal {} to pid {}'.format(signal_type, pid))
           self._kill(signal_type)
         except OSError as e:
           logger.warning('caught OSError({e!s}) during attempt to kill -{signal} {pid}!'
-                         .format(e=e, signal=signal_type, pid=self.pid))
+                         .format(e=e, signal=signal_type, pid=pid))
 
         # Wait up to kill_wait seconds to terminate or move onto the next signal.
         try:
           if self._deadline_until(self.is_dead, kill_wait):
             alive = False
+            logger.debug('successfully terminated pid {}'.format(pid))
             break
         except self.Timeout:
           # Loop to the next kill signal on timeout.
@@ -294,7 +317,7 @@ class ProcessManager(object):
                                       .format(pid=self.pid, chain=signal_chain))
 
     if purge:
-      self._purge_metadata()
+      self.purge_metadata(force=True)
 
   def get_subprocess_output(self, *args):
     try:
@@ -318,6 +341,7 @@ class ProcessManager(object):
        daemons. Having a disparate umask from pre-vs-post fork causes files written in each phase to
        differ in their permissions without good reason - in this case, we want to inherit the umask.
     """
+    self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
     if pid == 0:
@@ -348,6 +372,7 @@ class ProcessManager(object):
        Using this daemonization method vs daemonize() leaves the responsibility of writing the pid
        to the caller to allow for library-agnostic flexibility in subprocess execution.
     """
+    self.purge_metadata()
     self.pre_fork(**pre_fork_opts or {})
     pid = os.fork()
     if pid == 0:

@@ -12,6 +12,7 @@ import re
 import select
 import threading
 import time
+from contextlib import closing
 
 from six import string_types
 from twitter.common.collections import maybe_list
@@ -30,7 +31,7 @@ class NailgunProcessGroup(ProcessGroup):
   _NAILGUN_KILL_LOCK = threading.Lock()
 
   def __init__(self):
-    ProcessGroup.__init__(self, name='nailgun')
+    super(NailgunProcessGroup, self).__init__(name='nailgun')
     # TODO: this should enumerate the .pids dir first, then fallback to ps enumeration (& warn).
 
   def _iter_nailgun_instances(self, everywhere=False):
@@ -150,7 +151,7 @@ class NailgunExecutor(Executor, ProcessManager):
         nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
         try:
           logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
-          return nailgun(main, cwd, *args)
+          return nailgun.execute(main, cwd, *args)
         except nailgun.NailgunError as e:
           self.terminate()
           raise self.Error('Problem launching via {ng_desc} command {main} {args}: {msg}'
@@ -210,23 +211,19 @@ class NailgunExecutor(Executor, ProcessManager):
 
   def ensure_connectable(self, nailgun):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
-    attempt_count = 0
+    attempt_count = 1
     while 1:
-      if attempt_count > self._connect_attempts:
-        logger.debug('Failed to connect to ng after {count} attempts'
-                     .format(count=self._connect_attempts))
-        raise NailgunClient.NailgunError('Failed to connect to ng server.')
-
       try:
-        sock = nailgun.try_connect()
-        if sock:
-          logger.debug('Connected to ng server {server!r}'.format(server=self))
+        with closing(nailgun.try_connect()) as sock:
+          logger.debug('Verified new ng server is connectable at {}'.format(sock.getpeername()))
           return
-      finally:
-        sock.close()
+      except nailgun.NailgunConnectionError:
+        if attempt_count >= self._connect_attempts:
+          logger.debug('Failed to connect to ng after {} attempts'.format(self._connect_attempts))
+          raise     # Re-raise the NailgunConnectionError which provides more context to the user.
 
       attempt_count += 1
-      time.sleep(self.WAIT_INTERVAL)
+      time.sleep(self.WAIT_INTERVAL_SEC)
 
   def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Synchronously spawn a new nailgun server."""

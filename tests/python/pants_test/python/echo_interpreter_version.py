@@ -13,6 +13,7 @@ import sys
 v = sys.version_info
 print('%d.%d.%d' % v[0:3])
 
+
 def say_hello():
   # NOTE: Do not change this text without changing tests that check for it.
   print('echo_interpreter_version loaded successfully.')

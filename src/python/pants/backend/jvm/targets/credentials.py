@@ -5,11 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 class Credentials(Target):
-  """Supplies credentials for a maven repository on demand.
+  """Credentials for a maven repository.
 
   The ``publish.jar`` section of your ``pants.ini`` file can refer to one
   or more of these.

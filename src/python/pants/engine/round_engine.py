@@ -116,7 +116,7 @@ class RoundEngine(Engine):
       self._target_roots = None
 
     def propose_alternates(self, proposer, target_roots):
-      if target_roots:
+      if target_roots is not None:
         if self._target_roots and (self._target_roots != target_roots):
           raise self.ConflictingProposalsError(
               'Already have a proposal by {0} for {1} and cannot accept conflicting proposal '
@@ -125,7 +125,7 @@ class RoundEngine(Engine):
         self._target_roots = target_roots
 
     def apply(self, context):
-      if self._target_roots:
+      if self._target_roots is not None:
         context._replace_targets(self._target_roots)
 
   def _visit_goal(self, goal, context, goal_info_by_goal, target_roots_replacement):
@@ -152,7 +152,11 @@ class RoundEngine(Engine):
         for producer_info in dependencies:
           producer_goal = producer_info.goal
           if producer_goal == goal:
-            if producer_info.task_type in visited_task_types:
+            if producer_info.task_type == task_type:
+              # We allow a task to produce products it itself needs.  We trust the Task writer
+              # to arrange for proper sequencing.
+              pass
+            elif producer_info.task_type in visited_task_types:
               ordering = '\n\t'.join("[{0}] '{1}' {2}".format(i, tn,
                                                               goal.task_type_by_name(tn).__name__)
                                      for i, tn in enumerate(goal.ordered_task_names()))

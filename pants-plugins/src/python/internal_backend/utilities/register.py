@@ -12,8 +12,8 @@ from twitter.common.collections import OrderedSet
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot, pants_version
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.build_file_aliases import BuildFileAliases
 
 
 def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
@@ -83,7 +83,7 @@ def contrib_setup_py(name, description, additional_classifiers=None, **kwargs):
 
 
 class PantsPlugin(PythonLibrary):
-  """Describes a pants plugin published by pantsbuild."""
+  """A pants plugin published by pantsbuild."""
 
   @classmethod
   def create_setup_py(cls, name, description, additional_classifiers=None):
@@ -151,7 +151,7 @@ class PantsPlugin(PythonLibrary):
 
 
 class ContribPlugin(PantsPlugin):
-  """Describes a contributed pants plugin published by pantsbuild."""
+  """A contributed pants plugin published by pantsbuild."""
 
   @classmethod
   def create_setup_py(cls, name, description, additional_classifiers=None):
@@ -159,7 +159,7 @@ class ContribPlugin(PantsPlugin):
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     objects={
       'pants_setup_py': pants_setup_py,
       'contrib_setup_py': contrib_setup_py

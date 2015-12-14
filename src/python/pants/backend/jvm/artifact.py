@@ -41,9 +41,17 @@ class Artifact(PayloadField):
                        .format(PublicationMetadata, type(publication_metadata)))
 
     self.org = org
-    self.name = name
+    self._base_name = name
     self.repo = repo
     self.publication_metadata = publication_metadata
+
+  @property
+  def name(self):
+    return self._base_name
+
+  @name.setter
+  def name(self, value):
+    self._base_name = value
 
   def __eq__(self, other):
     return (type(other) == Artifact and

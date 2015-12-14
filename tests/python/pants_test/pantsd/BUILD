@@ -39,3 +39,25 @@ python_tests(
     'src/python/pants/pantsd:watchman_client'
   ]
 )
+
+python_tests(
+  name = 'pailgun_server',
+  sources = ['test_pailgun_server.py'],
+  coverage = ['pants.pantsd.pailgun_server'],
+  dependencies = [
+    ':test_deps',
+    'src/python/pants/pantsd:pailgun_server'
+  ]
+)
+
+python_tests(
+  name = 'daemon',
+  sources = ['test_pants_daemon.py'],
+  coverage = ['pants.pantsd.pants_daemon'],
+  dependencies = [
+    ':test_deps',
+    'src/python/pants/pantsd:pants_daemon',
+    'src/python/pants/pantsd/service:pants_service',
+    'src/python/pants/util:contextutil'
+  ]
+)

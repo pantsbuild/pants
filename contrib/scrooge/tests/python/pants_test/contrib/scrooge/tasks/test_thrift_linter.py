@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from mock import Mock, patch
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.scrooge.tasks.thrift_linter import ThriftLinter
@@ -21,7 +21,7 @@ class ThriftLinterTest(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_thrift_library': JavaThriftLibrary,
       },

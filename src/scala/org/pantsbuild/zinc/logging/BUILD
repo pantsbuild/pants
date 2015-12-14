@@ -1,6 +1,6 @@
 scala_library(
   name='logging',
-  provides=artifact(
+  provides=scala_artifact(
     org='org.pantsbuild',
     name='zinc-logging',
     repo=public,
@@ -10,4 +10,5 @@ scala_library(
     '3rdparty/jvm/com/typesafe/sbt:incremental-compiler',
   ],
   sources=globs('*.scala'),
+  strict_deps=True,
 )

@@ -6,10 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import multiprocessing
 import os
 import sys
 import threading
 import time
+import uuid
 from contextlib import contextmanager
 
 import requests
@@ -17,10 +19,11 @@ import requests
 from pants.base.build_environment import get_pants_cachedir
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.reporting.report import Report
+from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
@@ -52,30 +55,39 @@ class RunTracker(Subsystem):
   BACKGROUND_ROOT_NAME = 'background'
 
   @classmethod
+  def subsystem_dependencies(cls):
+    return (StatsDBFactory,)
+
+  @classmethod
   def register_options(cls, register):
     register('--stats-upload-url', advanced=True, default=None,
              help='Upload stats to this URL on run completion.')
     register('--stats-upload-timeout', advanced=True, type=int, default=2,
              help='Wait at most this many seconds for the stats upload to complete.')
-    register('--num-foreground-workers', advanced=True, type=int, default=8,
+    register('--num-foreground-workers', advanced=True, type=int,
+             default=multiprocessing.cpu_count(),
              help='Number of threads for foreground work.')
-    register('--num-background-workers', advanced=True, type=int, default=8,
+    register('--num-background-workers', advanced=True, type=int,
+             default=multiprocessing.cpu_count(),
              help='Number of threads for background work.')
+    register('--stats-local-json-file', advanced=True, default=None,
+             help='Write stats to this local json file on run completion.')
 
   def __init__(self, *args, **kwargs):
     super(RunTracker, self).__init__(*args, **kwargs)
-    self.run_timestamp = time.time()  # A double, so we get subsecond precision for ids.
-    cmd_line = ' '.join(['./pants'] + sys.argv[1:])
+    run_timestamp = time.time()
+    cmd_line = ' '.join(['pants'] + sys.argv[1:])
 
     # run_id is safe for use in paths.
-    millis = int((self.run_timestamp * 1000) % 1000)
-    run_id = 'pants_run_{}_{}'.format(
-               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self.run_timestamp)), millis)
+    millis = int((run_timestamp * 1000) % 1000)
+    run_id = 'pants_run_{}_{}_{}'.format(
+               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
+               uuid.uuid4().hex)
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
     self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
-    self.run_info.add_basic_info(run_id, self.run_timestamp)
+    self.run_info.add_basic_info(run_id, run_timestamp)
     self.run_info.add_info('cmd_line', cmd_line)
 
     # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
@@ -114,7 +126,8 @@ class RunTracker(Subsystem):
     self._background_worker_pool = None
     self._background_root_workunit = None
 
-    # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring)
+    # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring).
+    SubprocPool.set_num_processes(self._num_foreground_workers)
     SubprocPool.foreground()
 
     self._aborted = False
@@ -193,19 +206,19 @@ class RunTracker(Subsystem):
     workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=parent, name=name, labels=labels,
                         cmd=cmd, log_config=log_config)
     workunit.start()
+
+    outcome = WorkUnit.FAILURE  # Default to failure we will override if we get success/abort.
     try:
       self.report.start_workunit(workunit)
       yield workunit
     except KeyboardInterrupt:
-      workunit.set_outcome(WorkUnit.ABORTED)
+      outcome = WorkUnit.ABORTED
       self._aborted = True
       raise
-    except:
-      workunit.set_outcome(WorkUnit.FAILURE)
-      raise
     else:
-      workunit.set_outcome(WorkUnit.SUCCESS)
+      outcome = WorkUnit.SUCCESS
     finally:
+      workunit.set_outcome(outcome)
       self.end_workunit(workunit)
 
   def log(self, level, *msg_elements):
@@ -237,21 +250,48 @@ class RunTracker(Subsystem):
       return error("Error: {}".format(e))
     return True
 
-  def upload_stats(self):
-    """Write stats to local cache, and upload to server, if needed."""
+  @classmethod
+  def write_stats_to_json(cls, file_name, stats):
+    """Write stats to a local json file.
+
+    :return: True if successfully written, False otherwise.
+    """
+    params = json.dumps(stats)
+    try:
+      with open(file_name, 'w') as f:
+        f.write(params)
+    except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
+      print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
+            file=sys.stderr)
+      return False
+    return True
+
+  def store_stats(self):
+    """Store stats about this run in local and optionally remote stats dbs."""
     stats = {
       'run_info': self.run_info.get_as_dict(),
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all()
     }
+    # Dump individual stat file.
+    # TODO(benjy): Do we really need these, once the statsdb is mature?
     stats_file = os.path.join(get_pants_cachedir(), 'stats',
                               '{}.json'.format(self.run_info.get_info('id')))
     safe_file_dump(stats_file, json.dumps(stats))
 
+    # Add to local stats db.
+    StatsDBFactory.global_instance().get_db().insert_stats(stats)
+
+    # Upload to remote stats db.
     stats_url = self.get_options().stats_upload_url
     if stats_url:
       self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
+
+    # Write stats to local json file.
+    stats_json_file_name = self.get_options().stats_local_json_file
+    if stats_json_file_name:
+      self.write_stats_to_json(stats_json_file_name, stats)
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
@@ -260,7 +300,6 @@ class RunTracker(Subsystem):
 
     Note: If end() has been called once, subsequent calls are no-ops.
     """
-
     if self._background_worker_pool:
       if self._aborted:
         self.log(Report.INFO, "Aborting background workers.")
@@ -270,9 +309,9 @@ class RunTracker(Subsystem):
         self._background_worker_pool.shutdown()
       self.end_workunit(self._background_root_workunit)
 
-    SubprocPool.shutdown(self._aborted)
+    self.shutdown_worker_pool()
 
-    # Run a dummy work unit to write out one last timestamp
+    # Run a dummy work unit to write out one last timestamp.
     with self.new_workunit("complete"):
       pass
 
@@ -286,13 +325,11 @@ class RunTracker(Subsystem):
     self.log(log_level, outcome_str)
 
     if self.run_info.get_info('outcome') is None:
-      try:
-        self.run_info.add_info('outcome', outcome_str)
-      except IOError:
-        pass  # If the goal is clean-all then the run info dir no longer exists...
+      # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
+      self.run_info.add_info('outcome', outcome_str, ignore_errors=True)
 
     self.report.close()
-    self.upload_stats()
+    self.store_stats()
 
   def end_workunit(self, workunit):
     self.report.end_workunit(workunit)
@@ -314,3 +351,10 @@ class RunTracker(Subsystem):
                                                 run_tracker=self,
                                                 num_workers=self._num_background_workers)
     return self._background_worker_pool
+
+  def shutdown_worker_pool(self):
+    """Shuts down the SubprocPool.
+
+    N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
+    """
+    SubprocPool.shutdown(self._aborted)

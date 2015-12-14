@@ -24,6 +24,10 @@ class DummyOptionable(Optionable):
   options_scope = 'foo'
 
 
+class UninitializedSubsystem(Subsystem):
+  options_scope = 'uninitialized-scope'
+
+
 class SubsystemTest(unittest.TestCase):
   def setUp(self):
     DummySubsystem._options = DummyOptions()
@@ -114,3 +118,18 @@ class SubsystemTest(unittest.TestCase):
     for root in SubsystemA, SubsystemB, SubsystemC:
       with self.assertRaises(Subsystem.CycleException):
         Subsystem.closure((root,))
+
+  def test_uninitialized_global(self):
+
+    with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,
+                                 r'UninitializedSubsystem.*uninitialized-scope'):
+      UninitializedSubsystem.global_instance()
+
+  def test_uninitialized_scoped_instance(self):
+    class UninitializedOptional(Optionable):
+      options_scope = 'optional'
+
+    optional = UninitializedOptional()
+    with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,
+                                 r'UninitializedSubsystem.*uninitialized-scope'):
+      UninitializedSubsystem.scoped_instance(optional)

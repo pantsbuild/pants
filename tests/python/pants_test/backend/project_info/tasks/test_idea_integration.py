@@ -9,20 +9,20 @@ import os
 import re
 import xml.dom.minidom as minidom
 
-import pytest
-
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
+from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class IdeaIntegrationTest(PantsRunIntegrationTest):
+class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
   RESOURCE = 'java-resource'
   TEST_RESOURCE = 'java-test-resource'
 
   def _idea_test(self, specs, project_dir=os.path.join('.pants.d', 'idea', 'idea', 'IdeaGen'),
-                 project_name=None, check_func=None, config=None):
+                 project_name=None, check_func=None, config=None, load_extra_confs=True,
+                 extra_args=None):
     """Helper method that tests idea generation on the input spec list.
 
     :param project_dir: directory passed to --idea-project-dir
@@ -37,11 +37,15 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir(root_dir=project_dir) as project_dir_path:
 
       extra_flags = ['--idea-project-dir={dir}'.format(dir=project_dir_path)]
+      extra_flags.extend(extra_args or ())
 
       if project_name is None:
         project_name = "project"  # to match Pants' built-in default w/o --idea-project-name
       else:
         extra_flags += ['--idea-project-name={name}'.format(name=project_name)]
+
+      if not load_extra_confs:
+        extra_flags += ['--no-idea-source-jars', '--no-idea-javadoc-jars']
 
       all_flags = ['idea', '--no-open'] + specs + extra_flags
       pants_run = self.run_pants(all_flags, config=config)
@@ -60,6 +64,17 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
       if check_func:
         check_func(workdir)
+
+  def evaluate_subtask(self, targets, workdir, load_extra_confs, extra_args, expected_jars):
+    def check(path):
+      for jar in expected_jars:
+        parts = jar.split(':')
+        jar_name = '{}.jar'.format('-'.join(parts[1:]))
+        jar_path = os.path.join(get_buildroot(), path, 'external-libs', jar_name)
+        self.assertTrue(os.path.exists(jar_path), 'Expected {} to exist.'.format(jar_path))
+
+    self._idea_test(targets, load_extra_confs=load_extra_confs, extra_args=extra_args,
+                    check_func=check)
 
   def _get_new_module_root_manager(self, dom):
     module = dom.getElementsByTagName('module')[0]
@@ -88,6 +103,13 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
             if library.getAttribute('name') == 'external':
               for library_type in library.getElementsByTagName(type):
                 return library_type.getElementsByTagName('root')
+    return None
+
+  def _get_compiler_configuration(self, dom):
+    project = dom.getElementsByTagName('project')[0]
+    for component in project.getElementsByTagName('component'):
+      if component.getAttribute('name') == 'CompilerConfiguration':
+        return component
     return None
 
   # Testing IDEA integration on lots of different targets which require different functionalities to
@@ -277,9 +299,34 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
           .format(url=url, is_test_source=is_test_source))
       self.assertTrue(found_source_content)
 
-    self._idea_test(['testprojects/maven_layout/resource_collision::', '--idea-use-source-root',
-                     '--idea-infer-test-from-siblings'],
+    self._idea_test(['testprojects/maven_layout/resource_collision::', '--idea-use-source-root'],
                     check_func=do_check)
+
+  def _test_idea_language_level(self, targets, expected):
+    def do_check(path):
+      iml_file = os.path.join(path, 'project.iml')
+      dom = minidom.parse(iml_file)
+      module = dom.getElementsByTagName('module')[0]
+      for component in module.getElementsByTagName('component'):
+        if component.getAttribute('name') == 'NewModuleRootManager':
+          received = component.getAttribute('LANGUAGE_LEVEL')
+          self.assertEquals(expected, received,
+                            'Language level was {0} instead of {1}.'.format(received, expected))
+          break
+    self._idea_test(targets, check_func=do_check)
+
+  def test_idea_language_level_homogenous(self):
+    self._test_idea_language_level(
+      targets=['testprojects/src/java/org/pantsbuild/testproject/targetlevels/java7'],
+      expected='JDK_1_7'
+    )
+
+  def test_idea_language_level_heterogenous(self):
+    self._test_idea_language_level(
+      targets=['testprojects/src/java/org/pantsbuild/testproject/targetlevels/java7',
+               'testprojects/src/java/org/pantsbuild/testproject/targetlevels/java8'],
+      expected='JDK_1_8'
+    )
 
   def test_idea_exclude_maven_targets(self):
     def do_check(path):
@@ -357,41 +404,26 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
   def test_ivy_classifiers(self):
     def do_check(path):
       """Check to see that the project contains the expected jar files."""
-      def check_jars(dom, jars, expected_jars):
+      def check_jars(jars, expected_jars):
         # Make sure the .jar files are present on disk
         for jar in expected_jars:
-          self.assertTrue(os.path.exists(jar))
-        to_find = set(['jar://{}!/'.format(jar) for jar in expected_jars])
+          self.assertTrue(os.path.exists(jar), '{} does not exist.'.format(jar))
+        to_find = set('jar://{}!/'.format(jar) for jar in expected_jars)
         for external_library in jars:
           to_find.discard(external_library.getAttribute('url'))
-        self.assertEqual(set([]), to_find)
+        self.assertEqual(set(), to_find)
 
       iml_file = os.path.join(path, 'project.iml')
       self.assertTrue(os.path.exists(iml_file))
       dom = minidom.parse(iml_file)
-      check_jars(dom, self._get_external_libraries(dom, type='CLASSES'), [
-         os.path.join(get_buildroot(), path, 'external-libs', jar_path)
-        for jar_path in [
-          'avro-1.7.7.jar',
-          'avro-1.7.7-tests.jar'
-        ]
-      ])
-
-      # TODO(Eric Ayers) we'd pull down sources and javadoc, but this fails when you
-      # use <artifact> elements in ivy to pull artifacts with classifiers.
-
-      #check_jars(dom, self._get_external_libraries(dom, type='SOURCES'), [
-      #  "jar://" + os.path.join(get_buildroot(), path, 'external-libsources', jar_path )
-      #  for jar_path in [
-      #    'avro-1.7.7-sources.jar',
-      #  ]
-      #])
-      #check_jars(dom, self._get_external_libraries(dom, type='JAVADOC'), [
-      #  "jar://" + os.path.join(get_buildroot(), path, 'external-libjavadoc', jar_path )
-      #  for jar_path in [
-      #    'avro-1.7.7-javadoc.jar',
-      #    ]
-      #])
+      base = os.path.join(get_buildroot(), path)
+      check_jars(self._get_external_libraries(dom, type='CLASSES'),
+                 [os.path.join(base, 'external-libs', jar_path)
+                  for jar_path in ['avro-1.7.7.jar', 'avro-1.7.7-tests.jar']])
+      check_jars(self._get_external_libraries(dom, type='SOURCES'),
+                 [os.path.join(base, 'external-libsources', 'avro-1.7.7-sources.jar')])
+      check_jars(self._get_external_libraries(dom, type='JAVADOC'),
+                 [os.path.join(base, 'external-libjavadoc', 'avro-1.7.7-javadoc.jar')])
 
     self._idea_test(['testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier::'],
                     check_func=do_check)
@@ -534,4 +566,48 @@ class IdeaIntegrationTest(PantsRunIntegrationTest):
 
     self._idea_test([
       'testprojects/tests/java/org/pantsbuild/testproject/ideatestsandlib::'
+    ], check_func=do_check)
+
+  def test_annotation_processor(self):
+    """Turn on annotation processor support for AutoValue in IntellliJ"""
+
+    def do_check(path):
+      iml_file = os.path.join(path, 'project.iml')
+      iml_dom = minidom.parse(iml_file)
+      found_paths = set()
+      for sourceFolder in self._get_sourceFolders(iml_dom):
+        url = sourceFolder.getAttribute('url')
+        source_path = re.sub(r'^.*/generated', 'generated', url)
+        found_paths.add(source_path)
+      self.assertIn("generated", found_paths)
+      self.assertIn("generated_tests", found_paths)
+
+      ipr_file = os.path.join(path, 'project.ipr')
+      ipr_dom = minidom.parse(ipr_file)
+      annotation_processing = self._get_compiler_configuration(ipr_dom).getElementsByTagName(
+        'annotationProcessing')[0]
+      profile = annotation_processing.getElementsByTagName('profile')[0]
+      self.assertEquals('True', profile.getAttribute('enabled'))
+      self.assertEquals('true', profile.getAttribute('default'))
+      self.assertEquals('Default', profile.getAttribute('name'))
+      processor_path = profile.getElementsByTagName('processorPath')[0]
+      self.assertEquals('true', processor_path.getAttribute('useClasspath'))
+      source_output_dir = profile.getElementsByTagName('sourceOutputDir')[0]
+      self.assertEquals('../../../generated', source_output_dir.getAttribute('name'))
+      source_test_output_dir = profile.getElementsByTagName('sourceTestOutputDir')[0]
+      self.assertEquals('../../../generated_tests', source_test_output_dir.getAttribute('name'))
+      found_processors = set()
+      for processor in profile.getElementsByTagName('processor'):
+        found_processors.add(processor.getAttribute('name'))
+      self.assertEquals({'com.google.auto.value.processor.AutoAnnotationProcessor',
+                         'com.google.auto.value.processor.AutoValueBuilderProcessor',
+                         'com.google.auto.value.processor.AutoValueProcessor'},
+                        found_processors)
+
+    self._idea_test([
+      'examples/src/java/org/pantsbuild/example/autovalue::',
+      '--idea-annotation-processing-enabled',
+      '--idea-annotation-processor=com.google.auto.value.processor.AutoAnnotationProcessor',
+      '--idea-annotation-processor=com.google.auto.value.processor.AutoValueBuilderProcessor',
+      '--idea-annotation-processor=com.google.auto.value.processor.AutoValueProcessor',
     ], check_func=do_check)

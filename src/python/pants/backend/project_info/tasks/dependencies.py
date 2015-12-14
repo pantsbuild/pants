@@ -7,14 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.base.exceptions import TaskError
 from pants.base.payload_field import JarsField, PythonRequirementsField
+from pants.task.console_task import ConsoleTask
 
 
 class Dependencies(ConsoleTask):
-  """Generates a textual list (using the target format) for the dependency set of a target."""
+  """Print the target's dependencies."""
 
   @staticmethod
   def _is_jvm(target):

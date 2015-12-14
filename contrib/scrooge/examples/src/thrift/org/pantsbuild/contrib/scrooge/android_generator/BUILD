@@ -1,0 +1,11 @@
+java_thrift_library(
+  name='android_generator',
+  sources=['struct.thrift'],
+  compiler='scrooge',
+  language='android',
+  rpc_style='finagle',
+  dependencies=[
+  '3rdparty:thrift-0.6.1',
+  'contrib/scrooge/examples/src/thrift/org/pantsbuild/contrib/scrooge/dummy_generator:dummy_generator'
+  ],
+)

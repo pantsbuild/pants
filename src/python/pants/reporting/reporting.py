@@ -11,8 +11,9 @@ import sys
 from six import StringIO
 
 from pants.base.workunit import WorkUnitLabel
-from pants.option.custom_types import dict_option, list_option
+from pants.option.custom_types import dict_option
 from pants.reporting.html_reporter import HtmlReporter
+from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
 from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report, ReportingError
@@ -92,7 +93,10 @@ class Reporting(Subsystem):
 
     return report
 
-  def update_reporting(self, global_options, is_quiet_task, run_tracker, invalidation_report=None):
+  def _get_invalidation_report(self):
+    return InvalidationReport() if self.get_options().invalidation_report else None
+
+  def update_reporting(self, global_options, is_quiet_task, run_tracker):
     """Updates reporting config once we've parsed cmd-line flags."""
 
     # Get any output silently buffered in the old console reporter, and remove it.
@@ -110,7 +114,8 @@ class Reporting(Subsystem):
 
     if global_options.quiet or is_quiet_task:
       console_reporter = QuietReporter(run_tracker,
-                                       QuietReporter.Settings(log_level=log_level, color=color))
+                                       QuietReporter.Settings(log_level=log_level, color=color,
+                                                              timing=timing, cache_stats=cache_stats))
     else:
       # Set up the new console reporter.
       settings = PlainTextReporter.Settings(log_level=log_level, outfile=sys.stdout, color=color,
@@ -136,7 +141,10 @@ class Reporting(Subsystem):
       logfile_reporter.flush()
       run_tracker.report.add_reporter('logfile', logfile_reporter)
 
+    invalidation_report = self._get_invalidation_report()
     if invalidation_report:
       run_id = run_tracker.run_info.get_info('id')
       outfile = os.path.join(self.get_options().reports_dir, run_id, 'invalidation-report.csv')
       invalidation_report.set_filename(outfile)
+
+    return invalidation_report

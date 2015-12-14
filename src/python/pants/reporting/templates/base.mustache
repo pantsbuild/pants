@@ -4,6 +4,8 @@
   <title>Pants</title>
   <link rel="stylesheet" type="text/css" href="/assets/css/pants.css">
   <link rel="stylesheet" type="text/css" href="/assets/css/font-awesome.css">
+  <script type="text/javascript" src="/assets/js/underscore.min.js"></script>
+  <script type="text/javascript" src="/assets/js/underscore.string.min.js"></script>
   <script type="text/javascript" src="/assets/js/jquery-1.8.3.min.js"></script>
   <script type="text/javascript" src="/assets/js/pants.js"></script>
 </head>
@@ -18,12 +20,14 @@
 <div id="menu">
 <ul id="nav">
   <li><a href="/runs/"><span>Pants Runs</span></a></li>
+  <li><a href="/stats/"><span>Timing Stats</span></a></li>
   <li><a href="/browse/"><span>Browse Codebase</span></a></li>
 </ul>
 </div>
 
 <div id="main-content">
-{{#include}}{{content_template}}{{/include}}
+  <div class="error-msg error-msg-hidden"></div>
+  {{#include}}{{content_template}}{{/include}}
 </div>
 </div>
 

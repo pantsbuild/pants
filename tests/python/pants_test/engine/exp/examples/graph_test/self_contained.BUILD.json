@@ -1,0 +1,125 @@
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+{
+  "type_alias": "Target",
+  "name": "thrift1",
+  "sources": null
+}
+
+{
+  "type_alias": "Target",
+  "name": "thrift2",
+  "dependencies": [
+    ":thrift1"
+  ]
+}
+
+{
+  "type_alias": "Target",
+  "name": "java1",
+  "sources": {},
+  "dependencies": [
+    ":thrift2"
+  ],
+  "configurations": [
+    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
+    # off / prove the capabilities of the new BUILD graph parser.
+    {
+      "type_alias": "ApacheThriftConfig",
+      "version": "0.9.2",
+      "strict": true,
+      "lang": "java"
+    },
+    ":nonstrict",
+    {
+      "type_alias": "PublishConfig",
+      "default_repo": ":public",
+      "repos": {
+        "jake": {
+          "type_alias": "Config",
+          "url": "https://dl.bintray.com/pantsbuild/maven"
+        },
+        "jane": ":public"
+      }
+    }
+  ]
+}
+
+{
+  "type_alias": "ApacheThriftConfig",
+  "name": "nonstrict",
+  "version": "0.9.2",
+  "strict": false,
+  "lang": "java"
+}
+
+{
+  "type_alias": "Config",
+  "name": "public",
+  "url": "https://oss.sonatype.org/#stagingRepositories"
+}
+
+{
+  "type_alias": "Config",
+  "name": "type_mismatch",
+
+  # This should trigger a type mismatch when resolved since ApacheThriftConfig is not a superclass
+  # of Config
+  "extends": ":nonstrict"
+}
+
+{
+  "type_alias": "Config",
+  "name": "self_cycle",
+
+  # This should trigger a cycle error when resolved since we're trying to depend on ourselves for
+  # inheritance purposes.
+  "extends": ":self_cycle"
+}
+
+# A single-hop direct cycle - though through different types of dependency edges.
+{
+  "type_alias": "Target",
+  "name": "direct_cycle",
+  "dependencies": [
+    ":direct_cycle_dep"
+  ]
+}
+
+{
+  "type_alias": "Target",
+  "name": "direct_cycle_dep",
+  "configurations": [
+    ":direct_cycle"
+  ]
+}
+
+# A multi-hop cycle
+{
+  "type_alias": "Target",
+  "name": "indirect_cycle",
+  "merges": [":one"]
+}
+
+{
+  "type_alias": "Target",
+  "name": "one",
+  "dependencies": [
+    ":two"
+  ]
+}
+
+{
+  "type_alias": "Target",
+  "name": "two",
+  "extends": ":three"
+}
+
+{
+  "type_alias": "Target",
+  "name": "three",
+  "configurations": [
+    ":one"
+  ]
+}

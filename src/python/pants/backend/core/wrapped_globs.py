@@ -19,6 +19,7 @@ from pants.util.memo import memoized_property
 def globs_matches(path, patterns):
   return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
 
+
 def matches_filespec(path, spec):
   if spec is None:
     return False
@@ -28,6 +29,7 @@ def matches_filespec(path, spec):
     if matches_filespec(path, spec):
       return False
   return True
+
 
 class FilesetWithSpec(object):
   """A set of files that keeps track of how we got it.
@@ -52,6 +54,7 @@ class FilesetWithSpec(object):
 
 
 class FilesetRelPathWrapper(object):
+  KNOWN_PARAMETERS = frozenset(['exclude', 'follow_links'])
 
   @classmethod
   @manual.builddict(factory=True)
@@ -66,16 +69,26 @@ class FilesetRelPathWrapper(object):
     self._rel_path = rel_path
 
   def __call__(self, *args, **kwargs):
-    root = os.path.join(get_buildroot(), self._rel_path)
+    root = os.path.normpath(os.path.join(get_buildroot(), self._rel_path))
 
-    excludes = kwargs.pop('exclude', [])
-    if isinstance(excludes, string_types):
-        raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
+    raw_excludes = kwargs.pop('exclude', [])
+    if isinstance(raw_excludes, string_types):
+      raise ValueError("Expected exclude parameter to be a list of globs, lists, or strings")
 
-    for i, exclude in enumerate(excludes):
-      if isinstance(exclude, string_types):
-        # You can't subtract raw strings from globs
-        excludes[i] = [exclude]
+    # You can't subtract raw strings from globs
+    def ensure_string_wrapped_in_list(element):
+      if isinstance(element, string_types):
+        return [element]
+      else:
+        return element
+
+    excludes = [ensure_string_wrapped_in_list(exclude) for exclude in raw_excludes]
+
+    # making sure there is no unknown argument(s)
+    unknown_args = set(kwargs.keys()) - self.KNOWN_PARAMETERS
+
+    if unknown_args:
+      raise ValueError('Unexpected arguments while parsing globs: {}'.format(', '.join(unknown_args)))
 
     for glob in args:
       if self._is_glob_dir_outside_root(glob, root):
@@ -91,6 +104,8 @@ class FilesetRelPathWrapper(object):
 
     buildroot = get_buildroot()
     rel_root = os.path.relpath(root, buildroot)
+    if rel_root == '.':
+      rel_root = ''
     filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
     return FilesetWithSpec(rel_root, filespec, files_calculator)
 
@@ -157,6 +172,7 @@ class RGlobs(FilesetRelPathWrapper):
   those in ``config/foo``.  Please use exclude instead, since pants is moving to
   make BUILD files easier to parse, and the new grammar will not support arithmetic.
   """
+
   @staticmethod
   def rglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
     if 'follow_links' not in kw:
@@ -222,6 +238,7 @@ class ZGlobs(FilesetRelPathWrapper):
 
   Uses ``BUILD`` file's directory as the "working directory".
   """
+
   @staticmethod
   def zglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
     if 'follow_links' not in kw:

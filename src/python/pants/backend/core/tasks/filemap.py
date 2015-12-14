@@ -5,11 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.task.console_task import ConsoleTask
 
 
 class Filemap(ConsoleTask):
-  """Outputs a mapping from source file to the target that owns the source file."""
+  """Print a mapping from source file to the target that owns the source file."""
 
   def console_output(self, _):
     visited = set()

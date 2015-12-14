@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.contextutil import temporary_file
-from pants.util.fileutil import atomic_copy
+from pants.util.contextutil import temporary_file, temporary_file_path
+from pants.util.fileutil import atomic_copy, create_size_estimators
 
 
 class FileutilTest(unittest.TestCase):
@@ -21,3 +21,7 @@ class FileutilTest(unittest.TestCase):
         dst.close()
         with open(dst.name) as new_dst:
           self.assertEquals(src.name, new_dst.read())
+
+  def test_line_count_estimator(self):
+    with temporary_file_path() as src:
+      self.assertEqual(create_size_estimators()['linecount']([src]), 0)

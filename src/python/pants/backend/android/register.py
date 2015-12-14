@@ -15,12 +15,12 @@ from pants.backend.android.tasks.dx_compile import DxCompile
 from pants.backend.android.tasks.sign_apk import SignApkTask
 from pants.backend.android.tasks.unpack_libraries import UnpackLibraries
 from pants.backend.android.tasks.zipalign import Zipalign
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     targets={
       'android_binary': AndroidBinary,
       'android_dependency': AndroidDependency,
@@ -28,6 +28,7 @@ def build_file_aliases():
       'android_resources': AndroidResources,
     }
   )
+
 
 def register_goals():
   task(name='unpack-libs', action=UnpackLibraries).install('unpack-jars')

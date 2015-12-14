@@ -14,13 +14,13 @@ from logging.handlers import RotatingFileHandler
 from pants.util.dirutil import safe_mkdir
 
 
-def setup_logging(level, console_stream=None, log_dir=None, scope=None):
+def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None):
   """Configures logging for a given scope, by default the global scope.
 
   :param str level: The logging level to enable, must be one of the level names listed here:
                     https://docs.python.org/2/library/logging.html#levels
-  :param str console_stream: The stream to use for default (console) logging.  Will be sys.stderr
-                             if unspecified.
+  :param file console_stream: The stream to use for default (console) logging. If None (default),
+                              this will disable console logging.
   :param str log_dir: An optional directory to emit logs files in.  If unspecified, no disk logging
                       will occur.  If supplied, the directory will be created if it does not already
                       exist and all logs will be tee'd to a rolling set of log files in that
@@ -28,6 +28,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None):
   :param str scope: A logging scope to configure.  The scopes are hierarchichal logger names, with
                     The '.' separator providing the scope hierarchy.  By default the root logger is
                     configured.
+  :param str log_name: The base name of the log file (defaults to 'pants.log').
   :returns: The full path to the main log file if file logging is configured or else `None`.
   :rtype: str
   """
@@ -43,15 +44,16 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None):
   for handler in logger.handlers:
     logger.removeHandler(handler)
 
-  log_file = None
-  console_handler = StreamHandler(stream=console_stream)
-  console_handler.setFormatter(Formatter(fmt='%(levelname)s] %(message)s'))
-  console_handler.setLevel(level)
-  logger.addHandler(console_handler)
+  if console_stream:
+    log_file = None
+    console_handler = StreamHandler(stream=console_stream)
+    console_handler.setFormatter(Formatter(fmt='%(levelname)s] %(message)s'))
+    console_handler.setLevel(level)
+    logger.addHandler(console_handler)
 
   if log_dir:
     safe_mkdir(log_dir)
-    log_file = os.path.join(log_dir, 'pants.log')
+    log_file = os.path.join(log_dir, log_name or 'pants.log')
     file_handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=4)
 
     class GlogFormatter(Formatter):
@@ -79,4 +81,8 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None):
     logger.addHandler(file_handler)
 
   logger.setLevel(level)
+
+  # This routes warnings through our loggers instead of straight to raw stderr.
+  logging.captureWarnings(True)
+
   return log_file

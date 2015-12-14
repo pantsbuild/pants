@@ -27,6 +27,9 @@ from six.moves.urllib.parse import urlparse
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 
 
+logger = logging.getLogger(__name__)
+
+
 class Fetcher(AbstractClass):
   """Knows how to interpret some remote import paths and fetch code to satisfy them."""
 
@@ -181,9 +184,11 @@ class Fetchers(Subsystem):
     register('--mapping', metavar='<mapping>', type=dict_option, default=cls._DEFAULT_FETCHERS,
              advanced=True,
              help="A mapping from a remote import path matching regex to a fetcher type to use "
-                  "to fetch the remote sources.  Fetcher types are fully qualified class names "
-                  "or else an installed alias for a fetcher type; ie the builtin "
-                  "`contrib.go.subsystems.fetchers.ArchiveFetcher` is aliased as 'ArchiveFetcher'.")
+                  "to fetch the remote sources.  The regex must match the beginning of the remote "
+                  "import path; no '^' anchor is needed, it is assumed.  The Fetcher types are "
+                  "fully qualified class names or else an installed alias for a fetcher type; ie "
+                  "the builtin `contrib.go.subsystems.fetchers.ArchiveFetcher` is aliased as "
+                  "'ArchiveFetcher'.")
 
   class GetFetcherError(Exception):
     """Indicates an error finding an appropriate Fetcher."""
@@ -270,8 +275,6 @@ class Fetchers(Subsystem):
 class ArchiveFetcher(Fetcher, Subsystem):
   """A fetcher that knows how find archives for remote import paths and unpack them."""
 
-  logger = logging.getLogger(__name__)
-
   class UrlInfo(namedtuple('UrlInfo', ['url_format', 'default_rev', 'strip_level'])):
     def rev(self, rev):
       return rev or self.default_rev
@@ -279,12 +282,16 @@ class ArchiveFetcher(Fetcher, Subsystem):
   options_scope = 'archive-fetcher'
 
   _DEFAULT_MATCHERS = {
-    r'bitbucket.org/(?P<user>[^/]+)/(?P<repo>[^/]+)':
+    r'bitbucket\.org/(?P<user>[^/]+)/(?P<repo>[^/]+)':
       UrlInfo(url_format='https://bitbucket.org/\g<user>/\g<repo>/get/{rev}.tar.gz',
               default_rev='tip',
               strip_level=1),
-    r'github.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':
+    r'github\.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':
       UrlInfo(url_format='https://github.com/\g<user>/\g<repo>/archive/{rev}.tar.gz',
+              default_rev='master',
+              strip_level=1),
+    r'golang\.org/x/(?P<repo>[^/]+)':
+      UrlInfo(url_format='https://github.com/golang/\g<repo>/archive/{rev}.tar.gz',
               default_rev='master',
               strip_level=1),
   }
@@ -297,8 +304,9 @@ class ArchiveFetcher(Fetcher, Subsystem):
              # They're converted to a single space by the help formatting and the resulting long
              # line of help text is simply wrapped.
              help="A mapping from a remote import path matching regex to an UrlInfo struct "
-                  "describing how to fetch and unpack a remote import path.  The UrlInfo struct is "
-                  "a 3-tuple with the following slots:\n"
+                  "describing how to fetch and unpack a remote import path.  The regex must match "
+                  "the beginning of the remote import path; no '^' anchor is needed, it is "
+                  "assumed. The UrlInfo struct is a 3-tuple with the following slots:\n"
                   "0. An url format string that is supplied to the regex match\'s `.template` "
                   "method and then formatted with the remote import path\'s `rev` and `pkg`.\n"
                   "1. The default revision string to use when no `rev` is supplied; ie 'HEAD' or "
@@ -383,7 +391,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
   @contextmanager
   def _download(self, url):
     # TODO(jsirois): Wrap with workunits, progress meters, checksums.
-    self.logger.info('Downloading {}...'.format(url))
+    logger.info('Downloading {}...'.format(url))
     with closing(self.session().get(url, stream=True)) as res:
       if res.status_code != requests.codes.ok:
         raise self.FetchError('Failed to download {} ({} error)'.format(url, res.status_code))
@@ -419,37 +427,47 @@ class GopkgInFetcher(Fetcher, Subsystem):
     return ArchiveFetcher.global_instance()
 
   def root(self, import_path):
-    return import_path
+    user, package, raw_rev = self._extract_root_components(import_path)
+    pkg = '{}.{}'.format(package, raw_rev)
+    return 'gopkg.in/{}/{}'.format(user, pkg) if user else 'gopkg.in/{}'.format(pkg)
 
-  #VisibleForTesting
+  # VisibleForTesting
   def _do_fetch(self, import_path, dest, rev=None):
     return self._fetcher.fetch(import_path, dest, rev=rev)
 
   def fetch(self, import_path, dest, rev=None):
-    github_root, github_rev = self._map_import_path(import_path, rev)
+    github_root, github_rev = self._map_github_root_and_rev(import_path, rev)
     self._do_fetch(github_root, dest, rev=rev or github_rev)
 
-  _PACKAGE_AND_REV_RE = re.compile(r'(?P<package>[^/]+).(?P<rev>v[0-9]+)')
+  # GitHub username rules allow us to bank on pkg.v1 being the package/rev and never a user.
+  # Could not find docs for this, but trying to sign up as 'pkg.v1' on 11/17/2015 yields:
+  # "Username may only contain alphanumeric characters or single hyphens, and cannot begin or end
+  #  with a hyphen."
+  _USER_PACKAGE_AND_REV_RE = re.compile(r'(?:(?P<user>[^/]+)/)?(?P<package>[^/]+).(?P<rev>v[0-9]+)')
 
   @memoized_method
-  def _map_import_path(self, import_path, rev=None):
-    components = import_path.split('/', 2)
+  def _extract_root_components(self, import_path):
+    components = import_path.split('/', 1)
 
     domain = components.pop(0)
     if 'gopkg.in' != domain:
-      raise self.FetchError('Can only fetch packages for pkgio.in, given: {}'.format(import_path))
+      raise self.FetchError('Can only fetch packages for gopkg.in, given: {}'.format(import_path))
 
-    user = components.pop(0) if len(components) == 2 else None
-
-    match = self._PACKAGE_AND_REV_RE.match(components[0])
+    match = self._USER_PACKAGE_AND_REV_RE.match(components[0])
     if not match:
       raise self.FetchError('Invalid gopkg.in package and rev in: {}'.format(import_path))
-    package, raw_rev = match.groups()
 
+    user, package, raw_rev = match.groups()
+    return user, package, raw_rev
+
+  @memoized_method
+  def _map_github_root_and_rev(self, import_path, rev=None):
+    user, package, raw_rev = self._extract_root_components(import_path)
     user = user or 'go-{}'.format(package)
     rev = rev or self._find_highest_compatible(user, package, raw_rev)
-    root = 'github.com/{user}/{pkg}'.format(user=user, pkg=package)
-    return root, rev
+    github_root = 'github.com/{user}/{pkg}'.format(user=user, pkg=package)
+    logger.debug('Resolved {} to {} at rev {}'.format(import_path, github_root, rev))
+    return github_root, rev
 
   class ApiError(Fetcher.FetchError):
     """Indicates a compatible version could not be found due to github API errors."""
@@ -461,10 +479,6 @@ class GopkgInFetcher(Fetcher, Subsystem):
     """Indicates no versions were found even there there were no github API errors - unexpected."""
 
   def _find_highest_compatible(self, user, repo, raw_rev):
-    # http://labix.org/gopkg.in defines v0 as master.
-    if raw_rev == 'v0':
-      return 'master'
-
     candidates = set()
     errors = []
 
@@ -483,6 +497,10 @@ class GopkgInFetcher(Fetcher, Subsystem):
     highest_compatible = self._select_highest_compatible(candidates, raw_rev)
     if highest_compatible:
       return highest_compatible
+
+    # http://labix.org/gopkg.in defines the v0 fallback as master.
+    if raw_rev == 'v0':
+      return 'master'
 
     if len(errors) == 2:
       raise self.ApiError('Failed to fetch both tags and branches:\n\t{}\n\t{}'
@@ -562,8 +580,9 @@ class GopkgInFetcher(Fetcher, Subsystem):
 # All builtin fetchers should be advertised and registered as defaults here, 1st advertise,
 # then register:
 Fetchers.advertise(GopkgInFetcher, namespace='')
-Fetchers._register_default(r'^gopkg\.in/.*$', GopkgInFetcher)
+Fetchers._register_default(r'gopkg\.in/.*', GopkgInFetcher)
 
 Fetchers.advertise(ArchiveFetcher, namespace='')
-Fetchers._register_default(r'^bitbucket\.org/.*$', ArchiveFetcher)
-Fetchers._register_default(r'^github\.com/.*$', ArchiveFetcher)
+Fetchers._register_default(r'bitbucket\.org/.*', ArchiveFetcher)
+Fetchers._register_default(r'github\.com/.*', ArchiveFetcher)
+Fetchers._register_default(r'golang\.org/x/.*', ArchiveFetcher)

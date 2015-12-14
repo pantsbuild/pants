@@ -5,13 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
-
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
+from pants_test.base_test import BaseTest
 
 
-class EngineTestBase(unittest.TestCase):
+class EngineTestBase(BaseTest):
 
   @classmethod
   def as_goal(cls, goal_name):
@@ -32,10 +31,11 @@ class EngineTestBase(unittest.TestCase):
     :param list dependencies: The list of goal names the task depends on, if any.
     :param string goal: The name of the goal to install the task in, if different from the task
                         name.
-    :returns The installed ``TaskRegistrar`` object.
+    :returns The ``Goal`` object with task installed.
     """
-    TaskRegistrar(name, action=action or (lambda: None),
-                  dependencies=dependencies or []).install(goal if goal is not None else None)
+    return TaskRegistrar(name,
+                         action=action or (lambda: None),
+                         dependencies=dependencies or []).install(goal if goal is not None else None)
 
   def setUp(self):
     super(EngineTestBase, self).setUp()

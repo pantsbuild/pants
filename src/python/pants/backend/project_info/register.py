@@ -18,26 +18,15 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
   pass
 
+
 # TODO https://github.com/pantsbuild/pants/issues/604 register_goals
 def register_goals():
   # IDE support.
-  task(name='idea', action=IdeaGen).install().with_description(
-      'Create an IntelliJ IDEA project from the given targets.')
+  task(name='idea', action=IdeaGen).install()
+  task(name='eclipse', action=EclipseGen).install()
+  task(name='ensime', action=EnsimeGen).install()
+  task(name='export', action=Export).install()
 
-  task(name='eclipse', action=EclipseGen).install().with_description(
-      'Create an Eclipse project from the given targets.')
-
-  task(name='ensime', action=EnsimeGen).install().with_description(
-      'Create an Ensime project from the given targets.')
-
-  task(name='export', action=Export).install().with_description(
-    'Export project information for targets in JSON format. '
-    'Use with resolve goal to get detailed information about libraries.')
-
-  task(name='depmap', action=Depmap).install().with_description("Depict the target's dependencies.")
-
-  task(name='dependencies', action=Dependencies).install().with_description(
-      "Print the target's dependencies.")
-
-  task(name='filedeps', action=FileDeps).install('filedeps').with_description(
-      'Print out the source and BUILD files the target depends on.')
+  task(name='depmap', action=Depmap).install()
+  task(name='dependencies', action=Dependencies).install()
+  task(name='filedeps', action=FileDeps).install('filedeps')

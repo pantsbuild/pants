@@ -12,10 +12,10 @@ from mock import MagicMock
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
 from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -32,7 +32,7 @@ class ScroogeGenTest(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_thrift_library': JavaThriftLibrary})
+    return BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary})
 
   def setUp(self):
     super(ScroogeGenTest, self).setUp()
@@ -130,17 +130,17 @@ class ScroogeGenTest(TaskTestBase):
 
     saved_add_new_target = Context.add_new_target
     try:
-      Context.add_new_target = MagicMock()
+      mock = MagicMock()
+      Context.add_new_target = mock
       task.execute()
-      relative_task_outdir = os.path.relpath(self.task_outdir, get_buildroot())
-      spec = '{spec_path}:{name}'.format(spec_path=relative_task_outdir, name='test_smoke.a')
-      address = Address.parse(spec=spec)
-      Context.add_new_target.assert_called_once_with(address,
-                                                     library_type,
-                                                     sources=sources,
-                                                     excludes=OrderedSet(),
-                                                     dependencies=OrderedSet(),
-                                                     provides=None,
-                                                     derived_from=target)
+
+      self.assertEquals(1, mock.call_count)
+      _, call_kwargs = mock.call_args
+      self.assertEquals(call_kwargs['target_type'], library_type)
+      self.assertEquals(call_kwargs['dependencies'], OrderedSet())
+      self.assertEquals(call_kwargs['provides'], None)
+      self.assertEquals(call_kwargs['sources'], [])
+      self.assertEquals(call_kwargs['derived_from'], target)
+
     finally:
       Context.add_new_target = saved_add_new_target

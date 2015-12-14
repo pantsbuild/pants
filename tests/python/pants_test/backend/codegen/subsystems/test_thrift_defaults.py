@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import create_subsystem
 

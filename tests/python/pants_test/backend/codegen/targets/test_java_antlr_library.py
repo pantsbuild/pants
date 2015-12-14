@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.codegen.targets.java_antlr_library import JavaAntlrLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
@@ -16,7 +16,7 @@ class JavaAntlrLibraryTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'java_antlr_library': JavaAntlrLibrary})
+    return BuildFileAliases(targets={'java_antlr_library': JavaAntlrLibrary})
 
   def test_empty(self):
     with self.assertRaisesRegexp(ValueError, "Missing required 'sources' parameter"):

@@ -11,6 +11,7 @@ from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 class NailgunTaskTestBase(JvmToolTaskTestBase):
   """Prepares an ephemeral test build root that supports nailgun tasks."""
+
   def setUp(self):
     super(NailgunTaskTestBase, self).setUp()
     self.set_options(use_nailgun=True)

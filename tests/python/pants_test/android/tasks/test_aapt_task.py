@@ -19,7 +19,6 @@ class TestAaptTask(TestAndroidBase):
 
   # This just tests the AaptTask static/class methods. Any methods that need a task instance
   # are exercised in tests for AaptTask subclasses.
-
   def test_is_aapt_target(self):
     with self.android_binary() as android_binary:
       self.assertTrue(AaptTask.is_android_binary(android_binary))

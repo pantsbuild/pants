@@ -7,13 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_compile.scala.zinc_compile import BaseZincCompile
+from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
 
 from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
 class ScalaJSZincCompile(BaseZincCompile):
+  """Compile scala source code to an scala.js representation, ready to be linked."""
+
   _name = 'scala-js'
   _file_suffix = '.scala'
 
@@ -21,6 +23,10 @@ class ScalaJSZincCompile(BaseZincCompile):
   def register_options(cls, register):
     super(ScalaJSZincCompile, cls).register_options(register)
     cls.register_jvm_tool(register, 'scala-js-compiler')
+
+  @classmethod
+  def product_types(cls):
+    return ['scala_js_ir']
 
   def __init__(self, *args, **kwargs):
     super(ScalaJSZincCompile, self).__init__(*args, **kwargs)

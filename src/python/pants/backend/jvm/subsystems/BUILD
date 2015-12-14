@@ -5,7 +5,6 @@ python_library(
   name = 'jvm_tool_mixin',
   sources = ['jvm_tool_mixin.py'],
   dependencies = [
-    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:exceptions',
     'src/python/pants/option',
   ],
@@ -16,8 +15,18 @@ python_library(
   sources = ['jar_tool.py'],
   dependencies = [
     ':jvm_tool_mixin',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:workunit',
     'src/python/pants/option',
+    'src/python/pants/subsystem',
+  ],
+)
+
+python_library(
+  name = 'java',
+  sources = ['java.py'],
+  dependencies = [
+    ':zinc_language_mixin',
     'src/python/pants/subsystem',
   ],
 )
@@ -49,7 +58,30 @@ python_library(
   sources = ['scala_platform.py'],
   dependencies = [
     ':jvm_tool_mixin',
+    ':zinc_language_mixin',
     'src/python/pants/option',
     'src/python/pants/subsystem',
+    'src/python/pants/util:memo',
   ],
+)
+
+python_library(
+  name = 'shader',
+  sources = ['shader.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_library(
+  name = 'zinc_language_mixin',
+  sources = ['zinc_language_mixin.py'],
+  dependencies = [
+    'src/python/pants/subsystem',
+  ]
 )

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
+import sys
 import tarfile
 import tempfile
 import time
@@ -48,7 +49,20 @@ def environment_as(**kwargs):
 
 
 @contextmanager
-def temporary_dir(root_dir=None, cleanup=True):
+def stdio_as(stdout, stderr, stdin=None):
+  """Redirect sys.{stdout, stderr, stdin} to alternate file-like objects."""
+  old_stdout, sys.stdout = sys.stdout, stdout
+  old_stderr, sys.stderr = sys.stderr, stderr
+  if stdin:
+    old_stdin, sys.stdin = sys.stdin, stdin
+  yield
+  sys.stdout, sys.stderr = old_stdout, old_stderr
+  if stdin:
+    sys.stdin = old_stdin
+
+
+@contextmanager
+def temporary_dir(root_dir=None, cleanup=True, suffix=str()):
   """
     A with-context that creates a temporary directory.
 
@@ -56,7 +70,7 @@ def temporary_dir(root_dir=None, cleanup=True):
     :param string root_dir: The parent directory to create the temporary directory.
     :param bool cleanup: Whether or not to clean up the temporary directory.
   """
-  path = tempfile.mkdtemp(dir=root_dir)
+  path = tempfile.mkdtemp(dir=root_dir, suffix=suffix)
   try:
     yield path
   finally:

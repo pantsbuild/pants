@@ -6,6 +6,10 @@ sudo: false
 
 
 before_cache:
+  # Kill all python bytecode in our cached venvs.  Some files appear to
+  # get bytecode compiled in non-yet-understood circumstances leading to
+  # a full cache re-pack due to new bytecode files.
+  - find build-support -name "*.py[co]" -print -delete
   # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
   # effect on resolution time is in the noise, but they are
   # re-timestamped in internal comments and fields on each run and this
@@ -26,6 +30,10 @@ cache:
   directories:
     - $HOME/.cache/pants
     - $HOME/.ivy2/pants
+    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
+    # using its own isolated cache:
+    #   https://github.com/pantsbuild/pants/issues/2485
+    - $HOME/.npm
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
@@ -40,7 +48,7 @@ install:
 env:
   global:
     - CXX=g++
-    - PANTS_CONFIG_OVERRIDE=pants.travis-ci.ini
+    - PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']"
     # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
     # These are encrypted with a public key for our repo that only
     # Travis-CI has the private key for.  We are trusting Travis-CI

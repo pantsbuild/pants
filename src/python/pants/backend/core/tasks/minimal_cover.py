@@ -5,11 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.console_task import ConsoleTask
+from pants.task.console_task import ConsoleTask
 
 
 class MinimalCover(ConsoleTask):
-  """Outputs a minimal covering set of targets.
+  """Print a minimal covering set of targets.
 
   For a given set of input targets, the output targets transitive dependency set will include all
   the input targets without gaps.

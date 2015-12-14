@@ -69,6 +69,11 @@ class Executor(AbstractClass):
       :param string cwd: optionally set the working directory
       """
 
+    @abstractmethod
+    def kill(self):
+      """Terminates the java command."""
+      raise NotImplementedError
+
   def __init__(self, distribution):
     """Constructs an Executor that can be used to launch java programs.
 
@@ -122,12 +127,14 @@ class Executor(AbstractClass):
 
 class CommandLineGrabber(Executor):
   """Doesn't actually execute anything, just captures the cmd line."""
+
   def __init__(self, distribution):
     super(CommandLineGrabber, self).__init__(distribution=distribution)
     self._command = None  # Initialized when we run something.
 
   def _runner(self, classpath, main, jvm_options, args, cwd=None):
     self._command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
+
     class Runner(self.Runner):
       @property
       def executor(_):
@@ -139,11 +146,15 @@ class CommandLineGrabber(Executor):
 
       def run(_, stdout=None, stderr=None, cwd=None):
         return 0
+
     return Runner()
 
   @property
   def cmd(self):
     return self._command
+
+  def kill(self):
+    pass
 
 
 class SubprocessExecutor(Executor):
@@ -175,6 +186,7 @@ class SubprocessExecutor(Executor):
   def __init__(self, distribution):
     super(SubprocessExecutor, self).__init__(distribution=distribution)
     self._buildroot = get_buildroot()
+    self._process = None
 
   def _create_command(self, classpath, main, jvm_options, args, cwd=None):
     cwd = cwd or self._buildroot
@@ -206,12 +218,17 @@ class SubprocessExecutor(Executor):
     cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
     return self._spawn(cmd, cwd, **subprocess_args)
 
+  def kill(self):
+    if self._process is not None:
+      self._process.kill()
+
   def _spawn(self, cmd, cwd=None, **subprocess_args):
     with self._maybe_scrubbed_env():
       cwd = cwd or self._buildroot
       logger.debug('Executing: {cmd} args={args} at cwd={cwd}'
                    .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
       try:
-        return subprocess.Popen(cmd, cwd=cwd, **subprocess_args)
+        self._process = subprocess.Popen(cmd, cwd=cwd, **subprocess_args)
+        return self._process
       except OSError as e:
         raise self.Error('Problem executing {0}: {1}'.format(self._distribution.java, e))

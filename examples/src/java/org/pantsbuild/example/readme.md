@@ -165,10 +165,10 @@ must compile before it can test.
     $ ./pants test examples/src/java/org/pantsbuild/example/hello/:: examples/tests/java/org/pantsbuild/example/hello/::
 
 Assuming you use `junit_test` targets, output from the `junit` run is written to
-`.pants.d/test/junit/`; you can see it on the console with `--no--suppress-output`:
+`.pants.d/test/junit/`; you can see it on the console with `--output-mode=ALL`:
 
     :::bash
-    $ ./pants test.junit --no-suppress-output examples/tests/java/org/pantsbuild/example/hello::
+    $ ./pants test.junit --output-mode=ALL examples/tests/java/org/pantsbuild/example/hello::
 
 
 **Run just that one troublesome test class:** (assuming a JUnit test;
@@ -209,7 +209,8 @@ Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up compiles.
 JVM daemon that runs in the background. This means you don't need to start up a JVM and load
 classes for each JVM-based operation. Things go faster.
 
-Pants uses Jmake, a dependency tracking compiler facade.
+Pants uses Zinc, a dependency tracking compiler facade that supports sub-target incremental
+compilation for Java and Scala.
 
 Java7 vs Java6, Which Java
 --------------------------
@@ -415,6 +416,114 @@ After building our `hello` example, if we check the binary jar's contents, there
     org/pantsbuild/example/hello/
     org/pantsbuild/example/hello/world.txt
     $
+
+Shading
+-------
+
+Sometimes you have dependencies that have conflicting package or class names. This typically occurs
+in the following scenario: Your jvm_binary depends on a 3rdparty library A (rev 1.0), and a 3rdparty
+library B (rev 1.3). It turns out that A happens to also depend on B, but it depends on B (rev 2.0),
+which is backwards-incompatible with rev 1.3. Now B (1.3) and B (2.0) define different versions of
+the same classes, with the same fully-qualified class names, and you're pulling them all onto the
+classpath for your project.
+
+This is where shading comes in: you can rename the fully-qualified names of the classes that
+conflict, typically by applying a prefix (eg, `__shaded_by_pants__.org.foobar.example`).
+
+Pants uses jarjar for shading, and allows shading rules to be specified on `jvm_binary` targets with
+the `shading_rules` argument. The `shading_rules` argument is a list of rules. Available rules
+include: <a pantsref='bdict_shading_relocate'>`shading_relocate`</a>,
+<a pantsref='bdict_shading_exclude'>`shading_exclude`</a>,
+<a pantsref='bdict_shading_relocate_package'>`shading_relocate_package`</a>, and
+<a pantsref='bdict_shading_exclude_package'>`shading_exclude_package`</a>.
+
+The order of rules in the list matters, as typical of shading
+logic in general.
+
+These rules are powerful enough to take advantage of jarjar's more
+advanced syntax, like using wildcards in the middle of package
+names. E.g., this syntax works:
+
+    :::python
+    # Destination pattern will be inferred to be
+    # __shaded_by_pants__.com.@1.foo.bar.@2
+    shading_relocate('com.*.foo.bar.**')
+
+Which can also be done by:
+
+   :::python
+   shading_relocate_package('com.*.foo.bar')
+
+The default shading prefix is `__shaded_by_pants__`, but you can change it:
+
+    :::python
+    shading_relocate_package('com.foo.bar', shade_prefix='__my_prefix__.')
+
+You can rename a specific class:
+
+    :::python
+    shading_relocate('com.example.foo.Main', 'org.example.bar.NotMain')
+
+If you want to shade everything in a package except a particular file (or subpackage), you can use
+the <a pantsref='bdict_shading_exclude'>`shading_exclude`</a> rule.
+
+    :::python
+    shading_exclude('com.example.foobar.Main') # Omit the Main class.
+    shading_exclude_package('com.example.foobar.api') # Omit the api subpackage.
+    shading_relocate_package('com.example.foobar')
+
+Again, order matters here: excludes have to appear __first__.
+
+To see an example, take a look at `testprojects/src/java/org/pantsbuild/testproject/shading/BUILD`,
+and try running
+
+    :::bash
+    ./pants binary testprojects/src/java/org/pantsbuild/testproject/shading
+    jar -tf dist/shading.jar
+
+Dependency Hygiene
+------------------
+
+As the set of targets in a repository grows larger, it becomes increasingly important that they
+observe good dependency hygiene. In particular, following
+[[the 1:1:1 rule|pants('src/docs:build_files')]] helps keep useful code self-contained. But even
+while observing 1:1:1, it's possible to declare and use dependencies that add little or no benefit
+for a target.
+
+For example: a particularly large target may expose many different APIs. In cases where other
+targets depend on the large target, they might need only a fraction of those APIs. But because
+they can't declare a dependency on a smaller subset of the large target, they are forced to
+build the entire dependency. Even in the presence of distributed builds and caching, this slows
+down your build!
+
+To help users address these problems for JVM targets, pants has a `dep-usage.jvm` task which
+supports scoring and summarizing the fractions of each dependency that a target uses.
+
+### For local analysis
+
+In the default output mode ("summary" mode) the `dep-usage.jvm` task outputs targets ordered by
+a simple 'badness' score. The "badness" score is intended to indicate both how easy the dependency
+would be to remove (based on the maximum fraction used by each dependee) and how valuable it would
+be remove (based on a estimate of the transitive cost to build the dep).
+
+    :::shell
+    $ ./pants dep-usage.jvm examples/src/scala/org/pantsbuild/example::
+    ...
+    [
+      {"badness": 4890, "max_usage": 0.3, "cost_transitive": 1630, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome"},
+      {"badness": 1098, "max_usage": 1.0, "cost_transitive": 1098, "target": "examples/src/java/org/pantsbuild/example/hello/greet"}
+    ]
+
+The above example indicates that within the scope of the scala examples, the
+`examples/src/scala/org/pantsbuild/example/hello/welcome` target is the worst dependency. This is
+because it has a high transitive "cost" to build, and sees a maximum of 30% usage by its dependees.
+
+### For global analysis
+
+The summary mode is great when users want to inspect their own targets. But for more in-depth
+analysis, disabling summary mode (by passing the `--no-summary` flag) will output raw usage data
+for each dependency edge. This mode does no aggregation, so using it effectively usually means
+doing analytics or graph analysis with an external tool.
 
 Further Reading
 ---------------

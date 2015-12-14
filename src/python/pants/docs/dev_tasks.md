@@ -17,7 +17,7 @@ Hello Task
 ----------
 
 To implement a Task, you define a subclass of
-[pants.backend.core.tasks.task.Task](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/core/tasks/task.py)
+[pants.task.task.Task](https://github.com/pantsbuild/pants/blob/master/src/python/pants/task/task.py)
 and define an `execute` method for that class. The `execute` method does
 the work.
 
@@ -43,7 +43,7 @@ registers goals in its `register_goals` function. Here's an excerpt from
 [Pants' own Python
 backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/python/register.py):
 
-!inc[start-at=def register_goals&end-at=Python projects from python_library](../backend/python/register.py)
+!inc[start-at=def register_goals](../backend/python/register.py)
 
 That `task(...)` is a name for
 `pants.goal.task_registrar.TaskRegistrar`. Calling its `install` method
@@ -79,12 +79,12 @@ tell Pants about these inter-task dependencies...
 The "early" task class defines a `product_types` class method that
 returns a list of strings:
 
-!inc[start-at=  def product_types&end-at=resources_by_target](../backend/jvm/tasks/resources_task.py)
+!inc[start-at=  def product_types&end-at=runtime_classpath](../backend/jvm/tasks/resources_task.py)
 
 The "late" task defines a `prepare` method that calls
 `round_manager.require_data` to "require" one of those same strings:
 
-!inc[start-at=  def prepare&end-at=resources_by_target](../backend/jvm/tasks/detect_duplicates.py)
+!inc[start-at=  def prepare&end-at=runtime_classpath](../backend/jvm/tasks/detect_duplicates.py)
 
 Pants uses this information to determine which tasks must run first to
 prepare data required by other tasks. (If one task requires data that no
@@ -93,12 +93,9 @@ task provides, Pants errors out.)
 A task can have more than one product type. You might want to know which type[s] were `require`d
 by other tasks. If one product is especially "expensive" to make, perhaps your task should only
 do so if another task will use it. Use `self.context.products.isrequired` to find out if a task
-required a product type. `isrequired` returns a predicate function that a task can use to find
-out if any task required a product (`isrequired` returns `None` if none did) and which targets
-were required&mdash;`require` takes an optional target filter predicate function; you can call
-this function to find out which targets to generate the product for:
+required a product type:
 
-!inc[start-at=isrequired('jar_dependencies')&end-before=def](../backend/jvm/tasks/ivy_resolve.py)
+!inc[start-at=products.isrequired(&end-before=def](../backend/jvm/tasks/jvmdoc_gen.py)
 
 Task Configuration
 ------------------
@@ -120,7 +117,7 @@ Option values are available via `self.get_options()`:
 
 Every task has an options *scope*: If the task is registered as `my-task` in goal `my-goal`, then its
 scope is `my-goal.my-task`, unless goal and task are the same string, in which case the scope is simply
-that string. For example, the `JavaCompile` task has scope `compile.java`, and the `filemap`
+that string. For example, the `ZincCompile` task has scope `compile.zinc`, and the `filemap`
 task has the scope `filemap`.
 
 The scope is used to set options values. E.g., the value of `self.get_options().my_option` for a
@@ -158,18 +155,17 @@ will affect the behaviour of the registered option. The most common parameters a
 GroupTask
 ---------
 
-Some `Task`s are grouped together under a parent `GroupTask`.
+`Task`s may be grouped together under a parent `GroupTask`.
 Specifically, the JVM compile tasks:
 
     :::python
     jvm_compile = GroupTask.named(
     'jvm-compilers',
-    product_type=['classes_by_target', 'classes_by_source'],
+    product_type=['compile_classpath', 'classes_by_source'],
     flag_namespace=['compile'])
 
-    jvm_compile.add_member(ScalaCompile)
     jvm_compile.add_member(AptCompile)
-    jvm_compile.add_member(JavaCompile)
+    jvm_compile.add_member(ZincCompile)
 
 A `GroupTask` allows its constituent tasks to 'claim' targets for
 processing, and can iterate between those tasks until all work is done.

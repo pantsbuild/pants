@@ -10,8 +10,8 @@ from textwrap import dedent
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.checkstyle import Checkstyle
-from pants.base.address import Address
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
 
@@ -103,7 +103,7 @@ class CheckstyleTest(NailgunTaskTestBase):
     context = self._create_context(rules_xml=[self._RULE_XML_FILE_TAB_CHECKER],
                                    target_roots=[no_tab])
 
-    self.populate_compile_classpath(context=context)
+    self.populate_runtime_classpath(context=context)
     self.execute(context)
 
   @ensure_cached(Checkstyle, expected_num_artifacts=0)
@@ -113,7 +113,7 @@ class CheckstyleTest(NailgunTaskTestBase):
                                    target_roots=[with_tab])
     # add a tab in the source to trigger the tab check rule to fail.
 
-    self.populate_compile_classpath(context=context)
+    self.populate_runtime_classpath(context=context)
     with self.assertRaises(TaskError):
       self.execute(context)
 
@@ -142,5 +142,5 @@ class CheckstyleTest(NailgunTaskTestBase):
       },
       target_roots=[no_tab, with_tab_1, with_tab_2])
 
-    self.populate_compile_classpath(context=context)
+    self.populate_runtime_classpath(context=context)
     self.execute(context)

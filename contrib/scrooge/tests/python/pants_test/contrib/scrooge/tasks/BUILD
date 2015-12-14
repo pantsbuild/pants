@@ -1,16 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='tasks',
-  dependencies=[
-    ':java_thrift_library_fingerprint_strategy',
-    ':scrooge_gen',
-    ':thrift_linter_integration',
-    ':thrift_util',
-  ],
-)
-
 python_tests(
   name='java_thrift_library_fingerprint_strategy',
   sources=['test_java_thrift_library_fingerprint_strategy.py'],
@@ -30,10 +20,9 @@ python_tests(
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:scrooge_gen',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file_aliases',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:context',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
@@ -46,6 +35,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  tags={'integration'},
 )
 
 python_tests(
@@ -56,9 +46,9 @@ python_tests(
      'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_linter',
      'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_util',
      'src/python/pants/backend/codegen/targets:java',
-     'src/python/pants/base:build_file_aliases',
+     'src/python/pants/build_graph',
      'tests/python/pants_test/tasks:task_test_base',
-     'tests/python/pants_test/testutils',
+     'tests/python/pants_test/testutils:mock_logger',
   ],
 )
 

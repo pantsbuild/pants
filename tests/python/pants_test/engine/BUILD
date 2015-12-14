@@ -7,14 +7,7 @@ python_library(
   dependencies = [
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
-  ]
-)
-
-target(
-  name = 'engine',
-  dependencies = [
-    ':test_engine',
-    ':test_round_engine',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -35,7 +28,7 @@ python_tests(
   dependencies = [
     ':engine_test_base',
     'src/python/pants/engine',
-    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/task',
     'tests/python/pants_test:base_test',
   ],
 )

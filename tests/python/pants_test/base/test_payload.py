@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
 from pants.base.payload_field import PrimitiveField
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.base_test import BaseTest
 
 
@@ -17,7 +17,7 @@ class PayloadTest(BaseTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(
+    return BuildFileAliases(
       targets={
         'java_library': JavaLibrary,
       },
@@ -75,16 +75,16 @@ class PayloadTest(BaseTest):
     # nesting no longer allowed
     self.add_to_build_file('z/BUILD', 'java_library(name="z", sources=[globs("*")])')
     with self.assertRaises(ValueError):
-      self.context().scan(self.build_root)
+      self.context().scan()
 
   def test_flat_globs_list(self):
     # flattened allowed
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=globs("*"))')
-    self.context().scan(self.build_root)
+    self.context().scan()
 
   def test_single_source(self):
     self.add_to_build_file('y/BUILD', 'java_library(name="y", sources=["Source.scala"])')
-    self.context().scan(self.build_root)
+    self.context().scan()
 
   def test_missing_payload_field(self):
     payload = Payload()

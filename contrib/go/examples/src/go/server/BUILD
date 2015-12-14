@@ -2,7 +2,6 @@
 # To re-generate run: `pants buildgen.go --materialize --remote`
 
 go_binary(
-  name='server',
   dependencies=[
     'contrib/go/examples/3rdparty/go/github.com/gorilla/mux',
   ]

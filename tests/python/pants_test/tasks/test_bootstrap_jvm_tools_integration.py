@@ -12,7 +12,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
 
   def test_zinc_tool_reuse_between_scala_and_java(self):
-    with temporary_dir(root_dir=self.workdir_root()) as artifact_cache:
+    with temporary_dir() as artifact_cache:
       bootstrap_args = [
         'bootstrap.bootstrap-jvm-tools',
         "--cache-write-to=['{}']".format(artifact_cache),
@@ -20,7 +20,8 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
       ]
 
       # Scala compilation should bootstrap and shade zinc.
-      pants_run = self.run_pants(bootstrap_args + ['compile', 'examples/src/scala/org/pantsbuild/example/hello'])
+      args = bootstrap_args + ['compile', 'examples/src/scala/org/pantsbuild/example/hello']
+      pants_run = self.run_pants(args)
       self.assert_success(pants_run)
       self.assertTrue('[shade-zinc]' in pants_run.stdout_data)
 
@@ -29,7 +30,6 @@ class BootstrapJvmToolsIntegrationTest(PantsRunIntegrationTest):
       pants_run = self.run_pants(bootstrap_args +
                                  ['clean-all',
                                   'compile',
-                                  'examples/src/java/org/pantsbuild/example/hello/simple',
-                                  '--no-compile-java-use-jmake'])
+                                  'examples/src/java/org/pantsbuild/example/hello/simple'])
       self.assert_success(pants_run)
       self.assertFalse('[shade-zinc]' in pants_run.stdout_data)

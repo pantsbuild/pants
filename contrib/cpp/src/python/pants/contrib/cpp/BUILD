@@ -7,7 +7,7 @@ contrib_plugin(
     'contrib/cpp/src/python/pants/contrib/cpp/targets:targets',
     'contrib/cpp/src/python/pants/contrib/cpp/tasks:tasks',
     'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.cpp',

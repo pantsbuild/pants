@@ -2,6 +2,5 @@
 # To re-generate run: `pants buildgen.go --materialize --remote`
 
 go_remote_library(
-  name='go-simplejson',
   rev='v0.4.3',
 )

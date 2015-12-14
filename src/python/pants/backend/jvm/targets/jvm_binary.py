@@ -85,12 +85,17 @@ class Duplicate(JarRule):
   CONCAT = 'CONCAT'
   """Concatenates the contents of all duplicate entries encountered in the order encountered."""
 
+  CONCAT_TEXT = 'CONCAT_TEXT'
+  """Concatenates the contents of all duplicate entries encountered in the order encountered,
+  separating entries with newlines if needed.
+  """
+
   FAIL = 'FAIL'
   """Raises a :class:``Duplicate.Error`` when a duplicate entry is
   encountered.
   """
 
-  _VALID_ACTIONS = frozenset((SKIP, REPLACE, CONCAT, FAIL))
+  _VALID_ACTIONS = frozenset((SKIP, REPLACE, CONCAT, CONCAT_TEXT, FAIL))
 
   @classmethod
   def validate_action(cls, action):
@@ -110,7 +115,8 @@ class Duplicate(JarRule):
     :param string apply_pattern: A regular expression that matches duplicate jar entries this rule
       applies to.
     :param action: An action to take to handle one or more duplicate entries.  Must be one of:
-      ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT`` or ``Duplicate.FAIL``.
+      ``Duplicate.SKIP``, ``Duplicate.REPLACE``, ``Duplicate.CONCAT``, ``Duplicate.CONCAT_TEXT``,
+      or ``Duplicate.FAIL``.
     """
     payload = Payload()
     payload.add_fields({
@@ -149,6 +155,7 @@ class JarRules(FingerprintedMixin):
   `Duplicate <#Duplicate>`_ rules support resolution of these cases by allowing 1st wins,
   last wins, concatenation of the duplicate entry contents or raising an exception.
   """
+
   @classmethod
   def skip_signatures_and_duplicates_concat_well_known_metadata(cls, default_dup_action=None,
                                                                 additional_rules=None):
@@ -175,7 +182,7 @@ class JarRules(FingerprintedMixin):
              Skip(r'^META-INF/[^/]+\.DSA$'),  # default signature alg. file
              Skip(r'^META-INF/[^/]+\.RSA$'),  # default signature alg. file
              Skip(r'^META-INF/INDEX.LIST$'),  # interferes with Class-Path: see man jar for i option
-             Duplicate(r'^META-INF/services/', Duplicate.CONCAT)]  # 1 svc fqcn per line
+             Duplicate(r'^META-INF/services/', Duplicate.CONCAT_TEXT)]  # 1 svc fqcn per line
 
     return JarRules(rules=rules + additional_rules, default_dup_action=default_dup_action)
 
@@ -269,7 +276,7 @@ class ManifestEntries(FingerprintedMixin):
 
 
 class JvmBinary(JvmTarget):
-  """Produces a JVM binary optionally identifying a launcher main class.
+  """A JVM binary.
 
   Below are a summary of how key goals affect targets of this type:
 
@@ -290,6 +297,7 @@ class JvmBinary(JvmTarget):
                deploy_excludes=None,
                deploy_jar_rules=None,
                manifest_entries=None,
+               shading_rules=None,
                **kwargs):
     """
     :param string main: The name of the ``main`` class, e.g.,
@@ -299,9 +307,6 @@ class JvmBinary(JvmTarget):
       ``'hello'``. (By default, uses ``name`` param)
     :param string source: Name of one ``.java`` or ``.scala`` file (a good
       place for a ``main``).
-    :param sources: Overridden by source. If you want more than one source
-      file, use a library and have the jvm_binary depend on that library.
-    :param resources: List of ``resource``\s to include in bundle.
     :param dependencies: Targets (probably ``java_library`` and
      ``scala_library`` targets) to "link" in.
     :type dependencies: list of target specs
@@ -315,9 +320,10 @@ class JvmBinary(JvmTarget):
       deploy jar.
     :param manifest_entries: dict that specifies entries for `ManifestEntries <#manifest_entries>`_
       for adding to MANIFEST.MF when packaging this binary.
-    :param configurations: Ivy configurations to resolve for this target.
-      This parameter is not intended for general use.
-    :type configurations: tuple of strings
+    :param list shading_rules: Optional list of shading rules to apply when building a shaded
+      (aka monolithic aka fat) binary jar. The order of the rules matters: the first rule which
+      matches a fully-qualified class name is used to shade it. See shading_relocate(),
+      shading_exclude(), shading_relocate_package(), and shading_exclude_package().
     """
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     if main and not isinstance(main, string_types):
@@ -348,7 +354,8 @@ class JvmBinary(JvmTarget):
       'deploy_jar_rules': FingerprintedField(deploy_jar_rules or JarRules.default()),
       'manifest_entries': FingerprintedField(ManifestEntries(manifest_entries)),
       'main': PrimitiveField(main),
-      })
+      'shading_rules': PrimitiveField(shading_rules or ()),
+    })
 
     super(JvmBinary, self).__init__(name=name,
                                     address=address,
@@ -367,6 +374,10 @@ class JvmBinary(JvmTarget):
   @property
   def deploy_jar_rules(self):
     return self.payload.deploy_jar_rules
+
+  @property
+  def shading_rules(self):
+    return self.payload.shading_rules
 
   @property
   def main(self):

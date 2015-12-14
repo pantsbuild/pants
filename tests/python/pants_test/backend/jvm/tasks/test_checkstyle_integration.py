@@ -8,15 +8,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
+import pytest
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_cached
 
 
 class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
+  @pytest.mark.xfail
+  # This test is now expected to fail due to changes in caching behaviour.
+  # TODO(Tansy Arron): Write a general purpose incremental compile test.
+  # https://github.com/pantsbuild/pants/issues/2591
   def test_checkstyle_cached(self):
-    with temporary_dir(root_dir=self.workdir_root()) as cache:
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_cachedir() as cache:
+      with self.temporary_workdir() as workdir:
         args = [
             'clean-all',
             'compile.checkstyle',
@@ -53,8 +59,8 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_cached(expected_num_artifacts=2)
   def test_config_invalidates_targets(self, cache_args):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      with temporary_dir(root_dir=self.workdir_root()) as tmp:
+    with self.temporary_workdir() as workdir:
+      with temporary_dir() as tmp:
         configs = [
             dedent("""
               <module name="TreeWalker">
@@ -85,13 +91,13 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_cached(expected_num_artifacts=2)
   def test_jvm_tool_changes_invalidate_targets(self, cache_args):
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
-      # Ensure that only the second '//:checkstyle' will not invalidate anything.
-      for checkstyle_jar in ('//:checkstyle', 'testprojects/3rdparty/checkstyle', '//:checkstyle'):
+    with self.temporary_workdir() as workdir:
+      # Ensure that only the second use of the default checkstyle will not invalidate anything.
+      for checkstyle_jar in (None, 'testprojects/3rdparty/checkstyle', None):
         args = [
             'compile.checkstyle',
             cache_args,
-            '--checkstyle=["{}"]'.format(checkstyle_jar),
+            '--checkstyle={}'.format(checkstyle_jar) if checkstyle_jar else '',
             'examples/src/java/org/pantsbuild/example/hello/simple'
           ]
         pants_run = self.run_pants_with_workdir(args, workdir)

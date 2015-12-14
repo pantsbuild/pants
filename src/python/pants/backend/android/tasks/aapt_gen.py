@@ -15,14 +15,15 @@ from pants.backend.android.tasks.aapt_task import AaptTask
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.base.address import Address
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.address import Address
 from pants.util.dirutil import safe_mkdir
 
 
 logger = logging.getLogger(__name__)
+
 
 class AaptGen(AaptTask):
   """
@@ -112,6 +113,7 @@ class AaptGen(AaptTask):
       # framework can't differentiate between one library that has to be compiled by multiple sdks.
 
       gentargets = [binary]
+
       def gather_gentargets(tgt):
         """Gather all AndroidLibrary targets that have a manifest."""
         if isinstance(tgt, AndroidLibrary) and tgt.manifest:

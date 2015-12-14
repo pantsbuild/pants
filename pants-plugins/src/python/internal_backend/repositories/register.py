@@ -10,8 +10,8 @@ import os
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.build_manual import manual
+from pants.build_graph.build_file_aliases import BuildFileAliases
 
 
 public_repo = Repository(name='public',
@@ -54,7 +54,7 @@ manual.builddict(suppress=True)(testing_repo)
 
 
 def build_file_aliases():
-  return BuildFileAliases.create(
+  return BuildFileAliases(
     objects={
       'public': public_repo,  # key 'public' must match name='public' above
       'testing': testing_repo,

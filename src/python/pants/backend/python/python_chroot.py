@@ -20,8 +20,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.core.targets.prep_command import PrepCommand
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -30,11 +28,15 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
-from pants.base.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.build_graph.prep_command import PrepCommand
+from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
+from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
 
 logger = logging.getLogger(__name__)
+
 
 class PythonChroot(object):
   _VALID_DEPENDENCIES = {
@@ -44,12 +46,14 @@ class PythonChroot(object):
     PythonBinary: 'binaries',
     PythonThriftLibrary: 'thrifts',
     PythonAntlrLibrary: 'antlrs',
-    PythonTests: 'tests'
+    PythonTests: 'tests',
+    Resources: 'resources'
   }
 
   class InvalidDependencyException(Exception):
     def __init__(self, target):
-      Exception.__init__(self, "Not a valid Python dependency! Found: {}".format(target))
+      super(PythonChroot.InvalidDependencyException, self).__init__(
+        'Not a valid Python dependency! Found: {}'.format(target))
 
   @staticmethod
   def get_platforms(platform_list):
@@ -64,7 +68,8 @@ class PythonChroot(object):
                builder,
                targets,
                platforms,
-               extra_requirements=None):
+               extra_requirements=None,
+               log=None):
     self._python_setup = python_setup
     self._python_repos = python_repos
     self._ivy_bootstrapper = ivy_bootstrapper
@@ -75,6 +80,7 @@ class PythonChroot(object):
     self._targets = targets
     self._platforms = platforms
     self._extra_requirements = list(extra_requirements) if extra_requirements else []
+    self._logger = log or logger
 
     # Note: unrelated to the general pants artifact cache.
     self._artifact_cache_root = os.path.join(
@@ -86,9 +92,8 @@ class PythonChroot(object):
     """Deletes this chroot from disk if it has been dumped."""
     safe_rmtree(self.path())
 
-  def debug(self, msg, indent=0):
-    if os.getenv('PANTS_VERBOSE') is not None:
-      print('{}{}'.format(' ' * indent, msg))
+  def debug(self, msg):
+    self._logger.debug(msg)
 
   def path(self):
     return os.path.realpath(self._builder.path())
@@ -179,7 +184,7 @@ class PythonChroot(object):
         if isinstance(trg, target_type):
           children[target_key].add(trg)
           return
-        elif isinstance(trg, Dependencies):
+        elif type(trg) == Target:
           return
       raise self.InvalidDependencyException(trg)
     for target in targets:

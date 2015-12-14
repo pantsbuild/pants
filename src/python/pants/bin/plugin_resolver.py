@@ -35,6 +35,7 @@ class PluginResolver(object):
 
     bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
     self._plugin_requirements = bootstrap_options.plugins
+    self._plugin_cache_dir = bootstrap_options.plugin_cache_dir
 
   def resolve(self, working_set=None):
     """Resolves any configured plugins and adds them to the global working set.
@@ -94,7 +95,7 @@ class PluginResolver(object):
   @memoized_property
   def plugin_cache_dir(self):
     """The path of the directory pants plugins bdists are cached in."""
-    return os.path.join(self._options.for_global_scope().pants_bootstrapdir, 'plugins')
+    return self._plugin_cache_dir
 
   @memoized_property
   def _python_repos(self):

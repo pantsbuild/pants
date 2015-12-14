@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import pytest
 
-from pants.base.build_graph import CycleException, sort_targets
+from pants.build_graph.build_graph import CycleException, sort_targets
 from pants_test.base_test import BaseTest
 
 
@@ -23,14 +23,13 @@ class SortTargetsTest(BaseTest):
   #                       self.make_target,
   #                       ':invalid',
   #                       dependencies=1)
-
   def test_detect_cycle_direct(self):
     a = self.make_target(':a')
 
     # no cycles yet
     sort_targets([a])
     self.build_graph.inject_dependency(a.address, a.address)
-    with pytest.raises(CycleException):
+    with self.assertRaises(CycleException):
       sort_targets([a])
 
   def test_detect_cycle_indirect(self):
@@ -42,7 +41,7 @@ class SortTargetsTest(BaseTest):
     sort_targets([a])
 
     self.build_graph.inject_dependency(c.address, a.address)
-    with pytest.raises(CycleException):
+    with self.assertRaises(CycleException):
       sort_targets([a])
 
   def test_sort(self):

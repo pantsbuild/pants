@@ -33,11 +33,11 @@ class JvmRun(JvmTask):
     super(JvmRun, cls).register_options(register)
     register('--only-write-cmd-line', metavar='<file>',
              help='Instead of running, just write the cmd line to this file.')
-    # Note the unusual registration pattern. This is so we can support three cases:
+    # Note the use of implicit_value. This is so we can support three cases:
     # --cwd=<path>
-    # --cwd (defaults to the value of 'const', which is None here)
-    # No explicit --cwd at all (defaults to the value of 'default')
-    register('--cwd', default=_CWD_NOT_PRESENT, nargs='?',
+    # --cwd (uses the implicit value)
+    # No explicit --cwd at all (uses the default)
+    register('--cwd', default=_CWD_NOT_PRESENT, implicit_value='',
              help='Set the working directory. If no argument is passed, use the target path.')
     register('--main', metavar='<main class>',
              help='Invoke this class (overrides "main"" attribute in jvm_binary targets)')
@@ -49,17 +49,6 @@ class JvmRun(JvmTask):
   @classmethod
   def supports_passthru_args(cls):
     return True
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(JvmRun, cls).prepare(options, round_manager)
-
-    # TODO(John Sirois): these are fake requirements in order to force compile run before this
-    # goal. Introduce a RuntimeClasspath product for JvmCompile and PrepareResources to populate
-    # and depend on that.
-    # See: https://github.com/pantsbuild/pants/issues/310
-    round_manager.require_data('resources_by_target')
-    round_manager.require_data('classes_by_target')
 
   def __init__(self, *args, **kwargs):
     super(JvmRun, self).__init__(*args, **kwargs)
@@ -100,7 +89,7 @@ class JvmRun(JvmTask):
       executor = CommandLineGrabber(jvm) if self.only_write_cmd_line else None
       self.context.release_lock()
       result = jvm.execute_java(
-        classpath=(self.classpath([target])),
+        classpath=self.classpath([target]),
         main=self.get_options().main or binary.main,
         executor=executor,
         jvm_options=self.jvm_options,
@@ -109,6 +98,7 @@ class JvmRun(JvmTask):
         workunit_name='run',
         workunit_labels=[WorkUnitLabel.RUN],
         cwd=working_dir,
+        synthetic_jar_dir=self.workdir,
       )
 
       if self.only_write_cmd_line:

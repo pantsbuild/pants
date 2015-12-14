@@ -18,8 +18,7 @@ class ThriftLintError(Exception):
 
 
 class ThriftLinter(NailgunTask):
-  """Print linter warnings for thrift files.
-  """
+  """Print linter warnings for thrift files."""
 
   _CONFIG_SECTION = 'thrift-linter'
 
@@ -48,12 +47,6 @@ class ThriftLinter(NailgunTask):
   def product_types(cls):
     # Declare the product of this goal. Gen depends on thrift-linter.
     return ['thrift-linter']
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(ThriftLinter, cls).prepare(options, round_manager)
-    # Linter depends on ivy running before it.
-    round_manager.require_data('ivy_imports')
 
   @property
   def config_section(self):

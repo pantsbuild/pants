@@ -16,6 +16,7 @@ from pants.backend.android.tasks.android_task import AndroidTask
 IGNORED_ASSETS = ('!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:'
                   '!thumbs.db:!picasa.ini:!*~:BUILD*')
 
+
 class AaptTask(AndroidTask):
   """Base class for tasks performed by the Android aapt tool."""
 

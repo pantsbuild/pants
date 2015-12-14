@@ -53,11 +53,10 @@ Pants Equivalents
 `run`
 
 `-Xdebug` run a binary in the debugger<br>
-`run.jvm --debug`
+`run.jvm --jvm-debug`
 
 `-Dtest=com.foo.BarSpec -Dmaven.surefire.debug=true test` run one test in the debugger<br>
-`test.junit --debug --test=com.foo.BarSpec` or
-`test.specs --debug --test=com.foo.BarSpec`
+`test.junit --jvm-debug --test=com.foo.BarSpec`
 
 Depending on Source, not Jars
 -----------------------------

@@ -25,8 +25,9 @@ from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError, TestFailedTaskError
-from pants.base.target import Target
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.target import Target
+from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
@@ -66,13 +67,15 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
-class PytestRun(PythonTask):
+class PytestRun(TestRunnerTaskMixin, PythonTask):
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
     # to avoid confusion when debugging pants tests.
     # TODO: make these an option, so any pants install base can pick their pytest version.
     PythonRequirement('pytest>=2.6,<2.7'),
-    PythonRequirement('pytest-timeout'),
+    # NB, pytest-timeout 1.0.0 introduces a conflicting pytest>=2.8.0 requirement, see:
+    #   https://github.com/pantsbuild/pants/issues/2566
+    PythonRequirement('pytest-timeout<1.0.0'),
     PythonRequirement('pytest-cov>=1.8,<1.9'),
     PythonRequirement('unittest2', version_filter=lambda py, pl: py.startswith('2')),
     PythonRequirement('unittest2py3k', version_filter=lambda py, pl: py.startswith('3'))
@@ -112,11 +115,21 @@ class PytestRun(PythonTask):
   def supports_passthru_args(cls):
     return True
 
-  def execute(self):
-    def is_python_test(target):
+  def __init__(self, *args, **kwargs):
+    super(PytestRun, self).__init__(*args, **kwargs)
+    self._process = None
+
+  def _test_target_filter(self):
+    def target_filter(target):
       return isinstance(target, PythonTests)
 
-    test_targets = list(filter(is_python_test, self.context.targets()))
+    return target_filter
+
+  def _validate_target(self, target):
+    pass
+
+  def _execute(self, all_targets):
+    test_targets = self._get_test_targets()
     if test_targets:
       self.context.release_lock()
       with self.context.new_workunit(name='run',
@@ -139,11 +152,10 @@ class PytestRun(PythonTask):
       # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
       fail_hard = not self.get_options().fail_slow and not self.get_options().coverage
       for target in targets:
-        if isinstance(target, PythonTests):
-          rv = self._do_run_tests([target], workunit)
-          results[target] = rv
-          if not rv.success and fail_hard:
-            break
+        rv = self._do_run_tests([target], workunit)
+        results[target] = rv
+        if not rv.success and fail_hard:
+          break
 
       for target in sorted(results):
         self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
@@ -405,19 +417,19 @@ class PytestRun(PythonTask):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
 
-    with self.cached_chroot(interpreter=interpreter,
-                            pex_info=pex_info,
-                            targets=targets,
-                            platforms=('current',),
-                            extra_requirements=self._TESTING_TARGETS) as chroot:
-      pex = chroot.pex()
-      with self._maybe_shard() as shard_args:
-        with self._maybe_emit_junit_xml(targets) as junit_args:
-          with self._maybe_emit_coverage_data(targets,
-                                              chroot.path(),
-                                              pex,
-                                              workunit) as coverage_args:
-            yield pex, shard_args + junit_args + coverage_args
+    chroot = self.cached_chroot(interpreter=interpreter,
+                                pex_info=pex_info,
+                                targets=targets,
+                                platforms=('current',),
+                                extra_requirements=self._TESTING_TARGETS)
+    pex = chroot.pex()
+    with self._maybe_shard() as shard_args:
+      with self._maybe_emit_junit_xml(targets) as junit_args:
+        with self._maybe_emit_coverage_data(targets,
+                                            chroot.path(),
+                                            pex,
+                                            workunit) as coverage_args:
+          yield pex, shard_args + junit_args + coverage_args
 
   def _do_run_tests_with_args(self, pex, workunit, args):
     try:
@@ -443,7 +455,9 @@ class PytestRun(PythonTask):
   # Pattern for lines such as ones below.  The second one is from a test inside a class.
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
   # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
-  RESULTLOG_FAILED_PATTERN = re.compile(r'F +(.+?)::(.+)')
+
+  # 'E' is here as well to catch test errors, not just test failures.
+  RESULTLOG_FAILED_PATTERN = re.compile(r'[EF] +(.+?)::(.+)')
 
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):
@@ -511,12 +525,25 @@ class PytestRun(PythonTask):
           args.insert(0, '--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
+  def _timeout_abort_handler(self):
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process.
+    if self._process is not None:
+      self._process.kill()
+
   def _pex_run(self, pex, workunit, args, setsid=False):
     # NB: We don't use pex.run(...) here since it makes a point of running in a clean environment,
     # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
     # task.
-    process = subprocess.Popen(pex.cmdline(args),
+
+    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
+    #   storing the process handle here, the test mixin class will call the start_test() fn
+    #   on the language specific class which will return an object that can kill/monitor/etc
+    #   the test process.
+    self._process = subprocess.Popen(pex.cmdline(args),
                                preexec_fn=os.setsid if setsid else None,
                                stdout=workunit.output('stdout'),
                                stderr=workunit.output('stderr'))
-    return process.wait()
+    return self._process.wait()

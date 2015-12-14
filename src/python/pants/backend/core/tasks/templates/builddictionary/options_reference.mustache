@@ -23,7 +23,7 @@ and is installed in the ``compile`` goal.
 -----------------------------------------------------------------------------
 
 {{#goal.description}}
-{{goal.description}}
+{{.}}
 {{/goal.description}}
 
 {{#tasks}}
@@ -33,7 +33,7 @@ and is installed in the ``compile`` goal.
 
 *
 {{#ogroup.title}}
-  **{{{ogroup.title}}}**
+  **{{{.}}}**
 {{/ogroup.title}}
   Implemented by ``{{impl}}``
 {{/ogroup}}
@@ -43,17 +43,20 @@ and is installed in the ``compile`` goal.
 
 
 {{#doc_rst}}
-{{{doc_rst}}}
+{{{.}}}
 {{/doc_rst}}
 
 {{#ogroup}}
 {{#options}}
   * | ``{{st}}``
 {{#typ}}
-      ``{{typ}}``
+      ``{{.}}``
 {{/typ}}
+{{#fromfile}}
+      (@fromfile value supported)
+{{/fromfile}}
 {{#default}}
-      (Default: ``{{default}}``)
+      (Default: ``{{.}}``)
 {{/default}}
     |
 {{{hlp}}}
@@ -84,10 +87,13 @@ These command-line flags are available with all Pants goals.
 {{#options}}
   * | ``{{st}}``
 {{#typ}}
-      ``{{typ}}``
+      ``{{.}}``
 {{/typ}}
+{{#fromfile}}
+      (@fromfile value supported)
+{{/fromfile}}
 {{#default}}
-      (Default: ``{{default}}``)
+      (Default: ``{{.}}``)
 {{/default}}
     |
 {{{hlp}}}

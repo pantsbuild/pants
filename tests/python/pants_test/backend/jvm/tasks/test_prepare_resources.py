@@ -7,11 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.prepare_resources import PrepareResources
-from pants.base.target import Target
+from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -58,21 +58,6 @@ class PrepareResourcesTest(TaskTestBase):
     relevant_resources_targets = task.find_all_relevant_resources_targets()
     self.assertEqual(sorted([self.target('resources:target1'), self.target('resources:target4')]),
                      sorted(relevant_resources_targets))
-
-  def test_relative_resource_paths_none(self):
-    task = self.create_task(self.context())
-    resources = self.make_target('resources:target', target_type=Resources)
-    self.assertEqual([], task.relative_resource_paths(resources, '/chroot/path/does/not/matter'))
-
-  def test_relative_resource_paths(self):
-    task = self.create_task(self.context())
-    resources = self.make_target('resources:target',
-                                 target_type=Resources,
-                                 sources=['a/b.txt', 'c.txt'])
-    relative_resource_paths = task.relative_resource_paths(resources,
-                                                           '/chroot/path/does/not/matter')
-    self.assertEqual(sorted(['a/b.txt', 'c.txt']),
-                     sorted(relative_resource_paths))
 
   def test_prepare_resources_none(self):
     task = self.create_task(self.context())

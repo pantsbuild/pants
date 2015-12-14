@@ -6,7 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import time
+
+from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.python_task import PythonTask
@@ -40,10 +41,9 @@ class PythonBinaryCreate(PythonTask):
   def create_binary(self, binary):
     interpreter = self.select_interpreter_for_targets(binary.closure())
 
-    run_info = self.context.run_tracker.run_info
-    build_properties = {}
-    build_properties.update(run_info.add_basic_info(run_id=None, timestamp=time.time()))
-    build_properties.update(run_info.add_scm_info())
+    run_info_dict = self.context.run_tracker.run_info.get_as_dict()
+    build_properties = PexInfo.make_build_properties()
+    build_properties.update(run_info_dict)
 
     pexinfo = binary.pexinfo.copy()
     pexinfo.build_properties = build_properties

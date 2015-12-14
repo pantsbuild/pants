@@ -12,12 +12,11 @@ import os
 import re
 import shutil
 
-import bs4
 import pystache
 from six.moves import range
 
-from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
+from pants.task.task import Task
 
 
 """Static Site Generator for the Pants Build documentation site.
@@ -28,7 +27,19 @@ Suggested use:
 """
 
 
+def beautiful_soup(*args, **kwargs):
+  """Indirection function so we can lazy-import bs4.
+
+  It's an expensive import that invokes re.compile a lot, so we don't want to incur that cost
+  unless we must.
+  """
+  import bs4
+  return bs4.BeautifulSoup(*args, **kwargs)
+
+
 class SiteGen(Task):
+  """Generate the Pants static web site."""
+
   @classmethod
   def register_options(cls, register):
     super(SiteGen, cls).register_options(register)
@@ -61,7 +72,7 @@ def load_soups(config):
   soups = {}
   for page, path in config['sources'].items():
     with open(path, 'rb') as orig_file:
-      soups[page] = bs4.BeautifulSoup(orig_file.read().decode('utf-8'))
+      soups[page] = beautiful_soup(orig_file.read().decode('utf-8'))
   return soups
 
 
@@ -204,6 +215,7 @@ def ensure_headings_linkable(soups):
             tag['id'] = candidate_id
             break
 
+
 def add_here_links(soups):
   """Add the "pilcrow" links.
 
@@ -217,7 +229,7 @@ def add_here_links(soups):
       anchor = tag.get('id') or tag.get('name')
       if not anchor:
         continue
-      new_table = bs4.BeautifulSoup('''
+      new_table = beautiful_soup("""
       <table class="h-plus-pilcrow">
         <tbody>
         <tr>
@@ -228,7 +240,7 @@ def add_here_links(soups):
         </tr>
         </tbody>
       </table>
-      '''.format(anchor=anchor))
+      """.format(anchor=anchor))
       tag.replace_with(new_table)
       header_holder = new_table.find(attrs={'class': 'h-plus-pilcrow-holder'})
       header_holder.append(tag)
@@ -269,6 +281,7 @@ def get_title(soup):
 
 def generate_site_toc(config, precomputed, here):
   site_toc = []
+
   def recurse(tree, depth_so_far):
     for node in tree:
       if 'page' in node and node['page'] != 'index':
@@ -291,6 +304,7 @@ def generate_site_toc(config, precomputed, here):
 def generate_breadcrumbs(config, precomputed, here):
   """return template data for breadcrumbs"""
   breadcrumb_pages = []
+
   def recurse(tree, pages_so_far):
     pages_so_far_next = []
     for node in tree:

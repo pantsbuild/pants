@@ -23,8 +23,8 @@ class UnpackedJarsTest(BaseTest):
     target = self.make_target(':foo', UnpackedJars, libraries=[':import_jars'])
 
     self.assertIsInstance(target, UnpackedJars)
-    traversable_specs = [spec for spec in target.traversable_specs]
-    self.assertSequenceEqual([':import_jars'], traversable_specs)
+    traversable_dependency_specs = [spec for spec in target.traversable_dependency_specs]
+    self.assertSequenceEqual([':import_jars'], traversable_dependency_specs)
     self.assertEquals(1, len(target.imported_jars))
     import_jar_dep = target.imported_jars[0]
     self.assertIsInstance(import_jar_dep, JarDependency)

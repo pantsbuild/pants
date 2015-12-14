@@ -17,11 +17,22 @@ class CompileContext(object):
   This can be used to differentiate between a partially completed compile in a temporary location
   and a finalized compile in its permanent location.
   """
-  def __init__(self, target, analysis_file, classes_dir, sources):
+
+  def __init__(self, target, analysis_file, portable_analysis_file, classes_dir, jar_file,
+               log_file, sources, strict_deps):
     self.target = target
     self.analysis_file = analysis_file
+    self.portable_analysis_file = portable_analysis_file
     self.classes_dir = classes_dir
+    self.jar_file = jar_file
+    self.log_file = log_file
     self.sources = sources
+    self.strict_deps = strict_deps
+
+  @contextmanager
+  def open_jar(self, mode):
+    with open_zip(self.jar_file, mode=mode, compression=zipfile.ZIP_STORED) as jar:
+      yield jar
 
   @property
   def _id(self):
@@ -35,15 +46,3 @@ class CompileContext(object):
 
   def __hash__(self):
     return hash(self._id)
-
-
-class IsolatedCompileContext(CompileContext):
-  """Extends CompileContext to add a jar location."""
-  def __init__(self, target, analysis_file, classes_dir, jar_file, sources):
-    super(IsolatedCompileContext, self).__init__(target, analysis_file, classes_dir, sources)
-    self.jar_file = jar_file
-
-  @contextmanager
-  def open_jar(self, mode):
-    with open_zip(self.jar_file, mode=mode, compression=zipfile.ZIP_STORED) as jar:
-      yield jar

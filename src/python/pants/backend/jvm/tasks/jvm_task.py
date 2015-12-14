@@ -5,9 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.task import Task
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.build_graph.build_graph import BuildGraph
+from pants.task.task import Task
 
 
 class JvmTask(Task):
@@ -24,7 +27,7 @@ class JvmTask(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data('runtime_classpath')
 
   def __init__(self, *args, **kwargs):
     super(JvmTask, self).__init__(*args, **kwargs)
@@ -33,10 +36,23 @@ class JvmTask(Task):
     self.args = self.jvm.get_program_args()
     self.confs = self.get_options().confs
 
-  def classpath(self, targets, cp=None):
-    classpath = list(cp) if cp else []
+  def classpath(self, targets, classpath_prefix=None, classpath_product=None):
+    """Builds a transitive classpath for the given targets.
 
-    classpath_for_targets = ClasspathUtil.classpath_entries(
-      targets, self.context.products.get_data('compile_classpath'), self.confs)
+    Optionally includes a classpath prefix or building from a non-default classpath product.
+
+    :param targets: the targets for which to build the transitive classpath.
+    :param classpath_prefix: optional additional entries to prepend to the classpath.
+    :param classpath_product: an optional ClasspathProduct from which to build the classpath. if not
+    specified, the runtime_classpath will be used.
+    :return: a list of classpath strings.
+    """
+    classpath = list(classpath_prefix) if classpath_prefix else []
+
+    classpath_product = classpath_product or self.context.products.get_data('runtime_classpath')
+
+    closure = BuildGraph.closure(targets, bfs=True)
+
+    classpath_for_targets = ClasspathUtil.classpath(closure, classpath_product, self.confs)
     classpath.extend(classpath_for_targets)
     return classpath

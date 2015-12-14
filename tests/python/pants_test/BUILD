@@ -25,22 +25,14 @@ python_library(
   name = 'base_test',
   sources = ['base_test.py'],
   dependencies = [
-    'src/python/pants/base:address',
-    'src/python/pants/base:build_configuration',
     'src/python/pants/base:build_file',
-    'src/python/pants/base:build_file_address_mapper',
-    'src/python/pants/base:build_file_aliases',
-    'src/python/pants/base:build_file_parser',
-    'src/python/pants/base:build_graph',
     'src/python/pants/base:build_root',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:source_root',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:goal',
-    'src/python/pants/goal:products',
+    'src/python/pants/source',
     'src/python/pants/subsystem',
-    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',
     'tests/python/pants_test/option/util',
@@ -49,13 +41,17 @@ python_library(
 
 python_library(
   name = 'int-test',
-  sources = ['pants_run_integration_test.py'],
+  sources = [
+    'pants_run_integration_test.py'
+  ],
   dependencies = [
     '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_file',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/testutils:file_test_util',
   ]
 )
 
@@ -64,47 +60,8 @@ python_tests(
   sources = ['test_maven_layout.py'],
   dependencies = [
     ':base_test',
-    'src/python/pants/backend/maven_layout',
-    'src/python/pants/base:build_file_aliases',
-  ]
-)
-
-target(
-  name = 'integration',
-  dependencies = [
-    'tests/python/pants_test/android:integration',
-    'tests/python/pants_test/base:integration',
-    'tests/python/pants_test/targets:integration',
-    'tests/python/pants_test/tasks:integration',
-    'tests/python/pants_test/python:integration',
-  ]
-)
-
-target(
-  name = 'all',
-  dependencies = [
-    ':test_maven_layout',
-    'tests/python/pants_test/android',
-    'tests/python/pants_test/authentication:netrc',
-    'tests/python/pants_test/backend',
-    'tests/python/pants_test/base',
-    'tests/python/pants_test/cache',
-    'tests/python/pants_test/engine',
-    'tests/python/pants_test/fs',
-    'tests/python/pants_test/goal',
-    'tests/python/pants_test/ivy',
-    'tests/python/pants_test/java',
-    'tests/python/pants_test/logging',
-    'tests/python/pants_test/net',
-    'tests/python/pants_test/option',
-    'tests/python/pants_test/process',
-    'tests/python/pants_test/projects',
-    'tests/python/pants_test/python',
-    'tests/python/pants_test/reporting',
-    'tests/python/pants_test/scm',
-    'tests/python/pants_test/subsystem',
-    'tests/python/pants_test/targets',
-    'tests/python/pants_test/tasks',
-    'tests/python/pants_test/util',
+    'src/python/pants/build_graph',
+    'src/python/pants/source',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

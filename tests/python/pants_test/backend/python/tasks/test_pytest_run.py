@@ -11,10 +11,12 @@ import xml.dom.minidom as DOM
 from textwrap import dedent
 
 import coverage
+from mock import patch
 
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.contextutil import pushd
+from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -100,9 +102,31 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
             def test_one_in_class(self):
               self.assertEqual(1, core.two())
         """))
+    self.create_file(
+      'tests/test_core_sleep.py',
+      dedent("""
+          import core
+
+          def test_three():
+            assert 1 == core.one()
+        """))
+    self.create_file(
+      'tests/test_error.py',
+      dedent("""
+        def test_error(bad_fixture):
+          pass
+      """)
+    )
     self.add_to_build_file(
         'tests',
         dedent("""
+          python_tests(
+            name='error',
+            sources=[
+              'test_error.py'
+            ],
+          )
+
           python_tests(
             name='green',
             sources=[
@@ -143,10 +167,38 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           )
 
           python_tests(
+            name='sleep_no_timeout',
+            sources=[
+              'test_core_sleep.py',
+            ],
+            timeout = 0,
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='sleep_timeout',
+            sources=[
+              'test_core_sleep.py',
+            ],
+            timeout = 1,
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
             name='all',
             sources=[
               'test_core_green.py',
-              'test_core_red.py'
+              'test_core_red.py',
             ],
             dependencies=[
               'lib:core'
@@ -171,8 +223,17 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     self.red = self.target('tests:red')
     self.red_in_class = self.target('tests:red_in_class')
+    self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
+    self.sleep_timeout = self.target('tests:sleep_timeout')
+    self.error = self.target('tests:error')
+
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
+
+  def test_error(self):
+    """Test that a test that errors rather than fails shows up in TestFailedTaskError."""
+
+    self.run_failing_tests(targets=[self.red, self.green, self.error], failed_targets=[self.red, self.error])
 
   def test_green(self):
     self.run_tests(targets=[self.green])
@@ -187,6 +248,28 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
+
+  def test_one_timeout(self):
+    """When we have two targets, any of them doesn't have a timeout, and we have no default, then no timeout is set."""
+
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
+      self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
+
+      # Ensures that Timeout is instantiated with no timeout.
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (None,))
+
+  def test_timeout(self):
+    """Check that a failed timeout returns the right results."""
+
+    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
+      mock_timeout().__exit__.side_effect = TimeoutReached(1)
+      self.run_failing_tests(targets=[self.sleep_timeout],
+                             failed_targets=[self.sleep_timeout])
+
+      # Ensures that Timeout is instantiated with a 1 second timeout.
+      args, kwargs = mock_timeout.call_args
+      self.assertEqual(args, (1,))
 
   def test_junit_xml_option(self):
     # We expect xml of the following form:

@@ -1,0 +1,35 @@
+{
+  "type_alias": "sources",
+  "name": "sources",
+  "files": ["Selector.java"]
+}
+
+{
+  "type_alias": "target",
+  "name": "selected",
+  "sources": ":sources",
+  "dependencies": [
+    "3rdparty/jvm:guava",
+    "src/thrift/codegen/selector:selector@scrooge_scala_config"
+  ]
+}
+
+{
+  "type_alias": "target",
+  "name": "conflict",
+  "sources": ":sources",
+  "dependencies": [
+    "3rdparty/jvm:guava",
+    "src/thrift/codegen/selector"
+  ]
+}
+
+{
+  "type_alias": "target",
+  "name": "failing",
+  "sources": ":sources",
+  "dependencies": [
+    "3rdparty/jvm:guava",
+    "src/thrift/codegen/selector:selector@failing"
+  ]
+}

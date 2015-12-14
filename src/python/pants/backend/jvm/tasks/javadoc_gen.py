@@ -12,6 +12,8 @@ from pants.util.memo import memoized
 
 
 class JavadocGen(JvmdocGen):
+  """Generate javadoc html for Java source targets."""
+
   @classmethod
   @memoized
   def jvmdoc(cls):

@@ -42,29 +42,26 @@ class GlobalOptionsRegistrar(Optionable):
     logging.addLevelName(logging.WARNING, 'WARN')
     register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
              help='Set the logging level.')
-    register('-q', '--quiet', action='store_true',
-             help='Squelches all console output apart from errors.')
+    register('-q', '--quiet', action='store_true', recursive=True,
+             help='Squelches most console output.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', action='store_true', default=True, recursive=True,
-             help='Set whether log messages are displayed in color.')
+    register('--colors', '--color', action='store_true', default=True, recursive=True,
+             help='Set whether log messages are displayed in color. NB: The singular `color` form '
+                  'is deprecated until 0.0.66: prefer `colors`.')
 
-    # NB: Right now this option is a placeholder that is unused within pants itself except when
-    # specified on the command line to print the OSS pants version.  Both the IntelliJ Pants plugin
-    # and the pantsbuild/setup bootstrap script grep for pants_version though so this option
-    # registration serves in part as documentation of the dependency.
-    # TODO(John Sirois): Move pantsbuild.pants bootstrapping into pants itself and have it use this
-    # version option directly.
-    register('-V', '--pants-version', '--version',  # NB: pants_version is the 1st long option
-                                                    # since that's the one read from pants.ini;
-                                                    # the version form only works from the CLI.
-             nargs='?',  # Allows using the flag with no args on the CLI to print version as well
-                         # as setting the version in pants.ini
-             default=pants_version(),  # Displays the current version correctly in `./pants -h`.
-             const=pants_version(),  # Displays the current version via `./pants -V`.
-             help="Prints pants' version number and exits.")
+    # Pants code uses this only to verify that we are of the requested version. However
+    # setup scripts, runner scripts, IDE plugins, etc., may grep this out of pants.ini
+    # and use it to select the right version.
+    # Note that to print the version of the pants instance you're running, use -v, -V or --version.
+    register('--pants-version', advanced=True, default=pants_version(),
+             help='Use this pants version.')
 
     register('--plugins', advanced=True, type=list_option, help='Load these plugins.')
+    register('--plugin-cache-dir', advanced=True,
+             default=os.path.join(get_pants_cachedir(), 'plugins'),
+             help='Cache resolved plugin requirements here.')
+
     register('--backend-packages', advanced=True, type=list_option,
              help='Load backends from these packages that are already on the path.')
 
@@ -81,7 +78,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-distdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'dist'),
              help='Write end-product artifacts to this dir.')
-    register('--config-override', advanced=True,
+    register('--config-override', advanced=True, action='append', metavar='<path>',
              help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, action='store_true', default=True,
              help='Use pantsrc files.')
@@ -98,6 +95,12 @@ class GlobalOptionsRegistrar(Optionable):
     # registration and not so that their values can be interpolated in configs.
     register('-d', '--logdir', advanced=True, metavar='<dir>',
              help='Write logs to files under this directory.')
+
+    # This facilitates bootstrap-time configuration of pantsd usage such that we can
+    # determine whether or not to use the Pailgun client to invoke a given pants run
+    # without resorting to heavier options parsing.
+    register('--enable-pantsd', advanced=True, action='store_true', default=False,
+             help='Enables use of the pants daemon. (Beta)')
 
   @classmethod
   def register_options(cls, register):
@@ -135,9 +138,9 @@ class GlobalOptionsRegistrar(Optionable):
              default=[register.bootstrap.pants_workdir],
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
-    register('--fail-fast', advanced=True, action='store_true',
-             help='When parsing specs, will stop on the first erronous BUILD file encountered. '
-                  'Otherwise, will parse all builds in a spec and then display an error.')
+    register('--fail-fast', advanced=True, action='store_true', recursive=True,
+             help='Exit as quickly as possible on error, rather than attempting to continue '
+                  'to process the non-erroneous subset of the input.')
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,

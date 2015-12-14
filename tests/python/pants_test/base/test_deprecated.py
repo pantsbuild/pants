@@ -12,7 +12,8 @@ import pytest
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
                                    MissingRemovalVersionError, PastRemovalVersionError,
-                                   check_deprecated_semver, deprecated)
+                                   check_deprecated_semver, deprecated, deprecated_conditional,
+                                   deprecated_module)
 from pants.version import VERSION
 
 
@@ -20,15 +21,18 @@ FUTURE_VERSION = '9999.9.9'
 
 
 @contextmanager
-def _test_deprecation():
+def _test_deprecation(deprecation_expected=True):
   with warnings.catch_warnings(record=True) as seen_warnings:
     def assert_deprecation_warning():
-      assert len(seen_warnings) == 1
-      warning = seen_warnings[0]
-      assert isinstance(warning.message, DeprecationWarning)
-      return warning.message
+      if deprecation_expected:
+        assert len(seen_warnings) == 1
+        warning = seen_warnings[0]
+        assert isinstance(warning.message, DeprecationWarning)
+        return warning.message
+      else:
+        assert len(seen_warnings) == 0
 
-    warnings.simplefilter("always")
+    warnings.simplefilter('always')
     assert len(seen_warnings) == 0
     yield assert_deprecation_warning
     assert_deprecation_warning()
@@ -57,6 +61,18 @@ def test_deprecated_method():
     assert expected_return == Test().deprecated_method()
 
 
+def test_deprecated_conditional_true():
+  predicate = lambda: True
+  with _test_deprecation():
+    deprecated_conditional(predicate, FUTURE_VERSION, "test hint message", stacklevel=0)
+
+
+def test_deprecated_conditional_false():
+  predicate = lambda: False
+  with _test_deprecation(deprecation_expected=False):
+    deprecated_conditional(predicate, FUTURE_VERSION, "test hint message", stacklevel=0)
+
+
 def test_deprecated_property():
   expected_return = 'deprecated_property'
 
@@ -68,6 +84,18 @@ def test_deprecated_property():
 
   with _test_deprecation():
     assert expected_return == Test().deprecated_property
+
+
+def test_deprecated_module():
+  with _test_deprecation() as extract_deprecation_warning:
+    # Note: Attempting to import here a dummy module that just calls deprecated_module() does not
+    # properly trigger the deprecation, due to a bad interaction with pytest that I've not fully
+    # understood.  But we trust python to correctly execute modules on import, so just testing a
+    # direct call of deprecated_module() here is fine.
+    deprecated_module(FUTURE_VERSION, hint_message='Do not use me.')
+    warning_message = str(extract_deprecation_warning())
+    assert 'Module is deprecated' in warning_message
+    assert 'Do not use me' in warning_message
 
 
 def test_deprecation_hint():
@@ -107,6 +135,7 @@ def test_removal_version_bad():
     def test_func():
       pass
 
+
 def test_removal_version_same():
   with pytest.raises(PastRemovalVersionError):
     check_deprecated_semver(VERSION)
@@ -116,6 +145,7 @@ def test_removal_version_same():
     def test_func():
       pass
 
+
 def test_removal_version_too_small():
   with pytest.raises(PastRemovalVersionError):
     check_deprecated_semver('0.0.27')
@@ -124,6 +154,7 @@ def test_removal_version_too_small():
     @deprecated('0.0.27')
     def test_func():
       pass
+
 
 def test_bad_decorator_nesting():
   with pytest.raises(BadDecoratorNestingError):

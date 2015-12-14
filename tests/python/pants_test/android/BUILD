@@ -2,31 +2,14 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'android',
-  dependencies = [
-    ':android_config_util',
-    ':android_distribution',
-    ':android_manifest_parser',
-    ':keystore_resolver',
-    'tests/python/pants_test/android/tasks',
-  ]
-)
-
-target(
-  name = 'integration',
-  dependencies = [
-    'tests/python/pants_test/android/tasks:integration',
-  ]
-)
-
-python_tests(
+python_library(
   name = 'android_integration_test',
   sources = [
     'android_integration_test.py',
   ],
   dependencies = [
     'src/python/pants/java/distribution:distribution',
+    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
   ],
 )
@@ -42,7 +25,7 @@ python_library(
     'src/python/pants/backend/android/tasks:all',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base'
+    'tests/python/pants_test/jvm:jvm_tool_task_test_base',
   ]
 )
 

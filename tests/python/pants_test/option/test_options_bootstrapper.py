@@ -123,6 +123,60 @@ class BootstrapOptionsTest(unittest.TestCase):
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)
     self.assertEquals('/pear/banana', opts.for_scope('fruit').apple)
 
+  def test_create_bootstrapped_multiple_config_override(self):
+    # check with multiple config files, the latest values always get taken
+    # in this case worker_count will be overwritten, while fruit stays the same
+    with temporary_file() as fp:
+      fp.write(dedent("""
+      [compile.apt]
+      worker_count: 1
+
+      [fruit]
+      apple: red
+      """))
+      fp.close()
+
+      bootstrapper_single_config = OptionsBootstrapper(
+        configpath=fp.name, args=['--config-override={}'.format(fp.name)])
+
+      opts_single_config  = bootstrapper_single_config.get_full_options(known_scope_infos=[
+          ScopeInfo('', ScopeInfo.GLOBAL),
+          ScopeInfo('compile.apt', ScopeInfo.TASK),
+          ScopeInfo('fruit', ScopeInfo.TASK),
+      ])
+      # So we don't choke on it on the cmd line.
+      opts_single_config.register('', '--config-override', action='append')
+      opts_single_config.register('compile.apt', '--worker-count')
+      opts_single_config.register('fruit', '--apple')
+
+      self.assertEquals('1', opts_single_config.for_scope('compile.apt').worker_count)
+      self.assertEquals('red', opts_single_config.for_scope('fruit').apple)
+
+      with temporary_file() as fp2:
+        fp2.write(dedent("""
+        [compile.apt]
+        worker_count: 2
+        """))
+        fp2.close()
+
+        bootstrapper_double_config = OptionsBootstrapper(
+            configpath=fp.name,
+            args=['--config-override={}'.format(fp.name),
+                  '--config-override={}'.format(fp2.name)])
+
+        opts_double_config = bootstrapper_double_config.get_full_options(known_scope_infos=[
+          ScopeInfo('', ScopeInfo.GLOBAL),
+          ScopeInfo('compile.apt', ScopeInfo.TASK),
+          ScopeInfo('fruit', ScopeInfo.TASK),
+        ])
+        # So we don't choke on it on the cmd line.
+        opts_double_config.register('', '--config-override', action='append')
+        opts_double_config.register('compile.apt', '--worker-count')
+        opts_double_config.register('fruit', '--apple')
+
+        self.assertEquals('2', opts_double_config.for_scope('compile.apt').worker_count)
+        self.assertEquals('red', opts_double_config.for_scope('fruit').apple)
+
   def test_full_options_caching(self):
     with temporary_file_path() as config:
       bootstrapper = OptionsBootstrapper(env={}, configpath=config, args=[])

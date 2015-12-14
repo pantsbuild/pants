@@ -1,0 +1,15 @@
+{
+  "name": "server-project",
+  "version": "1.0.0",
+  "devDependencies": {
+    "babel": "5.8.23",
+    "mocha": "2.3.0"
+  },
+  "bin": "dist/main.js",
+  "main": "dist/Server.js",
+  "scripts": {
+    "prepublish": "babel src --out-dir dist",
+    "pretest": "npm run prepublish && babel test --out-dir testdist",
+    "test": "mocha ./testdist/unit.js"
+  }
+}

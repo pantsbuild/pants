@@ -17,7 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.build_manual import get_builddict_info
 from pants.base.exceptions import TaskError
 from pants.base.generator import TemplateData
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.goal.goal import Goal
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.arg_splitter import GLOBAL_SCOPE
@@ -35,7 +35,6 @@ buildroot = get_buildroot()
 
 
 # Our CLI help and doc-website-gen use this to get useful help text.
-
 def indent_docstring_by_n(s, n=1):
   """Given a non-empty docstring, return version indented N spaces.
   Given an empty thing, return the thing itself."""
@@ -327,6 +326,7 @@ def info_for_target_class(cls):
   paramdocs = param_docshards_to_template_datas(funcdoc_shards)
   return(argspec, funcdoc_rst, paramdocs)
 
+
 def entry_for_one_class(nom, cls):
   """  Generate a BUILD dictionary entry for a class.
   nom: name like 'python_binary'
@@ -380,10 +380,6 @@ def entry_for_one(nom, sym):
 
 
 PREDEFS = {  # some hardwired entries
-  'dependencies': {'defn':
-                     msg_entry('dependencies',
-                               'Old name for `target`_',
-                               'Old name for <a href="#target">target</a>')},
   'egg': {'defn': msg_entry('egg',
                             'In older Pants, loads a pre-built Python egg '
                             'from file system. Undefined in newer Pants.',
@@ -400,12 +396,6 @@ PREDEFS = {  # some hardwired entries
                         """In old Pants versions, a reference to a Pants targets.
                         (In new Pants versions, just use strings.)""")},
   'python_artifact': {'suppress': True},  # unused alias for PythonArtifact
-  'python_test_suite': {'defn':
-                          msg_entry('python_test_suite',
-                                    'Deprecated way to group Python tests;'
-                                    ' use `target`_',
-                                    'Deprecated way to group Python tests;'
-                                    ' use <a href="#target">target</a>')},
 }
 
 
@@ -420,7 +410,14 @@ def get_syms(build_file_parser):
         syms[sym] = item
 
   aliases = build_file_parser.registered_aliases()
-  map_symbols(aliases.targets)
+  map_symbols(aliases.target_types)
+
+  # TODO(John Sirois): Handle mapping the `Macro.expand` arguments - these are the real arguments
+  # to document and may be different than the set gathered from walking the Target hierarchy.
+  for alias, target_macro_factory in aliases.target_macro_factories.items():
+    for target_type in target_macro_factory.target_types:
+      map_symbols({alias: target_type})
+
   map_symbols(aliases.objects)
   map_symbols(aliases.context_aware_object_factories)
   return syms
@@ -454,9 +451,11 @@ def oref_template_data_from_help_info(oschi):
       hlp = indent_docstring_by_n(sub_buildroot(ohi.help), 6)
     option_l.append(TemplateData(
       st=st,
+      fromfile=ohi.fromfile,
       default=sub_buildroot(ohi.default),
       hlp=hlp,
-      typ=ohi.type.__name__))
+      choices=ohi.choices,
+      typ=ohi.typ.__name__))
   return TemplateData(
     title=title,
     options=option_l,
@@ -467,27 +466,30 @@ def gen_tasks_options_reference_data(options):
   """Generate the template data for the options reference rst doc."""
   goal_dict = {}
   goal_names = []
+
+  def fill_template(options, task_type):
+    for authored_task_type in task_type.mro():
+      if authored_task_type.__module__ != 'abc':
+        break
+    doc_rst = indent_docstring_by_n(authored_task_type.__doc__ or '', 2)
+    doc_html = rst_to_html(dedent_docstring(authored_task_type.__doc__))
+    parser = options.get_parser(task_type.options_scope)
+    oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
+    impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
+    return TemplateData(
+      impl=impl,
+      doc_html=doc_html,
+      doc_rst=doc_rst,
+      ogroup=oref_template_data_from_help_info(oschi))
+
   for goal in Goal.all():
-    tasks = []
-    for task_name in goal.ordered_task_names():
-      task_type = goal.task_type_by_name(task_name)
+    tasks = {}
+    for task_name, task_type in goal.task_items():
       # task_type may actually be a synthetic subclass of the authored class from the source code.
       # We want to display the authored class's name in the docs.
-      for authored_task_type in task_type.mro():
-        if authored_task_type.__module__ != 'abc':
-          break
-
-      doc_rst = indent_docstring_by_n(authored_task_type.__doc__ or '', 2)
-      doc_html = rst_to_html(dedent_docstring(authored_task_type.__doc__))
-      parser = options.get_parser(task_type.options_scope)
-      oschi = HelpInfoExtracter.get_option_scope_help_info_from_parser(parser)
-      impl = '{0}.{1}'.format(authored_task_type.__module__, authored_task_type.__name__)
-      tasks.append(TemplateData(
-          impl=impl,
-          doc_html=doc_html,
-          doc_rst=doc_rst,
-          ogroup=oref_template_data_from_help_info(oschi)))
-    goal_dict[goal.name] = TemplateData(goal=goal, tasks=tasks)
+      tasks[task_name] = fill_template(options, task_type)
+    sorted_tasks = [ tasks[k] for k in sorted(tasks.keys()) ]
+    goal_dict[goal.name] = TemplateData(goal=goal, tasks=sorted_tasks)
     goal_names.append(goal.name)
 
   goals = [goal_dict[name] for name in sorted(goal_names, key=lambda x: x.lower())]

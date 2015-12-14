@@ -1,0 +1,9 @@
+{
+  "main": "src/Button.js",
+  "scripts": {
+    "build": "web-build-tool",
+    "pretest": "NODE_ENV=test web-build-tool",
+    "test_unit": "npm run pretest && mocha ./dist/test/unit.js",
+    "test_integration": "npm run pretest && mocha ./dist/test/integration.js"
+  }
+}

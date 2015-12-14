@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache, UnreadableArtifact
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree
 
 
 logger = logging.getLogger(__name__)
@@ -46,15 +46,19 @@ class BaseLocalArtifactCache(ArtifactCache):
       self._artifact(tmp.name).collect(paths)
       yield self._store_tarball(cache_key, tmp.name)
 
-  def store_and_use_artifact(self, cache_key, src):
-    """
-      Read the contents of an tarball from an iterator and return an artifact stored in the cache
-    """
+  def store_and_use_artifact(self, cache_key, src, results_dir=None):
+    """Read the content of a tarball from an iterator and return an artifact stored in the cache."""
     with self._tmpfile(cache_key, 'read') as tmp:
       for chunk in src:
         tmp.write(chunk)
       tmp.close()
-      self._artifact(self._store_tarball(cache_key, tmp.name)).extract()
+      tarball = self._store_tarball(cache_key, tmp.name)
+      artifact = self._artifact(tarball)
+
+      if results_dir is not None:
+        safe_rmtree(results_dir)
+
+      artifact.extract()
       return True
 
   def _store_tarball(self, cache_key, src):
@@ -100,24 +104,24 @@ class LocalArtifactCache(BaseLocalArtifactCache):
         safe_delete(cur_file[0])
 
   def has(self, cache_key):
-    return os.path.isfile(self._cache_file_for_key(cache_key))
+    return self._artifact_for(cache_key).exists()
 
-  def _store_tarball(self, cache_key, src):
-    dest = self._cache_file_for_key(cache_key)
-    safe_mkdir_for(dest)
-    os.rename(src, dest)
-    self.prune(os.path.dirname(dest))  # Remove old cache files.
-    return dest
+  def _artifact_for(self, cache_key):
+    return self._artifact(self._cache_file_for_key(cache_key))
 
-  def use_cached_files(self, cache_key):
+  def use_cached_files(self, cache_key, results_dir=None):
+    tarfile = self._cache_file_for_key(cache_key)
     try:
-      tarfile = self._cache_file_for_key(cache_key)
-      if os.path.exists(tarfile):
-        self._artifact(tarfile).extract()
+      artifact = self._artifact_for(cache_key)
+      if artifact.exists():
+        if results_dir is not None:
+          safe_rmtree(results_dir)
+        artifact.extract()
         return True
     except Exception as e:
       # TODO(davidt): Consider being more granular in what is caught.
-      logger.warn('Error while reading from local artifact cache: {0}'.format(e))
+      logger.warn('Error while reading {0} from local artifact cache: {1}'.format(tarfile, e))
+      safe_delete(tarfile)
       return UnreadableArtifact(cache_key, e)
 
     return False
@@ -128,6 +132,13 @@ class LocalArtifactCache(BaseLocalArtifactCache):
 
   def delete(self, cache_key):
     safe_delete(self._cache_file_for_key(cache_key))
+
+  def _store_tarball(self, cache_key, src):
+    dest = self._cache_file_for_key(cache_key)
+    safe_mkdir_for(dest)
+    os.rename(src, dest)
+    self.prune(os.path.dirname(dest))  # Remove old cache files.
+    return dest
 
   def _cache_file_for_key(self, cache_key):
     # Note: it's important to use the id as well as the hash, because two different targets
@@ -154,7 +165,7 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
   def has(self, cache_key):
     return False
 
-  def use_cached_files(self, cache_key):
+  def use_cached_files(self, cache_key, results_dir=None):
     return False
 
   def delete(self, cache_key):

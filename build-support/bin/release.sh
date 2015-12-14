@@ -32,9 +32,11 @@ PKG_PANTS=(
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants==$(local_version) || die "pip install of pantsbuild.pants failed!"
-  execute_packaged_pants_with_internal_backends list src:: || die "'pants list src::' failed in venv!"
-  [[ "$(execute_packaged_pants_with_internal_backends --pants-version 2>/dev/null)" \
+  pip install ${PIP_ARGS} "${ROOT}/dist/pantsbuild.pants-$(local_version).tar.gz" || \
+    die "pip install of pantsbuild.pants failed!"
+  execute_packaged_pants_with_internal_backends list src:: || \
+    die "'pants list src::' failed in venv!"
+  [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
      == "$(local_version)" ]] || die "Installed version of pants does match local version!"
 }
 
@@ -45,7 +47,7 @@ PKG_PANTS_TESTINFRA=(
 )
 function pkg_pants_testinfra_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} pantsbuild.pants.testinfra==$(local_version) && \
+  pip install ${PIP_ARGS} "${ROOT}/dist/pantsbuild.pants.testinfra-$(local_version).tar.gz" && \
   python -c "import pants_test"
 }
 
@@ -83,12 +85,6 @@ function run_local_pants() {
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
 function execute_packaged_pants_with_internal_backends() {
-  local extra_bootstrap_buildfiles
-  if [[ "$1" =~ "extra_bootstrap_buildfiles" ]]; then
-    extra_bootstrap_buildfiles=${1#*=}
-    shift
-  fi
-
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
@@ -98,10 +94,6 @@ function execute_packaged_pants_with_internal_backends() {
         'internal_backend.repositories', \
         'internal_backend.sitegen', \
         'internal_backend.utilities', \
-      ]" \
-    --goals-bootstrap-buildfiles="[ \
-        '${ROOT}/BUILD', \
-        ${extra_bootstrap_buildfiles}
       ]" \
     "$@"
 }
@@ -125,7 +117,7 @@ function pkg_install_test_func() {
 }
 
 function local_version() {
-  run_local_pants --pants-version 2>/dev/null
+  run_local_pants --version 2>/dev/null
 }
 
 function build_packages() {
@@ -189,6 +181,10 @@ function install_and_test_packages() {
   )
 
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-$(local_version)!"
+
+  # Make sure we install fresh plugins since pants uses a fixed version number between releases.
+  export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
+  trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
@@ -316,6 +312,10 @@ function tag_release() {
     -m "pantsbuild.pants release ${release_version}" \
     ${tag_name} && \
   git push git@github.com:pantsbuild/pants.git ${tag_name}
+}
+
+function publish_docs() {
+  ${ROOT}/build-support/bin/publish_docs.sh -p -y
 }
 
 function list_packages() {
@@ -476,7 +476,7 @@ else
   banner "Releasing packages to PyPi." && \
   (
     check_origin && check_clean_master && check_pgp && check_owners && \
-      dry_run_install && publish_packages && tag_release && \
-        banner "Successfully released packages to PyPi."
+      dry_run_install && publish_packages && tag_release && publish_docs && \
+      banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
 fi

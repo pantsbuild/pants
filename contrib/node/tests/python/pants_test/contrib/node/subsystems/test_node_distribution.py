@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import os
 import subprocess
 import unittest
 from contextlib import contextmanager
@@ -54,3 +55,18 @@ class NodeDistributionTest(unittest.TestCase):
       versions = json.loads(versions_json)
 
       self.assertEqual(raw_version, versions['npm'])
+
+  def test_bin_dir_on_path(self):
+    with self.distribution() as node_distribution:
+      node_cmd = node_distribution.node_command(args=['--eval', 'console.log(process.env["PATH"])'])
+
+      # Test the case in which we do not pass in env,
+      # which should fall back to env=os.environ.copy()
+      output = node_cmd.check_output().strip()
+      self.assertEqual(node_cmd.bin_dir_path, output.split(os.pathsep)[0])
+
+      output = node_cmd.check_output(env={'PATH': '/test/path'}).strip()
+      self.assertEqual(node_cmd.bin_dir_path + os.path.pathsep + '/test/path', output)
+
+      output = node_cmd.check_output(env={'PATH': ''}).strip()
+      self.assertEqual(node_cmd.bin_dir_path, output)

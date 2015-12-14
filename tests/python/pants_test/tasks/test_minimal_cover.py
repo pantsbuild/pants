@@ -9,7 +9,7 @@ from textwrap import dedent
 
 from pants.backend.core.tasks.minimal_cover import MinimalCover
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -27,7 +27,7 @@ class MinimalCoverEmptyTest(BaseMinimalCovertTest):
 class MinimalCoverTest(BaseMinimalCovertTest):
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'python_library': PythonLibrary})
+    return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):
     super(MinimalCoverTest, self).setUp()

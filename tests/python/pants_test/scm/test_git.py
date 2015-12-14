@@ -12,8 +12,7 @@ import unittest
 from contextlib import contextmanager
 from itertools import izip_longest
 from textwrap import dedent
-
-import pytest
+from unittest import skipIf
 
 from pants.scm.git import Git
 from pants.scm.scm import Scm
@@ -65,7 +64,7 @@ def git_version():
   return Version(matches.group(1))
 
 
-@pytest.mark.skipif("git_version() < Version('1.7.10')")
+@skipIf(git_version() < Version('1.7.10'), 'The GitTest requires git >= 1.7.10.')
 class GitTest(unittest.TestCase):
 
   @staticmethod

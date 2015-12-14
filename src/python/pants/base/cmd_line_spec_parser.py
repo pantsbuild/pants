@@ -11,11 +11,12 @@ import re
 import traceback
 from collections import defaultdict
 
+import six
 from twitter.common.collections import OrderedSet, maybe_list
 
-from pants.base.address import Address, parse_spec
-from pants.base.address_lookup_error import AddressLookupError
 from pants.base.build_file import BuildFile
+from pants.build_graph.address import Address, parse_spec
+from pants.build_graph.address_lookup_error import AddressLookupError
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,6 @@ logger = logging.getLogger(__name__)
 # Note: In general, 'spec' should not be a user visible term, it is usually appropriate to
 # substitute 'address' for a spec resolved to an address, or 'address selector' if you are
 # referring to an unresolved spec string.
-
 class CmdLineSpecParser(object):
   """Parses address selectors as passed from the command line.
 
@@ -94,7 +94,7 @@ class CmdLineSpecParser(object):
       targets = ', '.join(self._excluded_target_map[CmdLineSpecParser._UNMATCHED_KEY])
       logger.debug('Targets after excludes: {targets}'.format(targets=targets))
       excluded_count = 0
-      for pattern, targets in self._excluded_target_map.iteritems():
+      for pattern, targets in six.iteritems(self._excluded_target_map):
         if pattern != CmdLineSpecParser._UNMATCHED_KEY:
           logger.debug('Targets excluded by pattern {pattern}\n  {targets}'
                        .format(pattern=pattern,

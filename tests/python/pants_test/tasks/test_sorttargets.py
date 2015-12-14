@@ -9,7 +9,7 @@ from textwrap import dedent
 
 from pants.backend.core.tasks.sorttargets import SortTargets
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.base.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -30,7 +30,7 @@ class SortTargetsTest(BaseSortTargetsTest):
 
   @property
   def alias_groups(self):
-    return BuildFileAliases.create(targets={'python_library': PythonLibrary})
+    return BuildFileAliases(targets={'python_library': PythonLibrary})
 
   def setUp(self):
     super(SortTargetsTest, self).setUp()
@@ -49,10 +49,10 @@ class SortTargetsTest(BaseSortTargetsTest):
 
   def test_sort(self):
     targets = [self.target('common/a'), self.target('common/c'), self.target('common/b')]
-    self.assertEqual(['common/a:a', 'common/b:b', 'common/c:c'],
+    self.assertEqual(['common/a', 'common/b', 'common/c'],
                      list(self.execute_console_task(targets=targets)))
 
   def test_sort_reverse(self):
     targets = [self.target('common/c'), self.target('common/a'), self.target('common/b')]
-    self.assertEqual(['common/c:c', 'common/b:b', 'common/a:a'],
+    self.assertEqual(['common/c', 'common/b', 'common/a'],
                      list(self.execute_console_task(targets=targets, options={'reverse': True})))

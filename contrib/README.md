@@ -24,11 +24,9 @@ Contrib plugins should generally follow 3 basic setup steps:
    The only hard requirement though is the `register.py` entry point file in the main src dir -
    in this example: `contrib/example/src/python/pants/contrib/example/register.py`.
 
-   Source roots for this layout would be added to contrib/example/BUILD:
-   ```
-   source_root('src/python', page, python_library, resources)
-   source_root('tests/python', page, python_library, python_tests, resources)
-   ```
+   Source roots for this layout should match your source root patterns.  The default patterns
+   are typically sufficient.
+
    **NB: python code should be in the pants/contrib and pants_test/contrib namespaces and the
    `__init__.py` files for these shared root namespaces should contain a namespace declaration
    like so:**
@@ -37,8 +35,8 @@ Contrib plugins should generally follow 3 basic setup steps:
    ```
 
 2. Make the local pants aware of your plugin
-   This involves 3 edits to `pants.ini`.  You'll need to add one entry in each of the
-   `pythonpath`, `backend_packages` and `bootstrap_buildfiles` lists:
+   This involves 2 edits to `pants.ini`.  You'll need to add one entry in each of the
+   `pythonpath` and `backend_packages` lists:
    ```ini
    [DEFAULT]
    # Enable our own custom loose-source plugins as well as contribs.
@@ -57,16 +55,6 @@ Contrib plugins should generally follow 3 basic setup steps:
        ...
        "pants.contrib.example",  # 2
        ...
-     ]
-   ...
-   [goals]
-   bootstrap_buildfiles: [
-       "%(buildroot)s/BUILD",
-       ...
-       "%(buildroot)s/contrib/example/BUILD",  # 3
-       ...
-       "%(buildroot)s/examples/BUILD",
-       "%(buildroot)s/testprojects/BUILD",
      ]
    ```
 

@@ -6,6 +6,7 @@ package org.pantsbuild.tools.jar;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.String;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -39,6 +40,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.pantsbuild.testing.EasyMockTest;
 import org.pantsbuild.testing.TearDownTestCase;
+import org.pantsbuild.tools.jar.JarBuilder;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateAction;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateEntryException;
 import org.pantsbuild.tools.jar.JarBuilder.DuplicateHandler;
@@ -89,11 +91,13 @@ public class JarBuilderTest {
       @Test
       public void test() {
         DuplicatePolicy anyA = DuplicatePolicy.pathMatches("a", DuplicateAction.CONCAT);
+        DuplicatePolicy anyTextA = DuplicatePolicy.pathMatches("a", DuplicateAction.CONCAT_TEXT);
         DuplicatePolicy startA = DuplicatePolicy.pathMatches("^a", DuplicateAction.SKIP);
         DuplicatePolicy endA = DuplicatePolicy.pathMatches("a$", DuplicateAction.REPLACE);
         DuplicatePolicy exactlyA = DuplicatePolicy.pathMatches("^a$", DuplicateAction.THROW);
 
         assertEquals(DuplicateAction.CONCAT, anyA.getAction());
+        assertEquals(DuplicateAction.CONCAT_TEXT, anyTextA.getAction());
         assertEquals(DuplicateAction.SKIP, startA.getAction());
         assertEquals(DuplicateAction.REPLACE, endA.getAction());
         assertEquals(DuplicateAction.THROW, exactlyA.getAction());
@@ -102,6 +106,11 @@ public class JarBuilderTest {
         assertTrue(anyA.apply("ab"));
         assertTrue(anyA.apply("ba"));
         assertFalse(anyA.apply("bbb"));
+
+        assertTrue(anyTextA.apply("bab"));
+        assertTrue(anyTextA.apply("ab"));
+        assertTrue(anyTextA.apply("ba"));
+        assertFalse(anyTextA.apply("bbb"));
 
         assertTrue(startA.apply("ab"));
         assertTrue(startA.apply("aa"));
@@ -545,6 +554,39 @@ public class JarBuilderTest {
     }
 
     @Test
+    public void testPolicyConcatText() throws IOException {
+      DuplicateHandler alwaysConcat = DuplicateHandler.always(DuplicateAction.CONCAT_TEXT);
+
+      File destinationJar = jarBuilder().add(content("1/137"), "meaning/of/life").write();
+
+      jarBuilder(destinationJar)
+          .add(content("42"), "meaning/of/life")
+          .add(content(""), "meaning/of/life")
+          .add(content("jake\n"), "meaning/of/life")
+          .write(true /* compress */, alwaysConcat);
+
+      File jar = jarBuilder().add(content("more\n"), "meaning/of/life").write();
+
+      File dir = newFolder("life/of");
+      write(new File(dir, "life"), "jane");
+
+      jarBuilder(destinationJar)
+          .addJar(jar)
+          .addDirectory(dir, Optional.of("meaning/of"))
+          .write(true /* compress */, alwaysConcat);
+
+      doWithJar(destinationJar, new ExceptionalClosure<JarFile, IOException>() {
+        @Override public void execute(JarFile jar) throws IOException {
+          assertListing(jar,
+              "meaning/",
+              "meaning/of/",
+              "meaning/of/life");
+          assertCompressedContents(jar, "meaning/of/life", "1/137\n42\njake\nmore\njane\n");
+        }
+      });
+    }
+
+    @Test
     public void testPolicySkip() throws IOException {
       DuplicateHandler alwaysSkip = DuplicateHandler.always(DuplicateAction.SKIP);
 
@@ -730,6 +772,28 @@ public class JarBuilderTest {
           FluentIterable.from(concatenated.getValue()).transform(GET_NAME).toList());
     }
 
+
+    @Test
+    public void testOnDuplicateConcatText() throws IOException {
+      Listener listener = createMock(Listener.class);
+      Capture<Iterable<? extends Entry>> concatenated = newCapture();
+      listener.onConcat(eq("concatenated/write"), capture(concatenated));
+      replay(listener);
+
+      File one = newFile("one");
+      File two = newFile("two");
+      File three = newFile("three");
+
+      jarBuilder(newFile(), listener)
+          .addFile(one, "concatenated/write")
+          .addFile(two, "concatenated/write")
+          .addFile(three, "concatenated/write")
+          .write(false /* compress */, DuplicateHandler.always(DuplicateAction.CONCAT_TEXT));
+
+      assertEquals(ImmutableList.of("one", "two", "three"),
+          FluentIterable.from(concatenated.getValue()).transform(GET_NAME).toList());
+    }
+
     @Test
     public void testOnDuplicateReplace() throws IOException {
       Listener listener = createMock(Listener.class);
@@ -787,6 +851,25 @@ public class JarBuilderTest {
       assertRelpath(new File("a/b/c"), new File("a/b/d"), "..", "c");
       assertRelpath(new File("a/b/c"), new File("a/d/e"), "..", "..", "b", "c");
       assertRelpath(new File("a/b/c"), new File("d/e/f"), "..", "..", "..", "a", "b", "c");
+    }
+  }
+
+  public static class PathJoinTest {
+
+    private static void assertJoinPath(String expected, String... components) {
+      assertEquals(expected, JarBuilder.joinJarPath(ImmutableList.copyOf(components)));
+    }
+
+    @Test
+    public void testJoin() {
+      assertJoinPath("a/b/c", "a", "b", "c");
+      assertJoinPath("a/b/c", "a/", "b", "c");
+      assertJoinPath("a/b/c", "a", "b/", "c");
+      assertJoinPath("a/b/c/", "a", "b", "c/");
+      assertJoinPath("a/b/c", "a", "b//", "c");
+      assertJoinPath("a/b/c/", "a", "b", "c/");
+      assertJoinPath("/a/b/c/", "/a", "b", "c/");
+      assertJoinPath("/a/b/c/", "//a", "b", "c/");
     }
   }
 }

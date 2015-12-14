@@ -17,7 +17,7 @@ class IvySubsystem(Subsystem):
   """Common configuration items for ivy tasks."""
   options_scope = 'ivy'
 
-  _DEFAULT_VERSION = '2.3.0'
+  _DEFAULT_VERSION = '2.4.0'
   _DEFAULT_URL = ('https://repo1.maven.org/maven2/'
                   'org/apache/ivy/ivy/'
                   '{version}/ivy-{version}.jar'.format(version=_DEFAULT_VERSION))

@@ -10,15 +10,12 @@ import sys
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.python_repl import PythonRepl
-from pants.base.address import Address
-from pants.base.build_file_aliases import BuildFileAliases
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
-from pants.base.target import Target
+from pants.build_graph.address import Address
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
+from pants.task.repl_task_mixin import ReplTaskMixin
 from pants.util.contextutil import temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
@@ -29,14 +26,12 @@ class PythonReplTest(PythonTaskTestBase):
     return PythonRepl
 
   class JvmTarget(Target):
-    def __init__(self, *args, **kwargs):
-      super(PythonReplTest.JvmTarget, self).__init__(*args, **kwargs)
-      self.add_labels('jvm')
+    pass
 
   @property
   def alias_groups(self):
     return super(PythonReplTest, self).alias_groups.merge(
-        BuildFileAliases.create(targets={'jvm_target': self.JvmTarget}))
+        BuildFileAliases(targets={'jvm_target': self.JvmTarget}))
 
   def create_non_python_target(self, relpath, name):
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""
@@ -49,30 +44,27 @@ class PythonReplTest(PythonTaskTestBase):
 
   def setUp(self):
     super(PythonReplTest, self).setUp()
-
-    SourceRoot.register('3rdparty', PythonRequirementLibrary)
-    SourceRoot.register('src', PythonBinary, PythonLibrary)
-
-    self.six = self.create_python_requirement_library('3rdparty/six', 'six',
+    self.six = self.create_python_requirement_library('3rdparty/python/six', 'six',
                                                       requirements=['six==1.9.0'])
-    self.requests = self.create_python_requirement_library('3rdparty/requests', 'requests',
+    self.requests = self.create_python_requirement_library('3rdparty/python/requests', 'requests',
                                                            requirements=['requests==2.6.0'])
 
-    self.library = self.create_python_library('src/lib', 'lib', {'lib.py': dedent("""
+    self.library = self.create_python_library('src/python/lib', 'lib', {'lib.py': dedent("""
     import six
 
 
     def go():
       six.print_('go', 'go', 'go!', sep='')
-    """)}, dependencies=['//3rdparty/six'])
+    """)}, dependencies=['//3rdparty/python/six'])
 
-    self.binary = self.create_python_binary('src/bin', 'bin', 'lib.go', dependencies=['//src/lib'])
+    self.binary = self.create_python_binary('src/python/bin', 'bin', 'lib.go',
+                                            dependencies=['//src/python/lib'])
 
-    self.non_python_target = self.create_non_python_target('src/java', 'java')
+    self.non_python_target = self.create_non_python_target('src/python/java', 'java')
 
   def tearDown(self):
     super(PythonReplTest, self).tearDown()
-    SourceRoot.reset()
+    ReplTaskMixin.reset_implementations()
 
   @contextmanager
   def new_io(self, input):
@@ -93,10 +85,31 @@ class PythonReplTest(PythonTaskTestBase):
   def do_test_repl(self, code, expected, targets, options=None):
     if options:
       self.set_options(**options)
-    python_repl = self.create_task(self.context(target_roots=targets))
 
+    class JvmRepl(ReplTaskMixin):
+      options_scope = 'test_scope_jvm_repl'
+
+      @classmethod
+      def select_targets(cls, target):
+        return isinstance(target, self.JvmTarget)
+
+      def setup_repl_session(_, targets):
+        raise AssertionError()
+
+      def launch_repl(_, session_setup):
+        raise AssertionError()
+
+    # Add a competing REPL impl.
+    JvmRepl.prepare(self.options, round_manager=None)
+
+    python_repl = self.create_task(self.context(target_roots=targets))
+    original_launcher = python_repl.launch_repl
     with self.new_io('\n'.join(code)) as (inp, out, err):
-      python_repl.execute(stdin=inp, stdout=out, stderr=err)
+      def custom_io_patched_launcher(pex):
+        return original_launcher(pex, stdin=inp, stdout=out, stderr=err)
+      python_repl.launch_repl = custom_io_patched_launcher
+
+      python_repl.execute()
       with open(out.name) as fp:
         lines = fp.read()
         if not expected:

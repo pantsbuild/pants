@@ -5,6 +5,6 @@ python_library(
   name = 'authentication',
   sources = globs('*.py'),
   dependencies = [
-    'src/python/pants/base:build_file_aliases',
+    'src/python/pants/build_graph',
   ]
 )

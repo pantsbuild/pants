@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="ivy-report.xsl"?>
+<ivy-report version="1.0">
+  <info organisation="toplevel" module="toplevelmodule" revision="latest" />
+  <dependencies>
+    <module organisation="org1" name="name1">
+      <revision name="0.0.1">
+        <caller organisation="toplevel" name="toplevelmodule" callerrev="latest"/>
+        <artifacts>
+          <artifact location="ivy2cache_path/org1/name1.jar"></artifact>
+          <artifact location="ivy2cache_path/org1/name1.jar" type="zip"></artifact>
+        </artifacts>
+      </revision>
+    </module>
+  </dependencies>
+</ivy-report>

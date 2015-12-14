@@ -10,6 +10,7 @@ from abc import ABCMeta
 
 class SingletonMetaclass(type):
   """Singleton metaclass."""
+
   def __call__(cls, *args, **kwargs):
     if not hasattr(cls, 'instance'):
       cls.instance = super(SingletonMetaclass, cls).__call__(*args, **kwargs)

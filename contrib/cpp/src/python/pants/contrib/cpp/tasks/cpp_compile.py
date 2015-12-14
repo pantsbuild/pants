@@ -9,6 +9,7 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
+from pants.util.dirutil import safe_mkdir_for
 
 from pants.contrib.cpp.tasks.cpp_task import CppTask
 
@@ -71,6 +72,7 @@ class CppCompile(CppTask):
   def _compile(self, target, results_dir, source):
     """Compile given source to an object file."""
     obj = self._objpath(target, results_dir, source)
+    safe_mkdir_for(obj)
 
     abs_source = os.path.join(get_buildroot(), source)
 

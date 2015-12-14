@@ -1,23 +1,10 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'util',
-  dependencies = [
-    ':contextutil',
-    ':dirutil',
-    ':fileutil',
-    ':memo',
-    ':meta',
-    ':osutil',
-    ':strutil',
-    ':xml_parser',
-  ]
-)
-
 python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],
+  coverage = ['pants.util.contextutil'],
   dependencies = [
     'src/python/pants/util:contextutil',
   ]
@@ -26,11 +13,22 @@ python_tests(
 python_tests(
   name = 'dirutil',
   sources = ['test_dirutil.py'],
+  coverage = ['pants.util.dirutil'],
   dependencies = [
     '3rdparty/python:mox',
+    '3rdparty/python:mock',
     '3rdparty/python:pytest',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
+  ]
+)
+
+python_tests(
+  name = 'eval',
+  sources = ['test_eval.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    'src/python/pants/util:eval',
   ]
 )
 
@@ -90,4 +88,22 @@ python_tests(
     'src/python/pants/util:xml_parser',
     'src/python/pants/util:contextutil',
   ]
+)
+
+python_tests(
+  name = 'timeout',
+  sources = ['test_timeout.py'],
+  dependencies = [
+    'src/python/pants/util:timeout',
+  ],
+)
+
+python_tests(
+  name = 'socket',
+  sources = ['test_socket.py'],
+  coverage = ['pants.util.socket'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:socket',
+  ],
 )

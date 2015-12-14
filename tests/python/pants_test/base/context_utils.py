@@ -11,8 +11,8 @@ from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
 
-from pants.base.target import Target
 from pants.base.workunit import WorkUnit
+from pants.build_graph.target import Target
 from pants.goal.context import Context
 from pants_test.option.util.fakes import create_options
 
@@ -47,8 +47,9 @@ class TestContext(Context):
   class DummyRunTracker(object):
     """A runtracker stand-in that does no actual tracking."""
     class DummyArtifactCacheStats(object):
-      def add_hit(self, cache_name, tgt): pass
-      def add_miss(self, cache_name, tgt): pass
+      def add_hits(self, cache_name, targets): pass
+
+      def add_misses(self, cache_name, targets, causes): pass
 
     artifact_cache_stats = DummyArtifactCacheStats()
 
@@ -73,7 +74,7 @@ class TestContext(Context):
 
 
 # TODO: Make Console and Workspace into subsystems, and simplify this signature.
-def create_context(options=None, target_roots=None, build_graph=None,
+def create_context(options=None, passthru_args=None, target_roots=None, build_graph=None,
                    build_file_parser=None, address_mapper=None,
                    console_outstream=None, workspace=None):
   """Creates a ``Context`` with no options or targets by default.
@@ -82,7 +83,7 @@ def create_context(options=None, target_roots=None, build_graph=None,
 
   Other params are as for ``Context``.
   """
-  options = create_options(options or {})
+  options = create_options(options or {}, passthru_args=passthru_args)
   run_tracker = TestContext.DummyRunTracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
   return TestContext(options=options, run_tracker=run_tracker, target_roots=target_roots,

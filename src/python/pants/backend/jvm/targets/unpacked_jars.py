@@ -10,14 +10,14 @@ import logging
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 logger = logging.getLogger(__name__)
 
 
 class UnpackedJars(ImportJarsMixin, Target):
-  """Describes a set of sources that are extracted from jar artifacts."""
+  """A set of sources extracted from JAR files."""
 
   class ExpectedLibrariesError(Exception):
     """Thrown when the target has no libraries defined."""
@@ -35,12 +35,12 @@ class UnpackedJars(ImportJarsMixin, Target):
     """
     payload = payload or Payload()
     payload.add_fields({
-      'library_specs': PrimitiveField(libraries or ())
+      'library_specs': PrimitiveField(libraries or ()),
+      'include_patterns' : PrimitiveField(include_patterns or ()),
+      'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
     })
     super(UnpackedJars, self).__init__(payload=payload, **kwargs)
 
-    self.include_patterns = include_patterns or []
-    self.exclude_patterns = exclude_patterns or []
     self._files = None
 
     if not libraries:

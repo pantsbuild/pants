@@ -37,15 +37,14 @@ else
 fi
 
 change_count=$(git rev-list HEAD ^${LAST_RELEASE_SHA} | wc -l)
-git log --format="format:%H %aE %s" HEAD ^${LAST_RELEASE_SHA} | {
+git log --format="format:%H %s" HEAD ^${LAST_RELEASE_SHA} | {
 
   echo
   echo "There have been ${change_count} changes since the last release."
   echo
 
-  while read sha user subject
+  while read sha subject
   do
-    date=$(git log -1 ${sha} --format="format:%cd")
     urls=()
     urls=(
       ${urls}
@@ -58,9 +57,6 @@ git log --format="format:%H %aE %s" HEAD ^${LAST_RELEASE_SHA} | {
       )
     )
 
-    echo ${date} ${user}
-    echo "https://github.com/pantsbuild/pants/commit/${sha}"
-    echo "=="
     echo "* ${subject}"
 
     for url in ${urls[@]}

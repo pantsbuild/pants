@@ -1,15 +1,5 @@
 #!/usr/bin/env bash
 
-# Prevent bootstrapping failure due to unrecognized flag:
-# https://github.com/pantsbuild/pants/issues/78
-function set_archflags() {
-  GCC_VERSION=`gcc -v 2>&1`
-  if [[ "$GCC_VERSION" == *503.0.38* ]]; then
-    # Required for clang version 503.0.38
-    export set ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
-  fi
-}
-set_archflags
 
 
 function log() {
@@ -41,3 +31,19 @@ function banner() {
 function fingerprint_data() {
   openssl md5 | cut -d' ' -f2
 }
+
+# Prevent bootstrapping failure due to unrecognized flag:
+# https://github.com/pantsbuild/pants/issues/78
+function set_archflags() {
+  GCC_VERSION=`gcc -v 2>&1`
+  if [ $? -ne 0 ]; then
+    die "ERROR: unable to execute 'gcc'. Please verify that your compiler is installed, in your\n" \
+        "      \$PATH and functional.\n\n" \
+        "      Hint: on Mac OS X, you may need to accept the XCode EULA: 'sudo xcodebuild -license accept'."
+  fi
+  if [[ "$GCC_VERSION" == *503.0.38* ]]; then
+    # Required for clang version 503.0.38
+    export set ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future
+  fi
+}
+set_archflags

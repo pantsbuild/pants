@@ -3,6 +3,7 @@
 
 java_library(name='protobuf-java',
   dependencies=[
+    '3rdparty:protobuf-java',
     'testprojects/src/protobuf/org/pantsbuild/testproject/distance',
   ],
   sources=globs('*.java'),

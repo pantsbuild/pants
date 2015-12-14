@@ -11,12 +11,10 @@ import shutil
 import tempfile
 from xml.dom import minidom
 
-from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.project_info.tasks.ide_gen import IdeGen, Project
-from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.generator import Generator, TemplateData
-from pants.base.source_root import SourceRoot
 from pants.scm.git import Git
 from pants.util.dirutil import safe_mkdir, safe_walk
 
@@ -42,6 +40,7 @@ _SCALA_VERSIONS = {
 
 
 class IdeaGen(IdeGen):
+  """Create an IntelliJ IDEA project from the given targets."""
 
   @classmethod
   def register_options(cls, register):
@@ -80,6 +79,14 @@ class IdeaGen(IdeGen):
                '.pants.d/resources',
                ],
              help='Adds folders to be excluded from the project configuration.')
+    register('--annotation-processing-enabled', action='store_true',
+             help='Tell IntelliJ IDEA to run annotation processors.')
+    register('--annotation-generated-sources-dir', default='generated', advanced=True,
+             help='Directory relative to --project-dir to write annotation processor sources.')
+    register('--annotation-generated-test-sources-dir', default='generated_tests', advanced=True,
+             help='Directory relative to --project-dir to write annotation processor sources.')
+    register('--annotation-processor', action='append', advanced=True,
+             help='Add a Class name of a specific annotation processor to run.')
 
   def __init__(self, *args, **kwargs):
     super(IdeaGen, self).__init__(*args, **kwargs)
@@ -99,11 +106,15 @@ class IdeaGen(IdeGen):
     self.java_maximum_heap_size = self.get_options().java_maximum_heap_size_mb
 
     idea_version = _VERSIONS[self.get_options().version]
-    self.project_template = os.path.join(_TEMPLATE_BASEDIR, 'project-{}.mustache'.format(idea_version))
-    self.module_template = os.path.join(_TEMPLATE_BASEDIR, 'module-{}.mustache'.format(idea_version))
+    self.project_template = os.path.join(_TEMPLATE_BASEDIR,
+                                         'project-{}.mustache'.format(idea_version))
+    self.module_template = os.path.join(_TEMPLATE_BASEDIR,
+                                        'module-{}.mustache'.format(idea_version))
 
-    self.project_filename = os.path.join(self.cwd, '{}.ipr'.format(self.project_name))
-    self.module_filename = os.path.join(self.gen_project_workdir, '{}.iml'.format(self.project_name))
+    self.project_filename = os.path.join(self.cwd,
+                                         '{}.ipr'.format(self.project_name))
+    self.module_filename = os.path.join(self.gen_project_workdir,
+                                        '{}.iml'.format(self.project_name))
 
   @staticmethod
   def _maven_targets_excludes(repo_root):
@@ -113,46 +124,28 @@ class IdeaGen(IdeGen):
         excludes.append(os.path.join(os.path.relpath(dirpath, start=repo_root), "target"))
     return excludes
 
-  @staticmethod
-  def _sibling_is_test(source_set):
-    """Determine if a SourceSet represents a test path.
-
-    Non test targets that otherwise live in test target roots (say a java_library), must
-    be marked as test for IDEA to correctly link the targets with the test code that uses
-    them. Therefore we check to see if the source root registered to the path or any of its sibling
-    source roots are defined with a test type.
-
-    :param source_set: SourceSet to analyze
-    :returns: True if the SourceSet represents a path containing tests
-    """
-
-    def has_test_type(types):
-      for target_type in types:
-        # TODO(Eric Ayers) Find a way for a target to identify itself instead of a hard coded list
-        if target_type in (JavaTests, PythonTests):
-          return True
-      return False
-
-    if source_set.path:
-      path = os.path.join(source_set.source_base, source_set.path)
-    else:
-      path = source_set.source_base
-    sibling_paths = SourceRoot.find_siblings_by_path(path)
-    for sibling_path in sibling_paths:
-      if has_test_type(SourceRoot.types(sibling_path)):
-        return True
-    return False
+  @property
+  def annotation_processing_template(self):
+    return TemplateData(
+      enabled=self.get_options().annotation_processing_enabled,
+      rel_source_output_dir=os.path.join('..','..','..',
+                                         self.get_options().annotation_generated_sources_dir),
+      source_output_dir=
+      os.path.join(self.gen_project_workdir,
+                   self.get_options().annotation_generated_sources_dir),
+      rel_test_source_output_dir=os.path.join('..','..','..',
+                                              self.get_options().annotation_generated_test_sources_dir),
+      test_source_output_dir=
+      os.path.join(self.gen_project_workdir,
+                   self.get_options().annotation_generated_test_sources_dir),
+      processors=[{'class_name' : processor}
+                  for processor in self.get_options().annotation_processor],
+    )
 
   def generate_project(self, project):
     def create_content_root(source_set):
       root_relative_path = os.path.join(source_set.source_base, source_set.path) \
                            if source_set.path else source_set.source_base
-
-      if self.get_options().infer_test_from_siblings:
-        is_test = IdeaGen._sibling_is_test(source_set)
-      else:
-        is_test = source_set.is_test
-
       if source_set.resources_only:
         if source_set.is_test:
           content_type = 'java-test-resource'
@@ -164,7 +157,7 @@ class IdeaGen(IdeGen):
       sources = TemplateData(
         path=root_relative_path,
         package_prefix=source_set.path.replace('/', '.') if source_set.path else None,
-        is_test=is_test,
+        is_test=source_set.is_test,
         content_type=content_type
       )
 
@@ -193,6 +186,14 @@ class IdeaGen(IdeGen):
 
     exclude_folders += self.get_options().exclude_folders
 
+    java_language_level = None
+    for target in project.targets:
+      if isinstance(target, JvmTarget):
+        if java_language_level is None or java_language_level < target.platform.source_level:
+          java_language_level = target.platform.source_level
+    if java_language_level is not None:
+      java_language_level = 'JDK_{0}_{1}'.format(*java_language_level.components[:2])
+
     configured_module = TemplateData(
       root_dir=get_buildroot(),
       path=self.module_filename,
@@ -208,8 +209,10 @@ class IdeaGen(IdeGen):
                              if cp_entry.javadoc_jar],
       external_source_jars=[cp_entry.source_jar for cp_entry in project.external_jars
                             if cp_entry.source_jar],
+      annotation_processing=self.annotation_processing_template,
       extra_components=[],
       exclude_folders=exclude_folders,
+      java_language_level=java_language_level,
     )
 
     outdir = os.path.abspath(self.intellij_output_dir)
@@ -231,6 +234,7 @@ class IdeaGen(IdeGen):
       scala=scala,
       checkstyle_classpath=';'.join(project.checkstyle_classpath),
       debug_port=project.debug_port,
+      annotation_processing=self.annotation_processing_template,
       extra_components=[],
     )
 

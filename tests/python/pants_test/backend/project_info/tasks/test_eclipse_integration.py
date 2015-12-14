@@ -37,7 +37,6 @@ class EclipseIntegrationTest(PantsRunIntegrationTest):
       return classpath
 
   # Test Eclipse generation on example targets; ideally should test that the build "works"
-
   def test_eclipse_on_protobuf(self):
     self._eclipse_test(['examples/src/java/org/pantsbuild/example/protobuf::'])
 

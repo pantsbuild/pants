@@ -1,0 +1,10 @@
+{
+  "type_alias": "target",
+  "name": "scrooge",
+  "sources": {
+    "files": ["Scrooge.scala"]
+  },
+  "dependencies": [
+    "3rdparty/jvm:scala-library"
+  ]
+}

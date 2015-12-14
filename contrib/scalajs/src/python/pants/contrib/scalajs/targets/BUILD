@@ -7,7 +7,7 @@ python_library(
     'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/base:target',
+    'src/python/pants/build_graph',
   ],
   sources = globs('*.py'),
 )

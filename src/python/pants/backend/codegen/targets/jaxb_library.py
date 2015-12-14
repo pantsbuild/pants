@@ -11,7 +11,7 @@ from pants.base.payload_field import PrimitiveField
 
 
 class JaxbLibrary(JvmTarget):
-  """Generates a stub Java library from jaxb xsd files."""
+  """A Java library generated from JAXB xsd files."""
 
   def __init__(self, payload=None, package=None, language='java', **kwargs):
     """

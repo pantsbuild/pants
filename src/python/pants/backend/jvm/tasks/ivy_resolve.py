@@ -8,33 +8,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 import time
-from collections import defaultdict
 from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.cache_manager import VersionedTargetSet
-from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
-from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.dirutil import safe_mkdir
+from pants.util.memo import memoized_property
 from pants.util.strutil import safe_shlex_split
 
 
 class IvyResolve(IvyTaskMixin, NailgunTask):
-
-  class Error(TaskError):
-    """Error in IvyResolve."""
-
-  class UnresolvedJarError(Error):
-    """A jar dependency couldn't be found in the symlink map"""
-
-  @classmethod
-  def global_subsystems(cls):
-    return super(IvyResolve, cls).global_subsystems() + (IvySubsystem, )
 
   @classmethod
   def register_options(cls, register):
@@ -62,19 +50,15 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
-    cls.register_jvm_tool(register, 'xalan')
+    cls.register_jvm_tool(register,
+                          'xalan',
+                          classpath=[
+                            JarDependency(org='xalan', name='xalan', rev='2.7.1'),
+                          ])
 
   @classmethod
   def product_types(cls):
-    return [
-        'compile_classpath',
-        'ivy_cache_dir',
-        'ivy_jar_products',
-        'ivy_resolve_symlink_map',
-        'jar_dependencies',
-        'jar_map_default',
-        'jar_map_sources',
-        'jar_map_javadoc']
+    return ['compile_classpath']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -85,110 +69,35 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
   def __init__(self, *args, **kwargs):
     super(IvyResolve, self).__init__(*args, **kwargs)
 
-    self._cachedir = IvySubsystem.global_instance().get_options().cache_dir
-    self._classpath_dir = os.path.join(self.workdir, 'mapped')
     self._outdir = self.get_options().outdir or os.path.join(self.workdir, 'reports')
     self._open = self.get_options().open
     self._report = self._open or self.get_options().report
-    self._confs = None
 
     self._args = []
     for arg in self.get_options().args:
       self._args.extend(safe_shlex_split(arg))
 
-  @property
-  def confs(self):
-    if self._confs is None:
-      self._confs = set(self.get_options().confs)
-      for conf in ('default', 'sources', 'javadoc'):
-        if self.context.products.isrequired('jar_map_{conf}'.format(conf=conf)):
-          self._confs.add(conf)
-    return self._confs
-
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
-
     executor = self.create_java_executor()
     targets = self.context.targets()
-    self.context.products.safe_create_data('ivy_cache_dir', lambda: self._cachedir)
     compile_classpath = self.context.products.get_data('compile_classpath',
-                                                       lambda: ClasspathProducts())
-    compile_classpath.add_excludes_for_targets(targets)
-    # After running ivy, we parse the resulting report, and record the dependencies for
-    # all relevant targets (ie: those that have direct dependencies).
-    _, resolve_hash_name = self.ivy_resolve(
-      targets,
-      executor=executor,
-      workunit_name='ivy-resolve',
-      confs=self.confs,
-      custom_args=self._args,
-    )
-
-    # Record the ordered subset of jars that each jar_library/leaf depends on using
-    # stable symlinks within the working copy.
-    ivy_jar_products = self._generate_ivy_jar_products(resolve_hash_name)
-    symlink_map = self.context.products.get_data('ivy_resolve_symlink_map')
-    for conf in self.confs:
-      ivy_jar_memo = {}
-      ivy_info_list = ivy_jar_products[conf]
-      if not ivy_info_list:
-        continue
-      # TODO: refactor ivy_jar_products to remove list
-      assert len(ivy_info_list) == 1, (
-        'The values in ivy_jar_products should always be length 1,'
-        ' since we no longer have exclusives groups.'
-      )
-      # Build the symlink_map product
-      ivy_info = ivy_info_list[0]
-      jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
-      for target in jar_library_targets:
-        # Add the artifacts from each dependency module.
-        for artifact_location in ivy_info.get_artifacts_for_jar_library(target, memo=ivy_jar_memo):
-          if artifact_location in symlink_map:
-            key = artifact_location
-          else:
-            key = os.path.realpath(artifact_location)
-          if key not in symlink_map:
-            raise self.UnresolvedJarError(
-              'Jar {artifact} in {spec} not resolved to the ivy symlink map in conf {conf}.'.format(
-              spec=target.address.spec, artifact=artifact_location, conf=conf))
-          artifact_location = symlink_map[key]
-          compile_classpath.add_for_target(target, [(conf, artifact_location)])
-
+        init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
+    resolve_hash_name = self.resolve(executor=executor,
+                                     targets=targets,
+                                     classpath_products=compile_classpath,
+                                     confs=self.get_options().confs,
+                                     extra_args=self._args)
     if self._report:
       self._generate_ivy_report(resolve_hash_name)
-    if self.context.products.is_required_data('ivy_jar_products'):
-      self._populate_ivy_jar_products(ivy_jar_products)
-
-    create_jardeps_for = self.context.products.isrequired('jar_dependencies')
-    if create_jardeps_for:
-      genmap = self.context.products.get('jar_dependencies')
-      for target in filter(create_jardeps_for, targets):
-        self.mapjars(genmap, target, executor=executor)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible
     # by target. So we can only cache it keyed by the entire target set.
     global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
     return [global_vts]
-
-  def _generate_ivy_jar_products(self, resolve_hash_name):
-    """Based on the ivy report, compute a map of conf to lists of IvyInfo objects."""
-    ivy_products = defaultdict(list)
-    for conf in self.confs:
-      ivyinfo = IvyUtils.parse_xml_report(resolve_hash_name, conf)
-      if ivyinfo:
-        # TODO(stuhood): Value is a list, previously to accommodate multiple exclusives groups.
-        ivy_products[conf].append(ivyinfo)
-    return ivy_products
-
-  def _populate_ivy_jar_products(self, new_ivy_products):
-    """Merge the given info into the ivy_jar_products product."""
-    ivy_products = self.context.products.get_data('ivy_jar_products', lambda: defaultdict(list))
-    for conf, new_ivyinfos in new_ivy_products.items():
-      ivy_products[conf] += new_ivyinfos
 
   def _generate_ivy_report(self, resolve_hash_name):
     def make_empty_report(report, organisation, module, conf):
@@ -217,14 +126,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     report = None
     org = IvyUtils.INTERNAL_ORG_NAME
     name = resolve_hash_name
-    xsl = os.path.join(self._cachedir, 'ivy-report.xsl')
+    xsl = os.path.join(self.ivy_cache_dir, 'ivy-report.xsl')
 
     # Xalan needs this dir to exist - ensure that, but do no more - we have no clue where this
     # points.
     safe_mkdir(self._outdir, clean=False)
 
-    for conf in self.confs:
-      xml_path = IvyUtils.xml_report_path(resolve_hash_name, conf)
+    for conf in self.get_options().confs:
+      xml_path = self._get_report_path(conf, resolve_hash_name)
       if not os.path.exists(xml_path):
         # Make it clear that this is not the original report from Ivy by changing its name.
         xml_path = xml_path[:-4] + "-empty.xml"
@@ -239,7 +148,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
       if 0 != self.runjava(classpath=tool_classpath, main='org.apache.xalan.xslt.Process',
                            args=args, workunit_name='report'):
-        raise IvyResolve.Error('Failed to create html report from xml ivy report.')
+        raise self.Error('Failed to create html report from xml ivy report.')
 
       # The ivy-report.xsl is already smart enough to generate an html page with tab links to all
       # confs for a given report coordinate (org, name).  We need only display 1 of the generated
@@ -250,7 +159,13 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     css = os.path.join(self._outdir, 'ivy-report.css')
     if os.path.exists(css):
       os.unlink(css)
-    shutil.copy(os.path.join(self._cachedir, 'ivy-report.css'), self._outdir)
+    shutil.copy(os.path.join(self.ivy_cache_dir, 'ivy-report.css'), self._outdir)
 
     if self._open and report:
       binary_util.ui_open(report)
+
+  def _get_report_path(self, conf, resolve_hash_name):
+    try:
+      return IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+    except IvyUtils.IvyResolveReportError as e:
+      raise self.Error('Failed to generate ivy report: {}'.format(e))

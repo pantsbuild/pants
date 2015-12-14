@@ -9,9 +9,10 @@ import os
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.java.jar.shader import Shader
 from pants.option.custom_types import dict_option, file_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import safe_open
@@ -41,6 +42,16 @@ class Checkstyle(NailgunTask):
              help='Run checkstyle with these extra jvm options.')
     cls.register_jvm_tool(register,
                           'checkstyle',
+                          classpath=[
+                            # Pants still officially supports java 6 as a tool; the supported
+                            # development environment for a pants hacker is based on that.  As
+                            # such, we use 6.1.1 here since its the last checkstyle version
+                            # compiled to java 6.  See the release notes here:
+                            # http://checkstyle.sourceforge.net/releasenotes.html
+                            JarDependency(org='com.puppycrawl.tools',
+                                          name='checkstyle',
+                                          rev='6.1.1'),
+                          ],
                           main=cls._CHECKSTYLE_MAIN,
                           custom_rules=[
                               # Checkstyle uses reflection to load checks and has an affordance that
@@ -57,7 +68,7 @@ class Checkstyle(NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(Checkstyle, cls).prepare(options, round_manager)
-    round_manager.require_data('compile_classpath')
+    round_manager.require_data('runtime_classpath')
 
   def _is_checked(self, target):
     return target.has_sources(self._JAVA_SOURCE_EXTENSION) and not target.is_synthetic
@@ -74,7 +85,7 @@ class Checkstyle(NailgunTask):
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       sources = self.calculate_sources(invalid_targets)
       if sources:
-        result = self.checkstyle(targets, sources)
+        result = self.checkstyle(invalid_targets, sources)
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._CHECKSTYLE_MAIN, result=result))
@@ -87,10 +98,12 @@ class Checkstyle(NailgunTask):
     return sources
 
   def checkstyle(self, targets, sources):
-    compile_classpaths = self.context.products.get_data('compile_classpath')
-    compile_classpath = compile_classpaths.get_for_targets(targets)
+    runtime_classpaths = self.context.products.get_data('runtime_classpath')
     union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
-    union_classpath.update(jar for conf, jar in compile_classpath if conf in self.get_options().confs)
+    for target in targets:
+      runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True))
+      union_classpath.update(jar for conf, jar in runtime_classpath
+                             if conf in self.get_options().confs)
 
     args = [
       '-c', self.get_options().configuration,

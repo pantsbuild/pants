@@ -13,22 +13,25 @@ from pants.option.option_util import is_boolean_flag
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
     ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
-     'type', 'default', 'help', 'deprecated_version', 'deprecated_message', 'deprecated_hint'])):
+     'typ', 'fromfile', 'default', 'help', 'deprecated_version', 'deprecated_message',
+     'deprecated_hint', 'choices'])):
   """A container for help information for a single option.
 
   registering_class: The type that registered the option.
-  display args: Arg strings suitable for display in help text, including value examples
+  display_args: Arg strings suitable for display in help text, including value examples
                 (e.g., [-f, --[no]-foo-bar, --baz=<metavar>].)
   scoped_cmd_line_args: The explicitly scoped raw flag names allowed anywhere on the cmd line,
                         (e.g., [--scope-baz, --no-scope-baz, --scope-qux])
   unscoped_cmd_line_args: The unscoped raw flag names allowed on the cmd line in this option's
                           scope context (e.g., [--baz, --no-baz, --qux])
-  type: The type of the option.
+  typ: The type of the option.
+  fromfile: `True` if the option supports @fromfile value loading.
   default: The value of this option if no flags are specified (derived from config and env vars).
   help: The help message registered for this option.
   deprecated_version: The version at which this option is to be removed, if any (None otherwise).
   deprecated_message: A more verbose message explaining the deprecated_version (None otherwise).
   deprecated_hint: A deprecation hint message registered for this option (None otherwise).
+  choices: If this option has a constrained list of choices, a csv list of the choices.
   """
   pass
 
@@ -52,7 +55,7 @@ class HelpInfoExtracter(object):
 
     Callers can format this dict into cmd-line help, HTML or whatever.
     """
-    return cls(parser.scope).get_option_scope_help_info(parser.registration_args)
+    return cls(parser.scope).get_option_scope_help_info(parser.option_registrations_iter())
 
   @staticmethod
   def compute_default(kwargs):
@@ -70,7 +73,7 @@ class HelpInfoExtracter(object):
       else:
         return 'None'
 
-    if typ == list_option or action == 'append':
+    if typ == list_option:
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
     elif typ == dict_option:
       default_str = '{{ {} }}'.format(
@@ -86,24 +89,26 @@ class HelpInfoExtracter(object):
     metavar = kwargs.get('metavar')
     if not metavar:
       typ = kwargs.get('type', str)
-      if typ == list_option or action == 'append':
+      if typ == list_option:
         metavar = '"[\'str1\',\'str2\',...]"'
       elif typ == dict_option:
-        metavar = '"{ \'key1\': val1,\'key2\': val2,...}"'
+        metavar = '"{\'key1\':val1,\'key2\':val2,...}"'
       else:
         metavar = '<{}>'.format(typ.__name__)
+
     return metavar
 
   def __init__(self, scope):
     self._scope = scope
     self._scope_prefix = scope.replace('.', '-')
 
-  def get_option_scope_help_info(self, registration_args):
+  def get_option_scope_help_info(self, option_registrations_iter):
     """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs) pairs."""
     basic_options = []
     recursive_options = []
     advanced_options = []
-    for args, kwargs in registration_args:
+    # Sort the arguments, so we display the help in alphabetical order.
+    for args, kwargs in sorted(option_registrations_iter):
       ohi = self.get_option_help_info(args, kwargs)
       if kwargs.get('advanced'):
         advanced_options.append(ohi)
@@ -155,15 +160,18 @@ class HelpInfoExtracter(object):
     deprecated_message = ('DEPRECATED. Will be removed in version {}.'.format(deprecated_version)
                           if deprecated_version else None)
     deprecated_hint = kwargs.get('deprecated_hint')
+    choices = ', '.join(kwargs.get('choices')) if kwargs.get('choices') else None
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
                          display_args=display_args,
                          scoped_cmd_line_args=scoped_cmd_line_args,
                          unscoped_cmd_line_args=unscoped_cmd_line_args,
-                         type=typ,
+                         typ=typ,
+                         fromfile=kwargs.get('fromfile', False),
                          default=default,
                          help=help_msg,
                          deprecated_version=deprecated_version,
                          deprecated_message=deprecated_message,
-                         deprecated_hint=deprecated_hint)
+                         deprecated_hint=deprecated_hint,
+                         choices=choices)
     return ret

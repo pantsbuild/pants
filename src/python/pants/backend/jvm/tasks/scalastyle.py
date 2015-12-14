@@ -10,7 +10,7 @@ import re
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.option.custom_types import file_option
 from pants.process.xargs import Xargs
 from pants.util.dirutil import touch
@@ -71,6 +71,9 @@ class Scalastyle(NailgunTask):
                   '(relative to the repo root) matches any of these regexes.')
     register('--jvm-options', action='append', metavar='<option>...', advanced=True,
              help='Run scalastyle with these extra jvm options.')
+    # TODO: Use the task's log level instead of this separate verbosity knob.
+    register('--verbose', action='store_true', default=False,
+             help='Enable verbose scalastyle output.')
     cls.register_jvm_tool(register, 'scalastyle')
 
   @classmethod
@@ -126,6 +129,8 @@ class Scalastyle(NailgunTask):
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
 
       scalastyle_config = self.validate_scalastyle_config()
+      scalastyle_verbose = self.get_options().verbose
+      scalastyle_quiet = self.get_options().quiet or False
       scalastyle_excluder = self.create_file_excluder()
 
       self.context.log.debug('Non synthetic scala targets to be checked:')
@@ -139,11 +144,19 @@ class Scalastyle(NailgunTask):
 
       if scala_sources:
         def call(srcs):
+          def to_java_boolean(x):
+            return str(x).lower()
+
           cp = self.tool_classpath('scalastyle')
+          scalastyle_args = [
+            '-c', scalastyle_config,
+            '-v', to_java_boolean(scalastyle_verbose),
+            '-q', to_java_boolean(scalastyle_quiet),
+            ]
           return self.runjava(classpath=cp,
                               main=self._MAIN,
                               jvm_options=self.get_options().jvm_options,
-                              args=['-c', scalastyle_config] + srcs)
+                              args=scalastyle_args + srcs)
 
         result = Xargs(call).execute(scala_sources)
         if result != 0:

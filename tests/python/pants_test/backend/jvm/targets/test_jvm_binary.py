@@ -13,7 +13,7 @@ from pants.backend.jvm.targets.jvm_binary import (Duplicate, JarRules, JvmBinary
                                                   Skip)
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload_field import FingerprintedField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 
@@ -163,8 +163,8 @@ class JvmBinaryTest(BaseTest):
 
   def test_manifest_bad_key(self):
     with self.assertRaisesRegexp(ManifestEntries.ExpectedDictionaryError,
-                                 r'entries must be dictionary of strings, got key bad-bad-bad '
-                                 r'type JarDependency'):
+                                 r'^entries must be dictionary of strings, got key .* '
+                                 r'type JarDependency$'):
       self.make_target(':foo',
                        JvmBinary,
                        main='com.example.Foo',

@@ -10,7 +10,6 @@ import time
 from collections import defaultdict
 from itertools import chain
 
-from pants.base.source_root import SourceRoot
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -57,10 +56,9 @@ class GoWorkspaceTaskTest(TaskTestBase):
 
   def test_symlink_local_src(self):
     with pushd(self.build_root):
-      SourceRoot.register('src/main/go')
       spec = 'src/main/go/foo/bar/mylib'
 
-      sources = ['x.go', 'y.go', 'z.go']
+      sources = ['x.go', 'y.go', 'z.go', 'z.c', 'z.h', 'w.png']
       for src in sources:
         self.create_file(os.path.join(spec, src))
 
@@ -97,11 +95,12 @@ class GoWorkspaceTaskTest(TaskTestBase):
   def test_symlink_remote_lib(self):
     with pushd(self.build_root):
       with temporary_dir() as d:
-        SourceRoot.register('3rdparty')
-        spec = '3rdparty/github.com/user/lib'
+        spec = '3rdparty/go/github.com/user/lib'
 
         remote_lib_src_dir = os.path.join(d, spec)
-        self.create_file(os.path.join(remote_lib_src_dir, 'file.go'))
+        remote_files = ['file.go', 'file.cc', 'file.hh']
+        for remote_file in remote_files:
+          self.create_file(os.path.join(remote_lib_src_dir, remote_file))
 
         go_remote_lib = self.make_target(spec=spec, target_type=GoRemoteLibrary)
 
@@ -117,5 +116,6 @@ class GoWorkspaceTaskTest(TaskTestBase):
         workspace_dir = os.path.join(gopath, 'src/github.com/user/lib')
         self.assertTrue(os.path.isdir(workspace_dir))
 
-        link = os.path.join(workspace_dir, 'file.go')
-        self.assertEqual(os.readlink(link), os.path.join(remote_lib_src_dir, 'file.go'))
+        for remote_file in remote_files:
+          link = os.path.join(workspace_dir, remote_file)
+          self.assertEqual(os.readlink(link), os.path.join(remote_lib_src_dir, remote_file))

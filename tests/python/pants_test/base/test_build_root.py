@@ -9,7 +9,7 @@ import os
 import unittest
 
 from pants.base.build_root import BuildRoot
-from pants.util.contextutil import environment_as, pushd, temporary_dir
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree, touch
 
 
@@ -23,10 +23,6 @@ class BuildRootTest(unittest.TestCase):
   def tearDown(self):
     BuildRoot().reset()
     safe_rmtree(self.new_root)
-
-  def test_via_env(self):
-    with environment_as(PANTS_BUILD_ROOT=self.new_root):
-      self.assertEqual(self.new_root, BuildRoot().path)
 
   def test_via_set(self):
     BuildRoot().path = self.new_root

@@ -1,0 +1,42 @@
+python_tests(
+  name='go_binary',
+  sources=['test_go_binary.py'],
+  dependencies=[
+    ':go_local_source_test_base',
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name='go_library',
+  sources=['test_go_library.py'],
+  dependencies=[
+    ':go_local_source_test_base',
+    'contrib/go/src/python/pants/contrib/go/targets:go_library',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_library(
+  name='go_local_source_test_base',
+  sources=['go_local_source_test_base.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
+    'contrib/go/src/python/pants/contrib/go:plugin',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:meta',
+    'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name='go_remote_library',
+  sources=['test_go_remote_library.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
+    'contrib/go/src/python/pants/contrib/go:plugin',
+    'src/python/pants/build_graph',
+    'tests/python/pants_test:base_test',
+  ]
+)

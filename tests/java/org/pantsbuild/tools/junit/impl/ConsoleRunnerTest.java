@@ -83,4 +83,10 @@ public class ConsoleRunnerTest extends ConsoleRunnerTestHelper{
     // as flaky - that is, it should be invoked only once.
     Assert.assertEquals(1, FlakyTest.numExpectedExceptionMethodInvocations);
   }
+
+  @Test
+  public void testTestCase() throws Exception {
+    ConsoleRunnerImpl.main(asArgsArray("SimpleTestCase"));
+    Assert.assertEquals("testDummy", TestRegistry.getCalledTests());
+  }
 }

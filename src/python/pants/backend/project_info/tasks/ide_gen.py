@@ -12,17 +12,16 @@ from collections import defaultdict
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
-from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
-from pants.backend.project_info.tasks.projectutils import get_jar_infos
-from pants.base.address import BuildFileAddress
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
 from pants.binaries import binary_util
+from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.resources import Resources
 from pants.util.dirutil import safe_mkdir, safe_walk
 
 
@@ -35,7 +34,6 @@ logger = logging.getLogger(__name__)
 # 2.) the target may be under development in which case it may not have sources yet - its pretty
 #     common to write a BUILD and ./pants idea the target inside to start development at which
 #     point there are no source files yet - and the developer intents to add them using the ide.
-
 def is_scala(target):
   return target.has_sources('.scala') or target.is_scala
 
@@ -44,7 +42,7 @@ def is_java(target):
   return target.has_sources('.java') or target.is_java
 
 
-class IdeGen(JvmToolTaskMixin, Task):
+class IdeGen(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def register_options(cls, register):
@@ -75,14 +73,9 @@ class IdeGen(JvmToolTaskMixin, Task):
              help='Includes scala sources in the project; otherwise compiles them and adds them '
                   'to the project classpath.')
     register('--use-source-root', action='store_true', default=False,
-             help='Use source_root() settings to collapse sourcepaths in project and determine '
+             help='Use source roots to collapse sourcepaths in project and determine '
                   'which paths are used for tests.  This is usually what you want if your repo '
                   ' uses a maven style directory layout.')
-    register('--infer-test-from-siblings', action='store_true',
-             help='When determining if a path should be added to the IDE, check to see if any of '
-                  'its sibling source_root() entries define test targets.  This is usually what '
-                  'you want so that resource directories under test source roots are picked up as '
-                  'test paths.')
     register('--debug_port', type=int, default=5005,
              help='Port to use for launching tasks under the debugger.')
     register('--source-jars', action='store_true', default=True,
@@ -111,15 +104,6 @@ class IdeGen(JvmToolTaskMixin, Task):
       round_manager.require('java')
     if options.scala:
       round_manager.require('scala')
-    # TODO(Garrett Malmquist): Clean this up by using IvyUtils in the caller, passing it confs as
-    # the parameter. See John's comments on RB 716.
-    round_manager.require_data('ivy_jar_products')
-    round_manager.require('jar_dependencies')
-    round_manager.require('jar_map_default')
-    if options.source_jars:
-      round_manager.require('jar_map_sources')
-    if options.javadoc_jars:
-      round_manager.require('jar_map_javadoc')
 
   class Error(TaskError):
     """IdeGen Error."""
@@ -172,6 +156,21 @@ class IdeGen(JvmToolTaskMixin, Task):
     self.intransitive = self.get_options().intransitive
     self.debug_port = self.get_options().debug_port
 
+  def resolve_jars(self, targets):
+    executor = self.create_java_executor()
+    confs = ['default']
+    if self.get_options().source_jars:
+      confs.append('sources')
+    if self.get_options().javadoc_jars:
+      confs.append('javadoc')
+    compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
+    self.resolve(executor=executor,
+                 targets=targets,
+                 classpath_products=compile_classpath,
+                 confs=confs,
+                 extra_args=())
+    return compile_classpath
+
   def _prepare_project(self):
     targets, self._project = self.configure_project(
         self.context.targets(),
@@ -191,6 +190,7 @@ class IdeGen(JvmToolTaskMixin, Task):
                       self.use_source_root,
                       get_buildroot(),
                       debug_port,
+                      self.context,
                       jvm_targets,
                       not self.intransitive,
                       self.TargetUtil(self.context),
@@ -232,7 +232,7 @@ class IdeGen(JvmToolTaskMixin, Task):
       if target.is_jvm:
         if target.excludes:
           excludes.update(target.excludes)
-        jars.update(jar for jar in target.jar_dependencies if jar.rev)
+        jars.update(jar for jar in target.jar_dependencies)
         if is_cp(target):
           target.walk(compiles.add)
 
@@ -282,16 +282,7 @@ class IdeGen(JvmToolTaskMixin, Task):
 
           self._project.internal_jars.add(ClasspathEntry(cp_jar, source_jar=cp_source_jar))
 
-  @staticmethod
-  def copy_jar(jar, dest_dir):
-    if jar:
-      cp_jar = os.path.join(dest_dir, os.path.basename(jar))
-      shutil.copy(jar, cp_jar)
-      return cp_jar
-    else:
-      return None
-
-  def map_external_jars(self):
+  def map_external_jars(self, targets):
     external_jar_dir = os.path.join(self.gen_project_workdir, 'external-libs')
     safe_mkdir(external_jar_dir, clean=True)
 
@@ -300,24 +291,44 @@ class IdeGen(JvmToolTaskMixin, Task):
 
     external_javadoc_jar_dir = os.path.join(self.gen_project_workdir, 'external-libjavadoc')
     safe_mkdir(external_javadoc_jar_dir, clean=True)
-    jar_products = self.context.products.get_data('ivy_jar_products')
-    jar_paths = get_jar_infos(jar_products)
-    for entry in jar_paths.values():
-      binary_jar  = self.copy_jar(entry.get('default'), external_jar_dir)
-      sources_jar = self.copy_jar(entry.get('sources'), external_source_jar_dir)
-      javadoc_jar = self.copy_jar(entry.get('javadoc'), external_javadoc_jar_dir)
-      if binary_jar:
-        self._project.external_jars.add(ClasspathEntry(jar=binary_jar,
+
+    classpath_products = self.resolve_jars(targets) or ClasspathProducts(self.get_options().pants_workdir)
+    cp_entry_by_classifier_by_orgname = defaultdict(lambda: defaultdict(dict))
+    for conf, jar_entry in classpath_products.get_artifact_classpath_entries_for_targets(targets):
+      coord = (jar_entry.coordinate.org, jar_entry.coordinate.name)
+      classifier = jar_entry.coordinate.classifier
+      cp_entry_by_classifier_by_orgname[coord][classifier] = jar_entry
+
+    def copy_jar(cp_entry, dest_dir):
+      if not cp_entry:
+        return None
+      cp_jar = os.path.join(dest_dir, os.path.basename(cp_entry.path))
+      shutil.copy(cp_entry.path, cp_jar)
+      return cp_jar
+
+    # Per org.name (aka maven "project"), collect the primary artifact and any extra classified
+    # artifacts, taking special note of 'sources' and 'javadoc' artifacts that IDEs handle specially
+    # to provide source browsing and javadocs for 3rdparty libs.
+    for cp_entry_by_classifier in cp_entry_by_classifier_by_orgname.values():
+      primary_jar = copy_jar(cp_entry_by_classifier.pop(None, None), external_jar_dir)
+      sources_jar = copy_jar(cp_entry_by_classifier.pop('sources', None), external_source_jar_dir)
+      javadoc_jar = copy_jar(cp_entry_by_classifier.pop('javadoc', None), external_javadoc_jar_dir)
+      if primary_jar:
+        self._project.external_jars.add(ClasspathEntry(jar=primary_jar,
                                                        source_jar=sources_jar,
                                                        javadoc_jar=javadoc_jar))
-      # treat all other jars as binaries
-      for classifier, jar in entry.iteritems():
-        if classifier not in {'default', 'sources', 'javadoc'}:
-          binary_jar  = self.copy_jar(jar, external_jar_dir)
-          self._project.external_jars.add(ClasspathEntry(binary_jar))
+
+      # Treat all other jars as opaque with no source or javadoc attachments of their own.  An
+      # example are jars with the 'tests' classifier.
+      for jar_entry in cp_entry_by_classifier.values():
+        extra_jar = copy_jar(jar_entry, external_jar_dir)
+        self._project.external_jars.add(ClasspathEntry(extra_jar))
 
   def execute(self):
     """Stages IDE project artifacts to a project directory and generates IDE configuration files."""
+    # Grab the targets in-play before the context is replaced by `self._prepare_project()` below.
+    targets = self.context.targets()
+
     self._prepare_project()
 
     if self.context.options.is_known_scope('compile.checkstyle'):
@@ -331,9 +342,8 @@ class IdeGen(JvmToolTaskMixin, Task):
       scalac_classpath = self.tool_classpath('scalac', scope='scala-platform')
 
     self._project.set_tool_classpaths(checkstyle_classpath, scalac_classpath)
-    targets = self.context.targets()
     self.map_internal_jars(targets)
-    self.map_external_jars()
+    self.map_external_jars(targets)
 
     idefile = self.generate_project(self._project)
     if idefile:
@@ -416,7 +426,7 @@ class Project(object):
         yield ext
 
   @staticmethod
-  def _collapse_by_source_root(source_sets):
+  def _collapse_by_source_root(source_roots, source_sets):
     """Collapse SourceSets with common source roots into one SourceSet instance.
 
     Use the registered source roots to collapse all source paths under a root.
@@ -430,20 +440,20 @@ class Project(object):
     collapsed_source_sets = []
     for source in source_sets:
       query = os.path.join(source.source_base, source.path)
-      source_root = SourceRoot.find_by_path(query)
+      source_root = source_roots.find_by_path(query)
       if not source_root:
         collapsed_source_sets.append(source)
       else:
-        collapsed_source_sets.append(SourceSet(source.root_dir, source_root, "",
+        collapsed_source_sets.append(SourceSet(source.root_dir, source_root.path, "",
                                                is_test=source.is_test,
                                                resources_only=source.resources_only))
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               debug_port, targets, transitive, target_util, spec_excludes):
+               debug_port, context, targets, transitive, target_util, spec_excludes):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
-
+    self.context = context
     self.target_util = target_util
     self.name = name
     self.root_dir = root_dir
@@ -468,10 +478,10 @@ class Project(object):
     self.external_jars = OrderedSet()
     self.spec_excludes = spec_excludes
 
-  def configure_python(self, source_roots, test_roots, lib_roots):
-    self.py_sources.extend(SourceSet(get_buildroot(), root, None) for root in source_roots)
-    self.py_sources.extend(SourceSet(get_buildroot(), root, None, is_test=True) for root in test_roots)
-    for root in lib_roots:
+  def configure_python(self, source_paths, test_paths, lib_paths):
+    self.py_sources.extend(SourceSet(get_buildroot(), root, None) for root in source_paths)
+    self.py_sources.extend(SourceSet(get_buildroot(), root, None, is_test=True) for root in test_paths)
+    for root in lib_paths:
       for path in os.listdir(os.path.join(get_buildroot(), root)):
         if os.path.isdir(os.path.join(get_buildroot(), root, path)) or path.endswith('.egg'):
           self.py_libs.append(SourceSet(get_buildroot(), root, path, is_test=False))
@@ -665,7 +675,7 @@ class Project(object):
     self.sources.extend(SourceSet(get_buildroot(), p, None, is_test=False) for p in extra_source_paths)
     self.sources.extend(SourceSet(get_buildroot(), p, None, is_test=True) for p in extra_test_paths)
     if self.use_source_root:
-      self.sources = Project._collapse_by_source_root(self.sources)
+      self.sources = Project._collapse_by_source_root(self.context.source_roots, self.sources)
     self.sources = self.dedup_sources(self.sources)
 
     return targets

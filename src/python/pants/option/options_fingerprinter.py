@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 from hashlib import sha1
 
-from pants.option.custom_types import file_option, target_list_option
+from pants.option.custom_types import file_option, target_list_option, target_option
 
 
 def stable_json_dumps(obj):
@@ -35,6 +35,8 @@ class OptionsFingerprinter(object):
 
     if option_type == target_list_option:
       return self._fingerprint_target_specs(option_val)
+    elif option_type == target_option:
+      return self._fingerprint_target_specs([option_val])
     elif option_type == file_option:
       return self._fingerprint_file(option_val)
     else:

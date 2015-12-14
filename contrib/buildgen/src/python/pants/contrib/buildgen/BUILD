@@ -21,6 +21,6 @@ python_library(
   name = 'build_file_manipulator',
   sources = ['build_file_manipulator.py'],
   dependencies = [
-    'src/python/pants/base:address',
+    'src/python/pants/build_graph',
   ]
 )

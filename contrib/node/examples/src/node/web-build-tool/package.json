@@ -1,0 +1,6 @@
+{
+  "name": "web-build-tool",
+  "version": "1.2.3",
+  "main": "./webpack.config.base.js",
+  "bin": "./web-build-tool"
+}

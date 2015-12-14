@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import six
 
-from pants.base.address import Addresses
+from pants.build_graph.address import Addresses
 
 
 class FromTarget(object):

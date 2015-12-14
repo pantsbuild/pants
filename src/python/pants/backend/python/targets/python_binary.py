@@ -16,7 +16,7 @@ from pants.base.exceptions import TargetDefinitionException
 
 
 class PythonBinary(PythonTarget):
-  """Produces a Python binary.
+  """A Python binary.
 
   Python binaries are pex files, self-contained executable shell
   scripts that contain a complete Python environment capable of

@@ -6,16 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import atexit
+import errno
 import os
 import tempfile
 import unittest
 
+import mock
 import mox
+import six
 
 from pants.util import dirutil
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir,
-                                relative_symlink, relativize_paths, safe_mkdir)
+                                relative_symlink, relativize_paths, rm_rf, safe_mkdir, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -29,12 +32,18 @@ class DirutilTest(unittest.TestCase):
     self._mox.UnsetStubs()
 
   def test_fast_relpath(self):
-    def assertRelpathC(path, start):
-      self.assertEquals('c', fast_relpath(path, start))
-    assertRelpathC('/a/b/c', '/a/b')
-    assertRelpathC('/a/b/c', '/a/b/')
-    assertRelpathC('b/c', 'b')
-    assertRelpathC('b/c', 'b/')
+    def assertRelpath(expected, path, start):
+      self.assertEquals(expected, fast_relpath(path, start))
+    assertRelpath('c', '/a/b/c', '/a/b')
+    assertRelpath('c', '/a/b/c', '/a/b/')
+    assertRelpath('c', 'b/c', 'b')
+    assertRelpath('c', 'b/c', 'b/')
+    assertRelpath('c/', 'b/c/', 'b')
+    assertRelpath('c/', 'b/c/', 'b/')
+    assertRelpath('', 'c/', 'c/')
+    assertRelpath('', 'c', 'c')
+    assertRelpath('c/', 'c/', '')
+    assertRelpath('c', 'c', '')
 
   def test_fast_relpath_invalid(self):
     with self.assertRaises(ValueError):
@@ -77,12 +86,15 @@ class DirutilTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def test_safe_walk(self):
+    """Test that directory names are correctly represented as unicode strings"""
+    # This test is unnecessary in python 3 since all strings are unicode there is no
+    # unicode constructor.
     with temporary_dir() as tmpdir:
       safe_mkdir(os.path.join(tmpdir, '中文'))
-      if isinstance(tmpdir, unicode):
+      if isinstance(tmpdir, six.text_type):
         tmpdir = tmpdir.encode('utf-8')
       for _, dirs, _ in dirutil.safe_walk(tmpdir):
-        self.assertTrue(all(isinstance(dirname, unicode) for dirname in dirs))
+        self.assertTrue(all(isinstance(dirname, six.text_type) for dirname in dirs))
 
   def test_relativize_paths(self):
     build_root = '/build-root'
@@ -146,3 +158,36 @@ class DirutilTest(unittest.TestCase):
     self.assertEquals(get_basedir('foo/bar/baz'), 'foo')
     self.assertEquals(get_basedir('/foo/bar/baz'), '')
     self.assertEquals(get_basedir('foo'), 'foo')
+
+  def test_rm_rf_file(self, file_name='./foo'):
+    with temporary_dir() as td, pushd(td):
+      touch(file_name)
+      self.assertTrue(os.path.isfile(file_name))
+      rm_rf(file_name)
+      self.assertFalse(os.path.exists(file_name))
+
+  def test_rm_rf_dir(self, dir_name='./bar'):
+    with temporary_dir() as td, pushd(td):
+      safe_mkdir(dir_name)
+      self.assertTrue(os.path.isdir(dir_name))
+      rm_rf(dir_name)
+      self.assertFalse(os.path.exists(dir_name))
+
+  def test_rm_rf_nonexistent(self, file_name='./non_existent_file'):
+    with temporary_dir() as td, pushd(td):
+      rm_rf(file_name)
+
+  def test_rm_rf_permission_error_raises(self, file_name='./perm_guarded_file'):
+    with temporary_dir() as td, pushd(td), \
+         mock.patch('pants.util.dirutil.shutil.rmtree') as mock_rmtree, \
+         self.assertRaises(OSError):
+      mock_rmtree.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
+      touch(file_name)
+      rm_rf(file_name)
+
+  def test_rm_rf_no_such_file_not_an_error(self, file_name='./vanishing_file'):
+    with temporary_dir() as td, pushd(td), \
+         mock.patch('pants.util.dirutil.shutil.rmtree') as mock_rmtree:
+      mock_rmtree.side_effect = OSError(errno.ENOENT, os.strerror(errno.ENOENT))
+      touch(file_name)
+      rm_rf(file_name)

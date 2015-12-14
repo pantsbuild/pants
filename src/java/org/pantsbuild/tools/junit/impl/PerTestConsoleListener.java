@@ -22,7 +22,7 @@ class PerTestConsoleListener extends ConsoleListener {
 
   @Override
   public void testRunStarted(Description description) throws Exception {
-    String displayName = description.getDisplayName();
+    String displayName = Util.getPantsFriendlyDisplayName(description);
     if (displayName != "null") {
       out.println(displayName);
     }
@@ -30,7 +30,7 @@ class PerTestConsoleListener extends ConsoleListener {
 
   @Override
   public void testStarted(Description description) {
-    out.print("\t" + description.getDisplayName());
+    out.print("\t" + Util.getPantsFriendlyDisplayName(description));
   }
 
   @Override

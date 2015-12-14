@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
-from pants.base.address import Address
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.address import Address
 
 
 class ScalaLibrary(ExportableJvmLibrary):
-  """A collection of Scala code.
+  """A Scala library.
 
   Normally has conceptually-related sources; invoking the ``compile`` goal
   on this target compiles scala and generates classes. Invoking the ``bundle``

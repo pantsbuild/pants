@@ -27,12 +27,10 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     expected_patterns = [
-      '/gen/wire/{subdir}/org/pantsbuild/example/temperature/Temperature.java'.format(
-          subdir=r'((global)|(isolated/[a-zA-Z0-9._-]+))'),
+      '/gen/wire/[^/]*/[^/]*/org/pantsbuild/example/temperature/Temperature.java',
     ]
     expected_outputs = [
       'Compiling proto source file',
-      'Created output directory',
       'Writing generated code',
     ]
     for expected_output in expected_outputs:
@@ -42,23 +40,22 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                       '{0}'.format(pattern))
 
   def test_bundle_wire_normal(self):
-    pants_run = self.run_pants(['bundle',
+    pants_run = self.run_pants(['bundle.jvm',
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/wire/temperatureservice'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-temperature-example-bundle')
 
-    java_run = subprocess.Popen(['java', '-cp', 'wire-temperature-example.jar',
-                                 'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample'],
-                                stdout=subprocess.PIPE,
-                                cwd=out_path)
+    args = ['java', '-cp', 'wire-temperature-example.jar',
+            'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample']
+    java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)
     java_retcode = java_run.wait()
     java_out = java_run.stdout.read()
     self.assertEquals(java_retcode, 0)
     self.assertIn('19 degrees celsius', java_out)
 
   def test_bundle_wire_dependent_targets(self):
-    pants_run = self.run_pants(['bundle',
+    pants_run = self.run_pants(['bundle.jvm',
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/wire/element'])
     self.assert_success(pants_run)
@@ -79,7 +76,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                   'atomic_number=1}}', java_out)
 
   def test_compile_wire_roots(self):
-    pants_run = self.run_pants(['bundle', '--deployjar',
+    pants_run = self.run_pants(['bundle.jvm', '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/wire/roots'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-roots-example.jar')

@@ -2,14 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'all',
+  name = 'resolve_jars_test_mixin',
+  sources = ['resolve_jars_test_mixin.py'],
   dependencies = [
-    ':dependencies',
-    ':depmap',
-    ':export',
-    ':filedeps',
-    ':ide_gen',
-    ':idea_gen',
+    'src/python/pants/util:contextutil',
   ],
 )
 
@@ -17,12 +13,12 @@ python_tests(
   name = 'dependencies',
   sources = ['test_dependencies.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/project_info/tasks:dependencies',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -47,6 +43,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -56,41 +53,43 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/core:plugin',
-    'src/python/pants/backend/core:wrapped_globs',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:export',
-    'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:parse_context',
-    'src/python/pants/base:source_root',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
-
 python_tests(
   name = 'export_integration',
   sources = ['test_export_integration.py'],
   dependencies = [
+    ':resolve_jars_test_mixin',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/ivy',
+    'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -111,22 +110,9 @@ python_tests(
   sources = ['test_ide_gen.py'],
   dependencies = [
     'src/python/pants/backend/project_info/tasks:ide_gen',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/base:source_root',
+    'src/python/pants/source',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'idea_gen',
-  sources = ['test_idea_gen.py'],
-  dependencies = [
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/project_info/tasks:ide_gen',
-    'src/python/pants/backend/project_info/tasks:idea_gen',
-    'src/python/pants/base:source_root',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
@@ -134,9 +120,10 @@ python_tests(
   name = 'idea_integration',
   sources = ['test_idea_integration.py'],
   dependencies = [
+    ':resolve_jars_test_mixin',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
-

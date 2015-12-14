@@ -9,7 +9,6 @@ import os
 import re
 import unittest
 
-from pants.util.contextutil import temporary_dir
 from pants_test.android.android_integration_test import AndroidIntegrationTest
 
 
@@ -43,7 +42,7 @@ class AaptBuilderIntegrationTest(AndroidIntegrationTest):
                                      'and ANDROID_HOME set in path.'.format(TOOLS))
   def test_android_library_products(self):
     # Doing the work under a tempdir gives us a handle for the workdir and guarantees a clean build.
-    with temporary_dir(root_dir=self.workdir_root()) as workdir:
+    with self.temporary_workdir() as workdir:
       spec = 'examples/src/android/hello_with_library:'
       pants_run = self.run_pants_with_workdir(['apk', '-ldebug', spec], workdir)
       self.assert_success(pants_run)

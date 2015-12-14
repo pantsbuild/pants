@@ -13,9 +13,9 @@ from collections import namedtuple
 
 from six.moves import range
 
-from pants.rwbuf.read_write_buffer import FileBackedRWBuf
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_method
+from pants.util.rwbuf import FileBackedRWBuf
 
 
 class WorkUnitLabel(object):
@@ -75,9 +75,6 @@ class WorkUnit(object):
   def outcome_string(outcome):
     """Returns a human-readable string describing the outcome."""
     return ['ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN'][outcome]
-
-
-
 
   def __init__(self, run_info_dir, parent, name, labels=None, cmd='', log_config=None):
     """
@@ -183,10 +180,12 @@ class WorkUnit(object):
     """Returns the time (in fractional seconds) spent in this workunit and its children."""
     return (self.end_time or time.time()) - self.start_time
 
+  @property
   def start_time_string(self):
     """A convenient string representation of start_time."""
     return time.strftime('%H:%M:%S', time.localtime(self.start_time))
 
+  @property
   def start_delta_string(self):
     """A convenient string representation of how long after the run started we started."""
     delta = int(self.start_time) - int(self.root().start_time)

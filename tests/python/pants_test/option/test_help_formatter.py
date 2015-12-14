@@ -12,17 +12,26 @@ from pants.help.help_info_extracter import OptionHelpInfo
 
 
 class OptionHelpFormatterTest(unittest.TestCase):
-  def test_format_help(self):
+  def format_help_for_foo(self, **kwargs):
     ohi = OptionHelpInfo(registering_class=type(None), display_args=['--foo'],
                          scoped_cmd_line_args=['--foo'], unscoped_cmd_line_args=['--foo'],
-                         type=bool, default='MYDEFAULT', help='help for foo',
-                         deprecated_version=None, deprecated_message=None, deprecated_hint=None)
-
+                         typ=bool, fromfile=False, default=None, help='help for foo',
+                         deprecated_version=None, deprecated_message=None, deprecated_hint=None,
+                         choices=None)
+    ohi = ohi._replace(**kwargs)
     lines = HelpFormatter(scope='', show_recursive=False, show_advanced=False,
                           color=False).format_option(ohi)
     self.assertEquals(len(lines), 2)
-    self.assertEquals('--foo (default: MYDEFAULT)', lines[0])
     self.assertIn('help for foo', lines[1])
+    return lines[0]
+
+  def test_format_help(self):
+    line = self.format_help_for_foo(default='MYDEFAULT')
+    self.assertEquals('--foo (default: MYDEFAULT)', line)
+
+  def test_format_help_fromfile(self):
+    line = self.format_help_for_foo(fromfile=True)
+    self.assertEquals('--foo (@fromfile value supported) (default: None)', line)
 
   def test_suppress_advanced(self):
     args = ['--foo']
@@ -34,3 +43,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
                           color=False).format_options('', '', [(args, kwargs)])
     print(lines)
     self.assertEquals(5, len(lines))
+
+  def test_format_help_choices(self):
+    line = self.format_help_for_foo(typ=str, default='kiwi', choices='apple, banana, kiwi')
+    self.assertEquals('--foo (one of: [apple, banana, kiwi] default: kiwi)', line)

@@ -11,7 +11,7 @@ scala_library(name='welcome',
   resources = [
     'examples/src/resources/org/pantsbuild/example/hello',
   ],
-  provides = artifact(org='org.pantsbuild.example.hello',
-                      name='welcome',
-                      repo=public,),
+  provides = scala_artifact(org='org.pantsbuild.example.hello',
+                            name='welcome',
+                            repo=public,),
 )

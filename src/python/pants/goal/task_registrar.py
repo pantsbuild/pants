@@ -53,12 +53,14 @@ class TaskRegistrar(object):
     """Install the task in the specified goal (or a new goal with the same name as the task).
 
     The placement of the task in the execution list of the goal defaults to the end but can be
+    :rtype : object
     influence by specifying exactly one of the following arguments:
 
     :param first: Places this task 1st in the goal's execution list.
     :param replace: Replaces any existing tasks in the goal with this goal.
     :param before: Places this task before the named task in the goal's execution list.
     :param after: Places this task after the named task in the goal's execution list.
+    :returns: The goal with task installed.
     """
     goal = Goal.by_name(goal or self.name)
     goal.install(self, first, replace, before, after)

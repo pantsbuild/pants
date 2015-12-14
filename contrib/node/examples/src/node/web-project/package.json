@@ -1,0 +1,7 @@
+{
+  "scripts": {
+    "build": "web-build-tool",
+    "pretest": "NODE_ENV=test web-build-tool",
+    "test": "mocha ./dist/unit.js"
+  }
+}

@@ -258,7 +258,7 @@ public final class Main {
         handler = PatternOptionHandler.class)
     private List<Pattern> skip = Lists.newArrayList();
 
-    private static final String ACTIONS = "SKIP|REPLACE|CONCAT|THROW";
+    private static final String ACTIONS = "SKIP|REPLACE|CONCAT|CONCAT_TEXT|THROW";
 
     @Option(name = "-default_action",
         usage = "The default duplicate action to apply if no policies match. Can be any of "
@@ -268,8 +268,8 @@ public final class Main {
     @Option(name = "-policies",
         usage = "A list of duplicate policies to apply. Policies are specified as "
             + "[regex]=[action], and the action can be any one of " + ACTIONS + ". For example: "
-            + "^META-INF/services/=CONCAT would concatenate duplicate service files into one large "
-            + "service file.",
+            + "^META-INF/services/=CONCAT_TEXT would concatenate duplicate service files into one "
+            + "large service file.",
         handler = DuplicatePolicyParser.class)
     private List<DuplicatePolicy> policies = Lists.newArrayList();
 

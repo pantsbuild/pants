@@ -10,17 +10,17 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.task import Task
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
-from pants.base.build_graph import sort_targets
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_graph import sort_targets
 from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import list_option
+from pants.task.task import Task
 
 
 class JvmDependencyCheck(JvmDependencyAnalyzer):
@@ -29,7 +29,7 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
   @classmethod
   def register_options(cls, register):
     super(JvmDependencyCheck, cls).register_options(register)
-    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='warn',
+    register('--missing-deps', choices=['off', 'warn', 'fatal'], default='off',
              fingerprint=True,
              help='Check for missing dependencies in compiled code. Reports actual '
                   'dependencies A -> B where there is no transitive BUILD file dependency path '
@@ -69,19 +69,24 @@ class JvmDependencyCheck(JvmDependencyAnalyzer):
     self._check_unnecessary_deps = munge_flag('unnecessary_deps')
     self._target_whitelist = self.get_options().missing_deps_whitelist
 
+  @classmethod
+  def skip(cls, options):
+    values = [options.missing_deps, options.missing_direct_deps, options.unnecessary_deps]
+    return all(v == 'off' for v in values)
+
   @property
   def cache_target_dirs(self):
     return True
 
   def execute(self):
-    if self.get_options().skip:
+    if self.skip(self.get_options()):
       return
     with self.invalidated(self.context.targets(),
                           invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.invalid_vts:
-        actual_source_deps = self.context.products.get_data('actual_source_deps').get(vt.target)
-        if actual_source_deps is not None:
-          self.check(vt.target, actual_source_deps)
+        product_deps_by_src = self.context.products.get_data('product_deps_by_src').get(vt.target)
+        if product_deps_by_src is not None:
+          self.check(vt.target, product_deps_by_src)
 
   def check(self, src_tgt, actual_deps):
     """Check for missing deps.

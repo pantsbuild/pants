@@ -34,12 +34,13 @@ class HelpFormatter(object):
   def _maybe_color(self, color, s):
     return color(s) if self._color else s
 
-  def format_options(self, scope, description, registration_args):
+  def format_options(self, scope, description, option_registrations_iter):
     """Return a help message for the specified options.
 
-    :param registration_args: A list of (args, kwargs) pairs, as passed in to options registration.
+    :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
+                                      options registration.
     """
-    oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(registration_args)
+    oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
     lines = []
     def add_option(category, ohis):
       if ohis:
@@ -62,9 +63,19 @@ class HelpFormatter(object):
     return lines
 
   def format_option(self, ohi):
+    """Format the help output for a single option.
+
+    :param OptionHelpInfo ohi: Extracted information for option to print
+    :return: Formatted help text for this option
+    :rtype: list of string
+    """
     lines = []
-    arg_line = '{args} {dflt}'.format(args=self._maybe_cyan(', '.join(ohi.display_args)),
-                                      dflt=self._maybe_green('(default: {})'.format(ohi.default)))
+    choices = 'one of: [{}] '.format(ohi.choices) if ohi.choices else ''
+    arg_line = ('{args} {fromfile}{dflt}'
+                .format(args=self._maybe_cyan(', '.join(ohi.display_args)),
+                        dflt=self._maybe_green('({}default: {})'.format(choices, ohi.default)),
+                        fromfile=self._maybe_green('(@fromfile value supported) ' if ohi.fromfile
+                                                   else '')))
     lines.append(arg_line)
 
     indent = '    '

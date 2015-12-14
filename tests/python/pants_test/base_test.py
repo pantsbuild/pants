@@ -5,30 +5,28 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
 import unittest
 from collections import defaultdict
-from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.base.address import Address
-from pants.base.build_configuration import BuildConfiguration
 from pants.base.build_file import FilesystemBuildFile
-from pants.base.build_file_address_mapper import BuildFileAddressMapper
-from pants.base.build_file_aliases import BuildFileAliases
-from pants.base.build_file_parser import BuildFileParser
-from pants.base.build_graph import BuildGraph
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.source_root import SourceRoot
-from pants.base.target import Target
+from pants.build_graph.address import Address
+from pants.build_graph.build_configuration import BuildConfiguration
+from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_parser import BuildFileParser
+from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.target import Target
 from pants.goal.goal import Goal
-from pants.goal.products import MultipleRootedProducts, UnionProducts
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree, touch
+from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context
 from pants_test.option.util.fakes import create_options_for_optionables
 
@@ -54,6 +52,15 @@ class BaseTest(unittest.TestCase):
     safe_mkdir(path)
     return path
 
+  def create_workdir_dir(self, relpath):
+    """Creates a directory under the work directory.
+
+    relpath: The relative path to the directory from the work directory.
+    """
+    path = os.path.join(self.pants_workdir, relpath)
+    safe_mkdir(path)
+    return path
+
   def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
 
@@ -62,6 +69,18 @@ class BaseTest(unittest.TestCase):
     mode:     The mode to write to the file in - over-write by default.
     """
     path = os.path.join(self.build_root, relpath)
+    with safe_open(path, mode=mode) as fp:
+      fp.write(contents)
+    return path
+
+  def create_workdir_file(self, relpath, contents='', mode='wb'):
+    """Writes to a file under the work directory.
+
+    relpath:  The relative path to the file from the work directory.
+    contents: A string containing the contents of the file - '' by default..
+    mode:     The mode to write to the file in - over-write by default.
+    """
+    path = os.path.join(self.pants_workdir, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
     return path
@@ -88,7 +107,7 @@ class BaseTest(unittest.TestCase):
     :param type target_type: The concrete target subclass to create this new target from.
     :param list dependencies: A list of target instances this new target depends on.
     :param derived_from: The target this new target was derived from.
-    :type derived_from: :class:`pants.base.target.Target`
+    :type derived_from: :class:`pants.build_graph.target.Target`
     """
     address = Address.parse(spec)
     target = target_type(name=address.target_name,
@@ -120,12 +139,7 @@ class BaseTest(unittest.TestCase):
 
   @property
   def alias_groups(self):
-    # NB: In a normal pants deployment, 'target' is an alias for
-    # `pants.backend.core.targets.dependencies.Dependencies`.  We avoid that dependency on the core
-    # backend here since the `BaseTest` is used by lower level tests in base and since the
-    # `Dependencies` type itself is nothing more than an alias for Target that carries along a
-    # pydoc for the BUILD dictionary.
-    return BuildFileAliases.create(targets={'target': Target})
+    return BuildFileAliases(targets={'target': Target})
 
   def setUp(self):
     super(BaseTest, self).setUp()
@@ -181,10 +195,12 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, target_roots=None, console_outstream=None,
-              workspace=None, for_subsystems=None):
+  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
+              console_outstream=None, workspace=None, for_subsystems=None):
 
-    optionables = set()
+    # Many tests use source root functionality via the SourceRootConfig.global_instance()
+    # (typically accessed via Target.target_base), so we always set it up, for convenience.
+    optionables = {SourceRootConfig}
     extra_scopes = set()
 
     for_subsystems = for_subsystems or ()
@@ -211,22 +227,22 @@ class BaseTest(unittest.TestCase):
       scoped_opts = options.setdefault(s, {})
       scoped_opts.update(opts)
 
-    option_values = create_options_for_optionables(optionables,
-                                                   extra_scopes=extra_scopes,
-                                                   options=options)
-
-    context = create_context(options=option_values,
+    options = create_options_for_optionables(optionables,
+                                             extra_scopes=extra_scopes,
+                                             options=options)
+    Subsystem._options = options
+    context = create_context(options=options,
+                             passthru_args=passthru_args,
                              target_roots=target_roots,
                              build_graph=self.build_graph,
                              build_file_parser=self.build_file_parser,
                              address_mapper=self.address_mapper,
                              console_outstream=console_outstream,
                              workspace=workspace)
-    Subsystem._options = context.options
     return context
 
   def tearDown(self):
-    SourceRoot.reset()
+    super(BaseTest, self).tearDown()
     FilesystemBuildFile.clear_cache()
     Subsystem.reset()
 
@@ -307,49 +323,11 @@ class BaseTest(unittest.TestCase):
   def create_resources(self, path, name, *sources):
     return self.create_library(path, 'resources', name, sources)
 
-  @contextmanager
-  def workspace(self, *buildfiles):
-    with temporary_dir() as root_dir:
-      with BuildRoot().temporary(root_dir):
-        with pushd(root_dir):
-          for buildfile in buildfiles:
-            touch(os.path.join(root_dir, buildfile))
-          yield os.path.realpath(root_dir)
+  def assertUnorderedPrefixEqual(self, expected, actual_iter):
+    """Consumes len(expected) items from the given iter, and asserts that they match, unordered."""
+    actual = list(itertools.islice(actual_iter, len(expected)))
+    self.assertEqual(sorted(expected), sorted(actual))
 
-  def populate_compile_classpath(self, context, classpath=None):
-    """
-    Helps actual test cases to populate the 'compile_classpath' products data mapping
-    in the context, which holds the classpath value for targets.
-
-    :param context: The execution context where the products data mapping lives.
-    :param classpath: a list of classpath strings. If not specified,
-                      [os.path.join(self.buildroot, 'none')] will be used.
-    """
-    classpath = classpath or [os.path.join(self.build_root, 'none')]
-    compile_classpaths = context.products.get_data('compile_classpath', lambda: UnionProducts())
-    compile_classpaths.add_for_targets(context.targets(),
-                                       [('default', entry) for entry in classpath])
-
-  @contextmanager
-  def add_data(self, context_products, data_type, target, *products):
-    make_products = lambda: defaultdict(MultipleRootedProducts)
-    data_by_target = context_products.get_data(data_type, make_products)
-    with temporary_dir() as outdir:
-      def create_product(product):
-        abspath = os.path.join(outdir, product)
-        with safe_open(abspath, mode='w') as fp:
-          fp.write(product)
-        return abspath
-      data_by_target[target].add_abs_paths(outdir, map(create_product, products))
-      yield temporary_dir
-
-  @contextmanager
-  def add_products(self, context_products, product_type, target, *products):
-    product_mapping = context_products.get(product_type)
-    with temporary_dir() as outdir:
-      def create_product(product):
-        with safe_open(os.path.join(outdir, product), mode='w') as fp:
-          fp.write(product)
-        return product
-      product_mapping.add(target, outdir, map(create_product, products))
-      yield temporary_dir
+  def assertPrefixEqual(self, expected, actual_iter):
+    """Consumes len(expected) items from the given iter, and asserts that they match, in order."""
+    self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))

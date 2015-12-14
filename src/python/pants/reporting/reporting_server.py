@@ -17,6 +17,7 @@ import urllib
 import urlparse
 from collections import namedtuple
 from datetime import date, datetime
+from textwrap import dedent
 
 import pystache
 from six.moves import range
@@ -25,6 +26,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.mustache import MustacheRenderer
 from pants.base.run_info import RunInfo
 from pants.pantsd.process_manager import ProcessManager
+from pants.stats.statsdb import StatsDBFactory
 
 
 logger = logging.getLogger(__name__)
@@ -45,12 +47,18 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     self._GET_handlers = [
       ('/runs/', self._handle_runs),  # Show list of known pants runs.
       ('/run/', self._handle_run),  # Show a report for a single pants run.
+      ('/stats/', self._handle_stats),  # Show a stats analytics page.
+      ('/statsdata/', self._handle_statsdata),  # Get JSON stats data.
       ('/browse/', self._handle_browse),  # Browse filesystem under build root.
       ('/content/', self._handle_content),  # Show content of file.
       ('/assets/', self._handle_assets),  # Statically serve assets (css, js etc.)
       ('/poll', self._handle_poll),  # Handle poll requests for raw file content.
-      ('/latestrunid', self._handle_latest_runid)  # Return id of latest pants run.
+      ('/latestrunid', self._handle_latest_runid),  # Return id of latest pants run.
+      ('/favicon.ico', self._handle_favicon)  # Return favicon.
     ]
+    # Note: BaseHTTPServer.BaseHTTPRequestHandler is an old-style class, so we must
+    # invoke its __init__ like this.
+    # TODO: Replace this entirely with a proper server as part of the pants daemon.
     BaseHTTPServer.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
 
   def do_GET(self):
@@ -70,7 +78,7 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self._handle_runs('', {})
         return
 
-      self._send_content('Invalid GET request {}'.format(self.path), 'text/html')
+      self._send_content('Invalid GET request {}'.format(self.path), 'text/html', code=400)
     except (IOError, ValueError):
       pass  # Printing these errors gets annoying, and there's nothing to do about them anyway.
       #sys.stderr.write('Invalid GET request {}'.format(self.path))
@@ -81,6 +89,20 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     args = self._default_template_args('run_list')
     args['runs_by_day'] = runs_by_day
     self._send_content(self._renderer.render_name('base', args), 'text/html')
+
+  _collapsible_fmt_string = dedent("""
+    <div class="{class_prefix}" id="{id}">
+      <div class="{class_prefix}-header toggle-header" id="{id}-header">
+        <div class="{class_prefix}-header-icon toggle-header-icon" onclick="pants.collapsible.toggle('{id}')">
+          <i id="{id}-icon" class="visibility-icon icon-large icon-caret-right hidden"></i>
+        </div>
+        <div class="{class_prefix}-header-text toggle-header-text">
+          [<span id="{id}-header-text">{title}</span>]
+        </div>
+      </div>
+      <div class="{class_prefix}-content toggle-content nodisplay" id="{id}-content"></div>
+    </div>
+  """)
 
   def _handle_run(self, relpath, params):
     """Show the report for a single pants run."""
@@ -100,17 +122,37 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       artifact_cache_stats_path = os.path.join(report_dir, 'artifact_cache_stats')
       run_info['timestamp_text'] = \
         datetime.fromtimestamp(float(run_info['timestamp'])).strftime('%H:%M:%S on %A, %B %d %Y')
+
+      timings_and_stats = '\n'.join([
+        self._collapsible_fmt_string.format(id='cumulative-timings-collapsible',
+                                            title='Cumulative timings', class_prefix='aggregated-timings'),
+        self._collapsible_fmt_string.format(id='self-timings-collapsible',
+                                            title='Self timings', class_prefix='aggregated-timings'),
+        self._collapsible_fmt_string.format(id='artifact-cache-stats-collapsible',
+                                            title='Artifact cache stats', class_prefix='artifact-cache-stats')
+      ])
+
       args.update({'run_info': run_info,
                    'report_path': report_relpath,
                    'self_timings_path': self_timings_path,
                    'cumulative_timings_path': cumulative_timings_path,
-                   'artifact_cache_stats_path': artifact_cache_stats_path})
+                   'artifact_cache_stats_path': artifact_cache_stats_path,
+                   'timings_and_stats': timings_and_stats})
       if run_id == 'latest':
         args['is_latest'] = run_info['id']
-      args.update({
-        'collapsible': lambda x: self._renderer.render_callable('collapsible', x, args)
-      })
+
     self._send_content(self._renderer.render_name('base', args), 'text/html')
+
+  def _handle_stats(self, relpath, params):
+    """Show stats for pants runs in the statsdb."""
+    args = self._default_template_args('stats')
+    self._send_content(self._renderer.render_name('base', args), 'text/html')
+
+  def _handle_statsdata(self, relpath, params):
+    """Show stats for pants runs in the statsdb."""
+    statsdb = StatsDBFactory.global_instance().get_db()
+    statsdata = list(statsdb.get_aggregated_stats_for_cmd_line('cumulative_timings', '%'))
+    self._send_content(json.dumps(statsdata), 'application/json')
 
   def _handle_browse(self, relpath, params):
     """Handle requests to browse the filesystem under the build root."""
@@ -195,6 +237,10 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     else:
       self._send_content(latest_runinfo['id'], 'text/plain')
 
+  def _handle_favicon(self, relpath, params):
+    """Statically serve the favicon out of the assets dir."""
+    self._handle_assets('favicon.ico', params)
+
   def _partition_runs_by_day(self):
     """Split the runs by day, so we can display them grouped that way."""
     run_infos = self._get_all_run_infos()
@@ -257,7 +303,8 @@ class PantsHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   def _serve_file(self, abspath, params):
     """Show a file.
 
-    The actual content of the file is rendered by _handle_content."""
+    The actual content of the file is rendered by _handle_content.
+    """
     relpath = os.path.relpath(abspath, self._root)
     breadcrumbs = self._create_breadcrumbs(relpath)
     link_path = urlparse.urlunparse([None, None, relpath, None, urllib.urlencode(params), None])

@@ -2,11 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'testutils',
-  sources = globs('*.py'),
+  name = 'mock_logger',
+  sources = globs('mock_logger.py'),
   dependencies = [
-    'src/python/pants/base:target',
     'src/python/pants/reporting',
-    'src/python/pants/backend/core/targets:common',
+  ],
+)
+
+python_library(
+  name = 'file_test_util',
+  sources = [
+    'file_test_util.py',
   ],
 )

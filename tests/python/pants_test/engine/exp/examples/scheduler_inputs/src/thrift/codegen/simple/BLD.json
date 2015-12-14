@@ -1,0 +1,8 @@
+{
+  "type_alias": "target",
+  "extends": "src/thrift:java_thrift_base",
+  "name": "simple",
+  "sources": {
+    "files": ["simple.thrift"]
+  }
+}

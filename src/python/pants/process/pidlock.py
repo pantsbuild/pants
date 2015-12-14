@@ -14,6 +14,7 @@ from lockfile import pidlockfile
 
 logger = logging.getLogger(__name__)
 
+
 class OwnerPrintingPIDLockFile(pidlockfile.PIDLockFile):
   def acquire(self, timeout=None):
     # If the lock is held, attempt to determine holder and print a message before waiting.

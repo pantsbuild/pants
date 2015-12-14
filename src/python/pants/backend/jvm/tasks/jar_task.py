@@ -10,16 +10,19 @@ import tempfile
 from abc import abstractmethod
 from contextlib import contextmanager
 
+import six
 from six import binary_type, string_types
 from twitter.common.collections import maybe_list
 
 from pants.backend.jvm.subsystems.jar_tool import JarTool
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import safe_args
 from pants.java.jar.manifest import Manifest
+from pants.java.util import relativize_classpath
 from pants.util.contextutil import temporary_dir
 from pants.util.meta import AbstractClass
 
@@ -81,12 +84,23 @@ class Jar(object):
         os.close(fd)
       return path
 
-  def __init__(self):
+  def __init__(self, path):
+    self._path = path
     self._entries = []
     self._jars = []
     self._manifest_entry = None
     self._main = None
-    self._classpath = None
+    self._classpath = []
+
+  @property
+  def classpath(self):
+    """The Class-Path entry of jar's Manifest."""
+    return self._classpath
+
+  @property
+  def path(self):
+    """The path to jar itself."""
+    return self._path
 
   def main(self, main):
     """Specifies a Main-Class entry for this jar's manifest.
@@ -97,12 +111,14 @@ class Jar(object):
       raise ValueError('The main entry must be a non-empty string')
     self._main = main
 
-  def classpath(self, classpath):
+  def append_classpath(self, classpath):
     """Specifies a Class-Path entry for this jar's manifest.
+
+    If called multiple times, new entry will be appended to the existing classpath.
 
     :param list classpath: a list of paths
     """
-    self._classpath = maybe_list(classpath)
+    self._classpath = self._classpath + maybe_list(classpath)
 
   def write(self, src, dest=None):
     """Schedules a write of the file at ``src`` to the ``dest`` path in this jar.
@@ -166,7 +182,11 @@ class Jar(object):
     args = []
 
     with temporary_dir() as manifest_stage_dir:
-      classpath = self._classpath or []
+      # relativize urls in canonical classpath, this needs to be stable too therefore
+      # do not follow the symlinks because symlinks may vary from platform to platform.
+      classpath = relativize_classpath(self.classpath,
+                                       os.path.dirname(self._path),
+                                       followlinks=False)
 
       def as_cli_entry(entry):
         src = entry.materialize(manifest_stage_dir)
@@ -216,9 +236,15 @@ class JarTask(NailgunTask):
   All subclasses will share the same underlying nailgunned jar tool and thus benefit from fast
   invocations.
   """
+
   @classmethod
   def global_subsystems(cls):
-    return super(JarTask, cls).global_subsystems() + (JarTool, )
+    return super(JarTask, cls).global_subsystems() + (JarTool,)
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarTask, cls).prepare(options, round_manager)
+    JarTool.prepare_tools(round_manager)
 
   @staticmethod
   def _flag(bool_value):
@@ -228,6 +254,7 @@ class JarTask(NailgunTask):
       Duplicate.SKIP: 'SKIP',
       Duplicate.REPLACE: 'REPLACE',
       Duplicate.CONCAT: 'CONCAT',
+      Duplicate.CONCAT_TEXT: 'CONCAT_TEXT',
       Duplicate.FAIL: 'THROW',
   }
 
@@ -241,7 +268,6 @@ class JarTask(NailgunTask):
   def __init__(self, *args, **kwargs):
     super(JarTask, self).__init__(*args, **kwargs)
     self.set_distribution(jdk=True)
-
     # TODO(John Sirois): Consider poking a hole for custom jar-tool jvm args - namely for Xmx
     # control.
 
@@ -255,7 +281,7 @@ class JarTask(NailgunTask):
     :param bool compressed: entries added to the jar should be compressed; ``True`` by default
     :param jar_rules: an optional set of rules for handling jar exclusions and duplicates
     """
-    jar = Jar()
+    jar = Jar(path)
     try:
       yield jar
     except jar.Error as e:
@@ -292,6 +318,9 @@ class JarTask(NailgunTask):
         if JarTool.global_instance().run(context=self.context, runjava=self.runjava, args=args):
           raise TaskError('jar-tool failed')
 
+
+class JarBuilderTask(JarTask):
+
   class JarBuilder(AbstractClass):
     """A utility to aid in adding the classes and resources associated with targets to a jar."""
 
@@ -317,7 +346,7 @@ class JarTask(NailgunTask):
       :param JvmBinary jvm_binary_target:
       :param Manifest manifest:
       """
-      for header, value in jvm_binary_target.manifest_entries.entries.iteritems():
+      for header, value in six.iteritems(jvm_binary_target.manifest_entries.entries):
         manifest.addentry(header, value)
 
     @staticmethod
@@ -330,66 +359,81 @@ class JarTask(NailgunTask):
       Later, in execute context, the `create_jar_builder` method can be called to get back a
       prepared ``JarTask.JarBuilder`` ready for use.
       """
-      round_manager.require_data('resources_by_target')
-      round_manager.require_data('classes_by_target')
+      round_manager.require_data('runtime_classpath')
 
     def __init__(self, context, jar):
       self._context = context
       self._jar = jar
       self._manifest = Manifest()
 
-    def add_target(self, target, recursive=False):
+    def add_target(self, target, recursive=False, canonical_classpath_base_dir=None):
       """Adds the classes and resources for a target to an open jar.
 
       :param target: The target to add generated classes and resources for.
       :param bool recursive: `True` to add classes and resources for the target's transitive
         internal dependency closure.
-      :returns: The list of targets that actually contributed classes or resources or both to the
-        jar.
+      :param string canonical_classpath_base_dir: If set, instead of adding targets to the jar
+        bundle, create canonical symlinks to the original classpath and save canonical symlinks
+        to Manifest's Class-Path.
+      :returns: `True` if the target contributed any files - manifest entries, classfiles or
+        resource files - to this jar.
+      :rtype: bool
       """
-      classes_by_target = self._context.products.get_data('classes_by_target')
-      resources_by_target = self._context.products.get_data('resources_by_target')
+      products_added = False
 
-      targets_added = []
+      classpath_products = self._context.products.get_data('runtime_classpath')
 
-      def add_to_jar(tgt):
-        target_classes = classes_by_target.get(tgt)
-
-        target_resources = []
-
-        # TODO(pl): https://github.com/pantsbuild/pants/issues/206
-        resource_products_on_target = resources_by_target.get(tgt)
-        if resource_products_on_target:
-          target_resources.append(resource_products_on_target)
-
-        if tgt.has_resources:
-          target_resources.extend(resources_by_target.get(r) for r in tgt.resources)
-
-        if target_classes or target_resources:
-          targets_added.append(tgt)
-
-          def add_products(target_products):
-            if target_products:
-              for root, products in target_products.rel_paths():
-                for prod in products:
-                  self._jar.write(os.path.join(root, prod), prod)
-
-          add_products(target_classes)
-          for resources_target in target_resources:
-            add_products(resources_target)
-
-          if isinstance(tgt, JavaAgent):
-            self._add_agent_manifest(tgt, self._manifest)
+      # TODO(John Sirois): Manifest handling is broken.  We should be tracking state and failing
+      # fast if any duplicate entries are added; ie: if we get a second binary or a second agent.
 
       if isinstance(target, JvmBinary):
         self._add_manifest_entries(target, self._manifest)
+        products_added = True
+      elif isinstance(target, JavaAgent):
+        self._add_agent_manifest(target, self._manifest)
+        products_added = True
+      elif recursive:
+        agents = [t for t in target.closure() if isinstance(t, JavaAgent)]
+        if len(agents) > 1:
+          raise TaskError('Only 1 agent can be added to a jar, found {} for {}:\n\t{}'
+                          .format(len(agents),
+                                  target.address.reference(),
+                                  '\n\t'.join(agent.address.reference() for agent in agents)))
+        elif agents:
+          self._add_agent_manifest(agents[0], self._manifest)
+          products_added = True
 
-      if recursive:
-        target.walk(add_to_jar)
+      # In the transitive case we'll gather internal resources naturally as dependencies, but in the
+      # non-transitive case we need to manually add these special (in the context of jarring)
+      # dependencies.
+      targets = target.closure(bfs=True) if recursive else [target]
+      if not recursive and target.has_resources:
+        targets += target.resources
+      # We only gather internal classpath elements per our contract.
+      if canonical_classpath_base_dir:
+        canonical_classpath = ClasspathUtil.create_canonical_classpath(
+          classpath_products,
+          targets,
+          canonical_classpath_base_dir
+        )
+        self._jar.append_classpath(canonical_classpath)
+        products_added = True
       else:
-        add_to_jar(target)
+        target_classpath = ClasspathUtil.internal_classpath(targets,
+                                                            classpath_products)
+        for entry in target_classpath:
+          if ClasspathUtil.is_jar(entry):
+            self._jar.writejar(entry)
+            products_added = True
+          elif ClasspathUtil.is_dir(entry):
+            for rel_file in ClasspathUtil.classpath_entries_contents([entry]):
+              self._jar.write(os.path.join(entry, rel_file), rel_file)
+              products_added = True
+          else:
+            # non-jar and non-directory classpath entries should be ignored
+            pass
 
-      return targets_added
+      return products_added
 
     def commit_manifest(self, jar):
       """Updates the manifest in the jar being written to.
@@ -399,6 +443,11 @@ class JarTask(NailgunTask):
       """
       if not self._manifest.is_empty():
         jar.writestr(Manifest.PATH, self._manifest.contents())
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(JarBuilderTask, cls).prepare(options, round_manager)
+    cls.JarBuilder.prepare(round_manager)
 
   @contextmanager
   def create_jar_builder(self, jar):

@@ -9,17 +9,17 @@ import sys
 
 from colors import cyan, green, red, yellow
 
-from pants.base.config import Config
 from pants.option import custom_types
+from pants.option.config import Config
 from pants.option.errors import ParseError
 
 
 migrations = {
   ('backends', 'packages'): ('DEFAULT', 'backend_packages'),
   ('backends', 'plugins'): ('DEFAULT', 'plugins'),
-  ('DEFAULT', 'bootstrap_buildfiles'): ('goals', 'bootstrap_buildfiles'),
 
   ('jvm', 'missing_deps_target_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
+  ('jvm', 'jdk_paths'): ('jvm-distributions', 'paths'),
   ('compile.java', 'missing_deps'): ('compile.jvm-dep-check', 'missing_deps'),
   ('compile.java', 'missing_direct_deps'): ('compile.jvm-dep-check', 'missing_direct_deps'),
   ('compile.java', 'missing_deps_whitelist'): ('compile.jvm-dep-check', 'missing_deps_whitelist'),
@@ -42,7 +42,7 @@ migrations = {
                                                                  'changed_targets_heuristic_limit'),
   ('scala-compile', 'warning_args'): ('compile.scala', 'warning_args'),
   ('scala-compile', 'no_warning_args'): ('compile.scala', 'no_warning_args'),
-  ('scala-compile', 'runtime-deps'): ('compile.scala', 'runtime-deps'),
+  ('scala-compile', 'runtime_deps'): ('compile.scala', 'runtime_deps'),
   ('scala-compile', 'use_nailgun'): ('compile.scala', 'use_nailgun'),
   ('scala-compile', 'args'): ('compile.scala', 'args'),
 
@@ -67,7 +67,7 @@ migrations = {
 
   ('scala-repl', 'args'): ('repl.scala', 'args'),
 
-  ('checkstyle', 'bootstrap-tools'): ('compile.checkstyle', 'bootstrap_tools'),
+  ('checkstyle', 'bootstrap_tools'): ('compile.checkstyle', 'bootstrap_tools'),
   ('checkstyle', 'configuration'): ('compile.checkstyle', 'configuration'),
   ('checkstyle', 'properties'): ('compile.checkstyle', 'properties'),
 
@@ -80,11 +80,11 @@ migrations = {
   ('jvm', 'debug_config'): ('DEFAULT', 'debug_config'),
   ('jvm', 'debug_port'): ('DEFAULT', 'debug_port'),
 
-  ('scala-compile', 'scalac-plugins'): ('compile.scala', 'plugins'),
-  ('scala-compile', 'scalac-plugin-args'): ('compile.scala', 'plugin_args'),
+  ('scala-compile', 'scalac_plugins'): ('compile.scala', 'plugins'),
+  ('scala-compile', 'scalac_plugin_args'): ('compile.scala', 'plugin_args'),
 
   ('markdown-to-html', 'extensions'): ('markdown', 'extensions'),
-  ('markdown-to-html', 'code-style'): ('markdown', 'code_style'),
+  ('markdown-to-html', 'code_style'): ('markdown', 'code_style'),
 
   # Note: This assumes that ConfluencePublish is registered as the only task in a
   #       goal called 'confluence'.  Adjust if this is not the case in your pants.ini.
@@ -93,25 +93,25 @@ migrations = {
   # JVM tool migrations.
   ('antlr-gen', 'javadeps'): ('gen.antlr', 'antlr3'),
   ('antlr4-gen', 'javadeps'): ('gen.antlr', 'antlr4'),
-  ('scrooge-gen', 'bootstrap-tools'): ('gen.scrooge', 'scrooge'),
-  ('thrift-linter', 'bootstrap-tools'): ('thrift-linter', 'scrooge_linter'),
-  ('wire-gen', 'bootstrap-tools'): ('gen.wire', 'wire_compiler'),
-  ('benchmark-run', 'bootstrap-tools'): ('bench', 'benchmark_tool'),
-  ('benchmark-run', 'agent-bootstrap-tools'): ('bench', 'benchmark_agent'),
-  ('compile.checkstyle', 'bootstrap-tools'): ('compile.checkstyle', 'checkstyle'),
-  ('ivy-resolve', 'bootstrap-tools'): ('resolve.ivy', 'xalan'),
-  ('jar-tool', 'bootstrap-tools'): ('DEFAULT', 'jar-tool'),
-  ('junit-run', 'junit-bootstrap-tools'): ('test.junit', 'junit'),
-  ('junit-run', 'emma-bootstrap-tools'): ('test.junit', 'emma'),
-  ('junit-run', 'cobertura-bootstrap-tools'): ('test.junit', 'cobertura'),
-  ('java-compile', 'jmake-bootstrap-tools'): ('compile.java', 'jmake'),
+  ('scrooge-gen', 'bootstrap_tools'): ('gen.scrooge', 'scrooge'),
+  ('thrift-linter', 'bootstrap_tools'): ('thrift-linter', 'scrooge_linter'),
+  ('wire-gen', 'bootstrap_tools'): ('gen.wire', 'wire_compiler'),
+  ('benchmark-run', 'bootstrap_tools'): ('bench', 'benchmark_tool'),
+  ('benchmark-run', 'agent_bootstrap_tools'): ('bench', 'benchmark_agent'),
+  ('compile.checkstyle', 'bootstrap_tools'): ('compile.checkstyle', 'checkstyle'),
+  ('ivy-resolve', 'bootstrap_tools'): ('resolve.ivy', 'xalan'),
+  ('jar-tool', 'bootstrap_tools'): ('DEFAULT', 'jar-tool'),
+  ('junit-run', 'junit_bootstrap_tools'): ('test.junit', 'junit'),
+  ('junit-run', 'emma_bootstrap_tools'): ('test.junit', 'emma'),
+  ('junit-run', 'cobertura_bootstrap_tools'): ('test.junit', 'cobertura'),
+  ('java-compile', 'jmake_bootstrap_tools'): ('compile.java', 'jmake'),
   ('java-compile', 'compiler-bootstrap-tools'): ('compile.java', 'java_compiler'),
   # Note: compile-bootstrap-tools is not a typo.
-  ('scala-compile', 'compile-bootstrap-tools'): ('compile.scala', 'scalac'),
-  ('scala-compile', 'zinc-bootstrap-tools'): ('compile.scala', 'zinc'),
-  ('scala-compile', 'scalac-plugin-bootstrap-tools'): ('compile.scala', 'plugin_jars'),
-  ('scala-repl', 'bootstrap-tools'): ('repl.scala', 'scala_repl'),
-  ('specs-run', 'bootstrap-tools'): ('test.specs', 'specs'),
+  ('scala-compile', 'compile_bootstrap_tools'): ('compile.scala', 'scalac'),
+  ('scala-compile', 'zinc_bootstrap_tools'): ('compile.scala', 'zinc'),
+  ('scala-compile', 'scalac_plugin_bootstrap_tools'): ('compile.scala', 'plugin_jars'),
+  ('scala-repl', 'bootstrap_tools'): ('repl.scala', 'scala_repl'),
+  ('specs-run', 'bootstrap_tools'): ('test.specs', 'specs'),
 
   # Artifact cache spec migration.
   ('dx-tool', 'read_artifact_caches'): ('dex', 'read_artifact_caches'),
@@ -140,7 +140,7 @@ migrations = {
 
   ('backend', 'python-path'): ('DEFAULT', 'pythonpath'),
 
-  ('python-ipython', 'entry-point'): ('repl.py', 'ipython_entry_point'),
+  ('python-ipython', 'entry_point'): ('repl.py', 'ipython_entry_point'),
   ('python-ipython', 'requirements'): ('repl.py', 'ipython_requirements'),
 
   ('jar-publish', 'restrict_push_branches'): ('publish.jar', 'restrict_push_branches'),
@@ -180,6 +180,7 @@ migrations = {
   ('binary', 'ng_daemons'): ('binary', 'use_nailgun'),
   ('binary.dex', 'ng_daemons'): ('binary.dex', 'use_nailgun'),
   ('binary.dup', 'ng_daemons'): ('binary.dup', 'use_nailgun'),
+  ('binary.dup', 'excludes'): ('binary.dup', 'exclude_files'),
 
   # NB: bundle.bundle -> bundle is a leaf scope
   ('bundle', 'ng_daemons'): ('bundle', 'use_nailgun'),
@@ -224,7 +225,7 @@ migrations = {
   ('scrooge-gen', 'java'): ('gen.scrooge', 'service_deps'),
 
   # jar-tool subsystem.
-  ('jar-tool', 'bootstrap-tools'): ('jar-tool', 'jar-tool'),
+  ('jar-tool', 'bootstrap_tools'): ('jar-tool', 'jar_tool'),
   ('jar-tool', 'jvm_args'): ('jar-tool', 'jvm_options'),
 
   # Technically 'indices' and 'indexes' are both acceptable plural forms of 'index'. However
@@ -271,7 +272,119 @@ migrations = {
   ('compile.zinc', 'jar'): None,
 
   ('unknown-arguments', 'ignored'): None,
+
+  # Tool specs, migrated from a list to a single string.
+  ('bench', 'benchmark-agent'): None,
+  ('bench', 'benchmark-tool'): None,
+  ('binary', 'nailgun-server'): None,
+  ('binary.dex', 'nailgun-server'): None,
+  ('binary.dup', 'nailgun-server'): None,
+  ('bootstrap.bootstrap-jvm-tools', 'jarjar'): None,
+  ('bootstrap.bootstrap-jvm-tools', 'nailgun-server'): None,
+  ('bundle', 'nailgun-server'): None,
+  ('bundle.dup', 'nailgun-server'): None,
+  ('compile.apt', 'java-compiler'): None,
+  ('compile.apt', 'jmake'): None,
+  ('compile.apt', 'nailgun-server'): None,
+  ('compile.checkstyle', 'checkstyle'): None,
+  ('compile.checkstyle', 'nailgun-server'): None,
+  ('compile.java', 'java-compiler'): None,
+  ('compile.java', 'jmake'): None,
+  ('compile.java', 'nailgun-server'): None,
+  ('compile.scalastyle', 'nailgun-server'): None,
+  ('compile.scalastyle', 'scalastyle'): None,
+  ('compile.zinc', 'compiler-interface'): None,
+  ('compile.zinc', 'nailgun-server'): None,
+  ('compile.zinc', 'plugin-jars'): None,
+  ('compile.zinc', 'sbt-interface'): None,
+  ('compile.zinc', 'zinc'): None,
+  ('detect-duplicates', 'nailgun-server'): None,
+  ('gen.antlr', 'antlr3'): None,
+  ('gen.antlr', 'antlr4'): None,
+  ('gen.antlr', 'nailgun-server'): None,
+  ('gen.jaxb', 'nailgun-server'): None,
+  ('gen.scrooge', 'nailgun-server'): None,
+  ('gen.scrooge', 'scrooge-gen'): None,
+  ('gen.spindle', 'nailgun-server'): None,
+  ('gen.spindle', 'spindle-codegen'): None,
+  ('gen.wire', 'javadeps'): None,
+  ('gen.wire', 'wire-compiler'): None,
+  ('imports.ivy-imports', 'nailgun-server'): None,
+  ('jar', 'nailgun-server'): None,
+  ('jar-tool', 'jar-tool'): None,
+  ('publish.jar', 'nailgun-server'): None,
+  ('repl-dirty.scala-dirty', 'scala-repl'): None,
+  ('repl.scala', 'scala-repl'): None,
+  ('resolve.ivy', 'nailgun-server'): None,
+  ('resolve.ivy', 'xalan'): None,
+  ('scala-platform', 'scalac'): None,
+  ('test.junit', 'cobertura-instrument'): None,
+  ('test.junit', 'cobertura-report'): None,
+  ('test.junit', 'cobertura-run'): None,
+  ('test.junit', 'emma'): None,
+  ('test.junit', 'junit'): None,
+  ('thrift-linter', 'nailgun-server'): None,
+  ('thrift-linter', 'scrooge-linter'): None,
+
+  # Global strategy removal.
+  ('compile.apt', 'changed-targets-heuristic-limit'): None,
+  ('compile.apt', 'partition-size-hint'): None,
+  ('compile.apt', 'strategy'): None,
+  ('compile.java', 'changed-targets-heuristic-limit'): None,
+  ('compile.java', 'partition-size-hint'): None,
+  ('compile.java', 'strategy'): None,
+  ('compile.zinc', 'changed-targets-heuristic-limit'): None,
+  ('compile.zinc', 'partition-size-hint'): None,
+  ('compile.zinc', 'strategy'): None,
+
+  # Jmake and Apt removal.
+  ('compile.apt', 'args'): ('compile.zinc', 'args'),
+  ('compile.apt', 'jvm_options'): ('compile.zinc', 'jvm_options'),
+  ('compile.java', 'args'): ('compile.zinc', 'args'),
+  ('compile.java', 'jvm_options'): ('compile.zinc', 'jvm_options'),
+
+  # Renaming JarCreate's scope.  It was previously privileged to be called 'jar'. That might seem reasonable,
+  # except that adding anything to the 'jar' goal (e.g., see extra_test_jar_example.py) creates the potential
+  # for option shadowing.
+  # Note: We probably did the "eliding a task with the same name as its goal" thing wrong. Since options are
+  # inherited from outer scopes, this creates lots of potential for option shadowing. We should probably not
+  # have elided the option scope (e.g., the scope should have remained jar.jar, not jar, internally), but rather
+  # done the elision early, when interpreting scopes in config/cmd-line args etc.
+  # TODO: Fix this?  I don't think it would be that difficult, but there might be unintended consequences.
+  # For now we simply avoid it in cases where there's any likelihood of options collision occuring.
+  # In practice this won't be a problem with cases where there really is only one sensible task in a goal,
+  # e.g., the various ConsoleTasks.
+  ('jar', 'use_nailgun'): ('jar.create', 'use_nailgun'),
+  ('jar', 'nailgun_timeout_seconds'): ('jar.create', 'nailgun_timeout_seconds'),
+  ('jar', 'nailgun_connect_attempts'): ('jar.create', 'nailgun_connect_attempts'),
+  ('jar', 'nailgun_server'): ('jar.create', 'nailgun_server'),
+
+  # Renaming JvmBinaryCreate's scope.  It was previously privileged to be called 'binary'.
+  ('binary', 'use_nailgun'): ('binary.jvm', 'use_nailgun'),
+  ('binary', 'nailgun_timeout_seconds'): ('binary.jvm', 'nailgun_timeout_seconds'),
+  ('binary', 'nailgun_connect_attempts'): ('binary.jvm', 'nailgun_connect_attempts'),
+  ('binary', 'nailgun_server'): ('binary.jvm', 'nailgun_server'),
+
+  # Renaming JvmBundleCreate's scope.  It was previously privileged to be called 'bundle'.
+  ('bundle', 'use_nailgun'): ('bundle.jvm', 'use_nailgun'),
+  ('bundle', 'nailgun_timeout_seconds'): ('bundle.jvm', 'nailgun_timeout_seconds'),
+  ('bundle', 'nailgun_connect_attempts'): ('bundle.jvm', 'nailgun_connect_attempts'),
+  ('bundle', 'nailgun_server'): ('bundle.jvm', 'nailgun_server'),
+  ('bundle', 'deployjar'): ('bundle.jvm', 'deployjar'),
+  ('bundle', 'archive'): ('bundle.jvm', 'archive'),
+  ('bundle', 'archive_prefix'): ('bundle.jvm', 'archive_prefix'),
+
+  # Preventing shadowing of global options.
+  ('compile.zinc', 'plugins'): ('compile.zinc', 'scalac_plugins'),
+  ('compile.zinc', 'plugin_args'): ('compile.zinc', 'scalac_plugin_args'),
+  ('gen.protoc', 'plugins'): ('gen.protoc', 'protoc_plugins'),
+
+  # Superceded by the global --tags option.
+  ('filter', 'tags'): None
 }
+
+jvm_global_strategy_removal = ('The JVM global compile strategy was removed in favor of the '
+                               'isolated strategy, which uses a different set of options.')
 
 ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_nailgun" option '
                    'local to each task that can use a nailgun.  A default can no longer be '
@@ -286,6 +399,12 @@ scrooge_gen_deps_note = ('The scrooge-gen per-language config fields have been r
                          'two options: one for service deps, and one for structs deps.')
 compile_jar_note = ('The isolated jvm compile `jar` option is critical to performant operation '
                     'and can no longer be disabled.')
+
+jvm_tool_spec_override = ('JVM tool classpath spec overrides have migrated from a list of target'
+                          'addresses to a single target address.  To migrate a list of addresses '
+                          'you\'ll need to create a new aggregator target to hold the list like '
+                          'so: `target(name=<your choice>, dependencies=[<list of addresses>])` '
+                          'and then point to its single address.')
 
 notes = {
   ('jvm', 'missing_deps_target_whitelist'): 'This should be split into compile.java or '
@@ -375,6 +494,12 @@ notes = {
   ('compile.cpp-compile', 'cc_extensions'): 'Value used to be a string (but default was a list), '
                                             'is now a list. Values also now include the dot, e.g.,'
                                             'it\'s now .cpp, not cpp.',
+
+  ('test.junit', 'coverage-patterns'): 'Option no longer exists. Only applied to emma coverage, '
+                                       'which was removed.',
+  ('test.junit', 'coverage-processor'): 'The default value for this option has changed from "emma" '
+                                        'to "cobertura".',
+
   ('test.junit', 'coverage_console'): 'Option no longer exists. Coverage always written to stdout.',
   ('test.junit', 'coverage_html'): 'Option no longer exists. Coverage always written to html file.',
   ('test.junit', 'coverage_xml'): 'Option no longer exists. Coverage always written to xml file.',
@@ -386,7 +511,75 @@ notes = {
   ('unknown-arguments', 'ignored'): 'Target name keys are now expected to be the alias used in '
                                     'BUILD files and not the target type\'s simple class name. '
                                     'For example, if you had \'JavaLibrary\' key you\'d now use '
-                                    '\'java_library\' instead.'
+                                    '\'java_library\' instead.',
+
+  ('bench', 'benchmark-agent'): jvm_tool_spec_override,
+  ('bench', 'benchmark-tool'): jvm_tool_spec_override,
+  ('binary', 'nailgun-server'): jvm_tool_spec_override,
+  ('binary.dex', 'nailgun-server'): jvm_tool_spec_override,
+  ('binary.dup', 'nailgun-server'): jvm_tool_spec_override,
+  ('bootstrap.bootstrap-jvm-tools', 'jarjar'): jvm_tool_spec_override,
+  ('bootstrap.bootstrap-jvm-tools', 'nailgun-server'): jvm_tool_spec_override,
+  ('bundle', 'nailgun-server'): jvm_tool_spec_override,
+  ('bundle.dup', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.apt', 'java-compiler'): jvm_tool_spec_override,
+  ('compile.apt', 'jmake'): jvm_tool_spec_override,
+  ('compile.apt', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.checkstyle', 'checkstyle'): jvm_tool_spec_override,
+  ('compile.checkstyle', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.java', 'java-compiler'): jvm_tool_spec_override,
+  ('compile.java', 'jmake'): jvm_tool_spec_override,
+  ('compile.java', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.scalastyle', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.scalastyle', 'scalastyle'): jvm_tool_spec_override,
+  ('compile.zinc', 'compiler-interface'): jvm_tool_spec_override,
+  ('compile.zinc', 'nailgun-server'): jvm_tool_spec_override,
+  ('compile.zinc', 'plugin-jars'): jvm_tool_spec_override,
+  ('compile.zinc', 'sbt-interface'): jvm_tool_spec_override,
+  ('compile.zinc', 'zinc'): jvm_tool_spec_override,
+  ('detect-duplicates', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.antlr', 'antlr3'): jvm_tool_spec_override,
+  ('gen.antlr', 'antlr4'): jvm_tool_spec_override,
+  ('gen.antlr', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.jaxb', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.scrooge', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.scrooge', 'scrooge-gen'): jvm_tool_spec_override,
+  ('gen.spindle', 'nailgun-server'): jvm_tool_spec_override,
+  ('gen.spindle', 'spindle-codegen'): jvm_tool_spec_override,
+  ('gen.wire', 'javadeps'): jvm_tool_spec_override,
+  ('gen.wire', 'wire-compiler'): jvm_tool_spec_override,
+  ('imports.ivy-imports', 'nailgun-server'): jvm_tool_spec_override,
+  ('jar', 'nailgun-server'): jvm_tool_spec_override,
+  ('jar-tool', 'jar-tool'): jvm_tool_spec_override,
+  ('publish.jar', 'nailgun-server'): jvm_tool_spec_override,
+  ('repl-dirty.scala-dirty', 'scala-repl'): jvm_tool_spec_override,
+  ('repl.scala', 'scala-repl'): jvm_tool_spec_override,
+  ('resolve.ivy', 'nailgun-server'): jvm_tool_spec_override,
+  ('resolve.ivy', 'xalan'): jvm_tool_spec_override,
+  ('scala-platform', 'scalac'): jvm_tool_spec_override,
+  ('test.junit', 'cobertura-instrument'): jvm_tool_spec_override,
+  ('test.junit', 'cobertura-report'): jvm_tool_spec_override,
+  ('test.junit', 'cobertura-run'): jvm_tool_spec_override,
+  ('test.junit', 'emma'): jvm_tool_spec_override,
+  ('test.junit', 'junit'): jvm_tool_spec_override,
+  ('thrift-linter', 'nailgun-server'): jvm_tool_spec_override,
+  ('thrift-linter', 'scrooge-linter'): jvm_tool_spec_override,
+
+  # Global strategy removal.
+  ('compile.apt', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.apt', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.apt', 'strategy'): jvm_global_strategy_removal,
+  ('compile.java', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.java', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.java', 'strategy'): jvm_global_strategy_removal,
+  ('compile.zinc', 'changed-targets-heuristic-limit'): jvm_global_strategy_removal,
+  ('compile.zinc', 'partition-size-hint'): jvm_global_strategy_removal,
+  ('compile.zinc', 'strategy'): jvm_global_strategy_removal,
+
+  ('bootstrap.bootstrap-jvm-tools', 'jvm-options'): 'This previously shadowed the same option '
+                                                    'registered by IvyTaskMixin.  If you want to '
+                                                    'specifically configure the shader, use '
+                                                    'shader-jvm-options.'
 }
 
 
@@ -395,27 +588,24 @@ def check_option(cp, src, dst):
     # David tried to avoid poking into cp's guts in https://rbcommons.com/s/twitter/r/1451/ but
     # that approach fails for the important case of boolean options.  Since this is a ~short term
     # tool and its highly likely its lifetime will be shorter than the time the private
-    # ConfigParser_sections API we use here changes, its worth the risk.
+    # ConfigParser_sections API we use here changes, it's worth the risk.
     if section == 'DEFAULT':
       # NB: The 'DEFAULT' section is not tracked via `has_section` or `_sections`, so we use a
-      # different API to check for an explicit default.  The defaults are a combination of both
-      # 'DEFAULT' section values and defaults passed to the ConfigParser constructor, but we
-      # create the `cp` config parser below explicitly with no constructor defaults so this check
-      # works.
+      # different API to check for an explicit default.
       return key in cp.defaults()
     else:
       return cp.has_section(section) and (key in cp._sections[section])
 
-  def section(s):
-    return cyan('[{0}]'.format(s))
+  def sect(s):
+    return cyan('[{}]'.format(s))
 
   src_section, src_key = src
   if has_explicit_option(src_section, src_key):
     if dst is not None:
       dst_section, dst_key = dst
       print('Found {src_key} in section {src_section}. Should be {dst_key} in section '
-            '{dst_section}.'.format(src_key=green(src_key), src_section=section(src_section),
-                                    dst_key=green(dst_key), dst_section=section(dst_section)),
+            '{dst_section}.'.format(src_key=green(src_key), src_section=sect(src_section),
+                                    dst_key=green(dst_key), dst_section=sect(dst_section)),
             file=sys.stderr)
     elif src not in notes:
       print('Found {src_key} in section {src_section} and there is no automated migration path'
@@ -423,18 +613,21 @@ def check_option(cp, src, dst):
             'codebase.'.format(src_key=red(src_key), src_section=red(src_section)))
 
     if (src_section, src_key) in notes:
-      print('  Note: {0}'.format(yellow(notes[(src_section, src_key)])))
+      print('  Note for {src_key} in section {src_section}: {note}'
+            .format(src_key=green(src_key),
+                    src_section=sect(src_section),
+                    note=yellow(notes[(src_section, src_key)])))
 
 
 def check_config_file(path):
-  cp = Config.create_parser()
+  cp = Config._create_parser()
   with open(path, 'r') as ini:
     cp.readfp(ini)
 
-  print('Checking config file at {0} for unmigrated keys.'.format(path), file=sys.stderr)
+  print('Checking config file at {} for unmigrated keys.'.format(path), file=sys.stderr)
 
   def section(s):
-    return cyan('[{0}]'.format(s))
+    return cyan('[{}]'.format(s))
 
   for src, dst in migrations.items():
     check_option(cp, src, dst)

@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.exceptions import TaskError
 from pants.engine.engine import Engine
-from pants_test.base.context_utils import create_context
 from pants_test.engine.base_engine_test import EngineTestBase
 
 
@@ -28,18 +27,19 @@ class EngineTest(EngineTestBase):
         self._action()
 
   def setUp(self):
-    self.context = create_context()
+    super(EngineTest, self).setUp()
+    self._context = self.context()
 
   def assert_attempt(self, engine, *goal_names):
     self.assertEqual(1, len(engine.attempts))
 
     context, goals = engine.attempts[0]
-    self.assertEqual(self.context, context)
+    self.assertEqual(self._context, context)
     self.assertEqual(self.as_goals(*goal_names), goals)
 
   def test_execute_success(self):
     engine = self.RecordingEngine()
-    result = engine.execute(self.context, self.as_goals('one', 'two'))
+    result = engine.execute(self._context, self.as_goals('one', 'two'))
     self.assertEqual(0, result)
     self.assert_attempt(engine, 'one', 'two')
 
@@ -50,12 +50,12 @@ class EngineTest(EngineTestBase):
 
   def test_execute_raise(self):
     engine = self.RecordingEngine(action=self._throw(TaskError()))
-    result = engine.execute(self.context, self.as_goals('three'))
+    result = engine.execute(self._context, self.as_goals('three'))
     self.assertEqual(1, result)
     self.assert_attempt(engine, 'three')
 
   def test_execute_code(self):
     engine = self.RecordingEngine(action=self._throw(TaskError(exit_code=42)))
-    result = engine.execute(self.context, self.as_goals('four', 'five', 'six'))
+    result = engine.execute(self._context, self.as_goals('four', 'five', 'six'))
     self.assertEqual(42, result)
     self.assert_attempt(engine, 'four', 'five', 'six')

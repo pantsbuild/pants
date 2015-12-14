@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import subprocess
 
-from pants.backend.core.tasks.task import Task
 from pants.base.exceptions import TaskError
+from pants.task.task import Task
 
 from pants.contrib.cpp.targets.cpp_binary import CppBinary
 from pants.contrib.cpp.targets.cpp_library import CppLibrary
@@ -45,8 +45,6 @@ class CppTask(Task):
       subprocess.check_call(cmd, stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
     except subprocess.CalledProcessError as e:
       raise TaskError('Execution failed: {0}'.format(e))
-    except:
-      raise TaskError('Failed to execute {0}'.format(cmd))
 
   @property
   def cpp_toolchain(self):

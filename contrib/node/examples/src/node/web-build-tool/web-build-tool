@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+# Assumes this is being run via "npm run web-build-tool" in a containing project.
+# That means this script is executed via the symlink [containing project directory]/node_modules/.bin/web-build-tool.
+
+project_bin_dir=$(dirname "${BASH_SOURCE[0]}")
+resolved_symlink=$(readlink "${BASH_SOURCE[0]}")
+web_build_tool_dir=$(dirname "${project_bin_dir}/${resolved_symlink}")
+
+cd "${web_build_tool_dir}"
+./node_modules/.bin/webpack --config ../../webpack.config.js $@

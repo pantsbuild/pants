@@ -15,7 +15,16 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <entry name="?*{{.}}"/>
       {{/project.resource_extensions}}
     </wildcardResourcePatterns>
-    <annotationProcessing enabled="false" useClasspath="true"/>
+    <annotationProcessing>
+      <profile default="true" name="Default" enabled="{{project.annotation_processing.enabled}}">
+        <sourceOutputDir name="{{project.annotation_processing.rel_source_output_dir}}" />
+        <sourceTestOutputDir name="{{project.annotation_processing.rel_test_source_output_dir}}" />
+        {{#project.annotation_processing.processors}}
+          <processor name="{{class_name}}" />
+        {{/project.annotation_processing.processors}}
+        <processorPath useClasspath="true" />
+      </profile>
+    </annotationProcessing>
   </component>
 
   <component name="JavacSettings">

@@ -1,0 +1,48 @@
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+thrift1 = Target(
+  sources=None,
+)
+
+thrift2 = Target(
+  sources={},
+  dependencies=[
+    ':thrift1',
+  ]
+)
+
+java1 = Target(
+  dependencies=[
+    ':thrift2',
+  ],
+  configurations=[
+    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
+    # off / prove the capabilities of the new BUILD graph parser.
+    ApacheThriftConfig(
+      version='0.9.2',
+      strict=True,
+      lang='java',
+    ),
+    ':nonstrict',
+    PublishConfig(
+      default_repo=':public',
+      repos={
+        'jake': Config(
+          url='https://dl.bintray.com/pantsbuild/maven'
+        ),
+        'jane': ':public'
+      }
+    )
+  ]
+)
+
+nonstrict = ApacheThriftConfig(
+  version='0.9.2',
+  strict=False,
+  lang='java'
+)
+
+public = Config(
+  url='https://oss.sonatype.org/#stagingRepositories'
+)

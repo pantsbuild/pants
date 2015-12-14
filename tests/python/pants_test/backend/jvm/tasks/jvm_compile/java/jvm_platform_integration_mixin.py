@@ -12,16 +12,15 @@ from textwrap import dedent
 
 from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
-from pants_test.testutils.compile_strategy_utils import provide_compile_strategies
 
 
 class JvmPlatformIntegrationMixin(object):
-  """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, jmake)."""
+  """Mixin providing lots of JvmPlatform-related integration tests to java compilers (eg, zinc)."""
 
   def get_pants_compile_args(self):
     """List of arguments to pants that determine what compiler to use.
 
-    The compiling task must be the last argument (eg, compile.java, compile.zinc-java).
+    The compiling task must be the last argument (eg, compile.zinc).
     """
     raise NotImplementedError
 
@@ -57,7 +56,7 @@ class JvmPlatformIntegrationMixin(object):
           class_to_version[os.path.relpath(path, tempdir)] = self.determine_version(path)
     return class_to_version
 
-  def _get_compiled_class_versions(self, strategy, spec, more_args=None):
+  def _get_compiled_class_versions(self, spec, more_args=None):
     more_args = more_args or []
     jar_name = os.path.basename(spec)
     while jar_name.endswith(':'):
@@ -65,11 +64,11 @@ class JvmPlatformIntegrationMixin(object):
     if ':' in jar_name:
       jar_name = jar_name[jar_name.find(':') + 1:]
     with temporary_dir() as cache_dir:
-      config = {'cache.compile.java': {'write_to': [cache_dir]}}
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+      with self.temporary_workdir() as workdir:
         pants_run = self.run_pants_with_workdir(
           ['binary'] + self.get_pants_compile_args()
-          + ['--strategy={}'.format(strategy), 'compile.checkstyle', '--skip', spec]
+          + ['compile.checkstyle', '--skip', spec]
           + more_args,
           workdir, config)
         self.assert_success(pants_run)
@@ -82,40 +81,36 @@ class JvmPlatformIntegrationMixin(object):
                      'Compiled class versions differed.\n  expected: {}\n  received: {}'
                      .format(format_dict(expected), format_dict(received)))
 
-  @provide_compile_strategies
-  def test_compile_java6(self, strategy):
+  def test_compile_java6(self):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/targetlevels/java6'
     self.assert_class_versions({
       'org/pantsbuild/testproject/targetlevels/java6/Six.class': '1.6',
-    }, self._get_compiled_class_versions(strategy, target_spec))
+    }, self._get_compiled_class_versions(target_spec))
 
-  @provide_compile_strategies
-  def test_compile_java7(self, strategy):
+  def test_compile_java7(self):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/targetlevels/java7'
     self.assert_class_versions({
       'org/pantsbuild/testproject/targetlevels/java7/Seven.class': '1.7',
-    }, self._get_compiled_class_versions(strategy, target_spec))
+    }, self._get_compiled_class_versions(target_spec))
 
-  @provide_compile_strategies
-  def test_compile_java7on6(self, strategy):
+  def test_compile_java7on6(self):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/targetlevels/java7on6'
     self.assert_class_versions({
       'org/pantsbuild/testproject/targetlevels/java7on6/SevenOnSix.class': '1.7',
       'org/pantsbuild/testproject/targetlevels/java6/Six.class': '1.6',
-    }, self._get_compiled_class_versions(strategy, target_spec))
+    }, self._get_compiled_class_versions(target_spec))
 
-  @provide_compile_strategies
-  def test_compile_target_coercion(self, strategy):
+  def test_compile_target_coercion(self):
     target_spec = 'testprojects/src/java/org/pantsbuild/testproject/targetlevels/unspecified'
     self.assert_class_versions({
       'org/pantsbuild/testproject/targetlevels/unspecified/Unspecified.class': '1.7',
       'org/pantsbuild/testproject/targetlevels/unspecified/Six.class': '1.6',
-    }, self._get_compiled_class_versions(strategy, target_spec, more_args=[
+    }, self._get_compiled_class_versions(target_spec, more_args=[
       '--jvm-platform-validate-check=warn',
       '--jvm-platform-default-platform=java7',
     ]))
 
-  def _test_compile(self, target_level, class_name, source_contents, strategy, platform_args=None):
+  def _test_compile(self, target_level, class_name, source_contents, platform_args=None):
     with temporary_dir(root_dir=os.path.abspath('.')) as tmpdir:
       with open(os.path.join(tmpdir, 'BUILD'), 'w') as f:
         f.write(dedent('''
@@ -139,47 +134,43 @@ class JvmPlatformIntegrationMixin(object):
       command.extend(['--jvm-platform-platforms={}'.format(platforms),
                       '--jvm-platform-default-platform={}'.format(target_level)])
       command.extend(self.get_pants_compile_args())
-      command.extend(['--strategy={}'.format(strategy), tmpdir])
+      command.extend([tmpdir])
 
       pants_run = self.run_pants(command)
       return pants_run
 
-  @provide_compile_strategies
-  def test_compile_diamond_operator_java7_works(self, strategy):
+  def test_compile_diamond_operator_java7_works(self):
     pants_run = self._test_compile('1.7', 'Diamond', dedent('''
       public class Diamond<T> {
         public static void main(String[] args) {
           Diamond<String> diamond = new Diamond<>();
         }
       }
-    '''), strategy)
+    '''))
     self.assert_success(pants_run)
 
-  @provide_compile_strategies
-  def test_compile_diamond_operator_java6_fails(self, strategy):
+  def test_compile_diamond_operator_java6_fails(self):
     pants_run = self._test_compile('1.6', 'Diamond', dedent('''
       public class Diamond<T> {
         public static void main(String[] args) {
           Diamond<String> diamond = new Diamond<>();
         }
       }
-    '''), strategy)
+    '''))
     self.assert_failure(pants_run)
 
-  @provide_compile_strategies
-  def test_compile_with_javac_args(self, strategy):
+  def test_compile_with_javac_args(self):
     pants_run = self._test_compile('1.7', 'LintyDiamond', dedent('''
       public class LintyDiamond<T> {
         public static void main(String[] args) {
           LintyDiamond<String> diamond = new LintyDiamond<>();
         }
       }
-    '''), strategy, platform_args=['-C-Xlint:cast'])
+    '''), platform_args=['-C-Xlint:cast'])
     self.assert_success(pants_run)
 
   def test_compile_stale_platform_settings(self):
     # Tests that targets are properly re-compiled when their source/target levels change.
-    # This currently fails because JMAKE doesn't realize that the old class files should be removed.
     with temporary_dir(root_dir=os.path.abspath('.')) as tmpdir:
       with open(os.path.join(tmpdir, 'BUILD'), 'w') as f:
         f.write(dedent('''
@@ -202,15 +193,14 @@ class JvmPlatformIntegrationMixin(object):
       }
 
       # We run these all in the same working directory, because we're testing caching behavior.
-      with temporary_dir(root_dir=self.workdir_root()) as workdir:
+      with self.temporary_workdir() as workdir:
 
         def compile_diamond(platform):
           return self.run_pants_with_workdir(['--jvm-platform-platforms={}'.format(platforms),
                                               '--jvm-platform-default-platform={}'.format(platform),
                                               '-ldebug',
                                               'compile'] + self.get_pants_compile_args() +
-                                              ['--strategy=isolated',
-                                               '{}:diamond'.format(tmpdir)], workdir=workdir)
+                                              ['{}:diamond'.format(tmpdir)], workdir=workdir)
 
         # We shouldn't be able to compile this with -source=6.
         self.assert_failure(compile_diamond('java6'), 'Diamond.java was compiled successfully with '
@@ -226,6 +216,6 @@ class JvmPlatformIntegrationMixin(object):
         self.assert_failure(compile_diamond('java6'), 'Diamond.java erroneously compiled in java6,'
                                                       ' which means that either compilation was'
                                                       ' skipped due to bad fingerprinting/caching,'
-                                                      ' or the compiler (probably jmake) failed to'
-                                                      ' clean up the previous class from the java7'
+                                                      ' or the compiler failed to clean up the'
+                                                      ' previous class from the java7'
                                                       ' compile.')

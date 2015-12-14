@@ -12,8 +12,6 @@ from org.pantsbuild.example.precipitation.ttypes import Precipitation
 
 
 # Illustrate using Thrift-generated code from Python.
-
-
 class UseThriftTest(unittest.TestCase):
   def test_make_it_rain(self):
     distance = Distance()

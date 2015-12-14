@@ -10,9 +10,9 @@ import subprocess
 from contextlib import closing
 from StringIO import StringIO
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 
@@ -21,6 +21,7 @@ from pants_test.base_test import BaseTest
 def is_exe(name):
   result = subprocess.call(['which', name], stdout=open(os.devnull, 'w'), stderr=subprocess.STDOUT)
   return result == 0
+
 
 def ensure_cached(task_cls, expected_num_artifacts=None):
   """Decorator for a task-executing unit test. Asserts that after running
@@ -38,7 +39,7 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
     def wrapper(self, *args, **kwargs):
       with temporary_dir() as artifact_cache:
         self.set_options_for_scope('cache.{}'.format(self.options_scope),
-                                   write_to=artifact_cache)
+                                   write_to=[artifact_cache])
         task_cache = os.path.join(artifact_cache, task_cls.stable_name())
         os.mkdir(task_cache)
 
@@ -57,8 +58,11 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
 
   return decorator
 
+
 class TaskTestBase(BaseTest):
   """A baseclass useful for testing a single Task type."""
+
+  options_scope = 'test_scope'
 
   @classmethod
   def task_type(cls):
@@ -67,7 +71,6 @@ class TaskTestBase(BaseTest):
 
   def setUp(self):
     super(TaskTestBase, self).setUp()
-    self.options_scope = 'test_scope'
     self._testing_task_type = self.synthesize_task_subtype(self.task_type(), self.options_scope)
     # We locate the workdir below the pants_workdir, which BaseTest locates within the BuildRoot.
     # BaseTest cleans this up, so we don't need to.  We give it a stable name, so that we can
@@ -103,15 +106,17 @@ class TaskTestBase(BaseTest):
   def set_options(self, **kwargs):
     self.set_options_for_scope(self.options_scope, **kwargs)
 
-  def context(self, for_task_types=None, options=None, target_roots=None,
-              console_outstream=None, workspace=None):
+  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
+              console_outstream=None, workspace=None, for_subsystems=None):
     # Add in our task type.
     for_task_types = [self._testing_task_type] + (for_task_types or [])
     return super(TaskTestBase, self).context(for_task_types=for_task_types,
                                              options=options,
+                                             passthru_args=passthru_args,
                                              target_roots=target_roots,
                                              console_outstream=console_outstream,
-                                             workspace=workspace)
+                                             workspace=workspace,
+                                             for_subsystems=for_subsystems)
 
   def create_task(self, context, workdir=None):
     return self._testing_task_type(context, workdir or self._test_workdir)
@@ -142,20 +147,33 @@ class ConsoleTaskTestBase(TaskTestBase):
       task.execute()
       return output.getvalue()
 
-  def execute_console_task(self, targets=None, extra_targets=None, options=None, workspace=None):
+  def execute_console_task(self, targets=None, extra_targets=None, options=None,
+                           passthru_args=None, workspace=None):
     """Creates a new task and executes it with the given config, command line args and targets.
 
     :param options: option values.
     :param targets: optional list of Target objects passed on the command line.
     :param extra_targets: optional list of extra targets in the context in addition to those
                           passed on the command line.
+    :param passthru_args: optional list of passthru_args
     :param workspace: optional Workspace to pass into the context.
 
     Returns the list of items returned from invoking the console task's console_output method.
     """
     options = options or {}
     self.set_options(**options)
-    context = self.context(target_roots=targets, workspace=workspace)
+    context = self.context(target_roots=targets, passthru_args=passthru_args, workspace=workspace)
+    return self.execute_console_task_given_context(context, extra_targets=extra_targets)
+
+  def execute_console_task_given_context(self, context, extra_targets=None):
+    """Creates a new task and executes it with the context and extra targets.
+
+    :param context: The pants run context to use.
+    :param extra_targets: An optional list of extra targets in the context in addition to those
+                          passed on the command line.
+    :returns: The list of items returned from invoking the console task's console_output method.
+    :rtype: list of strings
+    """
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()) + list(extra_targets or ())))
 

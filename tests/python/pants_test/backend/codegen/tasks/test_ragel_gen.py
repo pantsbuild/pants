@@ -11,6 +11,7 @@ from textwrap import dedent
 from pants.backend.codegen.targets.java_ragel_library import JavaRagelLibrary
 from pants.backend.codegen.tasks.ragel_gen import RagelGen, calculate_genfile
 from pants.util.contextutil import temporary_file
+from pants.util.dirutil import safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -68,12 +69,12 @@ class RagelGenTest(TaskTestBase):
                               sources=['atoi.rl'])
     task = self.create_task(self.context(target_roots=[target]))
 
-    task.execute()
+    target_workdir = safe_mkdtemp(dir=self.test_workdir)
+    task.execute_codegen(target, target_workdir)
 
     generated_files = []
-    outdir = task.codegen_workdir(target)
-    for root, _, files in os.walk(outdir):
-      generated_files.extend(os.path.relpath(os.path.join(root, f), outdir) for f in files)
+    for root, _, files in os.walk(target_workdir):
+      generated_files.extend(os.path.relpath(os.path.join(root, f), target_workdir) for f in files)
 
     self.assertEqual(['com/example/atoi/Parser.java'], generated_files)
 

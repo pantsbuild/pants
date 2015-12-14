@@ -1,0 +1,104 @@
+{
+  "type_alias": "jar",
+  "abstract": true,
+  "org": "org.apache.thrift",
+  "name": "libthrift"
+}
+
+{
+  "type_alias": "jar",
+  "org": "org.slf4j",
+  "name": "slf4j-api",
+  "rev": "1.6.1"
+}
+
+{
+  "type_alias": "target",
+  "abstract": true,
+  "name": "java_thrift_base",
+  "configurations": [
+    {
+      "type_alias": "apache_thrift_configuration",
+      "rev": "0.9.2",
+      "strict": true,
+      "gen": "java",
+      "deps": [
+        {
+          "type_alias": "jar",
+          "extends": ":libthrift",
+          "rev": "0.9.2"
+        },
+        {
+          "type_alias": "jar",
+          "org": "commons-lang",
+          "name": "commons-lang",
+          "rev": "2.5"
+        },
+        ":slf4j-api"
+      ]
+    }
+  ]
+}
+
+{
+  "type_alias": "scrooge_configuration",
+  "name": "scrooge_scala_config",
+  "rev": "3.20.0",
+  "strict": true,
+  "lang": "scala",
+  "deps": [
+    {
+      "type_alias": "jar",
+      "extends": ":libthrift",
+      "rev": "0.6.1"
+    },
+    {
+      "type_alias": "jar",
+      "org": "com.twitter",
+      "name": "scrooge-core_2.10",
+      "rev": "3.20.0"
+    },
+    {
+      "type_alias": "jar",
+      "org": "com.twitter",
+      "name": "finagle-thrift_2.10",
+      "rev": "6.28.0"
+    },
+    "3rdparty/jvm:scala-library"
+  ]
+}
+
+{
+  "type_alias": "target",
+  "abstract": true,
+  "name": "scala_thrift_base",
+  "configurations": [
+    ":scrooge_scala_config"
+  ]
+}
+
+{
+  "type_alias": "target",
+  "abstract": true,
+  "name": "all_jvm_thrift_base",
+  "merges": [":java_thrift_base", ":scala_thrift_base"],
+  "configurations": [
+    {
+      "type_alias": "scrooge_configuration",
+      "merges": [":scrooge_scala_config"],
+      "name": "scrooge_java_config",
+      "lang": "java",
+      "deps": [
+        "3rdparty/jvm:scala-library",
+        ":slf4j-api"
+      ]
+    },
+    {
+      "type_alias": "apache_thrift_configuration",
+      "name": "failing",
+      "rev": "fail",
+      "strict": true,
+      "gen": "java"
+    }
+  ]
+}

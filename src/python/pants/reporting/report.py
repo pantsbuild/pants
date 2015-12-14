@@ -7,11 +7,24 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import threading
 
-from twitter.common.threading import PeriodicThread
-
 
 class ReportingError(Exception):
   pass
+
+
+class EmitterThread(threading.Thread):
+  def __init__(self, report, name):
+    super(EmitterThread, self).__init__(name=name)
+    self._report = report
+    self._stop = threading.Event()
+    self.daemon = True
+
+  def run(self):
+    while not self._stop.wait(timeout=0.5):
+      self._report.flush()
+
+  def stop(self):
+    self._stop.set()
 
 
 class Report(object):
@@ -35,9 +48,7 @@ class Report(object):
 
   def __init__(self):
     # We periodically emit newly gathered output from tool invocations.
-    self._emitter_thread = \
-      PeriodicThread(target=self.flush, name='output-emitter', period_secs=0.5)
-    self._emitter_thread.daemon = True
+    self._emitter_thread = EmitterThread(report=self, name='output-emitter')
 
     # Map from workunit id to workunit.
     self._workunits = {}
@@ -57,7 +68,6 @@ class Report(object):
   # Note that if you addr/remove reporters after open() has been called you have
   # to ensure that their state is set up correctly. Best only to do this with
   # stateless reporters, such as ConsoleReporter.
-
   def add_reporter(self, name, reporter):
     with self._lock:
       self._reporters[name] = reporter

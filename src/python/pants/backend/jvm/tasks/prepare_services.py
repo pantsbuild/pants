@@ -16,6 +16,7 @@ from pants.util.dirutil import safe_open
 
 class JvmServiceFingerprintStrategy(DefaultFingerprintStrategy):
   """Fingerprints a JvmTarget for its service provider configuration."""
+
   def compute_fingerprint(self, target):
     return stable_json_sha1(target.services)
 
@@ -26,13 +27,14 @@ class PrepareServices(ResourcesTask):
   This automates maintenance of jvm service provider configuration files as described here:
   https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
   """
+
   @staticmethod
   def service_info_path(service):
     return os.path.join('META-INF', 'services', service)
 
   def find_all_relevant_resources_targets(self):
     def may_have_jvm_services(target):
-      return isinstance(target, JvmTarget)
+      return isinstance(target, JvmTarget) and target.services.values()
     return self.context.targets(predicate=may_have_jvm_services)
 
   def create_invalidation_strategy(self):
@@ -52,6 +54,3 @@ class PrepareServices(ResourcesTask):
           write_line('# Generated from pants target {}'.format(target.address.spec))
           for impl in impls:
             write_line(impl)
-
-  def relative_resource_paths(self, target, chroot):
-    return [self.service_info_path(service) for service, impls in target.services.items() if impls]

@@ -1,0 +1,3 @@
+<scalastyle>
+ <check level="error" class="org.scalastyle.file.FileTabChecker" enabled="true" />
+</scalastyle>

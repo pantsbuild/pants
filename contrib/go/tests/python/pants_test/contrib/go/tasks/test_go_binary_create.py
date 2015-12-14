@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.base.target import Target
+from pants.build_graph.target import Target
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 from pants_test.tasks.task_test_base import TaskTestBase

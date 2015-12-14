@@ -15,7 +15,7 @@ from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import BundleField, PrimitiveField
-from pants.base.target import Target
+from pants.build_graph.target import Target
 
 
 class RelativeToMapper(object):
@@ -140,7 +140,7 @@ class Bundle(object):
 
 
 class JvmApp(Target):
-  """A JVM-based application consisting of a binary plus "extra files".
+  """A deployable JVM application.
 
   Invoking the ``bundle`` goal on one of these targets creates a
   self-contained artifact suitable for deployment on some other machine.

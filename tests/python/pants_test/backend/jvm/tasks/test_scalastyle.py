@@ -34,7 +34,6 @@ class ScalastyleTest(NailgunTaskTestBase):
   #
   # Internal test helper section
   #
-
   def _create_scalastyle_config_file(self, rules=None):
     # put a default rule there if rules are not specified.
     rules = rules or ['org.scalastyle.scalariform.ImportGroupingChecker']

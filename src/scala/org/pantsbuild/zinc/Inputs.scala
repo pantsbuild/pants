@@ -6,6 +6,7 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList, Map => JMap }
+
 import sbt.Logger
 import sbt.Path._
 import sbt.compiler.IC
@@ -23,9 +24,7 @@ case class Inputs(
   scalacOptions: Seq[String],
   javacOptions: Seq[String],
   cacheFile: File,
-  analysisMap: Map[File, Analysis],
-  forceClean: Boolean,
-  definesClass: File => String => Boolean,
+  analysisMap: AnalysisMap,
   javaOnly: Boolean,
   compileOrder: CompileOrder,
   incOptions: IncOptions)
@@ -45,20 +44,10 @@ object Inputs {
       javacOptions,
       analysis.cache,
       analysis.cacheMap,
-      analysis.forceClean,
       javaOnly,
       compileOrder,
       incOptions)
   }
-
-  /** An overridden definesClass to use analysis for an input directory if it is available. */
-  def definesClass(log: Logger, analysisMap: Map[File, Analysis], entry: File): String => Boolean =
-    analysisMap.get(entry).map { analysis =>
-      log.debug(s"Hit analysis cache for class definitions with ${entry}")
-      (s: String) => analysis.relations.definesClass(s).nonEmpty
-    }.getOrElse {
-      Locate.definesClass(entry)
-    }
 
   /**
    * Create normalised and defaulted Inputs.
@@ -72,36 +61,26 @@ object Inputs {
     javacOptions: Seq[String],
     analysisCache: Option[File],
     analysisCacheMap: Map[File, File],
-    forceClean: Boolean,
     javaOnly: Boolean,
     compileOrder: CompileOrder,
     incOptions: IncOptions): Inputs =
   {
     val normalise: File => File = { _.getAbsoluteFile }
-    val cp               = classpath map normalise
-    val srcs             = sources map normalise
-    val classes          = normalise(classesDirectory)
-    val cacheFile        = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
-    val upstreamAnalysis = analysisCacheMap map { case (k, v) => (normalise(k), normalise(v)) }
-    // Use only existing upstream analysis files for class lookups.
-    val validUpstreamAnalysis =
-      upstreamAnalysis.flatMap {
-        case (k, _) if k == classes =>
-          // ignore our own analysis
-          None
-        case (k, v) =>
-          // use analysis only if it was valid/non-empty
-          Compiler.analysisOptionFor(v).map { analysis =>
-            k -> analysis
-          }
-      }
+    val cp = classpath map normalise
+    val srcs = sources map normalise
+    val classes = normalise(classesDirectory)
+    val cacheFile = normalise(analysisCache.getOrElse(defaultCacheLocation(classesDirectory)))
     val analysisMap =
-      cp.map { file =>
-        file -> initialAnalysisFor(file, classes, upstreamAnalysis, incOptions.nameHashing)
-      }.toMap
-    val incOpts          = updateIncOptions(incOptions, classesDirectory, normalise)
+      AnalysisMap.create(
+        analysisCacheMap.collect {
+          case (k, v) if normalise(k) != classes =>
+            (normalise(k), normalise(v))
+        },
+        log
+      )
+    val incOpts = updateIncOptions(incOptions, classesDirectory, normalise)
     new Inputs(
-      cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap, forceClean, definesClass(log, validUpstreamAnalysis, _),
+      cp, srcs, classes, scalacOptions, javacOptions, cacheFile, analysisMap,
       javaOnly, compileOrder, incOpts
     )
   }
@@ -129,7 +108,6 @@ object Inputs {
     javacOptions.asScala,
     Option(analysisCache),
     analysisMap.asScala.toMap,
-    forceClean = false,
     javaOnly = false,
     Settings.compileOrder(compileOrder),
     incOptions
@@ -141,24 +119,6 @@ object Inputs {
   def defaultCacheLocation(classesDir: File) = {
     classesDir.getParentFile / "cache" / classesDir.getName
   }
-
-  /**
-   * Get the possible cache location for a classpath entry. Checks the upstream analysis map
-   * for the cache location, otherwise uses the default location for output directories.
-   */
-  private def cacheLocationFor(file: File, exclude: File, mapped: Map[File, File]): Option[File] =
-    mapped.get(file) orElse {
-      if (file.isDirectory && file != exclude) Some(defaultCacheLocation(file)) else None
-    }
-
-  /**
-   * Get the analysis for a compile run, based on a classpath entry.
-   * If not cached in memory, reads from the cache file, or creates empty analysis.
-   */
-  def initialAnalysisFor(file: File, exclude: File, mapped: Map[File, File], nameHashing: Boolean): Analysis =
-    cacheLocationFor(file, exclude, mapped).flatMap(Compiler.analysisOptionFor).getOrElse {
-      ZincPrivateAnalysis.empty(nameHashing)
-    }
 
   /**
    * Normalise files and default the backup directory.
@@ -239,7 +199,6 @@ object Inputs {
       "javac options"                -> javacOptions,
       "cache file"                   -> cacheFile,
       "analysis map"                 -> analysisMap,
-      "force clean"                  -> forceClean,
       "java only"                    -> javaOnly,
       "compile order"                -> compileOrder,
       "incremental compiler options" -> incOpts)

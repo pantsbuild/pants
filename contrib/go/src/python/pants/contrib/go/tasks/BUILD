@@ -5,6 +5,7 @@ target(
     ':go_buildgen',
     ':go_compile',
     ':go_fetch',
+    ':go_go',
     ':go_run',
     ':go_test',
   ]
@@ -31,12 +32,11 @@ python_library(
     'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
-    'src/python/pants/base:address',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
-    'src/python/pants/base:source_root',
     'src/python/pants/base:workunit',
+    'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
@@ -61,11 +61,22 @@ python_library(
     'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
-    'src/python/pants/base:address',
-    'src/python/pants/base:address_lookup_error',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
+  name='go_go',
+  sources=['go_go.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:ansicolors',
+    'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/task',
   ]
 )
 
@@ -89,7 +100,7 @@ python_library(
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
-    'src/python/pants/backend/core/tasks:task',
+    'src/python/pants/task',
     'src/python/pants/util:memo',
   ]
 )
@@ -108,7 +119,6 @@ python_library(
   name='go_workspace_task',
   sources=['go_workspace_task.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',

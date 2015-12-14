@@ -82,10 +82,6 @@ class BinaryUtil(object):
     """Indicates that no urls were specified in pants.ini."""
     pass
 
-  class MissingBinaryUtilOptionsError(Exception):
-    """Internal error. --supportdir and --version must be registered in register_options()"""
-    pass
-
   def _select_binary_base_path(self, supportdir, version, name, uname_func=None):
     """Calculate the base path.
 
@@ -136,12 +132,10 @@ class BinaryUtil(object):
       self._path_by_id.update(path_by_id)
 
   @contextmanager
-  def _select_binary_stream(self, supportdir, version, name, url_opener=None):
+  def _select_binary_stream(self, name, binary_path, url_opener=None):
     """Select a binary matching the current os and architecture.
 
-    :param string supportdir: The path the `name` binaries are stored under.
-    :param string version: The version number of the binary to select.
-    :param string name: The name of the binary to fetch.
+    :param string binary_path: The path to the binary to fetch.
     :param url_opener: Optional argument used only for testing, to 'pretend' to open urls.
     :returns: a 'stream' to download it from a support directory. The returned 'stream' is actually
       a lambda function which returns the files binary contents.
@@ -152,7 +146,6 @@ class BinaryUtil(object):
     if not self._baseurls:
       raise self.NoBaseUrlsError(
           'No urls are defined for the --pants-support-baseurls option.')
-    binary_path = self._select_binary_base_path(supportdir, version, name)
     if url_opener is None:
       url_opener = lambda u: closing(urllib_request.urlopen(u, timeout=self._timeout_secs))
 
@@ -171,7 +164,7 @@ class BinaryUtil(object):
         accumulated_errors.append('Failed to fetch binary from {url}: {error}'
                                   .format(url=url, error=e))
     if not downloaded_successfully:
-      raise self.BinaryNotFound((supportdir, version, name), accumulated_errors)
+      raise self.BinaryNotFound(binary_path, accumulated_errors)
 
   def select_binary(self, supportdir, version, name):
     """Selects a binary matching the current os and architecture.
@@ -182,14 +175,29 @@ class BinaryUtil(object):
     :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
       and name could be found for the current platform.
     """
-    # TODO(John Sirois): finish doc of the path structure expected under base_path
+    # TODO(John Sirois): finish doc of the path structure expected under base_path.
     binary_path = self._select_binary_base_path(supportdir, version, name)
+    return self._fetch_binary(name=name, binary_path=binary_path)
+
+  def select_script(self, supportdir, version, name):
+    """Selects a platform-independent script.
+
+    :param string supportdir: The path the `name` scripts are stored under.
+    :param string version: The version number of the script to select.
+    :param string name: The name of the script to fetch.
+    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no script of the given version
+      and name could be found.
+    """
+    binary_path = os.path.join(supportdir, version, name)
+    return self._fetch_binary(name=name, binary_path=binary_path)
+
+  def _fetch_binary(self, name, binary_path):
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
     if not os.path.exists(bootstrapped_binary_path):
       downloadpath = bootstrapped_binary_path + '~'
       try:
-        with self._select_binary_stream(supportdir, version, name) as stream:
+        with self._select_binary_stream(name, binary_path) as stream:
           with safe_open(downloadpath, 'wb') as bootstrapped_binary:
             bootstrapped_binary.write(stream())
           os.rename(downloadpath, bootstrapped_binary_path)
