@@ -12,6 +12,7 @@ from pants.base.exceptions import TaskError
 from pants.option.options import Options
 from pants.util.dirutil import safe_mkdir
 
+from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
 
 
@@ -39,8 +40,12 @@ class ScalaJSLink(NailgunTask):
 
   @classmethod
   def product_types(cls):
-    # Outputs are provided as synthetic resource targets to downstream consumers.
-    return ['resources_by_target']
+    # Outputs are provided as javascript blobs to downstream consumers.
+    return ['scala_js_binaries']
+
+  @classmethod
+  def global_subsystems(cls):
+    return {ScalaJSPlatform}
 
   @property
   def cache_target_dirs(self):
@@ -50,10 +55,11 @@ class ScalaJSLink(NailgunTask):
     return isinstance(target, ScalaJSBinary)
 
   def _target_file(self, vt):
-    return os.path.join(vt.results_dir, "{}.js".format(vt.target.id))
+    return os.path.join(vt.results_dir, "{}.js".format(vt.target.name))
 
   def execute(self):
-    resources_by_target = self.context.products.get_data('resources_by_target')
+    scala_js_binaries = self.context.products.get_data('scala_js_binaries',
+                                                       lambda: defaultdict(MultipleRootedProducts))
     with self.invalidated(
         self.context.targets(self._is_linked),
         invalidate_dependents=True) as invalidation_check:
@@ -63,7 +69,7 @@ class ScalaJSLink(NailgunTask):
           self._link(vt.target, self._target_file(vt))
         else:
           self.context.log.debug('Already linked {}'.format(vt.target.address.spec))
-        resources_by_target[vt.target].add_abs_paths(vt.results_dir, [self._target_file(vt)])
+        scala_js_binaries[vt.target].add_abs_paths(vt.results_dir, [self._target_file(vt)])
 
   def _link(self, target, output_file):
     args = ['--output', output_file]

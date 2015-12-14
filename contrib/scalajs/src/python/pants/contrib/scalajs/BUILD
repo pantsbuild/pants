@@ -1,8 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  name='scalajs',
+contrib_plugin(
+  name='plugin',
   dependencies=[
     'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
     'contrib/scalajs/src/python/pants/contrib/scalajs/targets',
@@ -10,5 +10,9 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
-  sources=globs('*.py'),
+  distribution_name='pantsbuild.pants.contrib.scalajs',
+  description='scala.js support for pants.',
+  build_file_aliases=True,
+  register_goals=True,
+  global_subsystems=True
 )

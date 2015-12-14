@@ -4,6 +4,7 @@
 python_library(
   name = 'targets',
   dependencies = [
+    'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/scalajs/src/python/pants/contrib/scalajs/subsystems',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
