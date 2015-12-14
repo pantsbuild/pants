@@ -41,15 +41,15 @@ class FileDepsTest(ConsoleTaskTestBase):
         self.create_files(path, sources)
       self.add_to_build_file(path, definition)
 
-    create_target(path='tools',
-                  definition=dedent("""
-                    jar_library(
-                      name='scala-library',
-                      jars=[
-                        jar('org.scala-lang', 'scala-library', '2.11.2'),
-                      ]
-                    )
-                  """))
+    # create_target(path='tools',
+    #               definition=dedent("""
+    #                 jar_library(
+    #                   name='scala-library',
+    #                   jars=[
+    #                     jar('org.scala-lang', 'scala-library', '2.11.2'),
+    #                   ]
+    #                 )
+    #               """))
 
     create_target(path='src/scala/core',
                   definition=dedent("""
@@ -162,7 +162,7 @@ class FileDepsTest(ConsoleTaskTestBase):
 
   def test_globs(self):
     self.assert_console_output(
-      'tools/BUILD',
+      # 'tools/BUILD',
       'src/scala/core/BUILD',
       'src/scala/core/core1.scala',
       'src/java/core/BUILD',
@@ -187,14 +187,14 @@ class FileDepsTest(ConsoleTaskTestBase):
       'src/scala/core/core1.scala',
       'src/thrift/storage/BUILD',
       'src/thrift/storage/data_types.thrift',
-      'tools/BUILD',
+      # 'tools/BUILD',
       targets=[self.target('project:app')],
       options=dict(globs=True),
     )
 
   def test_scala_java_cycle_scala_end(self):
     self.assert_console_output(
-      'tools/BUILD',
+      # 'tools/BUILD',
       'src/scala/core/BUILD',
       'src/scala/core/core1.scala',
       'src/java/core/BUILD',
@@ -205,7 +205,7 @@ class FileDepsTest(ConsoleTaskTestBase):
 
   def test_scala_java_cycle_java_end(self):
     self.assert_console_output(
-      'tools/BUILD',
+      # 'tools/BUILD',
       'src/scala/core/BUILD',
       'src/scala/core/core1.scala',
       'src/java/core/BUILD',
@@ -216,7 +216,7 @@ class FileDepsTest(ConsoleTaskTestBase):
 
   def test_concrete_only(self):
     self.assert_console_output(
-      'tools/BUILD',
+      # 'tools/BUILD',
       'src/java/lib/BUILD',
       'src/java/lib/lib1.java',
       'src/thrift/storage/BUILD',
@@ -233,7 +233,7 @@ class FileDepsTest(ConsoleTaskTestBase):
 
   def test_jvm_app(self):
     self.assert_console_output(
-      'tools/BUILD',
+      # 'tools/BUILD',
       'project/BUILD',
       'project/config/app.yaml',
       'src/java/bin/BUILD',

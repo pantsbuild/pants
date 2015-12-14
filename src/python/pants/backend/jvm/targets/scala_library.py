@@ -45,8 +45,7 @@ class ScalaLibrary(ExportableJvmLibrary):
   def traversable_dependency_specs(self):
     for spec in super(ScalaLibrary, self).traversable_dependency_specs:
       yield spec
-    yield '//{}'.format(
-      ScalaPlatform._synthetic_runtime_target(self._build_graph).address.spec)
+    yield ScalaPlatform._synthetic_runtime_target(self._build_graph).address.spec
 
   @property
   def traversable_specs(self):

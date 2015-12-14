@@ -27,6 +27,10 @@ class FileDeps(ConsoleTask):
     register('--globs', default=False, action='store_true',
              help='Instead of outputting filenames, output globs (ignoring excludes)')
 
+  def _is_concrete(self, target):
+    """Does this target have a corresponding build_file"""
+    return hasattr(target.address, 'build_file')
+
   def console_output(self, targets):
     concrete_targets = set()
     for target in targets:
@@ -43,6 +47,9 @@ class FileDeps(ConsoleTask):
     buildroot = get_buildroot()
     files = set()
     output_globs = self.get_options().globs
+
+    # Filter out any synthetic targets, which will not have a build_file attr.
+    concrete_targets = set(filter(self._is_concrete, concrete_targets))
     for target in concrete_targets:
       files.add(target.address.build_file.full_path)
       if output_globs or target.has_sources():

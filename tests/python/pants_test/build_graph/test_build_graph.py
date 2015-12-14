@@ -255,7 +255,11 @@ class BuildGraphTest(BaseTest):
                                  '^BUILD file does not exist at:.*/non-existent-path/BUILD'
                                  '\s+when translating spec non-existent-path:b'
                                  '\s+referenced from //:a$'):
-      self.inject_address_closure('//:a')
+      try:
+        self.inject_address_closure('//:a')
+      except Exception as e:
+        print('"{}"'.format(e.message))
+        raise
 
   def test_invalid_address_two_hops(self):
     self.add_to_build_file('BUILD',
@@ -271,7 +275,11 @@ class BuildGraphTest(BaseTest):
                                  '\s+when translating spec non-existent-path:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from //:a$'):
-      self.inject_address_closure('//:a')
+      try:
+        self.inject_address_closure('//:a')
+      except Exception as e:
+        print('"{}"'.format(e.message))
+        raise
 
   def test_invalid_address_two_hops_same_file(self):
     self.add_to_build_file('BUILD',
@@ -291,7 +299,11 @@ class BuildGraphTest(BaseTest):
                                  '\s+referenced from goodpath:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from //:a$'):
-      self.inject_address_closure('//:a')
+      try:
+        self.inject_address_closure('//:a')
+      except Exception as e:
+        print('"{}"'.format(e.message))
+        raise
 
   def test_raise_on_duplicate_dependencies(self):
     self.add_to_build_file('BUILD',
