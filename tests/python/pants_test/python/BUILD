@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
 # XXX this tests the code running the test, not the code under test!
 python_tests(
   name = 'test_antlr_builder',
@@ -21,14 +22,6 @@ python_tests(
     'testprojects/src/thrift/org/pantsbuild/testing:duck-py',
     'testprojects/src/thrift/org/pantsbuild/testing:goose-py',
   ],
-)
-
-python_library(
-  name = 'echo_interpreter_version_lib',
-  sources = ['echo_interpreter_version.py'],
-  dependencies = [],
-  # Play with this to test interpreter selection in the pex machinery.
-  compatibility = ['CPython>=2.6,<3']
 )
 
 python_tests(
@@ -62,58 +55,4 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ],
-)
-
-# Used by interpreter_selection_integration.
-python_binary(
-  name = 'echo_interpreter_version_2.6',
-  dependencies = [
-    ':echo_interpreter_version_lib',
-  ],
-  entry_point = 'pants_test.python.echo_interpreter_version',
-  compatibility = ['CPython>=2.6,<2.7']
-)
-
-# Used by interpreter_selection_integration.
-python_binary(
-  name = 'echo_interpreter_version_2.7',
-  dependencies = [
-    ':echo_interpreter_version_lib',
-  ],
-  entry_point = 'pants_test.python.echo_interpreter_version',
-  compatibility = ['CPython>=2.7,<3']
-)
-
-# Useful for manual testing.
-python_binary(
-  name = 'echo_interpreter_version',
-  dependencies = [
-    ':echo_interpreter_version_lib',
-  ],
-  entry_point = 'pants_test.python.echo_interpreter_version',
-)
-
-# Useful for manual testing.
-python_binary(
-  name = 'deliberately_conficting_compatibility',
-  dependencies = [
-    ':echo_interpreter_version_lib',
-  ],
-  entry_point = 'pants_test.python.echo_interpreter_version',
-  compatibility = ['CPython<2.6']
-)
-
-python_library(
-  name = 'die_lib',
-  sources = ['die.py'],
-  dependencies = [],
-  compatibility = ['CPython>=2.6,<3']
-)
-
-python_binary(
-  name = 'die',
-  dependencies = [
-    ':die_lib',
-  ],
-  entry_point = 'pants_test.python.die',
 )
