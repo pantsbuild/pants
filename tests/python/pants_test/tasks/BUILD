@@ -28,11 +28,11 @@ python_tests(
   sources = ['test_builddict.py'],
   dependencies = [
     ':task_test_base',
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/core/tasks:builddictionary',
     'src/python/pants/backend/core/tasks:reflect',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/build_graph',
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
     'tests/python/pants_test:base_test',
@@ -63,10 +63,10 @@ python_tests(
   name = 'reflect',
   sources = ['test_reflect.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/core/tasks:reflect',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )

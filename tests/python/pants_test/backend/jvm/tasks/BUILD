@@ -210,11 +210,11 @@ python_tests(
   name = 'ivy_utils',
   sources = ['test_ivy_utils.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',

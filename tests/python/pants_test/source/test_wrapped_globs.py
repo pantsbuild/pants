@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.source.wrapped_globs import Globs, RGlobs
 from pants_test.base_test import BaseTest
 
 
@@ -21,6 +21,7 @@ class FilesetRelPathWrapperTest(BaseTest):
   def alias_groups(self):
     return BuildFileAliases(
       targets={
+        # TODO: Use dummy target type instead of depending on jvm backend.
         'java_library': JavaLibrary,
       },
       context_aware_object_factories={

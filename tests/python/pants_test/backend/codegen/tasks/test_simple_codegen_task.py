@@ -10,11 +10,10 @@ from textwrap import dedent
 
 from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
-from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.register import build_file_aliases as register_core
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 

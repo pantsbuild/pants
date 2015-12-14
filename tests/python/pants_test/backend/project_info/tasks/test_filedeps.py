@@ -9,10 +9,10 @@ import os
 from textwrap import dedent
 
 from pants.backend.codegen.register import build_file_aliases as register_codegen
-from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.filedeps import FileDeps
+from pants.build_graph.register import build_file_aliases as register_core
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
