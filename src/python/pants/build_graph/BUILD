@@ -8,7 +8,6 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core:wrapped_globs',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:build_environment',
@@ -18,6 +17,7 @@ python_library(
     'src/python/pants/base:parse_context',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
+    'src/python/pants/base:source_root',
     'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/subsystem',

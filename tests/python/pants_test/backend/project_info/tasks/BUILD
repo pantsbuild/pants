@@ -28,10 +28,10 @@ python_tests(
   sources = ['test_depmap.py'],
   coverage = ['pants.backend.project_info.tasks.depmap'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:depmap',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -60,7 +60,6 @@ python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -97,10 +96,10 @@ python_tests(
   sources = ['test_filedeps.py'],
   dependencies = [
     'src/python/pants/backend/codegen:plugin',
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:filedeps',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
