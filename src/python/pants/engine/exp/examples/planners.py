@@ -164,25 +164,19 @@ class ThriftPlanner(TaskPlanner):
                     if (product_type == self.product_type_by_config_type.get(type(config))))
     if not configs:
       # We don't know how to generate these type of sources for this subject.
-      return None
+      raise self.Error('No configuration for generating {!r} from {!r}.'.format(product_type, target))
     if len(configs) > 1:
       raise self.Error('Found more than one configuration for generating {!r} from {!r}:\n\t{}'
                        .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
     return configs[0]
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    if not isinstance(subject, Target):
-      return None
-
     thrift_sources = list(subject.sources.iter_paths(base_path=subject.address.spec_path,
                                                      ext='.thrift'))
     if not thrift_sources:
-      return None
+      raise self.Error('No thrift sources for {!r} from {!r}.'.format(product_type, subject))
 
     config = self._extract_thrift_config(product_type, subject, configuration=configuration)
-    if config is None:
-      return None
-
     subject = Subject(subject, alternate=Target(dependencies=config.deps))
     inputs = self.plan_parameters(scheduler, product_type, subject, config)
     return Plan(func_or_task_type=self.gen_func, subjects=(subject,), sources=thrift_sources, **inputs)
@@ -258,13 +252,7 @@ class BuildPropertiesPlanner(TaskPlanner):
     return {Classpath: [[BuildPropertiesConfiguration]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    if not isinstance(subject, Target):
-      return
-    name_config = filter(lambda x: isinstance(x, BuildPropertiesConfiguration), subject.configurations)
-    if not name_config:
-      return
     assert product_type == Classpath
-
     return Plan(func_or_task_type=write_name_file, subjects=(subject,), name=subject.name)
 
 
@@ -346,9 +334,6 @@ class JvmCompilerPlanner(TaskPlanner):
     """
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    if not isinstance(subject, Target):
-      return None
-
     sources = list(subject.sources.iter_paths(base_path=subject.address.spec_path,
                                               ext=self.source_ext))
     if not sources:
@@ -363,20 +348,14 @@ class JvmCompilerPlanner(TaskPlanner):
       # or transformed into a `Classpath` product by some other compiler targeting the jvm.
       sources = scheduler.promise(subject,
                                   Sources.of(self.source_ext),
-                                  configuration=configuration,
-                                  required=False)
-      if sources:
-        subject = sources.subject
-
-    if not sources:
-      # We don't know how to compile this subject, someone else may (Scalac, Groovyc, ...)
-      return None
+                                  configuration=configuration)
+      subject = sources.subject
 
     classpath_promises = []
     for dep, dep_config in self.iter_configured_dependencies(subject):
       # This could recurse to us (or be satisfied by IvyResolve, another jvm compiler, etc.
       # depending on the dep type).
-      classpath = scheduler.promise(dep, Classpath, configuration=dep_config, required=True)
+      classpath = scheduler.promise(dep, Classpath, configuration=dep_config)
       classpath_promises.append(classpath)
 
     return Plan(func_or_task_type=self.compile_task_type,

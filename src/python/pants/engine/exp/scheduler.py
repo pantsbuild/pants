@@ -261,11 +261,11 @@ class Plan(Serializable):
 
 
 class SchedulingError(Exception):
-  """Indicates inability to make a required scheduling promise."""
+  """Indicates inability to make a scheduling promise."""
 
 
 class NoProducersError(SchedulingError):
-  """Indicates no planners were able to promise a required product for a given subject."""
+  """Indicates no planners were able to promise a product for a given subject."""
 
   def __init__(self, product_type, subject=None):
     msg = ('No plans to generate {!r}{} could be made.'
@@ -301,7 +301,7 @@ class Scheduler(AbstractClass):
   """Schedule the creation of products."""
 
   @abstractmethod
-  def promise(self, subject, product_type, configuration=None, required=True):
+  def promise(self, subject, product_type, configuration=None):
     """Return an promise for a product of the given `product_type` for the given `subject`.
 
     The subject can either be a :class:`pants.engine.exp.objects.Serializable` object or else an
@@ -310,18 +310,14 @@ class Scheduler(AbstractClass):
 
     If a configuration is supplied, the promise is for the requested product in that configuration.
 
-    If the promise is required and no production plans can be made a
-    :class:`Scheduler.SchedulingError` is raised.
+    If no production plans can be made a :class:`Scheduler.SchedulingError` is raised.
 
     :param object subject: The subject that the product type should be created for.
     :param type product_type: The type of product to promise production of for the given subject.
     :param object configuration: An optional requested configuration for the product.
-    :param bool required: `False` if the product is not required; `True` by default.
-    :returns: A promise to make the given product type available for subject at task execution time
-              or None if the promise was not required and no production plans could be made.
+    :returns: A promise to make the given product type available for subject at task execution time.
     :rtype: :class:`Promise`
-    :raises: :class:`SchedulerError` if the promise was required and no production plans could be
-             made.
+    :raises: :class:`SchedulerError` if no production plans could be made.
     """
 
 
@@ -429,13 +425,11 @@ class Planners(object):
     :type planners: :class:`collections.Iterable` of :class:`TaskPlanner`
     """
     self._planners_by_goal_name = defaultdict(set)
-    self._planners_by_product_type = defaultdict(set)
     self._product_requirements = defaultdict(dict)
     self._output_products = set()
     for planner in planners:
       self._planners_by_goal_name[planner.goal_name].add(planner)
       for output_type, input_type_requirements in planner.product_types.items():
-        self._planners_by_product_type[output_type].add(planner)
         self._product_requirements[output_type][planner] = input_type_requirements
         self._output_products.add(output_type)
 
@@ -447,20 +441,32 @@ class Planners(object):
     """
     return self._planners_by_goal_name[goal_name]
 
-  def for_product_type(self, product_type):
-    """Return the set of task planners that can produce the given product type.
+  def for_product_type_and_subject(self, product_type, subject):
+    """Return the set of task planners that can produce the given product type for the subject.
+
+    TODO: memoize.
 
     :param type product_type: The product type the returned planners are capable of producing.
+    :param subject: The subject that the product will be produced for.
     :rtype: set of :class:`TaskPlanner`
     """
-    return self._planners_by_product_type[product_type]
+    input_products = list(Products.for_subject(subject))
+    fully_consumed = set()
+    partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
+    for planner, ored_clauses in self._product_requirements[product_type].items():
+      if self._apply_product_requirement_clauses(input_products,
+                                                 planner,
+                                                 ored_clauses,
+                                                 fully_consumed,
+                                                 partially_consumed_candidates):
+        yield planner
 
-  def _apply_product_requirement_clause(self,
-                                        input_products,
-                                        planner,
-                                        ored_clauses,
-                                        fully_consumed,
-                                        partially_consumed_candidates):
+  def _apply_product_requirement_clauses(self,
+                                         input_products,
+                                         planner,
+                                         ored_clauses,
+                                         fully_consumed,
+                                         partially_consumed_candidates):
     for anded_clause in ored_clauses:
       # Determine which of the anded clauses can be satisfied.
       matched = [self._apply_product_requirements(product_req,
@@ -473,13 +479,13 @@ class Planners(object):
       if matched_count == len(anded_clause):
         # If all product requirements in the clause are satisfied by the input products, then
         # we've found a planner capable of producing this product.
-        print('>>> planner {} has required inputs {}'.format(planner, anded_clause))
+        #print('>>> planner {} has required inputs {}'.format(planner, anded_clause))
         fully_consumed.update(anded_clause)
         return True
       elif matched_count > 0:
         # On the other hand, if only some of the products from the clause were matched, collect
         # the partially consumed values.
-        print('>>> planner {} has partial inputs {}'.format(planner, zip(anded_clause, matched)))
+        #print('>>> planner {} has partial inputs {}'.format(planner, zip(anded_clause, matched)))
         consumed = set()
         unconsumed = set()
         for requirement, was_consumed in zip(anded_clause, matched):
@@ -500,25 +506,25 @@ class Planners(object):
     """
     if output_product_type in input_products:
       # Requirement is directly satisfied.
-      print('>>> product {} directly available in inputs'.format(output_product_type))
+      #print('>>> product {} directly available in inputs'.format(output_product_type))
       return True
     elif output_product_type not in self._output_products:
       # Requirement can't be satisfied.
-      print('>>> product {} is not directly available in inputs ({}) and cannot be produced by the configured planners ({})'.format(output_product_type, input_products, self._output_products))
+      #print('>>> product {} is not directly available in inputs ({}) and cannot be produced by the configured planners ({})'.format(output_product_type, input_products, self._output_products))
       return False
     else:
       # Requirement might be possible to satisfy by requesting additional products.
       matched = False
       for planner, ored_clauses in self._product_requirements[output_product_type].items():
-        matched |= self._apply_product_requirement_clause(input_products,
-                                                          planner,
-                                                          ored_clauses,
-                                                          fully_consumed,
-                                                          partially_consumed_candidates)
+        matched |= self._apply_product_requirement_clauses(input_products,
+                                                           planner,
+                                                           ored_clauses,
+                                                           fully_consumed,
+                                                           partially_consumed_candidates)
       return matched
 
   def produced_types_for_subject(self, subject, output_product_types):
-    """Filters the given list of output products to those that are actual possible to produce.
+    """Filters the given list of output products to those that are actually possible to produce.
 
     This method additionally validates that there are no "partially consumed" input products.
     A partially consumed input product is a product where no planner successfully consumes the
@@ -540,9 +546,9 @@ class Planners(object):
       if producible:
         producible_output_types.add(output_product_type)
 
-    print('>>> for {} (with inputs {}), producible types are: {}'.format(subject, input_products, producible_output_types))
-    print('>>> fully consumed products: {}'.format(fully_consumed))
-    print('>>> partially consumed candidates: {}'.format(partially_consumed_candidates))
+    #print('>>> for {} (with inputs {}), producible types are: {}'.format(subject, input_products, producible_output_types))
+    #print('>>> fully consumed products: {}'.format(fully_consumed))
+    #print('>>> partially consumed candidates: {}'.format(partially_consumed_candidates))
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
     partially_consumed = {product: partials
@@ -797,7 +803,7 @@ class LocalScheduler(Scheduler):
         product_types.update(planner.product_types.keys())
       for subject in subjects:
         for product_type in self._planners.produced_types_for_subject(subject, product_types):
-          root_promises.append(self.promise(subject, product_type, required=True))
+          root_promises.append(self.promise(subject, product_type))
 
     # Give aggregating planners a chance to aggregate plans.
     for planner, plans_by_product_type in self._plans_by_product_type_by_planner.items():
@@ -816,25 +822,17 @@ class LocalScheduler(Scheduler):
     def finalize_plans(cls, plans):
       return plans
 
-  # A sentinel that denotes a `None` planning result that was accepted.  This can happen for
-  # promise requests that are not required.
-  NO_PLAN = Plan(func_or_task_type=None, subjects=())
-
-  def promise(self, subject, product_type, configuration=None, required=True):
+  def promise(self, subject, product_type, configuration=None):
     if isinstance(subject, Address):
       subject = self._graph.resolve(subject)
 
     promise = Promise(product_type, subject, configuration=configuration)
     plan = self._product_mapper.promised(promise)
     if plan is not None:
-      # The `NO_PLAN` plan may have been decided in a non-required round.
-      if required and promise is self.NO_PLAN:
-        raise NoProducersError(product_type, subject)
-      return None if promise is self.NO_PLAN else promise
+      return promise
 
-    planners = self._planners.for_product_type(product_type)
-    if required and not planners:
-      raise NoProducersError(product_type)
+    planners = list(self._planners.for_product_type_and_subject(product_type, subject))
+    print('>>> for {} and {}, using planners:\n\t{}'.format(product_type, subject, planners))
 
     plans = []
     for planner in planners:
@@ -853,10 +851,7 @@ class LocalScheduler(Scheduler):
       planners = [planner for planner, plan in plans]
       raise ConflictingProducersError(product_type, subject, planners)
     elif not plans:
-      if required:
-        raise NoProducersError(product_type, subject)
-      self._product_mapper.register_promises(product_type, self.NO_PLAN)
-      return None
+      raise NoProducersError(product_type, subject)
 
     planner, plan = plans[0]
     try:
