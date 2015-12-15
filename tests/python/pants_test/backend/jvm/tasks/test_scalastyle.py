@@ -101,10 +101,19 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.make_target(':scala-compiler',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.10.5')])
+      self.make_target(':scala-compiler_211',
+                       JarLibrary,
+                       jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.11.7')])
       self.make_target(':scala-library',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
       self.set_options_for_scope(ScalaPlatform.options_scope, scalac=':scala-compiler')
+
+      # Scala Platform requires options to be defined for scalac_2_10 and scalac_2_11,
+      # because it all jvm tools are bootstrapped.
+      self.set_options_for_scope(ScalaPlatform.options_scope, scalac_2_10=':scala-compiler')
+      self.set_options_for_scope(ScalaPlatform.options_scope, scalac_2_11=':scala-compiler_211')
+      self.set_options_for_scope(ScalaPlatform.options_scope, version='custom')
       yield
 
   def test_get_non_synthetic_scala_targets(self):

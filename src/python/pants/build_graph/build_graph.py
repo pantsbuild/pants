@@ -391,8 +391,6 @@ class BuildGraph(object):
         if not self.contains_address(maybe_synthetic_address):
           addr = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
           self.inject_address_closure(addr)
-        else:
-          print('skipping {}'.format(spec))
 
       for traversable_spec in target.traversable_dependency_specs:
         inject_spec_closure(traversable_spec)

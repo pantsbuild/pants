@@ -35,7 +35,6 @@ class ScalaLibraryTest(BaseTest):
     super(ScalaLibraryTest, self).setUp()
     self.context(options={
       'scala-platform': {
-        'runtime': [],
         'version': '2.10'
       }
     })
