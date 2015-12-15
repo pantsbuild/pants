@@ -8,8 +8,6 @@ import org.scalatest.MustMatchers
 import org.scalatest.WordSpec
 import org.scalatest.junit.JUnitRunner
 
-import org.mozilla.javascript.Context
-
 import com.google.common.base.Charsets
 import com.google.common.io.Resources
 
@@ -17,24 +15,9 @@ import com.google.common.io.Resources
 class FactfinderSpec extends WordSpec with MustMatchers {
   "Factfinder" should {
     "be available on the classpath" in {
-      factfinderResource must not equal(null)
-    }
-
-    "work when run with rhino" in {
-			val cx = Context.enter()
-			try {
-			  val scope = cx.initStandardObjects()
-        val factfinder = Resources.toString(factfinderResource, Charsets.UTF_8)
-			  val result: Any = cx.evaluateString(scope, factfinder, "<cmd>", 1, null)
-
-			  Context.toString(result) must equal("1")
-			} finally {
-			  // Exit from the context.
-			  Context.exit()
-			}
+      val factfinderURL = Resources.getResource("factfinder.js")
+      factfinderURL must not equal(null)
+      Resources.toString(factfinderURL, Charsets.UTF_8).nonEmpty must equal(true)
     }
   }
-
-  def factfinderResource =
-    Resources.getResource("factfinder.js")
 }
