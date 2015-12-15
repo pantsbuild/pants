@@ -443,7 +443,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       }
       profile = self.get_options().profile
       if profile:
-        env['PEX_PROFILE'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
+        env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
       with environment_as(**env):
         rc = self._pex_run(pex, workunit, args=args, setsid=True)
         return PythonTestResult.rc(rc)
