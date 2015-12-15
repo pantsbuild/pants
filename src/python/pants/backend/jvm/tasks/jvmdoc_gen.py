@@ -11,8 +11,6 @@ import multiprocessing
 import os
 import subprocess
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
@@ -157,7 +155,7 @@ class JvmdocGen(JvmTask):
             multiprocessing.Pool(processes=min(len(jobs), multiprocessing.cpu_count()))) as pool:
         # map would be a preferable api here but fails after the 1st batch with an internal:
         # ...
-        #  File "...src/python/pants/backend/core/tasks/jar_create.py", line 170, in javadocjar
+        #  File "...src/python/pants/backend/jvm/tasks/jar_create.py", line 170, in javadocjar
         #      pool.map(createjar, jobs)
         #    File "...lib/python2.6/multiprocessing/pool.py", line 148, in map
         #      return self.map_async(func, iterable, chunksize).get()

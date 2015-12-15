@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.target_filter_task_mixin import TargetFilterTaskMixin
+from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase

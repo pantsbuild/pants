@@ -13,7 +13,7 @@ from pants.util.dirutil import touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class CacheCleanupTest(PantsRunIntegrationTest):
+class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
   def create_platform_args(self, version):
     return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.core.tasks.listtargets import ListTargets
+from pants.backend.graph_info.tasks.listtargets import ListTargets
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact

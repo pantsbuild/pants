@@ -45,6 +45,7 @@ target(
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/docgen:plugin',
+    'src/python/pants/backend/graph_info:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info:plugin',
     'src/python/pants/backend/python:plugin',
