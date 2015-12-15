@@ -113,6 +113,7 @@ def load_build_configuration_from_source(build_configuration, additional_backend
   # pants.core_tasks aren't really backends.
   backend_packages = ['pants.build_graph',
                       'pants.core_tasks',
+                      'pants.backend.graph_info',
                       'pants.backend.docgen',
                       'pants.backend.authentication',
                       'pants.backend.core',
