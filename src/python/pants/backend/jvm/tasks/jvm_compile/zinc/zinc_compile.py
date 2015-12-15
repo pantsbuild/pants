@@ -185,12 +185,6 @@ class BaseZincCompile(JvmCompile):
     """Optionally write the results of incremental compiles to the cache."""
     return self.get_options().incremental_caching
 
-  def select(self, target):
-    return target.has_sources('.java') or target.has_sources('.scala')
-
-  def select_source(self, source_file_path):
-    return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
-
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
 
