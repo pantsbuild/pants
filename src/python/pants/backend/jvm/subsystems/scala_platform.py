@@ -16,11 +16,14 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized
 
 
-major_version_info = namedtuple('major_version_info', 'full_version compiler_name runtime_name')
+major_version_info = namedtuple(
+  'major_version_info',
+  'full_version compiler_name runtime_name repl_name')
+
 scala_build_info = {
-  '2.10': major_version_info('2.10.4', 'scalac_2_10', 'runtime_2_10'),
-  '2.11': major_version_info('2.11.7', 'scalac_2_11', 'runtime_2_11'),
-  'custom': major_version_info(None, 'scalac', 'runtime_default'),
+  '2.10': major_version_info('2.10.4', 'scalac_2_10', 'runtime_2_10', 'scala_2_10_repl'),
+  '2.11': major_version_info('2.11.7', 'scalac_2_11', 'runtime_2_11', 'scala_2_11_repl'),
+  'custom': major_version_info(None, 'scalac', 'runtime_default', 'scala-repl'),
 }
 
 
@@ -81,6 +84,44 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                           rev = scala_build_info['2.10'].full_version),
                           ])
 
+    # Scala 2.10 repl
+    cls.register_jvm_tool(register,
+                          'scala_2_10_repl',
+                          classpath=[
+                            JarDependency(org = 'org.scala-lang',
+                                          name = 'jline',
+                                          rev = scala_build_info['2.10'].full_version),
+                            JarDependency(org = 'org.scala-lang',
+                                          name = 'scala-compiler',
+                                          rev = scala_build_info['2.10'].full_version),
+                          ])
+
+
+    # Scala 2.11 repl
+    cls.register_jvm_tool(register,
+                          'scala_2_11_repl',
+                          classpath=[
+                            JarDependency(org = 'org.scala-lang',
+                                          name = 'jline',
+                                          rev = scala_build_info['2.11'].full_version),
+                            JarDependency(org = 'org.scala-lang',
+                                          name = 'scala-compiler',
+                                          rev = scala_build_info['2.11'].full_version),
+                          ])
+
+    # Provide a default so that if scala-repl since all jvm tools are bootstrapped.
+    cls.register_jvm_tool(register,
+                          'scala_repl',
+                          classpath=[
+                            JarDependency(org = 'org.scala-lang',
+                                          name = 'jline',
+                                          rev = scala_build_info['2.10'].full_version),
+                            JarDependency(org = 'org.scala-lang',
+                                          name = 'scala-compiler',
+                                          rev = scala_build_info['2.10'].full_version),
+                          ])
+
+
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
     compiler_name = scala_build_info.get(self.get_options().version, 'custom').compiler_name
@@ -100,6 +141,12 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                       '({1}): it will be added automatically.'.format(name, self.version))
     return '{0}_{1}'.format(name, self.version)
 
+  @property
+  def repl(self):
+    """Return the proper repl name.
+    :return iterator: list with single runtime.
+    """
+    return scala_build_info.get(self.get_options().version, 'repl_default').repl_name
   @property
   def runtime(self):
     """Return the proper runtime based on scala version.
