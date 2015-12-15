@@ -20,6 +20,11 @@ from pants.util.dirutil import safe_mkdir
 
 class BundleCreate(JvmBinaryTask):
 
+  # Prefixes are used to avoid name conflict when both internal and external jars are
+  # placed in the same directory.
+  INTERNAL_JAR_PREFIX = 'internal-'
+  EXTERNAL_JAR_PREFIX = '3rdparty-'
+
   @classmethod
   def register_options(cls, register):
     super(BundleCreate, cls).register_options(register)
@@ -121,15 +126,16 @@ class BundleCreate(JvmBinaryTask):
       # Add external dependencies to the bundle.
       for path, coordinate in self.list_external_jar_dependencies(app.binary):
         external_jar = coordinate.artifact_filename
-        destination = os.path.join(lib_dir, external_jar)
+        destination = os.path.join(lib_dir, self.EXTERNAL_JAR_PREFIX + external_jar)
         verbose_symlink(path, destination)
         classpath.add(destination)
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
-    canonical_classpath_base_dir = lib_dir if not self._create_deployjar else None
+    canonical_classpath_prefix = os.path.join(lib_dir, self.INTERNAL_JAR_PREFIX) \
+      if not self._create_deployjar else None
     with self.monolithic_jar(app.binary, bundle_jar,
-                             canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
+                             canonical_classpath_prefix=canonical_classpath_prefix) as jar:
       self.add_main_manifest_entry(jar, app.binary)
       if classpath:
         # append external dependencies to monolithic jar's classpath,

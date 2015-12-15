@@ -366,15 +366,15 @@ class JarBuilderTask(JarTask):
       self._jar = jar
       self._manifest = Manifest()
 
-    def add_target(self, target, recursive=False, canonical_classpath_base_dir=None):
+    def add_target(self, target, recursive=False, canonical_classpath_prefix=None):
       """Adds the classes and resources for a target to an open jar.
 
       :param target: The target to add generated classes and resources for.
       :param bool recursive: `True` to add classes and resources for the target's transitive
         internal dependency closure.
-      :param string canonical_classpath_base_dir: If set, instead of adding targets to the jar
-        bundle, create canonical symlinks to the original classpath and save canonical symlinks
-        to Manifest's Class-Path.
+      :param string canonical_classpath_prefix: If set, instead of adding targets to the jar
+        bundle, create canonical symlinks with this prefix to the original classpath and save
+        canonical symlinks to Manifest's Class-Path.
       :returns: `True` if the target contributed any files - manifest entries, classfiles or
         resource files - to this jar.
       :rtype: bool
@@ -410,11 +410,11 @@ class JarBuilderTask(JarTask):
       if not recursive and target.has_resources:
         targets += target.resources
       # We only gather internal classpath elements per our contract.
-      if canonical_classpath_base_dir:
+      if canonical_classpath_prefix:
         canonical_classpath = ClasspathUtil.create_canonical_classpath(
           classpath_products,
           targets,
-          canonical_classpath_base_dir
+          canonical_classpath_prefix
         )
         self._jar.append_classpath(canonical_classpath)
         products_added = True

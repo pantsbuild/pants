@@ -31,11 +31,12 @@ class RuntimeClasspathPublisher(Task):
     return self.options_scope.replace('.', os.sep)
 
   def execute(self):
-    basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
+    # append / to the end as part of the prefix
+    classpath_prefix = os.path.join(self.get_options().pants_distdir, self._output_folder, '')
     runtime_classpath = self.context.products.get_data('runtime_classpath')
     use_target_id = not self.get_options().use_old_naming_style
     ClasspathUtil.create_canonical_classpath(runtime_classpath,
                                              self.context.targets(),
-                                             basedir,
+                                             classpath_prefix,
                                              save_classpath_file=True,
                                              use_target_id=use_target_id)

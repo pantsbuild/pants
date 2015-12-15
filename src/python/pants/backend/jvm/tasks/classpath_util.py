@@ -5,13 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
+import re
 
 from twitter.common.collections import OrderedSet
 
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_open, safe_walk
+from pants.util.dirutil import fast_relpath, safe_delete, safe_open, safe_walk
 
 
 class ClasspathUtil(object):
@@ -149,65 +149,77 @@ class ClasspathUtil(object):
     return os.path.isdir(path)
 
   @classmethod
-  def create_canonical_classpath(cls, classpath_products, targets, basedir,
+  def create_canonical_classpath(cls, classpath_products, targets, symlink_prefix,
                                  save_classpath_file=False,
                                  use_target_id=True):
     """Create a stable classpath of symlinks with standardized names.
 
     :param classpath_products: Classpath products.
     :param targets: Targets to create canonical classpath for.
-    :param basedir: Directory to create symlinks.
+    :param symlink_prefix: Prefix for classpath symlinks.
     :param save_classpath_file: An optional file with original classpath entries that symlinks
       are created from.
 
     :returns: Converted canonical classpath.
     :rtype: list of strings
     """
-    def _stable_output_folder(basedir, target):
+    def delete_old_target_output_files(classpath_prefix):
+      """Delete existing output files or symlinks for target."""
+      directory, basename = os.path.split(classpath_prefix)
+      pattern = re.compile('{}(([0-9]+)(.jar)?|classpath.txt)'.format(basename))
+      files = [filename for filename in os.listdir(directory) if pattern.match(filename)]
+      for rel_path in files:
+        path = os.path.join(directory, rel_path)
+        if os.path.islink(path) or os.path.isfile(path):
+          safe_delete(path)
+
+    def prepare_target_output_folder(symlink_prefix, target):
+      """Prepare directory that will contain canonical classpath for the target.
+
+      This includes creating directories if it does not already exist, cleaning up
+      previous classpath output related to the target.
+      """
+      output_dir = os.path.dirname(symlink_prefix)
       if use_target_id:
-        return os.path.join(basedir, target.id)
+        classpath_prefix_for_target = symlink_prefix + target.id + '-'
+      else:
+        address = target.address
+        output_dir = os.path.join(
+          output_dir,
+          # target.address.spec is used in export goal to identify targets
+          address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
+        )
+        # append / to the end as part of the prefix
+        classpath_prefix_for_target = os.path.join(output_dir, '')
 
-      address = target.address
-      return os.path.join(
-        basedir,
-        # target.address.spec is used in export goal to identify targets
-        address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
-      )
-
-    def safe_delete_current_directory(directory):
-      """Delete only the files or symlinks under the current directory."""
-      try:
-        for name in os.listdir(directory):
-          path = os.path.join(directory, name)
-          if os.path.islink(path) or os.path.isfile(path):
-            safe_delete(path)
-      except OSError as e:
-        if e.errno != errno.ENOENT:
-          raise
+      if os.path.exists(output_dir):
+        delete_old_target_output_files(classpath_prefix_for_target)
+      else:
+        os.makedirs(output_dir)
+      return classpath_prefix_for_target
 
     canonical_classpath = []
     for target in targets:
-      folder_for_target_symlinks = _stable_output_folder(basedir, target)
-      safe_delete_current_directory(folder_for_target_symlinks)
+      classpath_prefix_for_target = prepare_target_output_folder(symlink_prefix, target)
 
       classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
         [target])
 
       if len(classpath_entries_for_target) > 0:
-        safe_mkdir(folder_for_target_symlinks)
 
         classpath = []
         for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
           classpath.append(entry.path)
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
-          file_name = os.path.basename(entry.path)
-          symlink_path = os.path.join(folder_for_target_symlinks, '{}-{}'.format(index, file_name))
+          _, ext = os.path.splitext(entry.path)
+
+          symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
 
         if save_classpath_file:
-          with safe_open(os.path.join(folder_for_target_symlinks, 'classpath.txt'), 'w') as classpath_file:
+          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'w') as classpath_file:
             classpath_file.write(os.pathsep.join(classpath))
             classpath_file.write('\n')
 
