@@ -83,8 +83,8 @@ class ScalaJSLink(NailgunTask):
       args.append('--checkIR')
 
     # NB: We give the linker the entire classpath for this target, and let it check validity.
-    compile_classpaths = self.context.products.get_data('compile_classpath')
-    args.extend(jar for _, jar in compile_classpaths.get_for_targets(target.closure(bfs=True)))
+    classpaths = self.context.products.get_data('runtime_classpath')
+    args.extend(jar for _, jar in classpaths.get_for_targets(target.closure(bfs=True)))
 
     result = self.runjava(classpath=self.tool_classpath('scala-js-cli'), main=self._SCALA_JS_CLI_MAIN,
                           jvm_options=self.get_options().jvm_options,

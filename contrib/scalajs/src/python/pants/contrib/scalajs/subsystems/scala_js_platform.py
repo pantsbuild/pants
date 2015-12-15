@@ -38,9 +38,11 @@ class ScalaJSPlatform(Subsystem, NodeResolverBase):
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
     # Copy any binaries to the results directory.
+    main = ''
     scala_js_binaries = node_task.context.products.get_data('scala_js_binaries')
     for dirname, rel_paths in scala_js_binaries[target].rel_paths():
       for rel_path in rel_paths:
+        main = rel_path
         src_path = os.path.join(dirname, rel_path)
         dest_path = os.path.join(results_dir, rel_path)
         safe_mkdir(os.path.dirname(dest_path))
@@ -50,6 +52,7 @@ class ScalaJSPlatform(Subsystem, NodeResolverBase):
     package = {
       'name': target.name,
       'version': '0.0.0',
+      'main': main,
     }
     with open(os.path.join(results_dir, 'package.json'), 'wb') as fp:
       json.dump(package, fp, indent=2)
