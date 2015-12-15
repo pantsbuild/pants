@@ -96,7 +96,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                           rev = scala_build_info['2.10'].full_version),
                           ])
 
-
     # Scala 2.11 repl
     cls.register_jvm_tool(register,
                           'scala_2_11_repl',
@@ -120,7 +119,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                           name = 'scala-compiler',
                                           rev = scala_build_info['2.10'].full_version),
                           ])
-
 
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
@@ -147,6 +145,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     :return iterator: list with single runtime.
     """
     return scala_build_info.get(self.get_options().version, 'repl_default').repl_name
+
   @property
   def runtime(self):
     """Return the proper runtime based on scala version.
