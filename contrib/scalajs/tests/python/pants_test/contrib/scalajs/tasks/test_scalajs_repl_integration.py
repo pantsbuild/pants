@@ -15,10 +15,10 @@ class ScalaJSReplIntegrationTest(PantsRunIntegrationTest):
   def test_run_repl(self):
     command = ['-q',
                'repl',
-               'contrib/scalajs/examples/src/scalajs/org/pantsbuild/example/factfinder']
+               'contrib/scalajs/examples/src/scala/org/pantsbuild/scalajs/example/factfinder']
     program = dedent("""
         var _ = require('factfinder');
-        org.pantsbuild.example.factfinder.Main().main();
+        org.pantsbuild.scalajs.example.factfinder.Main().main();
       """)
     pants_run = self.run_pants(command=command, stdin_data=program)
 

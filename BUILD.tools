@@ -28,12 +28,12 @@ jar_library(name = 'scalastyle',
               scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
             ])
 
-target(name = 'scala-js-cli', dependencies=['3rdparty/jvm/org/scala-js:cli'])
+target(name = 'scala-js-cli', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:cli'])
 target(name = 'scala-js-compiler', dependencies=[
-  '3rdparty/jvm/org/scala-js:compiler',
-  '3rdparty/jvm/org/scala-js:library',
+  'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
+  'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
 ])
-target(name = 'scala-js-library', dependencies=['3rdparty/jvm/org/scala-js:library'])
+target(name = 'scala-js-library', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:library'])
 
 
 jar_library(name = 'scrooge-gen',

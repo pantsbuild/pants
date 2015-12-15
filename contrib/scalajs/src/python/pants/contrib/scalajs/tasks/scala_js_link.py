@@ -42,8 +42,8 @@ class ScalaJSLink(NailgunTask):
 
   @classmethod
   def product_types(cls):
-    # Outputs are provided as javascript blobs to downstream consumers.
-    return ['scala_js_binaries']
+    # Outputs are javascript blobs provided as a product or a resource to downstream consumers.
+    return ['scala_js_binaries', 'runtime_classpath']
 
   @classmethod
   def global_subsystems(cls):
@@ -62,18 +62,20 @@ class ScalaJSLink(NailgunTask):
   def execute(self):
     scala_js_binaries = self.context.products.get_data('scala_js_binaries',
                                                        lambda: defaultdict(MultipleRootedProducts))
+    classpaths = self.context.products.get_data('runtime_classpath')
     with self.invalidated(
         self.context.targets(self._is_linked),
         invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if not vt.valid:
           self.context.log.debug('Linking {}...'.format(vt.target.address.spec))
-          self._link(vt.target, self._target_file(vt))
+          self._link(vt.target, self._target_file(vt), classpaths)
         else:
           self.context.log.debug('Already linked {}'.format(vt.target.address.spec))
         scala_js_binaries[vt.target].add_abs_paths(vt.results_dir, [self._target_file(vt)])
+        classpaths.add_for_target(vt.target, [('default', vt.results_dir)])
 
-  def _link(self, target, output_file):
+  def _link(self, target, output_file, classpaths):
     args = ['--output', output_file]
     if self.get_options().level == 'debug':
       args.append('--debug')
@@ -83,7 +85,6 @@ class ScalaJSLink(NailgunTask):
       args.append('--checkIR')
 
     # NB: We give the linker the entire classpath for this target, and let it check validity.
-    classpaths = self.context.products.get_data('runtime_classpath')
     args.extend(jar for _, jar in classpaths.get_for_targets(target.closure(bfs=True)))
 
     result = self.runjava(classpath=self.tool_classpath('scala-js-cli'), main=self._SCALA_JS_CLI_MAIN,

@@ -1,4 +1,4 @@
-package org.pantsbuild.example.factfinder
+package org.pantsbuild.scalajs.example.factfinder
 
 import scala.scalajs.js.annotation.JSExport
 import scala.scalajs.js.JSApp
