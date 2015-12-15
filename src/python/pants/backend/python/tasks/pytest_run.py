@@ -24,6 +24,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -443,7 +444,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       }
       profile = self.get_options().profile
       if profile:
-        env['PEX_PROFILE'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
+        env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
       with environment_as(**env):
         rc = self._pex_run(pex, workunit, args=args, setsid=True)
         return PythonTestResult.rc(rc)
@@ -505,7 +506,10 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
         failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
         return result.with_failed_targets(failed_targets)
 
-      args = []
+      # N.B. the `--confcutdir` here instructs pytest to stop scanning for conftest.py files at the
+      # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
+      # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
+      args = ['--confcutdir', get_buildroot()]
       if self._debug:
         args.extend(['-s'])
       if self.get_options().colors:
