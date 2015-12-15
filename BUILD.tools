@@ -4,14 +4,6 @@
 # common rev for all org.scala-lang%* artifacts
 SCALA_REV = '2.10.4'
 
-
-jar_library(name = 'scala-repl',
-            jars = [
-              jar(org = 'org.scala-lang', name = 'jline', rev = SCALA_REV, intransitive = True),
-            ],
-            dependencies = [
-            ])
-
 jar_library(name = 'scalastyle',
             jars = [
               scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
