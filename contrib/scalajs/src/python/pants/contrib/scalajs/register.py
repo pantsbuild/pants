@@ -11,22 +11,28 @@ from pants.goal.task_registrar import TaskRegistrar as task
 from pants.contrib.node.tasks.node_resolve import NodeResolve
 from pants.contrib.scalajs.subsystems.scala_js_platform import ScalaJSPlatform
 from pants.contrib.scalajs.targets.scala_js_binary import ScalaJSBinary
+from pants.contrib.scalajs.targets.scala_js_library import ScalaJSLibrary
 from pants.contrib.scalajs.tasks.scala_js_link import ScalaJSLink
 from pants.contrib.scalajs.tasks.scala_js_zinc_compile import ScalaJSZincCompile
 
-
-def global_subsystems():
-  return {ScalaJSPlatform}
 
 def build_file_aliases():
   return BuildFileAliases(
     targets={
       'scala_js_binary': ScalaJSBinary,
+      'scala_js_library': ScalaJSLibrary,
     },
   )
 
+
 def register_goals():
   NodeResolve.register_resolver_for_type(ScalaJSBinary, ScalaJSPlatform)
+  # NB: These task/goal assignments are pretty nuts, but are necessary in order to
+  # prevent product-graph cycles between the JVM and node.js.
+  #   see https://github.com/pantsbuild/pants/labels/engine
+  task(name='scala-js-compile', action=ScalaJSZincCompile).install('resolve')
+  task(name='scala-js-link', action=ScalaJSLink).install('resolve')
 
-  task(name='scala-js', action=ScalaJSZincCompile).install('compile')
-  task(name='scala-js', action=ScalaJSLink).install('link')
+
+def global_subsystems():
+  return {ScalaJSPlatform}

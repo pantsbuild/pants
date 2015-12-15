@@ -15,6 +15,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
@@ -354,6 +355,10 @@ class ZincCompile(BaseZincCompile):
     return ['runtime_classpath', 'classes_by_source', 'product_deps_by_src']
 
   def select(self, target):
+    # Require that targets are marked for JVM compilation, to differentiate from
+    # targets owned by the scalajs contrib module.
+    if not isinstance(target, JvmTarget):
+      return False
     return target.has_sources('.java') or target.has_sources('.scala')
 
   def select_source(self, source_file_path):

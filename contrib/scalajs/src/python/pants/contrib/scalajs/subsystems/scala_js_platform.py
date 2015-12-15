@@ -5,8 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
+import os
+import shutil
+
 from pants.option.custom_types import target_list_option
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 
@@ -32,12 +37,19 @@ class ScalaJSPlatform(Subsystem, NodeResolverBase):
     return self.get_options().runtime
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
-    # Copy sources owned by the target.
-    self._copy_sources(target, results_dir)
-
-    # Copy each binary to the results directory.
+    # Copy any binaries to the results directory.
     scala_js_binaries = node_task.context.products.get_data('scala_js_binaries')
-    for dirname, rel_path in scala_js_binaries[target].rel_paths():
-      dest_path = os.path.join(results_dir, rel_path)
-      safe_mkdir(os.path.dirname(dest_path))
-      shutil.copy2(os.path.join(dirname, rel_path), dest_path)
+    for dirname, rel_paths in scala_js_binaries[target].rel_paths():
+      for rel_path in rel_paths:
+        src_path = os.path.join(dirname, rel_path)
+        dest_path = os.path.join(results_dir, rel_path)
+        safe_mkdir(os.path.dirname(dest_path))
+        shutil.copy2(src_path, dest_path)
+    
+    # And emit an empty package.json.
+    package = {
+      'name': target.name,
+      'version': '0.0.0',
+    }
+    with open(os.path.join(results_dir, 'package.json'), 'wb') as fp:
+      json.dump(package, fp, indent=2)

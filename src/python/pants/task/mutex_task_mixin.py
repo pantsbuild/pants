@@ -110,8 +110,8 @@ class MutexTaskMixin(Task):
     if len(self.context.target_roots) == 0:
       raise self.NoActivationsError('No target specified.')
 
-    accepted = self.context.targets(accept_predicate)
-    rejected = self.context.targets(reject_predicate)
+    accepted = list(filter(accept_predicate, self.context.target_roots))
+    rejected = list(filter(reject_predicate, self.context.target_roots))
     if len(accepted) == 0:
       # no targets were accepted, regardless of rejects
       return None

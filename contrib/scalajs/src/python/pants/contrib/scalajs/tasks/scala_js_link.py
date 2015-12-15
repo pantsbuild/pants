@@ -6,9 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import defaultdict
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.goal.products import MultipleRootedProducts
 from pants.option.options import Options
 from pants.util.dirutil import safe_mkdir
 
@@ -82,7 +84,7 @@ class ScalaJSLink(NailgunTask):
 
     # NB: We give the linker the entire classpath for this target, and let it check validity.
     compile_classpaths = self.context.products.get_data('compile_classpath')
-    args.extend(jar for _, jar in compile_classpaths.get_for_target(target))
+    args.extend(jar for _, jar in compile_classpaths.get_for_targets(target.closure(bfs=True)))
 
     result = self.runjava(classpath=self.tool_classpath('scala-js-cli'), main=self._SCALA_JS_CLI_MAIN,
                           jvm_options=self.get_options().jvm_options,
@@ -92,6 +94,11 @@ class ScalaJSLink(NailgunTask):
     # that should be caused by a task-implementation error rather than a user error.
     if result != 0:
       raise TaskError(
-          'java {main} ... exited non-zero ({result})'.format(
-            main=self._SCALA_JS_CLI_MAIN, result=result),
+          'java {main} ... exited non-zero ({result}) for {target}'.format(
+            main=self._SCALA_JS_CLI_MAIN, result=result, target=target.address.spec),
+          failed_targets=[target])
+    if not os.path.exists(output_file):
+      raise TaskError(
+          'java {main} ... failed to produce an output for {target}'.format(
+            main=self._SCALA_JS_CLI_MAIN, target=target.address.spec),
           failed_targets=[target])
