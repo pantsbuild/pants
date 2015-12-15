@@ -178,7 +178,6 @@ class BuildFileAddressMapper(object):
     try:
       self.from_cache(self.root_dir, spec_path)
     except BuildFile.BuildFileError as e:
-      self.from_cache(self.root_dir, spec_path)
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
     return Address(spec_path, name)
