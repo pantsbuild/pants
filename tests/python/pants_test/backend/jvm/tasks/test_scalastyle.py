@@ -131,12 +131,11 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.set_options_for_scope(ScalaPlatform.options_scope, scalac=':scala-compiler')
 
       # Scala Platform requires options to be defined for any registered tools in ScalaPlatform,
-      # because it all jvm tools are bootstrapped.
+      # because all jvm tools are bootstrapped.
       self.set_options_for_scope(ScalaPlatform.options_scope, version='custom')
       self.set_options_for_scope(ScalaPlatform.options_scope, scalac_2_10=':scala-compiler')
       self.set_options_for_scope(ScalaPlatform.options_scope, scalac_2_11=':scala-compiler_211')
 
-      #REPL ins't actually used in this test.
       self.set_options_for_scope(ScalaPlatform.options_scope, scala_2_10_repl=':scala-repl')
       self.set_options_for_scope(ScalaPlatform.options_scope, scala_2_11_repl=':scala-repl_211')
       self.set_options_for_scope(ScalaPlatform.options_scope, scala_repl=':scala-repl')
@@ -193,7 +192,7 @@ class ScalastyleTest(NailgunTaskTestBase):
         ]
       )
 
-      #Also includes scala-library target
+      # Remember, we have the extra 'scala-library' dep target.
       self.assertEqual(3, len(context.targets()))
 
       # Now create the task and run the scala source and exclusion filtering.
