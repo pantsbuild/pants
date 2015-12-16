@@ -3,7 +3,7 @@
 
 python_tests(
   name = 'reporting',
-  sources = globs('*.py'),
+  sources = ['test_linkify.py'],
   dependencies = [
     'src/python/pants/reporting',
   ]

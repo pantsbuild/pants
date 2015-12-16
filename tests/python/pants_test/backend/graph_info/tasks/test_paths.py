@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.paths import Path, Paths
+from pants.backend.graph_info.tasks.paths import Path, Paths
 from pants.base.exceptions import TaskError
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 

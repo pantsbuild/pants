@@ -15,9 +15,8 @@ python_tests(
   name = 'java_wire_library',
   sources = ['test_java_wire_library.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )

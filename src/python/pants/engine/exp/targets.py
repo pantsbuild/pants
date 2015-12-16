@@ -8,9 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import os
 
-from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.engine.exp.addressable import Exactly, SubclassesOf, addressable, addressable_list
 from pants.engine.exp.configuration import Configuration
+from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 
 
 class Sources(Configuration):

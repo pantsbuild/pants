@@ -27,5 +27,6 @@ python_tests(
   sources=['test_declared_deps_integration.py'],
   dependencies=[
     ':base_compile_integration_test',
-  ]
+  ],
+  tags={'integration'},
 )
