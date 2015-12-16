@@ -126,14 +126,17 @@ class BundleCreate(JvmBinaryTask):
       # Add external dependencies to the bundle.
       for path, coordinate in self.list_external_jar_dependencies(app.binary):
         external_jar = coordinate.artifact_filename
-        destination = os.path.join(lib_dir, self.EXTERNAL_JAR_PREFIX + external_jar)
+        destination = os.path.join(lib_dir,
+                                   '{jar_prefix}{jar}'
+                                   .format(jar_prefix=self.EXTERNAL_JAR_PREFIX, jar=external_jar))
         verbose_symlink(path, destination)
         classpath.add(destination)
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
-    canonical_classpath_prefix = os.path.join(lib_dir, self.INTERNAL_JAR_PREFIX) \
-      if not self._create_deployjar else None
+    canonical_classpath_prefix = None
+    if not self._create_deployjar:
+      canonical_classpath_prefix = os.path.join(lib_dir, self.INTERNAL_JAR_PREFIX)
     with self.monolithic_jar(app.binary, bundle_jar,
                              canonical_classpath_prefix=canonical_classpath_prefix) as jar:
       self.add_main_manifest_entry(jar, app.binary)

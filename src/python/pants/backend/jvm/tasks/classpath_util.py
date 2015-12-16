@@ -166,7 +166,7 @@ class ClasspathUtil(object):
     def delete_old_target_output_files(classpath_prefix):
       """Delete existing output files or symlinks for target."""
       directory, basename = os.path.split(classpath_prefix)
-      pattern = re.compile('{}(([0-9]+)(.jar)?|classpath.txt)'.format(basename))
+      pattern = re.compile(r'^{}(([0-9]+)(\.jar)?|classpath\.txt)$'.format(basename))
       files = [filename for filename in os.listdir(directory) if pattern.match(filename)]
       for rel_path in files:
         path = os.path.join(directory, rel_path)
@@ -181,7 +181,8 @@ class ClasspathUtil(object):
       """
       output_dir = os.path.dirname(symlink_prefix)
       if use_target_id:
-        classpath_prefix_for_target = symlink_prefix + target.id + '-'
+        classpath_prefix_for_target = '{prefix}{target_id}-'.format(prefix=symlink_prefix,
+                                                                    target_id=target.id)
       else:
         address = target.address
         output_dir = os.path.join(
@@ -219,8 +220,8 @@ class ClasspathUtil(object):
           canonical_classpath.append(symlink_path)
 
         if save_classpath_file:
-          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'w') as classpath_file:
-            classpath_file.write(os.pathsep.join(classpath))
+          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
+            classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
             classpath_file.write('\n')
 
     return canonical_classpath
