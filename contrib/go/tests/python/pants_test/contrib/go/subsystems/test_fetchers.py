@@ -11,8 +11,8 @@ from contextlib import contextmanager
 import mock
 import requests
 from pants.util.contextutil import temporary_dir
-from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test import base_test
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 from pants.contrib.go.subsystems.fetchers import ArchiveFetcher, Fetchers, GopkgInFetcher
 
