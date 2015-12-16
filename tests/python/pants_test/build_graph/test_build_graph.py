@@ -152,6 +152,44 @@ class BuildGraphTest(BaseTest):
     d = self.make_target('d', dependencies=[a, c])
     self.assertEquals([d, a, c, b], d.closure())
 
+  def test_closure(self):
+    self.assertEquals([], BuildGraph.closure([]))
+    a = self.make_target('a')
+    self.assertEquals([a], BuildGraph.closure([a]))
+    b = self.make_target('b', dependencies=[a])
+    self.assertEquals([b, a], BuildGraph.closure([b]))
+    c = self.make_target('c', dependencies=[b])
+    self.assertEquals([c, b, a], BuildGraph.closure([c]))
+    d = self.make_target('d', dependencies=[a, c])
+    self.assertEquals([d, a, c, b], BuildGraph.closure([d]))
+
+    def d_gen():
+      yield d
+    self.assertEquals([d, a, c, b], BuildGraph.closure(d_gen()))
+
+    def empty_gen():
+      return
+      yield
+    self.assertEquals([], BuildGraph.closure(empty_gen()))
+
+  def test_closure_bfs(self):
+    root = self.inject_graph('a', {
+      'a': ['b', 'c'],
+      'b': ['d', 'e'],
+      'c': ['f', 'g'],
+      'd': ['h', 'i'],
+      'e': ['j', 'k'],
+      'f': ['l', 'm'],
+      'g': ['n', 'o'],
+      'h': [], 'i': [], 'j': [], 'k': [], 'l': [], 'm': [], 'n': [], 'o': [],
+    })
+
+    bfs_closure = BuildGraph.closure([self.build_graph.get_target(root)], bfs=True)
+    self.assertEquals(
+        [t.address.target_name for t in bfs_closure],
+        [str(six.unichr(x)) for x in six.moves.xrange(ord('a'), ord('o') + 1)],
+    )
+
   def test_transitive_subgraph_of_addresses_bfs(self):
     root = self.inject_graph('a', {
       'a': ['b', 'c'],
@@ -216,7 +254,7 @@ class BuildGraphTest(BaseTest):
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
                                  '^BUILD file does not exist at:.*/non-existent-path/BUILD'
                                  '\s+when translating spec non-existent-path:b'
-                                 '\s+referenced from :a$'):
+                                 '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
   def test_invalid_address_two_hops(self):
@@ -232,7 +270,7 @@ class BuildGraphTest(BaseTest):
                                  '^BUILD file does not exist at: .*/non-existent-path/BUILD'
                                  '\s+when translating spec non-existent-path:c'
                                  '\s+referenced from goodpath:b'
-                                 '\s+referenced from :a$'):
+                                 '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
   def test_invalid_address_two_hops_same_file(self):
@@ -252,7 +290,7 @@ class BuildGraphTest(BaseTest):
                                  '\s+when translating spec non-existent-path:d'
                                  '\s+referenced from goodpath:c'
                                  '\s+referenced from goodpath:b'
-                                 '\s+referenced from :a$'):
+                                 '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
   def test_raise_on_duplicate_dependencies(self):
@@ -268,5 +306,5 @@ class BuildGraphTest(BaseTest):
     with self.assertRaisesRegexp(
         BuildGraph.TransitiveLookupError,
         '^Addresses in dependencies must be unique. \'other:b\' is referenced more than once.'
-        '\s+referenced from :a$'):
+        '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')

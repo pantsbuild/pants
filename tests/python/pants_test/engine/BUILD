@@ -11,14 +11,6 @@ python_library(
   ]
 )
 
-target(
-  name = 'engine',
-  dependencies = [
-    ':test_engine',
-    ':test_round_engine',
-  ]
-)
-
 python_tests(
   name = 'test_engine',
   sources = ['test_engine.py'],
@@ -36,7 +28,7 @@ python_tests(
   dependencies = [
     ':engine_test_base',
     'src/python/pants/engine',
-    'src/python/pants/backend/core/tasks:common',
+    'src/python/pants/task',
     'tests/python/pants_test:base_test',
   ],
 )

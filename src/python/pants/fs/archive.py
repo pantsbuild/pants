@@ -43,7 +43,7 @@ class TarArchiver(Archiver):
       tar.extractall(outdir)
 
   def __init__(self, mode, extension):
-    Archiver.__init__(self)
+    super(TarArchiver, self).__init__()
     self.mode = mode
     self.extension = extension
 
@@ -81,13 +81,15 @@ class ZipArchiver(Archiver):
             archive_file.extract(name, outdir)
 
   def __init__(self, compression):
-    Archiver.__init__(self)
+    super(ZipArchiver, self).__init__()
     self.compression = compression
 
   def create(self, basedir, outdir, name, prefix=None):
     zippath = os.path.join(outdir, '{}.zip'.format(name))
     with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
-      for root, _, files in safe_walk(basedir):
+      # For symlinks, we want to archive the actual content of linked files but
+      # under the relpath derived from symlink.
+      for root, _, files in safe_walk(basedir, followlinks=True):
         root = ensure_text(root)
         for file in files:
           file = ensure_text(file)

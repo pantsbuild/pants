@@ -1,17 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'cache',
-  dependencies = [
-    ':artifact',
-    ':artifact_cache',
-    ':cache_setup',
-    ':pinger',
-    ':resolver',
-  ]
-)
-
 python_tests(
   name = 'artifact',
   sources = ['test_artifact.py'],
@@ -38,12 +27,20 @@ python_tests(
   sources = ['test_cache_setup.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/backend/core/tasks:task',
     'src/python/pants/cache',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
+    'src/python/pants/task',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/testutils',
+    'tests/python/pants_test/testutils:mock_logger',
+  ]
+)
+
+python_library(
+  name = 'delay_server',
+  sources = ['delay_server.py'],
+  dependencies = [
+  '3rdparty/python:six',
   ]
 )
 
@@ -53,7 +50,7 @@ python_tests(
   dependencies = [
     'src/python/pants/cache',
     'tests/python/pants_test:base_test',
-    '3rdparty/python:six',
+    'tests/python/pants_test/cache:delay_server',
   ]
 )
 

@@ -123,6 +123,30 @@ class GolangOrgFetcherTest(unittest.TestCase):
 
 
 class GopkgInFetcherTest(unittest.TestCase):
+  def test_root_bad_domain(self):
+    with subsystem_instance(GopkgInFetcher) as fetcher:
+      with self.assertRaises(fetcher.FetchError):
+        fetcher.root('gopkg.com/check.v1')
+
+  def test_root_pkg_simple(self):
+    with subsystem_instance(GopkgInFetcher) as fetcher:
+      root = fetcher.root('gopkg.in/check.v1')
+      self.assertEqual('gopkg.in/check.v1', root)
+
+  def test_root_pkg_subpackage(self):
+    with subsystem_instance(GopkgInFetcher) as fetcher:
+      root = fetcher.root('gopkg.in/amz.v1/s3')
+      self.assertEqual('gopkg.in/amz.v1', root)
+
+  def test_root_user_pkg_simple(self):
+    with subsystem_instance(GopkgInFetcher) as fetcher:
+      root = fetcher.root('gopkg.in/bob/check.v1')
+      self.assertEqual('gopkg.in/bob/check.v1', root)
+
+  def test_root_user_pkg_subpackage(self):
+    with subsystem_instance(GopkgInFetcher) as fetcher:
+      root = fetcher.root('gopkg.in/bob/amz.v1/s3')
+      self.assertEqual('gopkg.in/bob/amz.v1', root)
 
   def do_fetch(self, import_path, version_override=None, github_api_responses=None,
                expected_fetch=None):
@@ -168,8 +192,18 @@ class GopkgInFetcherTest(unittest.TestCase):
                   github_api_responses=([{'ref': 'refs/tags/v1'}], []),
                   expected_fetch=('github.com/go-check/check', 'v1'))
 
+  def test_tag_match_exact_subpackage(self):
+    self.do_fetch('gopkg.in/check.v1/sub/pkg',
+                  github_api_responses=([{'ref': 'refs/tags/v1'}], []),
+                  expected_fetch=('github.com/go-check/check', 'v1'))
+
   def test_user_protocol(self):
     self.do_fetch('gopkg.in/fred/bob.v5',
+                  github_api_responses=([{'ref': 'refs/tags/v5.5'}], []),
+                  expected_fetch=('github.com/fred/bob', 'v5.5'))
+
+  def test_user_protocol_subpackage(self):
+    self.do_fetch('gopkg.in/fred/bob.v5/sub/pkg',
                   github_api_responses=([{'ref': 'refs/tags/v5.5'}], []),
                   expected_fetch=('github.com/fred/bob', 'v5.5'))
 

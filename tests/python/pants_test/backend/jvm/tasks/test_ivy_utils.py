@@ -9,13 +9,16 @@ import os
 import xml.etree.ElementTree as ET
 from textwrap import dedent
 
-from pants.backend.core.register import build_file_aliases as register_core
-from pants.backend.jvm.ivy_utils import IvyModuleRef, IvyResolveMappingError, IvyUtils
+from twitter.common.collections import OrderedSet
+
+from pants.backend.jvm.ivy_utils import (IvyInfo, IvyModule, IvyModuleRef, IvyResolveMappingError,
+                                         IvyUtils)
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.base_test import BaseTest
@@ -374,3 +377,81 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     ivy_info = IvyUtils._parse_xml_report(conf='default', path=path)
     self.assertIsNotNone(ivy_info)
     return ivy_info
+
+  def test_ivy_module_ref_cmp(self):
+    self.assertEquals(
+      IvyModuleRef('foo', 'bar', '1.2.3'), IvyModuleRef('foo', 'bar', '1.2.3'))
+    self.assertTrue(
+      IvyModuleRef('foo1', 'bar', '1.2.3') < IvyModuleRef('foo2', 'bar', '1.2.3'))
+    self.assertTrue(
+      IvyModuleRef('foo2', 'bar', '1.2.3') >IvyModuleRef('foo1', 'bar', '1.2.3'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar1', '1.2.3') < IvyModuleRef('foo', 'bar2', '1.2.3'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar2', '1.2.3') > IvyModuleRef('foo', 'bar1', '1.2.3'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.3') < IvyModuleRef('foo', 'bar', '1.2.4'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.4') > IvyModuleRef('foo', 'bar', '1.2.3'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.3', ext='jar') < IvyModuleRef('foo', 'bar', '1.2.3', ext='tgz'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.3', ext='tgz') > IvyModuleRef('foo', 'bar', '1.2.3', ext='jar'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.3', ext='jar', classifier='javadoc')
+      < IvyModuleRef('foo', 'bar', '1.2.3', ext='jar', classifier='sources'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.3', ext='tgz', classifier='sources')
+      > IvyModuleRef('foo', 'bar', '1.2.3', ext='jar', classifier='javadoc'))
+    # make sure rev is sorted last
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.4', classifier='javadoc')
+      < IvyModuleRef('foo', 'bar', '1.2.3', classifier='sources'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.3', classifier='sources')
+      > IvyModuleRef('foo', 'bar', '1.2.4', classifier='javadoc'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.4', ext='jar')
+      < IvyModuleRef('foo', 'bar', '1.2.3', ext='tgz'))
+    self.assertTrue(
+      IvyModuleRef('foo', 'bar', '1.2.3', ext='tgz')
+      > IvyModuleRef('foo', 'bar', '1.2.4', ext='jar'))
+
+  def test_traverse_dep_graph_sorted(self):
+    """Make sure the modules are returned in a deterministic order by name"""
+
+    def make_ref(org, name):
+      return  IvyModuleRef(org=org, name=name, rev='1.0')
+
+    ref1 = make_ref('foo', '1')
+    ref2 = make_ref('foo', 'child1')
+    ref3 = make_ref('foo', 'child2')
+    ref4 = make_ref('foo', 'child3')
+    ref5 = make_ref('foo', 'grandchild1')
+    ref6 = make_ref('foo', 'grandchild2')
+
+    module1 = IvyModule(ref1, '/foo', [])
+    module2 = IvyModule(ref2, '/foo', [ref1])
+    module3 = IvyModule(ref3, '/foo', [ref1])
+    module4 = IvyModule(ref4, '/foo', [ref1])
+    module5 = IvyModule(ref5, '/foo', [ref3])
+    module6 = IvyModule(ref6, '/foo', [ref3])
+
+    def assert_order(inputs):
+      info = IvyInfo('default')
+      for module in inputs:
+        info.add_module(module)
+
+      def collector(dep):
+        return OrderedSet([dep])
+
+      result = [ref for ref in info.traverse_dependency_graph(ref1, collector)]
+      self.assertEquals([ref1, ref2, ref3, ref5, ref6, ref4],
+                        result)
+    # Make sure the order remains unchanged no matter what order we insert the into the structure
+    assert_order([module1, module2, module3, module4, module5, module6])
+    assert_order([module6, module5, module4, module3, module2, module1])
+    assert_order([module5, module1, module2, module6,  module3, module4])
+    assert_order([module6, module4, module3, module1 ,module2, module5])
+    assert_order([module4, module2, module1, module3, module6, module5])
+    assert_order([module4, module2, module5, module6, module1, module3])

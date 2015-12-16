@@ -44,9 +44,9 @@ class RESTfulArtifactCache(ArtifactCache):
 
   def __init__(self, artifact_root, url_base, local):
     """
-    :param str artifact_root: The path under which cacheable products will be read/written.
-    :param str url_base: The prefix for urls on some RESTful service. We must be able to PUT and
-                         GET to any path under this base.
+    :param string artifact_root: The path under which cacheable products will be read/written.
+    :param string url_base: The prefix for urls on some RESTful service. We must be able to PUT and
+                            GET to any path under this base.
     :param BaseLocalArtifactCache local: local cache instance for storing and creating artifacts
     """
     super(RESTfulArtifactCache, self).__init__(artifact_root)
@@ -91,6 +91,7 @@ class RESTfulArtifactCache(ArtifactCache):
         return self._localcache.store_and_use_artifact(cache_key, byte_iter, results_dir)
     except Exception as e:
       logger.warn('\nError while reading from remote artifact cache: {0}\n'.format(e))
+      # TODO(peiyu): clean up partially downloaded local file if any
       return UnreadableArtifact(cache_key, e)
 
     return False
@@ -111,7 +112,6 @@ class RESTfulArtifactCache(ArtifactCache):
     session = RequestsSession.instance()
 
     try:
-      response = None
       if 'PUT' == method:
         response = session.put(url, data=body, timeout=self._timeout_secs)
       elif 'GET' == method:

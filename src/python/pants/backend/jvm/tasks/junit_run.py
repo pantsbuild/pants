@@ -13,7 +13,6 @@ from collections import defaultdict
 from six.moves import range
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.test_task_mixin import TestTaskMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_tests import JavaTests as junit_tests
@@ -30,6 +29,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -56,7 +56,7 @@ def interpret_test_spec(test_spec):
     return (None, (classname_or_srcfile, methodname))
 
 
-class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
+class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
@@ -75,8 +75,11 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--test-shard', advanced=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. '
                   'For example, 1/3 means run tests number 2, 5, 8, 11, ...')
-    register('--suppress-output', action='store_true', default=True,
-             help='Redirect test output to files in .pants.d/test/junit.')
+    register('--output-mode', choices=['ALL', 'FAILURE_ONLY', 'NONE'], default='NONE',
+             help='Specify what part of output should be passed to stdout. '
+                  'In case of FAILURE_ONLY and parallel tests execution '
+                  'output can be partial or even wrong. '
+                  'All tests output also redirected to files in .pants.d/test/junit.')
     register('--cwd', advanced=True,
              help='Set the working directory. If no argument is passed, use the build root. '
                   'If cwd is set on a target, it will supersede this argument.')
@@ -93,12 +96,12 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='0.0.12'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.0'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
-                          # Clearly both tests and the runner need access to the same @Test, 
-                          # @Before, as well as other annotations, but there is also the Assert 
+                          # Clearly both tests and the runner need access to the same @Test,
+                          # @Before, as well as other annotations, but there is also the Assert
                           # class and some subset of the @Rules, @Theories and @RunWith APIs.
                           custom_rules=[
                             Shader.exclude_package('junit.framework', recursive=True),
@@ -142,7 +145,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     if options.coverage or options.is_flagged('coverage_open'):
       coverage_processor = options.coverage_processor
       if coverage_processor == 'cobertura':
-        settings = CoberturaTaskSettings(self)
+        settings = CoberturaTaskSettings.from_task(self)
         self._coverage = Cobertura(settings)
       else:
         raise TaskError('unknown coverage processor {0}'.format(coverage_processor))
@@ -154,8 +157,14 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     self._strict_jvm_version = options.strict_jvm_version
     self._args = copy.copy(self.args)
     self._failure_summary = options.failure_summary
-    if options.suppress_output:
-      self._args.append('-suppress-output')
+
+    if options.output_mode == 'ALL':
+      self._args.append('-output-mode=ALL')
+    elif options.output_mode == 'FAILURE_ONLY':
+      self._args.append('-output-mode=FAILURE_ONLY')
+    else:
+      self._args.append('-output-mode=NONE')
+
     if self._fail_fast:
       self._args.append('-fail-fast')
     self._args.append('-outdir')
@@ -288,35 +297,37 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
 
     result = 0
     for (workdir, platform), tests in tests_by_properties.items():
-      for batch in self._partition(tests):
-        # Batches of test classes will likely exist within the same targets: dedupe them.
-        relevant_targets = set(map(tests_to_targets.get, batch))
-        complete_classpath = OrderedSet()
-        complete_classpath.update(classpath_prepend)
-        complete_classpath.update(self.tool_classpath('junit'))
-        complete_classpath.update(self.classpath(relevant_targets,
-                                                 classpath_product=classpath_product))
-        complete_classpath.update(classpath_append)
-        distribution = self.preferred_jvm_distribution([platform])
-        with binary_util.safe_args(batch, self.get_options()) as batch_tests:
-          self.context.log.debug('CWD = {}'.format(workdir))
-          self.context.log.debug('platform = {}'.format(platform))
-          self._executor = SubprocessExecutor(distribution)
-          result += abs(distribution.execute_java(
-            executor=self._executor,
-            classpath=complete_classpath,
-            main=JUnitRun._MAIN,
-            jvm_options=self.jvm_options + extra_jvm_options,
-            args=self._args + batch_tests + [u'-xmlreport'],
-            workunit_factory=self.context.new_workunit,
-            workunit_name='run',
-            workunit_labels=[WorkUnitLabel.TEST],
-            cwd=workdir,
-            synthetic_jar_dir=self.workdir,
-          ))
+      for (target_jvm_options, target_tests) in self._partition_by_jvm_options(tests_to_targets,
+                                                                               tests):
+        for batch in self._partition(target_tests):
+          # Batches of test classes will likely exist within the same targets: dedupe them.
+          relevant_targets = set(map(tests_to_targets.get, batch))
+          complete_classpath = OrderedSet()
+          complete_classpath.update(classpath_prepend)
+          complete_classpath.update(self.tool_classpath('junit'))
+          complete_classpath.update(self.classpath(relevant_targets,
+                                                   classpath_product=classpath_product))
+          complete_classpath.update(classpath_append)
+          distribution = self.preferred_jvm_distribution([platform])
+          with binary_util.safe_args(batch, self.get_options()) as batch_tests:
+            self.context.log.debug('CWD = {}'.format(workdir))
+            self.context.log.debug('platform = {}'.format(platform))
+            self._executor = SubprocessExecutor(distribution)
+            result += abs(distribution.execute_java(
+              executor=self._executor,
+              classpath=complete_classpath,
+              main=JUnitRun._MAIN,
+              jvm_options=self.jvm_options + extra_jvm_options + target_jvm_options,
+              args=self._args + batch_tests + [u'-xmlreport'],
+              workunit_factory=self.context.new_workunit,
+              workunit_name='run',
+              workunit_labels=[WorkUnitLabel.TEST],
+              cwd=workdir,
+              synthetic_jar_dir=self.workdir,
+            ))
 
-          if result != 0 and self._fail_fast:
-            break
+            if result != 0 and self._fail_fast:
+              break
 
     if result != 0:
       failed_targets_and_tests = self._get_failed_targets(tests_to_targets)
@@ -350,6 +361,21 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
       return tuple(prop(target) for prop in properties)
 
     return self._tests_by_property(tests_to_targets, combined_property)
+
+  def _partition_by_jvm_options(self, tests_to_targets, tests):
+    """Partitions a list of tests by the jvm options to run them with.
+
+    :param dict tests_to_targets: A mapping from each test to its target.
+    :param list tests: The list of tests to run.
+    :returns: A list of tuples where the first element is an array of jvm options and the second
+      is a list of tests to run with the jvm options. Each test in tests will appear in exactly
+      one one tuple.
+    """
+    jvm_options_to_tests = defaultdict(list)
+    for test in tests:
+      extra_jvm_options = tests_to_targets[test].payload.extra_jvm_options
+      jvm_options_to_tests[extra_jvm_options].append(test)
+    return [(list(jvm_options), tests) for jvm_options, tests in jvm_options_to_tests.items()]
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))
@@ -418,7 +444,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
 
   def _execute(self, targets):
     """
-    Implements the primary junit test execution. This method is called by the TestTaskMixin,
+    Implements the primary junit test execution. This method is called by the TestRunnerTaskMixin,
     which contains the primary Task.execute function and wraps this method in timeouts.
     """
 
@@ -428,7 +454,7 @@ class JUnitRun(TestTaskMixin, JvmToolTaskMixin, JvmTask):
     # and report on all the original targets, not just the test targets.
     #
     # We've already filtered out the non-test targets in the
-    # TestTaskMixin, so the mixin passes to us both the test
+    # TestRunnerTaskMixin, so the mixin passes to us both the test
     # targets and the unfiltered list of targets
     tests_and_targets = self._collect_test_targets(self._get_test_targets())
 

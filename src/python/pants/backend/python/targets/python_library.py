@@ -9,5 +9,5 @@ from pants.backend.python.targets.python_target import PythonTarget
 
 
 class PythonLibrary(PythonTarget):
-  """Produces a Python library."""
+  """A Python library."""
   pass

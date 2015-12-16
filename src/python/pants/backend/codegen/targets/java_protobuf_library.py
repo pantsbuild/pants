@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
-  """Generates a stub Java library from protobuf IDL files."""
+  """A Java library generated from Protocol Buffer IDL files."""
 
   def __init__(self, payload=None, buildflags=None, imports=None, **kwargs):
     """

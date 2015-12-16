@@ -41,7 +41,9 @@ python_library(
 
 python_library(
   name = 'int-test',
-  sources = ['pants_run_integration_test.py'],
+  sources = [
+    'pants_run_integration_test.py'
+  ],
   dependencies = [
     '3rdparty/python:ansicolors',
     'src/python/pants/base:build_environment',
@@ -49,6 +51,7 @@ python_library(
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test/testutils:file_test_util',
   ]
 )
 
@@ -60,45 +63,5 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/source',
     'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
-)
-
-target(
-  name = 'integration',
-  dependencies = [
-    'tests/python/pants_test/android:integration',
-    'tests/python/pants_test/base:integration',
-    'tests/python/pants_test/targets:integration',
-    'tests/python/pants_test/tasks:integration',
-    'tests/python/pants_test/python:integration',
-  ]
-)
-
-target(
-  name = 'all',
-  dependencies = [
-    ':test_maven_layout',
-    'tests/python/pants_test/android',
-    'tests/python/pants_test/authentication:netrc',
-    'tests/python/pants_test/backend',
-    'tests/python/pants_test/base',
-    'tests/python/pants_test/cache',
-    'tests/python/pants_test/engine',
-    'tests/python/pants_test/fs',
-    'tests/python/pants_test/goal',
-    'tests/python/pants_test/ivy',
-    'tests/python/pants_test/java',
-    'tests/python/pants_test/logging',
-    'tests/python/pants_test/net',
-    'tests/python/pants_test/option',
-    'tests/python/pants_test/process',
-    'tests/python/pants_test/projects',
-    'tests/python/pants_test/python',
-    'tests/python/pants_test/reporting',
-    'tests/python/pants_test/scm',
-    'tests/python/pants_test/subsystem',
-    'tests/python/pants_test/targets',
-    'tests/python/pants_test/tasks',
-    'tests/python/pants_test/util',
   ]
 )

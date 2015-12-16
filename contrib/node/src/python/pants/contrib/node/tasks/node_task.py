@@ -5,15 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.tasks.task import Task
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.task.task import Task
 from pants.util.memo import memoized_property
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution
 from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
-from pants.contrib.node.targets.npm_package import NpmPackage
-from pants.contrib.node.targets.npm_test import NpmTest
+from pants.contrib.node.targets.node_test import NodeTest
 
 
 class NodeTask(Task):
@@ -28,9 +28,9 @@ class NodeTask(Task):
     return NodeDistribution.Factory.global_instance().create()
 
   @classmethod
-  def is_npm_package(cls, target):
-    """Returns `True` if the given target is an `NpmPackage`."""
-    return isinstance(target, NpmPackage)
+  def is_node_package(cls, target):
+    """Returns `True` if the given target is an `NodePackage`."""
+    return isinstance(target, NodePackage)
 
   @classmethod
   def is_node_module(cls, target):
@@ -43,19 +43,9 @@ class NodeTask(Task):
     return isinstance(target, NodeRemoteModule)
 
   @classmethod
-  def is_npm_test(cls, target):
-    """Returns `True` if the given target is a `NpmTest`."""
-    return isinstance(target, NpmTest)
-
-  @classmethod
-  def render_npm_package_dependency(cls, node_paths, target):
-    """Return representation string of an NpmPackage target for a package.json dependencies hash.
-
-    :param node_paths: A NodePaths object
-    :param target: An NpmPackage target
-    :return: String to be used as the value for the NpmPackage in a package.json dependencies hash
-    """
-    return node_paths.node_path(target) if cls.is_node_module(target) else target.version
+  def is_node_test(cls, target):
+    """Returns `True` if the given target is a `NodeTest`."""
+    return isinstance(target, NodeTest)
 
   def execute_node(self, args, workunit_name=None, workunit_labels=None, **kwargs):
     """Executes node passing the given args.

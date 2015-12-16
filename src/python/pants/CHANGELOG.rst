@@ -1,6 +1,386 @@
 RELEASE HISTORY
 ===============
 
+0.0.64 (12/11/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release concludes the deprecation cycle of the following items, now removed:
+
+* `dependencies` and `python_test_suite` target aliases
+  BUILD file authors should use `target` instead.
+
+* `pants.backend.core.tasks.{Task,ConsoleTask,ReplTaskMixin}`
+  Custom task authors can update imports to the new homes in `pants.task`
+
+* The `test.junit` `--no-suppress-output` option
+  You now specify `--output-mode=ALL` in the `test.junit` scope instead.
+
+This release also fixes issues using the Scala REPL via `./pants repl` for very
+large classpaths.
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to junit-runner 1.0.0.
+  `RB #3232 <https://rbcommons.com/s/twitter/r/3232>`_
+
+* Remove deprecated `-suppress-output` flag.
+  `RB #3229 <https://rbcommons.com/s/twitter/r/3229>`_
+
+* Kill `dependencies`, `python_test_suite` and old task base class aliases.
+  `RB #3228 <https://rbcommons.com/s/twitter/r/3228>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup the `NodePreinstalledModuleResolver`.
+  `RB #3240 <https://rbcommons.com/s/twitter/r/3240>`_
+
+* Prepend '//' to Address.spec when the spec_path is empty.
+  `RB #3234 <https://rbcommons.com/s/twitter/r/3234>`_
+
+* Fix problem with too long classpath while starting scala repl: python part
+  `RB #3195 <https://rbcommons.com/s/twitter/r/3195>`_
+
+* Fix problem with too long classpath while starting scala repl: java part
+  `RB #3194 <https://rbcommons.com/s/twitter/r/3194>`_
+
+* Fixing instrumentation classpath mutation to support multiple targets and entries.
+  `RB #3108 <https://rbcommons.com/s/twitter/r/3108>`_
+
+* Use target.id to create the stable classpath for bundle and export-classpath
+  `RB #3211 <https://rbcommons.com/s/twitter/r/3211>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add an option to write build stats into a local json file.
+  `RB #3218 <https://rbcommons.com/s/twitter/r/3218>`_
+
+* Make incremental compile optional for zinc
+  `RB #3226 <https://rbcommons.com/s/twitter/r/3226>`_
+
+* Create a test timeout_maximum flag so that we can prevent people from setting an insanely huge timeout
+  `RB #3219 <https://rbcommons.com/s/twitter/r/3219>`_
+
+* Add a jvm_prep_command that can work in compile, test, and binary goals
+  `RB #3209 <https://rbcommons.com/s/twitter/r/3209>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A docgen backend.
+  `RB #3242 <https://rbcommons.com/s/twitter/r/3242>`_
+
+* Add formatting of choices to help output
+  `RB #3241 <https://rbcommons.com/s/twitter/r/3241>`_
+
+* Remove test target aliases for pants' tests
+  `RB #3233 <https://rbcommons.com/s/twitter/r/3233>`_
+
+* Move resources() and prep_command() out of backend/core.
+  `RB #3235 <https://rbcommons.com/s/twitter/r/3235>`_
+
+* [pantsd] Implement PantsDaemon et al.
+  `RB #3224 <https://rbcommons.com/s/twitter/r/3224>`_
+
+* New implementation of `./pants targets`.
+  `RB #3214 <https://rbcommons.com/s/twitter/r/3214>`_
+
+* Allow alternate_target_roots to specify an empty collection
+  `RB #3216 <https://rbcommons.com/s/twitter/r/3216>`_
+
+* Remove group task and register zinc_compile directly
+  `RB #3215 <https://rbcommons.com/s/twitter/r/3215>`_
+
+* Bump the default Go distribution to 1.5.2.
+  `RB #3208 <https://rbcommons.com/s/twitter/r/3208>`_
+
+0.0.63 (12/04/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release contains a few deprecations and refactorings to help prepare for 1.0.0. It
+also includes the first release of the new Haskell module contributed by Gabriel Gonzalez.
+Thanks Gabriel!
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate calling with_description() when registering a task.
+  `RB #3207 <https://rbcommons.com/s/twitter/r/3207>`_
+
+* Create a core_tasks top-level dir.
+  `RB #3197 <https://rbcommons.com/s/twitter/r/3197>`_
+
+* Move more tasks to core_tasks.
+  `RB #3199 <https://rbcommons.com/s/twitter/r/3199>`_
+
+* Move remaining core tasks to core_tasks.
+  `RB #3204 <https://rbcommons.com/s/twitter/r/3204>`_
+
+* Upgrade PEX to 1.1.1
+  `RB #3200 <https://rbcommons.com/s/twitter/r/3200>`_
+
+* Properly deprecate the Dependencies alias.
+  `RB #3196 <https://rbcommons.com/s/twitter/r/3196>`_
+
+* Move the rwbuf code under util/.
+  `RB #3193 <https://rbcommons.com/s/twitter/r/3193>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix cache_setup.py so build doesn't fail if configured cache is empty.
+  `RB #3142 <https://rbcommons.com/s/twitter/r/3142>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add Haskell plugin to `contrib/release_packages.sh`; now included in the release!
+  `RB #3198 <https://rbcommons.com/s/twitter/r/3198>`_
+
+* Refine cache stats: distinguish legit misses from miss errors
+  `RB #3190 <https://rbcommons.com/s/twitter/r/3190>`_
+
+* [pantsd] Initial implementation of the pants nailgun service.
+  `RB #3171 <https://rbcommons.com/s/twitter/r/3171>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove references to jmake
+  `RB #3210 <https://rbcommons.com/s/twitter/r/3210>`_
+
+* Deprecate exception.message usages
+  `RB #3201 <https://rbcommons.com/s/twitter/r/3201>`_
+
+* Make monolithic jars produced by bundle/binary slimmer
+  `RB #3133 <https://rbcommons.com/s/twitter/r/3133>`_
+
+
+0.0.62 (11/30/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release is primarily small bug fixes and minor improvements.
+
+The following modules have been moved, with their old locations now deprecated:
+
+* `MutexTaskMixin` and `ReplTaskMixin` from `pants.backend.core` -> `pants.task`
+
+API Changes
+~~~~~~~~~~~
+
+* Move the test runner task mixin out of backend/core.
+  `RB #3181 <https://rbcommons.com/s/twitter/r/3181>`_
+
+* Move two generic task mixins out of backend/core.
+  `RB #3176 <https://rbcommons.com/s/twitter/r/3176>`_
+
+Bugfixes
+~~~~~~~~
+
+* Jvm compile counter should increment for double check cache hits
+  `RB #3188 <https://rbcommons.com/s/twitter/r/3188>`_
+
+* Exit with non-zero status when help fails
+  `RB #3184 <https://rbcommons.com/s/twitter/r/3184>`_
+
+* When a pytest errors rather than failures, make that target also show up in TestTaskFailedError
+  `Issue #2623 <https://github.com/pantsbuild/pants/issues/2623>`_
+  `RB #3175 <https://rbcommons.com/s/twitter/r/3175>`_
+
+* Add the -no-header argument to jaxb generator to give deterministic output
+  `RB #3179 <https://rbcommons.com/s/twitter/r/3179>`_
+
+* Fix bug that recognized "C" as a remote package.
+  `RB #3170 <https://rbcommons.com/s/twitter/r/3170>`_
+
+* Fix jvm_compile product publishing for cached builds
+  `RB #3161 <https://rbcommons.com/s/twitter/r/3161>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Minimal Haskell plugin for `pants`
+  `RB #2975 <https://rbcommons.com/s/twitter/r/2975>`_
+
+* Option to specify stdout from tests to ALL, NONE or FAILURE_ONLY: python part
+  `RB #3165 <https://rbcommons.com/s/twitter/r/3165>`_
+  `RB #3145 <https://rbcommons.com/s/twitter/r/3145>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update the dependencies returned from ivy to be in a stable (sorted) order.
+  `RB #3168 <https://rbcommons.com/s/twitter/r/3168>`_
+
+* Refactor detect_duplicates with some user friendly features
+  `RB #3178 <https://rbcommons.com/s/twitter/r/3178>`_
+
+* Updating some documentation for pants.ini Update some settings in pants.ini which used `=` instead of `:`
+  `RB #3189 <https://rbcommons.com/s/twitter/r/3189>`_
+
+* Add the compile.zinc options to the options reference
+  `RB #3186 <https://rbcommons.com/s/twitter/r/3186>`_
+
+* include_dependees no longer an optional argument.
+  `RB #1997 <https://rbcommons.com/s/twitter/r/1997>`_
+
+* Relocate task tests from tests/python/pants_test/task/ to the appropriate backend
+  `RB #3183 <https://rbcommons.com/s/twitter/r/3183>`_
+
+* Move tests corresponding to pants/task code.
+  `RB #3182 <https://rbcommons.com/s/twitter/r/3182>`_
+
+* Add error message when a JDK is not installed, add minimum requirements to documentation.
+  `RB #3136 <https://rbcommons.com/s/twitter/r/3136>`_
+
+0.0.61 (11/23/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release to fix two regressions in 0.0.60.  It also happens to
+include a small UX improvement for the console output of isolated compiles.
+
+Bugfixes
+~~~~~~~~
+
+* Make sure the deprecated pants.backend.core.tasks.task module is bundled.
+  `RB #3164 <https://rbcommons.com/s/twitter/r/3164>`_
+
+* Revert "Isolate .pex dir"
+  `Issue #2610 <https://github.com/pantsbuild/pants/issues/2610>`_
+  `RB #3135 <https://rbcommons.com/s/twitter/r/3135>`_
+  `RB #3163 <https://rbcommons.com/s/twitter/r/3163>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* During a jvm compile, include a running count in the printed log.
+  `RB #3153 <https://rbcommons.com/s/twitter/r/3153>`_
+
+0.0.60 (11/21/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release is primarily small bug fixes and minor improvements.  It also
+removes several deprecated options and methods:
+
+* `ReverseDepmap.type`.
+* `pants.backend.maven_layout`.
+* `Depmap.path_to`.
+* `SourceRoot.find`.
+* `SourceRoot.find_by_path`.
+* `pants.bin.goal_runner.SourceRootBootstrapper` and its option `[goals] bootstrap_buildfiles`.
+* `pants.build_graph.target._set_no_cache`.
+
+The following modules have been moved, with their old locations now deprecated:
+
+* `pants.backend.core.tasks.console_task` -> `pants.task.console_task`.
+* `pants.backend.core.tasks.task` -> `pants.task.task`.
+
+
+API Changes
+~~~~~~~~~~~
+
+* Move ConsoleTask to pants/task.
+  `RB #3157 <https://rbcommons.com/s/twitter/r/3157>`_
+
+* Move task.py out of backend/core.
+  `RB #3130 <https://rbcommons.com/s/twitter/r/3130>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* Add a helper staticmethod `closure()` to `BuildGraph`.
+  `RB #3160 <https://rbcommons.com/s/twitter/r/3160>`_
+
+* Fix a bug preventing re-upload artifacts that encountered read-errors
+  `RB #1361 <https://rbcommons.com/s/twitter/r/1361>`_
+  `RB #3141 <https://rbcommons.com/s/twitter/r/3141>`_
+
+* Fix `gopkg.in` fetcher to handle subpackages.
+  `RB #3139 <https://rbcommons.com/s/twitter/r/3139>`_
+
+* Update scalac_plugin_args call to the new option name.
+  `RB #3132 <https://rbcommons.com/s/twitter/r/3132>`_
+
+* Fix cases where transitivity is required despite strict_deps; enable within the repo for Java
+  `RB #3125 <https://rbcommons.com/s/twitter/r/3125>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Isolate .pex dir
+  `RB #3135 <https://rbcommons.com/s/twitter/r/3135>`_
+
+* Group cache hits/misses by their task names
+  `RB #3137 <https://rbcommons.com/s/twitter/r/3137>`_
+
+* Add back the --[no-]color flag as deprecated.
+  `RB #3150 <https://rbcommons.com/s/twitter/r/3150>`_
+
+* Add support for extra_jvm_options to java_tests
+  `Issue #2383 <https://github.com/pantsbuild/pants/issues/2383>`_
+  `RB #3140 <https://rbcommons.com/s/twitter/r/3140>`_
+
+* Removed Wire 2.0 support.  Update default Wire library to 1.8.0
+  `RB #3124 <https://rbcommons.com/s/twitter/r/3124>`_
+
+* Remove legacy code in wire_gen and protobuf_gen designed for global codegen strategy
+  `RB #3123 <https://rbcommons.com/s/twitter/r/3123>`_
+
+0.0.59 (11/15/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This is a hotfix release that pins an internal pants python requirement to prevent failures running
+`./pants test` against `python_tests` targets.
+See more details here: http://github.com/pantsbuild/pants/issues#issue/2566
+
+Bugfixes
+~~~~~~~~
+
+* Fixup floating `pytest-timeout` dep.
+  `RB #3126 <https://rbcommons.com/s/twitter/r/3126>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow bundle to run for all targets, rather than just target roots
+  `RB #3119 <https://rbcommons.com/s/twitter/r/3119>`_
+
+* Allow per-jvm-target configuration of fatal warnings
+  `RB #3080 <https://rbcommons.com/s/twitter/r/3080>`_
+
+* Add options to repro and expand user on output file
+  `RB #3109 <https://rbcommons.com/s/twitter/r/3109>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove use of twitter.common.util.topological_sort in SortTargets
+  `RB #3121 <https://rbcommons.com/s/twitter/r/3121>`_
+
+* Delay many re.compile calls.
+  `RB #3122 <https://rbcommons.com/s/twitter/r/3122>`_
+
 0.0.58 (11/13/2015)
 -------------------
 

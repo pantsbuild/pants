@@ -11,6 +11,7 @@ import threading
 import urlparse
 
 from pants.goal.run_tracker import RunTracker
+from pants.util.contextutil import temporary_file_path
 from pants_test.base_test import BaseTest
 
 
@@ -45,3 +46,14 @@ class RunTrackerTest(BaseTest):
 
     server.shutdown()
     server.server_close()
+
+  def test_write_stats_to_json_file(self):
+    # Set up
+    stats = {'stats': {'foo': 'bar', 'baz': 42}}
+
+    # Execute & verify
+    with temporary_file_path() as file_name:
+      self.assertTrue(RunTracker.write_stats_to_json(file_name, stats))
+      with open(file_name) as f:
+        result = json.load(f)
+        self.assertEquals(stats, result)

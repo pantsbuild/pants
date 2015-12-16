@@ -113,9 +113,9 @@ python_library(
     ':python_requirement',
     ':thrift_builder',
     'src/python/pants/backend/codegen/targets:python',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
     'src/python/pants/invalidation',
     'src/python/pants/util:dirutil'
   ],

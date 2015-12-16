@@ -30,6 +30,7 @@ class NodeDistribution(object):
 
     @classmethod
     def register_options(cls, register):
+      super(NodeDistribution.Factory, cls).register_options(register)
       register('--supportdir', advanced=True, default='bin/node',
                help='Find the Node distributions under this dir.  Used as part of the path to '
                     'lookup the distribution with --binary-util-baseurls and --pants-bootstrapdir')

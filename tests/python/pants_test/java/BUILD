@@ -1,17 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'java',
-  dependencies = [
-    ':executor',
-    ':nailgun_client',
-    ':util',
-    'tests/python/pants_test/java/distribution',
-    'tests/python/pants_test/java/jar',
-  ]
-)
-
 python_tests(
   name = 'executor',
   sources = ['test_executor.py'],
@@ -30,6 +19,16 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/java:nailgun_client',
+  ]
+)
+
+python_tests(
+  name = 'nailgun_io',
+  sources = ['test_nailgun_io.py'],
+  coverage = ['pants.java.nailgun_io'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/java:nailgun_io',
   ]
 )
 
@@ -58,5 +57,6 @@ python_tests(
   sources = ['test_nailgun_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test'
-  ]
+  ],
+  tags = {'integration'},
 )

@@ -8,14 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 import sys
-from collections import OrderedDict, defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.util.dirutil import fast_relpath
 from pants.util.fileutil import create_size_estimators
@@ -80,7 +79,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
       with open(output_file, 'w') as fh:
         self._render(graph, fh)
     else:
-      sys.stdout.write('\n')
+      sys.stdout.write(b'\n')
       self._render(graph, sys.stdout)
 
   def _render(self, graph, fh):
@@ -92,7 +91,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   def _resolve_aliases(self, target):
     """Recursively resolve `target` aliases."""
     for declared in target.dependencies:
-      if isinstance(declared, Dependencies) or type(declared) == Target:
+      if type(declared) == Target:
         for r in self._resolve_aliases(declared):
           yield r
       else:
@@ -105,8 +104,7 @@ class JvmDependencyUsage(JvmDependencyAnalyzer):
   def _select(self, target):
     if self.get_options().internal_only and isinstance(target, JarLibrary):
       return False
-    elif isinstance(target, (Dependencies, Resources)) or type(target) == Target:
-      # ignore aliases and resources
+    elif isinstance(target, Resources) or type(target) == Target:
       return False
     else:
       return True

@@ -103,14 +103,44 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
       return ret
 
 
+def relativize_classpath(classpath, root_dir, followlinks=True):
+  """Convert into classpath relative to a directory.
+
+  This is eventually used by a jar file located in this directory as its manifest
+  attribute Class-Path. See
+  https://docs.oracle.com/javase/7/docs/technotes/guides/extensions/spec.html#bundled
+
+  :param list classpath: Classpath to be relativized.
+  :param string root_dir: directory to relativize urls in the classpath, does not
+    have to exist yet.
+  :param bool followlinks: whether to follow symlinks to calculate relative path.
+
+  :returns: Converted classpath of the same size as input classpath.
+  :rtype: list of strings
+  """
+  def relativize_url(url, root_dir):
+    # When symlink is involed, root_dir concatenated with the returned relpath may not exist.
+    # Consider on mac `/var` is a symlink of `/private/var`, the relative path of subdirectories
+    # under /var to any other directories under `/` computed by os.path.relpath misses one level
+    # of `..`. Use os.path.realpath to guarantee returned relpath can always be located.
+    # This is not needed only when path are all relative.
+    url = os.path.realpath(url) if followlinks else url
+    root_dir = os.path.realpath(root_dir) if followlinks else root_dir
+    url_in_bundle = os.path.relpath(url, root_dir)
+    # Append '/' for directories, those not ending with '/' are assumed to be jars.
+    # Note isdir does what we need here to follow symlinks.
+    if os.path.isdir(url):
+      url_in_bundle += '/'
+    return url_in_bundle
+
+  return [relativize_url(url, root_dir) for url in classpath]
+
+
 # VisibleForTesting
 def safe_classpath(classpath, synthetic_jar_dir):
   """Bundles classpath into one synthetic jar that includes original classpath in its manifest.
 
-  This is to ensure classpath length never exceeds platform ARG_MAX. Original classpath are
-  converted to URLs relative to synthetic jar path and saved in its manifest as attribute
-  `Class-Path`. See
-  https://docs.oracle.com/javase/7/docs/technotes/guides/extensions/spec.html#bundled
+  This is to ensure classpath length never exceeds platform ARG_MAX.
 
   :param list classpath: Classpath to be bundled.
   :param string synthetic_jar_dir: directory to store the synthetic jar, if `None`
@@ -120,18 +150,12 @@ def safe_classpath(classpath, synthetic_jar_dir):
   :returns: A classpath (singleton list with just the synthetic jar).
   :rtype: list of strings
   """
-  def prepare_url(url, root_dir):
-    url_in_bundle = os.path.relpath(os.path.realpath(url), os.path.realpath(root_dir))
-    # append '/' for directories, those not ending with '/' are assumed to be jars
-    if os.path.isdir(url):
-      url_in_bundle += '/'
-    return url_in_bundle
-
   if synthetic_jar_dir:
     safe_mkdir(synthetic_jar_dir)
   else:
     synthetic_jar_dir = safe_mkdtemp()
-  bundled_classpath = [prepare_url(url, synthetic_jar_dir) for url in classpath]
+
+  bundled_classpath = relativize_classpath(classpath, synthetic_jar_dir)
 
   manifest = Manifest()
   manifest.addentry(Manifest.CLASS_PATH, ' '.join(bundled_classpath))

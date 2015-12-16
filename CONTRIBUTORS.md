@@ -1,5 +1,6 @@
 Created by running `./build-support/bin/contributors.sh`.
 
++ Alan Paulin
 + Alexander Johnson
 + Alyssa Pohahau
 + Andy Reitz
@@ -14,6 +15,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Cody Gibb
 + Craig Schertz
 + Dan Davydov
++ Dan Harrison
 + Daniel Anderson
 + David Taylor
 + David Turner
@@ -55,6 +57,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
++ Karin Lundberg
 + Ken Kawamoto
 + Kevin Sweeney
 + Kris Wilson
@@ -105,4 +108,5 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tom Howland
 + Travis Crawford
 + Ugo Di Girolamo
++ Wei An
 + Yi Cheng

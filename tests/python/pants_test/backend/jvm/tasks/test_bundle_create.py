@@ -67,6 +67,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self.assertEquals({dist_root: ['FooApp-bundle']}, product_data)
 
     bundle_root = os.path.join(dist_root, 'FooApp-bundle')
+    # TODO foo.txt and Foo.class are also under libs in a subdirectory, verify their existence
     self.assertEqual(sorted(['foo-binary.jar',
                              'libs/org.example-foo-1.0.0.jar',
                              'libs/org.pantsbuild-bar-2.0.0.zip',
@@ -74,8 +75,9 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                              'libs/org.gnu-gary-4.0.0.tar.gz']),
                      sorted(self.iter_files(bundle_root)))
 
+    # TODO verify Manifest's Class-Path
     with open_zip(os.path.join(bundle_root, 'foo-binary.jar')) as jar:
-      self.assertEqual(sorted(['META-INF/', 'META-INF/MANIFEST.MF', 'Foo.class', 'foo.txt']),
+      self.assertEqual(sorted(['META-INF/', 'META-INF/MANIFEST.MF']),
                        sorted(jar.namelist()))
 
   def test_jvm_bundle_missing_product(self):

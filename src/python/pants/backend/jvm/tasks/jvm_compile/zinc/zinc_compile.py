@@ -15,6 +15,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
@@ -80,6 +81,11 @@ class ZincCompile(JvmCompile):
   def subsystem_dependencies(cls):
     return super(ZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
 
+  @property
+  def compiler_plugin_types(cls):
+    """A tuple of target types which are compiler plugins."""
+    return (AnnotationProcessor, ScalacPlugin)
+
   @classmethod
   def get_args_default(cls, bootstrap_option_values):
     return ('-S-encoding', '-SUTF-8', '-S-g:vars')
@@ -114,6 +120,12 @@ class ZincCompile(JvmCompile):
              help='A dict of option regexes that make up pants\' supported API for zinc. '
                   'Options not listed here are subject to change/removal. The value of the dict '
                   'indicates that an option accepts an argument.')
+
+    register('--incremental', advanced=True, action='store_true', default=True,
+             help='When set, zinc will use sub-target incremental compilation, which dramatically '
+                  'improves compile performance while changing large targets. When unset, '
+                  'changed targets will be compiled with an empty output directory, as if after '
+                  'running clean-all.')
 
     # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
     #  https://github.com/sbt/sbt/pull/2085
@@ -176,7 +188,7 @@ class ZincCompile(JvmCompile):
     Setting this property causes the task infrastructure to clone the previous
     results_dir for a target into the new results_dir for a target.
     """
-    return True
+    return self.get_options().incremental
 
   @property
   def cache_incremental(self):
@@ -240,7 +252,7 @@ class ZincCompile(JvmCompile):
     if not self.get_options().scalac_plugins:
       return []
 
-    plugin_args = self.get_options().plugin_args
+    plugin_args = self.get_options().scalac_plugin_args
     active_plugins = self._find_plugins()
     ret = []
     for name, jar in active_plugins.items():
@@ -294,7 +306,7 @@ class ZincCompile(JvmCompile):
         f.write('{}\n'.format(processor.strip()))
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings):
+              log_file, settings, fatal_warnings):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
@@ -338,6 +350,9 @@ class ZincCompile(JvmCompile):
       '-C-target', '-C{}'.format(settings.target_level),
     ])
     zinc_args.extend(settings.args)
+
+    if fatal_warnings:
+      zinc_args.extend(['-S-Xfatal-warnings', '-C-Werror'])
 
     jvm_options = list(self._jvm_options)
 

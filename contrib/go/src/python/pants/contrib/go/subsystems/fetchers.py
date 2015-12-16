@@ -450,38 +450,47 @@ class GopkgInFetcher(Fetcher, Subsystem):
     return ArchiveFetcher.global_instance()
 
   def root(self, import_path):
-    return import_path
+    user, package, raw_rev = self._extract_root_components(import_path)
+    pkg = '{}.{}'.format(package, raw_rev)
+    return 'gopkg.in/{}/{}'.format(user, pkg) if user else 'gopkg.in/{}'.format(pkg)
 
-  #VisibleForTesting
+  # VisibleForTesting
   def _do_fetch(self, import_path, dest, rev=None):
     return self._fetcher.fetch(import_path, dest, rev=rev)
 
   def fetch(self, import_path, dest, rev=None):
-    github_root, github_rev = self._map_import_path(import_path, rev)
+    github_root, github_rev = self._map_github_root_and_rev(import_path, rev)
     self._do_fetch(github_root, dest, rev=rev or github_rev)
 
-  _PACKAGE_AND_REV_RE = re.compile(r'(?P<package>[^/]+).(?P<rev>v[0-9]+)')
+  # GitHub username rules allow us to bank on pkg.v1 being the package/rev and never a user.
+  # Could not find docs for this, but trying to sign up as 'pkg.v1' on 11/17/2015 yields:
+  # "Username may only contain alphanumeric characters or single hyphens, and cannot begin or end
+  #  with a hyphen."
+  _USER_PACKAGE_AND_REV_RE = re.compile(r'(?:(?P<user>[^/]+)/)?(?P<package>[^/]+).(?P<rev>v[0-9]+)')
 
   @memoized_method
-  def _map_import_path(self, import_path, rev=None):
-    components = import_path.split('/', 2)
+  def _extract_root_components(self, import_path):
+    components = import_path.split('/', 1)
 
     domain = components.pop(0)
     if 'gopkg.in' != domain:
-      raise self.FetchError('Can only fetch packages for pkgio.in, given: {}'.format(import_path))
+      raise self.FetchError('Can only fetch packages for gopkg.in, given: {}'.format(import_path))
 
-    user = components.pop(0) if len(components) == 2 else None
-
-    match = self._PACKAGE_AND_REV_RE.match(components[0])
+    match = self._USER_PACKAGE_AND_REV_RE.match(components[0])
     if not match:
       raise self.FetchError('Invalid gopkg.in package and rev in: {}'.format(import_path))
-    package, raw_rev = match.groups()
 
+    user, package, raw_rev = match.groups()
+    return user, package, raw_rev
+
+  @memoized_method
+  def _map_github_root_and_rev(self, import_path, rev=None):
+    user, package, raw_rev = self._extract_root_components(import_path)
     user = user or 'go-{}'.format(package)
     rev = rev or self._find_highest_compatible(user, package, raw_rev)
-    root = 'github.com/{user}/{pkg}'.format(user=user, pkg=package)
-    logger.debug('Resolved {} to {} at rev {}'.format(import_path, root, rev))
-    return root, rev
+    github_root = 'github.com/{user}/{pkg}'.format(user=user, pkg=package)
+    logger.debug('Resolved {} to {} at rev {}'.format(import_path, github_root, rev))
+    return github_root, rev
 
   class ApiError(Fetcher.FetchError):
     """Indicates a compatible version could not be found due to github API errors."""

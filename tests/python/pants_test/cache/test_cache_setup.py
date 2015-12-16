@@ -9,7 +9,6 @@ import os
 
 from mock import Mock
 
-from pants.backend.core.tasks.task import Task
 from pants.cache.cache_setup import (CacheFactory, CacheSetup, CacheSpec, CacheSpecFormatError,
                                      EmptyCacheSpecError, InvalidCacheSpecError,
                                      LocalCacheSpecRequiredError, RemoteCacheSpecRequiredError,
@@ -18,6 +17,7 @@ from pants.cache.local_artifact_cache import LocalArtifactCache
 from pants.cache.resolver import Resolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
+from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 from pants_test.testutils.mock_logger import MockLogger
@@ -55,6 +55,7 @@ class TestCacheSetup(BaseTest):
   REMOTE_URI_1 = 'http://host1'
   REMOTE_URI_2 = 'https://host2:666'
   REMOTE_URI_3 = 'http://host3'
+  EMPTY_URI = 'http://localhost:9999'
 
   CACHE_SPEC_LOCAL_ONLY = CacheSpec(local=LOCAL_URI, remote=None)
   CACHE_SPEC_REMOTE_ONLY = CacheSpec(local=None, remote=REMOTE_URI_1)
@@ -72,6 +73,9 @@ class TestCacheSetup(BaseTest):
     options = Mock()
     options.pinger_timeout = .5
     options.pinger_tries = 2
+    options.read_from = [self.EMPTY_URI]
+    options.write_to = [self.EMPTY_URI]
+    options.compression_level = 1
     self.cache_factory = CacheFactory(options=options, log=MockLogger(),
                                  stable_name='test', resolver=self.resolver)
 
@@ -182,3 +186,9 @@ class TestCacheSetup(BaseTest):
 
       with self.assertRaises(TooManyCacheSpecsError):
         mk_cache([tmpdir, self.REMOTE_URI_1, self.REMOTE_URI_2])
+
+  def test_read_cache_available(self):
+    self.assertEquals(None, self.cache_factory.read_cache_available())
+
+  def test_write_cache_available(self):
+    self.assertEquals(None, self.cache_factory.write_cache_available())

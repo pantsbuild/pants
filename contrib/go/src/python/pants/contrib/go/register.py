@@ -33,8 +33,7 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='go', action=GoBuildgen).install('buildgen').with_description(
-    'Automatically generate BUILD files.')
+  task(name='go', action=GoBuildgen).install('buildgen')
   task(name='go', action=GoGo).install('go')
   task(name='go-env', action=GoEnv).install()
   task(name='go', action=GoFetch).install('resolve')

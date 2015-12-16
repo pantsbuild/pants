@@ -20,9 +20,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
-from pants.backend.core.targets.dependencies import Dependencies
-from pants.backend.core.targets.prep_command import PrepCommand
-from pants.backend.core.targets.resources import Resources
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -31,6 +28,9 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.prep_command import PrepCommand
+from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp, safe_rmtree
 
@@ -52,7 +52,8 @@ class PythonChroot(object):
 
   class InvalidDependencyException(Exception):
     def __init__(self, target):
-      Exception.__init__(self, "Not a valid Python dependency! Found: {}".format(target))
+      super(PythonChroot.InvalidDependencyException, self).__init__(
+        'Not a valid Python dependency! Found: {}'.format(target))
 
   @staticmethod
   def get_platforms(platform_list):
@@ -183,7 +184,7 @@ class PythonChroot(object):
         if isinstance(trg, target_type):
           children[target_key].add(trg)
           return
-        elif isinstance(trg, Dependencies):
+        elif type(trg) == Target:
           return
       raise self.InvalidDependencyException(trg)
     for target in targets:

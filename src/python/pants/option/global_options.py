@@ -46,8 +46,9 @@ class GlobalOptionsRegistrar(Optionable):
              help='Squelches most console output.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', action='store_true', default=True, recursive=True,
-             help='Set whether log messages are displayed in color.')
+    register('--colors', '--color', action='store_true', default=True, recursive=True,
+             help='Set whether log messages are displayed in color. NB: The singular `color` form '
+                  'is deprecated until 0.0.66: prefer `colors`.')
 
     # Pants code uses this only to verify that we are of the requested version. However
     # setup scripts, runner scripts, IDE plugins, etc., may grep this out of pants.ini
@@ -94,6 +95,12 @@ class GlobalOptionsRegistrar(Optionable):
     # registration and not so that their values can be interpolated in configs.
     register('-d', '--logdir', advanced=True, metavar='<dir>',
              help='Write logs to files under this directory.')
+
+    # This facilitates bootstrap-time configuration of pantsd usage such that we can
+    # determine whether or not to use the Pailgun client to invoke a given pants run
+    # without resorting to heavier options parsing.
+    register('--enable-pantsd', advanced=True, action='store_true', default=False,
+             help='Enables use of the pants daemon. (Beta)')
 
   @classmethod
   def register_options(cls, register):

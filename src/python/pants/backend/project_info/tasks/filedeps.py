@@ -8,14 +8,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import itertools
 import os
 
-from pants.backend.core.tasks.console_task import ConsoleTask
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
+from pants.task.console_task import ConsoleTask
 
 
 class FileDeps(ConsoleTask):
-  """List all transitive file dependencies of the targets specified on the command line.
+  """List all source and BUILD files a target transitively depends on.
 
   Files are listed with absolute paths and any BUILD files implied in the transitive closure of
   targets are also included.

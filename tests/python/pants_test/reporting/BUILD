@@ -3,7 +3,7 @@
 
 python_tests(
   name = 'reporting',
-  sources = globs('*.py'),
+  sources = ['test_linkify.py'],
   dependencies = [
     'src/python/pants/reporting',
   ]
@@ -15,5 +15,6 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test'
-  ]
+  ],
+  tags = {'integration'},
 )

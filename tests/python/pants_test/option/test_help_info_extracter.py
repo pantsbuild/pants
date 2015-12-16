@@ -36,7 +36,7 @@ class HelpInfoExtracterTest(unittest.TestCase):
     do_test(['--foo'], {'type': dict_option}, ['--foo="{\'key1\':val1,\'key2\':val2,...}"'],
                                             ['--foo'])
     do_test(['--foo'], {'action': 'append'},
-            ['--foo="[\'str1\',\'str2\',...]" (--foo="[\'str1\',\'str2\',...]") ...'], ['--foo'])
+            ['--foo=<str> (--foo=<str>) ...'], ['--foo'])
 
     do_test(['--foo', '--bar'], {}, ['--foo=<str>', '--bar=<str>'], ['--foo', '--bar'])
 

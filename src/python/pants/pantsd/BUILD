@@ -12,6 +12,16 @@ python_library(
 )
 
 python_library(
+  name = 'pailgun_server',
+  sources = ['pailgun_server.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    'src/python/pants/java:nailgun_protocol',
+    'src/python/pants/util:socket'
+  ]
+)
+
+python_library(
   name = 'watchman',
   sources = ['watchman.py'],
   dependencies = [
@@ -26,5 +36,14 @@ python_library(
   sources = ['watchman_client.py'],
   dependencies = [
     '3rdparty/python:pywatchman'
+  ]
+)
+
+python_library(
+  name = 'pants_daemon',
+  sources = ['pants_daemon.py'],
+  dependencies = [
+    '3rdparty/python:setproctitle',
+    'src/python/pants/goal:run_tracker'
   ]
 )

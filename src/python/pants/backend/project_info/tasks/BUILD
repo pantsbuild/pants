@@ -20,10 +20,10 @@ python_library(
   sources = ['dependencies.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload_field',
+    'src/python/pants/task',
   ],
 )
 
@@ -31,9 +31,9 @@ python_library(
   name = 'depmap',
   sources = ['depmap.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
+    'src/python/pants/task',
   ],
 )
 
@@ -83,8 +83,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:pex',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -95,9 +93,11 @@ python_library(
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/option',
+    'src/python/pants/task',
     'src/python/pants/util:memo',
   ],
 )
@@ -106,11 +106,11 @@ python_library(
   name = 'filedeps',
   sources = ['filedeps.py'],
   dependencies = [
-    'src/python/pants/backend/core/tasks:console_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:build_environment',
+    'src/python/pants/build_graph',
+    'src/python/pants/task',
   ],
 )
 
@@ -119,7 +119,6 @@ python_library(
   sources = ['ide_gen.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:classpath_products',

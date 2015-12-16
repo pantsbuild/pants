@@ -12,7 +12,7 @@ from pants.base.exceptions import TargetDefinitionException
 
 
 class AndroidResources(AndroidTarget):
-  """Processes android resources to generate R.java"""
+  """Android resources used to generate R.java."""
 
   def __init__(self,
                resource_dir=None,

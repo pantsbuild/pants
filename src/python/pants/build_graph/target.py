@@ -11,9 +11,7 @@ from hashlib import sha1
 
 from six import string_types
 
-from pants.backend.core.wrapped_globs import FilesetWithSpec
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
@@ -24,6 +22,7 @@ from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
 from pants.source.source_root import SourceRootConfig
+from pants.source.wrapped_globs import FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -119,7 +118,9 @@ class AbstractTarget(object):
 
 
 class Target(AbstractTarget):
-  """The baseclass for all pants targets.
+  """A generic target used to group dependencies.
+
+  The baseclass for all pants targets.
 
   Handles registration of a target amongst all parsed targets as well as location of the target
   parse context.
@@ -256,12 +257,6 @@ class Target(AbstractTarget):
       self.add_labels('no_cache')
     if kwargs:
       self.UnknownArguments.check(self, kwargs)
-
-  @deprecated('0.0.59',
-              'The `no_cache` property is generally ambiguous, and is no longer necessary '
-              'for jvm compiles.')
-  def _set_no_cache(self):
-    self.add_labels('no_cache')
 
   @property
   def type_alias(self):

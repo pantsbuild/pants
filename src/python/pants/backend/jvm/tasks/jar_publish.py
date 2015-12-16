@@ -17,7 +17,6 @@ from copy import copy
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.scm_publish import Namedver, ScmPublishMixin, Semver
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -34,6 +33,7 @@ from pants.build_graph.build_graph import sort_targets
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.option.custom_types import dict_option, list_option
+from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin, Semver
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 

@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
-from pants.contrib.node.targets.npm_package import NpmPackage
+from pants.contrib.node.targets.node_package import NodePackage
 
 
-class NodeRemoteModule(NpmPackage):
-  """Represents a remote Node module."""
+class NodeRemoteModule(NodePackage):
+  """A remote Node module."""
 
   def __init__(self, version=None, address=None, payload=None, **kwargs):
     """
