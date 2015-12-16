@@ -31,6 +31,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.process_handler import ProcessHandler
 from pants.util.strutil import safe_shlex_split
 
 
@@ -540,7 +541,19 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
     # task.
 
-    return subprocess.Popen(pex.cmdline(args),
+    process = subprocess.Popen(pex.cmdline(args),
                                preexec_fn=os.setsid if setsid else None,
                                stdout=workunit.output('stdout'),
                                stderr=workunit.output('stderr'))
+
+    class PytestProcessHandler(ProcessHandler):
+      def wait(_):
+        return process.wait()
+
+      def kill(_):
+        return process.kill()
+
+      def terminate(_):
+        return process.terminate(_)
+
+    return PytestProcessHandler()

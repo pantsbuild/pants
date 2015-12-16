@@ -30,6 +30,7 @@ from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util.process_handler import ProcessHandler
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -199,6 +200,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     :param Executor executor: the java subprocess executor to use. If not specified, construct
       using the distribution passed in via the parameter.
     :param Distribution distribution: The JDK or JRE installed.
+    :returns: ProcessHandler
 
     Returns a process handler which supports wait(), kill() and terminate().
     """
@@ -211,7 +213,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
     # This ProcessHandler is created with a closure including the process and return_code_handler
     # returned by execute_java.
-    class ProcessHandler(object):
+    class JUnitProcessHandler(ProcessHandler):
       def wait(_):
         ret = process.wait()
         return_code_handler(ret)
@@ -223,7 +225,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       def terminate(_):
         return process.terminate()
 
-    return ProcessHandler()
+    return JUnitProcessHandler()
 
   def execute_java_for_targets(self, targets, *args, **kwargs):
     """Execute java for targets, using the test mixin spawn and wait in order to activate timeouts

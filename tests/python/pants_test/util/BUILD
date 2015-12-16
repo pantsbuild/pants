@@ -103,7 +103,7 @@ python_tests(
   dependencies = [
     'src/python/pants/util:xml_parser',
     'src/python/pants/util:contextutil',
-  ],
+  ]
 )
 
 python_tests(
@@ -111,7 +111,7 @@ python_tests(
   sources = ['test_timeout.py'],
   dependencies = [
     'src/python/pants/util:timeout',
-  ],
+  ]
 )
 
 python_tests(
@@ -121,5 +121,5 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/util:socket',
-  ],
+  ]
 )
