@@ -24,6 +24,7 @@ class ScalaJSPlatform(Subsystem, NodeResolverBase):
   @classmethod
   def register_options(cls, register):
     super(ScalaJSPlatform, cls).register_options(register)
+    # TODO: revisit after https://rbcommons.com/s/twitter/r/3225/
     register('--runtime', advanced=True, type=target_list_option, default=['//:scala-js-library'],
              help='Target specs pointing to the scala-js runtime libraries.')
 
