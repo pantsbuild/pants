@@ -247,7 +247,7 @@ class Fetchers(Subsystem):
       fetchers.append((matcher, fetcher))
     return fetchers
 
-  # @method
+  @memoized_method
   def maybe_get_fetcher(self, import_path):
     """Returns a :class:`Fetcher` capable of resolving the given remote import path.
 
@@ -335,7 +335,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
              fromfile=True,
              help="Known import-prefixes for go packages")
 
-  @property
+  @memoized_property
   def _matchers(self):
     matchers = []
     for regex, info in self.get_options().matchers.items():
@@ -344,7 +344,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
       matchers.append((matcher, url_info))
     return matchers
 
-  @property
+  @memoized_property
   def _prefixes(self):
     # The Go get meta protocol involves reading the HTML to find a meta tag with the name go-import
     # that lists a prefix. Knowing this prefix ahead of time allows the ArchiveFetcher to fetch
@@ -352,7 +352,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
     # network access other than to a repository of tarballs of the source.
     return self.get_options().prefixes or []
 
-  # @method
+  @memoized_method
   def _matcher(self, import_path):
     for matcher, url_info in self._matchers:
       match = matcher.search(import_path)

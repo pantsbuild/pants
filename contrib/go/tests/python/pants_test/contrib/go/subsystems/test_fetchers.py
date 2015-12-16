@@ -12,11 +12,12 @@ import mock
 import requests
 from pants.util.contextutil import temporary_dir
 from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test import base_test
 
 from pants.contrib.go.subsystems.fetchers import ArchiveFetcher, Fetchers, GopkgInFetcher
 
 
-class FetchersTest(unittest.TestCase):
+class FetchersTest(base_test.BaseTest):
   # TODO(John Sirois): Add more tests of the Fetches subsystem: advertisement and aliasing as part
   # of: https://github.com/pantsbuild/pants/issues/2018
 
@@ -65,13 +66,12 @@ class PrefixesTest(unittest.TestCase):
 
   @contextmanager
   def fetcher(self, import_path):
-    with subsystem_instance(Fetchers, options={
-        '': {
-          'prefixes' :['foo', 'bar/baz'],
+    with subsystem_instance(Fetchers, **{'fetchers' : {
           'mapping' : {'.*': 'ArchiveFetcher'},
           },
-        'archive-fetcher': {
-          'matchers' : {'.*': ('', None, 0)}
+        'archive-fetcher' : {
+          'matchers' : {'.*': ('', None, 0)},
+          'prefixes' :['foo', 'bar/baz'],
         }}) as fetchers:
       yield fetchers.get_fetcher(import_path)
 

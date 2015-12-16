@@ -18,6 +18,7 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:base_test',
   ]
 )
 
