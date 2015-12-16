@@ -232,16 +232,13 @@ class Fetchers(Subsystem):
                                    .format(name, cls._fully_qualified_class_name(fetcher_class)))
     return fetcher_class
 
-  @property
+  @memoized_property
   def _fetchers(self):
     fetchers = []
     for regex, fetcher in self.get_options().mapping.items():
       matcher = re.compile(regex)
 
       fetcher_class = self._fetcher(fetcher)
-      # @jsirois: Here is the line I am concerned about. Does it use a
-      # contextmanager, or does it grab the global_instance that has the
-      # previous configuration already memoized?
       fetcher = (fetcher_class.global_instance() if issubclass(fetcher_class, Subsystem)
                  else fetcher_class())
       fetchers.append((matcher, fetcher))
