@@ -60,6 +60,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/core_tasks',
     'src/python/pants/goal:workspace',
+    'src/python/pants/source',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

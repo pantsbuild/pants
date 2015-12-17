@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.core.tasks import builddictionary, reflect
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.python.register import build_file_aliases as register_python
+from pants.build_graph.register import build_file_aliases as register_core
 from pants_test.base_test import BaseTest
 
 

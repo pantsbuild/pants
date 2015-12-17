@@ -91,14 +91,3 @@ python_tests(
     'tests/python/pants_test:base_test'
   ]
 )
-
-python_tests(
-  name = 'wiki_page',
-  sources = ['test_wiki_page.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.confluence',
-    'src/python/pants/backend/core/targets:doc',
-    'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
-  ]
-)

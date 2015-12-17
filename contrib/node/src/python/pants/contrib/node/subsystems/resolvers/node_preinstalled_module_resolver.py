@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import shutil
 from contextlib import closing
 
 import six.moves.urllib.error as urllib_error
@@ -76,4 +77,4 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
                         .format(target=target.address.reference(),
                                 dependencies_archive_url=target.dependencies_archive_url))
 
-      os.rename(extracted_node_modules, os.path.join(results_dir, 'node_modules'))
+      shutil.move(extracted_node_modules, os.path.join(results_dir, 'node_modules'))

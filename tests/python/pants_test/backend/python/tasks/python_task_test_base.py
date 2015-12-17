@@ -10,21 +10,11 @@ from textwrap import dedent
 
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.build_graph.address import Address
+from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class PythonTaskTestBase(TaskTestBase):
-  def setUp(self):
-    super(PythonTaskTestBase, self).setUp()
-
-    # Use the "real" interpreter cache, so tests don't waste huge amounts of time recreating it.
-    # It would be nice to get the location of the real interpreter cache from PythonSetup,
-    # but unfortunately real subsystems aren't available here (for example, we have no access
-    # to the enclosing pants instance's options), so we have to hard-code it.
-    python_setup_workdir = os.path.join(self.real_build_root, '.pants.d', 'python-setup')
-    self.set_options_for_scope('python-setup',
-        interpreter_cache_dir=os.path.join(python_setup_workdir, 'interpreters'),
-        chroot_cache_dir=os.path.join(python_setup_workdir, 'chroots'))
+class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
 
   @property
   def alias_groups(self):

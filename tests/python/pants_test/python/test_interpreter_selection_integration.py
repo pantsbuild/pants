@@ -13,8 +13,10 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
+  testproject = 'testprojects/src/python/interpreter_selection'
+
   def test_conflict(self):
-    binary_target = 'tests/python/pants_test/python:deliberately_conficting_compatibility'
+    binary_target = '{}:deliberately_conficting_compatibility'.format(self.testproject)
     pants_run = self._build_pex(binary_target)
     self.assert_failure(pants_run,
                         'Unexpected successful build of {binary}.'.format(binary=binary_target))
@@ -27,14 +29,14 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
   def _maybe_test_version(self, version):
     if self.has_python_version(version):
-      print('Found python %s. Testing interpreter selection against it.' % version)
+      print('Found python {}. Testing interpreter selection against it.'.format(version))
       echo = self._echo_version(version)
       v = echo.split('.')  # E.g., 2.6.8 .
-      self.assertTrue(len(v) > 2, 'Not a valid version string: %s' % v)
-      self.assertEquals(version, '%s.%s' % (v[0], v[1]))
+      self.assertTrue(len(v) > 2, 'Not a valid version string: {}'.format(v))
+      self.assertEquals(version, '{}.{}'.format(v[0], v[1]))
     else:
-      print('No python %s found. Skipping.' % version)
-      self.skipTest('No python %s on system' % version)
+      print('No python {} found. Skipping.'.format(version))
+      self.skipTest('No python {} on system'.format(version))
 
   def _echo_version(self, version):
     with temporary_dir() as distdir:
@@ -43,8 +45,8 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
           'pants_distdir': distdir
         }
       }
-      binary_name = 'echo_interpreter_version_%s' % version
-      binary_target = 'tests/python/pants_test/python:' + binary_name
+      binary_name = 'echo_interpreter_version_{}'.format(version)
+      binary_target = '{}:{}'.format(self.testproject, binary_name)
       pants_run = self._build_pex(binary_target, config)
       self.assert_success(pants_run, 'Failed to build {binary}.'.format(binary=binary_target))
 
