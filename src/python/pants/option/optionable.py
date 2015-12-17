@@ -30,7 +30,7 @@ class Optionable(AbstractClass):
   @classmethod
   def get_description(cls):
     # First line of docstring.
-    return '' if cls.__doc__ is None else cls.__doc__.partition('\n')[0]
+    return '' if cls.__doc__ is None else cls.__doc__.partition('\n')[0].strip()
 
   @classmethod
   def register_options(cls, register):

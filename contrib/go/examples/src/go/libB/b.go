@@ -1,11 +1,11 @@
 package libB
 
 import (
-  "libD"
+	"libD"
 )
 
 func Speak() {
 	println("Hello from libB!")
-  libD.Speak()
-  println("Bye from libB!")
+	libD.Speak()
+	println("Bye from libB!")
 }
