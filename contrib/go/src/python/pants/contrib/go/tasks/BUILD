@@ -3,6 +3,7 @@ target(
   dependencies=[
     ':go_binary_create',
     ':go_buildgen',
+    ':go_checkstyle',
     ':go_compile',
     ':go_fetch',
     ':go_go',
@@ -40,6 +41,17 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
+  name='go_checkstyle',
+  sources=['go_checkstyle.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:dirutil',
   ]
 )
 
