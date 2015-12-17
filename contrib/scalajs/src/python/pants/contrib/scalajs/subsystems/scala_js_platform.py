@@ -48,7 +48,7 @@ class ScalaJSPlatform(Subsystem, NodeResolverBase):
         dest_path = os.path.join(results_dir, rel_path)
         safe_mkdir(os.path.dirname(dest_path))
         shutil.copy2(src_path, dest_path)
-    
+
     # And emit an empty package.json.
     package = {
       'name': target.name,
