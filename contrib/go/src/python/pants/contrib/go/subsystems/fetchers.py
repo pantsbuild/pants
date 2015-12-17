@@ -329,7 +329,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
     register('--retries', default=1, advanced=True,
              help='How many times to retry to fetch a remote library.')
     register('--prefixes', metavar='<paths>', type=list_option, advanced=True,
-             fromfile=True,
+             fromfile=True, default=[],
              help="Known import-prefixes for go packages")
 
   @memoized_property
@@ -343,11 +343,12 @@ class ArchiveFetcher(Fetcher, Subsystem):
 
   @memoized_property
   def _prefixes(self):
+    """Returns known prefixes of Go packages that are the root of archives."""
     # The Go get meta protocol involves reading the HTML to find a meta tag with the name go-import
     # that lists a prefix. Knowing this prefix ahead of time allows the ArchiveFetcher to fetch
     # the archive. This is especially useful if running in an environment where there is no
     # network access other than to a repository of tarballs of the source.
-    return self.get_options().prefixes or []
+    return self.get_options().prefixes
 
   @memoized_method
   def _matcher(self, import_path):
