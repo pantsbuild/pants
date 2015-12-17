@@ -1,13 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='subsystems',
-  dependencies=[
-    ':shader'
-  ]
-)
-
 python_tests(
   name='shader',
   sources=['test_shader.py'],
@@ -32,4 +25,5 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )

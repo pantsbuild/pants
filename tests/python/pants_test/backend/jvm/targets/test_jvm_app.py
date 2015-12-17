@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
+from pants.source.wrapped_globs import Globs
 from pants_test.base_test import BaseTest
 
 

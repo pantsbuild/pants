@@ -294,14 +294,14 @@ class DistributionLinuxLocationTest(BaseDistributionLocationTest):
         dist = DistributionLocator.locate(minimum_version='2')
         self.assertEqual(jdk2_home, dist.home)
 
-  def test_locate_trumps_path(self):
+  def test_default_to_path(self):
     with self.java_dist_dir() as (jdk1_home, jdk2_home):
       with distribution(executables=exe('bin/java', version='3')) as path_jdk:
         with env(PATH=os.path.join(path_jdk, 'bin')):
           dist = DistributionLocator.locate(minimum_version='2')
-          self.assertEqual(jdk2_home, dist.home)
-          dist = DistributionLocator.locate(minimum_version='3')
           self.assertEqual(path_jdk, dist.home)
+          dist = DistributionLocator.locate(maximum_version='2')
+          self.assertEqual(jdk1_home, dist.home)
 
   def test_locate_jdk_home_trumps(self):
     with self.java_dist_dir() as (jdk1_home, jdk2_home):
@@ -377,14 +377,14 @@ class DistributionOSXLocationTest(BaseDistributionLocationTest):
         dist = DistributionLocator.locate(minimum_version='2')
         self.assertEqual(jdk2_home, dist.home)
 
-  def test_locate_trumps_path(self):
+  def test_default_to_path(self):
     with self.java_home_exe() as (jdk1_home, jdk2_home):
       with distribution(executables=exe('bin/java', version='3')) as path_jdk:
         with env(PATH=os.path.join(path_jdk, 'bin')):
-          dist = DistributionLocator.locate()
-          self.assertEqual(jdk1_home, dist.home)
-          dist = DistributionLocator.locate(minimum_version='3')
+          dist = DistributionLocator.locate(minimum_version='2')
           self.assertEqual(path_jdk, dist.home)
+          dist = DistributionLocator.locate(maximum_version='2')
+          self.assertEqual(jdk1_home, dist.home)
 
   def test_locate_jdk_home_trumps(self):
     with self.java_home_exe() as (jdk1_home, jdk2_home):

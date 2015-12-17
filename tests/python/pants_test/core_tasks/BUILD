@@ -27,7 +27,6 @@ python_tests(
   sources = ['test_run_prep_command.py'],
   dependencies = [
     '3rdparty/python:six',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/core_tasks',
@@ -55,13 +54,13 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/codegen/targets:python',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/build_graph',
     'src/python/pants/core_tasks',
     'src/python/pants/goal:workspace',
+    'src/python/pants/source',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

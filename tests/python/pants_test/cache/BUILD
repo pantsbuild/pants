@@ -1,18 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'cache',
-  dependencies = [
-    ':artifact',
-    ':artifact_cache',
-    ':cache_setup',
-    ':delay_server',
-    ':pinger',
-    ':resolver',
-  ]
-)
-
 python_tests(
   name = 'artifact',
   sources = ['test_artifact.py'],

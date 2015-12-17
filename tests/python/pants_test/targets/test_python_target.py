@@ -7,13 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.resources import Resources
 from pants_test.base_test import BaseTest
 
 
@@ -29,7 +29,7 @@ class PythonTargetTest(BaseTest):
                        spec=":one",
                        provides=Artifact(org='com.twitter', name='one-jar', repo=internal_repo))
 
-    spec = ":test-with-PythonArtifact"
+    spec = "//:test-with-PythonArtifact"
     pa = PythonArtifact(name='foo', version='1.0', description='foo')
 
     # This test verifies that adding a 'setup_py' provides to a PythonTarget is okay.
@@ -38,7 +38,7 @@ class PythonTargetTest(BaseTest):
                                         provides=pa)
     self.assertEquals(pt_with_artifact.address.spec, spec)
 
-    spec = ":test-with-none"
+    spec = "//:test-with-none"
     # This test verifies that having no provides is okay.
     pt_no_artifact = self.make_target(spec=spec,
                                       target_type=PythonTarget,

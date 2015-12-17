@@ -1,18 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='targets',
-  dependencies=[
-    ':jar_dependency',
-    ':jar_library',
-    ':jvm_app',
-    ':jvm_binary',
-    ':jvm_target',
-    ':unpacked_jars',
-  ]
-)
-
 python_tests(
   name='jar_dependency',
   sources=['test_jar_dependency.py'],
@@ -35,10 +23,10 @@ python_tests(
   name='jvm_app',
   sources=['test_jvm_app.py'],
   dependencies=[
-    'src/python/pants/backend/core:wrapped_globs',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/source',
     'tests/python/pants_test:base_test',
   ]
 )
@@ -59,8 +47,8 @@ python_tests(
   name='jvm_target',
   sources=['test_jvm_target.py'],
   dependencies=[
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
 )

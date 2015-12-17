@@ -14,7 +14,7 @@ from pants.option.option_util import is_boolean_flag
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
     ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
      'typ', 'fromfile', 'default', 'help', 'deprecated_version', 'deprecated_message',
-     'deprecated_hint'])):
+     'deprecated_hint', 'choices'])):
   """A container for help information for a single option.
 
   registering_class: The type that registered the option.
@@ -31,6 +31,7 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   deprecated_version: The version at which this option is to be removed, if any (None otherwise).
   deprecated_message: A more verbose message explaining the deprecated_version (None otherwise).
   deprecated_hint: A deprecation hint message registered for this option (None otherwise).
+  choices: If this option has a constrained list of choices, a csv list of the choices.
   """
   pass
 
@@ -159,6 +160,7 @@ class HelpInfoExtracter(object):
     deprecated_message = ('DEPRECATED. Will be removed in version {}.'.format(deprecated_version)
                           if deprecated_version else None)
     deprecated_hint = kwargs.get('deprecated_hint')
+    choices = ', '.join(kwargs.get('choices')) if kwargs.get('choices') else None
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
                          display_args=display_args,
@@ -170,5 +172,6 @@ class HelpInfoExtracter(object):
                          help=help_msg,
                          deprecated_version=deprecated_version,
                          deprecated_message=deprecated_message,
-                         deprecated_hint=deprecated_hint)
+                         deprecated_hint=deprecated_hint,
+                         choices=choices)
     return ret

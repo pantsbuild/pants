@@ -215,7 +215,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
   def test_intellij_integration(self):
     with self.temporary_workdir() as workdir:
-      targets = ['src/python/::', 'tests/python/pants_test:all', 'contrib/::']
+      targets = ['src/python/::', 'tests/python/pants_test/base::', 'contrib/::']
       excludes = [
         '--exclude-target-regexp=.*go/examples.*',
         '--exclude-target-regexp=.*scrooge/tests/thrift.*',

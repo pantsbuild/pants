@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.python.register import build_file_aliases as register_python
+from pants.build_graph.register import build_file_aliases as register_core
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 

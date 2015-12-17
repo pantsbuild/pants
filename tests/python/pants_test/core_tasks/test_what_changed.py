@@ -10,9 +10,6 @@ from textwrap import dedent
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
-from pants.backend.core.from_target import FromTarget
-from pants.backend.core.targets.resources import Resources
-from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -20,8 +17,11 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.from_target import FromTarget
+from pants.build_graph.resources import Resources
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.workspace import Workspace
+from pants.source.wrapped_globs import Globs, RGlobs
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -30,6 +30,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
   @property
   def alias_groups(self):
     return BuildFileAliases(
+      # TODO: Use dummy target types here, instead of depending on other backends.
       targets={
         'java_library': JavaLibrary,
         'python_library': PythonLibrary,
@@ -380,6 +381,6 @@ class WhatChangedTest(BaseWhatChangedTest):
 
   def test_root_config(self):
     self.assert_console_output(
-      ':pants-config',
+      '//:pants-config',
       workspace=self.workspace(files=['pants.ini'])
     )

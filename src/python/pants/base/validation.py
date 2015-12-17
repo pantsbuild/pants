@@ -9,7 +9,7 @@ from six import string_types
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.fileset import Fileset
 
-from pants.backend.core.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import FilesetWithSpec
 
 
 def assert_list(obj, expected_type=string_types, can_be_none=True, default=(), key_arg=None,

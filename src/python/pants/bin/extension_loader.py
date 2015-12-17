@@ -93,8 +93,7 @@ def load_plugins(build_configuration, plugins, working_set):
 
 
 def load_build_configuration_from_source(build_configuration, additional_backends=None):
-  """Installs pants backend packages to provide targets and helper functions to BUILD files and
-  goals to the cli.
+  """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
   :param BuildConfiguration build_configuration: The BuildConfiguration (for adding aliases).
   :param additional_backends: An optional list of additional packages to load backends from.
@@ -103,9 +102,19 @@ def load_build_configuration_from_source(build_configuration, additional_backend
   """
   # Note: pants.core_tasks must be first in this list, as it registers various stubs
   # that other tasks can use for scheduling against.
+  #
   # TODO: Allow repos to opt in to any backend (but not to core_tasks, which must always
-  # be loaded).
-  backend_packages = ['pants.core_tasks',
+  # be loaded).  Note that some backends use targets from other backends in their own BUILD files,
+  # e.g., pants.backend.python uses the page() target type from pants.backend.docgen.  So we must
+  # ensure that depended-on backends are loaded first. We do so manually here, but when making these
+  # opt-in we'll require a facility for loading dependent backends in the right order.
+  #
+  # TODO: Consider replacing the "backend" nomenclature here. For example, pants.build_graph and
+  # pants.core_tasks aren't really backends.
+  backend_packages = ['pants.build_graph',
+                      'pants.core_tasks',
+                      'pants.backend.graph_info',
+                      'pants.backend.docgen',
                       'pants.backend.authentication',
                       'pants.backend.core',
                       'pants.backend.python',

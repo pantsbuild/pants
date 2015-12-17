@@ -1,22 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'util',
-  dependencies = [
-    ':contextutil',
-    ':dirutil',
-    ':eval',
-    ':fileutil',
-    ':memo',
-    ':meta',
-    ':osutil',
-    ':strutil',
-    ':xml_parser',
-    ':timeout',
-  ]
-)
-
 python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],

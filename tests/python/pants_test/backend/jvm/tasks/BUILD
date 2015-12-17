@@ -1,42 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'tasks',
-  dependencies = [
-    ':benchmark_run',
-    ':binary_create',
-    ':bootstrap_jvm_tools',
-    ':bundle_create',
-    ':checkstyle',
-    ':check_published_deps',
-    ':classpath_products',
-    ':classpath_util',
-    ':coverage',
-    ':detect_duplicates',
-    ':ivy_imports',
-    ':ivy_resolve',
-    ':ivy_utils',
-    ':jar_create',
-    ':jar_publish',
-    ':jar_task',
-    ':junit_run',
-    ':jvm_dependency_usage',
-    ':jvm_platform_analysis',
-    ':jvm_prep_command',
-    ':jvm_run',
-    ':jvm_task',
-    ':jvmdoc_gen',
-    ':prepare_resources',
-    ':prepare_services',
-    ':properties',
-    ':resources_task',
-    ':scalastyle',
-    ':unpack_jars',
-    'tests/python/pants_test/backend/jvm/tasks/jvm_compile',
-  ]
-)
-
 python_tests(
   name = 'binary_create',
   sources = ['test_binary_create.py'],
@@ -70,7 +34,8 @@ python_tests(
   sources = ['test_bootstrap_jvm_tools_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -89,7 +54,8 @@ python_tests(
   sources = ['test_benchmark_run_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -101,6 +67,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -134,14 +101,14 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
   name = 'check_published_deps',
   sources = ['test_check_published_deps.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
     'src/python/pants/backend/jvm/targets:java',
@@ -236,17 +203,18 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
   name = 'ivy_utils',
   sources = ['test_ivy_utils.py'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:jar_dependency_utils',
     'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
@@ -259,7 +227,6 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
@@ -303,6 +270,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -327,7 +295,6 @@ python_tests(
   sources = ['test_junit_run.py'],
   dependencies = [
     '3rdparty/python:mock',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',
     'src/python/pants/backend/python/tasks:python',
@@ -337,6 +304,7 @@ python_tests(
     'src/python/pants/ivy',
     'src/python/pants/java/distribution:distribution',
     'src/python/pants/java:executor',
+    'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:timeout',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
@@ -351,7 +319,8 @@ python_tests(
     'src/python/pants/java/distribution',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/subsystem:subsystem_utils',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -361,6 +330,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_library(
@@ -381,6 +351,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -403,7 +374,8 @@ python_tests(
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -425,7 +397,8 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:jvm_platform_analysis',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -447,6 +420,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -477,6 +451,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -508,7 +483,6 @@ python_tests(
   name = 'prepare_resources',
   sources = ['test_prepare_resources.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:prepare_resources',
@@ -560,6 +534,7 @@ python_tests(
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
