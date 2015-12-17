@@ -20,9 +20,10 @@ from pants.util.dirutil import safe_mkdir
 
 class BundleCreate(JvmBinaryTask):
 
+  # Directory for 3rdparty libraries.
   LIBS_DIR = 'libs'
-  # Sub-directory under libs for internal libraries.
-  INTERNAL_LIBS_DIR = 'internal'
+  # Directory for internal libraries.
+  INTERNAL_LIBS_DIR = 'internal-libs'
 
   @classmethod
   def register_options(cls, register):
@@ -133,14 +134,14 @@ class BundleCreate(JvmBinaryTask):
 
     canonical_classpath_base_dir = None
     if not self._create_deployjar:
-      canonical_classpath_base_dir = os.path.join(lib_dir, self.INTERNAL_LIBS_DIR)
+      canonical_classpath_base_dir = os.path.join(bundle_dir, self.INTERNAL_LIBS_DIR)
     with self.monolithic_jar(app.binary, bundle_jar,
                              canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
       self.add_main_manifest_entry(jar, app.binary)
       if classpath:
         # append external dependencies to monolithic jar's classpath,
         # eventually will be saved in the Class-Path entry of its Manifest.
-        jar.append_classpath([os.path.join(self.LIBS_DIR, jar_path) for jar_path in classpath])
+        jar.append_classpath(classpath)
 
       # Make classpath complete by adding internal classpath and monolithic jar.
       classpath.update(jar.classpath + [jar.path])
