@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/option',
+    'src/python/pants/subsystem',
     'src/python/pants/util:memo',
   ]
 )
