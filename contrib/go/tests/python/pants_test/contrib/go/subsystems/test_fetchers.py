@@ -11,12 +11,13 @@ from contextlib import contextmanager
 import mock
 import requests
 from pants.util.contextutil import temporary_dir
+from pants_test import base_test
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
 from pants.contrib.go.subsystems.fetchers import ArchiveFetcher, Fetchers, GopkgInFetcher
 
 
-class FetchersTest(unittest.TestCase):
+class FetchersTest(base_test.BaseTest):
   # TODO(John Sirois): Add more tests of the Fetches subsystem: advertisement and aliasing as part
   # of: https://github.com/pantsbuild/pants/issues/2018
 
@@ -59,6 +60,30 @@ class FetchersTest(unittest.TestCase):
 
   def test_default_gopkg(self):
     self.check_default('gopkg.in/check.v1', expected_root='gopkg.in/check.v1')
+
+
+class PrefixesTest(unittest.TestCase):
+
+  @contextmanager
+  def fetcher(self, import_path):
+    with subsystem_instance(Fetchers, **{'fetchers' : {
+          'mapping' : {'.*': 'ArchiveFetcher'},
+          },
+        'archive-fetcher' : {
+          'matchers' : {'.*': ('', None, 0)},
+          'prefixes' :['foo', 'bar/baz'],
+        }}) as fetchers:
+      yield fetchers.get_fetcher(import_path)
+
+  def check_root(self, import_path, expected_root):
+    with self.fetcher(import_path) as fetcher:
+      self.assertEqual(expected_root, fetcher.root(import_path))
+
+  def test_roots_from_prefixes(self):
+    self.check_root('foo', 'foo')
+    self.check_root('foo/bar', 'foo')
+    self.check_root('bar/baz', 'bar/baz')
+    self.check_root('bar/baz/quuz', 'bar/baz')
 
 
 class GolangOrgFetcherTest(unittest.TestCase):
