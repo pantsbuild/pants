@@ -166,7 +166,8 @@ class ClasspathUtil(object):
     def delete_old_target_output_files(classpath_prefix):
       """Delete existing output files or symlinks for target."""
       directory, basename = os.path.split(classpath_prefix)
-      pattern = re.compile(r'^{}(([0-9]+)(\.jar)?|classpath\.txt)$'.format(basename))
+      pattern = re.compile(r'^{basename}(([0-9]+)(\.jar)?|classpath\.txt)$'
+                           .format(basename=re.escape(basename)))
       files = [filename for filename in os.listdir(directory) if pattern.match(filename)]
       for rel_path in files:
         path = os.path.join(directory, rel_path)
