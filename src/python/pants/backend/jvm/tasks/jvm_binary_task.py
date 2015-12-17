@@ -67,15 +67,15 @@ class JvmBinaryTask(JarBuilderTask):
             if not entry.is_excluded_by(binary.deploy_excludes)]
 
   @contextmanager
-  def monolithic_jar(self, binary, path, canonical_classpath_prefix=None):
+  def monolithic_jar(self, binary, path, canonical_classpath_base_dir=None):
     """Creates a jar containing the class files for a jvm_binary target and all its deps.
 
     Yields a handle to the open jarfile, so the caller can add to the jar if needed.
 
     :param binary: The jvm_binary target to operate on.
     :param path: Write the output jar here, overwriting an existing file, if any.
-    :param string canonical_classpath_prefix: If set, instead of directly adding targets
-      to the jar bundle, create canonical symlinks to the targets' classpath with this prefix
+    :param string canonical_classpath_base_dir: If set, instead of directly adding targets
+      to the jar bundle, create canonical symlinks to the targets' classpath from this base_dir
       and save to jar's Manifest attribute Class-Path. Note this includes external dependencies.
     """
     # TODO(benjy): There's actually nothing here that requires 'binary' to be a jvm_binary.
@@ -88,12 +88,12 @@ class JvmBinaryTask(JarBuilderTask):
         with self.context.new_workunit(name='add-internal-classes'):
           with self.create_jar_builder(monolithic_jar) as jar_builder:
             jar_builder.add_target(binary, recursive=True,
-                                   canonical_classpath_prefix=canonical_classpath_prefix)
+                                   canonical_classpath_base_dir=canonical_classpath_base_dir)
 
         # NB(gmalmquist): Shading each jar dependency with its own prefix would be a nice feature,
         # but is not currently possible with how things are set up. It may not be possible to do
         # in general, at least efficiently.
-        if not canonical_classpath_prefix:
+        if not canonical_classpath_base_dir:
           with self.context.new_workunit(name='add-dependency-jars'):
             dependencies = self.list_external_jar_dependencies(binary)
             for jar, coordinate in dependencies:

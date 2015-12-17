@@ -20,10 +20,9 @@ from pants.util.dirutil import safe_mkdir
 
 class BundleCreate(JvmBinaryTask):
 
-  # Prefixes are used to avoid name conflict when both internal and external jars are
-  # placed in the same directory.
-  INTERNAL_JAR_PREFIX = 'internal-'
-  EXTERNAL_JAR_PREFIX = '3rdparty-'
+  LIBS_DIR = 'libs'
+  # Sub-directory under libs for internal libraries.
+  INTERNAL_LIBS_DIR = 'internal'
 
   @classmethod
   def register_options(cls, register):
@@ -120,30 +119,28 @@ class BundleCreate(JvmBinaryTask):
     # loose classes, and have no classpath. Otherwise we add the external dependencies
     # to the bundle as jars in a libs directory.
     if not self._create_deployjar:
-      lib_dir = os.path.join(bundle_dir, 'libs')
+      lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
       os.mkdir(lib_dir)
 
       # Add external dependencies to the bundle.
       for path, coordinate in self.list_external_jar_dependencies(app.binary):
         external_jar = coordinate.artifact_filename
-        destination = os.path.join(lib_dir,
-                                   '{jar_prefix}{jar}'
-                                   .format(jar_prefix=self.EXTERNAL_JAR_PREFIX, jar=external_jar))
+        destination = os.path.join(lib_dir, external_jar)
         verbose_symlink(path, destination)
         classpath.add(destination)
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
-    canonical_classpath_prefix = None
+    canonical_classpath_base_dir = None
     if not self._create_deployjar:
-      canonical_classpath_prefix = os.path.join(lib_dir, self.INTERNAL_JAR_PREFIX)
+      canonical_classpath_base_dir = os.path.join(lib_dir, self.INTERNAL_LIBS_DIR)
     with self.monolithic_jar(app.binary, bundle_jar,
-                             canonical_classpath_prefix=canonical_classpath_prefix) as jar:
+                             canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
       self.add_main_manifest_entry(jar, app.binary)
       if classpath:
         # append external dependencies to monolithic jar's classpath,
         # eventually will be saved in the Class-Path entry of its Manifest.
-        jar.append_classpath([os.path.join('libs', jar_path) for jar_path in classpath])
+        jar.append_classpath([os.path.join(self.LIBS_DIR, jar_path) for jar_path in classpath])
 
       # Make classpath complete by adding internal classpath and monolithic jar.
       classpath.update(jar.classpath + [jar.path])

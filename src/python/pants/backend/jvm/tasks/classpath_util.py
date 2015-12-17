@@ -149,14 +149,14 @@ class ClasspathUtil(object):
     return os.path.isdir(path)
 
   @classmethod
-  def create_canonical_classpath(cls, classpath_products, targets, symlink_prefix,
+  def create_canonical_classpath(cls, classpath_products, targets, basedir,
                                  save_classpath_file=False,
                                  use_target_id=True):
     """Create a stable classpath of symlinks with standardized names.
 
     :param classpath_products: Classpath products.
     :param targets: Targets to create canonical classpath for.
-    :param symlink_prefix: Prefix for classpath symlinks.
+    :param basedir: Directory to create symlinks.
     :param save_classpath_file: An optional file with original classpath entries that symlinks
       are created from.
 
@@ -173,20 +173,19 @@ class ClasspathUtil(object):
         if os.path.islink(path) or os.path.isfile(path):
           safe_delete(path)
 
-    def prepare_target_output_folder(symlink_prefix, target):
+    def prepare_target_output_folder(basedir, target):
       """Prepare directory that will contain canonical classpath for the target.
 
       This includes creating directories if it does not already exist, cleaning up
       previous classpath output related to the target.
       """
-      output_dir = os.path.dirname(symlink_prefix)
       if use_target_id:
-        classpath_prefix_for_target = '{prefix}{target_id}-'.format(prefix=symlink_prefix,
-                                                                    target_id=target.id)
+        output_dir = basedir
+        classpath_prefix_for_target = os.path.join(basedir, target.id, '-')
       else:
         address = target.address
         output_dir = os.path.join(
-          output_dir,
+          basedir,
           # target.address.spec is used in export goal to identify targets
           address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
         )
@@ -201,7 +200,7 @@ class ClasspathUtil(object):
 
     canonical_classpath = []
     for target in targets:
-      classpath_prefix_for_target = prepare_target_output_folder(symlink_prefix, target)
+      classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
       classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
         [target])
