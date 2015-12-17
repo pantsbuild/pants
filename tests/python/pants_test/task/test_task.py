@@ -152,7 +152,17 @@ class TaskTest(TaskTestBase):
 
   def test_fingerprint_global(self):
     """The fingerprint for a task should be affected by global subsystem options."""
-    task1 = self.create_task(self.context(options={'dummy': {'opt': '1'}}, for_subsystems=[DummySubsystem]))
-    task2 = self.create_task(self.context(options={'dummy': {'opt': '2'}}, for_subsystems=[DummySubsystem]))
+    options1 ={'dummy': {'opt': '1'}}
+    with subsystem_instance(DummySubsystem, **options1):
+      task1 = self.create_task(self.context(options=options1, for_subsystems=[DummySubsystem]))
+      opt1 = DummySubsystem.global_instance().get_options().opt
+      fingerprint1 = task1.fingerprint
+    self.setUp()
+    options2 ={'dummy': {'opt': '2'}}
+    with subsystem_instance(DummySubsystem, **options2):
+      task2 = self.create_task(self.context(options=options2, for_subsystems=[DummySubsystem]))
+      opt2 = DummySubsystem.global_instance().get_options().opt
+      fingerprint2 = task2.fingerprint
 
-    self.assertNotEqual(task1.fingerprint, task2.fingerprint)
+    self.assertNotEqual(opt1, opt2)
+    self.assertNotEqual(fingerprint1, fingerprint2)
