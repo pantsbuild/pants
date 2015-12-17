@@ -79,8 +79,8 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
         # The shaded jars are no longer symlinks to .pants.d, they are actual files.
         library_jars_are_symlinks=False,
         expected_bundle_content=[
-          'libs/3rdparty-com.google.code.gson-gson-2.3.1.jar',
-          'libs/internal-testprojects.src.java.org.pantsbuild.testproject.shading.third_lib-0.jar',
+          'libs/com.google.code.gson-gson-2.3.1.jar',
+          'libs/internal/testprojects.src.java.org.pantsbuild.testproject.shading.third_lib-0.jar',
           'third.jar']).strip()))
 
   def test_deployjar_run(self):

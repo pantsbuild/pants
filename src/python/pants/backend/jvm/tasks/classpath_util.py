@@ -181,7 +181,8 @@ class ClasspathUtil(object):
       """
       if use_target_id:
         output_dir = basedir
-        classpath_prefix_for_target = os.path.join(basedir, target.id, '-')
+        classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
+                                                                      target_id=target.id)
       else:
         address = target.address
         output_dir = os.path.join(

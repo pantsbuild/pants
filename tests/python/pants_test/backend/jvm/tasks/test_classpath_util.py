@@ -89,13 +89,13 @@ class ClasspathUtilTest(BaseTest):
 
     with temporary_dir() as base_dir:
       self._test_canonical_classpath_helper(classpath_products, [a],
-                                            'internal-', True, base_dir,
+                                            'internal', True, base_dir,
                                             [
-                                              'internal-a.b.b-0.jar',
-                                              'internal-a.b.b-1'
+                                              'internal/a.b.b-0.jar',
+                                              'internal/a.b.b-1'
                                             ],
                                             {
-                                              'internal-a.b.b-classpath.txt':
+                                              'internal/a.b.b-classpath.txt':
                                               '{}/a.jar:{}/resources\n'.format(self.pants_workdir,
                                                                                self.pants_workdir)
                                             })
@@ -104,12 +104,12 @@ class ClasspathUtilTest(BaseTest):
     classpath_products = ClasspathProducts(self.pants_workdir)
     classpath_products.add_for_target(a, [('default', self._path('a.jar'))])
     self._test_canonical_classpath_helper(classpath_products, [a],
-                                          'internal-', True, base_dir,
+                                          'internal', True, base_dir,
                                           [
-                                            'internal-a.b.b-0.jar',
+                                            'internal/a.b.b-0.jar',
                                           ],
                                           {
-                                            'internal-a.b.b-classpath.txt':
+                                            'internal/a.b.b-classpath.txt':
                                             '{}/a.jar\n'.format(self.pants_workdir)
                                           })
 
@@ -118,13 +118,13 @@ class ClasspathUtilTest(BaseTest):
     classpath_products.add_for_target(a, [('default', self._path('a.jar')),
                                           ('default', self._path('b.jar'))])
     self._test_canonical_classpath_helper(classpath_products, [a],
-                                          'internal-', True, base_dir,
+                                          'internal', True, base_dir,
                                           [
-                                            'internal-a.b.b-0.jar',
-                                            'internal-a.b.b-1.jar'
+                                            'internal/a.b.b-0.jar',
+                                            'internal/a.b.b-1.jar'
                                           ],
                                           {
-                                            'internal-a.b.b-classpath.txt':
+                                            'internal/a.b.b-classpath.txt':
                                             '{}/a.jar:{}/b.jar\n'.format(self.pants_workdir,
                                                                          self.pants_workdir)
                                           })

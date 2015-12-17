@@ -22,8 +22,8 @@ public class PantsRunnerTest {
   static final File SYNTHETIC_JAR =
       new File("dist/pants-runner-testproject-bundle/pants-runner-testproject.jar");
   static final File MAIN_JAR =
-      new File("dist/pants-runner-testproject-bundle/libs/" +
-          "internal-testprojects.src.java.org.pantsbuild.testproject.runner.main-class-0.jar");
+      new File("dist/pants-runner-testproject-bundle/libs/internal/" +
+          "testprojects.src.java.org.pantsbuild.testproject.runner.main-class-0.jar");
   static final String MAIN_CLASS = "org.pantsbuild.testproject.runner.MainClass";
 
   @BeforeClass
@@ -38,9 +38,9 @@ public class PantsRunnerTest {
     assertOutputIsExpected("Hello!\n" +
             "Args: [arg1]\n" +
             "URL: pants-runner-testproject.jar\n" +
-            "URL: internal-testprojects.src.java.org." +
+            "URL: testprojects.src.java.org." +
                  "pantsbuild.testproject.runner.main-class-0.jar\n" +
-            "URL: internal-testprojects.src.java.org." +
+            "URL: testprojects.src.java.org." +
                  "pantsbuild.testproject.runner.dependent-class-0.jar\n",
         new URL[]{SYNTHETIC_JAR.toURI().toURL()}, new String[]{MAIN_CLASS, "arg1"});
   }
@@ -50,9 +50,9 @@ public class PantsRunnerTest {
     assertOutputIsExpected("Hello!\n" +
             "Args: []\n" +
             "URL: pants-runner-testproject.jar\n" +
-            "URL: internal-testprojects.src.java.org." +
+            "URL: testprojects.src.java.org." +
                  "pantsbuild.testproject.runner.main-class-0.jar\n" +
-            "URL: internal-testprojects.src.java.org." +
+            "URL: testprojects.src.java.org." +
                  "pantsbuild.testproject.runner.dependent-class-0.jar\n",
         new URL[]{SYNTHETIC_JAR.toURI().toURL()}, new String[]{MAIN_CLASS});
   }
