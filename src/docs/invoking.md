@@ -61,6 +61,12 @@ This gets tricky. We happen to know we can pass `-k list` here, that `pytest` ac
 args, and that this `test` invocation upon `tests/python/...` won't invoke any other tools
 (assuming nobody hid a `junit` test in the `python` directory).
 
+Append arguments that append to a list can be specified more than one time.  When specifying more
+than one test to run at a time, you could run:
+
+    :::bash
+    $ ./pants test.junit --test="com.twitter.MyMainTest" --test="com.twitter.MySideTest" ./beans::
+
 Setting Options Other Ways
 --------------------------
 
