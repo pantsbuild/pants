@@ -206,6 +206,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     hasher = sha1()
     for (option_type, option_val) in pairs:
       fp = self._options_fingerprinter.fingerprint(option_type, option_val)
+      print('fingerprint for option {} with {} is: {}'.format(option_type, option_val, fp))
       if fp is not None:
         hasher.update(fp)
     return hasher.hexdigest()
@@ -224,8 +225,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       hasher = sha1()
       hasher.update(self._options_fingerprint(self.options_scope))
       for dep in self.subsystem_dependencies_iter():
+        print('Including dep {} in fingerprint for {}, with scope {}'.format(dep, self, dep.options_scope()))
         hasher.update(self._options_fingerprint(dep.options_scope()))
       self._fingerprint = str(hasher.hexdigest())
+      print('Fingerprint for {} is {}'.format(self, self._fingerprint))
     return self._fingerprint
 
   def artifact_cache_reads_enabled(self):
