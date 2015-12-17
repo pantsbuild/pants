@@ -11,9 +11,7 @@ import shutil
 from pants.base.build_environment import get_buildroot
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
-from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
-from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -26,22 +24,8 @@ class DummyLibrary(Target):
     super(DummyLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
 
 
-class DummySubsystem(Subsystem):
-  options_scope = 'dummy'
-
-  @classmethod
-  def register_options(cls, register):
-    register('--opt', type=str, default=None, fingerprint=True, help='An option.')
-
-
 class DummyTask(Task):
   """A task that appends the content of a DummyLibrary's source into its results_dir."""
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    # Dummy subsystem is registered as both global and local.
-    return super(DummyTask, cls).subsystem_dependencies() + (
-        DummySubsystem, DummySubsystem.scoped(cls))
 
   @property
   def incremental(self):
@@ -135,34 +119,3 @@ class TaskTest(TaskTestBase):
     self.assertContent(vtA, one)
     self.assertContent(vtB, two)
     self.assertNotEqual(vtA.results_dir, vtB.results_dir)
-
-  def test_fingerprint_scoped(self):
-    """The fingerprint for a task should be affected by scoped subsystem options."""
-    with subsystem_instance(DummySubsystem.scoped(DummyTask), opt='1'):
-      task1 = self.create_task(self.context())
-      opt1 = DummySubsystem.scoped_instance(DummyTask).get_options().opt
-      fingerprint1 = task1.fingerprint
-    with subsystem_instance(DummySubsystem.scoped(DummyTask), opt='2'):
-      task2 = self.create_task(self.context())
-      opt2 = DummySubsystem.scoped_instance(DummyTask).get_options().opt
-      fingerprint2 = task2.fingerprint
-
-    self.assertNotEqual(opt1, opt2)
-    self.assertNotEqual(fingerprint1, fingerprint2)
-
-  def test_fingerprint_global(self):
-    """The fingerprint for a task should be affected by global subsystem options."""
-    options1 ={'dummy': {'opt': '1'}}
-    with subsystem_instance(DummySubsystem, **options1):
-      task1 = self.create_task(self.context(options=options1, for_subsystems=[DummySubsystem]))
-      opt1 = DummySubsystem.global_instance().get_options().opt
-      fingerprint1 = task1.fingerprint
-    self.setUp()
-    options2 ={'dummy': {'opt': '2'}}
-    with subsystem_instance(DummySubsystem, **options2):
-      task2 = self.create_task(self.context(options=options2, for_subsystems=[DummySubsystem]))
-      opt2 = DummySubsystem.global_instance().get_options().opt
-      fingerprint2 = task2.fingerprint
-
-    self.assertNotEqual(opt1, opt2)
-    self.assertNotEqual(fingerprint1, fingerprint2)

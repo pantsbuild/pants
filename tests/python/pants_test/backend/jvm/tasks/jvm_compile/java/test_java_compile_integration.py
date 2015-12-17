@@ -67,11 +67,9 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
       pants_run = self.run_pants(self.create_platform_args(6) +
                                  ['compile',
-                                  '--no-color',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
-      print(pants_run.stdout_data)
 
       # One artifact for java 6
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
@@ -79,11 +77,9 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       # Rerun for java 7
       pants_run = self.run_pants(self.create_platform_args(7) +
                                  ['compile',
-                                  '--no-color',
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
                                  config)
       self.assert_success(pants_run)
-      print(pants_run.stdout_data)
 
       # One artifact for java 6 and one for 7
       self.assertEqual(len(os.listdir(artifact_dir)), 2)
