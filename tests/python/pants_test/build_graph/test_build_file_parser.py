@@ -107,7 +107,7 @@ class BuildFileParserTargetTest(BaseTest):
     addresses = address_map.keys()
     self.assertEqual({bar_build_file, base_build_file, foo_build_file},
                      set([address.build_file for address in addresses]))
-    self.assertEqual({':base', ':foo', ':bat'},
+    self.assertEqual({'//:base', '//:foo', '//:bat'},
                      set([address.spec for address in addresses]))
 
   def test_build_file_duplicates(self):

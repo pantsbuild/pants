@@ -11,7 +11,6 @@ from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import (IvyInfo, IvyModule, IvyModuleRef, IvyResolveMappingError,
                                          IvyUtils)
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
@@ -19,6 +18,7 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.base_test import BaseTest

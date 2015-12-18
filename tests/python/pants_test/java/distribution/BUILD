@@ -6,6 +6,7 @@ python_tests(
   sources = ['test_distribution.py'],
   dependencies = [
     'src/python/pants/base:revision',
+    'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/subsystem:subsystem_utils',

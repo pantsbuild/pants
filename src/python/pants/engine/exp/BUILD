@@ -104,5 +104,6 @@ python_library(
   dependencies=[
     ':addressable',
     ':configuration',
+    'src/python/pants/source',
   ]
 )

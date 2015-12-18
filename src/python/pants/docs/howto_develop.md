@@ -124,11 +124,12 @@ contribute a change or merge it to master:
     :::bash
     $ ./build-support/bin/ci.sh
 
-To run just Pants' *unit* tests (skipping the can-be-slow integration tests), use the
-`tests/python/pants_test:all` target:
+To run just Pants' *unit* tests (skipping the can-be-slow integration tests), filter out
+the python tests tagged with 'integration'.  For convenience, this is wrapped up
+in a script:
 
     :::bash
-    $ ./pants test tests/python/pants_test:all
+    $ ./build-support/bin/unit-test.sh
 
 If you only want to run tests for changed targets, then you can use the
 `test-changed` goal:

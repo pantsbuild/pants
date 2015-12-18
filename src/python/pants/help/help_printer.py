@@ -9,12 +9,10 @@ import sys
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.help.help_formatter import HelpFormatter
+from pants.help.scope_info_iterator import ScopeInfoIterator
 from pants.option.arg_splitter import (GLOBAL_SCOPE, NoGoalHelp, OptionsHelp, UnknownGoalHelp,
                                        VersionHelp)
-from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.scope import ScopeInfo
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
 class HelpPrinter(object):
@@ -26,10 +24,6 @@ class HelpPrinter(object):
   @property
   def _help_request(self):
     return self._options.help_request
-
-  @property
-  def _known_scope_to_info(self):
-    return self._options.known_scope_to_info
 
   def print_help(self):
     """Print help to the console.
@@ -62,29 +56,15 @@ class HelpPrinter(object):
     """
     show_all_help = self._help_request.all_scopes
     if show_all_help:
-      help_scopes = self._known_scope_to_info.keys()
+      help_scopes = self._options.known_scope_to_info.keys()
     else:
       # The scopes explicitly mentioned by the user on the cmd line.
       help_scopes = set(self._options.scope_to_flags.keys()) - set([GLOBAL_SCOPE])
-      # As a user-friendly heuristic, add all task scopes under requested scopes, so that e.g.,
-      # `./pants help compile` will show help for compile.java, compile.scala etc.
-      # Note that we don't do anything similar for subsystems - that would just create noise by
-      # repeating options for every task-specific subsystem instance.
-      for scope, info in self._known_scope_to_info.items():
-        if info.category == ScopeInfo.TASK:
-          outer = enclosing_scope(scope)
-          while outer != GLOBAL_SCOPE:
-            if outer in help_scopes:
-              help_scopes.add(scope)
-              break
-            outer = enclosing_scope(outer)
 
-    help_scope_infos = [self._known_scope_to_info[s] for s in sorted(help_scopes)]
-    if help_scope_infos:
-      for scope_info in self._help_subscopes_iter(help_scope_infos):
-        description = (scope_info.optionable_cls.get_description() if scope_info.optionable_cls
-                       else None)
-        help_str = self._format_help(scope_info, description)
+    scope_infos = list(ScopeInfoIterator(self._options.known_scope_to_info).iterate(help_scopes))
+    if scope_infos:
+      for scope_info in scope_infos:
+        help_str = self._format_help(scope_info)
         if help_str:
           print(help_str)
       return
@@ -103,39 +83,17 @@ class HelpPrinter(object):
       print('    dir:: to include all targets found recursively under the directory.')
       print('\nFriendly docs:\n  http://pantsbuild.github.io/')
 
-      print(self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL), ''))
+      print(self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL)))
 
-  def _help_subscopes_iter(self, scope_infos):
-    """Yields the scopes to actually show help for when the user asks for help for scope_info."""
-    for scope_info in scope_infos:
-      yield scope_info
-      # We don't currently subclass GlobalOptionsRegistrar, and I can't think of any reason why
-      # we would, but might as well be robust.
-      if scope_info.optionable_cls is not None:
-        if issubclass(scope_info.optionable_cls, GlobalOptionsRegistrar):
-          for scope, info in self._known_scope_to_info.items():
-            if info.category == ScopeInfo.SUBSYSTEM and enclosing_scope(scope) == GLOBAL_SCOPE:
-              # This is a global subsystem, so show it when asked for global help.
-              yield info
-        elif issubclass(scope_info.optionable_cls, SubsystemClientMixin):
-          def yield_deps(subsystem_client_cls):
-            for dep in subsystem_client_cls.subsystem_dependencies_iter():
-              if dep.scope != GLOBAL_SCOPE:
-                yield self._known_scope_to_info[dep.options_scope()]
-                for info in yield_deps(dep.subsystem_cls):
-                  yield info
-          for info in yield_deps(scope_info.optionable_cls):
-            yield info
-
-  def _format_help(self, scope_info, description):
+  def _format_help(self, scope_info):
     """Return a help message for the options registered on this object.
 
     Assumes that self._help_request is an instance of OptionsHelp.
 
     :param scope_info: Scope of the options.
-    :param description: Description of scope.
     """
     scope = scope_info.scope
+    description = scope_info.description
     show_recursive = self._help_request.advanced
     show_advanced = self._help_request.advanced
     color = sys.stdout.isatty()

@@ -15,7 +15,7 @@ class JavaTests(JvmTarget):
   """JUnit tests."""
 
   def __init__(self, cwd=None, test_platform=None, payload=None, timeout=None,
-               extra_jvm_options=None, **kwargs):
+               extra_jvm_options=None, extra_env_vars=None, **kwargs):
     """
     :param str cwd: working directory (relative to the build root) for the tests under this
       target. If unspecified (None), the working directory will be controlled by junit_run's --cwd.
@@ -24,12 +24,22 @@ class JavaTests(JvmTarget):
       unspecified, the platform will default to the same one used for compilation.
     :param list extra_jvm_options: A list of key value pairs of jvm options to use when running the
       tests. Example: ['-Dexample.property=1'] If unspecified, no extra jvm options will be added.
+    :param dict extra_env_vars: A map of environment variables to set when running the tests, e.g.
+      { 'FOOBAR': 12 }. Using `None` as the value will cause the variable to be unset.
     """
     self.cwd = cwd
     payload = payload or Payload()
+
+    if extra_env_vars is None:
+      extra_env_vars = {}
+    for key, value in extra_env_vars.items():
+      if value is not None:
+        extra_env_vars[key] = str(value)
+
     payload.add_fields({
       'test_platform': PrimitiveField(test_platform),
-      'extra_jvm_options': PrimitiveField(tuple(extra_jvm_options or ()))
+      'extra_jvm_options': PrimitiveField(tuple(extra_jvm_options or ())),
+      'extra_env_vars': PrimitiveField(tuple(extra_env_vars.items())),
     })
     self._timeout = timeout
     super(JavaTests, self).__init__(payload=payload, **kwargs)

@@ -66,7 +66,13 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target'
     ]
 
-    targets_to_exclude = known_failing_targets + negative_test_targets + need_java_8 + timeout_targets
-    exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target), targets_to_exclude)
+    deliberately_conflicting_targets = [
+      'testprojects/src/python/interpreter_selection.*'
+    ]
+
+    targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
+                          timeout_targets + deliberately_conflicting_targets)
+    exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
+                       targets_to_exclude)
     pants_run = self.pants_test(['testprojects::'] + exclude_opts)
     self.assert_success(pants_run)

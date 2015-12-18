@@ -133,3 +133,17 @@ class SubsystemTest(unittest.TestCase):
     with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,
                                  r'UninitializedSubsystem.*uninitialized-scope'):
       UninitializedSubsystem.scoped_instance(optional)
+
+  def test_subsystem_dependencies_iter(self):
+    class SubsystemB(Subsystem):
+      options_scope = 'b'
+
+    class SubsystemA(Subsystem):
+      options_scope = 'a'
+
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (DummySubsystem.scoped(cls), SubsystemB)
+
+    dep_scopes = set(dep.options_scope() for dep in SubsystemA.subsystem_dependencies_iter())
+    self.assertEqual({'b', 'dummy.a'}, dep_scopes)
