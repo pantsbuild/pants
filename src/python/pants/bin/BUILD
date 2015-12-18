@@ -19,6 +19,7 @@ python_library(
     'src/python/pants/base:scm_build_file',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
+    'src/python/pants/core_tasks',
     'src/python/pants/engine',
     'src/python/pants/goal',
     'src/python/pants/goal:context',
@@ -43,10 +44,11 @@ target(
     'src/python/pants/backend/authentication',
     'src/python/pants/backend/codegen:plugin',
     'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/docgen:plugin',
+    'src/python/pants/backend/graph_info:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info:plugin',
     'src/python/pants/backend/python:plugin',
-    'src/python/pants/core_tasks',
   ],
 )
 

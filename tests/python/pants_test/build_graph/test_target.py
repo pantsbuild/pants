@@ -49,7 +49,7 @@ class TargetTest(BaseTest):
                               TestDeferredSourcesTarget,
                               deferred_sources_address=foo.address)
     self.assertSequenceEqual([], list(target.traversable_specs))
-    self.assertSequenceEqual([':foo'], list(target.traversable_dependency_specs))
+    self.assertSequenceEqual(['//:foo'], list(target.traversable_dependency_specs))
 
   def test_illegal_kwargs(self):
     with subsystem_instance(Target.UnknownArguments):

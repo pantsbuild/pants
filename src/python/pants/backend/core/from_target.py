@@ -5,27 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import six
+from pants.base.deprecated import deprecated_module
+from pants.build_graph.from_target import FromTarget
 
-from pants.build_graph.address import Addresses
+
+deprecated_module('0.0.66',
+                  hint_message='pants.backend.core.from_target has moved to '
+                               'pants.build_graph.from_target. Replace deps on '
+                               'src/python/pants/backend/core with a dep on '
+                               'src/python/pants/build_graph and change imports accordingly.')
 
 
-class FromTarget(object):
-  """Used in a BUILD file to redirect the value of the sources= attribute to another target.
-  """
-  class ExpectedAddressError(Exception):
-    """Thrown if an object that is not an address is added to an import attribute.
-    """
-
-  def __init__(self, parse_context):
-    """
-    :param ParseContext parse_context: build file context
-    """
-    self._parse_context = parse_context
-
-  def __call__(self, address):
-    """Expects a string representing an address."""
-    if not isinstance(address, six.string_types):
-      raise self.ExpectedAddressError("Expected string address argument, got type {type}"
-                                     .format(type(address)))
-    return Addresses(addresses=[address], rel_path=self._parse_context.rel_path)
+FromTarget = FromTarget

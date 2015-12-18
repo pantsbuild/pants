@@ -454,6 +454,7 @@ def oref_template_data_from_help_info(oschi):
       fromfile=ohi.fromfile,
       default=sub_buildroot(ohi.default),
       hlp=hlp,
+      choices=ohi.choices,
       typ=ohi.typ.__name__))
   return TemplateData(
     title=title,

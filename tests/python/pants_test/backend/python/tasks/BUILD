@@ -1,10 +1,17 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+
+python_library(
+  name='interpreter_cache_test_mixin',
+  sources=['interpreter_cache_test_mixin.py'],
+)
+
 python_library(
   name='python_task_test_base',
   sources=['python_task_test_base.py'],
   dependencies=[
+    ':interpreter_cache_test_mixin',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base'

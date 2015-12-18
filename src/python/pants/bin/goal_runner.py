@@ -29,7 +29,6 @@ from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.logging.setup import setup_logging
-from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
