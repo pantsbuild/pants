@@ -12,7 +12,7 @@
     "src/thrift/codegen/selector:selector@scrooge_scala_config"
   ],
   "configurations": [
-    ":sources",
+    ":sources"
   ]
 }
 
@@ -24,7 +24,7 @@
     "src/thrift/codegen/selector"
   ],
   "configurations": [
-    ":sources",
+    ":sources"
   ]
 }
 
@@ -36,6 +36,6 @@
     "src/thrift/codegen/selector:selector@failing"
   ],
   "configurations": [
-    ":sources",
+    ":sources"
   ]
 }
