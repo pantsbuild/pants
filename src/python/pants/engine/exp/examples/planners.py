@@ -19,8 +19,7 @@ from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
 from pants.engine.exp.scheduler import LocalScheduler, Plan, Planners, Subject, Task, TaskPlanner
-from pants.engine.exp.targets import Sources
-from pants.engine.exp.targets import Target
+from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized, memoized_property
 
 
