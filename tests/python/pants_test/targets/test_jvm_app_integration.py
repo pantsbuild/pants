@@ -20,7 +20,8 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
       'Hello, world.\n',
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
-        'bundle-example',
+        'testprojects.src.java.org.pantsbuild.testproject.bundle.bundle',
+        binary_name='bundle-example',
         # this is the only thing bundle jar has, which means Class-Path must be properly
         # set for its Manifest.
         expected_bundle_jar_content=[
@@ -28,6 +29,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
         ],
         expected_bundle_content=[
           'bundle-example.jar',
+          'data/exampledata.txt',
           'libs/com.google.guava-guava-18.0.jar',
           'libs/testprojects.src.java.org.pantsbuild.testproject.bundle.bundle-bin/0-z.jar']))
 
@@ -40,11 +42,13 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
       'Hello, world.\n',
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
-        'bundle-example',
+        'testprojects.src.java.org.pantsbuild.testproject.bundle.bundle',
+        binary_name='bundle-example',
         bundle_options=['--deployjar'],
         # this is the only thing bundle zip has, all class files must be there.
         expected_bundle_content=[
-          'bundle-example.jar']))
+          'bundle-example.jar',
+          'data/exampledata.txt']))
 
   def test_missing_files(self):
     pants_run = self.run_pants(['bundle',

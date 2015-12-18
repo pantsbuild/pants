@@ -33,7 +33,12 @@ class BundleCreate(JvmBinaryTask):
              help='Create an archive of this type from the bundle.')
     register('--archive-prefix', action='store_true', default=False,
              fingerprint=True,
-             help='If --archive is specified, use the target basename as the path prefix.')
+             help='If --archive is specified, prefix archive with target basename or a unique '
+                  'identifier as determined by --use-basename.')
+    register('--use-basename', action='store_true', default=False,
+             fingerprint=True,
+             help='Use target basename to prefix bundle folder or archive; otherwise a unique '
+                  'identifier derived from target will be used.')
 
   @classmethod
   def product_types(cls):
@@ -45,6 +50,7 @@ class BundleCreate(JvmBinaryTask):
     self._prefix = self.get_options().archive_prefix
     self._archiver_type = self.get_options().archive
     self._create_deployjar = self.get_options().deployjar
+    self._use_basename = self.get_options().use_basename
 
   class App(object):
     """A uniform interface to an app."""
@@ -62,29 +68,37 @@ class BundleCreate(JvmBinaryTask):
       self.basename = target.basename
 
   def execute(self):
+    def get_bundle_basename(app):
+      if not self._use_basename:
+        return target.id
+      return app.basename
+
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
     for target in self.context.targets():
       for app in map(self.App, filter(self.App.is_app, [target])):
-        basedir = self.bundle(app)
+        bundle_basename = get_bundle_basename(app)
+        bundle_dir = os.path.join(self._outdir, '{}-bundle'.format(bundle_basename))
+        self.bundle(app, bundle_dir)
         # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
         # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
         # expect the product to be cached, a user running an 'rm' on the dist/ directory could
         # cause inconsistencies.
         jvm_bundles_product = self.context.products.get('jvm_bundles')
-        jvm_bundles_product.add(target, os.path.dirname(basedir)).append(os.path.basename(basedir))
+        jvm_bundles_product.add(target,
+                                os.path.dirname(bundle_dir)).append(os.path.basename(bundle_dir))
         if archiver:
           archivepath = archiver.create(
-            basedir,
+            bundle_dir,
             self._outdir,
-            app.basename,
-            prefix=app.basename if self._prefix else None
+            bundle_basename,
+            prefix=bundle_basename if self._prefix else None
           )
           self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
   class MissingJarError(TaskError):
     """Indicates an unexpected problem finding a jar that a bundle depends on."""
 
-  def bundle(self, app):
+  def bundle(self, app, bundle_dir):
     """Create a self-contained application bundle.
 
     The bundle will contain the target classes, dependencies and resources.
@@ -104,7 +118,6 @@ class BundleCreate(JvmBinaryTask):
         self.context.log.error('Unable to create symlink: {0} -> {1}'.format(src, dst))
         raise e
 
-    bundle_dir = os.path.join(self._outdir, '{}-bundle'.format(app.basename))
     self.context.log.info('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
     safe_mkdir(bundle_dir, clean=True)
@@ -154,5 +167,3 @@ class BundleCreate(JvmBinaryTask):
             path, app.address.spec))
         safe_mkdir(os.path.dirname(bundle_path))
         verbose_symlink(path, bundle_path)
-
-    return bundle_dir

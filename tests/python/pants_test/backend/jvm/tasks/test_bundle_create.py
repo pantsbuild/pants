@@ -22,51 +22,66 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   def task_type(cls):
     return BundleCreate
 
-  def test_jvm_bundle_products(self):
-    jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
-                               target_type=JarLibrary,
-                               jars=[JarDependency(org='org.example', name='foo', rev='1.0.0'),
-                                     JarDependency(org='org.pantsbuild', name='bar', rev='2.0.0',
-                                                   ext='zip'),
-                                     JarDependency(org='org.apache', name='baz', rev='3.0.0',
-                                                   classifier='tests'),
-                                     JarDependency(org='org.gnu', name='gary', rev='4.0.0',
-                                                   ext='tar.gz')])
-    binary_target = self.make_target(spec='//foo:foo-binary',
-                                     target_type=JvmBinary,
-                                     source='Foo.java',
-                                     dependencies=[jar_lib])
-    app_target = self.make_target(spec='//foo:foo-app',
-                                  target_type=JvmApp,
-                                  basename='FooApp',
-                                  dependencies=[binary_target])
+  def setUp(self):
+    super(TestBundleCreate, self).setUp()
 
-    context = self.context(target_roots=[app_target])
+    self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
+    self.zip_artifact = self.create_artifact(org='org.pantsbuild', name='bar', rev='2.0.0',
+                                             ext='zip')
+    self.bundle_artifact = self.create_artifact(org='org.apache', name='baz', rev='3.0.0',
+                                                classifier='tests')
+    self.tar_gz_artifact = self.create_artifact(org='org.gnu', name='gary', rev='4.0.0',
+                                                ext='tar.gz')
 
-    jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
-    zip_artifact = self.create_artifact(org='org.pantsbuild', name='bar', rev='2.0.0', ext='zip')
-    bundle_artifact = self.create_artifact(org='org.apache', name='baz', rev='3.0.0',
-                                           classifier='tests')
-    tar_gz_artifact = self.create_artifact(org='org.gnu', name='gary', rev='4.0.0', ext='tar.gz')
+    self.jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
+                                    target_type=JarLibrary,
+                                    jars=[JarDependency(org='org.example', name='foo', rev='1.0.0'),
+                                          JarDependency(org='org.pantsbuild', name='bar', rev='2.0.0',
+                                                        ext='zip'),
+                                          JarDependency(org='org.apache', name='baz', rev='3.0.0',
+                                                        classifier='tests'),
+                                          JarDependency(org='org.gnu', name='gary', rev='4.0.0',
+                                                        ext='tar.gz')])
+    self.binary_target = self.make_target(spec='//foo:foo-binary',
+                                          target_type=JvmBinary,
+                                          source='Foo.java',
+                                          dependencies=[self.jar_lib])
+    self.app_target = self.make_target(spec='//foo:foo-app',
+                                        target_type=JvmApp,
+                                        basename='FooApp',
+                                        dependencies=[self.binary_target])
 
-    classpath_products = self.ensure_classpath_products(context)
-    classpath_products.add_jars_for_targets(targets=[jar_lib],
+    self.context = self.context(target_roots=[self.app_target])
+    classpath_products = self.ensure_classpath_products(self.context)
+    classpath_products.add_jars_for_targets(targets=[self.jar_lib],
                                             conf='default',
-                                            resolved_jars=[jar_artifact,
-                                                           zip_artifact,
-                                                           bundle_artifact,
-                                                           tar_gz_artifact])
+                                            resolved_jars=[self.jar_artifact,
+                                                           self.zip_artifact,
+                                                           self.bundle_artifact,
+                                                           self.tar_gz_artifact])
 
-    self.add_to_runtime_classpath(context, binary_target, {'Foo.class': '', 'foo.txt': ''})
+    self.add_to_runtime_classpath(self.context, self.binary_target,
+                                  {'Foo.class': '', 'foo.txt': ''})
 
-    self.execute(context)
-    products = context.products.get('jvm_bundles')
+
+  def test_jvm_bundle_products(self):
+    self.execute(self.context)
+    self.check_bundle_products('foo.foo-app')
+
+  def test_jvm_bundle_use_basename(self):
+    self.set_options(use_basename=True)
+    self.execute(self.context)
+    self.check_bundle_products('FooApp')
+
+  def check_bundle_products(self, bundle_basename):
+    products = self.context.products.get('jvm_bundles')
     self.assertIsNotNone(products)
-    product_data = products.get(app_target)
+    product_data = products.get(self.app_target)
     dist_root = os.path.join(self.build_root, 'dist')
-    self.assertEquals({dist_root: ['FooApp-bundle']}, product_data)
+    self.assertEquals({dist_root: ['{basename}-bundle'.format(basename=bundle_basename)]},
+                      product_data)
 
-    bundle_root = os.path.join(dist_root, 'FooApp-bundle')
+    bundle_root = os.path.join(dist_root, '{basename}-bundle'.format(basename=bundle_basename))
     # TODO foo.txt and Foo.class are also under libs in a subdirectory, verify their existence
     self.assertEqual(sorted(['foo-binary.jar',
                              'libs/org.example-foo-1.0.0.jar',
@@ -81,24 +96,12 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                        sorted(jar.namelist()))
 
   def test_jvm_bundle_missing_product(self):
-    binary_target = self.make_target(spec='//foo:foo-binary',
-                                     target_type=JvmBinary,
-                                     source='Foo.java')
-    app_target = self.make_target(spec='//foo:foo-app',
-                                  target_type=JvmApp,
-                                  basename='FooApp',
-                                  dependencies=[binary_target])
-
-    context = self.context(target_roots=[app_target])
-
-    jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0',
-                                        materialize=False)
-    classpath_products = self.ensure_classpath_products(context)
-    classpath_products.add_jars_for_targets(targets=[binary_target],
+    missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
+                                                materialize=False)
+    classpath_products = self.ensure_classpath_products(self.context)
+    classpath_products.add_jars_for_targets(targets=[self.binary_target],
                                             conf='default',
-                                            resolved_jars=[jar_artifact])
-
-    self.add_to_runtime_classpath(context, binary_target, {'Foo.class': '', 'foo.txt': ''})
+                                            resolved_jars=[missing_jar_artifact])
 
     with self.assertRaises(BundleCreate.MissingJarError):
-      self.execute(context)
+      self.execute(self.context)
