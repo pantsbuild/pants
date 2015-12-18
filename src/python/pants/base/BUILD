@@ -184,7 +184,5 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:six',
-    # TODO: Get rid of this dep, or move/delete this validation module.
-    'src/python/pants/source',
   ],
 )
