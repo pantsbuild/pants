@@ -1,0 +1,10 @@
+{
+  "type_alias": "target",
+  "name": "simple",
+  "configuration": [
+    {
+      "type_alias": "resources",
+      "files": ["simple.txt"]
+    }
+  ]
+}

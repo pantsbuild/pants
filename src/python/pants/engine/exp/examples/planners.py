@@ -19,7 +19,7 @@ from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
 from pants.engine.exp.scheduler import LocalScheduler, Plan, Planners, Subject, Task, TaskPlanner
-from pants.engine.exp.targets import Sources as AddressableSources
+from pants.engine.exp.targets import Sources
 from pants.engine.exp.targets import Target
 from pants.util.memo import memoized, memoized_property
 
@@ -41,6 +41,26 @@ def printing_func(func):
     product = func(**inputs)
     return product if product else '<<<Fake{}Product>>>'.format(func.__name__)
   return wrapper
+
+
+class JavaSources(Sources):
+  extensions = ('.java',)
+
+
+class ScalaSources(Sources):
+  extensions = ('.scala',)
+
+
+class PythonSources(Sources):
+  extensions = ('.py',)
+
+
+class ThriftSources(Sources):
+  extensions = ('.thrift',)
+
+
+class ResourceSources(Sources):
+  extensions = tuple()
 
 
 class Requirement(Configuration):
@@ -100,36 +120,6 @@ class GlobalIvyResolvePlanner(TaskPlanner):
 class IvyResolve(PrintingTask):
   def execute(self, jars):
     return super(IvyResolve, self).execute(jars=jars)
-
-
-def _create_sources(ext):
-  # A pickle-compatible top-level function for custom unpickling of Sources per-extension types.
-  return Sources.of(ext)
-
-
-class Sources(object):
-  @classmethod
-  @memoized
-  def of(cls, ext):
-    type_name = b'Sources({!r})'.format(ext)
-
-    class_dict = {'ext': ext,
-                  # We need custom serialization for the dynamic class type.
-                  '__reduce__': lambda self: (_create_sources, ext)}
-
-    ext_type = type(type_name, (cls,), class_dict)
-
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, ext_type)
-
-    return ext_type
-
-  @classmethod
-  def ext(cls):
-    raise NotImplementedError()
-
-  def __repr__(self):
-    return 'Sources(ext={!r})'.format(self.ext)
 
 
 class ThriftConfiguration(Configuration):
@@ -211,7 +201,7 @@ class ApacheThriftPlanner(ThriftPlanner):
   def _product_type_by_lang(self):
     # This will come via an option default.
     # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
-    return {'java': Sources.of('.java'), 'py': Sources.of('.py')}
+    return {'java': JavaSources, 'py': PythonSources}
 
   @property
   def product_types(self):
@@ -306,7 +296,7 @@ class ScroogePlanner(ThriftPlanner):
   def _product_type_by_lang(self):
     # This will come via an option default.
     # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
-    return {'scala': Sources.of('.scala'), 'java': Sources.of('.java')}
+    return {'scala': ScalaSources, 'java': JavaSources}
 
   @property
   def product_types(self):
@@ -357,8 +347,8 @@ class JvmCompilerPlanner(TaskPlanner):
     """
 
   @abstractproperty
-  def source_ext(self):
-    """Return the extension of the source code compiled by the jvm compiler.
+  def source_type(self):
+    """Return the subclass of Sources that are consumed by this jvm compiler.
 
     :rtype: string
     """
@@ -367,8 +357,8 @@ class JvmCompilerPlanner(TaskPlanner):
     if not isinstance(subject, Target):
       return None
 
-    sources = list(subject.sources.iter_paths(base_path=subject.address.spec_path,
-                                              ext=self.source_ext))
+    sources_config = subject.select_configuration(tpe=self.source_type)
+    sources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
     if not sources:
       # TODO(John Sirois): Abstract a ~SourcesConsumerPlanner that can grab sources of given types
       # or else defer to a code generator like we do here.  As it stands, the planner must
@@ -380,7 +370,7 @@ class JvmCompilerPlanner(TaskPlanner):
       # could be something that gets transformed in to our compile input source extension (codegen)
       # or transformed into a `Classpath` product by some other compiler targeting the jvm.
       sources = scheduler.promise(subject,
-                                  Sources.of(self.source_ext),
+                                  self.source_type,
                                   configuration=configuration,
                                   required=False)
       if sources:
@@ -405,8 +395,8 @@ class JvmCompilerPlanner(TaskPlanner):
 
 class JavacPlanner(JvmCompilerPlanner):
   @property
-  def source_ext(self):
-    return '.java'
+  def source_type(self):
+    return JavaSources
 
   @property
   def compile_task_type(self):
@@ -420,8 +410,8 @@ class Javac(PrintingTask):
 
 class ScalacPlanner(JvmCompilerPlanner):
   @property
-  def source_ext(self):
-    return '.scala'
+  def source_type(self):
+    return ScalaSources
 
   @property
   def compile_task_type(self):
@@ -436,6 +426,14 @@ class Scalac(PrintingTask):
 # TODO(John Sirois): When https://github.com/pantsbuild/pants/issues/2413 is resolved, move the
 # unpickleable input and output test planners below to engine test.  There will be less setup
 # required at that point since no target addresses will need to be supplied in the build_request.
+class UnpickleableInput(object):
+  pass
+
+
+class UnpickleableResult(object):
+  pass
+
+
 class UnpickleableInputsPlanner(TaskPlanner):
   @property
   def goal_name(self):
@@ -444,7 +442,7 @@ class UnpickleableInputsPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    yield Sources.of('unpickleable_inputs')
+    yield UnpickleableInput
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     # Nested functions like this lambda are unpicklable.
@@ -464,7 +462,7 @@ class UnpickleableResultPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    yield Sources.of('unpickleable_result')
+    yield UnpickleableResult
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     return Plan(unpickable_result_func, (subject,))
@@ -480,7 +478,11 @@ def setup_json_scheduler(build_root):
                   'jar': Jar,
                   'requirement': Requirement,
                   'scrooge_configuration': ScroogeConfiguration,
-                  'sources': AddressableSources,
+                  'java': JavaSources,
+                  'python': PythonSources,
+                  'resources': ResourceSources,
+                  'scala': ScalaSources,
+                  'thrift': ThriftSources,
                   'target': Target,
                   'build_properties': BuildPropertiesConfiguration}
   json_parser = functools.partial(parse_json, symbol_table=symbol_table)
