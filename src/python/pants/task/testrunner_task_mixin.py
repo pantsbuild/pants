@@ -67,14 +67,6 @@ class TestRunnerTaskMixin(object):
 
   def _timeout_for_target(self, target):
     timeout = getattr(target, 'timeout', None)
-    deprecated_conditional(
-      lambda: timeout == 0,
-      "0.0.65",
-      hint_message=dedent("""
-        Target {target} has parameter: 'timeout=0', which is deprecated.
-        To use the default timeout remove the 'timeout' parameter from your test target.
-      """.format(target=target.address.spec)))
-
     timeout_maximum = self.get_options().timeout_maximum
     if timeout is not None and timeout_maximum is not None:
       if timeout > timeout_maximum:
