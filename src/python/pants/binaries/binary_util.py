@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import posixpath
+import ssl
 import subprocess
 from contextlib import closing, contextmanager
 
@@ -56,16 +57,18 @@ class BinaryUtil(object):
       register('--fetch-timeout-secs', type=int, default=30, advanced=True,
                help='Timeout in seconds for url reads when fetching binary tools from the '
                     'repos specified by --baseurls')
-      register("--path-by-id", type=dict_option, advanced=True,
+      register('--path-by-id', type=dict_option, advanced=True,
                help='Maps output of uname for a machine to a binary search path.  e.g. '
                '{ ("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux", "arm32"] }')
+      register('--verify-ssl-certs', action='store_true', default=False, advanced=True,
+               help='Turn on SSL client certificate verification for https connections.')
 
     @classmethod
     def create(cls):
       # NB: create is a class method to ~force binary fetch location to be global.
       options = cls.global_instance().get_options()
       return BinaryUtil(options.baseurls, options.fetch_timeout_secs, options.pants_bootstrapdir,
-                        options.path_by_id)
+                        options.path_by_id, options.verify_ssl_certs)
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
@@ -110,7 +113,7 @@ class BinaryUtil(object):
           sysname=sysname, release=release, machine=machine))
     return os.path.join(supportdir, *(middle_path + [version, name]))
 
-  def __init__(self, baseurls, timeout_secs, bootstrapdir, path_by_id=None):
+  def __init__(self, baseurls, timeout_secs, bootstrapdir, path_by_id=None, verify_ssl_certs=None):
     """Creates a BinaryUtil with the given settings to define binary lookup behavior.
 
     This constructor is primarily used for testing.  Production code will usually initialize
@@ -123,6 +126,7 @@ class BinaryUtil(object):
       search for binaries in, or download binaries to if needed.
     :param dict path_by_id: Additional mapping from (sysname, id) -> (os, arch) for tool
       directory naming
+    :param bool verify_ssl_certs: If true, turn on SSL client cert verification for https urls
     """
     self._baseurls = baseurls
     self._timeout_secs = timeout_secs
@@ -130,6 +134,7 @@ class BinaryUtil(object):
     self._path_by_id = _DEFAULT_PATH_BY_ID.copy()
     if path_by_id:
       self._path_by_id.update(path_by_id)
+    self._verify_ssl_certs = verify_ssl_certs
 
   @contextmanager
   def _select_binary_stream(self, name, binary_path, url_opener=None):
@@ -146,8 +151,23 @@ class BinaryUtil(object):
     if not self._baseurls:
       raise self.NoBaseUrlsError(
           'No urls are defined for the --pants-support-baseurls option.')
+
+    def url_opener_default(u):
+      if u.startswith('https'):
+        if not self._verify_ssl_certs:
+          ssl_context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        else:
+          ssl_context = None;
+        logger.debug('SSL client cert verification is {}'.format(
+          'ON' if ssl_context == None else 'off'))
+        request = closing(urllib_request.urlopen(u, timeout=self._timeout_secs,
+                                                 context=ssl_context))
+      else:
+        request = closing(urllib_request.urlopen(u, timeout=self._timeout_secs))
+      return request
+
     if url_opener is None:
-      url_opener = lambda u: closing(urllib_request.urlopen(u, timeout=self._timeout_secs))
+      url_opener = url_opener_default
 
     downloaded_successfully = False
     accumulated_errors = []
