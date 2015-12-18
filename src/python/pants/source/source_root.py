@@ -39,6 +39,8 @@ class SourceRoots(object):
     unknown structure.  Tests should prefer to use dirs that match our source root patterns
     instead of explicitly setting source roots here.
     """
+    if os.path.isabs(path):
+      path = os.path.relpath(path, get_buildroot())
     self._trie.add_fixed(path, langs)
 
   def find(self, target):
@@ -58,7 +60,6 @@ class SourceRoots(object):
     :param path: Find the source root for this path.
     :return: A SourceRoot instance, or None if no matching source root found.
     """
-    # TODO: Is this normalization necessary? Shouldn't all paths here be relative already?
     if os.path.isabs(path):
       path = os.path.relpath(path, get_buildroot())
     return self._trie.find(path)

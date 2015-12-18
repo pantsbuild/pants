@@ -12,7 +12,7 @@ from pants.backend.core import wrapped_globs
 from pants.base.build_environment import get_buildroot
 from pants.base.payload_field import PayloadField
 from pants.base.validation import assert_list
-
+from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import FilesetWithSpec
 
 
@@ -30,6 +30,14 @@ class SourcesField(PayloadField):
     self._source_paths = assert_list(sources, key_arg='sources', allowable_add=(FilesetWithSpec,))
     self._ref_address = ref_address
     self._filespec = filespec
+
+  @property
+  def source_root(self):
+    """:returns: the source root for these sources, or None if they're not under a source root."""
+    # TODO: It's a shame that we have to access the singleton directly here, instead of getting
+    # the SourceRoots instance from context, as tasks do.  In the new engine we could inject
+    # this into the target, rather than have it reach out for global singletons.
+    return SourceRootConfig.global_instance().get_source_roots().find_by_path(self._rel_path)
 
   @property
   def filespec(self):
@@ -139,3 +147,6 @@ class DeferredSourcesField(SourcesField):
     if not self._populated:
       raise self.NotPopulatedError()
     return super(DeferredSourcesField, self)._compute_fingerprint()
+
+
+EmptySourcesField = SourcesField('todo/these/are/empty/sources', sources=())
