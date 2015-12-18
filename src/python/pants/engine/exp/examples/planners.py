@@ -107,6 +107,31 @@ def _create_sources(ext):
   return Sources.of(ext)
 
 
+@printing_func
+def isolate_resources(resources):
+  """Copies resources into a private directory, and provides them as a Classpath entry."""
+  pass
+
+
+class ResourcesPlanner(TaskPlanner):
+  """A planner that adds a Classpath entry for targets containing resources."""
+
+  @property
+  def goal_name(self):
+    return 'compile'
+
+  @property
+  def product_types(self):
+    # TODO: need to differentiate Resources from other Sources
+    return {Classpath: [[Sources.of(...)]]}
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
+    # TODO: no type, so unable to differentiate by extension; Sources should be configuration
+    resources = list(subject.sources.iter_paths(base_path=subject.address.spec_path,
+                                                     ext=...))
+    return Plan(func_or_task_type=isolate_resources, subjects=(subject,), resources=resources)
+
+
 class ThriftConfiguration(Configuration):
   def __init__(self, deps=None, **kwargs):
     """
@@ -252,7 +277,6 @@ class BuildPropertiesPlanner(TaskPlanner):
     return {Classpath: [[BuildPropertiesConfiguration]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    assert product_type == Classpath
     return Plan(func_or_task_type=write_name_file, subjects=(subject,), name=subject.name)
 
 
