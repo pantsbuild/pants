@@ -26,7 +26,7 @@ class SubsystemDependency(namedtuple('_SubsystemDependency', ('subsystem_cls', '
     indicated by this dependency.
     """
     if self.is_global():
-      return self.scope
+      return self.subsystem_cls.options_scope
     else:
       return self.subsystem_cls.subscope(self.scope)
 
