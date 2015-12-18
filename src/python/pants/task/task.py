@@ -223,6 +223,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     if not self._fingerprint:
       hasher = sha1()
       hasher.update(self._options_fingerprint(self.options_scope))
+      # TODO: this is not recursive, but should be: see #2739
       for dep in self.subsystem_dependencies_iter():
         hasher.update(self._options_fingerprint(dep.options_scope()))
       self._fingerprint = str(hasher.hexdigest())
