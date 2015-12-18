@@ -20,10 +20,12 @@ public class PantsRunnerTest {
   static final String TEST_PROJECT =
       "testprojects/src/java/org/pantsbuild/testproject/runner:pants-runner-testproject";
   static final File SYNTHETIC_JAR =
-      new File("dist/pants-runner-testproject-bundle/pants-runner-testproject.jar");
+      new File("dist/testprojects.src.java.org.pantsbuild.testproject.runner.pants-runner-" +
+               "testproject-bundle/pants-runner-testproject.jar");
   static final File MAIN_JAR =
-      new File("dist/pants-runner-testproject-bundle/libs/" +
-          "testprojects.src.java.org.pantsbuild.testproject.runner.main-class/0-z.jar");
+      new File("dist/testprojects.src.java.org.pantsbuild.testproject.runner.pants-runner-" +
+               "testproject-bundle/libs/" +
+               "testprojects.src.java.org.pantsbuild.testproject.runner.main-class/0-z.jar");
   static final String MAIN_CLASS = "org.pantsbuild.testproject.runner.MainClass";
 
   @BeforeClass

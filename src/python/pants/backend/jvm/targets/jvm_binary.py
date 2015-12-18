@@ -304,7 +304,8 @@ class JvmBinary(JvmTarget):
       ``'org.pantsbuild.example.hello.main.HelloMain'``. This class may be
       present as the source of this target or depended-upon library.
     :param string basename: Base name for the generated ``.jar`` file, e.g.,
-      ``'hello'``. (By default, uses ``name`` param)
+      ``'hello'``. (By default, uses ``name`` param)  Note this is unsafe
+      because of the possible conflict when multiple binaries are built.
     :param string source: Name of one ``.java`` or ``.scala`` file (a good
       place for a ``main``).
     :param dependencies: Targets (probably ``java_library`` and
