@@ -139,27 +139,21 @@ class Target(Configuration):
     :rtype: list
     """
 
-  def select_configuration(self, name=None, tpe=None):
+  def select_configuration(self, name):
     """Selects a named configuration of this target.
 
-    :param string name: The name of the configuration to select, or None
-    :param type tpe: The exact type of the configuration to select, or None.
-    :returns: The configuration with the given name or type.
+    :param string name: The name of the configuration to select.
+    :returns: The configuration with the given name.
     :rtype: :class:`pants.engine.exp.configuration.Configuration`
     :raises: :class:`Target.ConfigurationNotFound` if the configuration was not found.
     """
-    if name is None and tpe is None:
-      raise ValueError('Expected one of `name` or `tpe` to select_configuration.')
-    configs = tuple(config for config in self.configurations
-                    if config.name == name or type(confg) == tpe)
+    configs = tuple(config for config in self.configurations if config.name == name)
     if len(configs) != 1:
       configurations = ('{} -> {!r}'.format(repr(c.name) if c.name else '<anonymous>', c)
                         for c in configs)
-      specification = '{}{}'.format(' name={}'.format(name) if name else '',
-                                        ' type={}'.format(tpe.__name__) if tpe else '')
-      raise self.ConfigurationNotFound('Failed to find a single configuration with {!r} for these '
+      raise self.ConfigurationNotFound('Failed to find a single configuration named {!r} these '
                                        'configurations in {!r}:\n\t{}'
-                                       .format(specification, self, '\n\t'.join(configurations)))
+                                       .format(name, self, '\n\t'.join(configurations)))
     return configs[0]
 
   def walk_targets(self, postorder=True):
