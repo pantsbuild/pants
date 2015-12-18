@@ -39,7 +39,7 @@ class Sources(Configuration):
     """
     super(Sources, self).__init__(name=name, files=files, globs=globs, rglobs=rglobs, zglobs=zglobs,
                                   **kwargs)
-    if files:
+    if files and self.extensions:
       for f in files:
         accepted = False
         for extension in self.extensions:
@@ -48,7 +48,7 @@ class Sources(Configuration):
             break
         if not accepted:
           # TODO: TargetDefinitionError or similar
-          raise ValueError('Path `{}` selected by {} is not a {} file.'.format(f, self, extensions))
+          raise ValueError('Path `{}` selected by {} is not a {} file.'.format(f, self, self.extensions))
     self.excludes = excludes
 
   @abstractproperty
@@ -166,7 +166,10 @@ class Target(Configuration):
     :returns: The configuration with the given type, or None.
     :rtype: :class:`pants.engine.exp.configuration.Configuration`
     """
-    configs = tuple(config for config in self.configurations if type(config) == tpe)
+    def match(config):
+      matched = type(config) == tpe
+      return matched
+    configs = tuple(config for config in self.configurations if match(config))
     if not configs:
       return None
     elif len(configs) > 1:

@@ -4,7 +4,7 @@
   "dependencies": [
     "3rdparty/jvm:scala-library"
   ],
-  "configuration": [
+  "configurations": [
     {
       "type_alias": "scala",
       "files": ["Scrooge.scala"]

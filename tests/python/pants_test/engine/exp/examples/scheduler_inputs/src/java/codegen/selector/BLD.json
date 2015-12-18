@@ -11,7 +11,7 @@
     "3rdparty/jvm:guava",
     "src/thrift/codegen/selector:selector@scrooge_scala_config"
   ],
-  "configuration": [
+  "configurations": [
     ":sources",
   ]
 }
@@ -23,7 +23,7 @@
     "3rdparty/jvm:guava",
     "src/thrift/codegen/selector"
   ],
-  "configuration": [
+  "configurations": [
     ":sources",
   ]
 }
@@ -35,7 +35,7 @@
     "3rdparty/jvm:guava",
     "src/thrift/codegen/selector:selector@failing"
   ],
-  "configuration": [
+  "configurations": [
     ":sources",
   ]
 }

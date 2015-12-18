@@ -2,7 +2,7 @@
   "type_alias": "target",
   "extends": "src/thrift:java_thrift_base",
   "name": "simple",
-  "configuration": [
+  "configurations": [
     {
       "type_alias": "thrift",
       "files": ["simple.thrift"]

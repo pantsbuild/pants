@@ -6,7 +6,7 @@
     "src/resources/simple",
     "src/thrift/codegen/simple"
   ],
-  "configuration": [
+  "configurations": [
     {
       "type_alias": "java",
       "files": ["Simple.java"]

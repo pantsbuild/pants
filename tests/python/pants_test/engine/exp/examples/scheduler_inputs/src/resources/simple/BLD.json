@@ -1,7 +1,7 @@
 {
   "type_alias": "target",
   "name": "simple",
-  "configuration": [
+  "configurations": [
     {
       "type_alias": "resources",
       "files": ["simple.txt"]
