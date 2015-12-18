@@ -167,8 +167,10 @@ class ThriftPlanner(TaskPlanner):
     if not isinstance(subject, Target):
       return None
 
-    thrift_sources = list(subject.sources.iter_paths(base_path=subject.address.spec_path,
-                                                     ext='.thrift'))
+    thrift_sources = None
+    sources_config = subject.select_configuration_type(ThriftSources)
+    if sources_config:
+      thrift_sources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
     if not thrift_sources:
       return None
 
@@ -357,8 +359,10 @@ class JvmCompilerPlanner(TaskPlanner):
     if not isinstance(subject, Target):
       return None
 
-    sources_config = subject.select_configuration(tpe=self.source_type)
-    sources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
+    sources = None
+    sources_config = subject.select_configuration_type(self.source_type)
+    if sources_config:
+      sources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
     if not sources:
       # TODO(John Sirois): Abstract a ~SourcesConsumerPlanner that can grab sources of given types
       # or else defer to a code generator like we do here.  As it stands, the planner must

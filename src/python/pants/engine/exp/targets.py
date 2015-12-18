@@ -151,9 +151,29 @@ class Target(Configuration):
     if len(configs) != 1:
       configurations = ('{} -> {!r}'.format(repr(c.name) if c.name else '<anonymous>', c)
                         for c in configs)
-      raise self.ConfigurationNotFound('Failed to find a single configuration named {!r} these '
+      raise self.ConfigurationNotFound('Failed to find a single configuration named {!r} for these '
                                        'configurations in {!r}:\n\t{}'
                                        .format(name, self, '\n\t'.join(configurations)))
+    return configs[0]
+
+  def select_configuration_type(self, tpe):
+    """Selects a configuration of the given type on this target, or None
+
+    TODO: after https://rbcommons.com/s/twitter/r/3245/ , it should become
+    an error for this not to match.
+
+    :param type tpe: The exact type of the configuration to select: subclasses will not match.
+    :returns: The configuration with the given type, or None.
+    :rtype: :class:`pants.engine.exp.configuration.Configuration`
+    """
+    configs = tuple(config for config in self.configurations if type(config) == tpe)
+    if not configs:
+      return None
+    elif len(configs) > 1:
+      configurations = ('{!r}'.format(c) for c in configs)
+      raise self.ConfigurationNotFound('Found more than one configuration with type {!r} for these '
+                                       'configurations in {!r}:\n\t{}'
+                                       .format(tpe, self, '\n\t'.join(configurations)))
     return configs[0]
 
   def walk_targets(self, postorder=True):
