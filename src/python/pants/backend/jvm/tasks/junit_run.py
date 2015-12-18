@@ -195,19 +195,14 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     max_version = Revision(*(min_version.components + [9999])) if self._strict_jvm_version else None
     return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
 
-  def _spawn(self, executor, distribution, *args, **kwargs):
+  def _spawn(self, distribution, executor=None, *args, **kwargs):
     """Returns a processhandler to a process executing java.
 
     :param Executor executor: the java subprocess executor to use. If not specified, construct
       using the distribution passed in via the parameter.
     :param Distribution distribution: The JDK or JRE installed.
-    :returns: ProcessHandler
-
-    Returns a process handler which supports wait(), kill() and terminate().
+    :rtype: ProcessHandler
     """
-
-    if distribution is None:
-      raise InternalError("Can't call spawn with distribution=None")
 
     actual_executor = executor or SubprocessExecutor(distribution)
     (process, return_code_handler) = distribution.execute_java(*args,

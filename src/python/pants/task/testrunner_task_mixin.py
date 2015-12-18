@@ -82,8 +82,7 @@ class TestRunnerTaskMixin(object):
   def _spawn(self, *args, **kwargs):
     """Spawn the actual test runner process.
 
-    :return: ProcessHandler: The handle to control (wait, kill, etc) the process. This must be an object
-    which supports kill(), wait(), and terminate() calls.
+    :rtype: ProcessHandler
     """
 
     raise NotImplementedError
