@@ -199,7 +199,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     """Returns a processhandler to a process executing java.
 
     :param Executor executor: the java subprocess executor to use. If not specified, construct
-      using the distribution passed in via the parameter.
+      using the distribution.
     :param Distribution distribution: The JDK or JRE installed.
     :rtype: ProcessHandler
     """
@@ -210,8 +210,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                                                                wait=False,
                                                                **kwargs)
 
-    # This ProcessHandler is created with a closure including the process and return_code_handler
-    # returned by execute_java.
     class JUnitProcessHandler(ProcessHandler):
       def wait(_):
         ret = process.wait()
@@ -227,8 +225,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return JUnitProcessHandler()
 
   def execute_java_for_targets(self, targets, *args, **kwargs):
-    """Execute java for targets, using the test mixin spawn and wait in order to activate timeouts
-    and other testmixin code common across test targets.
+    """Execute java for targets using the test mixin spawn and wait.
+
+    Activates timeouts and other common functionality shared among tests.
     """
 
     distribution = self.preferred_jvm_distribution_for_targets(targets)
@@ -236,8 +235,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return self._spawn_and_wait(*args, executor=actual_executor, distribution=distribution, **kwargs)
 
   def execute_java_for_coverage(self, targets, executor=None, *args, **kwargs):
-    """Execute java for targets directly and don't use the test mixin so that
-    this execution doesn't get wrapped with timeouts and other testmixin code common
+    """Execute java for targets directly and don't use the test mixin.
+
+    This execution won't be wrapped with timeouts and other testmixin code common
     across test targets. Used for coverage instrumentation.
     """
 
@@ -246,9 +246,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return distribution.execute_java(*args, executor=actual_executor, **kwargs)
 
   def _collect_test_targets(self, targets):
-    """Returns a mapping from test names to target objects for all tests that
-    are included in targets. If self._tests_to_run is set, return {test: None}
-    for these tests instead.
+    """Returns a mapping from test names to target objects for all tests that are included in targets.
+
+    If self._tests_to_run is set, return {test: None} for these tests instead.
     """
 
     tests_from_targets = dict(list(self._calculate_tests_from_targets(targets)))
@@ -466,9 +466,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       raise TargetDefinitionException(target, msg)
 
   def _execute(self, targets):
-    """
-    Implements the primary junit test execution. This method is called by the TestRunnerTaskMixin,
-    which contains the primary Task.execute function and wraps this method in timeouts.
+    """Implements the primary junit test execution.
+
+    This method is called by the TestRunnerTaskMixin, which contains the primary Task.execute function
+    and wraps this method in timeouts.
     """
 
     # We only run tests within java_tests/junit_tests targets.
