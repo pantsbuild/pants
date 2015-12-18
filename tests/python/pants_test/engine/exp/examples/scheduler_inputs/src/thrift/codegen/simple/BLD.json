@@ -1,6 +1,6 @@
 {
   "type_alias": "target",
-  "extends": "src/thrift:java_thrift_base",
+  "merges": ["src/thrift:java_thrift_base"],
   "name": "simple",
   "configurations": [
     {
