@@ -167,8 +167,8 @@ class JvmCompile(NailgunTaskBase):
   _supports_concurrent_execution = None
 
   @classmethod
-  def task_subsystems(cls):
-    return super(JvmCompile, cls).task_subsystems() + (Java, JvmPlatform, ScalaPlatform)
+  def subsystem_dependencies(cls):
+    return super(JvmCompile, cls).subsystem_dependencies() + (Java, JvmPlatform, ScalaPlatform)
 
   @classmethod
   def name(cls):

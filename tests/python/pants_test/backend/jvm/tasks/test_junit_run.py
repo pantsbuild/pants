@@ -21,6 +21,7 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.util.contextutil import environment_as
 from pants.util.dirutil import safe_file_dump
 from pants.util.timeout import TimeoutReached
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
@@ -141,7 +142,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (1,))
 
-  def execute_junit_runner(self, content, **kwargs):
+  def execute_junit_runner(self, content, create_some_resources=True, **kwargs):
     # Create the temporary base test directory
     test_rel_path = 'tests/java/org/pantsbuild/foo'
     test_abs_path = self.create_dir(test_rel_path)
@@ -178,15 +179,18 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     else:
       target = self.create_library(test_rel_path, 'java_tests', 'foo_test', ['FooTest.java'])
 
-    # Create a synthetic resource target.
-    resources = self.make_target('some_resources', Resources)
+    target_roots = []
+    if create_some_resources:
+      # Create a synthetic resource target.
+      target_roots.append(self.make_target('some_resources', Resources))
+    target_roots.append(target)
 
     # Set the context with the two targets, one java_tests target and
     # one synthetic resources target.
     # The synthetic resources target is to make sure we won't regress
     # in the future with bug like https://github.com/pantsbuild/pants/issues/508. Note
     # in that bug, the resources target must be the first one in the list.
-    context = self.context(target_roots=[resources, target])
+    context = self.context(target_roots=target_roots)
 
     # Before we run the task, we need to inject the "runtime_classpath" with
     # the compiled test java classes that JUnitRun will know which test
@@ -296,3 +300,79 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       """),
     target_name='foo:foo_test'
     )
+
+  def test_junit_runner_extra_env_vars(self):
+    self.make_target(
+      spec='foo:foo_test',
+      target_type=JavaTests,
+      sources=['FooTest.java'],
+      extra_env_vars={
+        'HELLO': 27,
+        'THERE': 32,
+      },
+    )
+
+    self.make_target(
+      spec='bar:bar_test',
+      target_type=JavaTests,
+      sources=['FooTest.java'],
+      extra_env_vars={
+        'THE_ANSWER': 42,
+        'HELLO': 12,
+      },
+    )
+
+    self.execute_junit_runner(dedent("""
+        import org.junit.Test;
+        import static org.junit.Assert.assertEquals;
+        public class FooTest {
+          @Test
+          public void testFoo() {
+            assertEquals("27", System.getenv().get("HELLO"));
+            assertEquals("32", System.getenv().get("THERE"));
+          }
+        }
+      """), target_name='foo:foo_test')
+
+    # Execute twice in a row to make sure the environment changes aren't sticky.
+    self.execute_junit_runner(dedent("""
+        import org.junit.Test;
+        import static org.junit.Assert.assertEquals;
+        import static org.junit.Assert.assertFalse;
+        public class FooTest {
+          @Test
+          public void testFoo() {
+            assertEquals("12", System.getenv().get("HELLO"));
+            assertEquals("42", System.getenv().get("THE_ANSWER"));
+            assertFalse(System.getenv().containsKey("THERE"));
+          }
+        }
+      """), target_name='bar:bar_test', create_some_resources=False)
+
+  def test_junit_runner_extra_env_vars_none(self):
+    with environment_as(THIS_VARIABLE="12", THAT_VARIABLE="This is a variable."):
+      self.make_target(
+        spec='foo:foo_test',
+        target_type=JavaTests,
+        sources=['FooTest.java'],
+        extra_env_vars={
+          'HELLO': None,
+          'THERE': False,
+          'THIS_VARIABLE': None
+        },
+      )
+
+      self.execute_junit_runner(dedent("""
+          import org.junit.Test;
+          import static org.junit.Assert.assertEquals;
+          import static org.junit.Assert.assertFalse;
+          public class FooTest {
+            @Test
+            public void testFoo() {
+              assertEquals("False", System.getenv().get("THERE"));
+              assertEquals("This is a variable.", System.getenv().get("THAT_VARIABLE"));
+              assertFalse(System.getenv().containsKey("HELLO"));
+              assertFalse(System.getenv().containsKey("THIS_VARIABLE"));
+            }
+          }
+        """), target_name='foo:foo_test')

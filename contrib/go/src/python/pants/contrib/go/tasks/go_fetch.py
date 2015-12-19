@@ -158,35 +158,35 @@ class GoFetch(GoTask):
     def __init__(self, address):
       self.address = address
 
-  def _resolve(self, dependent_remote_lib, address, pkg, implict_ok):
+  def _resolve(self, dependent_remote_lib, address, pkg, implicit_ok):
     """Resolves the GoRemoteLibrary at `address` defining the given `pkg`.
 
-    If `implicit_ok` is True, then a GoRemoteLibrary to own `pkg` is always synthesized; otherwise
-    the address must already exist in the build graph (a BUILD file must exist on disk that owns
-    the given `pkg` and declares a `rev` for it).
+    If `implicit_ok` is True, then a GoRemoteLibrary to own `pkg` is always synthesized if it does
+    not already exist; otherwise the address must already exist in the build graph (a BUILD file
+    must exist on disk that owns the given `pkg` and declares a `rev` for it).
 
     :param dependent_remote_lib: The remote library that depends on the remote `pkg`.
     :type: :class:`pants.contrib.go.targets.go_remote_library.GoRemoteLibrary`
     :param address: The address of the remote library that should own `pkg`.
     :type: :class:`pants.base.Address`
     :param string pkg: The remote package path whose owning target needs to be resolved.
-    :param bool implict_ok: `False` if the given `address` must be defined in a BUILD file on disk;
-                            otherwise a remote library to own `pkg` will always be created and
-                            returned.
+    :param bool implicit_ok: `False` if the given `address` must be defined in a BUILD file on disk;
+                             otherwise a remote library to own `pkg` will always be created and
+                             returned.
     :returns: The resulting resolved remote library after injecting it in the build graph.
     :rtype: :class:`pants.contrib.go.targets.go_remote_library.GoRemoteLibrary`
     :raises: :class:`GoFetch.UndeclaredRemoteLibError`: If no BUILD file exists for the remote root
              `pkg` lives in.
     """
-    if implict_ok:
-      self.context.add_new_target(address=address,
-                                  target_base=dependent_remote_lib.target_base,
-                                  target_type=GoRemoteLibrary,
-                                  pkg=pkg)
-    else:
-      try:
-        self.context.build_graph.inject_address_closure(address)
-      except AddressLookupError:
+    try:
+      self.context.build_graph.inject_address_closure(address)
+    except AddressLookupError:
+      if implicit_ok:
+        self.context.add_new_target(address=address,
+                                    target_base=dependent_remote_lib.target_base,
+                                    target_type=GoRemoteLibrary,
+                                    pkg=pkg)
+      else:
         raise self.UndeclaredRemoteLibError(address)
     return self.context.build_graph.get_target(address)
 
