@@ -198,15 +198,12 @@ class ThriftPlanner(TaskPlanner):
 
     thrift_sources = None
     sources_config = subject.select_configuration_type(ThriftSources)
-    print('>>> selected config for {} was: {}'.format(subject, sources_config))
     if sources_config:
       thrift_sources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
-    print('>>>   selected thrift for {} were: {}'.format(subject, thrift_sources))
     if not thrift_sources:
       return None
 
     config = self.extract_thrift_config(product_type, subject, configuration=configuration)
-    print('>>>   selected thrift config for {} was: {}'.format(subject, config))
     if config is None:
       return None
 
@@ -243,9 +240,7 @@ class ApacheThriftPlanner(ThriftPlanner):
 
   def _product_type(self, gen):
     lang = gen.partition(':')[0]
-    tpe = self._product_type_by_lang.get(lang)
-    print('>>> product type for {} is: {}'.format(gen, tpe))
-    return tpe
+    return self._product_type_by_lang.get(lang)
 
   def extract_thrift_config(self, product_type, target, configuration=None):
     configs = (configuration,) if configuration else target.configurations
@@ -395,10 +390,8 @@ class JvmCompilerPlanner(TaskPlanner):
 
     sources = None
     sources_config = subject.select_configuration_type(self.source_type)
-    print('>>> selected {} for {} was: {}'.format(self.source_type.__name__, subject, sources_config))
     if sources_config:
       sources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
-    print('>>>   selected jvm sources for {} were: {}'.format(subject, sources))
     if not sources:
       # TODO(John Sirois): Abstract a ~SourcesConsumerPlanner that can grab sources of given types
       # or else defer to a code generator like we do here.  As it stands, the planner must
@@ -413,7 +406,6 @@ class JvmCompilerPlanner(TaskPlanner):
                                   self.source_type,
                                   configuration=configuration,
                                   required=False)
-      print('>>>   promised sources for {} were: {}'.format(subject, sources))
       if sources:
         subject = sources.subject
 
