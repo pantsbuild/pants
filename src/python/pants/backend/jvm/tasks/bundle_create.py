@@ -34,7 +34,7 @@ class BundleCreate(JvmBinaryTask):
     register('--archive-prefix', action='store_true', default=False,
              fingerprint=True,
              help='If --archive is specified, prefix archive with target basename or a unique '
-                  'identifier as determined by --use-basename.')
+                  'identifier as determined by --use-basename-prefix.')
     register('--use-basename-prefix', action='store_true', default=False,
              help='Use target basename to prefix bundle folder or archive; otherwise a unique '
                   'identifier derived from target will be used.')
@@ -58,13 +58,13 @@ class BundleCreate(JvmBinaryTask):
     def is_app(target):
       return isinstance(target, (JvmApp, JvmBinary))
 
-    def __init__(self, target, use_basename=False):
+    def __init__(self, target, use_basename_prefix=False):
       assert self.is_app(target), '{} is not a valid app target'.format(target)
 
       self.address = target.address
       self.binary = target if isinstance(target, JvmBinary) else target.binary
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
-      self.basename = target.basename if use_basename else target.id
+      self.basename = target.basename if use_basename_prefix else target.id
       self.target = target
 
   def execute(self):
@@ -73,23 +73,22 @@ class BundleCreate(JvmBinaryTask):
         # Using target_roots instead of all transitive targets to avoid possible basename
         # conflicts.  An example is jvm_app A depends on jvm_binary B, both have the same
         # basename, whoever runs the second will destroy the previous one.
-        return [self.App(target, use_basename=True) for target in self.context.target_roots]
-      return map(self.App, self.context.targets(predicate=self.App.is_app))
+        return [self.App(target, use_basename_prefix=True) for target in self.context.target_roots]
+      return [self.App(target) for target in self.context.targets(predicate=self.App.is_app)]
 
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
 
     for app in get_bundle_apps():
-      bundle_dir = self.bundle(app)
+      basedir = self.bundle(app)
       # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
       # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
       # expect the product to be cached, a user running an 'rm' on the dist/ directory could
       # cause inconsistencies.
       jvm_bundles_product = self.context.products.get('jvm_bundles')
-      jvm_bundles_product.add(app.target,
-                              os.path.dirname(bundle_dir)).append(os.path.basename(bundle_dir))
+      jvm_bundles_product.add(app.target, os.path.dirname(basedir)).append(os.path.basename(basedir))
       if archiver:
         archivepath = archiver.create(
-          bundle_dir,
+          basedir,
           self._outdir,
           app.basename,
           prefix=app.basename if self._prefix else None

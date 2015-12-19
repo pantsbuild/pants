@@ -157,7 +157,8 @@ class JvmApp(Target):
       (e.g.: config files, startup scripts).
     :param string basename: Name of this application, if different from the
       ``name``. Optionally pants uses this in the ``bundle`` goal to name the distribution
-      artifact. Note this is unsafe because of the possible conflict when multiple bundles are built.
+      artifact.  Note this is unsafe because of the possible conflict when multiple bundles
+      are built.
     """
     payload = payload or Payload()
     payload.add_fields({

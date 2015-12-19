@@ -23,6 +23,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     return BundleCreate
 
   def setUp(self):
+    """Prepare targets, context, runtime classpath. """
     super(TestBundleCreate, self).setUp()
 
     self.jar_artifact = self.create_artifact(org='org.example', name='foo', rev='1.0.0')
@@ -55,6 +56,9 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self._setup_classpath(self.task_context)
 
   def _setup_classpath(self, task_context):
+    """As a separate prep step because to test different option settings, this needs to rerun
+    after context is re-created.
+    """
     classpath_products = self.ensure_classpath_products(task_context)
     classpath_products.add_jars_for_targets(targets=[self.jar_lib],
                                             conf='default',
@@ -67,17 +71,34 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
                                   {'Foo.class': '', 'foo.txt': ''})
 
   def test_jvm_bundle_products(self):
+    """Test default setting outputs bundle products using `target.id`."""
+
     self.execute(self.task_context)
-    self.check_bundle_products('foo.foo-app')
+    self._check_bundle_products('foo.foo-app')
 
   def test_jvm_bundle_use_basename(self):
-    self.set_options(use_basename=True)
+    """Test override default setting outputs bundle products using basename."""
+
+    self.set_options(use_basename_prefix=True)
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
-    self.check_bundle_products('FooApp')
+    self._check_bundle_products('FooApp')
 
-  def check_bundle_products(self, bundle_basename):
+  def test_jvm_bundle_missing_product(self):
+    """Test exception is thrown in case of a missing jar."""
+
+    missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
+                                                materialize=False)
+    classpath_products = self.ensure_classpath_products(self.task_context)
+    classpath_products.add_jars_for_targets(targets=[self.binary_target],
+                                            conf='default',
+                                            resolved_jars=[missing_jar_artifact])
+
+    with self.assertRaises(BundleCreate.MissingJarError):
+      self.execute(self.task_context)
+
+  def _check_bundle_products(self, bundle_basename):
     products = self.task_context.products.get('jvm_bundles')
     self.assertIsNotNone(products)
     product_data = products.get(self.app_target)
@@ -98,14 +119,3 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     with open_zip(os.path.join(bundle_root, 'foo-binary.jar')) as jar:
       self.assertEqual(sorted(['META-INF/', 'META-INF/MANIFEST.MF']),
                        sorted(jar.namelist()))
-
-  def test_jvm_bundle_missing_product(self):
-    missing_jar_artifact = self.create_artifact(org='org.example', name='foo', rev='2.0.0',
-                                                materialize=False)
-    classpath_products = self.ensure_classpath_products(self.task_context)
-    classpath_products.add_jars_for_targets(targets=[self.binary_target],
-                                            conf='default',
-                                            resolved_jars=[missing_jar_artifact])
-
-    with self.assertRaises(BundleCreate.MissingJarError):
-      self.execute(self.task_context)
