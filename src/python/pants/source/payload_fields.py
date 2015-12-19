@@ -8,12 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from hashlib import sha1
 
-from pants.backend.core import wrapped_globs
 from pants.base.build_environment import get_buildroot
 from pants.base.payload_field import PayloadField
 from pants.base.validation import assert_list
 from pants.source.source_root import SourceRootConfig
-from pants.source.wrapped_globs import FilesetWithSpec
+from pants.source.wrapped_globs import FilesetWithSpec, matches_filespec
 
 
 class SourcesField(PayloadField):
@@ -44,7 +43,7 @@ class SourcesField(PayloadField):
     return self._filespec
 
   def matches(self, path):
-    return wrapped_globs.matches_filespec(path, self.filespec)
+    return matches_filespec(path, self.filespec)
 
   @property
   def rel_path(self):
@@ -138,7 +137,7 @@ class DeferredSourcesField(SourcesField):
   def matches(self, path):
     if not self._populated:
       raise self.NotPopulatedError()
-    return wrapped_globs.matches_filespec(path, self.filespec)
+    return matches_filespec(path, self.filespec)
 
   def _compute_fingerprint(self):
     """A subclass must provide an implementation of _compute_fingerprint that can return a valid

@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 
 from pants.base.validation import assert_list
+from types import GeneratorType
 
 
 class ParseValidation(unittest.TestCase):
@@ -37,3 +38,14 @@ class ParseValidation(unittest.TestCase):
       assert_list([["file3.txt"]], key_arg='artifacts')  # All values most be strings
     with self.assertRaisesRegexp(ValueError, "In key 'jars':"):
       assert_list(None, can_be_none=False, key_arg='jars')  # The default is ok as None only when can_be_noe is true
+
+  def test_additional_allowables(self):
+    def generator():
+      x = -1
+      while x < 10:
+        x += 1
+        yield str(x)
+    assert_list(generator(), allowable_add=(GeneratorType,))
+    assert_list(['1', '2'], allowable_add=(GeneratorType,))
+    with self.assertRaises(ValueError):
+      assert_list(generator(), allowable_add=[])
