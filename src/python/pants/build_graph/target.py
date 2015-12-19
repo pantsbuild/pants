@@ -20,7 +20,7 @@ from pants.base.validation import assert_list
 from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
-from pants.source.payload_fields import DeferredSourcesField, EmptySourcesField, SourcesField
+from pants.source.payload_fields import DeferredSourcesField, SourcesField
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -356,7 +356,7 @@ class Target(AbstractTarget):
   @property
   def _sources_field(self):
     sources_field = self.payload.get_field('sources')
-    return sources_field if sources_field else EmptySourcesField
+    return sources_field if sources_field else SourcesField(self.address.spec_path, sources=())
 
   def has_sources(self, extension=''):
     """

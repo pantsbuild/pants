@@ -146,6 +146,3 @@ class DeferredSourcesField(SourcesField):
     if not self._populated:
       raise self.NotPopulatedError()
     return super(DeferredSourcesField, self)._compute_fingerprint()
-
-
-EmptySourcesField = SourcesField('todo/these/are/empty/sources', sources=())

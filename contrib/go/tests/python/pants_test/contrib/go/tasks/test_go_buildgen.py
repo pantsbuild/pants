@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -69,7 +70,8 @@ class GoBuildgenTest(TaskTestBase):
     self.create_dir('src/go')
     context = self.context(target_roots=[self.make_target('src2/go/fred', GoBinary)])
     task = self.create_task(context)
-    with self.assertRaises(task.UnrootedLocalSourceError):
+    # Target does not have a source root.
+    with self.assertRaises(TargetDefinitionException):
       task.execute()
 
   def test_multiple_remote_roots_failure(self):
