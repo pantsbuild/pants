@@ -100,6 +100,7 @@ class BaseTest(unittest.TestCase):
                   target_type=Target,
                   dependencies=None,
                   derived_from=None,
+                  synthetic=False,
                   **kwargs):
     """Creates a target and injects it into the test's build graph.
 
@@ -118,7 +119,8 @@ class BaseTest(unittest.TestCase):
 
     self.build_graph.inject_target(target,
                                    dependencies=[dep.address for dep in dependencies],
-                                   derived_from=derived_from)
+                                   derived_from=derived_from,
+                                   synthetic=synthetic)
 
     # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
     # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
