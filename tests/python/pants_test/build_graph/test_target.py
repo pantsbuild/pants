@@ -38,6 +38,20 @@ class TargetTest(BaseTest):
     self.assertEquals(list(syn_one.derived_from_chain), [concrete])
     self.assertEquals(list(concrete.derived_from_chain), [])
 
+  def test_is_synthetic(self):
+    # add concrete target
+    concrete = self.make_target('y:concrete', Target)
+
+    # add synthetic targets
+    syn_one = self.make_target('y:syn_one', Target, derived_from=concrete)
+    syn_two = self.make_target('y:syn_two', Target, derived_from=syn_one)
+    syn_three = self.make_target('y:syn_three', Target, synthetic=True)
+
+    self.assertFalse(concrete.is_synthetic)
+    self.assertTrue(syn_one.is_synthetic)
+    self.assertTrue(syn_two.is_synthetic)
+    self.assertTrue(syn_three.is_synthetic)
+
   def test_empty_traversable_properties(self):
     target = self.make_target(':foo', Target)
     self.assertSequenceEqual([], list(target.traversable_specs))
