@@ -23,7 +23,6 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     super(ScalaRepl, cls).register_options(register)
     register('--main', default='scala.tools.nsc.MainGenericRunner',
              help='The entry point for running the repl.')
-    # cls.register_jvm_tool(register, 'scala-repl', classpath_spec='//:scala-repl')
     cls.register_jvm_tool(register, 'pants-runner', classpath=[
         JarDependency(org='org.pantsbuild', name='pants-runner', rev='0.0.1'),
     ], main=ScalaRepl._RUNNER_MAIN)

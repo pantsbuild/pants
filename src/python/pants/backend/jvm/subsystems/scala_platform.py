@@ -75,7 +75,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                           rev = scala_build_info['2.11'].full_version),
                           ])
 
-    # Provide a default so that if scala-compiler since all jvm tools are bootstrapped.
+    # Provide a classpath default for scala-compiler since all jvm tools are bootstrapped.
     cls.register_jvm_tool(register,
                           'scalac',
                           classpath=[
@@ -108,7 +108,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                           rev = scala_build_info['2.11'].full_version),
                           ])
 
-    # Provide a default so that if scala-repl since all jvm tools are bootstrapped.
+    # Provide a classpath default for scala-repl since all jvm tools are bootstrapped.
     cls.register_jvm_tool(register,
                           'scala_repl',
                           classpath=[
@@ -120,9 +120,12 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                           rev = scala_build_info['2.10'].full_version),
                           ])
 
+  def _get_label(self):
+    return getattr(self.get_options(), 'version', 'custom')
+
   def compiler_classpath(self, products):
     """Return the proper classpath based on products and scala version."""
-    compiler_name = scala_build_info.get(self.get_options().version, 'custom').compiler_name
+    compiler_name = scala_build_info.get(self._get_label()).compiler_name
     return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
 
   @property
@@ -144,14 +147,14 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper repl name.
     :return iterator: list with single runtime.
     """
-    return scala_build_info.get(self.get_options().version, 'repl_default').repl_name
+    return scala_build_info.get(self._get_label()).repl_name
 
   @property
   def runtime(self):
     """Return the proper runtime based on scala version.
     :return iterator: list with single runtime.
     """
-    runtime_name = scala_build_info.get(self.get_options().version, 'runtime_default').runtime_name
+    runtime_name = scala_build_info.get(self._get_label()).runtime_name
     return [getattr(self, runtime_name)]
 
   @classmethod

@@ -27,10 +27,6 @@ class FileDeps(ConsoleTask):
     register('--globs', default=False, action='store_true',
              help='Instead of outputting filenames, output globs (ignoring excludes)')
 
-  def _is_concrete(self, target):
-    """Does this target have a corresponding build_file"""
-    return hasattr(target.address, 'build_file')
-
   def console_output(self, targets):
     concrete_targets = set()
     for target in targets:
