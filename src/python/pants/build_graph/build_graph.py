@@ -27,6 +27,9 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
+  class ManualSyntheticTargetError(AddressLookupError):
+    """Used to indicate that an synthetic target was defined manually"""
+
   @staticmethod
   def closure(targets, bfs=False):
     targets = OrderedSet(targets)

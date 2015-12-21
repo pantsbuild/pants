@@ -13,7 +13,6 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized
 
 
 major_version_info = namedtuple(
@@ -176,4 +175,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
         buildgraph.inject_synthetic_target(synth_library_address,
                                            JarLibrary,
                                            jars=runtime)
+      else:
+        if not buildgraph.get_target('//:scala_library_synthetic').is_synthetic():
+          raise buildgraph.ManualSyntheticTargetError(
+            'Synthetic targets can not be defined manually'
+          )
       return buildgraph.get_target(synth_library_address)
