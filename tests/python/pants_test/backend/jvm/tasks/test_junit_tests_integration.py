@@ -120,12 +120,12 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn('Success output', run_with_failure_only_output.stdout_data)
 
     run_with_none_output = run_test('NONE')
-    self.assertNotIn('Failure output', run_with_none_output)
-    self.assertNotIn('Success output', run_with_none_output)
+    self.assertNotIn('Failure output', run_with_none_output.stdout_data)
+    self.assertNotIn('Success output', run_with_none_output.stdout_data)
 
     run_with_default_output = run_test(None)
-    self.assertNotIn('Failure output', run_with_default_output)
-    self.assertNotIn('Success output', run_with_default_output)
+    self.assertNotIn('Failure output', run_with_default_output.stdout_data)
+    self.assertNotIn('Success output', run_with_default_output.stdout_data)
 
   def test_junit_test_target_cwd(self):
     pants_run = self.run_pants([
