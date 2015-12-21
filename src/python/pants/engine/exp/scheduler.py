@@ -441,24 +441,30 @@ class Planners(object):
     """
     return self._planners_by_goal_name[goal_name]
 
-  def for_product_type_and_subject(self, product_type, subject):
+  def for_product_type_and_subject(self, product_type, subject, configuration=None):
     """Return the set of task planners that can produce the given product type for the subject.
 
     TODO: memoize.
 
     :param type product_type: The product type the returned planners are capable of producing.
     :param subject: The subject that the product will be produced for.
+    :param configuration: An optional configuration to require that a planner consumes, or None.
     :rtype: set of :class:`TaskPlanner`
     """
     input_products = list(Products.for_subject(subject))
-    fully_consumed = set()
     partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
     for planner, ored_clauses in self._product_requirements[product_type].items():
-      if self._apply_product_requirement_clauses(input_products,
-                                                 planner,
-                                                 ored_clauses,
-                                                 fully_consumed,
-                                                 partially_consumed_candidates):
+      fully_consumed = set()
+      if not self._apply_product_requirement_clauses(input_products,
+                                                     planner,
+                                                     ored_clauses,
+                                                     fully_consumed,
+                                                     partially_consumed_candidates):
+        continue
+      # Only yield planners that were recursively able to consume the configuration.
+      # TODO: This is matching on type only, while selectors are usually implemented
+      # as by-name. Convert config selectors to configuration mergers.
+      if not configuration or type(configuration) in fully_consumed:
         yield planner
 
   def _apply_product_requirement_clauses(self,
@@ -824,8 +830,10 @@ class LocalScheduler(Scheduler):
       return promise
 
     plans = []
-    # For all planners that can produce this product, request it.
-    for planner in self._planners.for_product_type_and_subject(product_type, subject):
+    # For all planners that can produce this product with the given configuration, request it.
+    for planner in self._planners.for_product_type_and_subject(product_type,
+                                                               subject,
+                                                               configuration=configuration):
       plan = planner.plan(self, product_type, subject, configuration=configuration)
       if plan:
         plans.append((planner, plan))
