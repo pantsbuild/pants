@@ -176,7 +176,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                            JarLibrary,
                                            jars=runtime)
       else:
-        if not buildgraph.get_target(synth_library_address).is_synthetic():
+        if not buildgraph.get_target(synth_library_address).is_synthetic:
           raise buildgraph.ManualSyntheticTargetError(
             'Synthetic targets can not be defined manually'
           )
