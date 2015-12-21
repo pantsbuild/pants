@@ -25,7 +25,7 @@ from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
 from pants.base.revision import Revision
-from pants.base.workunit import WorkUnitLabel
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries import binary_util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -205,16 +205,19 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     """
 
     actual_executor = executor or SubprocessExecutor(distribution)
-    (process, return_code_handler) = distribution.execute_java(*args,
+    (process, return_code_handler, exception_handler) = distribution.execute_java(*args,
                                                                executor=actual_executor,
                                                                wait=False,
                                                                **kwargs)
 
     class JUnitProcessHandler(ProcessHandler):
       def wait(_):
-        ret = process.wait()
-        return_code_handler(ret)
-        return ret
+        try:
+          ret = process.wait()
+          return_code_handler(ret)
+          return ret
+        except KeyboardInterrupt as e:
+          exception_handler(e)
 
       def kill(_):
         return process.kill()

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import sys
 from zipfile import ZIP_STORED
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -48,8 +49,9 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
     the process handle and a callback which should be called with the return value from wait().
 
   Returns the exit code of the java program if it waited for the return,
-  otherwise it returns a tuple of the process handle, and a callback to be called
-  with the return code when the process is done.
+  otherwise it returns a tuple of the process handle, and two callbacks,
+  one to be called with the returnvalue of the process.exit() call and
+  a second to be called with any exception that occurs.
 
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
   """
@@ -106,16 +108,35 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
         WorkUnitLabel.NAILGUN if isinstance(runner.executor, NailgunExecutor) else WorkUnitLabel.JVM
     ] + (workunit_labels or [])
 
-    with workunit_factory(name=workunit_name, labels=workunit_labels,
-                          cmd=runner.cmd, log_config=workunit_log_config) as workunit:
-      if wait:
+    if wait:
+      with workunit_factory(name=workunit_name, labels=workunit_labels,
+                            cmd=runner.cmd, log_config=workunit_log_config) as workunit:
         ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
         workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
         return ret
-      else:
-        process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
-        return_code_handler = lambda ret: workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
-        return process, return_code_handler
+    else:
+      # We can't use 'with' here because the workunit_generator's __exit__ function
+      # must be called after the process exits, in the return_code_handler.
+      # The wrapper around process.wait() needs to handle the same exceptions
+      # as the contextmanager does, so we have code duplication.
+      #
+      # We're basically faking the 'with' call to deal with asynchronous
+      # results.
+      workunit_generator = workunit_factory(name=workunit_name, labels=workunit_labels,
+                                  cmd=runner.cmd, log_config=workunit_log_config)
+      workunit = workunit_generator.__enter__()
+
+      process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
+
+      def return_code_handler(ret):
+        workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
+        workunit_generator.__exit__(None, None, None)
+
+      def exception_handler(exception):
+        if not workunit_generator.__exit__(*sys.exc_info()):
+          raise exception
+
+      return process, return_code_handler, exception_handler
 
 
 def relativize_classpath(classpath, root_dir, followlinks=True):
