@@ -216,7 +216,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           ret = process.wait()
           return_code_handler(ret)
           return ret
-        except KeyboardInterrupt as e:
+        except Exception as e:
           exception_handler(e)
 
       def kill(_):
