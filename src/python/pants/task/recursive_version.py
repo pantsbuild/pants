@@ -10,7 +10,7 @@ class RecursiveVersion(object):
   """Descriptor Class for Task Versions"""
 
   def __init__(self, value):
-    self.value = value
+    self.value = str(value)
 
   def __get__(self, obj, type=None):
     """Get method for Descriptor protocol

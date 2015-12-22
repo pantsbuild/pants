@@ -229,7 +229,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       # TODO: this is not recursive, but should be: see #2739
       for dep in self.subsystem_dependencies_iter():
         hasher.update(self._options_fingerprint(dep.options_scope()))
-      hasher.update(self.version)
+      hasher.update(str(self.version))
       self._fingerprint = str(hasher.hexdigest())
     return self._fingerprint
 
