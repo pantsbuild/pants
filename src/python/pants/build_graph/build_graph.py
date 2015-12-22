@@ -27,6 +27,9 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
+  class ManualSyntheticTargetError(AddressLookupError):
+    """Used to indicate that an synthetic target was defined manually"""
+
   @staticmethod
   def closure(targets, bfs=False):
     targets = OrderedSet(targets)
@@ -349,7 +352,6 @@ class BuildGraph(object):
     :param Address address: The address to inject.  Must be resolvable by `self._address_mapper` or
                             else be the address of an already injected entity.
     """
-
     if self.contains_address(address):
       # The address was either mapped in or synthetically injected already.
       return
@@ -385,13 +387,19 @@ class BuildGraph(object):
         target = self.get_target(target_address)
 
       def inject_spec_closure(spec):
-        addr = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
-        self.inject_address_closure(addr)
+        # Check to see if the target is synthetic or not.  If we find a synthetic target then
+        # short circuit the inject_address_closure since mapper.spec_to_address expects an actual
+        # BUILD file to exist on disk.
+        maybe_synthetic_address = Address.parse(spec, relative_to=target_address.spec_path)
+        if not self.contains_address(maybe_synthetic_address):
+          addr = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
+          self.inject_address_closure(addr)
 
       for traversable_spec in target.traversable_dependency_specs:
         inject_spec_closure(traversable_spec)
         traversable_spec_target = self.get_target_from_spec(traversable_spec,
                                                             relative_to=target_address.spec_path)
+
         if traversable_spec_target not in target.dependencies:
           self.inject_dependency(dependent=target.address,
                                  dependency=traversable_spec_target.address)
