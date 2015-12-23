@@ -54,3 +54,17 @@ def test_full_version():
 
   o = Baz()
   assert o.version == '1.2.3'
+
+
+def test_missing_base():
+  class Foo(object):
+    pass
+
+  class Bar(Foo):
+    version = RecursiveVersion(2)
+
+  class Baz(Bar):
+    version = RecursiveVersion(3)
+
+  o = Baz()
+  assert o.version == '_.2.3'

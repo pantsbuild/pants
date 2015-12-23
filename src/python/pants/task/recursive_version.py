@@ -41,4 +41,4 @@ class RecursiveVersion(object):
     if parent is object:
       return version
     else:
-      return "{}.{}".format(parent.version, version)
+      return "{}.{}".format(getattr(parent, 'version', '_'), version)
