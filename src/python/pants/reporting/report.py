@@ -16,9 +16,10 @@ class ReportingError(Exception):
 class EmitterThread(threading.Thread):
   """Periodically flush the report buffers.
 
-  This thread wakes up periodically and flushes the reporting buffes from memory to
+  This thread wakes up periodically and flushes the reporting buffers from memory to
   make sure that the output of long running workunits can be monitored.
   """
+
   def __init__(self, report, name):
     super(EmitterThread, self).__init__(name=name)
     self._report = report
