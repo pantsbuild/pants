@@ -453,7 +453,7 @@ class Target(AbstractTarget):
     """
     :return: True if this target did not originate from a BUILD file.
     """
-    return self.concrete_derived_from.address != self.address
+    return self.address in self._build_graph.synthetic_addresses
 
   @property
   def is_original(self):
