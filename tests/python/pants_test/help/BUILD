@@ -10,3 +10,47 @@ python_tests(
     'src/python/pants/help',
   ]
 )
+
+python_tests(
+  name='help_formatter',
+  sources=['test_help_formatter.py'],
+  coverage=['pants.help.help_formatter'],
+  dependencies=[
+    'src/python/pants/help',
+  ]
+)
+
+python_tests(
+  name='help_info_extracter',
+  sources=['test_help_info_extracter.py'],
+  coverage=['pants.help.help_info_extracter'],
+  dependencies=[
+    '3rdparty/python:mock',
+    'src/python/pants/help',
+    'src/python/pants/option',
+  ]
+)
+
+python_tests(
+  name='scope_info_iterator',
+  sources=['test_scope_info_iterator.py'],
+  coverage=['pants.help.scope_info_iterator'],
+  dependencies=[
+    'src/python/pants/help',
+    'src/python/pants/option',
+    'src/python/pants/subsystem',
+    'src/python/pants/task',
+  ]
+)
+
+
+python_tests(
+  name='help_integration',
+  sources=[
+    'test_help_integration.py',
+  ],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)

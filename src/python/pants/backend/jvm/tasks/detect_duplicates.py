@@ -36,13 +36,6 @@ class DuplicateDetector(JvmBinaryTask):
   @classmethod
   def register_options(cls, register):
     super(DuplicateDetector, cls).register_options(register)
-
-    register('--excludes', default=[','.join(EXCLUDED_FILES)], action='append',
-             deprecated_version='0.0.65',
-             deprecated_hint='Use --exclude-files, --exclude-patterns, or --exclude-dirs instead.',
-             help='Case insensitive filenames (without directory) to exclude from duplicate check. '
-                  'Filenames can be specified in a comma-separated list or by using multiple '
-                  'instances of this flag.')
     register('--exclude-files', default=EXCLUDED_FILES, type=list_option,
              help='Case insensitive filenames (without directory) to exclude from duplicate check.')
     register('--exclude-dirs', default=EXCLUDED_DIRS, type=list_option,
@@ -66,11 +59,7 @@ class DuplicateDetector(JvmBinaryTask):
 
   @memoized_property
   def exclude_files(self):
-    # Legacy, the excludes accepts a list of CSV filenames
-    legacy_excludes = [x.lower() for exclude in self.get_options().excludes or []
-                       for x in exclude.split(',')]
-    exclude_files = [x.lower() for x in self.get_options().exclude_files or []]
-    return set(exclude_files + legacy_excludes)
+    return set([x.lower() for x in self.get_options().exclude_files] or [])
 
   @memoized_property
   def exclude_dirs(self):

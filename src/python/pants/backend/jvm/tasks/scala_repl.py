@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -22,21 +23,22 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
     super(ScalaRepl, cls).register_options(register)
     register('--main', default='scala.tools.nsc.MainGenericRunner',
              help='The entry point for running the repl.')
-    cls.register_jvm_tool(register, 'scala-repl', classpath_spec='//:scala-repl')
     cls.register_jvm_tool(register, 'pants-runner', classpath=[
         JarDependency(org='org.pantsbuild', name='pants-runner', rev='0.0.1'),
     ], main=ScalaRepl._RUNNER_MAIN)
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ScalaRepl, cls).subsystem_dependencies() + (DistributionLocator,)
+    return super(ScalaRepl, cls).subsystem_dependencies() + (DistributionLocator, ScalaPlatform)
 
   @classmethod
   def select_targets(cls, target):
     return isinstance(target, (JarLibrary, JvmTarget))
 
   def setup_repl_session(self, targets):
-    return self.tool_classpath('pants-runner') + self.tool_classpath('scala-repl') +\
+    repl_name = ScalaPlatform.global_instance().repl
+    return self.tool_classpath('pants-runner') +\
+           self.tool_classpath(repl_name, scope=ScalaPlatform.options_scope) +\
            self.classpath(targets)
 
   def launch_repl(self, classpath):
