@@ -32,7 +32,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.process_handler import ProcessHandler
+from pants.util.process_handler import ProcessHandler, SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
 
 
@@ -550,14 +550,4 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
                                stdout=workunit.output('stdout'),
                                stderr=workunit.output('stderr'))
 
-    class PytestProcessHandler(ProcessHandler):
-      def wait(_):
-        return process.wait()
-
-      def kill(_):
-        return process.kill()
-
-      def terminate(_):
-        return process.terminate(_)
-
-    return PytestProcessHandler()
+    return SubprocessProcessHandler(process)

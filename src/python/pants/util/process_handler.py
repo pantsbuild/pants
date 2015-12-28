@@ -20,3 +20,17 @@ class ProcessHandler(object):
   @abstractmethod
   def terminate(self):
     raise NotImplementedError
+
+
+class SubprocessProcessHandler(ProcessHandler):
+  def __init__(self, process):
+    self._process = process
+
+  def wait(self):
+    return self._process.wait()
+
+  def kill(self):
+    return self._process.kill()
+
+  def terminate(self):
+    return self._process.terminate()

@@ -205,27 +205,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     """
 
     actual_executor = executor or SubprocessExecutor(distribution)
-    (process, return_code_handler, exception_handler) = distribution.execute_java(*args,
-                                                               executor=actual_executor,
-                                                               wait=False,
-                                                               **kwargs)
-
-    class JUnitProcessHandler(ProcessHandler):
-      def wait(_):
-        try:
-          ret = process.wait()
-          return_code_handler(ret)
-          return ret
-        except BaseException as e:
-          exception_handler(e, sys.exc_traceback)
-
-      def kill(_):
-        return process.kill()
-
-      def terminate(_):
-        return process.terminate()
-
-    return JUnitProcessHandler()
+    return distribution.execute_java_async(*args,
+                                           executor=actual_executor,
+                                           **kwargs)
 
   def execute_java_for_targets(self, targets, *args, **kwargs):
     """Execute java for targets using the test mixin spawn and wait.
