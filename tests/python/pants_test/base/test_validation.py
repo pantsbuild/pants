@@ -41,9 +41,7 @@ class ParseValidation(unittest.TestCase):
 
   def test_additional_allowables(self):
     def generator():
-      x = -1
-      while x < 10:
-        x += 1
+      for x in range(11):
         yield str(x)
     assert_list(generator(), allowable_add=(GeneratorType,))
     assert_list(['1', '2'], allowable_add=(GeneratorType,))
