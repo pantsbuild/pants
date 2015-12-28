@@ -63,5 +63,6 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/java/jar:manifest',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
   ],
 )
