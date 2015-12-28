@@ -216,8 +216,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           ret = process.wait()
           return_code_handler(ret)
           return ret
-        except Exception as e:
-          exception_handler(e)
+        except BaseException as e:
+          exception_handler(e, sys.exc_traceback)
 
       def kill(_):
         return process.kill()

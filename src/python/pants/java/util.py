@@ -132,9 +132,9 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
         workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
         workunit_generator.__exit__(None, None, None)
 
-      def exception_handler(exception):
+      def exception_handler(exception, traceback):
         if not workunit_generator.__exit__(*sys.exc_info()):
-          raise exception
+          raise exception, None, traceback
 
       return process, return_code_handler, exception_handler
 
