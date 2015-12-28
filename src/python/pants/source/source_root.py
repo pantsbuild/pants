@@ -44,7 +44,7 @@ class SourceRoots(object):
     self._trie.add_fixed(path, langs)
 
   def find(self, target):
-    """Find the source root for the given target.
+    """Find the source root for the given target, or None.
 
     :param target: Find the source root for this target.
     :return: A SourceRoot instance.
@@ -52,16 +52,23 @@ class SourceRoots(object):
     return self.find_by_path(target.address.spec_path)
 
   def find_by_path(self, path):
-    """Find the source root for the given path.
+    """Find the source root for the given path, or None.
 
     :param path: Find the source root for this path.
-    :return: A SourceRoot instance.
+    :return: A SourceRoot instance, or None if the path is not located under a source root
+             and `unmatched==fail`.
     """
     if os.path.isabs(path):
       path = os.path.relpath(path, get_buildroot())
-    # If no source root is found, use the path directly.
-    # TODO: Remove this logic. It should be an error to have no matching source root.
-    return self._trie.find(path) or SourceRoot(path, [])
+    matched = self._trie.find(path)
+    if matched:
+      return matched
+    elif self._options.unmatched == 'fail':
+      return None
+    elif self._options.unmatched == 'create':
+      # If no source root is found, use the path directly.
+      # TODO: Remove this logic. It should be an error to have no matching source root.
+      return SourceRoot(path, [])
 
   def all_roots(self):
     """Return all known source roots.
@@ -164,6 +171,10 @@ class SourceRootConfig(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(SourceRootConfig, cls).register_options(register)
+    register('--unmatched', choices=['create', 'fail'], default='create', advanced=True,
+             help='Configures the behaviour when sources are defined outside of any configured '
+                  'source root. `create` will cause a source root to be implicitly created at '
+                  'the definition location of the sources; `fail` will trigger an error.')
     register('--lang-canonicalizations', metavar='<map>', type=dict_option,
              default=cls._DEFAULT_LANG_CANONICALIZATIONS, advanced=True,
              help='Map of language aliases to their canonical names.')
