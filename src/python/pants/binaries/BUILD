@@ -6,8 +6,8 @@ python_library(
   sources=['binary_util.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
     'src/python/pants/base:exceptions',
+    'src/python/pants/net',
     'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
