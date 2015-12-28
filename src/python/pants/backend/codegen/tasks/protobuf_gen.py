@@ -158,7 +158,7 @@ class ProtobufGen(SimpleCodegenTask):
       base = target.target_base
       if base not in sources_by_base:
         sources_by_base[base] = OrderedSet()
-      sources_by_base[base].update(target.sources_relative_to_source_root())
+      sources_by_base[base].update(target.sources_relative_to_buildroot())
     return sources_by_base
 
   def _jars_to_directories(self, target):
