@@ -49,20 +49,19 @@ class SourceRoots(object):
     :param target: Find the source root for this target.
     :return: A SourceRoot instance.
     """
-    target_path = target.address.spec_path
-    # If no source root is found, use the target's path.
-    # TODO: Remove this logic. It should be an error to have no matching source root.
-    return self.find_by_path(target_path) or SourceRoot(target_path, [])
+    return self.find_by_path(target.address.spec_path)
 
   def find_by_path(self, path):
     """Find the source root for the given path.
 
     :param path: Find the source root for this path.
-    :return: A SourceRoot instance, or None if no matching source root found.
+    :return: A SourceRoot instance.
     """
     if os.path.isabs(path):
       path = os.path.relpath(path, get_buildroot())
-    return self._trie.find(path)
+    # If no source root is found, use the path directly.
+    # TODO: Remove this logic. It should be an error to have no matching source root.
+    return self._trie.find(path) or SourceRoot(path, [])
 
   def all_roots(self):
     """Return all known source roots.
