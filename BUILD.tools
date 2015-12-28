@@ -1,9 +1,6 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-# common rev for all org.scala-lang%* artifacts
-SCALA_REV = '2.10.4'
-
 jar_library(name = 'scalastyle',
             jars = [
               scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
