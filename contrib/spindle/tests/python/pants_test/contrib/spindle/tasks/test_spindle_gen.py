@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pants.build_graph.target import Target
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 from pants.contrib.spindle.targets.spindle_thrift_library import SpindleThriftLibrary
