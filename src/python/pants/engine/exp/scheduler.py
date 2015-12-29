@@ -284,7 +284,7 @@ class PartiallyConsumedInputsError(SchedulingError):
       yield '  To consume {}:'.format(input_product.__name__)
       for planner, additional_inputs in planners.items():
         inputs_str = ' OR '.join(i.__name__ for i in additional_inputs)
-        yield '    {!r} needed ({})'.format(planner, inputs_str)
+        yield '    {} needed ({})'.format(type(planner).__name__, inputs_str)
 
   def __init__(self, output_product, subject, partially_consumed_products):
     msg = '\n'.join(self.msg(output_product, subject, partially_consumed_products))
