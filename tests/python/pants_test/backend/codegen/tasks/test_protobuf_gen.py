@@ -10,6 +10,7 @@ from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.codegen.register import build_file_aliases as register_codegen
 from pants.backend.codegen.tasks.protobuf_gen import ProtobufGen
 from pants.build_graph.register import build_file_aliases as register_core
@@ -32,7 +33,7 @@ class ProtobufGenTest(TaskTestBase):
 
   @property
   def alias_groups(self):
-    return register_core().merge(register_codegen())
+    return register_core().merge(register_jvm()).merge(register_codegen())
 
   def test_protos_extracted_under_build_root(self):
     """This testcase shows that you can put sources for protos outside the directory where the
@@ -41,18 +42,21 @@ class ProtobufGenTest(TaskTestBase):
     """
     # place a .proto file in a place outside of where the BUILD file is defined
     extracted_source_path = os.path.join(self.build_root, 'extracted', 'src', 'proto')
-    safe_mkdir(os.path.join(extracted_source_path, 'sample-package'))
     sample_proto_path = os.path.join(extracted_source_path, 'sample-package', 'sample.proto')
-    with open(sample_proto_path, 'w') as sample_proto:
-      sample_proto.write(dedent("""
-            package com.example;
-            message sample {}
-          """))
+    self.create_file(sample_proto_path, dedent("""
+          package com.example;
+          message sample {}
+        """))
+    self.add_to_build_file('sample', dedent("""
+        jar_library(name='jar',
+          jars=[jar('org.example', 'jar', '0.0.1')]
+        )""").format(sample_proto_path=sample_proto_path))
     self.add_to_build_file('sample', dedent("""
         java_protobuf_library(name='sample',
-          sources=['{sample_proto_path}'],
+          sources=from_target(':jar'),
         )""").format(sample_proto_path=sample_proto_path))
-    target = self.target("sample:sample")
+    target = self.target('sample:sample')
+    target.payload.sources.populate([sample_proto_path], extracted_source_path)
     context = self.context(target_roots=[target])
     task = self.create_task(context=context)
     sources_by_base = task._calculate_sources(target)

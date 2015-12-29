@@ -36,7 +36,7 @@ class SourcesField(PayloadField):
     # TODO: It's a shame that we have to access the singleton directly here, instead of getting
     # the SourceRoots instance from context, as tasks do.  In the new engine we could inject
     # this into the target, rather than have it reach out for global singletons.
-    return SourceRootConfig.global_instance().get_source_roots().find_by_path(self._rel_path)
+    return SourceRootConfig.global_instance().get_source_roots().find_by_path(self.rel_path)
 
   @property
   def filespec(self):
@@ -89,13 +89,13 @@ class SourcesField(PayloadField):
 
 
 class DeferredSourcesField(SourcesField):
-  """ A SourcesField that isn't populated immediately when the graph is constructed.
+  """A SourcesField that isn't populated immediately when the graph is constructed.
 
-   You must subclass this and provide a fingerprint implementation. Requires a task
-   to call populate() to provide its contents later during processing.  For example,
-   if sources are in an archive, you might use the fingerprint of the archive. If they
-   are from an external artifact, you might take a fingerprint of the name and version of
-   the artifact.
+  You must subclass this and provide a fingerprint implementation. Requires a task
+  to call populate() to provide its contents later during processing.  For example,
+  if sources are in an archive, you might use the fingerprint of the archive. If they
+  are from an external artifact, you might take a fingerprint of the name and version of
+  the artifact.
   """
 
   class AlreadyPopulatedError(Exception):
@@ -128,10 +128,18 @@ class DeferredSourcesField(SourcesField):
     self._source_paths = assert_list(sources, key_arg='sources', allowable_add=(FilesetWithSpec,))
     self._populated = True
 
-  @property
-  def source_paths(self):
+  def _validate_populated(self):
     if not self._populated:
       raise self.NotPopulatedError()
+
+  @property
+  def rel_path(self):
+    self._validate_populated()
+    return self._rel_path
+
+  @property
+  def source_paths(self):
+    self._validate_populated()
     return self._source_paths
 
   def matches(self, path):
