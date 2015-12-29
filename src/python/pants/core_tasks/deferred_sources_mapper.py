@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 
-from pants.base.payload_field import DeferredSourcesField
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.source.payload_fields import DeferredSourcesField
 from pants.task.task import Task
 
 

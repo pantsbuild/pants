@@ -7,7 +7,17 @@ python_tests(
   dependencies = [
     'src/python/pants/source',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/subsystem:subsystem_utils'
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
+python_tests(
+  name = 'payload_fields',
+  sources = ['test_payload_fields.py'],
+  dependencies = [
+    'src/python/pants/source',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

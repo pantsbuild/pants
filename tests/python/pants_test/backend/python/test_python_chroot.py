@@ -98,9 +98,12 @@ class PythonChrootTest(BaseTest):
                                     sources=['word.g'],
                                     module='word')
 
+    # TODO: see 3rdparty/python/BUILD
+    antlr3_requirement = PythonRequirement('antlr_python_runtime==3.1.3',
+                                           repository='http://www.antlr3.org/download/Python/')
     antlr3 = self.make_target(spec='3rdparty/python:antlr3',
                               target_type=PythonRequirementLibrary,
-                              requirements=[PythonRequirement('antlr_python_runtime==3.1.3')])
+                              requirements=[antlr3_requirement])
     self.create_file(relpath='src/python/test/main.py', contents=dedent("""
       import antlr3
 
