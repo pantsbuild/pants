@@ -9,6 +9,11 @@ from abc import abstractmethod
 
 
 class ProcessHandler(object):
+  """A simple class to abstract process handling calls using the same interface as subprocess.Popen.
+
+  See SubprocessProcessHandler below for an example.
+  """
+
   @abstractmethod
   def wait(self):
     raise NotImplementedError
@@ -23,6 +28,8 @@ class ProcessHandler(object):
 
 
 class SubprocessProcessHandler(ProcessHandler):
+  """The simple passthrough class for a subprocess.Popen object."""
+
   def __init__(self, process):
     self._process = process
 

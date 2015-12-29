@@ -28,9 +28,6 @@ def _get_runner(classpath, main, jvm_options, args, executor,
   """Gets the java runner for execute_java and execute_java_async."""
 
   executor = executor or SubprocessExecutor(distribution)
-  if not isinstance(executor, Executor):
-    raise ValueError('The executor argument must be a java Executor instance, give {} of type {}'
-                     .format(executor, type(executor)))
 
   safe_cp = classpath
   if create_synthetic_jar:

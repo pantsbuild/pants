@@ -107,3 +107,11 @@ python_tests(
     'src/python/pants/util:socket',
   ]
 )
+
+python_tests(
+  name = 'process_handler',
+  sources = ['test_process_handler.py'],
+  dependencies = [
+    'src/python/pants/util:process_handler'
+  ]
+)

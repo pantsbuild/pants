@@ -25,9 +25,6 @@ class Timeout(object):
       <handle timeout>
   """
 
-  # TODO(sbrenn): Provide two abort handlers, one graceful and one aggressive,
-  # so that if the graceful one doesn't terminate the process we can call the aggressive
-  # one later.
   def __init__(self, seconds, abort_handler=lambda: None, threading_timer=threading.Timer):
 
     # self._triggered is not protected by a mutex because boolean set/get is atomic in all the Python

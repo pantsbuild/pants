@@ -71,7 +71,11 @@ class TestRunnerTaskMixin(object):
 
     process_handler = self._spawn(*args, **kwargs)
 
-    # process_handler.kill to be aggressive or process_handler.terminate to be graceful
+    # TODO(sbrenn): We use process_handler.kill here because we want to aggressively terminate the
+    # process. It may make sense in the future to do a multi-stage approach
+    # where first we do process_handler.terminate to let it die gracefully, and
+    # then do process_handler.kill if that doesn't work. It will probably require
+    # adding poll() support to ProcessHandler.
     try:
       with Timeout(timeout, abort_handler=process_handler.kill):
         return process_handler.wait()
