@@ -28,6 +28,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
+from pants.util.memo import memoized_property
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -49,8 +50,7 @@ class ZincCompile(JvmCompile):
 
   @staticmethod
   def write_plugin_info(resources_dir, target):
-    root = os.path.join(resources_dir, target.id)
-    plugin_info_file = os.path.join(root, _PLUGIN_INFO_FILE)
+    plugin_info_file = os.path.join(resources_dir, _PLUGIN_INFO_FILE)
     with safe_open(plugin_info_file, 'w') as f:
       f.write(textwrap.dedent("""
         <plugin>
@@ -58,7 +58,6 @@ class ZincCompile(JvmCompile):
           <classname>{}</classname>
         </plugin>
       """.format(target.plugin, target.classname)).strip())
-    return root, plugin_info_file
 
   @staticmethod
   def validate_arguments(log, whitelisted_args, args):
@@ -204,8 +203,6 @@ class ZincCompile(JvmCompile):
   def __init__(self, *args, **kwargs):
     super(ZincCompile, self).__init__(*args, **kwargs)
 
-    self._lazy_plugin_args = None
-
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
@@ -243,12 +240,8 @@ class ZincCompile(JvmCompile):
     else:
       return []
 
-  def plugin_args(self):
-    if self._lazy_plugin_args is None:
-      self._lazy_plugin_args = self._create_plugin_args()
-    return self._lazy_plugin_args
-
-  def _create_plugin_args(self):
+  @memoized_property
+  def _binary_plugin_args(self):
     if not self.get_options().scalac_plugins:
       return []
 
@@ -260,6 +253,19 @@ class ZincCompile(JvmCompile):
       for arg in plugin_args.get(name, []):
         ret.append('-S-P:{}:{}'.format(name, arg))
     return ret
+
+  def _source_plugin_args(self, target):
+    for dep in target.closure():
+      if isinstance(dep, ScalacPlugin) and dep is not target:
+        yield '-S-Xplugin-require:{}'.format(dep.plugin)
+
+  def plugin_args(self, target):
+    """Returns the plugin arguments to compile the given target.
+
+    Includes binary/jar plugins configured via options, and additionally any scalac_plugin
+    targets included in the transitive closure of the given target.
+    """
+    return self._binary_plugin_args + list(self._source_plugin_args(target))
 
   def _find_plugins(self):
     """Returns a map from plugin name to plugin jar."""
@@ -294,7 +300,7 @@ class ZincCompile(JvmCompile):
   def write_extra_resources(self, compile_context):
     """Override write_extra_resources to produce plugin and annotation processor files."""
     target = compile_context.target
-    if target.is_scalac_plugin and target.classname:
+    if isinstance(target, ScalacPlugin):
       self.write_plugin_info(compile_context.classes_dir, target)
     elif isinstance(target, AnnotationProcessor) and target.processors:
       processor_info_file = os.path.join(compile_context.classes_dir, _PROCESSOR_INFO_FILE)
@@ -305,8 +311,8 @@ class ZincCompile(JvmCompile):
       for processor in processors:
         f.write('{}\n'.format(processor.strip()))
 
-  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings):
+  def compile(self, target, args, classpath, sources, classes_output_dir, upstream_analysis,
+              analysis_file, log_file, settings, fatal_warnings):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
@@ -338,7 +344,7 @@ class ZincCompile(JvmCompile):
     zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
     zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
 
-    zinc_args += self.plugin_args()
+    zinc_args += self.plugin_args(target)
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
