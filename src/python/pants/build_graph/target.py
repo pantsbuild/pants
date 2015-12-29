@@ -16,12 +16,11 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
-from pants.base.payload_field import DeferredSourcesField, SourcesField
 from pants.base.validation import assert_list
 from pants.build_graph.address import Address, Addresses
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.option.custom_types import dict_option
-from pants.source.source_root import SourceRootConfig
+from pants.source.payload_fields import DeferredSourcesField, SourcesField
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -180,13 +179,10 @@ class Target(AbstractTarget):
         return target_cls
     return ConcreteTargetAddressable
 
-  @property
+  @memoized_property
   def target_base(self):
     """:returns: the source root path for this target."""
-    # TODO: It's a shame that we have to access the singleton directly here, instead of getting
-    # the SourceRoots instance from context, as tasks do.  In the new engine we could inject
-    # this into the target, rather than have it reach out for global singletons.
-    source_root = SourceRootConfig.global_instance().get_source_roots().find(self)
+    source_root = self._sources_field.source_root
     if not source_root:
       raise TargetDefinitionException(self, 'Not under any configured source root.')
     return source_root.path
@@ -357,17 +353,18 @@ class Target(AbstractTarget):
       dependee.mark_transitive_invalidation_hash_dirty()
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
 
+  @property
+  def _sources_field(self):
+    sources_field = self.payload.get_field('sources')
+    return sources_field if sources_field else SourcesField(self.address.spec_path, sources=())
+
   def has_sources(self, extension=''):
     """
     :param string extension: suffix of filenames to test for
     :return: True if the target contains sources that match the optional extension suffix
     :rtype: bool
     """
-    sources_field = self.payload.get_field('sources')
-    if sources_field:
-      return sources_field.has_sources(extension)
-    else:
-      return False
+    return self._sources_field.has_sources(extension)
 
   def sources_relative_to_buildroot(self):
     if self.has_sources():
@@ -383,9 +380,7 @@ class Target(AbstractTarget):
         yield os.path.relpath(abs_source, abs_source_root)
 
   def globs_relative_to_buildroot(self):
-    sources_field = self.payload.get_field('sources')
-    if sources_field:
-      return sources_field.filespec
+    return self._sources_field.filespec
 
   @property
   def derived_from(self):
