@@ -11,8 +11,7 @@ from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.base.payload_field import (ExcludesField, FingerprintedField, FingerprintedMixin,
-                                      JarsField, PrimitiveField, PythonRequirementsField,
-                                      SourcesField)
+                                      JarsField, PrimitiveField, PythonRequirementsField)
 from pants_test.base_test import BaseTest
 
 
@@ -111,66 +110,6 @@ class PayloadTest(BaseTest):
       ExcludesField([Exclude('com', 'foo'), Exclude('org', 'bar')]).fingerprint(),
       ExcludesField([Exclude('org', 'bar'), Exclude('com', 'foo')]).fingerprint(),
     )
-
-  def test_sources_field(self):
-    self.create_file('foo/bar/a.txt', 'a_contents')
-    self.create_file('foo/bar/b.txt', 'b_contents')
-
-    self.assertNotEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
-      ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['b.txt'],
-      ).fingerprint(),
-    )
-
-    self.assertEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
-      ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
-      ).fingerprint(),
-    )
-
-    self.assertEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
-      ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt'],
-      ).fingerprint(),
-    )
-
-    self.assertEqual(
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['a.txt', 'b.txt'],
-      ).fingerprint(),
-      SourcesField(
-        sources_rel_path='foo/bar',
-        sources=['b.txt', 'a.txt'],
-      ).fingerprint(),
-    )
-
-    fp1 = SourcesField(
-            sources_rel_path='foo/bar',
-            sources=['a.txt'],
-          ).fingerprint()
-    self.create_file('foo/bar/a.txt', 'a_contents_different')
-    fp2 = SourcesField(
-            sources_rel_path='foo/bar',
-            sources=['a.txt'],
-          ).fingerprint()
-
-    self.assertNotEqual(fp1, fp2)
 
   def test_fingerprinted_field(self):
     class TestValue(FingerprintedMixin):

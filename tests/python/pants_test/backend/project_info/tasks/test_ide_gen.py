@@ -18,7 +18,7 @@ class IdeGenTest(BaseTest):
       '/src/java': [],
       '/tests/java': [],
       '/some/other': []
-    }).get_source_roots()
+    }, unmatched='fail').get_source_roots()
     source_set_list = []
     self.assertEquals([], Project._collapse_by_source_root(source_roots, source_set_list))
 

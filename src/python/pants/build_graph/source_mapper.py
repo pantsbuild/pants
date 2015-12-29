@@ -9,7 +9,7 @@ import os
 from collections import defaultdict
 
 from pants.base.build_environment import get_buildroot
-from pants.base.payload_field import DeferredSourcesField
+from pants.source.payload_fields import DeferredSourcesField
 
 
 class SourceMapper(object):
