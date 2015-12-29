@@ -61,6 +61,7 @@ python_library(
     ':zinc_language_mixin',
     'src/python/pants/option',
     'src/python/pants/subsystem',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:memo',
   ],
 )

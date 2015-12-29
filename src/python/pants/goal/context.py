@@ -79,7 +79,6 @@ class Context(object):
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._spec_excludes = spec_excludes
     self._replace_targets(target_roots)
-    self._synthetic_targets = defaultdict(list)
     self._invalidation_report = invalidation_report
 
   @property
@@ -246,9 +245,6 @@ class Context(object):
                                              **kwargs)
     new_target = self.build_graph.get_target(address)
 
-    if derived_from:
-      self._synthetic_targets[derived_from].append(new_target)
-
     return new_target
 
   def targets(self, predicate=None, postorder=False):
@@ -266,9 +262,9 @@ class Context(object):
     target_set = self._collect_targets(self.target_roots, postorder=postorder)
 
     synthetics = OrderedSet()
-    for derived_from, synthetic_targets in self._synthetic_targets.items():
-      if derived_from in target_set or derived_from in synthetics:
-        synthetics.update(synthetic_targets)
+    for synthetic_address in self.build_graph.synthetic_addresses:
+      if self.build_graph.get_concrete_derived_from(synthetic_address) in target_set:
+        synthetics.add(self.build_graph.get_target(synthetic_address))
 
     synthetic_set = self._collect_targets(synthetics, postorder=postorder)
 

@@ -1,6 +1,82 @@
 RELEASE HISTORY
 ===============
 
+
+0.0.65 (12/18/2015)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release concludes the deprecation cycle of the following items, now removed:
+
+* `--excludes` to `DuplicateDetector`.  Use `--exclude-files`, `--exclude-patterns`,
+  or `--exclude-dirs` instead.
+
+* `timeout=0` on test targets.  To use the default timeout, remove the `timeout`
+  parameter from your test target.
+
+
+API Changes
+~~~~~~~~~~~
+
+* prefer explicit jvm locations over internal heuristics
+  `RB #3231 <https://rbcommons.com/s/twitter/r/3231>`_
+
+* A graph_info backend.
+  `RB #3256 <https://rbcommons.com/s/twitter/r/3256>`_
+
+* Move registration of basic build file constructs.
+  `RB #3246 <https://rbcommons.com/s/twitter/r/3246>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fixup `GoFetch` to respect transitive injections.
+  `RB #3270 <https://rbcommons.com/s/twitter/r/3270>`_
+
+* Make jvm_compile's subsystem dependencies global to fix ignored options
+  `Issue #2739 <https://github.com/pantsbuild/pants/issues/2739>`_
+  `RB #3238 <https://rbcommons.com/s/twitter/r/3238>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Go Checkstyle: run checkstyle, add tests, fix examples
+  `RB #3223 <https://rbcommons.com/s/twitter/r/3223>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Go: Allow users to specify known import prefixes for import paths.
+  `RB #3120 <https://rbcommons.com/s/twitter/r/3120>`_
+
+* Explains how append-style arguments work in pants
+  `RB #3268 <https://rbcommons.com/s/twitter/r/3268>`_
+
+* Allow specification of extra env vars for junit_tests runs.
+  `RB #3140 <https://rbcommons.com/s/twitter/r/3140>`_
+  `RB #3267 <https://rbcommons.com/s/twitter/r/3267>`_
+
+* Refactor help scope computation logic.
+  `RB #3264 <https://rbcommons.com/s/twitter/r/3264>`_
+
+* Make it easy for tests to use the "real" python interpreter cache.
+  `RB #3257 <https://rbcommons.com/s/twitter/r/3257>`_
+
+* Pass `--confcutdir` to py.test invocation to restrict `conftest.py` scanning to paths in the pants buildroot.
+  `RB #3258 <https://rbcommons.com/s/twitter/r/3258>`_
+
+* Remove stale `:all` alias used by plugin integration test
+  `RB #3254 <https://rbcommons.com/s/twitter/r/3254>`_
+
+* Move conflicting python test targets to testprojects.
+  `RB #3252 <https://rbcommons.com/s/twitter/r/3252>`_
+
+* Add convenience script for running unit tests, update docs
+  `RB #3233 <https://rbcommons.com/s/twitter/r/3233>`_
+  `RB #3248 <https://rbcommons.com/s/twitter/r/3248>`_
+
 0.0.64 (12/11/2015)
 -------------------
 

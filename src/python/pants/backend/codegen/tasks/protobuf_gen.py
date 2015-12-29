@@ -110,7 +110,7 @@ class ProtobufGen(SimpleCodegenTask):
     return isinstance(target, JavaProtobufLibrary)
 
   def execute_codegen(self, target, target_workdir):
-    sources_by_base = self._calculate_sources([target])
+    sources_by_base = self._calculate_sources(target)
     sources = target.sources_relative_to_buildroot()
 
     bases = OrderedSet(sources_by_base.keys())
@@ -143,31 +143,22 @@ class ProtobufGen(SimpleCodegenTask):
     if result != 0:
       raise TaskError('{0} ... exited non-zero ({1})'.format(self.protobuf_binary, result))
 
-  def _calculate_sources(self, targets):
-    assert len(targets) == 1, ("TODO: This method now only ever receives one target. Simplify.")
+  def _calculate_sources(self, target):
     gentargets = OrderedSet()
 
     def add_to_gentargets(target):
       if self.is_gentarget(target):
         gentargets.add(target)
     self.context.build_graph.walk_transitive_dependency_graph(
-      [target.address for target in targets],
+      [target.address],
       add_to_gentargets,
       postorder=True)
     sources_by_base = OrderedDict()
-    # TODO(Eric Ayers) Extract this logic for general use? When using unpacked_jars it is needed
-    # to get the correct source root for paths outside the current BUILD tree.
     for target in gentargets:
-      for source in target.sources_relative_to_buildroot():
-        src_root = self.context.source_roots.find_by_path(source)
-        base = src_root.path if src_root else None
-        if not base:
-          base, _ = target.target_base, target.sources_relative_to_buildroot()
-          self.context.log.debug('Could not find source root for {source}. Fell back to {base}.'
-                                 .format(source=source, base=base))
-        if base not in sources_by_base:
-          sources_by_base[base] = OrderedSet()
-        sources_by_base[base].add(source)
+      base = target.target_base
+      if base not in sources_by_base:
+        sources_by_base[base] = OrderedSet()
+      sources_by_base[base].update(target.sources_relative_to_buildroot())
     return sources_by_base
 
   def _jars_to_directories(self, target):
