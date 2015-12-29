@@ -276,9 +276,18 @@ class NoProducersError(SchedulingError):
 class PartiallyConsumedInputsError(SchedulingError):
   """No planner was able to produce a plan that consumed the given input products."""
 
-  def __init__(self, output_product_type, subject, partially_consumed_products):
-    msg = ('While attempting to produce {} for {}, products were partially consumed: {}'.format(
-             output_product_type, subject, partially_consumed_products))
+  @staticmethod
+  def msg(output_product, subject, partially_consumed_products):
+    yield 'While attempting to produce {} for {}, some products could not be consumed:'.format(
+             output_product.__name__, subject)
+    for input_product, planners in partially_consumed_products.items():
+      yield '  To consume {}:'.format(input_product.__name__)
+      for planner, additional_inputs in planners.items():
+        inputs_str = ' OR '.join(i.__name__ for i in additional_inputs)
+        yield '    {!r} needed ({})'.format(planner, inputs_str)
+
+  def __init__(self, output_product, subject, partially_consumed_products):
+    msg = '\n'.join(self.msg(output_product, subject, partially_consumed_products))
     super(PartiallyConsumedInputsError, self).__init__(msg)
 
 
