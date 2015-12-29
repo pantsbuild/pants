@@ -23,6 +23,8 @@ class Products(object):
     if isinstance(subject, Target):
       target = subject
       # Source products.
+      # TODO: after r/3274 it will no longer be necessary to iterate paths to determine the
+      # type of Sources on a Target.
       source_extensions = set()
       for source in target.sources.iter_paths(base_path=target.address.spec_path):
         _, ext = os.path.splitext(source)

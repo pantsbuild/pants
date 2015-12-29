@@ -421,6 +421,7 @@ class Task(object):
     """Executes this task."""
 
 
+# TODO: Extract to a separate file in a followup review.
 class Planners(object):
   """A registry of task planners indexed by both product type and goal name.
 
@@ -461,6 +462,7 @@ class Planners(object):
     :rtype: set of :class:`TaskPlanner`
     """
     input_products = list(Products.for_subject(subject))
+
     partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
     for planner, ored_clauses in self._product_requirements[product_type].items():
       fully_consumed = set()
@@ -514,8 +516,8 @@ class Planners(object):
                                   partially_consumed_candidates):
     """Determines whether the output product can be computed by the planners with the given inputs.
 
-    Returns a boolean indicating whether the value can be produced, a set of products that were fully
-    consumed, and a dict(product,dict(planner,list(product))) of partially consumed products.
+    Returns a boolean indicating whether the value can be produced. Mutates the fully consumed
+    product set, and a dict(product,dict(planner,list(product))) of partially consumed products.
     """
     if output_product_type in input_products:
       # Requirement is directly satisfied.
@@ -546,16 +548,15 @@ class Planners(object):
     """
     input_products = list(Products.for_subject(subject))
 
-    producible_output_types = set()
+    producible_output_types = list()
     fully_consumed = set()
     partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
     for output_product_type in output_product_types:
-      producible = self._apply_product_requirements(output_product_type,
-                                                    input_products,
-                                                    fully_consumed,
-                                                    partially_consumed_candidates)
-      if producible:
-        producible_output_types.add(output_product_type)
+      if self._apply_product_requirements(output_product_type,
+                                          input_products,
+                                          fully_consumed,
+                                          partially_consumed_candidates):
+        producible_output_types.append(output_product_type)
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
     partially_consumed = {product: partials
