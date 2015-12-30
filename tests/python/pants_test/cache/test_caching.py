@@ -52,25 +52,25 @@ class LocalCachingTest(TaskTestBase):
     self.artifact_cache = self.create_dir('artifact_cache')
     self.create_file(self._filename)
     self.set_options_for_scope(
-      CacheSetup.options_scope, 
+      CacheSetup.options_scope,
       write_to=[self.artifact_cache],
-      read_from=[self.artifact_cache], 
+      read_from=[self.artifact_cache],
       write=True,
     )
     self.target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
     context = self.context(for_task_types=[DummyTask], target_roots=[self.target])
     self.task = self.create_task(context)
-  
+
   def test_cache_written_to(self):
     all_vts, invalid_vts = self.task.execute()
     self.assertGreater(len(invalid_vts), 0)
     for vt in invalid_vts:
       artifact_address = "{}{}".format(
-        os.path.join(self.artifact_cache, self.task.stable_name(), self.target.id, vt.cache_key.hash), 
+        os.path.join(self.artifact_cache, self.task.stable_name(), self.target.id, vt.cache_key.hash),
         '.tgz',
       )
       self.assertTrue(os.path.isfile(artifact_address))
-    
+
   def test_cache_read_from(self):
     all_vts, invalid_vts = self.task.execute()
     # Executing the task for the first time the vt is expected to be in the invalid_vts list
@@ -78,6 +78,6 @@ class LocalCachingTest(TaskTestBase):
     # Delete .pants.d
     safe_rmtree(self.task._workdir)
     all_vts2, invalid_vts2 = self.task.execute()
-    # Check that running the task a second time results in a valid vt, 
+    # Check that running the task a second time results in a valid vt,
     # implying the artifact cache was hit.
     self.assertListEqual(invalid_vts2, [])
