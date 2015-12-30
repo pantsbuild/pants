@@ -68,18 +68,19 @@ class Exiter(object):
     """
     self.exit(result=1, msg=msg)
 
-  def _unhandled_exception_hook(self, exception_class, exception, tb):
-    """Default sys.excepthook implementation for unhandled exceptions, used by set_except_hook()."""
-    msg = ''
-    if self._should_print_backtrace:
-      msg = '\nException caught: ({})\n{}'.format(type(exception), ''.join(self._format_tb(tb)))
-    if str(exception):
-      msg += '\nException message: {}\n'.format(exception)
-    else:
-      msg += '\nNo specific exception message.\n'
-    # TODO(Jin Feng) Always output the unhandled exception details into a log file.
+  def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
+    """Default sys.excepthook implementation for unhandled exceptions."""
+    exc_class = exc_class or sys.exc_type
+    exc = exc or sys.exc_value
+    tb = tb or sys.exc_traceback
+
+    msg = 'Exception caught: ({})\n'.format(type(exc))
+    msg += '{}\n'.format(''.join(self._format_tb(tb))) if self._should_print_backtrace else '\n'
+    msg += 'Exception message: {}\n'.format(exc if str(exc) else 'none')
+    msg += '\n' if add_newline else ''
+
     self.exit_and_fail(msg)
 
   def set_except_hook(self):
     """Sets the global exception hook."""
-    sys.excepthook = self._unhandled_exception_hook
+    sys.excepthook = self.handle_unhandled_exception
