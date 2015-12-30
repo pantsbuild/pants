@@ -37,7 +37,7 @@
       "default_repo": ":public",
       "repos": {
         "jake": {
-          "type_alias": "Config",
+          "type_alias": "Struct",
           "url": "https://dl.bintray.com/pantsbuild/maven"
         },
         "jane": ":public"
@@ -55,22 +55,22 @@
 }
 
 {
-  "type_alias": "Config",
+  "type_alias": "Struct",
   "name": "public",
   "url": "https://oss.sonatype.org/#stagingRepositories"
 }
 
 {
-  "type_alias": "Config",
+  "type_alias": "Struct",
   "name": "type_mismatch",
 
   # This should trigger a type mismatch when resolved since ApacheThriftConfig is not a superclass
-  # of Config
+  # of Struct
   "extends": ":nonstrict"
 }
 
 {
-  "type_alias": "Config",
+  "type_alias": "Struct",
   "name": "self_cycle",
 
   # This should trigger a cycle error when resolved since we're trying to depend on ourselves for

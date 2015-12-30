@@ -28,7 +28,7 @@ java1 = Target(
     PublishConfig(
       default_repo=':public',
       repos={
-        'jake': Config(
+        'jake': Struct(
           url='https://dl.bintray.com/pantsbuild/maven'
         ),
         'jane': ':public'
@@ -43,6 +43,6 @@ nonstrict = ApacheThriftConfig(
   lang='java'
 )
 
-public = Config(
+public = Struct(
   url='https://oss.sonatype.org/#stagingRepositories'
 )

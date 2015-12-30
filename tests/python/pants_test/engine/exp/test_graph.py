@@ -11,7 +11,7 @@ from functools import partial
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
-from pants.engine.exp.configuration import Configuration
+from pants.engine.exp.configuration import Struct
 from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
                                     Resolver)
 from pants.engine.exp.mapper import AddressMapper
@@ -19,7 +19,7 @@ from pants.engine.exp.parsers import parse_json, python_assignments_parser, pyth
 from pants.engine.exp.targets import Target
 
 
-class ApacheThriftConfiguration(Configuration):
+class ApacheThriftConfiguration(Struct):
   # An example of a mixed-mode object - can be directly embedded without a name or else referenced
   # via address if both top-level and carrying a name.
   #
@@ -43,7 +43,7 @@ class ApacheThriftConfiguration(Configuration):
       self.report_validation_error('A thrift gen `lang` is required.')
 
 
-class PublishConfiguration(Configuration):
+class PublishConfiguration(Struct):
   # An example of addressable and addressable_mapping field wrappers.
 
   def __init__(self, default_repo, repos, name=None, **kwargs):
@@ -51,11 +51,11 @@ class PublishConfiguration(Configuration):
     self.default_repo = default_repo
     self.repos = repos
 
-  @addressable(Exactly(Configuration))
+  @addressable(Exactly(Struct))
   def default_repo(self):
     """"""
 
-  @addressable_dict(Exactly(Configuration))
+  @addressable_dict(Exactly(Struct))
   def repos(self):
     """"""
 
@@ -63,7 +63,7 @@ class PublishConfiguration(Configuration):
 class GraphTestBase(unittest.TestCase):
   def setUp(self):
     self.symbol_table = {'ApacheThriftConfig': ApacheThriftConfiguration,
-                         'Config': Configuration,
+                         'Struct': Struct,
                          'PublishConfig': PublishConfiguration,
                          'Target': Target}
 
@@ -92,7 +92,7 @@ class InlinedGraphTest(GraphTestBase):
                                           version='0.9.2',
                                           strict=False,
                                           lang='java')
-    public = Configuration(address=address('public'),
+    public = Struct(address=address('public'),
                            url='https://oss.sonatype.org/#stagingRepositories')
     thrift1 = Target(address=address('thrift1'))
     thrift2 = Target(address=address('thrift2'), dependencies=[thrift1])
@@ -104,7 +104,7 @@ class InlinedGraphTest(GraphTestBase):
                                 default_repo=public,
                                 repos={
                                   'jake':
-                                    Configuration(url='https://dl.bintray.com/pantsbuild/maven'),
+                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
                                   'jane': public
                                 }
                               )
@@ -211,7 +211,7 @@ class LazyResolvingGraphTest(GraphTestBase):
                                 default_repo=resolver(public_address),
                                 repos={
                                   'jake':
-                                    Configuration(url='https://dl.bintray.com/pantsbuild/maven'),
+                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
                                   'jane': resolver(public_address)
                                 }
                               )
@@ -229,7 +229,7 @@ class LazyResolvingGraphTest(GraphTestBase):
     self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
     self.assertIs(expected_java1.configurations[1], resolved_nonstrict)
 
-    expected_public = Configuration(address=public_address,
+    expected_public = Struct(address=public_address,
                                     url='https://oss.sonatype.org/#stagingRepositories')
     resolved_public = graph.resolve(public_address)
     self.assertEqual(expected_public, resolved_public)

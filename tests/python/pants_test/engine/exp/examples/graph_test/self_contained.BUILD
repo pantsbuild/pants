@@ -12,7 +12,7 @@ Target(
   ]
 )
 
-# Right now the base Config class only allows either `extends` or `merges`, but more complex chains
+# Right now the base Struct class only allows either `extends` or `merges`, but more complex chains
 # can always be built up via a sequence of objects extending or merging others.
 Target(
   name='java1',
@@ -25,7 +25,7 @@ Target(
     PublishConfig(
       default_repo=':public',
       repos={
-        'jake': Config(
+        'jake': Struct(
           url='https://dl.bintray.com/pantsbuild/maven'
         ),
         'jane': ':public'
@@ -41,7 +41,7 @@ ApacheThriftConfig(
   lang='java'
 )
 
-Config(
+Struct(
   name='public',
   url='https://oss.sonatype.org/#stagingRepositories'
 )
