@@ -225,12 +225,14 @@ class BaseZincCompile(JvmCompile):
 
   def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
-    return self.plugin_jars()
+    return self.plugin_jars
 
+  @property
   def plugin_jars(self):
     """The classpath entries for jars containing code for enabled plugins."""
     raise NotImplementedError()
 
+  @property
   def plugin_args(self):
     raise NotImplementedError()
 
@@ -248,8 +250,8 @@ class BaseZincCompile(JvmCompile):
       for processor in processors:
         f.write('{}\n'.format(processor.strip()))
 
-  def compile(self, target, args, classpath, sources, classes_output_dir, upstream_analysis,
-              analysis_file, log_file, settings, fatal_warnings):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
+              log_file, settings, fatal_warnings):
     # We add compiler_classpath to ensure the scala-library jar is on the classpath.
     # TODO: This also adds the compiler jar to the classpath, which compiled code shouldn't
     # usually need. Be more selective?
@@ -281,7 +283,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
     zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
 
-    zinc_args += self.plugin_args(target)
+    zinc_args += self.plugin_args
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
@@ -361,11 +363,7 @@ class ZincCompile(BaseZincCompile):
   def select_source(self, source_file_path):
     return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
 
-  def __init__(self, *args, **kwargs):
-    super(ZincCompile, self).__init__(*args, **kwargs)
-
-    self._lazy_plugin_args = None
-
+  @memoized_property
   def plugin_jars(self):
     """The classpath entries for jars containing code for enabled plugins."""
     if self.get_options().scalac_plugins:
@@ -373,12 +371,8 @@ class ZincCompile(BaseZincCompile):
     else:
       return []
 
+  @memoized_property
   def plugin_args(self):
-    if self._lazy_plugin_args is None:
-      self._lazy_plugin_args = self._create_plugin_args()
-    return self._lazy_plugin_args
-
-  def _create_plugin_args(self):
     if not self.get_options().scalac_plugins:
       return []
 
@@ -397,7 +391,7 @@ class ZincCompile(BaseZincCompile):
     plugin_names = set([p for val in self.get_options().scalac_plugins for p in val.split(',')])
     plugins = {}
     buildroot = get_buildroot()
-    for jar in self.plugin_jars():
+    for jar in self.plugin_jars:
       with open_zip(jar, 'r') as jarfile:
         try:
           with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:

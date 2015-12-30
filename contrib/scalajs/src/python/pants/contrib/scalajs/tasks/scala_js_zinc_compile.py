@@ -30,12 +30,14 @@ class ScalaJSZincCompile(BaseZincCompile):
   def product_types(cls):
     return ['scala_js_ir']
 
+  @memoized_property
   def plugin_jars(self):
     return self.tool_classpath('scala-js-compiler')
 
+  @memoized_property
   def plugin_args(self):
     # filter the tool classpath to select only the compiler jar
-    return ['-S-Xplugin:{}'.format(jar) for jar in self.plugin_jars() if 'scalajs-compiler_' in jar]
+    return ['-S-Xplugin:{}'.format(jar) for jar in self.plugin_jars if 'scalajs-compiler_' in jar]
 
   def select(self, target):
     if not isinstance(target, ScalaJSTarget):

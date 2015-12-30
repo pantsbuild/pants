@@ -213,14 +213,13 @@ class JvmCompile(NailgunTaskBase):
     """
     raise NotImplementedError()
 
-  def compile(self, target, args, classpath, sources, classes_output_dir, upstream_analysis,
-              analysis_file, log_file, settings, fatal_warnings):
+  def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
+              log_file, settings, fatal_warnings):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
 
     Subclasses must implement.
-    :param target target: The target being compiled.
     :param list args: Arguments to the compiler (such as jmake or zinc).
     :param list classpath: List of classpath entries.
     :param list sources: Source files.
@@ -450,8 +449,8 @@ class JvmCompile(NailgunTaskBase):
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
-        self.compile(vts.target, self._args, classpath, sources, outdir, upstream_analysis,
-                     analysis_file, log_file, settings, fatal_warnings)
+        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
+                     log_file, settings, fatal_warnings)
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""

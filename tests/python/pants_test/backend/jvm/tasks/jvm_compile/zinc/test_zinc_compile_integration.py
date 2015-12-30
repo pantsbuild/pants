@@ -65,11 +65,8 @@ class ZincCompileIntegrationTest(BaseCompileIT):
               'org/pantsbuild/testproject/javasources/JavaSource.class'))
 
   def test_scalac_plugin_compile(self):
-    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/consumer',
-                              expected_files=['HelloScalac.class', 'PluginConsumer.class',
-                                              'scalac-plugin.xml'],
-                              expect_in_stdout=['Hello Scalac!'],
-                              iterations=1) as found:
+    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
+                              expected_files=['HelloScalac.class', 'scalac-plugin.xml']) as found:
 
       self.assertTrue(
           self.get_only(found, 'HelloScalac.class').endswith(
@@ -81,7 +78,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                       'plugin registration file `{}` not located at the '
                       'root of the classpath'.format(path))
 
-      # And that the registration file is well formed.
+      # And that it is well formed.
       root = ET.parse(path).getroot()
       self.assertEqual('plugin', root.tag)
       self.assertEqual('hello_scalac', root.find('name').text)

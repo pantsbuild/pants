@@ -19,8 +19,7 @@ class BaseCompileIT(PantsRunIntegrationTest):
 
   @contextmanager
   def do_test_compile(self, target,
-      expected_files=None, iterations=2, expect_failure=False, extra_args=None,
-      workdir_outside_of_buildroot=False, expect_in_stdout=None):
+      expected_files=None, iterations=2, expect_failure=False, extra_args=None, workdir_outside_of_buildroot=False):
     """Runs a configurable number of iterations of compilation for the given target.
 
     By default, runs twice to shake out errors related to noops.
@@ -40,8 +39,6 @@ class BaseCompileIT(PantsRunIntegrationTest):
             self.assert_failure(pants_run)
           else:
             self.assert_success(pants_run)
-          for line in expect_in_stdout or []:
-            self.assertIn(line, pants_run.stdout_data)
         found = defaultdict(set)
         workdir_files = []
         if expected_files:
