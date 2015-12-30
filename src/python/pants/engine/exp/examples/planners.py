@@ -138,15 +138,9 @@ class ResourcesPlanner(TaskPlanner):
     return {Classpath: [[ResourceSources]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    if not isinstance(subject, Target):
-      return
-
-    resources = None
-    sources_config = subject.select_configuration_type(ResourceSources)
-    if sources_config:
-      resources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
-    if not resources:
-      return None
+    resources = []
+    for sources_config in subject.select_configuration_type(ResourceSources):
+      resources.extend(sources_config.iter_paths(base_path=subject.address.spec_path))
     return Plan(func_or_task_type=isolate_resources, subjects=(subject,), resources=resources)
 
 
@@ -214,12 +208,9 @@ class ThriftPlanner(TaskPlanner):
     return configs[0]
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    thrift_sources = None
-    sources_config = subject.select_configuration_type(ThriftSources)
-    if sources_config:
-      thrift_sources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
-    if not thrift_sources:
-      raise self.Error('No thrift sources for {!r} from {!r}.'.format(product_type, subject))
+    thrift_sources = []
+    for sources_config in subject.select_configuration_type(ThriftSources):
+      thrift_sources.extend(sources_config.iter_paths(base_path=subject.address.spec_path))
 
     config = self._extract_thrift_config(product_type, subject, configuration=configuration)
     subject = Subject(subject, alternate=Target(dependencies=config.deps))
@@ -379,10 +370,9 @@ class JvmCompilerPlanner(TaskPlanner):
     """
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    sources = None
-    sources_config = subject.select_configuration_type(self.source_type)
-    if sources_config:
-      sources = list(sources_config.iter_paths(base_path=subject.address.spec_path))
+    sources = []
+    for sources_config in subject.select_configuration_type(self.source_type):
+      sources.extend(sources_config.iter_paths(base_path=subject.address.spec_path))
     if not sources:
       # TODO(John Sirois): Abstract a ~SourcesConsumerPlanner that can grab sources of given types
       # or else defer to a code generator like we do here.  As it stands, the planner must
