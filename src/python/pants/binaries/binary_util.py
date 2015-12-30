@@ -11,11 +11,10 @@ import posixpath
 import subprocess
 from contextlib import closing, contextmanager
 
-import six.moves.urllib.error as urllib_error
-import six.moves.urllib.request as urllib_request
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TaskError
+from pants.net.http.fetcher import Fetcher
 from pants.option.custom_types import dict_option, list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
@@ -132,11 +131,11 @@ class BinaryUtil(object):
       self._path_by_id.update(path_by_id)
 
   @contextmanager
-  def _select_binary_stream(self, name, binary_path, url_opener=None):
+  def _select_binary_stream(self, name, binary_path, fetcher=None):
     """Select a binary matching the current os and architecture.
 
     :param string binary_path: The path to the binary to fetch.
-    :param url_opener: Optional argument used only for testing, to 'pretend' to open urls.
+    :param fetcher: Optional argument used only for testing, to 'pretend' to open urls.
     :returns: a 'stream' to download it from a support directory. The returned 'stream' is actually
       a lambda function which returns the files binary contents.
     :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
@@ -146,21 +145,21 @@ class BinaryUtil(object):
     if not self._baseurls:
       raise self.NoBaseUrlsError(
           'No urls are defined for the --pants-support-baseurls option.')
-    if url_opener is None:
-      url_opener = lambda u: closing(urllib_request.urlopen(u, timeout=self._timeout_secs))
-
     downloaded_successfully = False
     accumulated_errors = []
     for baseurl in OrderedSet(self._baseurls):  # Wrap in OrderedSet because duplicates are wasteful.
       url = posixpath.join(baseurl, binary_path)
       logger.info('Attempting to fetch {name} binary from: {url} ...'.format(name=name, url=url))
       try:
-        with url_opener(url) as binary:
+        with temporary_file() as dest:
+          fetcher = fetcher or Fetcher()
+          fetcher.download(url, listener=Fetcher.ProgressListener(), path_or_fd=dest)
           logger.info('Fetched {name} binary from: {url} .'.format(name=name, url=url))
           downloaded_successfully = True
-          yield lambda: binary.read()
+          dest.seek(0)
+          yield lambda: dest.read()
           break
-      except (IOError, urllib_error.HTTPError, urllib_error.URLError, ValueError) as e:
+      except (IOError, Fetcher.Error, ValueError) as e:
         accumulated_errors.append('Failed to fetch binary from {url}: {error}'
                                   .format(url=url, error=e))
     if not downloaded_successfully:

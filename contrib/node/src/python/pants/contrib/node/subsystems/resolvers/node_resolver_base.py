@@ -15,10 +15,14 @@ from pants.util.meta import AbstractClass
 
 
 class NodeResolverBase(AbstractClass):
-
   @abstractmethod
   def resolve_target(self, node_task, target, results_dir, node_paths):
     """Resolve a NodePackage target."""
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    """Allows a resolver to add additional product requirements to the NodeResolver task."""
+    pass
 
   def _copy_sources(self, target, results_dir):
     """Copy sources from a target to a results directory.
