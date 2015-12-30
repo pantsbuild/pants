@@ -10,12 +10,12 @@ import os
 from abc import abstractproperty
 
 from pants.engine.exp.addressable import Exactly, SubclassesOf, addressable, addressable_list
-from pants.engine.exp.configuration import Configuration
+from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 
 
-class Sources(Configuration):
-  """Represents a collection of source files."""
+class Sources(StructWithDeps):
+  """Represents a collection of source files with the dependencies needed to build them."""
 
   def __init__(self,
                name=None,
@@ -109,34 +109,25 @@ class Sources(Configuration):
 Sources.excludes = addressable(Exactly(Sources))(Sources.excludes)
 
 
-class Target(Configuration):
+class Target(Struct):
   """TODO(John Sirois): XXX DOCME"""
 
   class ConfigurationNotFound(Exception):
     """Indicates a requested configuration of a target could not be found."""
 
-  def __init__(self, name=None, configurations=None, dependencies=None, **kwargs):
+  def __init__(self, name=None, configurations=None, **kwargs):
     """
     :param string name: The name of this target which forms its address in its namespace.
     :param list configurations: The configurations that apply to this target in various contexts.
-    :param list dependencies: The direct dependencies of this target.
     """
     super(Target, self).__init__(name=name, **kwargs)
     self.configurations = configurations
-    self.dependencies = dependencies
 
-  @addressable_list(SubclassesOf(Configuration))
+  @addressable_list(SubclassesOf(Struct))
   def configurations(self):
     """The configurations that apply to this target in various contexts.
 
-    :rtype list of :class:`pants.engine.exp.configuration.Configuration`
-    """
-
-  @addressable_list(SubclassesOf(Configuration))
-  def dependencies(self):
-    """The direct dependencies of this target.
-
-    :rtype: list
+    :rtype list of :class:`pants.engine.exp.configuration.Struct`
     """
 
   def select_configuration(self, name):
@@ -144,7 +135,7 @@ class Target(Configuration):
 
     :param string name: The name of the configuration to select.
     :returns: The configuration with the given name.
-    :rtype: :class:`pants.engine.exp.configuration.Configuration`
+    :rtype: :class:`pants.engine.exp.configuration.Struct`
     :raises: :class:`Target.ConfigurationNotFound` if the configuration was not found.
     """
     configs = tuple(config for config in self.configurations if config.name == name)
@@ -182,6 +173,8 @@ class Target(Configuration):
   def walk_targets(self, postorder=True):
     """Performs a depth first walk of this target, visiting all reachable targets exactly once.
 
+    TODO: Walking a Target graph probably doesn't make sense; but walking an ExecutionGraph does.
+
     :param bool postorder: When ``True``, the traversal order is postorder (children before
                            parents), else it is preorder (parents before children).
     """
@@ -192,10 +185,11 @@ class Target(Configuration):
         visited.add(target)
         if not postorder:
           yield target
-        for dep in self.dependencies:
-          if isinstance(dep, Target):
-            for t in walk(dep):
-              yield t
+        for configuration in self.configurations:
+          for dep in configuration.dependencies:
+            if isinstance(dep, Target):
+              for t in walk(dep):
+                yield t
         if postorder:
           yield target
 

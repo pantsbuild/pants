@@ -14,7 +14,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
-from pants.engine.exp.configuration import Configuration
+from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
@@ -62,7 +62,7 @@ class ResourceSources(Sources):
   extensions = tuple()
 
 
-class Requirement(Configuration):
+class Requirement(Struct):
   """A setuptools requirement."""
 
   def __init__(self, req, repo=None, **kwargs):
@@ -78,7 +78,7 @@ class Classpath(object):
   pass
 
 
-class Jar(Configuration):
+class Jar(Struct):
   """A java jar."""
 
   def __init__(self, org=None, name=None, rev=None, **kwargs):
@@ -151,19 +151,8 @@ class ResourcesPlanner(TaskPlanner):
     return Plan(func_or_task_type=isolate_resources, subjects=(subject,), resources=resources)
 
 
-class ThriftConfiguration(Configuration):
-  def __init__(self, deps=None, **kwargs):
-    """
-    :param deps: An optional list of dependencies needed by the generated code.
-    :type deps: list of jars
-    """
-    super(ThriftConfiguration, self).__init__(**kwargs)
-    self.deps = deps
-
-  # Could be Jars, PythonRequirements, ... we simply don't know a-priori - depends on --gen lang.
-  @addressable_list(SubclassesOf(Configuration))
-  def deps(self):
-    """Return a list of the dependencies needed by the generated code."""
+class ThriftConfiguration(StructWithDeps):
+  pass
 
 
 class ThriftPlanner(TaskPlanner):
@@ -207,7 +196,7 @@ class ThriftPlanner(TaskPlanner):
     if config is None:
       return None
 
-    subject = Subject(subject, alternate=Target(dependencies=config.deps))
+    subject = Subject(subject, alternate=Target(dependencies=config.dependencies))
     inputs = self.plan_parameters(scheduler, product_type, subject, config)
     return Plan(func_or_task_type=self.gen_func, subjects=(subject,), sources=thrift_sources, **inputs)
 
@@ -272,7 +261,7 @@ def gen_apache_thrift(sources, rev, gen, strict):
                             'gen:{}, strict: {}'.format(sources, rev, gen, strict))
 
 
-class BuildPropertiesConfiguration(Configuration):
+class BuildPropertiesConfiguration(Struct):
   pass
 
 
