@@ -12,35 +12,19 @@ from pants_test.base_test import BaseTest
 class BinaryUtilTest(BaseTest):
   """Tests binary_util's pants_support_baseurls handling."""
 
-  class LambdaReader(object):
-    """Class which pretends to be an input stream, but is actually a lambda function."""
-
-    def __init__(self, func):
-      self._func = func
-
-    def __call__(self):
-      return self._func()
-
-    def read(self):
-      return self()
-
-    def __enter__(self, a=None, b=None, c=None, d=None):
-      return self
-
-    def __exit__(self, a=None, b=None, c=None, d=None):
-      pass
-
-  class MapReader(object):
-    """Class which pretends to be a url stream opener, but is actually a dictionary."""
+  class MapFetcher(object):
+    """Class which pretends to be a pants.net.http.Fetcher, but is actually a dictionary."""
 
     def __init__(self, read_map):
       self._map = read_map
 
-    def __call__(self, key):
-      if not key in self._map:
-        raise IOError("404: Virtual URL '{key}' does not exist.".format(key=key))
-      value = self._map[key]
-      return BinaryUtilTest.LambdaReader(lambda: value)
+    def download(self, url, listener=None, path_or_fd=None):
+      if not url in self._map:
+        raise IOError("404: Virtual URL '{}' does not exist.".format(url))
+      if not path_or_fd:
+        raise AssertionError("Expected path_or_fd to be set")
+      path_or_fd.write(self._map[url])
+      return path_or_fd
 
     def keys(self):
       return self._map.keys()
@@ -109,7 +93,7 @@ class BinaryUtilTest(BaseTest):
     binaries = {t[2]: t for t in (('bin/protobuf', '2.4.1', 'protoc'),
                                   ('bin/ivy', '4.3.7', 'ivy'),
                                   ('bin/bash', '4.4.3', 'bash'))}
-    reader = self.MapReader({
+    fetcher = self.MapFetcher({
       fake_url(binaries, bases[0], 'protoc'): 'SEEN PROTOC',
       fake_url(binaries, bases[0], 'ivy'): 'SEEN IVY',
       fake_url(binaries, bases[1], 'bash'): 'SEEN BASH',
@@ -118,16 +102,17 @@ class BinaryUtilTest(BaseTest):
       fake_url(binaries, bases[2], 'ivy'): 'UNSEEN IVY 2',
     })
 
-    unseen = [item for item in reader.values() if item.startswith('SEEN ')]
+    unseen = [item for item in fetcher.values() if item.startswith('SEEN ')]
     for supportdir, version, name in binaries.values():
       binary_path = binary_util._select_binary_base_path(supportdir=supportdir,
                                                          version=version,
                                                          name=name)
       with binary_util._select_binary_stream(name=name,
                                              binary_path=binary_path,
-                                             url_opener=reader) as stream:
-        self.assertEqual(stream(), 'SEEN ' + name.upper())
-        unseen.remove(stream())
+                                             fetcher=fetcher) as stream:
+        result = stream()
+        self.assertEqual(result, 'SEEN ' + name.upper())
+        unseen.remove(result)
     self.assertEqual(0, len(unseen))  # Make sure we've seen all the SEENs.
 
   def test_select_binary_base_path_linux(self):
