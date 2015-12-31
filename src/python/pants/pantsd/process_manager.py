@@ -16,7 +16,7 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.util.dirutil import rm_rf, safe_mkdir, safe_open
+from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 
 
 logger = logging.getLogger(__name__)
@@ -59,31 +59,10 @@ class ProcessMetadataManager(object):
 
   FILE_WAIT_SEC = 10
   WAIT_INTERVAL_SEC = .1
-  PID_DIR_NAME = '.pids'
+  PID_DIR_NAME = '.pids'  # TODO(kwlzn): Make this configurable.
 
   class MetadataError(Exception): pass
   class Timeout(Exception): pass
-
-  @staticmethod
-  def _read_file(filename):
-    """Read and return the contents of a file.
-
-    :param string filename: The filename of the file to read.
-    :returns: The contents of the file.
-    :rtype: string
-    """
-    with safe_open(filename, 'rb') as f:
-      return f.read().strip()
-
-  @staticmethod
-  def _write_file(filename, payload):
-    """Write a string to a file.
-
-    :param string filename: The filename of the file to write to.
-    :param string payload: The string to write to the file.
-    """
-    with safe_open(filename, 'wb') as f:
-      f.write(payload)
 
   @staticmethod
   def _maybe_cast(item, caster):
@@ -124,7 +103,7 @@ class ProcessMetadataManager(object):
     """
     try:
       file_path = os.path.join(cls._get_metadata_dir_by_name(name), metadata_key)
-      return cls._maybe_cast(cls._read_file(file_path), caster)
+      return cls._maybe_cast(read_file(file_path).strip(), caster)
     except (IOError, OSError):
       return None
 
@@ -138,7 +117,7 @@ class ProcessMetadataManager(object):
     """
     cls._maybe_init_metadata_dir_by_name(name)
     file_path = os.path.join(cls._get_metadata_dir_by_name(name), metadata_key)
-    cls._write_file(file_path, metadata_value)
+    safe_file_dump(file_path, metadata_value)
 
   @classmethod
   def _deadline_until(cls, closure, timeout, wait_interval=WAIT_INTERVAL_SEC):

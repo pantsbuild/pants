@@ -16,6 +16,7 @@ import psutil
 from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessMetadataManager,
                                           swallow_psutil_exceptions)
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_file_dump
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -69,13 +70,6 @@ class TestProcessMetadataManager(unittest.TestCase):
   TEST_VALUE_INT = 300
   BUILDROOT = '/mock_buildroot/'
 
-  def test_readwrite_file(self):
-    with temporary_dir() as td:
-      test_filename = os.path.join(td, 'test.out')
-      test_content = '3333'
-      ProcessMetadataManager._write_file(test_filename, test_content)
-      self.assertEqual(ProcessMetadataManager._read_file(test_filename), test_content)
-
   def test_maybe_cast(self):
     self.assertIsNone(ProcessMetadataManager._maybe_cast(None, int))
     self.assertEqual(ProcessMetadataManager._maybe_cast('3333', int), 3333)
@@ -113,7 +107,7 @@ class TestProcessMetadataManager(unittest.TestCase):
   def test_wait_for_file(self):
     with temporary_dir() as td:
       test_filename = os.path.join(td, 'test.out')
-      ProcessMetadataManager._write_file(test_filename, 'test')
+      safe_file_dump(test_filename, 'test')
       ProcessMetadataManager._wait_for_file(test_filename, timeout=.1)
 
   def test_wait_for_file_timeout(self):
