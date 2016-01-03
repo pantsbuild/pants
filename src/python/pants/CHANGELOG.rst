@@ -1,6 +1,58 @@
 RELEASE HISTORY
 ===============
 
+0.0.66 (01/02/2016)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release comes after a long and relatively quiet holiday break, but it represents a significant
+milestone towards pants 1.0.0: it is no longer necessary to explicitly configure any tool versions
+(as was usually done with BUILD.tools); all tools, including scalac, have default classpaths.
+
+This release also includes beta support for scala.js via the scalajs contrib module.
+
+Happy Holidays!
+
+
+API Changes
+~~~~~~~~~~~
+
+* Have SourcesField handle the calculation of SourceRoots
+  `RB #3230 <https://rbcommons.com/s/twitter/r/3230>`_
+
+* Remove the need to specify scala tools in BUILD.tools
+  `RB #3225 <https://rbcommons.com/s/twitter/r/3225>`_
+
+* Explicitly track when synthetic targets are injected.
+  `RB #3225 <https://rbcommons.com/s/twitter/r/3225>`_
+  `RB #3277 <https://rbcommons.com/s/twitter/r/3277>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix declaration of source scalac-plugins
+  `RB #3285 <https://rbcommons.com/s/twitter/r/3285>`_
+
+* Work around the fact that antlr3 is not currently available on pypi
+  `RB #3282 <https://rbcommons.com/s/twitter/r/3282>`_
+
+* Avoid ValueError exception from a reporting thread on shutdown
+  `RB #3278 <https://rbcommons.com/s/twitter/r/3278>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Preliminary support for scala.js
+  `RB #2453 <https://rbcommons.com/s/twitter/r/2453>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Convert binary_util to use fetcher like the ivy bootstrapper
+  `RB #3275 <https://rbcommons.com/s/twitter/r/3275>`_
+
 
 0.0.65 (12/18/2015)
 -------------------

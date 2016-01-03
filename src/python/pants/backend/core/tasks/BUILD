@@ -5,9 +5,6 @@ target(
   name = 'all',
   dependencies = [
     ':builddictionary',
-    ':dependees',
-    ':filter',
-    ':scm_publish',
   ]
 )
 
@@ -40,24 +37,6 @@ resources(
 )
 
 python_library(
-  name = 'dependees',
-  sources = ['dependees.py'],
-  dependencies = [
-    'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/base:deprecated',
-  ],
-)
-
-python_library(
-  name = 'filter',
-  sources = ['filter.py'],
-  dependencies = [
-    'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/base:deprecated',
-  ],
-)
-
-python_library(
   name = 'reflect',
   sources = ['reflect.py'],
   dependencies = [
@@ -70,14 +49,5 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/help',
     'src/python/pants/option',
-  ],
-)
-
-python_library(
-  name = 'scm_publish',
-  sources = ['scm_publish.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/task',
   ],
 )

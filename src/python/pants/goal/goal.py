@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.deprecated import deprecated
 from pants.goal.error import GoalError
 
 
@@ -149,14 +148,6 @@ class _Goal(object):
     if task_registrar.serialize:
       self.serialize = True
 
-    return self
-
-  @deprecated('0.0.66', "Single-task goals will take their description from the first sentence "
-                        "of that task's docstring.  Multiple-task goals can register a description "
-                        "explicitly using Goal.register(name, description).")
-  def with_description(self, description):
-    """Add a description to this goal."""
-    self._description = description
     return self
 
   def uninstall_task(self, name):
