@@ -101,7 +101,7 @@ class DaemonPantsRunner(ProcessManager):
     with stdio_as(*streams):
       yield
 
-  def _setup_signal_handlers(self):
+  def _setup_sigint_handler(self):
     """Sets up a control-c signal handler for the daemon runner context."""
     def handle_control_c(signum, frame):
       raise KeyboardInterrupt('remote client sent control-c!')
@@ -123,8 +123,8 @@ class DaemonPantsRunner(ProcessManager):
     # Broadcast our pid to the remote client so they can send us signals (i.e. SIGINT).
     NailgunProtocol.write_chunk(self._socket, ChunkType.PID, bytes(os.getpid()))
 
-    # Setup any signal handlers (i.e. for SIGINT).
-    self._setup_signal_handlers()
+    # Setup a SIGINT signal handler.
+    self._setup_sigint_handler()
 
     # Invoke a Pants run with stdio redirected.
     with self._nailgunned_stdio(self._socket):
