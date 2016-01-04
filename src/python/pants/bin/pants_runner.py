@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 class PantsRunner(object):
+  """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
+
   def __init__(self, exiter, args=None, env=None):
     """
     :param Exiter exiter: The Exiter instance to use for this run.
