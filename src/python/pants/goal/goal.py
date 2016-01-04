@@ -87,8 +87,11 @@ class _Goal(object):
     # Return the docstring for the Task registered under the same name as this goal, if any.
     # This is a very common case, and therefore a useful idiom.
     namesake_task = self._task_type_by_name.get(self.name)
-    if namesake_task:
-      return namesake_task.__doc__
+    if namesake_task and namesake_task.__doc__:
+      # First line of docstring.
+      # TODO: This is repetitive of Optionable.get_description(). We should probably just
+      # make Goal an Optionable, for uniformity.
+      return namesake_task.__doc__.partition('\n')[0].strip()
     return ''
 
   def register_options(self, options):

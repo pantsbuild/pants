@@ -107,26 +107,6 @@ class BuildFileAliases(object):
     BUILD file parse.
   """
 
-  @classmethod
-  def curry_context(cls, wrappee):
-    """Curry a function with a build file context.
-
-    Given a function foo(ctx, bar) that you want to expose in BUILD files
-    as foo(bar), use::
-
-        context_aware_object_factories={
-          'foo': BuildFileAliases.curry_context(foo),
-        }
-    """
-    # You might wonder: why not just use lambda and functools.partial?
-    # That loses the __doc__, thus messing up the BUILD dictionary.
-    wrapper = lambda ctx: functools.partial(wrappee, ctx)
-    wrapper.__doc__ = wrappee.__doc__
-    wrapper.__name__ = str(".".join(["curry_context",
-                                     wrappee.__module__,
-                                     wrappee.__name__]))
-    return wrapper
-
   @staticmethod
   def _is_target_type(obj):
     return inspect.isclass(obj) and issubclass(obj, Target)

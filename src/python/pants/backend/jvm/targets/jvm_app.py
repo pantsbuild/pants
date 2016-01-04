@@ -6,27 +6,28 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import namedtuple
+from hashlib import sha1
 
 from twitter.common.dirutil import Fileset
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.build_environment import get_buildroot
-from pants.base.build_manual import manual
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
-from pants.base.payload_field import BundleField, PrimitiveField
+from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
 from pants.build_graph.target import Target
 
 
 class RelativeToMapper(object):
-  """A mapper that maps files specified relative to a base directory."""
+  """A mapper that maps filesystem paths specified relative to a base directory."""
 
   def __init__(self, base):
-    """The base directory files should be mapped from."""
+    """The base directory paths should be mapped from."""
     self.base = base
 
-  def __call__(self, file):
-    return os.path.relpath(file, self.base)
+  def __call__(self, path):
+    return os.path.relpath(path, self.base)
 
   def __repr__(self):
     return 'IdentityMapper({})'.format(self.base)
@@ -38,8 +39,8 @@ class RelativeToMapper(object):
 class DirectoryReMapper(object):
   """A mapper that maps files relative to a base directory into a destination directory."""
 
-  class BaseNotExistsError(Exception):
-    "The base directory does not exist error"
+  class NonexistentBaseError(Exception):
+    pass
 
   def __init__(self, base, dest):
     """The base directory files should be mapped from, and the dest they should be mapped to.
@@ -49,7 +50,7 @@ class DirectoryReMapper(object):
     """
     self.base = os.path.abspath(os.path.join(get_buildroot(), base))
     if not os.path.isdir(self.base):
-      raise DirectoryReMapper.BaseNotExistsError(
+      raise DirectoryReMapper.NonexistentBaseError(
         'Could not find a directory to bundle relative to {0}'.format(self.base))
     self.dest = dest
 
@@ -58,6 +59,9 @@ class DirectoryReMapper(object):
 
   def __repr__(self):
     return 'DirectoryReMapper({0}, {1})'.format(self.base, self.dest)
+
+
+BundleProps = namedtuple('_BundleProps', ['rel_path', 'mapper', 'filemap', 'fileset'])
 
 
 class Bundle(object):
@@ -86,16 +90,10 @@ class Bundle(object):
 
   """
 
-  @classmethod
-  @manual.builddict(factory=True)
-  def factory(cls, parse_context):
-    """Return a factory method that can create bundles rooted at the parse context path."""
-    def bundle(**kwargs):
-      return Bundle(parse_context.rel_path, **kwargs)
-    bundle.__doc__ = Bundle.__init__.__doc__
-    return bundle
+  def __init__(self, parse_context):
+    self._rel_path = parse_context.rel_path
 
-  def __init__(self, target_rel_path, rel_path=None, mapper=None, relative_to=None, fileset=None):
+  def __call__(self, rel_path=None, mapper=None, relative_to=None, fileset=None):
     """
     :param rel_path: Base path of the "source" file paths. By default, path of the
       BUILD file. Useful for assets that don't live in the source code repo.
@@ -110,33 +108,48 @@ class Bundle(object):
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
-    self._rel_path = rel_path or target_rel_path
-    self.filemap = {}
+    rel_path = rel_path or self._rel_path
+    filemap = {}
 
     if relative_to:
-      base = os.path.join(get_buildroot(), self._rel_path, relative_to)
-      self.mapper = RelativeToMapper(base)
+      base = os.path.join(get_buildroot(), rel_path, relative_to)
+      mapper = RelativeToMapper(base)
     else:
-      self.mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), self._rel_path))
+      mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), rel_path))
 
     if fileset is not None:
-      self._add([fileset])
-    self.fileset = fileset
-
-  def _add(self, filesets):
-    for fileset in filesets:
       paths = fileset() if isinstance(fileset, Fileset) \
         else fileset if hasattr(fileset, '__iter__') \
         else [fileset]
       for path in paths:
         abspath = path
         if not os.path.isabs(abspath):
-          abspath = os.path.join(get_buildroot(), self._rel_path, path)
-        self.filemap[abspath] = self.mapper(abspath)
-    return self
+          abspath = os.path.join(get_buildroot(), rel_path, path)
+        filemap[abspath] = mapper(abspath)
 
-  def __repr__(self):
-    return 'Bundle({}, {})'.format(self.mapper, self.filemap)
+    return BundleProps(self._rel_path, mapper, filemap, fileset)
+
+
+class BundleField(tuple, PayloadField):
+  """A tuple subclass that mixes in PayloadField.
+
+  Must be initialized with an iterable of Bundle instances.
+  """
+  
+  @staticmethod
+  def _hash_bundle(bundle):
+    hasher = sha1()
+    hasher.update(bundle.rel_path)
+    for abs_path in sorted(bundle.filemap.keys()):
+      buildroot_relative_path = os.path.relpath(abs_path, get_buildroot())
+      hasher.update(buildroot_relative_path)
+      hasher.update(bundle.filemap[abs_path])
+      with open(abs_path, 'rb') as f:
+        hasher.update(f.read())
+    return hasher.hexdigest()
+
+  def _compute_fingerprint(self):
+    return combine_hashes(map(BundleField._hash_bundle, self))
 
 
 class JvmApp(Target):
