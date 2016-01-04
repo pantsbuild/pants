@@ -54,8 +54,10 @@ class RemotePantsRunner(object):
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
     signal.siginterrupt(signal.SIGINT, False)  # Retry interrupted system calls.
-    yield
-    signal.signal(signal.SIGINT, existing_sigint_handler)
+    try:
+      yield
+    finally:
+      signal.signal(signal.SIGINT, existing_sigint_handler)
 
   def _retrieve_pailgun_port(self):
     return ProcessManager.read_metadata_by_name('pantsd', 'socket_pailgun', int)
