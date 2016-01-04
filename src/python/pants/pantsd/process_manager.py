@@ -324,8 +324,8 @@ class ProcessManager(ProcessMetadataManager):
     :param bool force: If True, skip process liveness check before purging metadata.
     :raises: `ProcessManager.MetadataError` when OSError is encountered on metadata dir removal.
     """
-    if not force:
-      assert not self.is_alive(), 'aborting attempt to purge metadata for a running process!'
+    if not force and self.is_alive():
+      raise self.MetadataError('cannot purge metadata for a running process!')
 
     super(ProcessManager, self).purge_metadata_by_name(self._name)
 
