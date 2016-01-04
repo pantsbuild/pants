@@ -74,5 +74,5 @@ class RemotePantsRunner(object):
       # Execute the command on the pailgun.
       result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 
-      # Exit.
-      self._exiter.exit(result)
+    # Exit.
+    self._exiter.exit(result)
