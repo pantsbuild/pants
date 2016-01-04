@@ -114,23 +114,23 @@ class VersionedTarget(VersionedTargetSet):
     super(VersionedTarget, self).__init__(cache_manager, [self])
     self.id = target.id
 
-  def create_results_dir(self, root_dir, allow_incremental):
+  def create_results_dir(self, root_dir, allow_incremental, version=''):
     """Ensures that a results_dir exists under the given root_dir for this versioned target.
 
     If incremental=True, attempts to clone the results_dir for the previous version of this target
     to the new results dir. Otherwise, simply ensures that the results dir exists.
     """
-    def dirname(key):
+    def dirname(key, version=''):
       # TODO: Shorten cache_key hashes in general?
-      return os.path.join(root_dir, key.id, sha1(key.hash).hexdigest()[:12])
-    new_dir = dirname(self.cache_key)
+      return os.path.join(root_dir, version, key.id, sha1(key.hash).hexdigest()[:12])
+    new_dir = dirname(self.cache_key, version)
     self._results_dir = new_dir
     if self.valid:
       return
 
     if allow_incremental and self.previous_cache_key:
       self.is_incremental = True
-      old_dir = dirname(self.previous_cache_key)
+      old_dir = dirname(self.previous_cache_key, version)
       self._previous_results_dir = old_dir
       if os.path.isdir(old_dir) and not os.path.isdir(new_dir):
         shutil.copytree(old_dir, new_dir)
