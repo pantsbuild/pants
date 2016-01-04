@@ -154,11 +154,26 @@ class ClasspathUtil(object):
                                  use_target_id=True):
     """Create a stable classpath of symlinks with standardized names.
 
+    By default symlinks are created for each target under `basedir` based on its `target.id`.
+    Unique suffixes are added to further disambiguate classpath products from the same target.
+
+    It also optionally saves the classpath products to be used externally (by intellij plugin),
+    one output file for each target.
+
+    Note calling this function will refresh the symlinks and output files for the target under
+    `basedir` if they exist, but it will NOT delete/cleanup the contents for *other* targets.
+    Caller wants that behavior can make the similar calls for other targets or just remove
+    the `basedir` first.
+
     :param classpath_products: Classpath products.
     :param targets: Targets to create canonical classpath for.
     :param basedir: Directory to create symlinks.
     :param save_classpath_file: An optional file with original classpath entries that symlinks
       are created from.
+    :param use_target_id: Optionally switch to the subdirectory based symlinks naming.
+      This is added for backward compatibility. Remove once intellij plugin is ready to use
+      `target.id` based output files.  See `use_old_naming_style` option in :class:
+      `pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher.RuntimeClasspathPublisher`.
 
     :returns: Converted canonical classpath.
     :rtype: list of strings
@@ -182,6 +197,8 @@ class ClasspathUtil(object):
       """
       if use_target_id:
         output_dir = basedir
+        # TODO(peiyu) improve readability once we deprecate the old naming style.
+        # For example, `-` is commonly placed in string format as opposed to here.
         classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
                                                                       target_id=target.id)
       else:
