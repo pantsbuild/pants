@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
+from types import GeneratorType
 
 from pants.base.validation import assert_list
 
@@ -27,6 +28,8 @@ class ParseValidation(unittest.TestCase):
       assert_list([["file2.txt"], "file2.txt"])  # All values in list must be stringy values
     with self.assertRaises(ValueError):
       assert_list(None, can_be_none=False)  # The default is ok as None only when can_be_noe is true
+    with self.assertRaises(ValueError):
+      assert_list(["file.txt"], allowable=(set,))  # Incorrect type
 
   def test_invalid_inputs_with_key_arg(self):
     with self.assertRaisesRegexp(ValueError, "In key 'resources':"):
@@ -35,3 +38,12 @@ class ParseValidation(unittest.TestCase):
       assert_list([["file3.txt"]], key_arg='artifacts')  # All values most be strings
     with self.assertRaisesRegexp(ValueError, "In key 'jars':"):
       assert_list(None, can_be_none=False, key_arg='jars')  # The default is ok as None only when can_be_noe is true
+
+  def test_additional_allowables(self):
+    def generator():
+      for x in range(11):
+        yield str(x)
+    assert_list(generator(), allowable_add=(GeneratorType,))
+    assert_list(['1', '2'], allowable_add=(GeneratorType,))
+    with self.assertRaises(ValueError):
+      assert_list(generator(), allowable_add=[])

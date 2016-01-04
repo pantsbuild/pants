@@ -112,9 +112,6 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':build_environment',
-    ':validation',
-    # TODO: Get rid of this dep, possibly by moving payload_field to source.
-    'src/python/pants/source',
     'src/python/pants/util:meta',
   ]
 )
@@ -184,10 +181,8 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    # TODO: Get rid of this dep, or move/delete this validation module.
-    'src/python/pants/source',
+    '3rdparty/python:six',
   ],
 )

@@ -27,6 +27,9 @@ class BuildGraph(object):
   class TransitiveLookupError(AddressLookupError):
     """Used to append the current node to the error message from an AddressLookupError """
 
+  class ManualSyntheticTargetError(AddressLookupError):
+    """Used to indicate that an synthetic target was defined manually"""
+
   @staticmethod
   def closure(targets, bfs=False):
     targets = OrderedSet(targets)
@@ -56,6 +59,7 @@ class BuildGraph(object):
     self._target_dependencies_by_address = defaultdict(OrderedSet)
     self._target_dependees_by_address = defaultdict(set)
     self._derived_from_by_derivative_address = {}
+    self.synthetic_addresses = set()
 
   def contains_address(self, address):
     return address in self._target_by_address
@@ -112,13 +116,15 @@ class BuildGraph(object):
       next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
     return self.get_target(current_address)
 
-  def inject_target(self, target, dependencies=None, derived_from=None):
+  def inject_target(self, target, dependencies=None, derived_from=None, synthetic=False):
     """Injects a fully realized Target into the BuildGraph.
 
     :param Target target: The Target to inject.
     :param list<Address> dependencies: The Target addresses that `target` depends on.
     :param Target derived_from: The Target that `target` was derived from, usually as a result
       of codegen.
+    :param bool synthetic: Whether to flag this target as synthetic, even if it isn't derived
+      from another target.
     """
 
     dependencies = dependencies or frozenset()
@@ -140,6 +146,9 @@ class BuildGraph(object):
                          .format(target=target,
                                  derived_from=derived_from))
       self._derived_from_by_derivative_address[target.address] = derived_from.address
+
+    if derived_from or synthetic:
+      self.synthetic_addresses.add(address)
 
     self._target_by_address[address] = target
 
@@ -328,7 +337,10 @@ class BuildGraph(object):
                          address=address,
                          build_graph=self,
                          **kwargs)
-    self.inject_target(target, dependencies=dependencies, derived_from=derived_from)
+    self.inject_target(target,
+                       dependencies=dependencies,
+                       derived_from=derived_from,
+                       synthetic=True)
 
   def inject_address_closure(self, address):
     """Resolves, constructs and injects a Target and its transitive closure of dependencies.
@@ -340,7 +352,6 @@ class BuildGraph(object):
     :param Address address: The address to inject.  Must be resolvable by `self._address_mapper` or
                             else be the address of an already injected entity.
     """
-
     if self.contains_address(address):
       # The address was either mapped in or synthetically injected already.
       return
@@ -376,13 +387,19 @@ class BuildGraph(object):
         target = self.get_target(target_address)
 
       def inject_spec_closure(spec):
-        addr = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
-        self.inject_address_closure(addr)
+        # Check to see if the target is synthetic or not.  If we find a synthetic target then
+        # short circuit the inject_address_closure since mapper.spec_to_address expects an actual
+        # BUILD file to exist on disk.
+        maybe_synthetic_address = Address.parse(spec, relative_to=target_address.spec_path)
+        if not self.contains_address(maybe_synthetic_address):
+          addr = mapper.spec_to_address(spec, relative_to=target_address.spec_path)
+          self.inject_address_closure(addr)
 
       for traversable_spec in target.traversable_dependency_specs:
         inject_spec_closure(traversable_spec)
         traversable_spec_target = self.get_target_from_spec(traversable_spec,
                                                             relative_to=target_address.spec_path)
+
         if traversable_spec_target not in target.dependencies:
           self.inject_dependency(dependent=target.address,
                                  dependency=traversable_spec_target.address)
