@@ -29,7 +29,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
         expected_bundle_content=[
           'bundle-example.jar',
           'libs/com.google.guava-guava-18.0.jar',
-          'libs/testprojects.src.java.org.pantsbuild.testproject.bundle.bundle-bin/0-z.jar']))
+          'internal-libs/testprojects.src.java.org.pantsbuild.testproject.bundle.bundle-bin-0.jar']))
 
   def test_bundle_deployjar(self):
     """bundle with --deployjar.
