@@ -197,7 +197,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def test_version(self):
     result = self.execute_export_json('project_info:first')
-    self.assertEqual('1.0.4', result['version'])
+    self.assertEqual('1.0.5', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
