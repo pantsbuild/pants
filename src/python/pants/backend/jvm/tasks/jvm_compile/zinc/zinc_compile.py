@@ -29,6 +29,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
+from pants.util.memo import memoized_property
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -48,8 +49,7 @@ class BaseZincCompile(JvmCompile):
 
   @staticmethod
   def write_plugin_info(resources_dir, target):
-    root = os.path.join(resources_dir, target.id)
-    plugin_info_file = os.path.join(root, _PLUGIN_INFO_FILE)
+    plugin_info_file = os.path.join(resources_dir, _PLUGIN_INFO_FILE)
     with safe_open(plugin_info_file, 'w') as f:
       f.write(textwrap.dedent("""
         <plugin>
@@ -57,7 +57,6 @@ class BaseZincCompile(JvmCompile):
           <classname>{}</classname>
         </plugin>
       """.format(target.plugin, target.classname)).strip())
-    return root, plugin_info_file
 
   @staticmethod
   def validate_arguments(log, whitelisted_args, args):
@@ -189,8 +188,6 @@ class BaseZincCompile(JvmCompile):
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
 
-    self._lazy_plugin_args = None
-
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
@@ -228,19 +225,21 @@ class BaseZincCompile(JvmCompile):
 
   def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
-    return self.plugin_jars()
+    return self.plugin_jars
 
+  @property
   def plugin_jars(self):
     """The classpath entries for jars containing code for enabled plugins."""
     raise NotImplementedError()
 
+  @property
   def plugin_args(self):
     raise NotImplementedError()
 
   def write_extra_resources(self, compile_context):
     """Override write_extra_resources to produce plugin and annotation processor files."""
     target = compile_context.target
-    if target.is_scalac_plugin and target.classname:
+    if isinstance(target, ScalacPlugin):
       self.write_plugin_info(compile_context.classes_dir, target)
     elif isinstance(target, AnnotationProcessor) and target.processors:
       processor_info_file = os.path.join(compile_context.classes_dir, _PROCESSOR_INFO_FILE)
@@ -284,7 +283,7 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
     zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
 
-    zinc_args += self.plugin_args()
+    zinc_args += self.plugin_args
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
@@ -364,11 +363,7 @@ class ZincCompile(BaseZincCompile):
   def select_source(self, source_file_path):
     return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
 
-  def __init__(self, *args, **kwargs):
-    super(ZincCompile, self).__init__(*args, **kwargs)
-
-    self._lazy_plugin_args = None
-
+  @memoized_property
   def plugin_jars(self):
     """The classpath entries for jars containing code for enabled plugins."""
     if self.get_options().scalac_plugins:
@@ -376,12 +371,8 @@ class ZincCompile(BaseZincCompile):
     else:
       return []
 
+  @memoized_property
   def plugin_args(self):
-    if self._lazy_plugin_args is None:
-      self._lazy_plugin_args = self._create_plugin_args()
-    return self._lazy_plugin_args
-
-  def _create_plugin_args(self):
     if not self.get_options().scalac_plugins:
       return []
 
@@ -400,7 +391,7 @@ class ZincCompile(BaseZincCompile):
     plugin_names = set([p for val in self.get_options().scalac_plugins for p in val.split(',')])
     plugins = {}
     buildroot = get_buildroot()
-    for jar in self.plugin_jars():
+    for jar in self.plugin_jars:
       with open_zip(jar, 'r') as jarfile:
         try:
           with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
