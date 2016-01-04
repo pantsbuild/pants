@@ -56,7 +56,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.4'
+  DEFAULT_EXPORT_VERSION = '1.0.5'
 
   @classmethod
   def subsystem_dependencies(cls):
