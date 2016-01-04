@@ -10,18 +10,9 @@ from pants_test.base_test import BaseTest
 from pants_test.cache.delay_server import setup_delayed_server
 
 
-def get_delayed_handler(delay):
-  class DelayResponseHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
-    def do_HEAD(self):
-      time.sleep(delay)
-      self.send_response(200)
-      self.end_headers()
-
-  return DelayResponseHandler
-
-
 class TestPinger(BaseTest):
   timeout_seconds = .6
+  fast_timeout_seconds = .001
   slow_seconds = .05
   fast_seconds = 0
 
@@ -42,14 +33,14 @@ class TestPinger(BaseTest):
     self.assertEqual(ping_results[self.timeout_netloc], Pinger.UNREACHABLE)
 
   def test_pinger_timeout_config(self):
-    test = Pinger(timeout=self.slow_seconds - .02, tries=2)
+    test = Pinger(timeout=self.fast_timeout_seconds, tries=2)
     netlocs = [self.fast_netloc, self.slow_netloc]
     ping_results = dict(test.pings(netlocs))
     self.assertLess(ping_results[self.fast_netloc], 1)
     self.assertEqual(ping_results[self.slow_netloc], Pinger.UNREACHABLE)
 
   def test_global_pinger_memo(self):
-    fast_pinger = Pinger(timeout=self.slow_seconds - .02, tries=2)
+    fast_pinger = Pinger(timeout=self.fast_timeout_seconds, tries=2)
     slow_pinger = Pinger(timeout=self.timeout_seconds, tries=2)
     self.assertEqual(fast_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE)
     self.assertNotEqual(slow_pinger.pings([self.slow_netloc])[0][1], Pinger.UNREACHABLE)
