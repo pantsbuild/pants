@@ -250,7 +250,7 @@ class TestProcessManager(unittest.TestCase):
 
   def test_purge_metadata_aborts(self):
     with mock.patch.object(ProcessManager, 'is_alive', return_value=True):
-      with self.assertRaises(AssertionError):
+      with self.assertRaises(self.pm.MetadataError):
         self.pm.purge_metadata()
 
   def test_purge_metadata_alive_but_forced(self):
