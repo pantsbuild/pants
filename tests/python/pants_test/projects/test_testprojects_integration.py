@@ -36,7 +36,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/cycle1',
       'testprojects/src/java/org/pantsbuild/testproject/cycle2',
       'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
-      'testprojects/src/java/org/pantsbuild/testproject/junit/beforeclassexception:tests'
+      'testprojects/src/java/org/pantsbuild/testproject/junit/beforeclassexception:tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/failing/tests/org/pantsbuild/tmp/tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/mixed/tests/org/pantsbuild/tmp/tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests',
