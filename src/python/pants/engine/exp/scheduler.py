@@ -441,6 +441,9 @@ class ProductGraph(object):
     self._adjacencies = defaultdict(OrderedSet)
 
   def add(self, src, dst):
+    if dst in self._adjacencies[src]:
+      # TODO: add cached consumption of the graph
+      print('>>> recomputed {} -> {}'.format(src, dst))
     self._adjacencies[src].add(dst)
 
   def dependents(self, dst):
@@ -453,7 +456,7 @@ class ProductGraph(object):
     return next(product_graph.dependents(dst), None) is not None
 
   def __str__(self):
-    adj_str = ','.join('{} -> {}'.format(k, v) for k, v in self._adjacencies.items())
+    adj_str = ','.join('{} -> {}'.format(k, v) for k, values in self._adjacencies.items() for v in values)
     return 'ProductGraph({})'.format(adj_str)
 
 
