@@ -8,7 +8,16 @@ python_tests(
     'src/python/pants/bin',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/option:testing',
-  ]
+  ],
+)
+
+python_tests(
+  name='exe_integration',
+  sources=['test_exe_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
