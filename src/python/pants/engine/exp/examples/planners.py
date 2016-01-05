@@ -17,7 +17,8 @@ from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
-from pants.engine.exp.scheduler import LocalScheduler, Plan, Planners, Subject, Task, TaskPlanner
+from pants.engine.exp.scheduler import (LocalScheduler, Plan, Planners, Select, Subject, Task,
+                                        TaskPlanner)
 from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized, memoized_property
 
@@ -97,7 +98,7 @@ class GlobalIvyResolvePlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: [[Jar]]}
+    return {Classpath: [[Select(Select.Subject(), Jar)]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     if isinstance(subject, Jar):
@@ -135,7 +136,7 @@ class ResourcesPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: [[ResourceSources]]}
+    return {Classpath: [[Select(Select.Subject(), ResourceSources)]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     resources = []
@@ -166,11 +167,11 @@ class ThriftPlanner(TaskPlanner):
 
   @abstractproperty
   def product_type_by_config_type(self):
-    """A dict of configuration types to product types for this planner.
+    """A dict of configuration types to product types for this planner."""
 
-    # This will come via an option default.
-    # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
-    """
+  @abstractproperty
+  def extra_product_selectors(self):
+    """A list of additional product selectors required by plans produced by this planner."""
 
   @abstractproperty
   def gen_func(self):
@@ -188,7 +189,8 @@ class ThriftPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {product_type: [[ThriftSources, config_type]]
+    return {product_type: [[Select(Select.Subject(), ThriftSources),
+                            Select(Select.Subject(), config_type)] + self.extra_product_selectors]
             for config_type, product_type in self.product_type_by_config_type.items()}
 
   def _extract_thrift_config(self, product_type, target, configuration=None):
@@ -251,6 +253,10 @@ class ApacheThriftPlanner(ThriftPlanner):
         ApacheThriftPythonConfiguration: PythonSources,
       }
 
+  @memoized_property
+  def extra_product_selectors(self):
+    return []
+
   def plan_parameters(self, scheduler, product_type, subject, apache_thrift_config):
     return dict(rev=apache_thrift_config.rev,
                 gen=apache_thrift_config.gen,
@@ -285,7 +291,7 @@ class BuildPropertiesPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: [[BuildPropertiesConfiguration]]}
+    return {Classpath: [[Select(Select.Subject(), BuildPropertiesConfiguration)]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     assert product_type == Classpath
@@ -331,10 +337,15 @@ class ScroogePlanner(ThriftPlanner):
         ScroogeScalaConfiguration: ScalaSources,
       }
 
-  def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
-    # This will come via an option default.
+  @memoized_property
+  def extra_product_selectors(self):
+    # TODO: currently duplicates the literal `def promise` call in `plan_parameters`.
     # TODO(John Sirois): once the options system is plumbed, make the tool spec configurable.
     # It could also just be pointed at the scrooge jar at that point.
+    return [Select(Select.LiteralSubject(Address.parse('src/scala/scrooge')), Classpath)]
+
+  def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
+    # This will come via an option default.
     scrooge_classpath = scheduler.promise(Address.parse('src/scala/scrooge'), Classpath)
     return dict(scrooge_classpath=scrooge_classpath,
                 lang=scrooge_config.lang,
@@ -353,7 +364,9 @@ class JvmCompilerPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    return {Classpath: [[self.source_type]]}
+    # Request Sources for a subject, and Classpaths for its dependencies.
+    return {Classpath: [[Select(Select.Subject(), self.source_type),
+                         Select(Select.SubjectDependencies(), Classpath)]]}
 
   @abstractproperty
   def compile_task_type(self):
@@ -389,7 +402,7 @@ class JvmCompilerPlanner(TaskPlanner):
       subject = sources.subject
 
     classpath_promises = []
-    for dep, dep_config in self.iter_configured_dependencies(subject):
+    for dep, dep_config in Subject.iter_configured_dependencies(subject):
       # This could recurse to us (or be satisfied by IvyResolve, another jvm compiler, etc.
       # depending on the dep type).
       classpath = scheduler.promise(dep, Classpath, configuration=dep_config)
@@ -470,7 +483,7 @@ class UnpickleableResultPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    return {UnpickleableResult: [[UnpickleableInput]]}
+    return {UnpickleableResult: [[Select(Select.Subject(), UnpickleableInput)]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     return Plan(unpickable_result_func, (subject,))
@@ -508,6 +521,7 @@ def setup_json_scheduler(build_root):
                        ScalacPlanner(),
                        ScroogePlanner(),
                        UnpickleableInputsPlanner(),
-                       UnpickleableResultPlanner()])
+                       UnpickleableResultPlanner()],
+                      graph.resolve)
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler

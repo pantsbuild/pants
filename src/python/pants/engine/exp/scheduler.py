@@ -22,6 +22,18 @@ from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
+class Select(namedtuple('Select', ['selector', 'product_type'])):
+
+  class Subject(object):
+    pass
+
+  class SubjectDependencies(object):
+    pass
+
+  class LiteralSubject(namedtuple('LiteralSubject', ['address'])):
+    pass
+
+
 class Subject(object):
   """The subject of a production plan."""
 
@@ -32,6 +44,36 @@ class Subject(object):
     :rtype: :class:`Subject`
     """
     return item if isinstance(item, Subject) else cls(primary=item)
+
+  @classmethod
+  def iter_configured_dependencies(cls, subject):
+    """Return an iterator of the given subject's dependencies including any selected configurations.
+
+    If no configuration is selected by a dependency (there is no `@[config-name]` specifier suffix),
+    then `None` is returned for the paired configuration object; otherwise the `[config-name]` is
+    looked for in the subject `configurations` list and returned if found or else an error is
+    raised.
+
+    :returns: An iterator over subjects dependencies as pairs of (dependency, configuration).
+    :rtype: :class:`collections.Iterator` of (object, string)
+    :raises: :class:`TaskPlanner.Error` if a dependency configuration was selected by subject but
+             could not be found or was not unique.
+    """
+    for derivation in Subject.as_subject(subject).iter_derivations:
+      if derivation.dependencies:
+        for dep in derivation.dependencies:
+          configuration = None
+          if dep.address:
+            config_specifier = extract_config_selector(dep.address)
+            if config_specifier:
+              if not dep.configurations:
+                raise ValueError('The dependency of {dependee} on {dependency} selects '
+                                 'configuration {config} but {dependency} has no configurations.'
+                                 .format(dependee=derivation,
+                                         dependency=dep,
+                                         config=config_specifier))
+              configuration = dep.select_configuration(config_specifier)
+          yield dep, configuration
 
   def __init__(self, primary, alternate=None):
     """
@@ -336,36 +378,6 @@ class TaskPlanner(AbstractClass):
   class Error(Exception):
     """Indicates an error creating a product plan for a subject."""
 
-  @classmethod
-  def iter_configured_dependencies(cls, subject):
-    """Return an iterator of the given subject's dependencies including any selected configurations.
-
-    If no configuration is selected by a dependency (there is no `@[config-name]` specifier suffix),
-    then `None` is returned for the paired configuration object; otherwise the `[config-name]` is
-    looked for in the subject `configurations` list and returned if found or else an error is
-    raised.
-
-    :returns: An iterator over subjects dependencies as pairs of (dependency, configuration).
-    :rtype: :class:`collections.Iterator` of (object, string)
-    :raises: :class:`TaskPlanner.Error` if a dependency configuration was selected by subject but
-             could not be found or was not unique.
-    """
-    for derivation in Subject.as_subject(subject).iter_derivations:
-      if derivation.dependencies:
-        for dep in derivation.dependencies:
-          configuration = None
-          if dep.address:
-            config_specifier = extract_config_selector(dep.address)
-            if config_specifier:
-              if not dep.configurations:
-                raise cls.Error('The dependency of {dependee} on {dependency} selects '
-                                'configuration {config} but {dependency} has no configurations.'
-                                .format(dependee=derivation,
-                                        dependency=dep,
-                                        config=config_specifier))
-              configuration = dep.select_configuration(config_specifier)
-          yield dep, configuration
-
   @abstractproperty
   def goal_name(self):
     """Return the name of the goal this planner's task should run from.
@@ -377,11 +389,12 @@ class TaskPlanner(AbstractClass):
   def product_types(self):
     """Return a dict from output products to input product requirements for this planner.
 
+    Each requirement is a `Select`, which indicates that the Planner requires a particular
+    product for some subject/subjects.
+
     Product requirements are represented in disjunctive normal form (DNF). There are two
     levels of nested lists: the outer list represents clauses that are ORed; the inner
     list represents type matches that are ANDed.
-
-    TODO: dsl for this?
     """
 
   @abstractmethod
@@ -429,10 +442,11 @@ class Planners(object):
   to validate the graph.
   """
 
-  def __init__(self, planners):
+  def __init__(self, planners, address_resolver):
     """
     :param planners: All the task planners registered in the system.
     :type planners: :class:`collections.Iterable` of :class:`TaskPlanner`
+    :param address_resolver: A function that given an Address returns a Subject.
     """
     self._planners_by_goal_name = defaultdict(set)
     self._product_requirements = defaultdict(dict)
@@ -442,6 +456,7 @@ class Planners(object):
       for output_type, input_type_requirements in planner.product_types.items():
         self._product_requirements[output_type][planner] = input_type_requirements
         self._output_products.add(output_type)
+    self._address_resolver = address_resolver
 
   def for_goal(self, goal_name):
     """Return the set of task planners installed in the given goal.
@@ -461,12 +476,10 @@ class Planners(object):
     :param configuration: An optional configuration to require that a planner consumes, or None.
     :rtype: set of :class:`TaskPlanner`
     """
-    input_products = list(Products.for_subject(subject))
-
     partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
     for planner, ored_clauses in self._product_requirements[product_type].items():
       fully_consumed = set()
-      if not self._apply_product_requirement_clauses(input_products,
+      if not self._apply_product_requirement_clauses(subject,
                                                      planner,
                                                      ored_clauses,
                                                      fully_consumed,
@@ -479,18 +492,18 @@ class Planners(object):
         yield planner
 
   def _apply_product_requirement_clauses(self,
-                                         input_products,
+                                         subject,
                                          planner,
                                          ored_clauses,
                                          fully_consumed,
                                          partially_consumed_candidates):
     for anded_clause in ored_clauses:
       # Determine which of the anded clauses can be satisfied.
-      matched = [self._apply_product_requirements(product_req,
-                                                  input_products,
-                                                  fully_consumed,
-                                                  partially_consumed_candidates)
-                 for product_req in anded_clause]
+      matched = [self._apply_select(select,
+                                    subject,
+                                    fully_consumed,
+                                    partially_consumed_candidates)
+                 for select in anded_clause]
       matched_count = sum(1 for match in matched if match)
 
       if matched_count == len(anded_clause):
@@ -509,7 +522,25 @@ class Planners(object):
           partially_consumed_candidates[consumed_product][planner].update(unconsumed)
     return False
 
+  def _select_subjects(self, selector, subject):
+    """Yields all subjects selected by the given Select for the given subject."""
+    if isinstance(selector, Select.Subject):
+      print('>>> selected direct subject: {}'.format(subject))
+      yield subject
+    elif isinstance(selector, Select.SubjectDependencies):
+      deps = [dep for dep, _ in Subject.iter_configured_dependencies(subject)]
+      print('>>> selected subject dependencies of: {}: {}'.format(subject, deps))
+      for dep in deps:
+        yield dep
+    elif isinstance(selector, Select.LiteralSubject):
+      new_sub = self._address_resolver(selector.address)
+      print('>>> found LiteralSubject: {}, resolved to: {}'.format(selector, new_sub))
+      yield new_sub
+    else:
+      raise ValueError('Unimplemented `Select` type: {}'.format(select))
+
   def _apply_product_requirements(self,
+                                  subject,
                                   output_product_type,
                                   input_products,
                                   fully_consumed,
@@ -529,12 +560,36 @@ class Planners(object):
       # Requirement might be possible to satisfy by requesting additional products.
       matched = False
       for planner, ored_clauses in self._product_requirements[output_product_type].items():
-        matched |= self._apply_product_requirement_clauses(input_products,
+        matched |= self._apply_product_requirement_clauses(subject,
                                                            planner,
                                                            ored_clauses,
                                                            fully_consumed,
                                                            partially_consumed_candidates)
       return matched
+
+  def _apply_select(self,
+                    select,
+                    subject,
+                    fully_consumed,
+                    partially_consumed_candidates):
+    """Determines whether the given Select can be satisfied for the given Subject.
+
+    Returns a boolean indicating whether the value(s) specified by the Select can be produced.
+    Mutates the fully consumed product set, and a dict(product,dict(planner,list(product))) of
+    partially consumed products.
+    """
+    matched = True
+    print('>>> entering _apply_select for {} on {}'.format(select, subject))
+    for selected_subject in self._select_subjects(select.selector, subject):
+      input_products = list(Products.for_subject(selected_subject))
+      this_matched = self._apply_product_requirements(selected_subject,
+                                                      select.product_type,
+                                                      input_products,
+                                                      fully_consumed,
+                                                      partially_consumed_candidates)
+      print('>>> {}, {} for {} (with {}), {}'.format(matched, this_matched, selected_subject, input_products, select.product_type))
+      matched &= this_matched
+    return matched
 
   def produced_types_for_subject(self, subject, output_product_types):
     """Filters the given list of output products to those that are actually possible to produce.
@@ -546,16 +601,15 @@ class Planners(object):
     Note that this does not validate dependency subjects of the input subject, so it is necessary
     to validate every call to `def promise` against these requirements.
     """
-    input_products = list(Products.for_subject(subject))
-
     producible_output_types = list()
     fully_consumed = set()
     partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
     for output_product_type in output_product_types:
-      if self._apply_product_requirements(output_product_type,
-                                          input_products,
-                                          fully_consumed,
-                                          partially_consumed_candidates):
+      # If we can select the given product for this subject, then it is producible.
+      if self._apply_select(Select(Select.Subject(), output_product_type),
+                            subject,
+                            fully_consumed,
+                            partially_consumed_candidates):
         producible_output_types.append(output_product_type)
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
