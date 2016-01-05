@@ -55,6 +55,15 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
              help='The scala "platform version", which is suffixed onto all published '
                   'libraries. This should match the declared compiler/library versions.')
 
+    register('--runtime', advanced=True, type=list_option, default=['//:scala-library'],
+             help='Target specs pointing to the scala runtime libraries.',
+             deprecated_version='0.0.75',
+             deprecated_hint='Option is no longer used, version is used to specify the major'
+                             'runtime is created based on major version.')
+
+    register('--runtime-spec', advanced=True, default='//:scala-library',
+             help='Address to be used for custom scala runtime.')
+
     # Scala 2.10
     cls.register_jvm_tool(register,
                           'scalac_2_10',
@@ -150,8 +159,12 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper runtime based on scala version.
     :return iterator: list with single runtime.
     """
-    runtime_name = scala_build_info.get(self._get_label()).runtime_name
-    return [getattr(self, runtime_name)]
+    # If the version is custom allow the user the option to set the spec.
+    if self._get_label() == 'custom':
+      return self.get_options().runtime_spec
+    else:
+      runtime_name = scala_build_info.get(self._get_label()).runtime_name
+      return [getattr(self, runtime_name)]
 
   @classmethod
   def _synthetic_runtime_target(cls, buildgraph):
