@@ -11,10 +11,13 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.fs import archive
+from pants.fs.archive import JAR
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
@@ -68,6 +71,10 @@ class BundleCreate(JvmBinaryTask):
 
   def execute(self):
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
+
+    union_products = self.context.products.get_data('runtime_classpath')._classpaths
+    self.consolidate_classpath(union_products)
+
     for target in self.context.targets():
       for app in map(self.App, filter(self.App.is_app, [target])):
         basedir = self.bundle(app)
@@ -163,3 +170,22 @@ class BundleCreate(JvmBinaryTask):
         verbose_symlink(path, bundle_path)
 
     return bundle_dir
+
+  def consolidate_classpath(self, union_products):
+    def jardir(entry):
+      """Jar up the contents of the given ClasspathEntry and return a temporary jar path."""
+      root = entry.path
+
+      with temporary_dir(root_dir=self.workdir, cleanup=False) as destdir:
+        jarpath = JAR.create(root, destdir, 'output')
+      return ClasspathEntry(jarpath)
+
+    safe_mkdir(self.workdir)
+    for target, entries in dict(union_products._products_by_target).items():
+      new_entries = OrderedSet()
+      for conf, entry in entries:
+        if os.path.isdir(entry.path):
+          new_entries.add((conf, jardir(entry)))
+        else:
+          new_entries.add((conf, entry))
+      union_products._products_by_target[target] = new_entries
