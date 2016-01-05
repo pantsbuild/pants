@@ -12,7 +12,7 @@ from collections import namedtuple
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_file_dump, safe_mkdir
 
 
 class Watchman(ProcessManager):
@@ -69,7 +69,7 @@ class Watchman(ProcessManager):
   def _maybe_init_metadata(self):
     safe_mkdir(self._work_dir)
     # Initialize watchman with an empty, but valid statefile so it doesn't complain on startup.
-    self._write_file(self._state_file, '{}')
+    safe_file_dump(self._state_file, '{}')
 
   def _construct_cmd(self, cmd_parts, state_file, sock_file, log_file, log_level):
     return [part for part in cmd_parts] + ['--no-save-state',

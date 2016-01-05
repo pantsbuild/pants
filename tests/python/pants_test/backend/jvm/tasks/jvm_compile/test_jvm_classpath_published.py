@@ -20,6 +20,8 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
   def task_type(cls):
     return RuntimeClasspathPublisher
 
+  # TODO (peiyu) This overlaps with test cases in `ClasspathUtilTest`. Clean this up once we
+  # fully switch to `target.id` based canonical classpath.
   def test_incremental_caching(self):
     with temporary_dir(root_dir=self.pants_workdir) as jar_dir, \
          temporary_dir(root_dir=self.pants_workdir) as dist_dir:

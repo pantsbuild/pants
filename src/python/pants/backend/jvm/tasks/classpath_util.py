@@ -5,13 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import os
+import re
 
 from twitter.common.collections import OrderedSet
 
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_open, safe_walk
+from pants.util.dirutil import fast_relpath, safe_delete, safe_open, safe_walk
 
 
 class ClasspathUtil(object):
@@ -154,61 +154,92 @@ class ClasspathUtil(object):
                                  use_target_id=True):
     """Create a stable classpath of symlinks with standardized names.
 
+    By default symlinks are created for each target under `basedir` based on its `target.id`.
+    Unique suffixes are added to further disambiguate classpath products from the same target.
+
+    It also optionally saves the classpath products to be used externally (by intellij plugin),
+    one output file for each target.
+
+    Note calling this function will refresh the symlinks and output files for the target under
+    `basedir` if they exist, but it will NOT delete/cleanup the contents for *other* targets.
+    Caller wants that behavior can make the similar calls for other targets or just remove
+    the `basedir` first.
+
     :param classpath_products: Classpath products.
     :param targets: Targets to create canonical classpath for.
     :param basedir: Directory to create symlinks.
     :param save_classpath_file: An optional file with original classpath entries that symlinks
       are created from.
+    :param use_target_id: Optionally switch to the subdirectory based symlinks naming.
+      This is added for backward compatibility. Remove once intellij plugin is ready to use
+      `target.id` based output files.  See `use_old_naming_style` option in :class:
+      `pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher.RuntimeClasspathPublisher`.
 
     :returns: Converted canonical classpath.
     :rtype: list of strings
     """
-    def _stable_output_folder(basedir, target):
+    def delete_old_target_output_files(classpath_prefix):
+      """Delete existing output files or symlinks for target."""
+      directory, basename = os.path.split(classpath_prefix)
+      pattern = re.compile(r'^{basename}(([0-9]+)(\.jar)?|classpath\.txt)$'
+                           .format(basename=re.escape(basename)))
+      files = [filename for filename in os.listdir(directory) if pattern.match(filename)]
+      for rel_path in files:
+        path = os.path.join(directory, rel_path)
+        if os.path.islink(path) or os.path.isfile(path):
+          safe_delete(path)
+
+    def prepare_target_output_folder(basedir, target):
+      """Prepare directory that will contain canonical classpath for the target.
+
+      This includes creating directories if it does not already exist, cleaning up
+      previous classpath output related to the target.
+      """
       if use_target_id:
-        return os.path.join(basedir, target.id)
+        output_dir = basedir
+        # TODO(peiyu) improve readability once we deprecate the old naming style.
+        # For example, `-` is commonly placed in string format as opposed to here.
+        classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
+                                                                      target_id=target.id)
+      else:
+        address = target.address
+        output_dir = os.path.join(
+          basedir,
+          # target.address.spec is used in export goal to identify targets
+          address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
+        )
+        # append / to the end as part of the prefix
+        classpath_prefix_for_target = os.path.join(output_dir, '')
 
-      address = target.address
-      return os.path.join(
-        basedir,
-        # target.address.spec is used in export goal to identify targets
-        address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
-      )
-
-    def safe_delete_current_directory(directory):
-      """Delete only the files or symlinks under the current directory."""
-      try:
-        for name in os.listdir(directory):
-          path = os.path.join(directory, name)
-          if os.path.islink(path) or os.path.isfile(path):
-            safe_delete(path)
-      except OSError as e:
-        if e.errno != errno.ENOENT:
-          raise
+      if os.path.exists(output_dir):
+        delete_old_target_output_files(classpath_prefix_for_target)
+      else:
+        os.makedirs(output_dir)
+      return classpath_prefix_for_target
 
     canonical_classpath = []
     for target in targets:
-      folder_for_target_symlinks = _stable_output_folder(basedir, target)
-      safe_delete_current_directory(folder_for_target_symlinks)
+      classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
       classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
         [target])
 
       if len(classpath_entries_for_target) > 0:
-        safe_mkdir(folder_for_target_symlinks)
 
         classpath = []
         for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
           classpath.append(entry.path)
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
-          file_name = os.path.basename(entry.path)
-          symlink_path = os.path.join(folder_for_target_symlinks, '{}-{}'.format(index, file_name))
+          _, ext = os.path.splitext(entry.path)
+
+          symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
 
         if save_classpath_file:
-          with safe_open(os.path.join(folder_for_target_symlinks, 'classpath.txt'), 'w') as classpath_file:
-            classpath_file.write(os.pathsep.join(classpath))
+          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
+            classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
             classpath_file.write('\n')
 
     return canonical_classpath

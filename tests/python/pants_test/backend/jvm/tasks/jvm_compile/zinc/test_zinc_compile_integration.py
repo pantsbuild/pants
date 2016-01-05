@@ -72,8 +72,14 @@ class ZincCompileIntegrationTest(BaseCompileIT):
           self.get_only(found, 'HelloScalac.class').endswith(
               'org/pantsbuild/testproject/scalac/plugin/HelloScalac.class'))
 
-      tree = ET.parse(self.get_only(found, 'scalac-plugin.xml'))
-      root = tree.getroot()
+      # Ensure that the plugin registration file is written to the root of the classpath.
+      path = self.get_only(found, 'scalac-plugin.xml')
+      self.assertTrue(path.endswith('/classes/scalac-plugin.xml'),
+                      'plugin registration file `{}` not located at the '
+                      'root of the classpath'.format(path))
+
+      # And that it is well formed.
+      root = ET.parse(path).getroot()
       self.assertEqual('plugin', root.tag)
       self.assertEqual('hello_scalac', root.find('name').text)
       self.assertEqual('org.pantsbuild.testproject.scalac.plugin.HelloScalac',

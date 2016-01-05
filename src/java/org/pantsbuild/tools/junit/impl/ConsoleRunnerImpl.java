@@ -290,10 +290,15 @@ public class ConsoleRunnerImpl {
     @Override
     public void testFailure(Failure failure) throws Exception {
       if (outputMode == OutputMode.FAILURE_ONLY) {
-        InMemoryStreamCapture capture = caseCaptures.remove(failure.getDescription());
-        capture.close();
-        SWAPPABLE_OUT.getOriginal().append(new String(capture.readOut()));
-        SWAPPABLE_ERR.getOriginal().append(new String(capture.readErr()));
+        if (caseCaptures.containsKey(failure.getDescription())) {
+          InMemoryStreamCapture capture = caseCaptures.remove(failure.getDescription());
+          capture.close();
+          SWAPPABLE_OUT.getOriginal().append(new String(capture.readOut()));
+          SWAPPABLE_ERR.getOriginal().append(new String(capture.readErr()));
+        } else {
+          // Do nothing.
+          // In case of exception in @BeforeClass method testFailure executes without testStarted.
+        }
       }
       super.testFailure(failure);
     }

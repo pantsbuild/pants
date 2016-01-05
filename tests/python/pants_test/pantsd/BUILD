@@ -61,3 +61,12 @@ python_tests(
     'src/python/pants/util:contextutil'
   ]
 )
+
+python_tests(
+  name = 'pantsd_integration',
+  sources = ['test_pantsd_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test'
+  ],
+  tags = {'integration'}
+)

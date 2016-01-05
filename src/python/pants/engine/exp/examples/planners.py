@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
-import sys
 from abc import abstractmethod, abstractproperty
 
 from twitter.common.collections import OrderedSet
@@ -18,6 +17,7 @@ from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
+from pants.engine.exp.products import Sources
 from pants.engine.exp.scheduler import LocalScheduler, Plan, Planners, Subject, Task, TaskPlanner
 from pants.engine.exp.targets import Sources as AddressableSources
 from pants.engine.exp.targets import Target
@@ -79,7 +79,7 @@ class GlobalIvyResolvePlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    yield Classpath
+    return {Classpath: [[Jar]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     if isinstance(subject, Jar):
@@ -107,31 +107,6 @@ def _create_sources(ext):
   return Sources.of(ext)
 
 
-class Sources(object):
-  @classmethod
-  @memoized
-  def of(cls, ext):
-    type_name = b'Sources({!r})'.format(ext)
-
-    class_dict = {'ext': ext,
-                  # We need custom serialization for the dynamic class type.
-                  '__reduce__': lambda self: (_create_sources, ext)}
-
-    ext_type = type(type_name, (cls,), class_dict)
-
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, ext_type)
-
-    return ext_type
-
-  @classmethod
-  def ext(cls):
-    raise NotImplementedError()
-
-  def __repr__(self):
-    return 'Sources(ext={!r})'.format(self.ext)
-
-
 class ThriftConfiguration(Configuration):
   def __init__(self, deps=None, **kwargs):
     """
@@ -152,11 +127,12 @@ class ThriftPlanner(TaskPlanner):
   def goal_name(self):
     return 'gen'
 
-  @abstractmethod
-  def extract_thrift_config(self, product_type, target, configuration=None):
-    """Return the configuration to be used to produce the given product type for the given target.
+  @abstractproperty
+  def product_type_by_config_type(self):
+    """A dict of configuration types to product types for this planner.
 
-    :rtype: :class:`ThriftConfiguration`
+    # This will come via an option default.
+    # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
     """
 
   @abstractproperty
@@ -173,33 +149,58 @@ class ThriftPlanner(TaskPlanner):
     :rtype: dict
     """
 
-  def plan(self, scheduler, product_type, subject, configuration=None):
-    if not isinstance(subject, Target):
-      return None
+  @property
+  def product_types(self):
+    return {product_type: [[Sources.of('.thrift'), config_type]]
+            for config_type, product_type in self.product_type_by_config_type.items()}
 
+  def _extract_thrift_config(self, product_type, target, configuration=None):
+    """Return the configuration to be used to produce the given product type for the given target.
+
+    :rtype: :class:`ThriftConfiguration`
+    """
+    configs = (configuration,) if configuration else target.configurations
+    configs = tuple(config for config in configs
+                    if (product_type == self.product_type_by_config_type.get(type(config))))
+    if not configs:
+      # We don't know how to generate these type of sources for this subject.
+      raise self.Error('No configuration for generating {!r} from {!r}.'.format(product_type, target))
+    if len(configs) > 1:
+      raise self.Error('Found more than one configuration for generating {!r} from {!r}:\n\t{}'
+                       .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
+    return configs[0]
+
+  def plan(self, scheduler, product_type, subject, configuration=None):
     thrift_sources = list(subject.sources.iter_paths(base_path=subject.address.spec_path,
                                                      ext='.thrift'))
     if not thrift_sources:
-      return None
+      raise self.Error('No thrift sources for {!r} from {!r}.'.format(product_type, subject))
 
-    config = self.extract_thrift_config(product_type, subject, configuration=configuration)
-    if config is None:
-      return None
-
+    config = self._extract_thrift_config(product_type, subject, configuration=configuration)
     subject = Subject(subject, alternate=Target(dependencies=config.deps))
     inputs = self.plan_parameters(scheduler, product_type, subject, config)
     return Plan(func_or_task_type=self.gen_func, subjects=(subject,), sources=thrift_sources, **inputs)
 
 
-class ApacheThriftConfiguration(ThriftConfiguration):
-  def __init__(self, rev=None, gen=None, strict=True, **kwargs):
+class ApacheThriftJavaConfiguration(ThriftConfiguration):
+  def __init__(self, rev=None, strict=True, **kwargs):
     """
     :param string rev: The version of the apache thrift compiler to use.
-    :param string gen: The thrift compiler `--gen` argument specifying the type of code to generate
-                       and any options to pass to the generator.
     :param bool strict: `False` to turn strict compiler warnings off (not recommended).
     """
-    super(ApacheThriftConfiguration, self).__init__(rev=rev, gen=gen, strict=strict, **kwargs)
+    super(ApacheThriftJavaConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
+
+  @abstractproperty
+  def gen(self):
+    pass
+
+
+class ApacheThriftJavaConfiguration(ThriftConfiguration):
+  gen = 'java'
+
+
+class ApacheThriftPythonConfiguration(ThriftConfiguration):
+  gen = 'python'
 
 
 class ApacheThriftPlanner(ThriftPlanner):
@@ -208,31 +209,11 @@ class ApacheThriftPlanner(ThriftPlanner):
     return gen_apache_thrift
 
   @memoized_property
-  def _product_type_by_lang(self):
-    # This will come via an option default.
-    # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
-    return {'java': Sources.of('.java'), 'py': Sources.of('.py')}
-
-  @property
-  def product_types(self):
-    return self._product_type_by_lang.values()
-
-  def _product_type(self, gen):
-    lang = gen.partition(':')[0]
-    return self._product_type_by_lang.get(lang)
-
-  def extract_thrift_config(self, product_type, target, configuration=None):
-    configs = (configuration,) if configuration else target.configurations
-    configs = tuple(config for config in configs
-                    if (isinstance(config, ApacheThriftConfiguration) and
-                        product_type == self._product_type(config.gen)))
-    if not configs:
-      # We don't know how to generate these type of sources for this subject.
-      return None
-    if len(configs) > 1:
-      raise self.Error('Found more than one configuration for generating {!r} from {!r}:\n\t{}'
-                       .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
-    return configs[0]
+  def product_type_by_config_type(self):
+    return {
+        ApacheThriftJavaConfiguration: Sources.of('.java'),
+        ApacheThriftPythonConfiguration: Sources.of('.py'),
+      }
 
   def plan_parameters(self, scheduler, product_type, subject, apache_thrift_config):
     return dict(rev=apache_thrift_config.rev,
@@ -268,16 +249,10 @@ class BuildPropertiesPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    yield Classpath
+    return {Classpath: [[BuildPropertiesConfiguration]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    if not isinstance(subject, Target):
-      return
-    name_config = filter(lambda x: isinstance(x, BuildPropertiesConfiguration), subject.configurations)
-    if not name_config:
-      return
     assert product_type == Classpath
-
     return Plan(func_or_task_type=write_name_file, subjects=(subject,), name=subject.name)
 
 
@@ -288,13 +263,24 @@ def write_name_file(name):
 
 
 class ScroogeConfiguration(ThriftConfiguration):
-  def __init__(self, rev=None, lang=None, strict=True, **kwargs):
+  def __init__(self, rev=None, strict=True, **kwargs):
     """
     :param string rev: The version of the scrooge compiler to use.
-    :param string lang: The language to target code generation to.
     :param bool strict: `False` to turn strict compiler warnings off (not recommended).
     """
-    super(ScroogeConfiguration, self).__init__(rev=rev, lang=lang, strict=strict, **kwargs)
+    super(ScroogeScalaConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
+
+  @abstractproperty
+  def lang(self):
+    pass
+
+
+class ScroogeScalaConfiguration(ThriftConfiguration):
+  lang = 'scala'
+
+
+class ScroogeJavaConfiguration(ThriftConfiguration):
+  lang = 'java'
 
 
 class ScroogePlanner(ThriftPlanner):
@@ -303,27 +289,11 @@ class ScroogePlanner(ThriftPlanner):
     return gen_scrooge_thrift
 
   @memoized_property
-  def _product_type_by_lang(self):
-    # This will come via an option default.
-    # TODO(John Sirois): once the options system is plumbed, make the languages configurable.
-    return {'scala': Sources.of('.scala'), 'java': Sources.of('.java')}
-
-  @property
-  def product_types(self):
-    return self._product_type_by_lang.values()
-
-  def extract_thrift_config(self, product_type, target, configuration=None):
-    configs = (configuration,) if configuration else target.configurations
-    configs = tuple(config for config in configs
-                    if (isinstance(config, ScroogeConfiguration) and
-                        product_type == self._product_type_by_lang.get(config.lang)))
-    if not configs:
-      # We don't know how to generate these type of sources for this subject.
-      return None
-    if len(configs) > 1:
-      raise self.Error('Found more than one configuration for generating {!r} from {!r}:\n\t{}'
-                       .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
-    return configs[0]
+  def product_type_by_config_type(self):
+    return {
+        ScroogeJavaConfiguration: Sources.of('.java'),
+        ScroogeScalaConfiguration: Sources.of('.scala'),
+      }
 
   def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
     # This will come via an option default.
@@ -347,7 +317,7 @@ class JvmCompilerPlanner(TaskPlanner):
 
   @property
   def product_types(self):
-    yield Classpath
+    return {Classpath: [[Sources.of(self.source_ext)]]}
 
   @abstractproperty
   def compile_task_type(self):
@@ -364,9 +334,6 @@ class JvmCompilerPlanner(TaskPlanner):
     """
 
   def plan(self, scheduler, product_type, subject, configuration=None):
-    if not isinstance(subject, Target):
-      return None
-
     sources = list(subject.sources.iter_paths(base_path=subject.address.spec_path,
                                               ext=self.source_ext))
     if not sources:
@@ -381,20 +348,14 @@ class JvmCompilerPlanner(TaskPlanner):
       # or transformed into a `Classpath` product by some other compiler targeting the jvm.
       sources = scheduler.promise(subject,
                                   Sources.of(self.source_ext),
-                                  configuration=configuration,
-                                  required=False)
-      if sources:
-        subject = sources.subject
-
-    if not sources:
-      # We don't know how to compile this subject, someone else may (Scalac, Groovyc, ...)
-      return None
+                                  configuration=configuration)
+      subject = sources.subject
 
     classpath_promises = []
     for dep, dep_config in self.iter_configured_dependencies(subject):
       # This could recurse to us (or be satisfied by IvyResolve, another jvm compiler, etc.
       # depending on the dep type).
-      classpath = scheduler.promise(dep, Classpath, configuration=dep_config, required=True)
+      classpath = scheduler.promise(dep, Classpath, configuration=dep_config)
       classpath_promises.append(classpath)
 
     return Plan(func_or_task_type=self.compile_task_type,
@@ -444,7 +405,7 @@ class UnpickleableInputsPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    yield Sources.of('unpickleable_inputs')
+    return {Sources.of('unpickleable_inputs'): [[]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     # Nested functions like this lambda are unpicklable.
@@ -464,7 +425,7 @@ class UnpickleableResultPlanner(TaskPlanner):
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
-    yield Sources.of('unpickleable_result')
+    return {Sources.of('unpickleable_result'): [[Sources.of('unpickleable_inputs')]]}
 
   def plan(self, scheduler, product_type, subject, configuration=None):
     return Plan(unpickable_result_func, (subject,))
@@ -476,10 +437,12 @@ def setup_json_scheduler(build_root):
   :rtype tuple of (:class:`pants.engine.exp.graph.Graph`,
                    :class:`pants.engine.exp.scheduler.LocalScheduler`)
   """
-  symbol_table = {'apache_thrift_configuration': ApacheThriftConfiguration,
+  symbol_table = {'apache_thrift_java_configuration': ApacheThriftJavaConfiguration,
+                  'apache_thrift_python_configuration': ApacheThriftPythonConfiguration,
                   'jar': Jar,
                   'requirement': Requirement,
-                  'scrooge_configuration': ScroogeConfiguration,
+                  'scrooge_java_configuration': ScroogeJavaConfiguration,
+                  'scrooge_scala_configuration': ScroogeScalaConfiguration,
                   'sources': AddressableSources,
                   'target': Target,
                   'build_properties': BuildPropertiesConfiguration}

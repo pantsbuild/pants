@@ -107,7 +107,6 @@ python_tests(
   name = 'payload',
   sources = ['test_payload.py'],
   dependencies = [
-    'src/python/pants/backend/core',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
@@ -119,7 +118,6 @@ python_tests(
   name = 'payload_field',
   sources = ['test_payload_field.py'],
   dependencies = [
-    'src/python/pants/backend/core',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',

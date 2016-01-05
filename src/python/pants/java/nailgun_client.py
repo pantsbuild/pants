@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import select
+import signal
 import socket
 import sys
 import threading
-from contextlib import contextmanager
 
 from pants.java.nailgun_io import NailgunStreamReader
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
@@ -24,43 +24,52 @@ logger = logging.getLogger(__name__)
 class NailgunClientSession(NailgunProtocol):
   """Handles a single nailgun client session."""
 
-  BUF_SIZE = 8192
-
   def __init__(self, sock, in_fd, out_fd, err_fd):
     self._sock = sock
-    self._input_reader = NailgunStreamReader(in_fd, self._sock, self.BUF_SIZE) if in_fd else None
+    self._input_reader = NailgunStreamReader(in_fd, self._sock) if in_fd else None
     self._stdout = out_fd
     self._stderr = err_fd
+    self.remote_pid = None
 
-  @contextmanager
-  def _maybe_input_reader_running(self):
-    if self._input_reader: self._input_reader.start()
-    yield
-    if self._input_reader: self._input_reader.stop()
+  def _maybe_start_input_reader(self):
+    if self._input_reader:
+      self._input_reader.start()
+
+  def _maybe_stop_input_reader(self):
+    if self._input_reader:
+      self._input_reader.stop()
 
   def _process_session(self):
     """Process the outputs of the nailgun session."""
-    for chunk_type, payload in self.iter_chunks(self._sock):
-      if chunk_type == ChunkType.STDOUT:
-        self._stdout.write(payload)
-        self._stdout.flush()
-      elif chunk_type == ChunkType.STDERR:
-        self._stderr.write(payload)
-        self._stderr.flush()
-      elif chunk_type == ChunkType.EXIT:
-        self._stdout.flush()
-        self._stderr.flush()
-        return int(payload)
-      else:
-        raise self.ProtocolError('Received unexpected chunk {} -> {}'.format(chunk_type, payload))
+    try:
+      for chunk_type, payload in self.iter_chunks(self._sock):
+        if chunk_type == ChunkType.STDOUT:
+          self._stdout.write(payload)
+          self._stdout.flush()
+        elif chunk_type == ChunkType.STDERR:
+          self._stderr.write(payload)
+          self._stderr.flush()
+        elif chunk_type == ChunkType.EXIT:
+          self._stdout.flush()
+          self._stderr.flush()
+          return int(payload)
+        elif chunk_type == ChunkType.PID:
+          self.remote_pid = int(payload)
+        elif chunk_type == ChunkType.START_READING_INPUT:
+          self._maybe_start_input_reader()
+        else:
+          raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
+    finally:
+      # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
+      # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamReader is always stopped.
+      self._maybe_stop_input_reader()
 
   def execute(self, working_dir, main_class, *arguments, **environment):
     # Send the nailgun request.
     self.send_request(self._sock, working_dir, main_class, *arguments, **environment)
 
-    # Launch the NailgunStreamReader if applicable and process the remainder of the nailgun session.
-    with self._maybe_input_reader_running():
-      return self._process_session()
+    # Process the remainder of the nailgun session.
+    return self._process_session()
 
 
 class NailgunClient(object):
@@ -96,6 +105,7 @@ class NailgunClient(object):
     self._stdout = out or sys.stdout
     self._stderr = err or sys.stderr
     self._workdir = workdir or os.path.abspath(os.path.curdir)
+    self._session = None
 
   def try_connect(self):
     """Creates a socket, connects it to the nailgun and returns the connected socket.
@@ -114,6 +124,11 @@ class NailgunClient(object):
     else:
       return sock
 
+  def send_control_c(self):
+    """Sends SIGINT to a nailgun server using pid information from the active session."""
+    if self._session and self._session.remote_pid is not None:
+      os.kill(self._session.remote_pid, signal.SIGINT)
+
   def execute(self, main_class, cwd=None, *args, **environment):
     """Executes the given main_class with any supplied args in the given environment.
 
@@ -129,17 +144,18 @@ class NailgunClient(object):
     # N.B. This can throw NailgunConnectionError (catchable via NailgunError).
     sock = self.try_connect()
 
-    session = NailgunClientSession(sock, self._stdin, self._stdout, self._stderr)
+    self._session = NailgunClientSession(sock, self._stdin, self._stdout, self._stderr)
     try:
-      return session.execute(cwd, main_class, *args, **environment)
+      return self._session.execute(cwd, main_class, *args, **environment)
     except socket.error as e:
       raise self.NailgunError('Problem communicating with nailgun server at {}:{}: {!r}'
                               .format(self._host, self._port, e))
-    except session.ProtocolError as e:
+    except NailgunProtocol.ProtocolError as e:
       raise self.NailgunError('Problem in nailgun protocol with nailgun server at {}:{}: {!r}'
                               .format(self._host, self._port, e))
     finally:
       sock.close()
+      self._session = None
 
   def __repr__(self):
     return 'NailgunClient(host={!r}, port={!r}, workdir={!r})'.format(self._host,
