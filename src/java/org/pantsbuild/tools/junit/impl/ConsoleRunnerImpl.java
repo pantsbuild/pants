@@ -296,7 +296,8 @@ public class ConsoleRunnerImpl {
           SWAPPABLE_OUT.getOriginal().append(new String(capture.readOut()));
           SWAPPABLE_ERR.getOriginal().append(new String(capture.readErr()));
         } else {
-          // Do nothing. Can be in case of exception in @BeforeClass method.
+          // Do nothing.
+          // In case of exception in @BeforeClass method testFailure executes without testStarted.
         }
       }
       super.testFailure(failure);
