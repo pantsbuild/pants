@@ -15,6 +15,9 @@ from pants.util.contextutil import stdio_as
 from pants_test.base_test import BaseTest
 
 
+PATCH_OPTS = dict(autospec=True, spec_set=True)
+
+
 class StreamLoggerTest(BaseTest):
 
   TEST_LOG_LEVEL = logging.INFO
@@ -53,15 +56,16 @@ class PantsDaemonTest(BaseTest):
 
     self.mock_service = mock.create_autospec(PantsService, spec_set=True)
 
-  def test_close_fds(self):
-    mock_stdout, mock_stderr, mock_stdin = mock.Mock(), mock.Mock(), mock.Mock()
+  @mock.patch('os.close', **PATCH_OPTS)
+  def test_close_fds(self, mock_close):
+    mock_fd = mock.Mock()
+    mock_fd.fileno.side_effect = [0, 1, 2]
 
-    with stdio_as(mock_stdout, mock_stderr, mock_stdin):
+    with stdio_as(mock_fd, mock_fd, mock_fd):
       self.pantsd._close_fds()
 
-    mock_stdout.close.assert_called_once_with()
-    mock_stderr.close.assert_called_once_with()
-    mock_stdin.close.assert_called_once_with()
+    self.assertEquals(mock_fd.close.call_count, 3)
+    mock_close.assert_has_calls(mock.call(x) for x in [0, 1, 2])
 
   def test_shutdown(self):
     mock_thread = mock.Mock()
@@ -76,7 +80,7 @@ class PantsDaemonTest(BaseTest):
   def test_run_services_no_services(self):
     self.pantsd._run_services([])
 
-  @mock.patch('threading.Thread', autospec=True, spec_set=True)
+  @mock.patch('threading.Thread', **PATCH_OPTS)
   @mock.patch.object(PantsDaemon, 'shutdown', spec_set=True)
   def test_run_services_startupfailure(self, mock_shutdown, mock_thread):
     mock_thread.return_value.start.side_effect = RuntimeError('oops!')
@@ -86,7 +90,7 @@ class PantsDaemonTest(BaseTest):
 
     self.assertGreater(mock_shutdown.call_count, 0)
 
-  @mock.patch('threading.Thread', autospec=True, spec_set=True)
+  @mock.patch('threading.Thread', **PATCH_OPTS)
   @mock.patch.object(PantsDaemon, 'shutdown', spec_set=True)
   def test_run_services_runtimefailure(self, mock_shutdown, mock_thread):
     self.mock_killswitch.is_set.side_effect = [False, False, True]
