@@ -60,7 +60,7 @@ class Subject(object):
              could not be found or was not unique.
     """
     for derivation in Subject.as_subject(subject).iter_derivations:
-      if derivation.dependencies:
+      if getattr(derivation, 'dependencies', None):
         for dep in derivation.dependencies:
           configuration = None
           if dep.address:
@@ -323,9 +323,9 @@ class PartiallyConsumedInputsError(SchedulingError):
     yield 'While attempting to produce {} for {}, some products could not be consumed:'.format(
              output_product.__name__, subject)
     for input_product, planners in partially_consumed_products.items():
-      yield '  To consume {}:'.format(input_product.__name__)
+      yield '  To consume {}:'.format(input_product)
       for planner, additional_inputs in planners.items():
-        inputs_str = ' OR '.join(i.__name__ for i in additional_inputs)
+        inputs_str = ' OR '.join(str(i) for i in additional_inputs)
         yield '    {} needed ({})'.format(type(planner).__name__, inputs_str)
 
   def __init__(self, output_product, subject, partially_consumed_products):
@@ -483,7 +483,8 @@ class Planners(object):
                                                      planner,
                                                      ored_clauses,
                                                      fully_consumed,
-                                                     partially_consumed_candidates):
+                                                     partially_consumed_candidates,
+                                                     select_path=OrderedSet()):
         continue
       # Only yield planners that were recursively able to consume the configuration.
       # TODO: This is matching on type only, while selectors are usually implemented
@@ -496,13 +497,15 @@ class Planners(object):
                                          planner,
                                          ored_clauses,
                                          fully_consumed,
-                                         partially_consumed_candidates):
+                                         partially_consumed_candidates,
+                                         select_path):
     for anded_clause in ored_clauses:
       # Determine which of the anded clauses can be satisfied.
       matched = [self._apply_select(select,
                                     subject,
                                     fully_consumed,
-                                    partially_consumed_candidates)
+                                    partially_consumed_candidates,
+                                    select_path)
                  for select in anded_clause]
       matched_count = sum(1 for match in matched if match)
 
@@ -525,16 +528,16 @@ class Planners(object):
   def _select_subjects(self, selector, subject):
     """Yields all subjects selected by the given Select for the given subject."""
     if isinstance(selector, Select.Subject):
-      print('>>> selected direct subject: {}'.format(subject))
+      #print('>>> selected direct subject: {}'.format(subject))
       yield subject
     elif isinstance(selector, Select.SubjectDependencies):
       deps = [dep for dep, _ in Subject.iter_configured_dependencies(subject)]
-      print('>>> selected subject dependencies of: {}: {}'.format(subject, deps))
+      #print('>>> selected subject dependencies of: {}: {}'.format(subject, deps))
       for dep in deps:
         yield dep
     elif isinstance(selector, Select.LiteralSubject):
       new_sub = self._address_resolver(selector.address)
-      print('>>> found LiteralSubject: {}, resolved to: {}'.format(selector, new_sub))
+      #print('>>> found LiteralSubject: {}, resolved to: {}'.format(selector, new_sub))
       yield new_sub
     else:
       raise ValueError('Unimplemented `Select` type: {}'.format(select))
@@ -544,7 +547,8 @@ class Planners(object):
                                   output_product_type,
                                   input_products,
                                   fully_consumed,
-                                  partially_consumed_candidates):
+                                  partially_consumed_candidates,
+                                  select_path):
     """Determines whether the output product can be computed by the planners with the given inputs.
 
     Returns a boolean indicating whether the value can be produced. Mutates the fully consumed
@@ -564,31 +568,40 @@ class Planners(object):
                                                            planner,
                                                            ored_clauses,
                                                            fully_consumed,
-                                                           partially_consumed_candidates)
+                                                           partially_consumed_candidates,
+                                                           select_path)
       return matched
 
   def _apply_select(self,
                     select,
                     subject,
                     fully_consumed,
-                    partially_consumed_candidates):
+                    partially_consumed_candidates,
+                    select_path):
     """Determines whether the given Select can be satisfied for the given Subject.
 
     Returns a boolean indicating whether the value(s) specified by the Select can be produced.
     Mutates the fully consumed product set, and a dict(product,dict(planner,list(product))) of
     partially consumed products.
     """
+    if (select, subject) in select_path:
+      # We are already recursively attempting to satisfy the given Select, and would cause
+      # a cycle by attempting to re-apply it.
+      return False
+    select_path.add((select, subject))
     matched = True
-    print('>>> entering _apply_select for {} on {}'.format(select, subject))
+    #print('>>> entering _apply_select at {}'.format(select_path))
     for selected_subject in self._select_subjects(select.selector, subject):
       input_products = list(Products.for_subject(selected_subject))
       this_matched = self._apply_product_requirements(selected_subject,
                                                       select.product_type,
                                                       input_products,
                                                       fully_consumed,
-                                                      partially_consumed_candidates)
-      print('>>> {}, {} for {} (with {}), {}'.format(matched, this_matched, selected_subject, input_products, select.product_type))
+                                                      partially_consumed_candidates,
+                                                      select_path)
+      #print('>>> {}, {} for {} (with {}), {}'.format(matched, this_matched, selected_subject, input_products, select.product_type))
       matched &= this_matched
+    select_path.discard((select, subject))
     return matched
 
   def produced_types_for_subject(self, subject, output_product_types):
@@ -609,15 +622,17 @@ class Planners(object):
       if self._apply_select(Select(Select.Subject(), output_product_type),
                             subject,
                             fully_consumed,
-                            partially_consumed_candidates):
+                            partially_consumed_candidates,
+                            select_path=OrderedSet()):
         producible_output_types.append(output_product_type)
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
     partially_consumed = {product: partials
                           for product, partials in partially_consumed_candidates.items()
                           if product not in fully_consumed}
-    if partially_consumed:
-      raise PartiallyConsumedInputsError(output_product_type, subject, partially_consumed)
+    # TODO: reimplement using a generated graph
+    #if partially_consumed:
+    #  raise PartiallyConsumedInputsError(output_product_type, subject, partially_consumed)
 
     return producible_output_types
 
