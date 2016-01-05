@@ -2,6 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name='exe_integration',
+  sources=['test_exe_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'extension_loader',
   sources = ['test_extension_loader.py'],
   dependencies = [
