@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from unittest import skip
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -120,12 +121,23 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn('Success output', run_with_failure_only_output.stdout_data)
 
     run_with_none_output = run_test('NONE')
-    self.assertNotIn('Failure output', run_with_none_output)
-    self.assertNotIn('Success output', run_with_none_output)
+    self.assertNotIn('Failure output', run_with_none_output.stdout_data)
+    self.assertNotIn('Success output', run_with_none_output.stdout_data)
 
     run_with_default_output = run_test(None)
-    self.assertNotIn('Failure output', run_with_default_output)
-    self.assertNotIn('Success output', run_with_default_output)
+    self.assertNotIn('Failure output', run_with_default_output.stdout_data)
+    self.assertNotIn('Success output', run_with_default_output.stdout_data)
+
+  @skip('Skipped before publishing junit runner update.')
+  def test_junit_before_class_exception(self):
+    for output_mode in ['ALL', 'FAILURE_ONLY', 'NONE']:
+      run_result = self.run_pants([
+        'test.junit', '--no-test-junit-fail-fast',
+        '--output-mode=' + output_mode,
+        'testprojects/src/java/org/pantsbuild/testproject/junit/beforeclassexception:tests'
+      ])
+      self.assertTrue('Test mechanism' not in run_result.stdout_data,
+                      'Test mechanism exception in case of ' + output_mode + ' output mode.')
 
   def test_junit_test_target_cwd(self):
     pants_run = self.run_pants([
