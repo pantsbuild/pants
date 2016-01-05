@@ -30,7 +30,7 @@ def contains_exact_files(directory, expected_files, ignore_links=False):
 
 
 def check_file_content(path, expected_content):
-  """Check file is as expected content.
+  """Check file has expected content.
 
   :param str path: Path to file.
   :param str expected_content: Expected file content.
@@ -54,7 +54,7 @@ def check_symlinks(directory, symlinks=True):
 
 
 def check_zip_file_content(zip_file, expected_files):
-  """Check zip file contains expected files as well as their contents.
+  """Check zip file contains expected files as well as verify their contents are as expected.
 
   :param zip_file: Path to the zip file.
   :param expected_files: A map from file path included in the zip to its content. Set content
@@ -68,8 +68,7 @@ def check_zip_file_content(zip_file, expected_files):
 
     for rel_path in expected_files:
       path = os.path.join(workdir, rel_path)
-      if expected_files[rel_path] is None and \
-        not check_file_content(path, expected_files[rel_path]):
+      if expected_files[rel_path] and not check_file_content(path, expected_files[rel_path]):
         return False
 
   return True

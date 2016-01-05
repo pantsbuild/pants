@@ -72,6 +72,8 @@ class BundleCreate(JvmBinaryTask):
   def execute(self):
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
 
+    # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
+    # more efficient than loading them as individual files.
     union_products = self.context.products.get_data('runtime_classpath')._classpaths
     self.consolidate_classpath(union_products)
 

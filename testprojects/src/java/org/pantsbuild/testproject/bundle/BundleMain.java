@@ -11,6 +11,7 @@ public class BundleMain {
     // Introduce a 3rdparty library so we can test if Manifest's Class-Path entry is
     // set properly for both internal and external dependencies.
     String content = Resources.toString(Resources.getResource(RESOURCE_PATH), Charsets.UTF_8);
+    // Ensure resource is loaded properly.
     System.out.println("Hello world from " + content);
   }
 

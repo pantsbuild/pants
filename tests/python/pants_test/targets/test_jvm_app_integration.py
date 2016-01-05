@@ -17,7 +17,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
     other library jars.
     """
     self.assertEquals(
-      'Hello world from resource\n',
+      'Hello world from Foo\n',
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
         'bundle-example',
@@ -40,7 +40,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
     Verify monolithic jar is created with manifest file and the library class.
     """
     self.assertEquals(
-      'Hello world from resource\n',
+      'Hello world from Foo\n',
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
         'bundle-example',

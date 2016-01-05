@@ -122,6 +122,10 @@ def archiver(typename):
   'tbz2'  Returns a tar archiver that applies bzip2 compression and emits .tar.bz2 files.
   'zip'   Returns a zip archiver that applies standard compression and emits .zip files.
   'jar'   Returns a jar archiver that applies no compression and emits .jar files.
+    Note this is provided as a light way of zipping input files into a jar, without the
+    need to prepare Manifest etc. For more advanced usages, please refer to :class:
+    `pants.backend.jvm.subsystems.jar_tool.JarTool` or :class:
+    `pants.backend.jvm.tasks.jar_task.JarTask`.
   """
   archiver = _ARCHIVER_BY_TYPE.get(typename)
   if not archiver:
