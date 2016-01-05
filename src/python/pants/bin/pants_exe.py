@@ -14,8 +14,8 @@ import warnings
 # See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete list.
 warnings.simplefilter('default', DeprecationWarning)
 
-from pants.bin.pants_runner import LocalPantsRunner           # isort:skip
-from pants.bin.exiter import Exiter                           # isort:skip
+from pants.bin.pants_runner import PantsRunner  # isort:skip
+from pants.bin.exiter import Exiter  # isort:skip
 
 
 def main():
@@ -23,7 +23,7 @@ def main():
   exiter.set_except_hook()
 
   try:
-    LocalPantsRunner(exiter).run()
+    PantsRunner(exiter).run()
   except KeyboardInterrupt:
     exiter.exit_and_fail('Interrupted by user.')
 
