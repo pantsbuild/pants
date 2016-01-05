@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from unittest import skip
 
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -128,7 +127,6 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn('Failure output', run_with_default_output.stdout_data)
     self.assertNotIn('Success output', run_with_default_output.stdout_data)
 
-  @skip('Skipped before publishing junit runner update.')
   def test_junit_before_class_exception(self):
     for output_mode in ['ALL', 'FAILURE_ONLY', 'NONE']:
       run_result = self.run_pants([
