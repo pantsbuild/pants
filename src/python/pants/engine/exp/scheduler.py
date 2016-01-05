@@ -590,7 +590,6 @@ class Planners(object):
       return False
     select_path.add((select, subject))
     matched = True
-    #print('>>> entering _apply_select at {}'.format(select_path))
     for selected_subject in self._select_subjects(select.selector, subject):
       input_products = list(Products.for_subject(selected_subject))
       this_matched = self._apply_product_requirements(selected_subject,
