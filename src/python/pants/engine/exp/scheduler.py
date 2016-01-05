@@ -434,6 +434,29 @@ class Task(object):
     """Executes this task."""
 
 
+class ProductGraph(object):
+  """A DAG of product dependencies, with (Subject, Product) pairs as nodes."""
+
+  def __init__(self):
+    self._adjacencies = defaultdict(OrderedSet)
+
+  def add(self, src, dst):
+    self._adjacencies[src].add(dst)
+
+  def dependents(self, dst):
+    # TODO: linear time
+    for src, dsts in self._adjacencies.items():
+      if dst in dsts:
+        yield src
+
+  def has_dependents(self, dst):
+    return next(product_graph.dependents(dst), None) is not None
+
+  def __str__(self):
+    adj_str = ','.join('{} -> {}'.format(k, v) for k, v in self._adjacencies.items())
+    return 'ProductGraph({})'.format(adj_str)
+
+
 # TODO: Extract to a separate file in a followup review.
 class Planners(object):
   """A registry of task planners indexed by both product type and goal name.
@@ -476,35 +499,33 @@ class Planners(object):
     :param configuration: An optional configuration to require that a planner consumes, or None.
     :rtype: set of :class:`TaskPlanner`
     """
-    partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
     for planner, ored_clauses in self._product_requirements[product_type].items():
-      fully_consumed = set()
+      product_graph = ProductGraph()
       if not self._apply_product_requirement_clauses(subject,
+                                                     product_type,
                                                      planner,
                                                      ored_clauses,
-                                                     fully_consumed,
-                                                     partially_consumed_candidates,
+                                                     product_graph,
                                                      select_path=OrderedSet()):
         continue
       # Only yield planners that were recursively able to consume the configuration.
       # TODO: This is matching on type only, while selectors are usually implemented
       # as by-name. Convert config selectors to configuration mergers.
-      if not configuration or type(configuration) in fully_consumed:
+      if not configuration or product_graph.has_dependents((subject, type(configuration))):
         yield planner
 
   def _apply_product_requirement_clauses(self,
                                          subject,
+                                         output_product_type,
                                          planner,
                                          ored_clauses,
-                                         fully_consumed,
-                                         partially_consumed_candidates,
+                                         product_graph,
                                          select_path):
     for anded_clause in ored_clauses:
       # Determine which of the anded clauses can be satisfied.
       matched = [self._apply_select(select,
                                     subject,
-                                    fully_consumed,
-                                    partially_consumed_candidates,
+                                    product_graph,
                                     select_path)
                  for select in anded_clause]
       matched_count = sum(1 for match in matched if match)
@@ -512,17 +533,10 @@ class Planners(object):
       if matched_count == len(anded_clause):
         # If all product requirements in the clause are satisfied by the input products, then
         # we've found a planner capable of producing this product.
-        fully_consumed.update(anded_clause)
+        for match in matched:
+          for pair in match:
+            product_graph.add((subject, output_product_type), pair)
         return True
-      elif matched_count > 0:
-        # On the other hand, if only some of the products from the clause were matched, collect
-        # the partially consumed values.
-        consumed = set()
-        unconsumed = set()
-        for requirement, was_consumed in zip(anded_clause, matched):
-          (consumed if was_consumed else unconsumed).add(requirement)
-        for consumed_product in consumed:
-          partially_consumed_candidates[consumed_product][planner].update(unconsumed)
     return False
 
   def _select_subjects(self, selector, subject):
@@ -546,8 +560,7 @@ class Planners(object):
                                   subject,
                                   output_product_type,
                                   input_products,
-                                  fully_consumed,
-                                  partially_consumed_candidates,
+                                  product_graph,
                                   select_path):
     """Determines whether the output product can be computed by the planners with the given inputs.
 
@@ -565,43 +578,42 @@ class Planners(object):
       matched = False
       for planner, ored_clauses in self._product_requirements[output_product_type].items():
         matched |= self._apply_product_requirement_clauses(subject,
+                                                           output_product_type,
                                                            planner,
                                                            ored_clauses,
-                                                           fully_consumed,
-                                                           partially_consumed_candidates,
+                                                           product_graph,
                                                            select_path)
       return matched
 
   def _apply_select(self,
                     select,
                     subject,
-                    fully_consumed,
-                    partially_consumed_candidates,
+                    product_graph,
                     select_path):
     """Determines whether the given Select can be satisfied for the given Subject.
 
-    Returns a boolean indicating whether the value(s) specified by the Select can be produced.
-    Mutates the fully consumed product set, and a dict(product,dict(planner,list(product))) of
-    partially consumed products.
+    Returns all matched Subject/Product pairs if the select succeeded, or None if it failed.
     """
     if (select, subject) in select_path:
       # We are already recursively attempting to satisfy the given Select, and would cause
       # a cycle by attempting to re-apply it.
-      return False
+      return None
     select_path.add((select, subject))
+    selected = []
     matched = True
     for selected_subject in self._select_subjects(select.selector, subject):
       input_products = list(Products.for_subject(selected_subject))
       this_matched = self._apply_product_requirements(selected_subject,
                                                       select.product_type,
                                                       input_products,
-                                                      fully_consumed,
-                                                      partially_consumed_candidates,
+                                                      product_graph,
                                                       select_path)
       #print('>>> {}, {} for {} (with {}), {}'.format(matched, this_matched, selected_subject, input_products, select.product_type))
+      if this_matched:
+        selected.append((selected_subject, select.product_type))
       matched &= this_matched
     select_path.discard((select, subject))
-    return matched
+    return selected if matched else None
 
   def produced_types_for_subject(self, subject, output_product_types):
     """Filters the given list of output products to those that are actually possible to produce.
@@ -614,22 +626,20 @@ class Planners(object):
     to validate every call to `def promise` against these requirements.
     """
     producible_output_types = list()
-    fully_consumed = set()
-    partially_consumed_candidates = defaultdict(lambda: defaultdict(set))
+    product_graph = ProductGraph()
     for output_product_type in output_product_types:
       # If we can select the given product for this subject, then it is producible.
       if self._apply_select(Select(Select.Subject(), output_product_type),
                             subject,
-                            fully_consumed,
-                            partially_consumed_candidates,
+                            product_graph,
                             select_path=OrderedSet()):
         producible_output_types.append(output_product_type)
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
-    partially_consumed = {product: partials
-                          for product, partials in partially_consumed_candidates.items()
-                          if product not in fully_consumed}
     # TODO: reimplement using a generated graph
+    #partially_consumed = {product: partials
+    #                      for product, partials in partially_consumed_candidates.items()
+    #                      if product not in fully_consumed}
     #if partially_consumed:
     #  raise PartiallyConsumedInputsError(output_product_type, subject, partially_consumed)
 
