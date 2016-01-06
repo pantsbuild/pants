@@ -5,8 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import datetime
+import logging
+import os
 import sys
 import traceback
+
+from pants.util.dirutil import safe_open
+
+
+logger = logging.getLogger(__name__)
 
 
 class Exiter(object):
@@ -36,6 +44,7 @@ class Exiter(object):
     self._exit = exiter
     self._format_tb = formatter
     self._should_print_backtrace = print_backtraces
+    self._workdir = None
 
   def __call__(self, *args, **kwargs):
     """Map class calls to self.exit() to support sys.exit() fungibility."""
@@ -47,6 +56,7 @@ class Exiter(object):
     :param Options options: An instance of an Options object to fetch global options from.
     """
     self._should_print_backtrace = options.for_global_scope().print_exception_stacktrace
+    self._workdir = options.for_global_scope().pants_workdir
 
   def exit(self, result=0, msg=None, out=None):
     """Exits the runtime.
@@ -68,18 +78,38 @@ class Exiter(object):
     """
     self.exit(result=1, msg=msg)
 
-  def _unhandled_exception_hook(self, exception_class, exception, tb):
-    """Default sys.excepthook implementation for unhandled exceptions, used by set_except_hook()."""
-    msg = ''
-    if self._should_print_backtrace:
-      msg = '\nException caught: ({})\n{}'.format(type(exception), ''.join(self._format_tb(tb)))
-    if str(exception):
-      msg += '\nException message: {}\n'.format(exception)
-    else:
-      msg += '\nNo specific exception message.\n'
-    # TODO(Jin Feng) Always output the unhandled exception details into a log file.
-    self.exit_and_fail(msg)
+  def handle_unhandled_exception(self, exc_class=None, exc=None, tb=None, add_newline=False):
+    """Default sys.excepthook implementation for unhandled exceptions."""
+    exc_class = exc_class or sys.exc_type
+    exc = exc or sys.exc_value
+    tb = tb or sys.exc_traceback
+
+    def format_msg(print_backtrace=True):
+      msg = 'Exception caught: ({})\n'.format(type(exc))
+      msg += '{}\n'.format(''.join(self._format_tb(tb))) if print_backtrace else '\n'
+      msg += 'Exception message: {}\n'.format(exc if str(exc) else 'none')
+      msg += '\n' if add_newline else ''
+      return msg
+
+    # Always output the unhandled exception details into a log file.
+    self._log_exception(format_msg())
+    self.exit_and_fail(format_msg(self._should_print_backtrace))
+
+  def _log_exception(self, msg):
+    if self._workdir:
+      try:
+        output_path = os.path.join(self._workdir, 'logs', 'exceptions.log')
+        with safe_open(output_path, 'a') as exception_log:
+          exception_log.write('timestamp: {}\n'.format(datetime.datetime.now().isoformat()))
+          exception_log.write('args: {}\n'.format(sys.argv))
+          exception_log.write('pid: {}\n'.format(os.getpid()))
+          exception_log.write(msg)
+          exception_log.write('\n')
+      except Exception as e:
+        # This is all error recovery logic so we catch all exceptions from the logic above because
+        # we don't want to hide the original error.
+        logger.error('Problem logging original exception: {}'.format(e))
 
   def set_except_hook(self):
     """Sets the global exception hook."""
-    sys.excepthook = self._unhandled_exception_hook
+    sys.excepthook = self.handle_unhandled_exception

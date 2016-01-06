@@ -31,6 +31,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import environment_as
+from pants.util.process_handler import ProcessHandler
 from pants.util.strutil import pluralize
 from pants.util.xml_parser import XmlParser
 
@@ -97,7 +98,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.0'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.1'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
@@ -182,8 +183,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       self._args.append('-test-shard')
       self._args.append(options.test_shard)
 
-    self._executor = None
-
   def preferred_jvm_distribution_for_targets(self, targets):
     return self.preferred_jvm_distribution([target.platform for target in targets
                                             if isinstance(target, JvmTarget)])
@@ -196,15 +195,45 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     max_version = Revision(*(min_version.components + [9999])) if self._strict_jvm_version else None
     return DistributionLocator.cached(minimum_version=min_version, maximum_version=max_version)
 
-  def execute_java_for_targets(self, targets, executor=None, *args, **kwargs):
+  def _spawn(self, distribution, executor=None, *args, **kwargs):
+    """Returns a processhandler to a process executing java.
+
+    :param Executor executor: the java subprocess executor to use. If not specified, construct
+      using the distribution.
+    :param Distribution distribution: The JDK or JRE installed.
+    :rtype: ProcessHandler
+    """
+
+    actual_executor = executor or SubprocessExecutor(distribution)
+    return distribution.execute_java_async(*args,
+                                           executor=actual_executor,
+                                           **kwargs)
+
+  def execute_java_for_targets(self, targets, *args, **kwargs):
+    """Execute java for targets using the test mixin spawn and wait.
+
+    Activates timeouts and other common functionality shared among tests.
+    """
+
     distribution = self.preferred_jvm_distribution_for_targets(targets)
-    self._executor = executor or SubprocessExecutor(distribution)
-    return distribution.execute_java(*args, executor=self._executor, **kwargs)
+    actual_executor = kwargs.get('executor') or SubprocessExecutor(distribution)
+    return self._spawn_and_wait(*args, executor=actual_executor, distribution=distribution, **kwargs)
+
+  def execute_java_for_coverage(self, targets, executor=None, *args, **kwargs):
+    """Execute java for targets directly and don't use the test mixin.
+
+    This execution won't be wrapped with timeouts and other testmixin code common
+    across test targets. Used for coverage instrumentation.
+    """
+
+    distribution = self.preferred_jvm_distribution_for_targets(targets)
+    actual_executor = executor or SubprocessExecutor(distribution)
+    return distribution.execute_java(*args, executor=actual_executor, **kwargs)
 
   def _collect_test_targets(self, targets):
-    """Returns a mapping from test names to target objects for all tests that
-    are included in targets. If self._tests_to_run is set, return {test: None}
-    for these tests instead.
+    """Returns a mapping from test names to target objects for all tests that are included in targets.
+
+    If self._tests_to_run is set, return {test: None} for these tests instead.
     """
 
     tests_from_targets = dict(list(self._calculate_tests_from_targets(targets)))
@@ -316,9 +345,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           self.context.log.debug('CWD = {}'.format(workdir))
           self.context.log.debug('platform = {}'.format(platform))
           with environment_as(**dict(target_env_vars)):
-            self._executor = SubprocessExecutor(distribution)
-            result += abs(distribution.execute_java(
-              executor=self._executor,
+            result += abs(self._spawn_and_wait(
+              executor=SubprocessExecutor(distribution),
+              distribution=distribution,
               classpath=complete_classpath,
               main=JUnitRun._MAIN,
               jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
@@ -421,20 +450,11 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       msg = 'JavaTests target must include a non-empty set of sources.'
       raise TargetDefinitionException(target, msg)
 
-  def _timeout_abort_handler(self):
-    """Kills the test run."""
-
-    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
-    #   storing the process handle here, the test mixin class will call the start_test() fn
-    #   on the language specific class which will return an object that can kill/monitor/etc
-    #   the test process.
-    if self._executor is not None:
-      self._executor.kill()
-
   def _execute(self, targets):
-    """
-    Implements the primary junit test execution. This method is called by the TestRunnerTaskMixin,
-    which contains the primary Task.execute function and wraps this method in timeouts.
+    """Implements the primary junit test execution.
+
+    This method is called by the TestRunnerTaskMixin, which contains the primary Task.execute function
+    and wraps this method in timeouts.
     """
 
     # We only run tests within java_tests/junit_tests targets.
@@ -458,12 +478,12 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     self.context.release_lock()
     if self._coverage:
       self._coverage.instrument(
-        targets, tests_and_targets.keys(), compute_complete_classpath, self.execute_java_for_targets)
+        targets, tests_and_targets.keys(), compute_complete_classpath, self.execute_java_for_coverage)
 
     def _do_report(exception=None):
       if self._coverage:
         self._coverage.report(
-          targets, tests_and_targets.keys(), self.execute_java_for_targets, tests_failed_exception=exception)
+          targets, tests_and_targets.keys(), self.execute_java_for_coverage, tests_failed_exception=exception)
 
     try:
       self._run_tests(tests_and_targets)

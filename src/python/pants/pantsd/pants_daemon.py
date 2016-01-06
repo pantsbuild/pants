@@ -89,8 +89,10 @@ class PantsDaemon(ProcessManager):
   def _close_fds():
     """Close pre-fork stdio streams to avoid output in the pants process that launched pantsd."""
     for fd in (sys.stdin, sys.stdout, sys.stderr):
+      file_no = fd.fileno()
       fd.flush()
       fd.close()
+      os.close(file_no)
 
   def _setup_logging(self, log_level):
     """Reinitialize logging post-fork to clear all handlers, file descriptors, locks etc.
