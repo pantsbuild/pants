@@ -135,7 +135,7 @@ class BundleField(tuple, PayloadField):
 
   Must be initialized with an iterable of Bundle instances.
   """
-  
+
   @staticmethod
   def _hash_bundle(bundle):
     hasher = sha1()
