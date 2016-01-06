@@ -11,7 +11,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
@@ -77,8 +76,7 @@ class BundleCreate(JvmBinaryTask):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    targets = BuildGraph.closure(self.context.targets())
-    self.consolidate_classpath(targets, runtime_classpath)
+    self.consolidate_classpath(self.context.targets(), runtime_classpath)
 
     for target in self.context.targets():
       for app in map(self.App, filter(self.App.is_app, [target])):
@@ -177,8 +175,13 @@ class BundleCreate(JvmBinaryTask):
     return bundle_dir
 
   def consolidate_classpath(self, targets, classpath_products):
+    """Convert loose directories in classpath_products into jars.
+
+    TODO(peiyu): enable artifact caching to take advantage of caching as well saving to
+    the provided target-specific directories.
+    """
     def jardir(entry):
-      """Jar up the contents of the given ClasspathEntry and return a temporary jar path."""
+      """Jar up the contents of the given ClasspathEntry and return a unique jar path."""
       root = entry.path
       with temporary_dir(root_dir=self.workdir, cleanup=False) as destdir:
         jarpath = JAR.create(root, destdir, 'output')
