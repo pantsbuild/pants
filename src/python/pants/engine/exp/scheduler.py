@@ -451,10 +451,6 @@ class ProductGraph(object):
     def key(self):
       return (self.subject, self.product)
 
-    @property
-    def is_producible(self):
-      return not isinstance(self.source, SourceNone)
-
   def __init__(self):
     # Stores Nodes as a dict from key (which does not include the `source` field) to Node.
     self._nodes = dict()
@@ -478,17 +474,16 @@ class ProductGraph(object):
   def exists(self, subject, select):
     return (subject, select) in self._nodes
 
+  def _is_satisfied(self, node):
+    """Returns True if the given Node is recursively satisfied (no SourceNone dependencies)."""
+    if isinstance(node.source, ProductGraph.SourceNone):
+      return False
+    for dep_node in self._adjacencies[node]:
+      if not is_satisfied(dep_node):
+        return False
+    return True
 
-
-
-
-
-
-
-
-
-
-  def for_product_type_and_subject(self, subject, product, configuration=None):
+  def sources_for(self, subject, product, configuration=None):
     """Yields the set of Sources for the given subject and product (which consume the given config).
 
     :param subject: The subject that the product will be produced for.
@@ -496,8 +491,13 @@ class ProductGraph(object):
     :param configuration: An optional configuration to require that a planner consumes, or None.
     :rtype: sequences of ProductGraph.Source instances.
     """
-    def consumed_config(node):
-      """Returns True if the given Node recursively consumes the given configuration."""
+
+    def consumes_config(node):
+      """Returns True if the given Node recursively consumes the given configuration.
+
+      TODO: This is matching on type only, while selectors are usually implemented
+      as by-name. Convert config selectors to configuration mergers.
+      """
       if not configuration:
         return True
       for dep_node in self._adjacencies[node]:
@@ -510,48 +510,14 @@ class ProductGraph(object):
     key = (subject, product)
     for node in self._nodes:
       # Yield Sources that were recursively able to consume the configuration.
-      # TODO: This is matching on type only, while selectors are usually implemented
-      # as by-name. Convert config selectors to configuration mergers.
-      if node.key == key and consumed_config(node):
+      if node.key == key and self._is_satisfied(node) and consumes_config(node):
         yield node.source
 
-  def produced_types_for_subject(self, subject, output_product_types):
-    """Filters the given list of output products to those that are actually possible to produce.
-
-    This method additionally validates that there are no "partially consumed" input products.
-    A partially consumed input product is a product where no planner successfully consumes the
-    product, but at least one planner would consume it given some other missing input.
-
-    Note that this does not validate dependency subjects of the input subject, so it is necessary
-    to validate every call to `def promise` against these requirements.
-    """
-    producible_output_types = list()
-    product_graph = ProductGraph()
-    for output_product_type in output_product_types:
-      # If we can select the given product for this subject, then it is producible.
-      if self._apply_select(Select(Select.Subject(), output_product_type),
-                            subject,
-                            product_graph,
-                            select_path=OrderedSet()):
-        producible_output_types.append(output_product_type)
-      else:
-        print('>>> cannot produce {} for {}'.format(output_product_type, subject))
-
-    print('>>> graph: {}'.format(product_graph))
-
-    # If any partially consumed candidate was not fully consumed by some planner, it's an error.
-    # TODO: reimplement using a generated graph
-    #partially_consumed = {product: partials
-    #                      for product, partials in partially_consumed_candidates.items()
-    #                      if product not in fully_consumed}
-    #if partially_consumed:
-    #  raise PartiallyConsumedInputsError(output_product_type, subject, partially_consumed)
-
-    return producible_output_types
-
-
-
-
+  def products_for(self, subject):
+    """Yields products that are possible to produce for the given subject."""
+    for node in self._nodes:
+      if node.subject == subject and self._is_satisfied(node):
+        yield node.product
 
   def __str__(self):
     adj_str = ','.join('{} -> {}'.format(k, v) for k, values in self._adjacencies.items() for v in values)
@@ -614,14 +580,17 @@ class Planners(object):
       raise ValueError('Unimplemented `Select` type: {}'.format(select))
 
   def _node_sources(self, subject, product_type):
-    """Yields a sequence of sources of the given Subject/Product."""
+    """Returns a sequence of sources of the given Subject/Product."""
     # Look for native sources.
+    sources = []
     if node.product in Products.for_subject(node.subject)
-      yield ProductGraph.SourceNative()
+      sources.add(ProductGraph.SourceNative())
     # And for Planners.
     for planner, ored_clauses in self._product_requirements[product_type]:
       for anded_clause in ored_clauses:
-        yield ProductGraph.SourcePlanner(planner, tuple(anded_clause)))
+        sources.add(ProductGraph.SourcePlanner(planner, tuple(anded_clause))))
+    # If no Sources were found, return SourceNone to indicate the hole.
+    return sources or [ProductGraph.SourceNone]
 
   def _populate_node(self, product_graph, build_graph, node):
     """Expands the ProductGraph to include the given Node and its children."""
@@ -843,7 +812,7 @@ class ProductMapper(object):
 class LocalScheduler(Scheduler):
   """A scheduler that formulates an execution graph locally."""
 
-  def __init__(self, graph, planners):
+  def __init__(self, graph, product_graph, planners):
     """
     :param graph: The BUILD graph build requests will execute against.
     :type graph: :class:`pants.engine.exp.graph.Graph`
@@ -851,6 +820,7 @@ class LocalScheduler(Scheduler):
     :type planners: :class:`Planners`
     """
     self._graph = graph
+    self._product_graph = product_graph
     self._planners = planners
     self._product_mapper = ProductMapper()
     self._plans_by_product_type_by_planner = defaultdict(lambda: defaultdict(OrderedSet))
@@ -866,7 +836,6 @@ class LocalScheduler(Scheduler):
     """
     goals = build_request.goals
     subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
-
 
     root_promises = []
     for goal in goals:
@@ -890,7 +859,9 @@ class LocalScheduler(Scheduler):
       for planner in self._planners.for_goal(goal):
         product_types.update(planner.product_types.keys())
       for subject in subjects:
-        for product_type in self._planners.produced_types_for_subject(subject, product_types):
+        # Request promises for relevant products.
+        relevant_products = product_types & set(self._product_graph.products_for(subject))
+        for product_type in relevant_products:
           root_promises.append(self.promise(subject, product_type))
 
     # Give aggregating planners a chance to aggregate plans.
@@ -920,21 +891,23 @@ class LocalScheduler(Scheduler):
       return promise
 
     plans = []
-    # For all planners that can produce this product with the given configuration, request it.
-    for planner in self._planners.for_product_type_and_subject(product_type,
-                                                               subject,
-                                                               configuration=configuration):
-      plan = planner.plan(self, product_type, subject, configuration=configuration)
-      if plan:
-        plans.append((planner, plan))
-    # Additionally, if the product is directly available as a "native" product on the subject,
-    # include a Plan that lifts it off the subject.
-    for native_product_type in Products.for_subject(subject):
-      if native_product_type == product_type:
+    # For all sources of the product, request it.
+    for source in self._product_graph.sources_for(subject,
+                                                  product_type,
+                                                  configuration=configuration):
+      if isinstance(source, SourceGraph.SourceNative):
         plans.append((self.NoPlanner, Plan(func_or_task_type=lift_native_product,
                                        subjects=(subject,),
                                        subject=subject,
                                        product_type=product_type)))
+      elif isinstance(source, SourceGraph.SourcePlanner):
+        plan = planner.plan(self, product_type, subject, configuration=configuration)
+        # TODO: remove None check... should not be any planners failing.
+        if plan:
+          plans.append((planner, plan))
+      else:
+        raise ValueError('Unsupported source for ({}, {}): {}'.format(
+          subject, product_type, source))
 
     # TODO: It should be legal to have multiple plans, and they should be merged.
     if len(plans) > 1:
