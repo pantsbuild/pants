@@ -18,8 +18,7 @@ from pants.base.exceptions import TaskError
 
 
 class DxCompile(AndroidTask, NailgunTask):
-  """
-  Compile java classes into dex files, Dalvik executables, for AndroidBinary targets.
+  """Compile java classes into dex files, Dalvik executables, for AndroidBinary targets.
 
   Gather the class files of the AndroidBinary and all of its dependencies. This includes the
   AndroidLibrary targets that the AndroidBinary depends on. AndroidLibrary artifacts (.jars and

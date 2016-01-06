@@ -79,15 +79,15 @@ class BuildBuildDictionary(Task):
     tocs = [tocl(d), jvm_sub_tocl(d), python_sub_tocl(d)]
 
     defns = [d[t]['defn'] for t in sorted(d.keys(), key=_lower)]
-    # generate rst
-    template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
-    filename = os.path.join(self._outdir, 'build_dictionary.rst')
-    self.context.log.info('Generating {}'.format(filename))
-    with safe_open(filename, 'wb') as outfile:
-      generator = Generator(template,
-                            tocs=tocs,
-                            defns=defns)
-      generator.write(outfile)
+    # # generate rst
+    # template = resource_string(__name__, os.path.join(self._templates_dir, 'page.mustache'))
+    # filename = os.path.join(self._outdir, 'build_dictionary.rst')
+    # self.context.log.info('Generating {}'.format(filename))
+    # with safe_open(filename, 'wb') as outfile:
+    #   generator = Generator(template,
+    #                         tocs=tocs,
+    #                         defns=defns)
+    #   generator.write(outfile)
     # generate html
     template = resource_string(__name__, os.path.join(self._templates_dir, 'bdict_html.mustache'))
     filename = os.path.join(self._outdir, 'build_dictionary.html')
@@ -109,14 +109,14 @@ class BuildBuildDictionary(Task):
       filtered_goals.append(g)
     glopts = gen_glopts_reference_data(self.context.options)
 
-    # generate the .rst file
-    template = resource_string(__name__,
-                               os.path.join(self._templates_dir, 'options_reference.mustache'))
-    filename = os.path.join(self._outdir, 'options_reference.rst')
-    self.context.log.info('Generating {}'.format(filename))
-    with safe_open(filename, 'wb') as outfile:
-      generator = Generator(template, goals=filtered_goals, glopts=glopts)
-      generator.write(outfile)
+    # # generate the .rst file
+    # template = resource_string(__name__,
+    #                            os.path.join(self._templates_dir, 'options_reference.mustache'))
+    # filename = os.path.join(self._outdir, 'options_reference.rst')
+    # self.context.log.info('Generating {}'.format(filename))
+    # with safe_open(filename, 'wb') as outfile:
+    #   generator = Generator(template, goals=filtered_goals, glopts=glopts)
+    #   generator.write(outfile)
 
     # generate the .html file
     template = resource_string(__name__,

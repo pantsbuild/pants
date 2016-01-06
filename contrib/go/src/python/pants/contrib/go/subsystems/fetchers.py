@@ -70,7 +70,7 @@ class Fetcher(AbstractClass):
 
 
 class Fetchers(Subsystem):
-  """A registry of installed :class:`Fetcher`s."""
+  """A registry of installed remote code fetchers."""
 
   class AdvertisementError(Exception):
     """Indicates an error advertising a :class:`Fetcher`."""
@@ -188,9 +188,9 @@ class Fetchers(Subsystem):
              help="A mapping from a remote import path matching regex to a fetcher type to use "
                   "to fetch the remote sources.  The regex must match the beginning of the remote "
                   "import path; no '^' anchor is needed, it is assumed.  The Fetcher types are "
-                  "fully qualified class names or else an installed alias for a fetcher type; ie "
-                  "the builtin `contrib.go.subsystems.fetchers.ArchiveFetcher` is aliased as "
-                  "'ArchiveFetcher'.")
+                  "fully qualified class names or else an installed alias for a fetcher type; "
+                  "I.e., the built-in 'contrib.go.subsystems.fetchers.ArchiveFetcher' is aliased "
+                  "as 'ArchiveFetcher'.")
 
   class GetFetcherError(Exception):
     """Indicates an error finding an appropriate Fetcher."""
@@ -302,9 +302,6 @@ class ArchiveFetcher(Fetcher, Subsystem):
   def register_options(cls, register):
     register('--matchers', metavar='<mapping>', type=dict_option,
              default=cls._DEFAULT_MATCHERS, advanced=True,
-             # NB: The newlines used below are for reading the logical structure here only.
-             # They're converted to a single space by the help formatting and the resulting long
-             # line of help text is simply wrapped.
              help="A mapping from a remote import path matching regex to an UrlInfo struct "
                   "describing how to fetch and unpack a remote import path.  The regex must match "
                   "the beginning of the remote import path (no '^' anchor is needed, it is "
@@ -315,12 +312,11 @@ class ArchiveFetcher(Fetcher, Subsystem):
                   "method and then formatted with the remote import path\'s `rev`, `import_prefix`, "
                   "and `pkg`.\n"
                   "1. The default revision string to use when no `rev` is supplied; ie 'HEAD' or "
-                  "'master' for git.\n"
+                  "'master' for git. "
                   "2. An integer indicating the number of leading path components to strip from "
-                  "files upacked from the archive.\n"
-                  "\n"
-                  "An example configuration that works against github.com is:\n"
-                  "{r'github.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':\n"
+                  "files upacked from the archive. "
+                  "An example configuration that works against github.com is: "
+                  "{r'github.com/(?P<user>[^/]+)/(?P<repo>[^/]+)': "
                   " ('https://github.com/\g<user>/\g<repo>/archive/{rev}.zip', 'master', 1)}")
     register('--buffer-size', metavar='<bytes>', type=int, advanced=True,
              default=10 * 1024,  # 10KB in case jumbo frames are in play.
