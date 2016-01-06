@@ -22,7 +22,7 @@ from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
-class Select(namedtuple('Select', ['selector', 'product_type'])):
+class Select(namedtuple('Select', ['selector', 'product'])):
 
   class Subject(object):
     pass
@@ -435,10 +435,7 @@ class Task(object):
 
 
 class ProductGraph(object):
-  """A DAG of product dependencies, with (Subject, Product, `source`) tuples as nodes.
-
-  The `source` entry is a member of the ProductSource union.
-  """
+  """A DAG of product dependencies, with (Subject, Product, `source`) tuples as nodes."""
 
   class SourcePlanner(namedtuple('SourcePlanner', ['planner', 'clause'])):
     pass
@@ -451,176 +448,72 @@ class ProductGraph(object):
 
   class Node(namedtuple('Node', ['subject', 'product', 'source'])):
     @property
+    def key(self):
+      return (self.subject, self.product)
+
+    @property
     def is_producible(self):
       return not isinstance(self.source, SourceNone)
 
   def __init__(self):
     # Stores Nodes as a dict from key (which does not include the `source` field) to Node.
-    self._nodes = set()
+    self._nodes = dict()
     # Stores Node adjacencies.
     self._adjacencies = defaultdict(list)
 
-  def _add_nodes(self, nodes):
+  def add_nodes(self, nodes*):
     for node in nodes:
       if not isinstance(node, self.Node):
         raise ValueError('{} is not a {}'.format(node, self.Node))
-      self._nodes.add(node)
+      existing_node = self._nodes.get(node.key)
+      if existing_node:
+        raise ValueError('{} is already registered in the product graph as {}'.format(
+          node, existing_node))
+      self._nodes[node.key] = node
 
-  def add(self, src, dsts):
-    self._add_nodes(src)
-    self._add_nodes(*dsts)
-    self._adjacencies[src].extend(dsts)
+  def add_edge(self, src, dst):
+    self.add_nodes(src, dst)
+    self._adjacencies[src].add(dst)
 
-  def get(self, subject, product):
-    return self._nodes.get((subject, product), None)
-
-  def __str__(self):
-    adj_str = ','.join('{} -> {}'.format(k, v) for k, values in self._adjacencies.items() for v in values)
-    return 'ProductGraph({})'.format(adj_str)
+  def exists(self, subject, select):
+    return (subject, select) in self._nodes
 
 
-# TODO: Extract to a separate file in a followup review.
-class Planners(object):
-  """A registry of task planners indexed by both product type and goal name.
 
-  Holds a set of input product requirements for each output product, which can be used
-  to validate the graph.
-  """
 
-  def __init__(self, planners, address_resolver):
-    """
-    :param planners: All the task planners registered in the system.
-    :type planners: :class:`collections.Iterable` of :class:`TaskPlanner`
-    :param address_resolver: A function that given an Address returns a Subject.
-    """
-    self._planners_by_goal_name = defaultdict(set)
-    self._product_requirements = defaultdict(dict)
-    self._output_products = set()
-    for planner in planners:
-      self._planners_by_goal_name[planner.goal_name].add(planner)
-      for output_type, input_type_requirements in planner.product_types.items():
-        self._product_requirements[output_type][planner] = input_type_requirements
-        self._output_products.add(output_type)
-    self._address_resolver = address_resolver
 
-  def for_goal(self, goal_name):
-    """Return the set of task planners installed in the given goal.
 
-    :param string goal_name:
-    :rtype: set of :class:`TaskPlanner`
-    """
-    return self._planners_by_goal_name[goal_name]
 
-  def for_product_type_and_subject(self, product_type, subject, configuration=None):
-    """Return the set of task planners that can produce the given product type for the subject.
 
-    TODO: memoize.
 
-    :param type product_type: The product type the returned planners are capable of producing.
+
+
+  def for_product_type_and_subject(self, subject, product, configuration=None):
+    """Yields the set of Sources for the given subject and product (which consume the given config).
+
     :param subject: The subject that the product will be produced for.
+    :param type product: The product type the returned planners are capable of producing.
     :param configuration: An optional configuration to require that a planner consumes, or None.
-    :rtype: set of :class:`TaskPlanner`
+    :rtype: sequences of ProductGraph.Source instances.
     """
-    for planner, ored_clauses in self._product_requirements[product_type].items():
-      product_graph = ProductGraph()
-      if not self._apply_product_requirement_clauses(subject,
-                                                     product_type,
-                                                     planner,
-                                                     ored_clauses,
-                                                     product_graph,
-                                                     select_path=OrderedSet()):
-        continue
-      # Only yield planners that were recursively able to consume the configuration.
+    def consumed_config(node):
+      """Returns True if the given Node recursively consumes the given configuration."""
+      if not configuration:
+        return True
+      for dep_node in self._adjacencies[node]:
+        if dep_node.product == type(configuration):
+          return True
+        elif consumed_config(dep_node):
+          return True
+      return False
+
+    key = (subject, product)
+    for node in self._nodes:
+      # Yield Sources that were recursively able to consume the configuration.
       # TODO: This is matching on type only, while selectors are usually implemented
       # as by-name. Convert config selectors to configuration mergers.
-      if not configuration or product_graph.exists(subject, type(configuration)):
-        yield planner
-
-  def _select_subjects(self, selector, subject):
-    """Yields all subjects selected by the given Select for the given subject."""
-    if isinstance(selector, Select.Subject):
-      #print('>>> selected direct subject: {}'.format(subject))
-      yield subject
-    elif isinstance(selector, Select.SubjectDependencies):
-      deps = [dep for dep, _ in Subject.iter_configured_dependencies(subject)]
-      #print('>>> selected subject dependencies of: {}: {}'.format(subject, deps))
-      for dep in deps:
-        yield dep
-    elif isinstance(selector, Select.LiteralSubject):
-      new_sub = self._address_resolver(selector.address)
-      #print('>>> found LiteralSubject: {}, resolved to: {}'.format(selector, new_sub))
-      yield new_sub
-    else:
-      raise ValueError('Unimplemented `Select` type: {}'.format(select))
-
-  def _apply_product_requirements(self,
-                                  subject,
-                                  output_product_type,
-                                  input_products,
-                                  product_graph,
-                                  select_path):
-    """Determines whether the output product can be computed by the planners with the given inputs.
-
-    Returns a sequence of ProductGraph.Nodes representing sources for the product.
-    """
-    node = product_graph.get(subject, output_product_type)
-    if node:
-      # Requirement has already been computed.
-      return [node]
-    elif output_product_type in input_products:
-      # Requirement is directly satisfied.
-      return [ProductGraph.Node(subject, output_product_type, ProductGraph.SourceNative())]
-    elif output_product_type not in self._output_products:
-      # Requirement can't be satisfied.
-      return [ProductGraph.Node(subject, output_product_type, ProductGraph.SourceNone())]
-    else:
-      # Requirement might be possible to satisfy by requesting additional products.
-      for planner, ored_clauses in self._product_requirements[output_product_type].items():
-        for anded_clause in ored_clauses:
-          src_node = ProductGraph.Node(subject,
-                                       output_product_type,
-                                       # TODO: better unique id for select clause
-                                       ProductGraph.SourcePlanner(planner, str(anded_clause)))
-          # Determine which of the anded clauses can be satisfied.
-          dependency_nodes = [self._apply_select(select,
-                                                 subject,
-                                                 product_graph,
-                                                 select_path)
-                              for select in anded_clause]
-          # Regardless of whether they can be satisfied, cache the edges in the product graph.
-          for dst_nodes in matched:
-            product_graph.add(src_node, dst_nodes)
-
-
-  def _apply_select(self,
-                    select,
-                    subject,
-                    product_graph,
-                    select_path):
-    """Determines whether the given Select can be satisfied for the given Subject.
-
-    Returns all matched Subject/Product pairs if the select succeeded, or None if it failed.
-    """
-    if (select, subject) in select_path:
-      # We are already recursively attempting to satisfy the given Select, and would cause
-      # a cycle by attempting to re-apply it.
-      return None
-    select_path.add((select, subject))
-    selected = []
-    matched = True
-    for selected_subject in self._select_subjects(select.selector, subject):
-      input_products = list(Products.for_subject(selected_subject))
-      nodes = self._apply_product_requirements(selected_subject,
-                                               select.product_type,
-                                               input_products,
-                                               product_graph,
-                                               select_path)
-      #print('>>> {}, {} for {} (with {}), {}'.format(matched, this_matched, selected_subject, input_products, select.product_type))
-      if this_matched:
-        selected.append((selected_subject, select.product_type, planners))
-      matched &= this_matched
-    select_path.discard((select, subject))
-    return selected if matched else None
+      if node.key == key and consumed_config(node):
+        yield node.source
 
   def produced_types_for_subject(self, subject, output_product_types):
     """Filters the given list of output products to those that are actually possible to produce.
@@ -655,6 +548,104 @@ class Planners(object):
     #  raise PartiallyConsumedInputsError(output_product_type, subject, partially_consumed)
 
     return producible_output_types
+
+
+
+
+
+  def __str__(self):
+    adj_str = ','.join('{} -> {}'.format(k, v) for k, values in self._adjacencies.items() for v in values)
+    return 'ProductGraph({})'.format(adj_str)
+
+
+# TODO: Extract to a separate file in a followup review.
+class Planners(object):
+  """A registry of task planners indexed by both product type and goal name.
+
+  Holds a set of input product requirements for each output product, which can be used
+  to validate the graph.
+  """
+
+  def __init__(self, planners):
+    """
+    :param planners: All the task planners registered in the system.
+    :type planners: :class:`collections.Iterable` of :class:`TaskPlanner`
+    :param address_resolver: A function that given an Address returns a Subject.
+    """
+    self._planners_by_goal_name = defaultdict(set)
+    self._product_requirements = defaultdict(dict)
+    self._output_products = set()
+    for planner in planners:
+      self._planners_by_goal_name[planner.goal_name].add(planner)
+      for output_type, input_type_requirements in planner.product_types.items():
+        self._product_requirements[output_type][planner] = input_type_requirements
+        self._output_products.add(output_type)
+
+  def for_goal(self, goal_name):
+    """Return the set of task planners installed in the given goal.
+
+    :param string goal_name:
+    :rtype: set of :class:`TaskPlanner`
+    """
+    return self._planners_by_goal_name[goal_name]
+
+  def product_graph(self, build_graph, subject_type_pairs*):
+    """Creates a product graph for the given subject, product pairs."""
+    product_graph = ProductGraph()
+    for subject, product_type in subject_type_pairs:
+      for candidate_source in self._node_sources(subject, product_type):
+        self._populate_node(product_graph,
+                            build_graph,
+                            ProductGraph.Node(subject, product_type, candidate_source))
+    return product_graph
+
+  def _select_subjects(self, build_graph, selector, subject):
+    """Yields all subjects selected by the given Select for the given subject."""
+    if isinstance(selector, Select.Subject):
+      yield subject
+    elif isinstance(selector, Select.SubjectDependencies):
+      deps = [dep for dep, _ in Subject.iter_configured_dependencies(subject)]
+      for dep in deps:
+        yield dep
+    elif isinstance(selector, Select.LiteralSubject):
+      new_sub = self._address_resolver(selector.address)
+      yield new_sub
+    else:
+      raise ValueError('Unimplemented `Select` type: {}'.format(select))
+
+  def _node_sources(self, subject, product_type):
+    """Yields a sequence of sources of the given Subject/Product."""
+    # Look for native sources.
+    if node.product in Products.for_subject(node.subject)
+      yield ProductGraph.SourceNative()
+    # And for Planners.
+    for planner, ored_clauses in self._product_requirements[product_type]:
+      for anded_clause in ored_clauses:
+        yield ProductGraph.SourcePlanner(planner, tuple(anded_clause)))
+
+  def _populate_node(self, product_graph, build_graph, node):
+    """Expands the ProductGraph to include the given Node and its children."""
+    if product_graph.exists_node(node):
+      # We are already recursively attempting to populate the given Node, and would cause
+      # a cycle by attempting to re-apply it.
+      return
+    product_graph.add_nodes(node)
+
+    if isinstance(node.source, (ProductGraph.SourceNative, ProductGraph.SourceNone)):
+      # No dependencies; we're done.
+      pass
+    elif isinstance(node.source, ProductGraph.SourcePlanner):
+      # Recurse on the dependencies of the anded Select clause.
+      for dep_select in node.source.clause:
+        for dep_subject in self._select_subjects(build_graph, dep_select.selector):
+          for dep_source in self._node_sources(dep_subject, dep_select.product):
+            # Recurse to populate the Node.
+            dep_node = ProductGraph.Node(dep_subject, dep_select.product, dep_source)
+            self._populate_node(product_graph, build_graph, dep_node)
+            # Then link it as a dependency of this Node.
+            product_graph.add_edge(node, dep_node)
+    else:
+      raise ValueError('Unrecognized Source type: {}'.format(node.source))
 
 
 class BuildRequest(object):
