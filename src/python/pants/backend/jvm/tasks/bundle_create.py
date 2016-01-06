@@ -78,8 +78,8 @@ class BundleCreate(JvmBinaryTask):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    targets_to_consolidate = self.find_consolidate_classpath_candidate(runtime_classpath,
-                                                                       self.context.targets())
+    targets_to_consolidate = self.find_consolidate_classpath_candidates(runtime_classpath,
+                                                                        self.context.targets())
     self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
 
     for target in self.context.targets():
@@ -191,7 +191,7 @@ class BundleCreate(JvmBinaryTask):
             classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
             classpath_products.add_for_target(vt.target, [(conf, jarpath)])
 
-  def find_consolidate_classpath_candidate(self, classpath_products, targets):
+  def find_consolidate_classpath_candidates(self, classpath_products, targets):
     targets_with_directory_in_classpath = []
     for target in targets:
       entries = classpath_products.get_internal_classpath_entries_for_targets([target])
