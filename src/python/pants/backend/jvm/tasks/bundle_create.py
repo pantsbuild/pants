@@ -17,7 +17,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.fs import archive
 from pants.fs.archive import JAR
-from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
