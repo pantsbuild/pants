@@ -32,6 +32,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
 
 
@@ -118,7 +119,6 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
 
   def __init__(self, *args, **kwargs):
     super(PytestRun, self).__init__(*args, **kwargs)
-    self._process = None
 
   def _test_target_filter(self):
     def target_filter(target):
@@ -446,8 +446,15 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       if profile:
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
       with environment_as(**env):
-        rc = self._pex_run(pex, workunit, args=args, setsid=True)
+        rc = self._spawn_and_wait(pex, workunit, args=args, setsid=True)
         return PythonTestResult.rc(rc)
+    except TestFailedTaskError:
+      # _spawn_and_wait wraps the test runner in a timeout, so it could
+      # fail with a TestFailedTaskError. We can't just set PythonTestResult
+      # to a failure because the resultslog doesn't have all the failures
+      # when tests are killed with a timeout. Therefore we need to re-raise
+      # here.
+      raise
     except Exception:
       self.context.log.error('Failed to run test!')
       self.context.log.info(traceback.format_exc())
@@ -529,25 +536,18 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
           args.insert(0, '--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
-  def _timeout_abort_handler(self):
-    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
-    #   storing the process handle here, the test mixin class will call the start_test() fn
-    #   on the language specific class which will return an object that can kill/monitor/etc
-    #   the test process.
-    if self._process is not None:
-      self._process.kill()
-
   def _pex_run(self, pex, workunit, args, setsid=False):
+    process = self._spawn(pex, workunit, args, setsid=False)
+    return process.wait()
+
+  def _spawn(self, pex, workunit, args, setsid=False):
     # NB: We don't use pex.run(...) here since it makes a point of running in a clean environment,
     # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
     # task.
 
-    # TODO(sameerbrenn): When we refactor the test code to be more standardized, rather than
-    #   storing the process handle here, the test mixin class will call the start_test() fn
-    #   on the language specific class which will return an object that can kill/monitor/etc
-    #   the test process.
-    self._process = subprocess.Popen(pex.cmdline(args),
+    process = subprocess.Popen(pex.cmdline(args),
                                preexec_fn=os.setsid if setsid else None,
                                stdout=workunit.output('stdout'),
                                stderr=workunit.output('stderr'))
-    return self._process.wait()
+
+    return SubprocessProcessHandler(process)
