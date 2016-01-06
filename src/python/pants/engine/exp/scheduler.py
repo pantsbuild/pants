@@ -435,25 +435,44 @@ class Task(object):
 
 
 class ProductGraph(object):
-  """A DAG of product dependencies, with (Subject, Product) pairs as nodes."""
+  """A DAG of product dependencies, with (Subject, Product, `source`) tuples as nodes.
+
+  The `source` entry is a member of the ProductSource union.
+  """
+
+  class SourcePlanner(namedtuple('SourcePlanner', ['planner', 'clause'])):
+    pass
+
+  class SourceNative(object):
+    pass
+
+  class SourceNone(object):
+    pass
+
+  class Node(namedtuple('Node', ['subject', 'product', 'source'])):
+    @property
+    def is_producible(self):
+      return not isinstance(self.source, SourceNone)
 
   def __init__(self):
-    self._adjacencies = defaultdict(OrderedSet)
+    # Stores Nodes as a dict from key (which does not include the `source` field) to Node.
+    self._nodes = set()
+    # Stores Node adjacencies.
+    self._adjacencies = defaultdict(list)
 
-  def add(self, src, dst):
-    if dst in self._adjacencies[src]:
-      # TODO: add cached consumption of the graph
-      print('>>> recomputed {} -> {}'.format(src, dst))
-    self._adjacencies[src].add(dst)
+  def _add_nodes(self, nodes):
+    for node in nodes:
+      if not isinstance(node, self.Node):
+        raise ValueError('{} is not a {}'.format(node, self.Node))
+      self._nodes.add(node)
 
-  def dependents(self, dst):
-    # TODO: linear time
-    for src, dsts in self._adjacencies.items():
-      if dst in dsts:
-        yield src
+  def add(self, src, dsts):
+    self._add_nodes(src)
+    self._add_nodes(*dsts)
+    self._adjacencies[src].extend(dsts)
 
-  def has_dependents(self, dst):
-    return next(product_graph.dependents(dst), None) is not None
+  def get(self, subject, product):
+    return self._nodes.get((subject, product), None)
 
   def __str__(self):
     adj_str = ','.join('{} -> {}'.format(k, v) for k, values in self._adjacencies.items() for v in values)
@@ -514,33 +533,8 @@ class Planners(object):
       # Only yield planners that were recursively able to consume the configuration.
       # TODO: This is matching on type only, while selectors are usually implemented
       # as by-name. Convert config selectors to configuration mergers.
-      if not configuration or product_graph.has_dependents((subject, type(configuration))):
+      if not configuration or product_graph.exists(subject, type(configuration)):
         yield planner
-
-  def _apply_product_requirement_clauses(self,
-                                         subject,
-                                         output_product_type,
-                                         planner,
-                                         ored_clauses,
-                                         product_graph,
-                                         select_path):
-    for anded_clause in ored_clauses:
-      # Determine which of the anded clauses can be satisfied.
-      matched = [self._apply_select(select,
-                                    subject,
-                                    product_graph,
-                                    select_path)
-                 for select in anded_clause]
-      matched_count = sum(1 for match in matched if match)
-
-      if matched_count == len(anded_clause):
-        # If all product requirements in the clause are satisfied by the input products, then
-        # we've found a planner capable of producing this product.
-        for match in matched:
-          for pair in match:
-            product_graph.add((subject, output_product_type), pair)
-        return True
-    return False
 
   def _select_subjects(self, selector, subject):
     """Yields all subjects selected by the given Select for the given subject."""
@@ -567,26 +561,36 @@ class Planners(object):
                                   select_path):
     """Determines whether the output product can be computed by the planners with the given inputs.
 
-    Returns a boolean indicating whether the value can be produced. Mutates the fully consumed
-    product set, and a dict(product,dict(planner,list(product))) of partially consumed products.
+    Returns a sequence of ProductGraph.Nodes representing sources for the product.
     """
-    if output_product_type in input_products:
+    node = product_graph.get(subject, output_product_type)
+    if node:
+      # Requirement has already been computed.
+      return [node]
+    elif output_product_type in input_products:
       # Requirement is directly satisfied.
-      return True
+      return [ProductGraph.Node(subject, output_product_type, ProductGraph.SourceNative())]
     elif output_product_type not in self._output_products:
       # Requirement can't be satisfied.
-      return False
+      return [ProductGraph.Node(subject, output_product_type, ProductGraph.SourceNone())]
     else:
       # Requirement might be possible to satisfy by requesting additional products.
-      matched = False
       for planner, ored_clauses in self._product_requirements[output_product_type].items():
-        matched |= self._apply_product_requirement_clauses(subject,
-                                                           output_product_type,
-                                                           planner,
-                                                           ored_clauses,
-                                                           product_graph,
-                                                           select_path)
-      return matched
+        for anded_clause in ored_clauses:
+          src_node = ProductGraph.Node(subject,
+                                       output_product_type,
+                                       # TODO: better unique id for select clause
+                                       ProductGraph.SourcePlanner(planner, str(anded_clause)))
+          # Determine which of the anded clauses can be satisfied.
+          dependency_nodes = [self._apply_select(select,
+                                                 subject,
+                                                 product_graph,
+                                                 select_path)
+                              for select in anded_clause]
+          # Regardless of whether they can be satisfied, cache the edges in the product graph.
+          for dst_nodes in matched:
+            product_graph.add(src_node, dst_nodes)
+
 
   def _apply_select(self,
                     select,
@@ -606,14 +610,14 @@ class Planners(object):
     matched = True
     for selected_subject in self._select_subjects(select.selector, subject):
       input_products = list(Products.for_subject(selected_subject))
-      this_matched = self._apply_product_requirements(selected_subject,
-                                                      select.product_type,
-                                                      input_products,
-                                                      product_graph,
-                                                      select_path)
+      nodes = self._apply_product_requirements(selected_subject,
+                                               select.product_type,
+                                               input_products,
+                                               product_graph,
+                                               select_path)
       #print('>>> {}, {} for {} (with {}), {}'.format(matched, this_matched, selected_subject, input_products, select.product_type))
       if this_matched:
-        selected.append((selected_subject, select.product_type))
+        selected.append((selected_subject, select.product_type, planners))
       matched &= this_matched
     select_path.discard((select, subject))
     return selected if matched else None
@@ -637,6 +641,10 @@ class Planners(object):
                             product_graph,
                             select_path=OrderedSet()):
         producible_output_types.append(output_product_type)
+      else:
+        print('>>> cannot produce {} for {}'.format(output_product_type, subject))
+
+    print('>>> graph: {}'.format(product_graph))
 
     # If any partially consumed candidate was not fully consumed by some planner, it's an error.
     # TODO: reimplement using a generated graph
