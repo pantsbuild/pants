@@ -77,7 +77,7 @@ class BundleCreate(JvmBinaryTask):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    targets = BuildGraph.closure(self.context.targets(), bfs=True)
+    targets = BuildGraph.closure(self.context.targets())
     self.consolidate_classpath(targets, runtime_classpath)
 
     for target in self.context.targets():
@@ -180,7 +180,6 @@ class BundleCreate(JvmBinaryTask):
     def jardir(entry):
       """Jar up the contents of the given ClasspathEntry and return a temporary jar path."""
       root = entry.path
-
       with temporary_dir(root_dir=self.workdir, cleanup=False) as destdir:
         jarpath = JAR.create(root, destdir, 'output')
       return jarpath
