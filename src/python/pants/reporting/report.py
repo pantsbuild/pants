@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import threading
+import time
 
 
 class ReportingError(Exception):
@@ -13,6 +14,12 @@ class ReportingError(Exception):
 
 
 class EmitterThread(threading.Thread):
+  """Periodically flush the report buffers.
+
+  This thread wakes up periodically and flushes the reporting buffers from memory to
+  make sure that the output of long running workunits can be monitored.
+  """
+
   def __init__(self, report, name):
     super(EmitterThread, self).__init__(name=name)
     self._report = report
@@ -20,8 +27,11 @@ class EmitterThread(threading.Thread):
     self.daemon = True
 
   def run(self):
-    while not self._stop.wait(timeout=0.5):
+    # NB(Eric Ayers) Using self._stop.wait(timeout=0.5) causes spurious exceptions on shutdown
+    # on some platforms. See https://github.com/pantsbuild/pants/issues/2750
+    while not self._stop.is_set():
       self._report.flush()
+      time.sleep(0.5)
 
   def stop(self):
     self._stop.set()

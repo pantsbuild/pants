@@ -9,6 +9,7 @@ from abc import abstractmethod
 from collections import defaultdict
 
 from pants.base.exceptions import TaskError
+from pants.build_graph.target import Target
 from pants.task.task import Task
 
 
@@ -92,12 +93,12 @@ class MutexTaskMixin(Task):
     """
 
   def execute(self):
-    targets = self._require_homogeneous_targets(self.select_targets, self._selected_by_other_impl)
+    targets = self._require_homogeneous_roots(self.select_targets, self._selected_by_other_impl)
     if targets:
       return self.execute_for(targets)
     # Else a single other mutex impl is executing.
 
-  def _require_homogeneous_targets(self, accept_predicate, reject_predicate):
+  def _require_homogeneous_roots(self, accept_predicate, reject_predicate):
     """Ensures that there is no ambiguity in the context according to the given predicates.
 
     If any targets in the context satisfy the accept_predicate, and no targets satisfy the
@@ -110,8 +111,19 @@ class MutexTaskMixin(Task):
     if len(self.context.target_roots) == 0:
       raise self.NoActivationsError('No target specified.')
 
-    accepted = self.context.targets(accept_predicate)
-    rejected = self.context.targets(reject_predicate)
+    def resolve(targets):
+      # Recursively resolve target aliases.
+      for t in targets:
+        if type(t) == Target:
+          for r in resolve(t.dependencies):
+            yield r
+        else:
+          yield t
+
+    expanded_roots = list(resolve(self.context.target_roots))
+
+    accepted = list(filter(accept_predicate, expanded_roots))
+    rejected = list(filter(reject_predicate, expanded_roots))
     if len(accepted) == 0:
       # no targets were accepted, regardless of rejects
       return None

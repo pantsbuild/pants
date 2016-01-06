@@ -1,32 +1,18 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-# common rev for all org.scala-lang%* artifacts
-SCALA_REV = '2.10.4'
-
-jar_library(name = 'scala-compiler',
-            jars = [
-              jar(org = 'org.scala-lang', name = 'scala-compiler', rev = SCALA_REV),
-            ])
-
-jar_library(name = 'scala-library',
-            jars = [
-              jar(org = 'org.scala-lang', name = 'scala-library', rev = SCALA_REV),
-            ])
-
-jar_library(name = 'scala-repl',
-            jars = [
-              jar(org = 'org.scala-lang', name = 'jline', rev = SCALA_REV, intransitive = True),
-            ],
-            dependencies = [
-              ':scala-compiler',
-              ':scala-library',
-            ])
-
 jar_library(name = 'scalastyle',
             jars = [
               scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
             ])
+
+target(name = 'scala-js-cli', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:cli'])
+target(name = 'scala-js-compiler', dependencies=[
+  'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
+  'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
+])
+target(name = 'scala-js-library', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:library'])
+
 
 jar_library(name = 'scrooge-gen',
             jars = [

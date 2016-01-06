@@ -18,10 +18,9 @@
   "name": "java_thrift_base",
   "configurations": [
     {
-      "type_alias": "apache_thrift_configuration",
+      "type_alias": "apache_thrift_java_configuration",
       "rev": "0.9.2",
       "strict": true,
-      "gen": "java",
       "deps": [
         {
           "type_alias": "jar",
@@ -41,11 +40,10 @@
 }
 
 {
-  "type_alias": "scrooge_configuration",
+  "type_alias": "scrooge_scala_configuration",
   "name": "scrooge_scala_config",
   "rev": "3.20.0",
   "strict": true,
-  "lang": "scala",
   "deps": [
     {
       "type_alias": "jar",
@@ -84,21 +82,24 @@
   "merges": [":java_thrift_base", ":scala_thrift_base"],
   "configurations": [
     {
-      "type_alias": "scrooge_configuration",
-      "merges": [":scrooge_scala_config"],
+      "type_alias": "scrooge_java_configuration",
       "name": "scrooge_java_config",
-      "lang": "java",
+      "rev": "3.20.0",
+      "strict": true,
       "deps": [
-        "3rdparty/jvm:scala-library",
-        ":slf4j-api"
+        ":slf4j-api",
+        {
+          "type_alias": "jar",
+          "extends": ":libthrift",
+          "rev": "0.6.1"
+        }
       ]
     },
     {
-      "type_alias": "apache_thrift_configuration",
+      "type_alias": "apache_thrift_java_configuration",
       "name": "failing",
       "rev": "fail",
-      "strict": true,
-      "gen": "java"
+      "strict": true
     }
   ]
 }

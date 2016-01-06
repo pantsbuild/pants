@@ -12,6 +12,7 @@ from mock import patch
 from pants.base.exceptions import TestFailedTaskError
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util.process_handler import ProcessHandler
 from pants.util.timeout import TimeoutReached
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -35,6 +36,23 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
       def _execute(self, all_targets):
         self.call_list.append(['_execute', all_targets])
+        self._spawn_and_wait()
+
+      def _spawn(self, *args, **kwargs):
+        self.call_list.append(['_spawn', args, kwargs])
+
+        class FakeProcessHandler(ProcessHandler):
+          def wait(_):
+            self.call_list.append(['process_handler.wait'])
+            return 0
+
+          def kill(_):
+            self.call_list.append(['process_handler.kill'])
+
+          def terminate(_):
+            self.call_list.append(['process_handler.terminate'])
+
+        return FakeProcessHandler()
 
       def _get_targets(self):
         return [targetA, targetB]
@@ -51,9 +69,6 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
       def _validate_target(self, target):
         self.call_list.append(['_validate_target', target])
-
-      def _timeout_abort_handler(self):
-        self.call_list.append(['_timeout_abort_handler'])
 
     return TestRunnerTaskMixinTask
 
@@ -125,6 +140,23 @@ class TestRunnerTaskMixinTimeoutTest(TaskTestBase):
 
       def _execute(self, all_targets):
         self.call_list.append(['_execute', all_targets])
+        self._spawn_and_wait()
+
+      def _spawn(self, *args, **kwargs):
+        self.call_list.append(['_spawn', args, kwargs])
+
+        class FakeProcessHandler(ProcessHandler):
+          def wait(_):
+            self.call_list.append(['process_handler.wait'])
+            return 0
+
+          def kill(_):
+            self.call_list.append(['process_handler.kill'])
+
+          def terminate(_):
+            self.call_list.append(['process_handler.terminate'])
+
+        return FakeProcessHandler()
 
       def _get_targets(self):
         return [targetB]

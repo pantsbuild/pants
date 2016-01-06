@@ -10,5 +10,5 @@ junit_tests(
     '3rdparty:guava-testlib',
     '3rdparty:junit',
     'src/java/org/pantsbuild/testing'
-  ]
+  ],
 )

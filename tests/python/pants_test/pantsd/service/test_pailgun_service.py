@@ -31,5 +31,3 @@ class TestPailgunService(unittest.TestCase):
     mock_setup.return_value = fake_pailgun
     self.assertIs(self.service.pailgun, fake_pailgun)
     self.assertEqual(self.service.pailgun_port, 33333)
-
-  # TODO(kwlzn): Circle back with integration test coverage once the closed-loop runner ships.
