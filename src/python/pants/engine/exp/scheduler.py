@@ -348,30 +348,6 @@ class ConflictingProducersError(SchedulingError):
     super(ConflictingProducersError, self).__init__(msg)
 
 
-class Scheduler(AbstractClass):
-  """Schedule the creation of products."""
-
-  @abstractmethod
-  def promise(self, subject, product_type, configuration=None):
-    """Return an promise for a product of the given `product_type` for the given `subject`.
-
-    The subject can either be a :class:`pants.engine.exp.objects.Serializable` object or else an
-    :class:`Address`, in which case the promise subject is the addressable, serializable object it
-    points to.
-
-    If a configuration is supplied, the promise is for the requested product in that configuration.
-
-    If no production plans can be made a :class:`Scheduler.SchedulingError` is raised.
-
-    :param object subject: The subject that the product type should be created for.
-    :param type product_type: The type of product to promise production of for the given subject.
-    :param object configuration: An optional requested configuration for the product.
-    :returns: A promise to make the given product type available for subject at task execution time.
-    :rtype: :class:`Promise`
-    :raises: :class:`SchedulerError` if no production plans could be made.
-    """
-
-
 class TaskPlanner(AbstractClass):
   """Produces plans to control execution of a paired task."""
 
@@ -398,11 +374,11 @@ class TaskPlanner(AbstractClass):
     """
 
   @abstractmethod
-  def plan(self, scheduler, product_type, subject, configuration=None):
+  def plan(self, product_mapper, product_type, subject, configuration=None):
     """
-    :param scheduler: A scheduler that can supply promises for any inputs needed that the planner
-                      cannot supply on its own to its associated task.
-    :type scheduler: :class:`Scheduler`
+    :param product_mapper: Supplies promises for any inputs needed that the planner cannot supply
+                           on its own to its associated task.
+    :type product_mapper: :class:`ProductMapper`
     :param type product_type: The type of product this plan should produce given subject when
                               executed.
     :param object subject: The subject of the plan.  Any products produced will be for the subject.
@@ -452,38 +428,32 @@ class ProductGraph(object):
       return (self.subject, self.product)
 
   def __init__(self):
-    # Stores Nodes as a dict from key (which does not include the `source` field) to Node.
-    self._nodes = dict()
-    # Stores Node adjacencies.
-    self._adjacencies = defaultdict(list)
+    self._nodes = set()
+    self._adjacencies = defaultdict(OrderedSet)
 
-  def add_nodes(self, nodes*):
-    for node in nodes:
-      if not isinstance(node, self.Node):
-        raise ValueError('{} is not a {}'.format(node, self.Node))
-      existing_node = self._nodes.get(node.key)
-      if existing_node:
-        raise ValueError('{} is already registered in the product graph as {}'.format(
-          node, existing_node))
-      self._nodes[node.key] = node
+  def add_node(self, node):
+    if not isinstance(node, self.Node):
+      raise ValueError('{} is not a {}'.format(node, self.Node))
+    self._nodes.add(node)
 
   def add_edge(self, src, dst):
-    self.add_nodes(src, dst)
+    self.add_node(src)
+    self.add_node(dst)
     self._adjacencies[src].add(dst)
 
-  def exists(self, subject, select):
-    return (subject, select) in self._nodes
+  def exists_node(self, node):
+    return node in self._nodes
 
   def _is_satisfied(self, node):
     """Returns True if the given Node is recursively satisfied (no SourceNone dependencies)."""
     if isinstance(node.source, ProductGraph.SourceNone):
       return False
     for dep_node in self._adjacencies[node]:
-      if not is_satisfied(dep_node):
+      if not self._is_satisfied(dep_node):
         return False
     return True
 
-  def sources_for(self, subject, product, configuration=None):
+  def sources_for(self, subject, product, consumed_product=None):
     """Yields the set of Sources for the given subject and product (which consume the given config).
 
     :param subject: The subject that the product will be produced for.
@@ -492,25 +462,25 @@ class ProductGraph(object):
     :rtype: sequences of ProductGraph.Source instances.
     """
 
-    def consumes_config(node):
-      """Returns True if the given Node recursively consumes the given configuration.
+    def consumes_product(node):
+      """Returns True if the given Node recursively consumes the given product.
 
       TODO: This is matching on type only, while selectors are usually implemented
       as by-name. Convert config selectors to configuration mergers.
       """
-      if not configuration:
+      if not consumed_product:
         return True
       for dep_node in self._adjacencies[node]:
-        if dep_node.product == type(configuration):
+        if dep_node.product == type(consumed_product):
           return True
-        elif consumed_config(dep_node):
+        elif consumes_product(dep_node):
           return True
       return False
 
     key = (subject, product)
     for node in self._nodes:
       # Yield Sources that were recursively able to consume the configuration.
-      if node.key == key and self._is_satisfied(node) and consumes_config(node):
+      if node.key == key and self._is_satisfied(node) and consumes_product(node):
         yield node.source
 
   def products_for(self, subject):
@@ -555,14 +525,15 @@ class Planners(object):
     """
     return self._planners_by_goal_name[goal_name]
 
-  def product_graph(self, build_graph, subject_type_pairs*):
-    """Creates a product graph for the given subject, product pairs."""
+  def product_graph(self, build_graph, subjects, products):
+    """Creates a product graph for the given subjects and products."""
     product_graph = ProductGraph()
-    for subject, product_type in subject_type_pairs:
-      for candidate_source in self._node_sources(subject, product_type):
-        self._populate_node(product_graph,
-                            build_graph,
-                            ProductGraph.Node(subject, product_type, candidate_source))
+    for subject in subjects:
+      for product in products:
+        for candidate_source in self._node_sources(subject, product):
+          self._populate_node(product_graph,
+                              build_graph,
+                              ProductGraph.Node(subject, product, candidate_source))
     return product_graph
 
   def _select_subjects(self, build_graph, selector, subject):
@@ -574,8 +545,7 @@ class Planners(object):
       for dep in deps:
         yield dep
     elif isinstance(selector, Select.LiteralSubject):
-      new_sub = self._address_resolver(selector.address)
-      yield new_sub
+      yield build_graph.resolve(selector.address)
     else:
       raise ValueError('Unimplemented `Select` type: {}'.format(select))
 
@@ -583,14 +553,14 @@ class Planners(object):
     """Returns a sequence of sources of the given Subject/Product."""
     # Look for native sources.
     sources = []
-    if node.product in Products.for_subject(node.subject)
-      sources.add(ProductGraph.SourceNative())
+    if product_type in Products.for_subject(subject):
+      sources.append(ProductGraph.SourceNative())
     # And for Planners.
-    for planner, ored_clauses in self._product_requirements[product_type]:
+    for planner, ored_clauses in self._product_requirements[product_type].items():
       for anded_clause in ored_clauses:
-        sources.add(ProductGraph.SourcePlanner(planner, tuple(anded_clause))))
+        sources.append(ProductGraph.SourcePlanner(planner, tuple(anded_clause)))
     # If no Sources were found, return SourceNone to indicate the hole.
-    return sources or [ProductGraph.SourceNone]
+    return sources or [ProductGraph.SourceNone()]
 
   def _populate_node(self, product_graph, build_graph, node):
     """Expands the ProductGraph to include the given Node and its children."""
@@ -598,7 +568,7 @@ class Planners(object):
       # We are already recursively attempting to populate the given Node, and would cause
       # a cycle by attempting to re-apply it.
       return
-    product_graph.add_nodes(node)
+    product_graph.add_node(node)
 
     if isinstance(node.source, (ProductGraph.SourceNative, ProductGraph.SourceNone)):
       # No dependencies; we're done.
@@ -606,7 +576,7 @@ class Planners(object):
     elif isinstance(node.source, ProductGraph.SourcePlanner):
       # Recurse on the dependencies of the anded Select clause.
       for dep_select in node.source.clause:
-        for dep_subject in self._select_subjects(build_graph, dep_select.selector):
+        for dep_subject in self._select_subjects(build_graph, dep_select.selector, node.subject):
           for dep_source in self._node_sources(dep_subject, dep_select.product):
             # Recurse to populate the Node.
             dep_node = ProductGraph.Node(dep_subject, dep_select.product, dep_source)
@@ -761,16 +731,27 @@ class Promise(object):
             .format(self._product_type, self._subject, self._configuration))
 
 
+# A synthetic planner that lifts products defined directly on targets into the product
+# namespace.
+class NoPlanner(object):
+  @classmethod
+  def finalize_plans(cls, plans):
+    return plans
+
+
 class ProductMapper(object):
   """Stores the mapping from promises to the plans whose execution will satisfy them."""
 
   class InvalidRegistrationError(Exception):
     """Indicates registration of a plan that does not cover the expected subject."""
 
-  def __init__(self):
+  def __init__(self, graph, product_graph):
+    self._graph = graph
+    self._product_graph = product_graph
     self._promises = {}
+    self._plans_by_product_type_by_planner = defaultdict(lambda: defaultdict(OrderedSet))
 
-  def register_promises(self, product_type, plan, primary_subject=None, configuration=None):
+  def _register_promises(self, product_type, plan, primary_subject=None, configuration=None):
     """Registers the promises the given plan will satisfy when executed.
 
     :param type product_type: The product type the plan will produce when executed.
@@ -798,7 +779,7 @@ class ProductMapper(object):
                                           .format(primary_subject, plan))
     return primary_promise
 
-  def promised(self, promise):
+  def _promised(self, promise):
     """Return the plan that was promised.
 
     :param promise: The promise to lookup a registered plan for.
@@ -808,11 +789,85 @@ class ProductMapper(object):
     """
     return self._promises.get(promise)
 
+  def promise(self, subject, product_type, configuration=None):
+    """Return a promise for a product of the given `product_type` for the given `subject`.
 
-class LocalScheduler(Scheduler):
+    The subject can either be a :class:`pants.engine.exp.objects.Serializable` object or else an
+    :class:`Address`, in which case the promise subject is the addressable, serializable object it
+    points to.
+
+    If a configuration is supplied, the promise is for the requested product in that configuration.
+
+    If no production plans can be made a :class:`SchedulingError` is raised.
+
+    :param object subject: The subject that the product type should be created for.
+    :param type product_type: The type of product to promise production of for the given subject.
+    :param object configuration: An optional requested configuration for the product.
+    :returns: A promise to make the given product type available for subject at task execution time.
+    :rtype: :class:`Promise`
+    :raises: :class:`SchedulingError` if no production plans could be made.
+    """
+    if isinstance(subject, Address):
+      subject = self._graph.resolve(subject)
+
+    promise = Promise(product_type, subject, configuration=configuration)
+    plan = self._promised(promise)
+    if plan is not None:
+      return promise
+
+    plans = []
+    # For all sources of the product, request it.
+    for source in self._product_graph.sources_for(subject,
+                                                  product_type,
+                                                  configuration=configuration):
+      if isinstance(source, SourceGraph.SourceNative):
+        plans.append((NoPlanner, Plan(func_or_task_type=lift_native_product,
+                                      subjects=(subject,),
+                                      subject=subject,
+                                      product_type=product_type)))
+      elif isinstance(source, SourceGraph.SourcePlanner):
+        plan = planner.plan(self, product_type, subject, configuration=configuration)
+        # TODO: remove None check... there should no longer be any planners failing.
+        if plan:
+          plans.append((planner, plan))
+      else:
+        raise ValueError('Unsupported source for ({}, {}): {}'.format(
+          subject, product_type, source))
+
+    # TODO: It should be legal to have multiple plans, and they should be merged.
+    if len(plans) > 1:
+      planners = [planner for planner, plan in plans]
+      raise ConflictingProducersError(product_type, subject, planners)
+    elif not plans:
+      raise NoProducersError(product_type, subject)
+
+    planner, plan = plans[0]
+    try:
+      primary_promise = self._register_promises(product_type, plan,
+                                                primary_subject=subject,
+                                                configuration=configuration)
+      self._plans_by_product_type_by_planner[planner][product_type].add(plan)
+      return primary_promise
+    except ProductMapper.InvalidRegistrationError:
+      raise SchedulingError('The plan produced for {subject!r} by {planner!r} does not cover '
+                            '{subject!r}:\n\t{plan!r}'.format(subject=subject,
+                                                              planner=type(planner).__name__,
+                                                              plan=plan))
+
+  def aggregate_plans(self):
+    """Invokes `finalize_plan` for all Planners."""
+    for planner, plans_by_product_type in self._plans_by_product_type_by_planner.items():
+      for product_type, plans in plans_by_product_type.items():
+        finalized_plans = planner.finalize_plans(plans)
+        if finalized_plans is not plans:
+          for finalized_plan in finalized_plans:
+            self._register_promises(product_type, finalized_plan)
+
+
+class LocalScheduler(object):
   """A scheduler that formulates an execution graph locally."""
 
-  def __init__(self, graph, product_graph, planners):
+  def __init__(self, graph, planners):
     """
     :param graph: The BUILD graph build requests will execute against.
     :type graph: :class:`pants.engine.exp.graph.Graph`
@@ -820,10 +875,7 @@ class LocalScheduler(Scheduler):
     :type planners: :class:`Planners`
     """
     self._graph = graph
-    self._product_graph = product_graph
     self._planners = planners
-    self._product_mapper = ProductMapper()
-    self._plans_by_product_type_by_planner = defaultdict(lambda: defaultdict(OrderedSet))
 
   def execution_graph(self, build_request):
     """Create an execution graph that can satisfy the given build request.
@@ -832,12 +884,13 @@ class LocalScheduler(Scheduler):
     :type build_request: :class:`BuildRequest`
     :returns: An execution graph of plans that, when reduced, can satisfy the given build request.
     :rtype: :class:`ExecutionGraph`
-    :raises: :class:`LocalScheduler.SchedulingError` if no execution graph solution could be found.
+    :raises: :class:`SchedulingError` if no execution graph solution could be found.
     """
     goals = build_request.goals
     subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
 
     root_promises = []
+    root_product_types = OrderedSet()
     for goal in goals:
       # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
       # ng-killall, and buildgen.go.
@@ -855,76 +908,21 @@ class LocalScheduler(Scheduler):
       # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
       # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
       # a TaskPlanner baseclass.
-      product_types = OrderedSet()
       for planner in self._planners.for_goal(goal):
-        product_types.update(planner.product_types.keys())
-      for subject in subjects:
-        # Request promises for relevant products.
-        relevant_products = product_types & set(self._product_graph.products_for(subject))
-        for product_type in relevant_products:
-          root_promises.append(self.promise(subject, product_type))
+        root_product_types.update(planner.product_types.keys())
+
+    # Compute a ProductGraph that determines which products are possible to produce for
+    # these subjects.
+    product_graph = self._planners.product_graph(self._graph, subjects, root_product_types)
+    product_mapper = ProductMapper(self._graph, product_graph)
+
+    # Request root promises for relevant products for each subject.
+    for subject in subjects:
+      relevant_products = root_product_types & set(product_graph.products_for(subject))
+      for product_type in relevant_products:
+        root_promises.append(product_mapper.promise(subject, product_type))
 
     # Give aggregating planners a chance to aggregate plans.
-    for planner, plans_by_product_type in self._plans_by_product_type_by_planner.items():
-      for product_type, plans in plans_by_product_type.items():
-        finalized_plans = planner.finalize_plans(plans)
-        if finalized_plans is not plans:
-          for finalized_plan in finalized_plans:
-            self._product_mapper.register_promises(product_type, finalized_plan)
+    product_mapper.aggregate_plans()
 
-    return ExecutionGraph(root_promises, self._product_mapper)
-
-  # A synthetic planner that lifts products defined directly on targets into the product
-  # namespace.
-  class NoPlanner(object):
-    @classmethod
-    def finalize_plans(cls, plans):
-      return plans
-
-  def promise(self, subject, product_type, configuration=None):
-    if isinstance(subject, Address):
-      subject = self._graph.resolve(subject)
-
-    promise = Promise(product_type, subject, configuration=configuration)
-    plan = self._product_mapper.promised(promise)
-    if plan is not None:
-      return promise
-
-    plans = []
-    # For all sources of the product, request it.
-    for source in self._product_graph.sources_for(subject,
-                                                  product_type,
-                                                  configuration=configuration):
-      if isinstance(source, SourceGraph.SourceNative):
-        plans.append((self.NoPlanner, Plan(func_or_task_type=lift_native_product,
-                                       subjects=(subject,),
-                                       subject=subject,
-                                       product_type=product_type)))
-      elif isinstance(source, SourceGraph.SourcePlanner):
-        plan = planner.plan(self, product_type, subject, configuration=configuration)
-        # TODO: remove None check... should not be any planners failing.
-        if plan:
-          plans.append((planner, plan))
-      else:
-        raise ValueError('Unsupported source for ({}, {}): {}'.format(
-          subject, product_type, source))
-
-    # TODO: It should be legal to have multiple plans, and they should be merged.
-    if len(plans) > 1:
-      planners = [planner for planner, plan in plans]
-      raise ConflictingProducersError(product_type, subject, planners)
-    elif not plans:
-      raise NoProducersError(product_type, subject)
-
-    planner, plan = plans[0]
-    try:
-      primary_promise = self._product_mapper.register_promises(product_type, plan,
-                                                               primary_subject=subject,
-                                                               configuration=configuration)
-      self._plans_by_product_type_by_planner[planner][product_type].add(plan)
-      return primary_promise
-    except ProductMapper.InvalidRegistrationError:
-      raise SchedulingError('The plan produced for {subject!r} by {planner!r} does not cover '
-                            '{subject!r}:\n\t{plan!r}'.format(subject=subject,
-                                                              planner=type(planner).__name__,
-                                                              plan=plan))
+    return ExecutionGraph(root_promises, product_mapper)

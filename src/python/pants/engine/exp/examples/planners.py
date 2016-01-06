@@ -521,7 +521,6 @@ def setup_json_scheduler(build_root):
                        ScalacPlanner(),
                        ScroogePlanner(),
                        UnpickleableInputsPlanner(),
-                       UnpickleableResultPlanner()],
-                      graph.resolve)
+                       UnpickleableResultPlanner()])
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler
