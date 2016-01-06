@@ -198,4 +198,6 @@ class BundleCreate(JvmBinaryTask):
       for conf, entry in entries:
         if ClasspathUtil.is_dir(entry.path):
           targets_with_directory_in_classpath.append(target)
+          break
+
     return targets_with_directory_in_classpath
