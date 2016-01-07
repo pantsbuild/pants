@@ -23,6 +23,13 @@ class Outcomes(object):
     self._outcomes = {}
 
   def add_outcome(self, path, outcome):
+    """Adds an outcome to this object.
+
+    Converts the outcome to a string because the consumer is outside pants without access to WorkUnit.
+
+    :param string path: colon-delimited path defining the workunit
+    :param int outcome: WorkUnit.ABORTED, WorkUnit.SUCCESS, etc.
+    """
     self._outcomes[path] = WorkUnit.outcome_string(outcome)
     # Check existence in case we're a clean-all. We don't want to write anything in that case.
     if self._path and os.path.exists(os.path.dirname(self._path)):
