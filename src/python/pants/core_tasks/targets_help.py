@@ -25,22 +25,17 @@ class TargetsHelp(ConsoleTask):
 
     alias = self.get_options().details
     if alias:
-      target_types = buildfile_aliases.target_types_by_alias.get(alias)
-      if target_types:
-        tti = next(x for x in extracter.get_target_type_info() if x.build_file_alias == alias)
-        yield blue('\n{}\n'.format(tti.description))
-        yield blue('{}('.format(alias))
+      tti = next(x for x in extracter.get_target_type_info() if x.symbol == alias)
+      yield blue('\n{}\n'.format(tti.description))
+      yield blue('{}('.format(alias))
 
-        for arg in extracter.get_target_args(list(target_types)[0]):
-          default = green('(default: {})'.format(arg.default) if arg.has_default else '')
-          yield '{:<30} {}'.format(
-            cyan('  {} = ...,'.format(arg.name)),
-            ' {}{}{}'.format(arg.description, ' ' if arg.description else '', default))
+      for arg in tti.args:
+        default = green('(default: {})'.format(arg.default) if arg.has_default else '')
+        yield '{:<30} {}'.format(
+          cyan('  {} = ...,'.format(arg.name)),
+          ' {}{}{}'.format(arg.description, ' ' if arg.description else '', default))
 
-        yield blue(')')
-      else:
-        yield 'No such target type: {}'.format(alias)
+      yield blue(')')
     else:
       for tti in extracter.get_target_type_info():
-        description = tti.description or '<Add description>'
-        yield '{} {}'.format(cyan('{:>30}:'.format(tti.build_file_alias)), description)
+        yield '{} {}'.format(cyan('{:>30}:'.format(tti.symbol)), tti.description)

@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.pants_requirement import pants_requirement
+from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_requirements import python_requirements
+from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -19,7 +19,6 @@ from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.target import Target
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
@@ -37,8 +36,8 @@ def build_file_aliases():
       'setup_py': PythonArtifact,
     },
     context_aware_object_factories={
-      'python_requirements': BuildFileAliases.curry_context(python_requirements),
-      'pants_requirement': BuildFileAliases.curry_context(pants_requirement),
+      'python_requirements': PythonRequirements,
+      'pants_requirement': PantsRequirement,
     }
   )
 
