@@ -450,6 +450,7 @@ class ProductGraph(object):
       return False
     for dep_node in self._adjacencies[node]:
       if not self._is_satisfied(dep_node):
+        print('>>> dep {} of {} is not satisfied'.format(dep_node, node))
         return False
     return True
 
@@ -486,15 +487,22 @@ class ProductGraph(object):
   def products_for(self, subject):
     """Yields products that are possible to produce for the given subject."""
     for node in self._nodes:
-      if node.subject == subject and self._is_satisfied(node):
+      is_satisfied = self._is_satisfied(node)
+      if node.subject == subject and is_satisfied:
+        print('>>> yielding {}'.format(node))
         yield node.product
+      else:
+        print('>>> skipping {} ({}, {})'.format(node, node.subject == subject, is_satisfied))
+
+  def edge_strings(self):
+    for node, adjacencies in self._adjacencies.items():
+      for dep_node in adjacencies:
+        yield '{} -> {}'.format(node, dep_node)
 
   def __str__(self):
-    adj_str = ','.join('{} -> {}'.format(k, v) for k, values in self._adjacencies.items() for v in values)
-    return 'ProductGraph({})'.format(adj_str)
+    return 'ProductGraph({})'.format(', '.join(self.edge_strings()))
 
 
-# TODO: Extract to a separate file in a followup review.
 class Planners(object):
   """A registry of task planners indexed by both product type and goal name.
 
@@ -531,6 +539,7 @@ class Planners(object):
     for subject in subjects:
       for product in products:
         for candidate_source in self._node_sources(subject, product):
+          print('>>> populating for {}, {}'.format(subject, product))
           self._populate_node(product_graph,
                               build_graph,
                               ProductGraph.Node(subject, product, candidate_source))
@@ -914,6 +923,7 @@ class LocalScheduler(object):
     # Compute a ProductGraph that determines which products are possible to produce for
     # these subjects.
     product_graph = self._planners.product_graph(self._graph, subjects, root_product_types)
+    print('>>>\n{}'.format('\n'.join(product_graph.edge_strings())))
     product_mapper = ProductMapper(self._graph, product_graph)
 
     # Request root promises for relevant products for each subject.
