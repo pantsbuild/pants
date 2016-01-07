@@ -343,13 +343,12 @@ class RunTracker(Subsystem):
     self.report.end_workunit(workunit)
     path, duration, self_time, is_tool = workunit.end()
 
-    try:
-      self._stats_lock.acquire()
+    # These three operations may not be thread-safe, and workunits may run in seperate threads
+    # and thus end concurrently, so we want to lock these operations.
+    with self._stats_lock:
       self.cumulative_timings.add_timing(path, duration, is_tool)
       self.self_timings.add_timing(path, self_time, is_tool)
       self.outcomes[path] = workunit.outcome_string(workunit.outcome())
-    finally:
-      self._stats_lock.release()
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
