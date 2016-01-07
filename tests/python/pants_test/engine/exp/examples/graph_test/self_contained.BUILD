@@ -5,7 +5,7 @@ Target(
   name='thrift1',
 )
 
-Target(
+StructWithDeps(
   name='thrift2',
   dependencies=[
     ':thrift1',
@@ -18,9 +18,6 @@ Target(
   name='java1',
   merges=[':production_thrift_configs'],
   sources={},
-  dependencies=[
-    ':thrift2',
-  ],
   configurations=[
     PublishConfig(
       default_repo=':public',
@@ -80,6 +77,9 @@ Target(
       version='0.9.2',
       strict=True,
       lang='java',
+      dependencies=[
+        ':thrift2',
+      ]
     ),
     ':nonstrict'
   ]

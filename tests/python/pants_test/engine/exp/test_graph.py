@@ -11,7 +11,7 @@ from functools import partial
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
-from pants.engine.exp.configuration import Struct
+from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
                                     Resolver)
 from pants.engine.exp.mapper import AddressMapper
@@ -19,7 +19,7 @@ from pants.engine.exp.parsers import parse_json, python_assignments_parser, pyth
 from pants.engine.exp.targets import Target
 
 
-class ApacheThriftConfiguration(Struct):
+class ApacheThriftConfiguration(StructWithDeps):
   # An example of a mixed-mode object - can be directly embedded without a name or else referenced
   # via address if both top-level and carrying a name.
   #
@@ -64,6 +64,7 @@ class GraphTestBase(unittest.TestCase):
   def setUp(self):
     self.symbol_table = {'ApacheThriftConfig': ApacheThriftConfiguration,
                          'Struct': Struct,
+                         'StructWithDeps': StructWithDeps,
                          'PublishConfig': PublishConfiguration,
                          'Target': Target}
 
@@ -205,7 +206,12 @@ class LazyResolvingGraphTest(GraphTestBase):
     expected_java1 = Target(address=java1_address,
                             sources={},
                             configurations=[
-                              ApacheThriftConfiguration(version='0.9.2', strict=True, lang='java'),
+                              ApacheThriftConfiguration(
+                                version='0.9.2',
+                                strict=True,
+                                lang='java',
+                                dependencies=[resolver(thrift2_address)]
+                              ),
                               resolver(nonstrict_address),
                               PublishConfiguration(
                                 default_repo=resolver(public_address),
@@ -215,8 +221,7 @@ class LazyResolvingGraphTest(GraphTestBase):
                                   'jane': resolver(public_address)
                                 }
                               )
-                            ],
-                            dependencies=[resolver(thrift2_address)])
+                            ])
 
     self.assertEqual(expected_java1, resolved_java1)
 
@@ -242,8 +247,10 @@ class LazyResolvingGraphTest(GraphTestBase):
     expected_thrift2 = Target(address=thrift2_address, dependencies=[resolver(thrift1_address)])
     resolved_thrift2 = graph.resolve(thrift2_address)
     self.assertEqual(expected_thrift2, resolved_thrift2)
-    self.assertEqual(expected_thrift2, resolved_java1.dependencies[0])
-    self.assertIs(resolved_java1.dependencies[0], resolved_thrift2)
+    resolved_thrift_config = [config for config in resolved_java1.configurations
+                              if isinstance(config, ApacheThriftConfiguration)]
+    self.assertEqual(expected_thrift2, resolved_thrift_config[0].dependencies[0])
+    self.assertIs(resolved_thrift_config[0].dependencies[0], resolved_thrift2)
 
     expected_thrift1 = Target(address=thrift1_address)
     resolved_thrift1 = graph.resolve(thrift1_address)
