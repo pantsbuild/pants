@@ -15,6 +15,7 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_graph import BuildGraph
 from pants.fs import archive
 from pants.fs.archive import JAR
 from pants.util.dirutil import safe_mkdir
