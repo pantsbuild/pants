@@ -95,6 +95,10 @@ class RunTracker(Subsystem):
 
     relative_symlink(self.run_info_dir, link_to_latest)
 
+    # A lock to ensure that adding to stats at the end of a workunit
+    # operates thread-safely.
+    self._stats_lock = threading.Lock()
+
     # Time spent in a workunit, including its children.
     self.cumulative_timings = AggregatedTimings(os.path.join(self.run_info_dir,
                                                              'cumulative_timings'))
@@ -338,12 +342,14 @@ class RunTracker(Subsystem):
   def end_workunit(self, workunit):
     self.report.end_workunit(workunit)
     path, duration, self_time, is_tool = workunit.end()
-    self.cumulative_timings.add_timing(path, duration, is_tool)
-    self.self_timings.add_timing(path, self_time, is_tool)
 
-    # Dict operations are thread-safe in CPython, so we can do this.
-    # https://docs.python.org/2/glossary.html#term-global-interpreter-lock
-    self.outcomes[path] = workunit.outcome_string(workunit.outcome())
+    try:
+      self._stats_lock.acquire()
+      self.cumulative_timings.add_timing(path, duration, is_tool)
+      self.self_timings.add_timing(path, self_time, is_tool)
+      self.outcomes[path] = workunit.outcome_string(workunit.outcome())
+    finally:
+      self._stats_lock.release()
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
