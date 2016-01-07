@@ -56,7 +56,14 @@ class MustacheRenderer(object):
     """
     self._template_dir = template_dir
     self._package_name = package_name
-    self._pystache_renderer = pystache.Renderer(search_dirs=template_dir)
+    if self._package_name is not None:
+      class PartialsLoader(object):
+        def get(me, template_name):
+          return self._get_template_text_from_package(template_name)
+      partials = PartialsLoader()
+    else:
+      partials = None
+    self._pystache_renderer = pystache.Renderer(search_dirs=template_dir, partials=partials)
     self._templates = {}
 
   def render_name(self, template_name, args):
@@ -73,12 +80,19 @@ class MustacheRenderer(object):
         # Let pystache find the template by name.
         template = self._pystache_renderer.load_template(template_name)
       else:
-        # Load the named template embedded in our package.
-        path = os.path.join('templates', template_name + '.mustache')
-        template_text = pkgutil.get_data(self._package_name, path)
-        if template_text is None:
-          raise self.MustacheError(
-            "could not find template {} in package {}".format(path, self._package_name))
+        template_text = self._get_template_text_from_package(template_name)
         template = MustacheRenderer.parse_template(template_text)
       self._templates[template_name] = template
     return template
+
+  def _get_template_text_from_package(self, template_name):
+    """Load the named template embedded in our package."""
+    if self._package_name is None:
+      raise self.MustacheError('No package specified for template loading.')
+
+    path = os.path.join('templates', template_name + '.mustache')
+    template_text = pkgutil.get_data(self._package_name, path)
+    if template_text is None:
+      raise self.MustacheError(
+        'could not find template {} in package {}'.format(path, self._package_name))
+    return template_text.decode('utf8')

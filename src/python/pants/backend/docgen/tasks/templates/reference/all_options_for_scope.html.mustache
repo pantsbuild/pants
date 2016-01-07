@@ -1,0 +1,16 @@
+<ul class="nobullets collapsible">
+{{#help_info.basic?}}
+  <li class="collapsed options-group">Basic options
+    <ul class="nobullets">
+      {{#help_info.basic}}{{> reference/single_option.html}}{{/help_info.basic}}
+    </ul>
+  </li>
+  {{/help_info.basic?}}
+  {{#help_info.advanced?}}
+  <li class="collapsed options-group">Advanced options
+    <ul class="nobullets">
+      {{#help_info.advanced}}{{> reference/single_option.html}}{{/help_info.advanced}}
+    </ul>
+  </li>
+  {{/help_info.advanced?}}
+</ul>
