@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import inspect
 import os
+import signal
 import socket
 import unittest
 from contextlib import contextmanager
@@ -63,32 +64,48 @@ class TestNailgunClientSession(unittest.TestCase):
     self.server_sock.close()
     self.client_sock.close()
 
-  def test_maybe_input_reader_running(self):
-    with self.nailgun_client_session._maybe_input_reader_running():
-      self.mock_reader.start.assert_called_once_with()
+  def test_input_reader_start_stop(self):
+    self.nailgun_client_session._maybe_start_input_reader()
+    self.mock_reader.start.assert_called_once_with()
+
+    self.nailgun_client_session._maybe_stop_input_reader()
     self.mock_reader.stop.assert_called_once_with()
 
+  def test_input_reader_noop(self):
+    self.nailgun_client_session._input_reader = None
+    self.nailgun_client_session._maybe_start_input_reader()
+    self.nailgun_client_session._maybe_stop_input_reader()
+
   def test_process_session(self):
+    NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b'31337')
+    NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDOUT, self.TEST_PAYLOAD)
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDOUT, self.TEST_PAYLOAD)
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.STDERR, self.TEST_PAYLOAD)
-    NailgunProtocol.write_chunk(self.server_sock, ChunkType.EXIT, '1729')
+    NailgunProtocol.write_chunk(self.server_sock, ChunkType.EXIT, b'1729')
     self.assertEquals(self.nailgun_client_session._process_session(), 1729)
     self.assertEquals(self.fake_stdout.content, self.TEST_PAYLOAD * 2)
     self.assertEquals(self.fake_stderr.content, self.TEST_PAYLOAD * 3)
+    self.mock_reader.start.assert_called_once_with()
+    self.mock_reader.stop.assert_called_once_with()
+    self.assertEquals(self.nailgun_client_session.remote_pid, 31337)
 
   def test_process_session_bad_chunk(self):
+    NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b'31337')
+    NailgunProtocol.write_chunk(self.server_sock, ChunkType.START_READING_INPUT)
     NailgunProtocol.write_chunk(self.server_sock, self.BAD_CHUNK_TYPE, '')
 
     with self.assertRaises(NailgunClientSession.ProtocolError):
       self.nailgun_client_session._process_session()
 
+    self.mock_reader.start.assert_called_once_with()
+    self.mock_reader.stop.assert_called_once_with()
+
   @mock.patch.object(NailgunClientSession, '_process_session', **PATCH_OPTS)
-  @mock.patch.object(NailgunClientSession, '_maybe_input_reader_running', **PATCH_OPTS)
-  def test_execute(self, mctx, mproc):
-    mproc.return_value = self.TEST_PAYLOAD
+  def test_execute(self, mock_process_session):
+    mock_process_session.return_value = self.TEST_PAYLOAD
     out = self.nailgun_client_session.execute(
       self.TEST_WORKING_DIR,
       self.TEST_MAIN_CLASS,
@@ -96,8 +113,7 @@ class TestNailgunClientSession(unittest.TestCase):
       **self.TEST_ENVIRON
     )
     self.assertEquals(out, self.TEST_PAYLOAD)
-    mctx.assert_called_once_with(self.nailgun_client_session)
-    mproc.assert_called_once_with(self.nailgun_client_session)
+    mock_process_session.assert_called_once_with(self.nailgun_client_session)
 
 
 class TestNailgunClient(unittest.TestCase):
@@ -159,3 +175,21 @@ class TestNailgunClient(unittest.TestCase):
 
   def test_repr(self):
     self.assertIsNotNone(repr(self.nailgun_client))
+
+  @mock.patch('os.kill', **PATCH_OPTS)
+  def test_send_control_c(self, mock_kill):
+    self.nailgun_client._session = mock.Mock(remote_pid=31337)
+    self.nailgun_client.send_control_c()
+    mock_kill.assert_called_once_with(31337, signal.SIGINT)
+
+  @mock.patch('os.kill', **PATCH_OPTS)
+  def test_send_control_c_noop_none(self, mock_kill):
+    self.nailgun_client._session = None
+    self.nailgun_client.send_control_c()
+    mock_kill.assert_not_called()
+
+  @mock.patch('os.kill', **PATCH_OPTS)
+  def test_send_control_c_noop_nopid(self, mock_kill):
+    self.nailgun_client._session = mock.Mock(remote_pid=None)
+    self.nailgun_client.send_control_c()
+    mock_kill.assert_not_called()

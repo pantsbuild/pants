@@ -94,11 +94,11 @@ class TestWatchman(BaseTest):
 
   def test_maybe_init_metadata(self):
     with mock.patch('pants.pantsd.watchman.safe_mkdir', **self.PATCH_OPTS) as mock_mkdir, \
-         mock.patch.object(Watchman, '_write_file', **self.PATCH_OPTS) as mock_write_file:
+         mock.patch('pants.pantsd.watchman.safe_file_dump', **self.PATCH_OPTS) as mock_file_dump:
       self.watchman._maybe_init_metadata()
 
       mock_mkdir.assert_called_once_with(self.WATCHMAN_DIR)
-      mock_write_file.assert_called_once_with(self.watchman, self.STATE_FILE, '{}')
+      mock_file_dump.assert_called_once_with(self.STATE_FILE, '{}')
 
   def test_construct_cmd(self):
     output = self.watchman._construct_cmd(['cmd', 'parts', 'etc'],

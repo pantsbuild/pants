@@ -87,17 +87,47 @@ class ClasspathUtilTest(BaseTest):
     classpath_products.add_for_target(a, [('default', self._path('a.jar')),
                                           ('default', self._path('resources'))])
 
-    self._test_canonical_classpath_helper(classpath_products, [a],
-                                          [
-                                            'a.b.b/0-a.jar',
-                                            'a.b.b/1-resources'
-                                          ],
-                                          {
-                                            'a.b.b/classpath.txt':
+    with temporary_dir() as base_dir:
+      self._test_canonical_classpath_helper(classpath_products, [a],
+                                            base_dir, True,
+                                            [
+                                              'a.b.b-0.jar',
+                                              'a.b.b-1'
+                                            ],
+                                            {
+                                              'a.b.b-classpath.txt':
                                               '{}/a.jar:{}/resources\n'.format(self.pants_workdir,
                                                                                self.pants_workdir)
-                                           },
-                                          True)
+                                            })
+
+    # incrementally delete the resource dendendency
+    classpath_products = ClasspathProducts(self.pants_workdir)
+    classpath_products.add_for_target(a, [('default', self._path('a.jar'))])
+    self._test_canonical_classpath_helper(classpath_products, [a],
+                                          base_dir, True,
+                                          [
+                                            'a.b.b-0.jar',
+                                          ],
+                                          {
+                                            'a.b.b-classpath.txt':
+                                            '{}/a.jar\n'.format(self.pants_workdir)
+                                          })
+
+    # incrementally add another jar dependency
+    classpath_products = ClasspathProducts(self.pants_workdir)
+    classpath_products.add_for_target(a, [('default', self._path('a.jar')),
+                                          ('default', self._path('b.jar'))])
+    self._test_canonical_classpath_helper(classpath_products, [a],
+                                          base_dir, True,
+                                          [
+                                            'a.b.b-0.jar',
+                                            'a.b.b-1.jar'
+                                          ],
+                                          {
+                                            'a.b.b-classpath.txt':
+                                            '{}/a.jar:{}/b.jar\n'.format(self.pants_workdir,
+                                                                         self.pants_workdir)
+                                          })
 
   def test_create_canonical_classpath_with_common_prefix(self):
     """
@@ -107,6 +137,7 @@ class ClasspathUtilTest(BaseTest):
     This is such a regression test case added for a bug discovered in
     https://github.com/pantsbuild/pants/pull/2664
 
+    NOTE: incremental test case is covered by `RuntimeClasspathPublisherTest`.
     TODO(peiyu) Remove once we fully migrate to use `target.id`.
     """
     # a and c' canonical classpath share a common prefix: a/b/b
@@ -119,50 +150,53 @@ class ClasspathUtilTest(BaseTest):
     classpath_products.add_for_target(c, [('default', self._path('c.jar'))])
 
     # target c first to verify its first created canonical classpath is preserved
-    self._test_canonical_classpath_helper(classpath_products, [c, a],
-                                          [
-                                            'a/b/b/c/c/0-c.jar',
-                                            'a/b/b/0-a.jar',
-                                          ],
-                                          {
-                                            'a/b/b/classpath.txt':
-                                              '{}/a.jar\n'.format(self.pants_workdir),
-                                            'a/b/b/c/c/classpath.txt':
-                                              '{}/c.jar\n'.format(self.pants_workdir),
-                                          },
-                                          False)
+    with temporary_dir() as base_dir:
+      self._test_canonical_classpath_helper(classpath_products, [c, a],
+                                            base_dir, False,
+                                            [
+                                              'a/b/b/c/c/0.jar',
+                                              'a/b/b/0.jar',
+                                            ],
+                                            {
+                                              'a/b/b/classpath.txt':
+                                                '{}/a.jar\n'.format(self.pants_workdir),
+                                              'a/b/b/c/c/classpath.txt':
+                                                '{}/c.jar\n'.format(self.pants_workdir),
+                                            })
 
   def _test_canonical_classpath_helper(self, classpath_products, targets,
+                                       libs_dir,
+                                       use_target_id,
                                        expected_canonical_classpath,
-                                       expected_classspath_files,
-                                       use_target_id):
+                                       expected_classspath_files):
     """
     Helper method to call `create_canonical_classpath` and verify generated canonical classpath.
 
     :param ClasspathProducts classpath_products: Classpath products.
     :param list targets: List of targets to generate canonical classpath from.
+    :param string libs_dir: Directory where canonical classpath are to be generated.
+    :param bool use_target_id: Whether to use target_id based naming.
     :param list expected_canonical_classpath: List of canonical classpath relative to a base directory.
     :param dict expected_classspath_files: A dict of classpath.txt path to its expected content.
     """
-    with temporary_dir() as base_dir:
-      canonical_classpath = ClasspathUtil.create_canonical_classpath(classpath_products,
-                                                                     targets,
-                                                                     base_dir,
-                                                                     save_classpath_file=True,
-                                                                     use_target_id=use_target_id)
-      # check canonical path returned
-      self.assertEquals(expected_canonical_classpath,
-                        relativize_paths(canonical_classpath, base_dir))
+    canonical_classpath = ClasspathUtil.create_canonical_classpath(classpath_products,
+                                                                   targets,
+                                                                   libs_dir,
+                                                                   save_classpath_file=True,
+                                                                   use_target_id=use_target_id)
+    # check canonical path returned
+    self.assertEquals(expected_canonical_classpath,
+                      relativize_paths(canonical_classpath, libs_dir))
 
-      # check canonical path created contain the exact set of files, no more, no less
-      self.assertTrue(contains_exact_files(base_dir,
-                                           expected_canonical_classpath +
-                                           expected_classspath_files.keys()))
+    # check canonical path created contain the exact set of files, no more, no less
+    self.assertTrue(contains_exact_files(libs_dir,
+                                         expected_canonical_classpath +
+                                         expected_classspath_files.keys()))
 
-      # check the content of classpath.txt
-      for classpath_file in expected_classspath_files:
-        self.assertTrue(check_file_content(os.path.join(base_dir, classpath_file),
-                                           expected_classspath_files[classpath_file]))
+    # check the content of classpath.txt
+    for classpath_file in expected_classspath_files:
+      self.assertTrue(check_file_content(os.path.join(libs_dir, classpath_file),
+                                         expected_classspath_files[classpath_file]))
 
   def _path(self, p):
     return os.path.join(self.pants_workdir, p)

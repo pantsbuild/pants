@@ -7,10 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import datetime
 import os
+import signal
 import socket
 import sys
 import traceback
 from contextlib import contextmanager
+
+from setproctitle import setproctitle as set_process_title
 
 from pants.bin.exiter import Exiter
 from pants.bin.pants_runner import LocalPantsRunner
@@ -98,6 +101,12 @@ class DaemonPantsRunner(ProcessManager):
     with stdio_as(*streams):
       yield
 
+  def _setup_sigint_handler(self):
+    """Sets up a control-c signal handler for the daemon runner context."""
+    def handle_control_c(signum, frame):
+      raise KeyboardInterrupt('remote client sent control-c!')
+    signal.signal(signal.SIGINT, handle_control_c)
+
   def run(self):
     """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
     self.daemonize(write_pid=False)
@@ -108,11 +117,22 @@ class DaemonPantsRunner(ProcessManager):
     # hook with socket-specific behavior.
     self._exiter.set_except_hook()
 
+    # Set context in the process title.
+    set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
+
+    # Broadcast our pid to the remote client so they can send us signals (i.e. SIGINT).
+    NailgunProtocol.write_chunk(self._socket, ChunkType.PID, bytes(os.getpid()))
+
+    # Setup a SIGINT signal handler.
+    self._setup_sigint_handler()
+
     # Invoke a Pants run with stdio redirected.
     with self._nailgunned_stdio(self._socket):
       try:
         LocalPantsRunner(self._exiter, self._args, self._env).run()
+      except KeyboardInterrupt:
+        self._exiter.exit(1, msg='Interrupted by user.\n')
       except Exception:
-        self._exiter.exit(1, msg=traceback.format_exc())
+        self._exiter.handle_unhandled_exception(add_newline=True)
       else:
         self._exiter.exit(0)
