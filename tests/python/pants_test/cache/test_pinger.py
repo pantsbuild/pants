@@ -28,6 +28,7 @@ class TestPinger(BaseTest):
     self.slow_netloc = 'localhost:{}'.format(slow.socket.getsockname()[1])
     self.unreachable_netloc = 'localhost:{}'.format(unreachable.socket.getsockname()[1])
 
+  @unittest.expectedFailure
   def test_pinger_times_correct(self):
     test = Pinger(timeout=self.slow_timeout_seconds, tries=2)
     netlocs = [self.fast_netloc, self.slow_netloc, self.unreachable_netloc]
@@ -36,6 +37,7 @@ class TestPinger(BaseTest):
     self.assertLess(ping_results[self.fast_netloc], ping_results[self.slow_netloc])
     self.assertEqual(ping_results[self.unreachable_netloc], Pinger.UNREACHABLE, msg=self.message)
 
+  @unittest.expectedFailure
   def test_pinger_timeout_config(self):
     test = Pinger(timeout=self.fast_timeout_seconds, tries=2)
     netlocs = [self.fast_netloc, self.slow_netloc]
@@ -44,6 +46,7 @@ class TestPinger(BaseTest):
     self.assertEqual(
       ping_results[self.slow_netloc], Pinger.UNREACHABLE, msg=self.message)
 
+  @unittest.expectedFailure
   def test_global_pinger_memo(self):
     fast_pinger = Pinger(timeout=self.fast_timeout_seconds, tries=2)
     slow_pinger = Pinger(timeout=self.slow_timeout_seconds, tries=2)
