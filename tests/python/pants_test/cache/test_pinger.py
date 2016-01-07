@@ -15,7 +15,7 @@ from pants_test.cache.delay_server import setup_delayed_server
 
 
 class TestPinger(BaseTest):
-  resolution = .1
+  resolution = 1
   fast_delay_seconds = 0
   fast_timeout_seconds = fast_delay_seconds + resolution
   slow_delay_seconds = fast_timeout_seconds + resolution
