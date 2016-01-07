@@ -108,7 +108,7 @@ class RunTracker(Subsystem):
       ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
 
     # Log of success/failure/aborted for each workunit.
-    self.outcomes = Outcomes()
+    self.outcomes = {}
 
     # Number of threads for foreground work.
     self._num_foreground_workers = self.get_options().num_foreground_workers
@@ -277,7 +277,7 @@ class RunTracker(Subsystem):
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
-      'outcomes': self.outcomes.get_all()
+      'outcomes': self.outcomes
     }
     # Dump individual stat file.
     # TODO(benjy): Do we really need these, once the statsdb is mature?
@@ -341,7 +341,7 @@ class RunTracker(Subsystem):
     path, duration, self_time, is_tool = workunit.end()
     self.cumulative_timings.add_timing(path, duration, is_tool)
     self.self_timings.add_timing(path, self_time, is_tool)
-    self.outcomes.add_outcome(path, workunit.outcome())
+    self.outcomes[path] = workunit.outcome_string(workunit.outcome())
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:

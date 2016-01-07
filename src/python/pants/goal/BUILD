@@ -98,12 +98,3 @@ python_library(
     'src/python/pants/util:meta',
   ],
 )
-
-python_library(
-  name='outcomes',
-  sources=['outcomes.py'],
-  dependencies=[
-    'src/python/pants/util:dirutil',
-    'src/python/pants/base:workunit'
-  ]
-)
