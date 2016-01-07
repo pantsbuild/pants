@@ -38,16 +38,16 @@ class PlannersTest(unittest.TestCase):
     def products_for(subject, all_products):
       product_graph = ps.product_graph(None, subjects=[subject], products=all_products)
       print('\n'.join(product_graph.edge_strings()))
-      res = list(product_graph.products_for(subject))
+      res = product_graph.products_for(subject)
       print('>>> for {}, {}: {}'.format(subject, all_products, res))
       return res
 
     # Product A can be produced given either A, B, or C.
-    self.assertEquals([A], products_for(A(), [A, D]))
-    self.assertEquals([A, B], products_for(B(), [A, D]))
-    self.assertEquals([A, B, C], products_for(C(), [A, D]))
+    self.assertEquals({A}, products_for(A(), [A, D]))
+    self.assertEquals({A, B}, products_for(B(), [A, D]))
+    self.assertEquals({A, B, C}, products_for(C(), [A, D]))
     # D can only be produced if it is already present.
-    self.assertEquals([D], products_for(D(), [A, D]))
+    self.assertEquals({D}, products_for(D(), [A, D]))
 
   def test_produced_types_partially_consumed(self):
     class A(object): pass

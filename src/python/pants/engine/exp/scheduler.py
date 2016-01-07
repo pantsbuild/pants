@@ -422,6 +422,9 @@ class ProductGraph(object):
   class SourceNone(object):
     pass
 
+  class SourceOR(object):
+    pass
+
   class Node(namedtuple('Node', ['subject', 'product', 'source'])):
     @property
     def key(self):
@@ -445,14 +448,26 @@ class ProductGraph(object):
     return node in self._nodes
 
   def _is_satisfied(self, node):
-    """Returns True if the given Node is recursively satisfied (no SourceNone dependencies)."""
+    """Returns True if the given Node is recursively satisfied.
+
+    A SourceNative node is always satisfied.
+    A SourceNone node is never satisfied.
+    A SourceOR node is satisfied if any child is satisfied.
+    A SourcePlanner node is satisfied if all children are satisfied."""
     if isinstance(node.source, ProductGraph.SourceNone):
       return False
-    for dep_node in self._adjacencies[node]:
-      if not self._is_satisfied(dep_node):
-        print('>>> dep {} of {} is not satisfied'.format(dep_node, node))
-        return False
-    return True
+    elif isinstance(node.source, ProductGraph.SourceNative):
+      return True
+    # The remaining Source types depend on the makeup of their dependencies.
+    satisfied_deps = (self._is_satisfied(dep_node) for dep_node in self._adjacencies[node])
+    if isinstance(node.source, ProductGraph.SourceOR):
+      # Any deps satisfied?
+      return any(satisfied_deps)
+    elif isinstance(node.source, ProductGraph.SourcePlanner):
+      # All deps satisfied?
+      return all(satisfied_deps)
+    else:
+      raise ValueError('Unimplemented `Source` type: {}'.format(node.source))
 
   def sources_for(self, subject, product, consumed_product=None):
     """Yields the set of Sources for the given subject and product (which consume the given config).
@@ -485,14 +500,16 @@ class ProductGraph(object):
         yield node.source
 
   def products_for(self, subject):
-    """Yields products that are possible to produce for the given subject."""
+    """Returns a set of products that are possible to produce for the given subject."""
+    products = set()
     for node in self._nodes:
       is_satisfied = self._is_satisfied(node)
       if node.subject == subject and is_satisfied:
         print('>>> yielding {}'.format(node))
-        yield node.product
+        products.add(node.product)
       else:
         print('>>> skipping {} ({}, {})'.format(node, node.subject == subject, is_satisfied))
+    return products
 
   def edge_strings(self):
     for node, adjacencies in self._adjacencies.items():
@@ -538,11 +555,16 @@ class Planners(object):
     product_graph = ProductGraph()
     for subject in subjects:
       for product in products:
-        for candidate_source in self._node_sources(subject, product):
-          print('>>> populating for {}, {}'.format(subject, product))
-          self._populate_node(product_graph,
-                              build_graph,
-                              ProductGraph.Node(subject, product, candidate_source))
+        dep_sources = self._node_sources(subject, product)
+        parent = None
+        # If there are multiple sources of this dependency, introduce a SourceOR node.
+        if len(dep_sources) > 1:
+          parent = ProductGraph.Node(subject, product, ProductGraph.SourceOR())
+        for dep_source in dep_sources:
+          dep_node = ProductGraph.Node(subject, product, dep_source)
+          self._populate_node(product_graph, build_graph, dep_node)
+          if parent:
+            product_graph.add_edge(parent, dep_node)
     return product_graph
 
   def _select_subjects(self, build_graph, selector, subject):
@@ -586,14 +608,20 @@ class Planners(object):
       # Recurse on the dependencies of the anded Select clause.
       for dep_select in node.source.clause:
         for dep_subject in self._select_subjects(build_graph, dep_select.selector, node.subject):
-          for dep_source in self._node_sources(dep_subject, dep_select.product):
-            # Recurse to populate the Node.
+          dep_sources = self._node_sources(dep_subject, dep_select.product)
+          parent = node
+          # If there are multiple sources of this dependency, introduce a SourceOR node.
+          if len(dep_sources) > 1:
+            parent = ProductGraph.Node(dep_subject, dep_select.product, ProductGraph.SourceOR())
+            product_graph.add_edge(node, parent)
+          # Recurse to populate each dependency Node.
+          for dep_source in dep_sources:
             dep_node = ProductGraph.Node(dep_subject, dep_select.product, dep_source)
             self._populate_node(product_graph, build_graph, dep_node)
             # Then link it as a dependency of this Node.
-            product_graph.add_edge(node, dep_node)
+            product_graph.add_edge(parent, dep_node)
     else:
-      raise ValueError('Unrecognized Source type: {}'.format(node.source))
+      raise ValueError('Unsupported Source type: {}'.format(node.source))
 
 
 class BuildRequest(object):
