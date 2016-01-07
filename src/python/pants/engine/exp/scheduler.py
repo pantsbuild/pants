@@ -476,7 +476,7 @@ class ProductGraph(object):
 
     :param subject: The subject that the product will be produced for.
     :param type product: The product type the returned planners are capable of producing.
-    :param configuration: An optional configuration to require that a planner consumes, or None.
+    :param consumed_product: An optional configuration to require that a planner consumes, or None.
     :rtype: sequences of ProductGraph.Source instances.
     """
 
@@ -496,22 +496,21 @@ class ProductGraph(object):
       return False
 
     key = (subject, product)
+    # TODO: order N: index by subject
     for node in self._nodes:
       # Yield Sources that were recursively able to consume the configuration.
-      if node.key == key and not isinstance(node.source, ProductGraph.SourceOR) and \
-          self._is_satisfied(node) and consumes_product(node):
+      if isinstance(node.source, ProductGraph.SourceOR):
+        continue
+      if node.key == key and self._is_satisfied(node) and consumes_product(node):
         yield node.source
 
   def products_for(self, subject):
     """Returns a set of products that are possible to produce for the given subject."""
     products = set()
+    # TODO: order N: index by subject
     for node in self._nodes:
-      is_satisfied = self._is_satisfied(node)
-      if node.subject == subject and is_satisfied:
-        print('>>> yielding {}'.format(node))
+      if node.subject == subject and self._is_satisfied(node):
         products.add(node.product)
-      else:
-        print('>>> skipping {} ({}, {})'.format(node, node.subject == subject, is_satisfied))
     return products
 
   def edge_strings(self):
@@ -575,8 +574,7 @@ class Planners(object):
     if isinstance(selector, Select.Subject):
       yield subject
     elif isinstance(selector, Select.SubjectDependencies):
-      deps = [dep for dep, _ in Subject.iter_configured_dependencies(subject)]
-      for dep in deps:
+      for dep, _ in Subject.iter_configured_dependencies(subject):
         yield dep
     elif isinstance(selector, Select.LiteralSubject):
       yield build_graph.resolve(selector.address)
