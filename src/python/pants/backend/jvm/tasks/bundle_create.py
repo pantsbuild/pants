@@ -11,14 +11,23 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_graph import BuildGraph
 from pants.fs import archive
+from pants.fs.archive import JAR
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
 class BundleCreate(JvmBinaryTask):
+
+  # Directory for 3rdparty libraries.
+  LIBS_DIR = 'libs'
+  # Directory for internal libraries.
+  INTERNAL_LIBS_DIR = 'internal-libs'
 
   @classmethod
   def register_options(cls, register):
@@ -63,6 +72,12 @@ class BundleCreate(JvmBinaryTask):
 
   def execute(self):
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
+
+    # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
+    # more efficient than loading them as individual files.
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    self.consolidate_classpath(self.context.targets(), runtime_classpath)
+
     for target in self.context.targets():
       for app in map(self.App, filter(self.App.is_app, [target])):
         basedir = self.bundle(app)
@@ -115,7 +130,7 @@ class BundleCreate(JvmBinaryTask):
     # loose classes, and have no classpath. Otherwise we add the external dependencies
     # to the bundle as jars in a libs directory.
     if not self._create_deployjar:
-      lib_dir = os.path.join(bundle_dir, 'libs')
+      lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
       os.mkdir(lib_dir)
 
       # Add external dependencies to the bundle.
@@ -127,14 +142,16 @@ class BundleCreate(JvmBinaryTask):
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
-    canonical_classpath_base_dir = lib_dir if not self._create_deployjar else None
+    canonical_classpath_base_dir = None
+    if not self._create_deployjar:
+      canonical_classpath_base_dir = os.path.join(bundle_dir, self.INTERNAL_LIBS_DIR)
     with self.monolithic_jar(app.binary, bundle_jar,
                              canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
       self.add_main_manifest_entry(jar, app.binary)
       if classpath:
         # append external dependencies to monolithic jar's classpath,
         # eventually will be saved in the Class-Path entry of its Manifest.
-        jar.append_classpath([os.path.join('libs', jar_path) for jar_path in classpath])
+        jar.append_classpath(classpath)
 
       # Make classpath complete by adding internal classpath and monolithic jar.
       classpath.update(jar.classpath + [jar.path])
@@ -156,3 +173,24 @@ class BundleCreate(JvmBinaryTask):
         verbose_symlink(path, bundle_path)
 
     return bundle_dir
+
+  def consolidate_classpath(self, targets, classpath_products):
+    """Convert loose directories in classpath_products into jars.
+
+    TODO(peiyu): enable artifact caching to take advantage of caching as well saving to
+    the provided target-specific directories.
+    """
+    def jardir(entry):
+      """Jar up the contents of the given ClasspathEntry and return a unique jar path."""
+      root = entry.path
+      with temporary_dir(root_dir=self.workdir, cleanup=False) as destdir:
+        jarpath = JAR.create(root, destdir, 'output')
+      return jarpath
+
+    safe_mkdir(self.workdir)
+    for target in targets:
+      entries = classpath_products.get_internal_classpath_entries_for_targets([target])
+      for conf, entry in entries:
+        if ClasspathUtil.is_dir(entry.path):
+          classpath_products.remove_for_target(target, [(conf, entry.path)])
+          classpath_products.add_for_target(target, [(conf, jardir(entry))])
