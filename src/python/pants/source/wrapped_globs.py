@@ -12,7 +12,6 @@ from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
-from pants.base.build_manual import manual
 from pants.util.memo import memoized_property
 
 
@@ -56,19 +55,19 @@ class FilesetWithSpec(object):
 class FilesetRelPathWrapper(object):
   KNOWN_PARAMETERS = frozenset(['exclude', 'follow_links'])
 
-  @classmethod
-  @manual.builddict(factory=True)
-  def factory(cls, parse_context):
-    """A factory for using a `FilesetRelPathWrapper` as a context aware object factory."""
-    return cls(parse_context.rel_path)
+  wrapped_fn = None   # Subclasses must override.
 
-  def __init__(self, rel_path):
+  def __init__(self, parse_context):
     """
-    :param string rel_path: The path this file set will be relative to.
+    :param parse_context: The BUILD file parse context.
     """
-    self._rel_path = rel_path
+    self._rel_path = parse_context.rel_path
 
-  def __call__(self, *args, **kwargs):
+  def __call__(self, *patterns, **kwargs):
+    """
+    :param patterns: glob patterns to apply.
+    :param exclude: A list of {,r,z}globs objects, strings, or lists of strings to exclude.
+    """
     root = os.path.normpath(os.path.join(get_buildroot(), self._rel_path))
 
     raw_excludes = kwargs.pop('exclude', [])
@@ -84,21 +83,22 @@ class FilesetRelPathWrapper(object):
 
     excludes = [ensure_string_wrapped_in_list(exclude) for exclude in raw_excludes]
 
-    # making sure there is no unknown argument(s)
+    # making sure there are no unknown arguments.
     unknown_args = set(kwargs.keys()) - self.KNOWN_PARAMETERS
 
     if unknown_args:
-      raise ValueError('Unexpected arguments while parsing globs: {}'.format(', '.join(unknown_args)))
+      raise ValueError('Unexpected arguments while parsing globs: {}'.format(
+        ', '.join(unknown_args)))
 
-    for glob in args:
+    for glob in patterns:
       if self._is_glob_dir_outside_root(glob, root):
-        raise ValueError('Invalid glob {}, points outside BUILD file root dir {}'.format(glob, root))
+        raise ValueError('Invalid glob {}, points outside BUILD file root {}'.format(glob, root))
 
     def files_calculator():
-      result = self.wrapped_fn(root=root, *args, **kwargs)
+      result = self.wrapped_fn(root=root, *patterns, **kwargs)
 
-      for exclude in excludes:
-        result -= exclude
+      for ex in excludes:
+        result -= ex
 
       return result
 
@@ -106,7 +106,7 @@ class FilesetRelPathWrapper(object):
     rel_root = os.path.relpath(root, buildroot)
     if rel_root == '.':
       rel_root = ''
-    filespec = self.to_filespec(args, root=rel_root, excludes=excludes)
+    filespec = self.to_filespec(patterns, root=rel_root, excludes=excludes)
     return FilesetWithSpec(rel_root, filespec, files_calculator)
 
   @staticmethod
@@ -138,39 +138,20 @@ class FilesetRelPathWrapper(object):
 
 
 class Globs(FilesetRelPathWrapper):
-  """Returns Fileset containing matching files in same directory as this BUILD file.
-  E.g., ``sources = globs('*java'),`` to get .java files in this directory.
+  """Matches files in the BUILD file's directory.
 
-  :param exclude: a list of {,r,z}globs objects, strings, or lists of
-    strings to exclude.  E.g. ``globs('*',exclude=[globs('*.java'),
-    'foo.py'])`` gives all files in this directory except ``.java``
-    files and ``foo.py``.
-
-  Deprecated:
-  You might see that old code uses "math" on the return value of
-  ``globs()``.  E.g., ``globs('*') - globs('*.java')`` gives all files
-  in this directory *except* ``.java`` files.  Please use exclude
-  instead, since pants is moving to make BUILD files easier to parse,
-  and the new grammar will not support arithmetic.
+  E.g., - ``sources = globs('*java'),`` to get .java files in this directory.
+        - ``globs('*',exclude=[globs('*.java'), 'foo.py'])`` to get all files in this directory
+          except ``.java`` files and ``foo.py``.
   """
   wrapped_fn = Fileset.globs
 
 
 class RGlobs(FilesetRelPathWrapper):
-  """Recursive ``globs``, returns Fileset matching files in this directory and its descendents.
+  """Matches files recursively under the BUILD file's directory.
 
-  E.g., ``bundle(fileset=rglobs('config/*')),`` to bundle up all files in
-  the config, config/foo, config/foo/bar directories.
-
-  :param exclude: a list of {,r,z}globs objects, strings, or lists of
-    strings to exclude.  E.g. ``rglobs('config/*',exclude=[globs('config/*.java'),
-    'config/foo.py'])`` gives all files under config except ``.java`` files and ``config/foo.py``.
-
-  Deprecated:
-  You might see that old code uses "math" on the return value of ``rglobs()``. E.g.,
-  ``rglobs('config/*') - rglobs('config/foo/*')`` gives all files under `config` *except*
-  those in ``config/foo``.  Please use exclude instead, since pants is moving to
-  make BUILD files easier to parse, and the new grammar will not support arithmetic.
+  E.g., ``bundle(fileset=rglobs('config/*'))`` to bundle up all files in the config,
+        config/foo, config/foo/bar directories.
   """
 
   @staticmethod
@@ -234,10 +215,7 @@ class RGlobs(FilesetRelPathWrapper):
 
 
 class ZGlobs(FilesetRelPathWrapper):
-  """Returns a FilesetWithSpec that matches zsh-style globs, including ``**/`` for recursive globbing.
-
-  Uses ``BUILD`` file's directory as the "working directory".
-  """
+  """Matches files in the BUILD file's dir using zsh-style globs, including ``**/`` to recurse."""
 
   @staticmethod
   def zglobs_following_symlinked_dirs_by_default(*globspecs, **kw):
