@@ -168,14 +168,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     with self.temporary_workdir() as workdir:
       yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
-  def bundle_and_run(self, target, bundle_name, bundle_options=None, args=None,
+  def bundle_and_run(self, target, bundle_name, bundle_jar_name=None, bundle_options=None,
+                     args=None,
                      expected_bundle_jar_content=None,
                      expected_bundle_content=None,
                      library_jars_are_symlinks=True):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
 
     :param target: target name to compile
-    :param bundle_name: resulting bundle filename (minus .jar extension)
+    :param bundle_name: resulting bundle filename (minus .zip extension)
+    :param bundle_jar_name: monolithic jar filename (minus .jar extension), if None will be the
+      same as bundle_name
     :param bundle_options: additional options for bundle
     :param args: optional arguments to pass to executable
     :param expected_bundle_content: verify the bundle zip content
@@ -185,6 +188,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       dependencies, only exception is when shading is used.
     :return: stdout as a string on success, raises an Exception on error
     """
+    bundle_jar_name = bundle_jar_name or bundle_name
     bundle_options = bundle_options or []
     bundle_options = ['bundle.jvm'] + bundle_options + ['--archive=zip', target]
     pants_run = self.run_pants(bundle_options)
@@ -202,10 +206,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
         self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
       if expected_bundle_jar_content:
         with temporary_dir() as check_bundle_jar_dir:
-          bundle_jar = os.path.join(workdir, '{bundle_name}.jar')
-          ZIP.extract('{workdir}/{bundle_name}.jar'.format(workdir=workdir,
-                                                           bundle_name=bundle_name),
-                      check_bundle_jar_dir)
+          bundle_jar = os.path.join(workdir, '{bundle_jar_name}.jar'
+                                    .format(bundle_jar_name=bundle_jar_name))
+          ZIP.extract(bundle_jar, check_bundle_jar_dir)
           self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
 
       optional_args = []
@@ -213,7 +216,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         optional_args = args
       java_run = subprocess.Popen(['java',
                                    '-jar',
-                                   '{bundle_name}.jar'.format(bundle_name=bundle_name)]
+                                   '{bundle_jar_name}.jar'.format(bundle_jar_name=bundle_jar_name)]
                                   + optional_args,
                                   stdout=subprocess.PIPE,
                                   cwd=workdir)
