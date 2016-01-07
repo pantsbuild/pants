@@ -125,7 +125,7 @@ class Validatable(AbstractClass):
 
   @abstractmethod
   def validate(self):
-    """Check that this objects fields are valid.
+    """Check that this object's fields are valid.
 
     :raises: :class:`ValidationError` if this object is invalid.
     """
