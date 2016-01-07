@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
@@ -58,6 +59,9 @@ class Scalastyle(NailgunTask):
   _SCALA_SOURCE_EXTENSION = '.scala'
 
   _MAIN = 'org.scalastyle.Main'
+
+  def subsystem_dependencies(cls):
+    return super(Scalastyle, cls).subsystem_dependencies() + (ScalaPlatform, )
 
   @classmethod
   def register_options(cls, register):
