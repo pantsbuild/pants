@@ -20,7 +20,8 @@
 <p>
   A <em>goal</em> is an action that can be taken on build targets. It represents some
   high-level goal that you wish to accomplish, such as compiling your code.
-  Goals are how you tell Pants what to do on the command line. E.g.,
+  Goals are how you tell Pants what to do on the command line. E.g., this is how you
+  invoke the compile goal:
 </p>
   <pre>
   ./pants compile examples/src/java/org/pantsbuild/example/hello/main</pre>
@@ -68,7 +69,7 @@
 </p>
 <ul>
   <li>
-    The options for task <code>foo</code> in goal <code>bar</code> belong to scope <code>foo.bar</code>.
+    The options for task <code>foo</code> in goal <code>bar</code> belong to scope <code>bar.foo</code>.
   </li>
   <li>
     If a task <code>foo</code> has the same name as its goal then it belongs to scope <code>foo</code>

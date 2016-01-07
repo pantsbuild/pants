@@ -6,7 +6,9 @@ function toggleTreeView(evt, elem) {
 }
 
 function expandAll(evt) {
-  evt.preventDefault();
+  if (evt !== undefined) {
+    evt.preventDefault();
+  }
   // We copy the returned htmlCollection, because our action changes it, which will
   // invalidate indexes.
   var liElems = [].slice.call(document.getElementsByClassName('collapsed'));
@@ -16,7 +18,9 @@ function expandAll(evt) {
 }
 
 function collapseAll(evt) {
-  evt.preventDefault();
+  if (evt !== undefined) {
+    evt.preventDefault();
+  }
   // We copy the returned htmlCollection, because our action changes it, which will
   // invalidate indexes.
   var liElems = [].slice.call(document.getElementsByClassName('expanded'));
@@ -52,4 +56,15 @@ window.onload = function() {
       elem.addEventListener('click', function(evt) { toggleTreeView(evt, this); });
     }
   }
+
+  // Expand all if the user hits ctrl-f (cmd-f on OSX) to search on the page, so that their
+  // search sees all content. Note that we can't capture Edit->Find via the menus,
+  // but this should be useful in practice.
+  var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  var ctrlKey = isMac ? 'metaKey' : 'ctrlKey';
+  document.addEventListener('keydown', function(e) {
+    if (e.which == '70' && e[ctrlKey]) {
+      expandAll();
+    }
+  });
 };

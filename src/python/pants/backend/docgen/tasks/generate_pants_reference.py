@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -19,7 +19,11 @@ from pants.util.dirutil import safe_open
 
 
 class GeneratePantsReference(Task):
-  """Generate Pants reference documentation."""
+  """Generate Pants reference documentation.
+
+  Specifically, generates two files: a build dictionary detailing all the directive that
+  can appear in BUILD files, and a reference listing all available goals and options.
+  """
 
   @classmethod
   def register_options(cls, register):
