@@ -15,7 +15,7 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
   def test_stats_local_json_file(self):
     with temporary_file_path() as tmpfile:
       pants_run = self.run_pants(['test',
-                                  '--run-tracker-stats-local-json-file=%s' % tmpfile,
+                                  '--run-tracker-stats-local-json-file={}'.format(tmpfile),
                                   'testprojects/src/java/org/pantsbuild/testproject/unicode/main'])
       self.assert_success(pants_run)
 
