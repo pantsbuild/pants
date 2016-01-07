@@ -76,7 +76,6 @@ python_library(
   dependencies = [
     ':aggregated_timings',
     ':artifact_cache_stats',
-    ':outcomes',
     '3rdparty/python:requests',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',

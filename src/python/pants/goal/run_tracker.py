@@ -22,7 +22,6 @@ from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
-from pants.goal.outcomes import Outcomes
 from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
@@ -341,6 +340,9 @@ class RunTracker(Subsystem):
     path, duration, self_time, is_tool = workunit.end()
     self.cumulative_timings.add_timing(path, duration, is_tool)
     self.self_timings.add_timing(path, self_time, is_tool)
+
+    # Dict operations are thread-safe in CPython, so we can do this.
+    # https://docs.python.org/2/glossary.html#term-global-interpreter-lock
     self.outcomes[path] = workunit.outcome_string(workunit.outcome())
 
   def get_background_root_workunit(self):
