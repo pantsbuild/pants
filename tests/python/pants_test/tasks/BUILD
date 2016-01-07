@@ -18,7 +18,6 @@ python_tests(
   sources = ['test_scalastyle_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-    'src/python/pants/util:contextutil',
   ],
   tags = {'integration'},
 )

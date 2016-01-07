@@ -148,27 +148,13 @@ class Target(Struct):
     return configs[0]
 
   def select_configuration_type(self, tpe):
-    """Selects a configuration of the given type on this target, or None
-
-    TODO: after https://rbcommons.com/s/twitter/r/3245/ , it should become
-    an error for this not to match.
+    """Selects configurations of the given type on this target.
 
     :param type tpe: The exact type of the configuration to select: subclasses will not match.
-    :returns: The configuration with the given type, or None.
+    :returns: The configurations with the given type.
     :rtype: :class:`pants.engine.exp.configuration.Configuration`
     """
-    def match(config):
-      matched = type(config) == tpe
-      return matched
-    configs = tuple(config for config in self.configurations if match(config))
-    if not configs:
-      return None
-    elif len(configs) > 1:
-      configurations = ('{!r}'.format(c) for c in configs)
-      raise self.ConfigurationNotFound('Found more than one configuration with type {!r} for these '
-                                       'configurations in {!r}:\n\t{}'
-                                       .format(tpe, self, '\n\t'.join(configurations)))
-    return configs[0]
+    return tuple(config for config in self.configurations if type(config) == tpe)
 
   def walk_targets(self, postorder=True):
     """Performs a depth first walk of this target, visiting all reachable targets exactly once.

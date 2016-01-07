@@ -16,6 +16,7 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
@@ -29,6 +30,7 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     return BuildFileAliases(
       targets={
         'jar_library': JarLibrary,
+        'target': Target,
       },
       objects={
         'exclude': Exclude,

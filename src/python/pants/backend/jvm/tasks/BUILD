@@ -297,6 +297,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     ':classpath_util',
     'src/python/pants/base:build_environment',
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
@@ -321,6 +322,7 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
     'src/python/pants/util:xml_parser',
   ],
 )

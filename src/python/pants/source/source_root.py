@@ -39,29 +39,36 @@ class SourceRoots(object):
     unknown structure.  Tests should prefer to use dirs that match our source root patterns
     instead of explicitly setting source roots here.
     """
+    if os.path.isabs(path):
+      path = os.path.relpath(path, get_buildroot())
     self._trie.add_fixed(path, langs)
 
   def find(self, target):
-    """Find the source root for the given target.
+    """Find the source root for the given target, or None.
 
     :param target: Find the source root for this target.
     :return: A SourceRoot instance.
     """
-    target_path = target.address.spec_path
-    # If no source root is found, use the target's path.
-    # TODO: Remove this logic. It should be an error to have no matching source root.
-    return self.find_by_path(target_path) or SourceRoot(target_path, [])
+    return self.find_by_path(target.address.spec_path)
 
   def find_by_path(self, path):
-    """Find the source root for the given path.
+    """Find the source root for the given path, or None.
 
     :param path: Find the source root for this path.
-    :return: A SourceRoot instance, or None if no matching source root found.
+    :return: A SourceRoot instance, or None if the path is not located under a source root
+             and `unmatched==fail`.
     """
-    # TODO: Is this normalization necessary? Shouldn't all paths here be relative already?
     if os.path.isabs(path):
       path = os.path.relpath(path, get_buildroot())
-    return self._trie.find(path)
+    matched = self._trie.find(path)
+    if matched:
+      return matched
+    elif self._options.unmatched == 'fail':
+      return None
+    elif self._options.unmatched == 'create':
+      # If no source root is found, use the path directly.
+      # TODO: Remove this logic. It should be an error to have no matching source root.
+      return SourceRoot(path, [])
 
   def all_roots(self):
     """Return all known source roots.
@@ -164,6 +171,10 @@ class SourceRootConfig(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(SourceRootConfig, cls).register_options(register)
+    register('--unmatched', choices=['create', 'fail'], default='create', advanced=True,
+             help='Configures the behaviour when sources are defined outside of any configured '
+                  'source root. `create` will cause a source root to be implicitly created at '
+                  'the definition location of the sources; `fail` will trigger an error.')
     register('--lang-canonicalizations', metavar='<map>', type=dict_option,
              default=cls._DEFAULT_LANG_CANONICALIZATIONS, advanced=True,
              help='Map of language aliases to their canonical names.')

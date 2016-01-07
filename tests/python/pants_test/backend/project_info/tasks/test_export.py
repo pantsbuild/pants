@@ -197,7 +197,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def test_version(self):
     result = self.execute_export_json('project_info:first')
-    self.assertEqual('1.0.4', result['version'])
+    self.assertEqual('1.0.5', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
@@ -247,6 +247,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       'globs': {'globs': ['project_info/this/is/a/source/Foo.scala',
                           'project_info/this/is/a/source/Bar.scala']},
       'libraries': ['org.apache:apache-jar:12.12.2012', 'org.scala-lang:scala-library:2.10.5'],
+      'id': 'project_info.jvm_target',
       'is_code_gen': False,
       'targets': ['project_info:jar_lib', '//:scala-library'],
       'roots': [

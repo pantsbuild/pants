@@ -55,6 +55,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/codegen/tasks:protobuf_gen',
     'src/python/pants/backend/codegen:plugin',
+    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/tasks:task_test_base',

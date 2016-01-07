@@ -20,6 +20,10 @@ class TestRunnerTaskMixin(object):
   expressed can support both languages, and any additional languages that are added to pants.
   """
 
+  @staticmethod
+  def _timeout_for_target(target):
+    return getattr(target, 'timeout', None)
+
   @classmethod
   def register_options(cls, register):
     super(TestRunnerTaskMixin, cls).register_options(register)
@@ -57,24 +61,38 @@ class TestRunnerTaskMixin(object):
       for target in test_targets:
         self._validate_target(target)
 
-      timeout = self._timeout_for_targets(test_targets)
+      self._execute(all_targets)
 
-      try:
-        with Timeout(timeout, abort_handler=self._timeout_abort_handler):
-          self._execute(all_targets)
-      except TimeoutReached as e:
-        raise TestFailedTaskError(str(e), failed_targets=test_targets)
+  def _spawn_and_wait(self, *args, **kwargs):
+    """Spawn the actual test runner process, and wait for it to complete."""
+
+    test_targets = self._get_test_targets()
+    timeout = self._timeout_for_targets(test_targets)
+
+    process_handler = self._spawn(*args, **kwargs)
+
+    # TODO(sbrenn): We use process_handler.kill here because we want to aggressively terminate the
+    # process. It may make sense in the future to do a multi-stage approach
+    # where first we do process_handler.terminate to let it die gracefully, and
+    # then do process_handler.kill if that doesn't work. It will probably require
+    # adding poll() support to ProcessHandler.
+    try:
+      with Timeout(timeout, abort_handler=process_handler.kill):
+        return process_handler.wait()
+    except TimeoutReached as e:
+      raise TestFailedTaskError(str(e), failed_targets=test_targets)
+
+  @abstractmethod
+  def _spawn(self, *args, **kwargs):
+    """Spawn the actual test runner process.
+
+    :rtype: ProcessHandler
+    """
+
+    raise NotImplementedError
 
   def _timeout_for_target(self, target):
     timeout = getattr(target, 'timeout', None)
-    deprecated_conditional(
-      lambda: timeout == 0,
-      "0.0.65",
-      hint_message=dedent("""
-        Target {target} has parameter: 'timeout=0', which is deprecated.
-        To use the default timeout remove the 'timeout' parameter from your test target.
-      """.format(target=target.address.spec)))
-
     timeout_maximum = self.get_options().timeout_maximum
     if timeout is not None and timeout_maximum is not None:
       if timeout > timeout_maximum:
@@ -140,15 +158,12 @@ class TestRunnerTaskMixin(object):
     return test_targets
 
   @abstractmethod
-  def _timeout_abort_handler(self):
-    """Abort the test process when it has been timed out."""
-
-  @abstractmethod
   def _test_target_filter(self):
     """A filter to run on targets to see if they are relevant to this test task.
 
     :return: function from target->boolean
     """
+    raise NotImplementedError
 
   @abstractmethod
   def _validate_target(self, target):
@@ -156,10 +171,11 @@ class TestRunnerTaskMixin(object):
 
     We don't need the type check here because _get_targets() combines with _test_target_type to
     filter the list of targets to only the targets relevant for this test task.
-im
+
     :param target: the target to validate
     :raises: TargetDefinitionException
     """
+    raise NotImplementedError
 
   @abstractmethod
   def _execute(self, all_targets):
@@ -167,3 +183,4 @@ im
 
     :param targets: list of the targets whose tests are to be run
     """
+    raise NotImplementedError
