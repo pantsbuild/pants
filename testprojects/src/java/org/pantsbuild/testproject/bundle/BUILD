@@ -31,3 +31,12 @@ jvm_app(name='missing-files',
     bundle(fileset=['data/no-such-file']),
   ]
 )
+
+# This should fail because its basename conflicts with :bundle-bin
+jvm_app(name='bundle-basename-conflict',
+  basename = 'bundle-example-bin',
+  binary=':bundle-bin',
+  bundles=[
+    bundle(fileset=globs('data/*')),
+  ]
+)

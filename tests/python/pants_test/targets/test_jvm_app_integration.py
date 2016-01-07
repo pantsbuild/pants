@@ -55,3 +55,11 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['bundle',
                                 'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files'])
     self.assert_failure(pants_run)
+
+  def test_conflicting_basename(self):
+    """Test should fail since `target_roots()` contains targets with conflicting basenames."""
+    pants_run = self.run_pants(['bundle.jvm',
+                                '--use-basename-folder-prefix',
+                                'testprojects/src/java/org/pantsbuild/testproject/bundle:bundle-basename-conflict '
+                                'testprojects/src/java/org/pantsbuild/testproject/bundle:bundle-bin'])
+    self.assert_failure(pants_run)

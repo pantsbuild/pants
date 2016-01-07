@@ -43,8 +43,8 @@ class BundleCreate(JvmBinaryTask):
     register('--archive-prefix', action='store_true', default=False,
              fingerprint=True,
              help='If --archive is specified, prefix archive with target basename or a unique '
-                  'identifier as determined by --use-basename-prefix.')
-    register('--use-basename-prefix', action='store_true', default=False,
+                  'identifier as determined by --use-basename-folder-prefix.')
+    register('--use-basename-folder-prefix', action='store_true', default=False,
              help='Use target basename to prefix bundle folder or archive; otherwise a unique '
                   'identifier derived from target will be used.')
 
@@ -58,7 +58,7 @@ class BundleCreate(JvmBinaryTask):
     self._prefix = self.get_options().archive_prefix
     self._archiver_type = self.get_options().archive
     self._create_deployjar = self.get_options().deployjar
-    self._use_basename_prefix = self.get_options().use_basename_prefix
+    self._use_basename_folder_prefix = self.get_options().use_basename_folder_prefix
 
   class App(object):
     """A uniform interface to an app."""
@@ -67,32 +67,37 @@ class BundleCreate(JvmBinaryTask):
     def is_app(target):
       return isinstance(target, (JvmApp, JvmBinary))
 
-    def __init__(self, target, use_basename_prefix=False):
+    def __init__(self, target, use_basename_folder_prefix=False):
       assert self.is_app(target), '{} is not a valid app target'.format(target)
 
       self.address = target.address
       self.binary = target if isinstance(target, JvmBinary) else target.binary
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
-      self.basename = target.basename if use_basename_prefix else target.id
+      self.basename = target.basename if use_basename_folder_prefix else target.id
       self.target = target
 
   def execute(self):
     def get_bundle_apps():
-      if self._use_basename_prefix:
+      if self._use_basename_folder_prefix:
         # Using target_roots instead of all transitive targets to avoid possible basename
         # conflicts.  An example is jvm_app A depends on jvm_binary B, both have the same
         # basename, whoever runs the second will destroy the previous one.
-        return [self.App(target, use_basename_prefix=True) for target in self.context.target_roots]
+        return [self.App(target, use_basename_folder_prefix=True) for target in self.context.target_roots]
       return [self.App(target) for target in self.context.targets(predicate=self.App.is_app)]
 
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
+
+    apps = get_bundle_apps()
+
+    if self._use_basename_folder_prefix:
+      self.check_basename_conflicts(apps)
 
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
     self.consolidate_classpath(self.context.targets(), runtime_classpath)
 
-    for app in get_bundle_apps():
+    for app in apps:
       basedir = self.bundle(app)
       # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
       # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
@@ -207,3 +212,15 @@ class BundleCreate(JvmBinaryTask):
         if ClasspathUtil.is_dir(entry.path):
           classpath_products.remove_for_target(target, [(conf, entry.path)])
           classpath_products.add_for_target(target, [(conf, jardir(entry))])
+
+  def check_basename_conflicts(self, apps):
+    """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
+
+    basename_seen = {}
+    for app in apps:
+      if app.basename in basename_seen:
+        raise TaskError('Basename must be unique, found two targets use the same basename:'
+                        "'{}'\n\t{} and \n\t{}"
+                        .format(app.basename, basename_seen[app.basename].address.spec,
+                                app.target.address.spec))
+      basename_seen[app.basename] = app.target

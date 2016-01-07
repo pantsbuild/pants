@@ -79,10 +79,10 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     self.execute(self.task_context)
     self._check_bundle_products('foo.foo-app')
 
-  def test_jvm_bundle_use_basename(self):
+  def test_jvm_bundle_use_basename_folder_prefix(self):
     """Test override default setting outputs bundle products using basename."""
 
-    self.set_options(use_basename_prefix=True)
+    self.set_options(use_basename_folder_prefix=True)
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
