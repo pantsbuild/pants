@@ -309,9 +309,11 @@ class SchedulingError(Exception):
 class NoProducersError(SchedulingError):
   """Indicates no planners were able to promise a product for a given subject."""
 
-  def __init__(self, product_type, subject=None):
+  def __init__(self, product_type, subject=None, configuration=None):
     msg = ('No plans to generate {!r}{} could be made.'
-            .format(product_type.__name__, ' {!r}'.format(subject) if subject else ''))
+            .format(product_type.__name__,
+                    ' for {!r}'.format(subject) if subject else '',
+                    ' (with config {!r})' if configuration else ''))
     super(NoProducersError, self).__init__(msg)
 
 
@@ -877,7 +879,7 @@ class ProductMapper(object):
       planners = [planner for planner, plan in plans]
       raise ConflictingProducersError(product_type, subject, planners)
     elif not plans:
-      raise NoProducersError(product_type, subject)
+      raise NoProducersError(product_type, subject, configuration)
 
     planner, plan = plans[0]
     try:
@@ -952,7 +954,7 @@ class LocalScheduler(object):
     # Compute a ProductGraph that determines which products are possible to produce for
     # these subjects.
     product_graph = self._planners.product_graph(self._graph, subjects, root_product_types)
-    print('>>>\n{}'.format('\n'.join(product_graph.edge_strings())))
+    #print('>>>\n{}'.format('\n'.join(product_graph.edge_strings())))
     product_mapper = ProductMapper(self._graph, product_graph)
 
     # Request root promises for relevant products for each subject.
