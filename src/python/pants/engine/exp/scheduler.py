@@ -496,7 +496,8 @@ class ProductGraph(object):
     key = (subject, product)
     for node in self._nodes:
       # Yield Sources that were recursively able to consume the configuration.
-      if node.key == key and self._is_satisfied(node) and consumes_product(node):
+      if node.key == key and not isinstance(node.source, ProductGraph.SourceOR) and \
+          self._is_satisfied(node) and consumes_product(node):
         yield node.source
 
   def products_for(self, subject):
@@ -816,7 +817,7 @@ class ProductMapper(object):
                                           .format(primary_subject, plan))
     return primary_promise
 
-  def _promised(self, promise):
+  def promised(self, promise):
     """Return the plan that was promised.
 
     :param promise: The promise to lookup a registered plan for.
@@ -848,7 +849,7 @@ class ProductMapper(object):
       subject = self._graph.resolve(subject)
 
     promise = Promise(product_type, subject, configuration=configuration)
-    plan = self._promised(promise)
+    plan = self.promised(promise)
     if plan is not None:
       return promise
 
@@ -856,17 +857,17 @@ class ProductMapper(object):
     # For all sources of the product, request it.
     for source in self._product_graph.sources_for(subject,
                                                   product_type,
-                                                  configuration=configuration):
-      if isinstance(source, SourceGraph.SourceNative):
+                                                  consumed_product=configuration):
+      if isinstance(source, ProductGraph.SourceNative):
         plans.append((NoPlanner, Plan(func_or_task_type=lift_native_product,
                                       subjects=(subject,),
                                       subject=subject,
                                       product_type=product_type)))
-      elif isinstance(source, SourceGraph.SourcePlanner):
-        plan = planner.plan(self, product_type, subject, configuration=configuration)
+      elif isinstance(source, ProductGraph.SourcePlanner):
+        plan = source.planner.plan(self, product_type, subject, configuration=configuration)
         # TODO: remove None check... there should no longer be any planners failing.
         if plan:
-          plans.append((planner, plan))
+          plans.append((source.planner, plan))
       else:
         raise ValueError('Unsupported source for ({}, {}): {}'.format(
           subject, product_type, source))
