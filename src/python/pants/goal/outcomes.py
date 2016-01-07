@@ -5,10 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.base.workunit import WorkUnit
-from pants.util.dirutil import safe_mkdir_for
 
 
 class Outcomes(object):
@@ -17,9 +14,7 @@ class Outcomes(object):
   This allows automation calling pants to determine which task failed.
   """
 
-  def __init__(self, path):
-    self._path = path
-    safe_mkdir_for(self._path)
+  def __init__(self):
     self._outcomes = {}
 
   def add_outcome(self, path, outcome):
@@ -30,12 +25,10 @@ class Outcomes(object):
     :param string path: colon-delimited path defining the workunit
     :param int outcome: WorkUnit.ABORTED, WorkUnit.SUCCESS, etc.
     """
+
+    # Dict operations are thread-safe in CPython, so we can do this.
+    # https://docs.python.org/2/glossary.html#term-global-interpreter-lock
     self._outcomes[path] = WorkUnit.outcome_string(outcome)
-    # Check existence in case we're a clean-all. We don't want to write anything in that case.
-    if self._path and os.path.exists(os.path.dirname(self._path)):
-      with open(self._path, 'w') as f:
-        for key, value in self.get_all().items():
-          f.write('{key}: {value}\n'.format(key=key, value=value))
 
   def get_all(self):
     return self._outcomes

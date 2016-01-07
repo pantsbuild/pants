@@ -37,6 +37,5 @@ python_tests(
   dependencies = [
     'src/python/pants/goal:outcomes',
     'src/python/pants/base:workunit',
-    'src/python/pants/util:contextutil',
   ]
 )

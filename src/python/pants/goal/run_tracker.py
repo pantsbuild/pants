@@ -107,8 +107,8 @@ class RunTracker(Subsystem):
     self.artifact_cache_stats = \
       ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
 
-    # Log of success/failure/aborted for each workunit
-    self.outcomes = Outcomes(os.path.join(self.run_info_dir, 'outcomes'))
+    # Log of success/failure/aborted for each workunit.
+    self.outcomes = Outcomes()
 
     # Number of threads for foreground work.
     self._num_foreground_workers = self.get_options().num_foreground_workers
