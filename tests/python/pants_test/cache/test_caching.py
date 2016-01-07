@@ -75,9 +75,13 @@ class LocalCachingTest(TaskTestBase):
     all_vts, invalid_vts = self.task.execute()
     # Executing the task for the first time the vt is expected to be in the invalid_vts list
     self.assertGreater(len(invalid_vts), 0)
+    first_vt = invalid_vts[0]
     # Delete .pants.d
     safe_rmtree(self.task._workdir)
     all_vts2, invalid_vts2 = self.task.execute()
     # Check that running the task a second time results in a valid vt,
     # implying the artifact cache was hit.
+    self.assertGreater(len(all_vts2), 0)
+    second_vt = all_vts2[0]
+    self.assertEqual(first_vt.cache_key.hash, second_vt.cache_key.hash)
     self.assertListEqual(invalid_vts2, [])
