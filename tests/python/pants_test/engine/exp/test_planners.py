@@ -26,6 +26,13 @@ class PlannersTest(unittest.TestCase):
         yield cls()
     return Planners(list(mk_planners()))
 
+  def products_for(self, planners, subject, root_products):
+    product_graph = planners.product_graph(None, [subject], root_products)
+    return product_graph.products_for(subject)
+
+  def assert_products_for(self, planners, expected_products, subject, root_products):
+    self.assertEquals(expected_products, self.products_for(planners, subject, root_products))
+
   def test_produced_types_transitive(self):
     class A(object): pass
     class B(object): pass
@@ -35,19 +42,12 @@ class PlannersTest(unittest.TestCase):
     ps = self.planners({A: [[Select(Select.Subject(), B)]]},
                        {B: [[Select(Select.Subject(), C)]]})
 
-    def products_for(subject, all_products):
-      product_graph = ps.product_graph(None, subjects=[subject], products=all_products)
-      print('\n'.join(product_graph.edge_strings()))
-      res = product_graph.products_for(subject)
-      print('>>> for {}, {}: {}'.format(subject, all_products, res))
-      return res
-
     # Product A can be produced given either A, B, or C.
-    self.assertEquals({A}, products_for(A(), [A, D]))
-    self.assertEquals({A, B}, products_for(B(), [A, D]))
-    self.assertEquals({A, B, C}, products_for(C(), [A, D]))
+    self.assert_products_for(ps, {A}, A(), [A, D])
+    self.assert_products_for(ps, {A, B}, B(), [A, D])
+    self.assert_products_for(ps, {A, B, C}, C(), [A, D])
     # D can only be produced if it is already present.
-    self.assertEquals({D}, products_for(D(), [A, D]))
+    self.assert_products_for(ps, {D}, D(), [A, D])
 
   def test_produced_types_partially_consumed(self):
     class A(object): pass
@@ -63,7 +63,6 @@ class PlannersTest(unittest.TestCase):
                        {B: [[Select(Select.Subject(), C), Select(Select.Subject(), E)]]})
 
     # Should receive a PartiallyConsumedInputs error, because no Planner can (recursively)
-    # consume C to product A.
+    # consume C to produce A.
     with self.assertRaises(PartiallyConsumedInputsError):
-      ps.produced_types_for_subject(subject=C(),
-                                    output_product_types=[A])
+      self.products_for(ps, C(), [A])

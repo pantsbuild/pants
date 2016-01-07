@@ -555,11 +555,11 @@ class Planners(object):
     """
     return self._planners_by_goal_name[goal_name]
 
-  def product_graph(self, build_graph, subjects, products):
+  def product_graph(self, build_graph, root_subjects, root_products):
     """Creates a product graph for the given subjects and products."""
     product_graph = ProductGraph()
-    for subject in subjects:
-      for product in products:
+    for subject in root_subjects:
+      for product in root_products:
         dep_sources = self._node_sources(subject, product)
         parent = None
         # If there are multiple sources of this dependency, introduce a SourceOR node.
