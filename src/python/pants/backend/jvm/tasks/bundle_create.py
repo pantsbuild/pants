@@ -183,11 +183,16 @@ class BundleCreate(JvmBinaryTask):
     """Convert loose directories in classpath_products into jars. """
 
     with self.invalidated(targets=targets) as invalidation:
-      for vt in invalidation.invalid_vts:
+      for vt in invalidation.all_vts:
         entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
         for index, (conf, entry) in enumerate(entries):
           if ClasspathUtil.is_dir(entry.path):
-            jarpath = JAR.create(entry.path, vt.results_dir, 'output-{}'.format(index))
+            # regenerate artifact for invalid vts
+            if not vt.valid:
+              JAR.create(entry.path, vt.results_dir, 'output-{}'.format(index))
+
+            # replace directory classpath entry with its jarpath
+            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
             classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
             classpath_products.add_for_target(vt.target, [(conf, jarpath)])
 
