@@ -106,7 +106,7 @@ class RunTracker(Subsystem):
     # Hit/miss stats for the artifact cache.
     self.artifact_cache_stats = \
       ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
-    
+
     # Log of success/failure/aborted for each workunit
     self.outcomes = Outcomes(os.path.join(self.run_info_dir, 'outcomes'))
 
