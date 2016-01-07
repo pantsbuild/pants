@@ -30,3 +30,13 @@ python_tests(
     'tests/python/pants_test:base_test',
   ]
 )
+
+python_tests(
+  name = 'outcomes',
+  sources = ['test_outcomes.py'],
+  dependencies = [
+    'src/python/pants/goal:outcomes',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:contextutil',
+  ]
+)

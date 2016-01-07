@@ -76,6 +76,7 @@ python_library(
   dependencies = [
     ':aggregated_timings',
     ':artifact_cache_stats',
+    ':outcomes',
     '3rdparty/python:requests',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',
@@ -96,4 +97,13 @@ python_library(
     'src/python/pants/scm',
     'src/python/pants/util:meta',
   ],
+)
+
+python_library(
+  name='outcomes',
+  sources=['outcomes.py'],
+  dependencies=[
+    'src/python/pants/util:dirutil',
+    'src/python/pants/base:workunit'
+  ]
 )
