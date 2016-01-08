@@ -50,7 +50,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       self.assertEqual(len(os.listdir(good_artifact_dir)), 1)
 
   # TODO(John Sirois): Factor up a shared utility for reuse by
-  # tests/python/pants_test/backend/core/tasks/test_cache_cleanup.py
+  # tests/python/pants_test/backend/core/tasks/test_cache_cleanup_integration.py
   def create_platform_args(self, version):
     return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""
              .format(version=version)),
