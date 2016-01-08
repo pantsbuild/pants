@@ -182,7 +182,7 @@ class BundleCreate(JvmBinaryTask):
   def consolidate_classpath(self, targets, classpath_products):
     """Convert loose directories in classpath_products into jars. """
 
-    with self.invalidated(targets=targets) as invalidation:
+    with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation:
       for vt in invalidation.all_vts:
         entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
         for index, (conf, entry) in enumerate(entries):
