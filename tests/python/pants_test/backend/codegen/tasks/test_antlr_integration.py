@@ -16,14 +16,14 @@ class AntlrIntegrationTest(PantsRunIntegrationTest):
   def test_run_antlr3(self):
     stdout_data = self.bundle_and_run('examples/src/java/org/pantsbuild/example/antlr3',
                                       'examples.src.java.org.pantsbuild.example.antlr3.antlr3',
-                                      binary_name='antlr3',
+                                      bundle_jar_name='antlr3',
                                       args=['7*8'])
     self.assertEquals('56.0', stdout_data.rstrip(), msg="got output:{0}".format(stdout_data))
 
   def test_run_antlr4(self):
     stdout_data = self.bundle_and_run('examples/src/java/org/pantsbuild/example/antlr4',
                                       'examples.src.java.org.pantsbuild.example.antlr4.antlr4',
-                                      binary_name='antlr4',
+                                      bundle_jar_name='antlr4',
                                       args=['7*6'])
     self.assertEquals('42.0', stdout_data.rstrip(), msg="got output:{0}".format(stdout_data))
 

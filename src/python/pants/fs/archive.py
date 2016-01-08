@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from abc import abstractmethod
 from collections import OrderedDict
-from zipfile import ZIP_DEFLATED
+from zipfile import ZIP_DEFLATED, ZIP_STORED
 
 from pants.util.contextutil import open_tar, open_zip
 from pants.util.dirutil import safe_walk
@@ -80,13 +80,14 @@ class ZipArchiver(Archiver):
           if (not filter_func or filter_func(name)):
             archive_file.extract(name, outdir)
 
-  def __init__(self, compression):
+  def __init__(self, compression, extension):
     super(ZipArchiver, self).__init__()
     self.compression = compression
+    self.extension = extension
 
   def create(self, basedir, outdir, name, prefix=None):
-    zippath = os.path.join(outdir, '{}.zip'.format(name))
-    with open_zip(zippath, 'w', compression=ZIP_DEFLATED) as zip:
+    zippath = os.path.join(outdir, '{}.{}'.format(name, self.extension))
+    with open_zip(zippath, 'w', compression=self.compression) as zip:
       # For symlinks, we want to archive the actual content of linked files but
       # under the relpath derived from symlink.
       for root, _, files in safe_walk(basedir, followlinks=True):
@@ -104,9 +105,10 @@ class ZipArchiver(Archiver):
 TAR = TarArchiver('w:', 'tar')
 TGZ = TarArchiver('w:gz', 'tar.gz')
 TBZ2 = TarArchiver('w:bz2', 'tar.bz2')
-ZIP = ZipArchiver(ZIP_DEFLATED)
+ZIP = ZipArchiver(ZIP_DEFLATED, 'zip')
+JAR = ZipArchiver(ZIP_STORED, 'jar')
 
-_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
+_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP, jar=JAR)
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
 
@@ -119,6 +121,11 @@ def archiver(typename):
   'tgz'   Returns a tar archiver that applies gzip compression and emits .tar.gz files.
   'tbz2'  Returns a tar archiver that applies bzip2 compression and emits .tar.bz2 files.
   'zip'   Returns a zip archiver that applies standard compression and emits .zip files.
+  'jar'   Returns a jar archiver that applies no compression and emits .jar files.
+    Note this is provided as a light way of zipping input files into a jar, without the
+    need to prepare Manifest etc. For more advanced usages, please refer to :class:
+    `pants.backend.jvm.subsystems.jar_tool.JarTool` or :class:
+    `pants.backend.jvm.tasks.jar_task.JarTask`.
   """
   archiver = _ARCHIVER_BY_TYPE.get(typename)
   if not archiver:

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name='pants_requirements',
+  name='pants_requirement',
   sources=['test_pants_requirement.py'],
   dependencies=[
     'src/python/pants/backend/python:python_requirement',

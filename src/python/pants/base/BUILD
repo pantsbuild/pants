@@ -111,7 +111,6 @@ python_library(
   sources = ['payload_field.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':build_environment',
     'src/python/pants/util:meta',
   ]
 )

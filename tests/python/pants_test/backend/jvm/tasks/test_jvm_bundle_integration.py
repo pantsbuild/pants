@@ -16,7 +16,7 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     stdout = self.bundle_and_run(
       'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
       'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
-      binary_name='unicode-testproject')
+      bundle_jar_name='unicode-testproject')
     self.assertIn("Have a nice day!", stdout)
     self.assertIn("shapeless success", stdout)
 
@@ -31,6 +31,6 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
       bundle_name = ('testprojects.maven_layout.resource_collision.example_{name}.'
                      'src.main.java.org.pantsbuild.duplicateres.example{name}.example{name}'
                      .format(name=name))
-      binary_name = 'example{proj}'.format(proj=name)
-      stdout = self.bundle_and_run(target, bundle_name, binary_name=binary_name)
+      bundle_jar_name = 'example{proj}'.format(proj=name)
+      stdout = self.bundle_and_run(target, bundle_name, bundle_jar_name=bundle_jar_name)
       self.assertEquals(stdout, 'Hello world!: resource from example {name}\n'.format(name=name))

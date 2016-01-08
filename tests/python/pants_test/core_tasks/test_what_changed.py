@@ -42,8 +42,8 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
         'python_thrift_library': PythonThriftLibrary,
       },
       context_aware_object_factories={
-        'globs': Globs.factory,
-        'rglobs': RGlobs.factory,
+        'globs': Globs,
+        'rglobs': RGlobs,
         'from_target': FromTarget,
       },
       objects={

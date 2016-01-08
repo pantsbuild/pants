@@ -25,6 +25,7 @@ python_tests(
   dependencies=[
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:parse_context',
     'src/python/pants/build_graph',
     'src/python/pants/source',
     'tests/python/pants_test:base_test',

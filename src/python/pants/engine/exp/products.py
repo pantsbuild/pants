@@ -21,18 +21,8 @@ class Products(object):
     likely become "real" products.
     """
     if isinstance(subject, Target):
-      target = subject
-      # Source products.
-      # TODO: after r/3274 it will no longer be necessary to iterate paths to determine the
-      # type of Sources on a Target.
-      source_extensions = set()
-      for source in target.sources.iter_paths(base_path=target.address.spec_path):
-        _, ext = os.path.splitext(source)
-        if ext not in source_extensions:
-          yield Sources.of(ext)
-          source_extensions.add(ext)
       # Config products.
-      for configuration in target.configurations:
+      for configuration in subject.configurations:
         yield type(configuration)
     else:
       # Any other type of subject is itself a product.
@@ -45,28 +35,3 @@ def lift_native_product(subject, product_type):
   TODO: This is a placeholder to demonstrate the concept of lifting products off of targets
   and into the product namespace.
   """
-
-
-class Sources(object):
-  @classmethod
-  @memoized
-  def of(cls, ext):
-    type_name = b'Sources({!r})'.format(ext)
-
-    class_dict = {'ext': ext,
-                  # We need custom serialization for the dynamic class type.
-                  '__reduce__': lambda self: (_create_sources, ext)}
-
-    ext_type = type(type_name, (cls,), class_dict)
-
-    # Expose the custom class type at the module level to be pickle compatible.
-    setattr(sys.modules[cls.__module__], type_name, ext_type)
-
-    return ext_type
-
-  @classmethod
-  def ext(cls):
-    raise NotImplementedError()
-
-  def __repr__(self):
-    return 'Sources(ext={!r})'.format(self.ext)

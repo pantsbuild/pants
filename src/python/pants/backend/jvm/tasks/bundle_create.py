@@ -11,10 +11,14 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.build_graph import BuildGraph
 from pants.fs import archive
+from pants.fs.archive import JAR
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
@@ -82,6 +86,11 @@ class BundleCreate(JvmBinaryTask):
       return [self.App(target) for target in self.context.targets(predicate=self.App.is_app)]
 
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
+
+    # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
+    # more efficient than loading them as individual files.
+    runtime_classpath = self.context.products.get_data('runtime_classpath')
+    self.consolidate_classpath(self.context.targets(), runtime_classpath)
 
     for app in get_bundle_apps():
       basedir = self.bundle(app)
@@ -177,3 +186,24 @@ class BundleCreate(JvmBinaryTask):
         verbose_symlink(path, bundle_path)
 
     return bundle_dir
+
+  def consolidate_classpath(self, targets, classpath_products):
+    """Convert loose directories in classpath_products into jars.
+
+    TODO(peiyu): enable artifact caching to take advantage of caching as well saving to
+    the provided target-specific directories.
+    """
+    def jardir(entry):
+      """Jar up the contents of the given ClasspathEntry and return a unique jar path."""
+      root = entry.path
+      with temporary_dir(root_dir=self.workdir, cleanup=False) as destdir:
+        jarpath = JAR.create(root, destdir, 'output')
+      return jarpath
+
+    safe_mkdir(self.workdir)
+    for target in targets:
+      entries = classpath_products.get_internal_classpath_entries_for_targets([target])
+      for conf, entry in entries:
+        if ClasspathUtil.is_dir(entry.path):
+          classpath_products.remove_for_target(target, [(conf, entry.path)])
+          classpath_products.add_for_target(target, [(conf, jardir(entry))])
