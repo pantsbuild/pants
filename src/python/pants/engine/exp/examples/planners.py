@@ -17,8 +17,7 @@ from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
-from pants.engine.exp.scheduler import (LocalScheduler, Plan, Planners, Select, Subject, Task,
-                                        TaskPlanner)
+from pants.engine.exp.scheduler import LocalScheduler, Planners, Select, Subject, Task
 from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized, memoized_property
 
@@ -89,19 +88,6 @@ class Jar(Struct):
     :param string rev: The Maven ``version`` of this dependency.
     """
     super(Jar, self).__init__(org=org, name=name, rev=rev, **kwargs)
-
-
-class GlobalIvyResolvePlanner(TaskPlanner):
-  def finalize_plans(self, plans):
-    # TODO: need a (new) stable strategy to aggregate ivy resolve.
-    # The finalized plan will s/jar/jars/ for a single global resolve.
-    subjects = set()
-    jars = OrderedSet()
-    for plan in plans:
-      subjects.update(plan.subjects)
-      jars.add(plan.jar)
-    global_plan = Plan(func_or_task_type=IvyResolve, subjects=subjects, jars=list(jars))
-    return [global_plan]
 
 
 class IvyResolve(PrintingTask):
@@ -284,9 +270,6 @@ def setup_json_scheduler(build_root):
          [Select(Select.Subject(), UnpickleableInput)],
          unpickleable_func),
       ],
-      [
-        GlobalIvyResolvePlanner(),
-      ]
     )
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler

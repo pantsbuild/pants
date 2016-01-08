@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 import inspect
 import itertools
+import threading
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict, namedtuple
 
@@ -50,17 +51,6 @@ class Subject(object):
     return item if isinstance(item, Subject) else cls(primary=item)
 
   @classmethod
-  def iter_dependencies(cls, subject, configuration_type):
-    """
-    :returns: An iterator over the subject's dependencies from configuration of the given type.
-    :rtype: :class:`collections.Iterator` of dependency subjects
-    """
-    for config in getattr(subject, 'configurations', []):
-      if isinstance(config, configuration_type) and isinstance(config, StructWithDeps):
-        for dep in config.dependencies:
-          yield dep
-
-  @classmethod
   def iter_configured_dependencies(cls, subject):
     """Return an iterator of the given subject's dependencies including any selected configurations.
 
@@ -91,6 +81,17 @@ class Subject(object):
                                             config=config_specifier))
                   configuration = dep.select_configuration(config_specifier)
               yield dep, configuration
+
+  @classmethod
+  def native_products_for_subject(self, subject):
+    """Return the products that are concretely present for the given subject."""
+    if isinstance(subject, Target):
+      # Config products.
+      for configuration in subject.configurations:
+        yield configuration
+    else:
+      # Any other type of subject is itself a product.
+      yield subject
 
   def __init__(self, primary, alternate=None):
     """
@@ -367,21 +368,6 @@ class ConflictingProducersError(SchedulingError):
     super(ConflictingProducersError, self).__init__(msg)
 
 
-class TaskPlanner(AbstractClass):
-  """Aggregates plans to control execution of a paired task."""
-
-  @classmethod
-  def finalize_plans(self, plans):
-    """Subclasses can override to finalize the plans they created.
-
-    :param plans: All the plans emitted by this planner for the current planning session.
-    :type plans: :class:`collections.Iterable` of :class:`Plan`
-    :returns: A possibly different iterable of plans.
-    :rtype: :class:`collections.Iterable` of :class:`Plan`
-    """
-    return plans
-
-
 class Task(object):
   """An executable task.
 
@@ -399,10 +385,10 @@ class Task(object):
 class ProductGraph(object):
   """A DAG of product dependencies, with (Subject, Product, `source`) tuples as nodes."""
 
-  class SourceTask(namedtuple('SourceTask', ['task', 'clause', 'promise'])):
+  class SourceTask(namedtuple('SourceTask', ['task', 'clause'])):
     pass
 
-  class SourceNative(namedtuple('SourceNative', ['value', 'promise'])):
+  class SourceNative(namedtuple('SourceNative', ['value'])):
     pass
 
   class SourceNone(object):
@@ -416,36 +402,52 @@ class ProductGraph(object):
     def key(self):
       return (self.subject, self.product)
 
+  class StateComplete(object):
+    pass
+
+  class StateIncomplete(object):
+    pass
+
+  class StateUnsatisfiable(object):
+    pass
+
   def __init__(self):
-    self._nodes = set()
+    # Maps nodes to Promises for their values.
+    self._nodes = dict()
     self._adjacencies = defaultdict(OrderedSet)
 
-  def add_node(self, node):
+  def _validate_present(self, node):
+    if node not in self._nodes:
+      raise ValueError('{} is not registered as a Node in {}'.format(node, self))
+
+  def add_node(self, node, promise):
     if not isinstance(node, self.Node):
       raise ValueError('{} is not a {}'.format(node, self.Node))
-    self._nodes.add(node)
+    if node in self._nodes:
+      raise ValueError('{} is already registered as {}'.format(node, self._nodes[]))
+    self._nodes[node] = promise
 
   def add_edge(self, src, dst):
-    self.add_node(src)
-    self.add_node(dst)
+    self._validate_present(src)
+    self._validate_present(dst)
     self._adjacencies[src].add(dst)
 
   def exists_node(self, node):
     return node in self._nodes
 
-  def _is_satisfied(self, node):
-    """Returns True if the given Node is recursively satisfied.
+  def _node_state(self, node):
+    """Returns the state of the given Node.
 
-    A SourceNative node is always satisfied.
-    A SourceNone node is never satisfied.
-    A SourceOR node is satisfied if any child is satisfied.
-    A SourceTask node is satisfied if all children are satisfied."""
+    `Native` nodes are either Complete or Incomplete.
+    `None` nodes are always Unsatisfiable.
+    `OR` nodes are satisfied if any child is satisfied.
+    `Task` nodes are satisfied if all children are satisfied."""
     if isinstance(node.source, ProductGraph.SourceNone):
-      return False
+      return StateUnsatisfiable
     elif isinstance(node.source, ProductGraph.SourceNative):
       return True
     # The remaining Source types depend on the makeup of their dependencies.
-    satisfied_deps = (self._is_satisfied(dep_node) for dep_node in self._adjacencies[node])
+    satisfied_deps = (self._is_satisfiable(dep_node) for dep_node in self._adjacencies[node])
     if isinstance(node.source, ProductGraph.SourceOR):
       # Any deps satisfied?
       return any(satisfied_deps)
@@ -485,7 +487,7 @@ class ProductGraph(object):
       # Yield Sources that were recursively able to consume the configuration.
       if isinstance(node.source, ProductGraph.SourceOR):
         continue
-      if node.key == key and self._is_satisfied(node) and consumes_product(node):
+      if node.key == key and self._is_satisfiable(node) and consumes_product(node):
         yield node.source
 
   def products_for(self, subject):
@@ -493,7 +495,7 @@ class ProductGraph(object):
     products = set()
     # TODO: order N: index by subject
     for node in self._nodes:
-      if node.subject == subject and self._is_satisfied(node):
+      if node.subject == subject and self._is_satisfiable(node):
         products.add(node.product)
     return products
 
@@ -513,10 +515,9 @@ class Planners(object):
   to validate the graph.
   """
 
-  def __init__(self, products_by_goal, tasks, planners):
+  def __init__(self, products_by_goal, tasks):
     self._products_by_goal = products_by_goal
     self._tasks = defaultdict(set)
-    self._planners = planners
 
     # Index tasks by their output type.
     for output_type, input_type_requirements, task in tasks:
@@ -563,25 +564,32 @@ class Planners(object):
     """Returns a sequence of sources of the given Subject/Product."""
     # Look for native sources.
     sources = []
-    if product_type in Products.for_subject(subject):
-      sources.append(ProductGraph.SourceNative())
+    for product in Subject.native_products_for_subject(subject):
+      if type(product) == product_type:
+        sources.append(ProductGraph.SourceNative(product))
     # And for Tasks.
     for task, anded_clause in self._tasks[product_type]:
       sources.append(ProductGraph.SourceTask(task, anded_clause))
     # If no Sources were found, return SourceNone to indicate the hole.
     return sources or [ProductGraph.SourceNone()]
 
-  def _populate_node(self, product_graph, build_graph, node):
-    """Expands the ProductGraph to include the given Node and its children."""
+  def _expand_node(self, product_graph, build_graph, node):
+    """Expands the ProductGraph to include the given Node and its children.
+    
+    If the Node is already Complete, then this is a noop. If it does not exist or is Incomplete,
+    this may result in recursion to expand child nodes.
+    """
     if product_graph.exists_node(node):
-      # We are already recursively attempting to populate the given Node, and would cause
-      # a cycle by attempting to re-apply it.
       return
-    product_graph.add_node(node)
+    promise = Promise()
+    product_graph.add_node(node, promise)
 
-    if isinstance(node.source, (ProductGraph.SourceNative, ProductGraph.SourceNone)):
-      # No dependencies; we're done.
+    if isinstance(node.source, ProductGraph.SourceNone):
+      # Will never be satisfied.
       pass
+    elif isinstance(node.source, ProductGraph.SourceNative):
+      # No dependencies; satisfied immediately.
+      promise.success(node.source.value)
     elif isinstance(node.source, ProductGraph.SourceTask):
       # Recurse on the dependencies of the anded Select clause.
       for dep_select in node.source.clause:
@@ -686,64 +694,31 @@ class ExecutionGraph(object):
 
 
 class Promise(object):
-  """Represents a promise to produce a given product type for a given subject."""
+  """A simple Promise/Future class to hand off a value between threads.
+  
+  TODO: switch to python's Future when it becomes available.
+  """
 
-  def __init__(self, product_type, subject, configuration=None):
-    """
-    :param type product_type: The type of product promised.
-    :param subject: The subject the product will be produced for; ie: a java library would be a
-                    natural subject for a request for classfile products.
-    :type subject: :class:`Subject` or else any object that will be the primary of the stored
-                   `Subject`.
-    :param object configuration: An optional promised configuration for the product.
-    """
-    self._product_type = product_type
-    self._subject = Subject.as_subject(subject)
-    self._configuration = configuration
+  def __init__(self):
+    self._success = None
+    self._failure = None
+    self._event = threading.Event()
 
-  @property
-  def product_type(self):
-    """Return the type of product promised.
+  def success(self, success):
+    self._success = success
+    self._event.set()
 
-    :rtype: type
-    """
-    return self._product_type
+  def failure(self, exception):
+    self._failure = exception
+    self._event.set()
 
-  @property
-  def subject(self):
-    """Return the subject of this promise.
-
-    :rtype: :class:`Subject`
-    """
-    return self._subject
-
-  def rebind(self, subject):
-    """Return a version of this promise bound to the new subject.
-
-    :param subject: The new subject of the promise.
-    :type subject: :class:`Subject` or else any object that will be the primary of the stored
-                   `Subject`.
-    :rtype: :class:`Promise`
-    """
-    return Promise(self._product_type, subject, configuration=self._configuration)
-
-  def _key(self):
-    # We promise the product_type for the primary subject, the alternate does not affect
-    # consume-side identity.
-    return self._product_type, self._subject.primary, self._configuration
-
-  def __hash__(self):
-    return hash(self._key())
-
-  def __eq__(self, other):
-    return isinstance(other, Promise) and self._key() == other._key()
-
-  def __ne__(self, other):
-    return not (self == other)
-
-  def __repr__(self):
-    return ('Promise(product_type={!r}, subject={!r}, configuration={!r})'
-            .format(self._product_type, self._subject, self._configuration))
+  def get(self):
+    """Blocks until the resulting value is available, or raises the resulting exception."""
+    self._event.wait()
+    if self._failure:
+      raise self._failure
+    else:
+      return self._success
 
 
 # A synthetic planner that lifts products defined directly on targets into the product
@@ -868,15 +843,6 @@ class ProductMapper(object):
                                                               planner=type(planner).__name__,
                                                               plan=plan))
 
-  def aggregate_plans(self):
-    """Invokes `finalize_plan` for all Planners."""
-    for planner, plans_by_product_type in self._plans_by_product_type_by_planner.items():
-      for product_type, plans in plans_by_product_type.items():
-        finalized_plans = planner.finalize_plans(plans)
-        if finalized_plans is not plans:
-          for finalized_plan in finalized_plans:
-            self._register_promises(product_type, finalized_plan)
-
 
 class LocalScheduler(object):
   """A scheduler that formulates an execution graph locally."""
@@ -931,7 +897,10 @@ class LocalScheduler(object):
     self._root_promises = tuple(root_promises)
 
   def schedule(self):
-    """Determines which Promises are ready to execute, and returns them."""
+    """Determines which Promises are ready to execute.
+    
+    Each Promise is returned with an execution Plan containing the dependencies.
+    """
 
 
     # Give aggregating planners a chance to aggregate plans.
