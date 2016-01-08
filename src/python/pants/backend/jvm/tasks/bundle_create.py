@@ -220,9 +220,6 @@ class BundleCreate(JvmBinaryTask):
       entries = classpath_products.get_internal_classpath_entries_for_targets([target])
       for conf, entry in entries:
         if ClasspathUtil.is_dir(entry.path):
-          classpath_products.remove_for_target(target, [(conf, entry.path)])
-          classpath_products.add_for_target(target, [(conf, jardir(entry))])
-
           targets_with_directory_in_classpath.append(target)
           break
 

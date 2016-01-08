@@ -27,7 +27,6 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     return BundleCreate
 
   def setUp(self):
-<<<<<<< HEAD
     """Prepare targets, context, runtime classpath. """
     super(TestBundleCreate, self).setUp()
 
