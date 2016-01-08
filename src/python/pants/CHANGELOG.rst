@@ -89,7 +89,7 @@ Small improvements, Refactoring and Tooling
   `RB #3296 <https://rbcommons.com/s/twitter/r/3296>`_
 
 * Create a complete product graph for the experimentation engine, and use it to validate inputs
-  `Issue #2525)) <https://github.com/pantsbuild/pants/issues/2525))>`_
+  `Issue #2525 <https://github.com/pantsbuild/pants/issues/2525>`_
   `RB #3245 <https://rbcommons.com/s/twitter/r/3245>`_
 
 * Add Unit Test for artifact caching to replace test_scalastyle_cached in test_scalastyle_integration.py, and test_checkstyle_cached in test_checkstyle_integration.py.
