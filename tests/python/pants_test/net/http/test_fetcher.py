@@ -5,8 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import BaseHTTPServer
 import os
-from contextlib import closing
+import SocketServer
+import unittest
+from contextlib import closing, contextmanager
+from threading import Thread
 
 import mox
 import requests
@@ -26,7 +30,8 @@ class FetcherTest(mox.MoxTestBase):
     self.listener = self.mox.CreateMock(Fetcher.Listener)
 
   def expect_get(self, url, chunk_size_bytes, timeout_secs, listener=True):
-    self.requests.get(url, stream=True, timeout=timeout_secs).AndReturn(self.response)
+    self.requests.get(url, allow_redirects=True, stream=True,
+                      timeout=timeout_secs).AndReturn(self.response)
     self.response.status_code = 200
     self.response.headers = {'content-length': '11'}
     if listener:
@@ -88,7 +93,8 @@ class FetcherTest(mox.MoxTestBase):
       self.assertEqual(downloaded, fp.getvalue())
 
   def test_size_mismatch(self):
-    self.requests.get('http://foo', stream=True, timeout=60).AndReturn(self.response)
+    self.requests.get('http://foo', allow_redirects=True, stream=True,
+                      timeout=60).AndReturn(self.response)
     self.response.status_code = 200
     self.response.headers = {'content-length': '11'}
     self.listener.status(200, content_length=11)
@@ -108,7 +114,8 @@ class FetcherTest(mox.MoxTestBase):
                          timeout_secs=60)
 
   def test_get_error_transient(self):
-    self.requests.get('http://foo', stream=True, timeout=60).AndRaise(requests.ConnectionError)
+    self.requests.get('http://foo', allow_redirects=True, stream=True,
+                      timeout=60).AndRaise(requests.ConnectionError)
 
     self.mox.ReplayAll()
 
@@ -119,7 +126,8 @@ class FetcherTest(mox.MoxTestBase):
                          timeout_secs=60)
 
   def test_get_error_permanent(self):
-    self.requests.get('http://foo', stream=True, timeout=60).AndRaise(requests.TooManyRedirects)
+    self.requests.get('http://foo', allow_redirects=True, stream=True,
+                      timeout=60).AndRaise(requests.TooManyRedirects)
 
     self.mox.ReplayAll()
 
@@ -131,7 +139,8 @@ class FetcherTest(mox.MoxTestBase):
     self.assertTrue(e.exception.response_code is None)
 
   def test_http_error(self):
-    self.requests.get('http://foo', stream=True, timeout=60).AndReturn(self.response)
+    self.requests.get('http://foo', allow_redirects=True, stream=True,
+                      timeout=60).AndReturn(self.response)
     self.response.status_code = 404
     self.listener.status(404)
 
@@ -147,7 +156,8 @@ class FetcherTest(mox.MoxTestBase):
     self.assertEqual(404, e.exception.response_code)
 
   def test_iter_content_error(self):
-    self.requests.get('http://foo', stream=True, timeout=60).AndReturn(self.response)
+    self.requests.get('http://foo', allow_redirects=True, stream=True,
+                      timeout=60).AndReturn(self.response)
     self.response.status_code = 200
     self.response.headers = {}
     self.listener.status(200, content_length=None)
@@ -200,3 +210,73 @@ class FetcherTest(mox.MoxTestBase):
       self.assertEqual(path, fd.name)
       with open(path) as fp:
         self.assertEqual(downloaded, fp.read())
+
+
+class FetcherRedirectTest(unittest.TestCase):
+  # NB(Eric Ayers): Using class variables like this seems horrible, but I can't figure out a better
+  # to pass state between the test and the RedirectHTTPHandler class because it gets
+  # re-instantiated on every request.
+  _URL = None
+  _URL2_ACCESSED = False
+  _URL1_ACCESSED = False
+
+  # A trivial HTTP server that serves up a redirect from /url2 --> /url1 and some hard-coded
+  # responses in the HTTP message body.
+  class RedirectHTTPHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+
+    def __init__(self, request, client_address, server):
+      # The base class implements GET and HEAD.
+      # Old-style class, so we must invoke __init__ this way.
+      BaseHTTPServer.BaseHTTPRequestHandler.__init__(self, request, client_address, server)
+
+    def do_GET(self):
+      if self.path.endswith('url2'):
+        self.send_response(302)
+        redirect_url = '{}/url1'.format(FetcherRedirectTest._URL)
+        self.send_header('Location',redirect_url)
+        self.end_headers()
+        self.wfile.write('\nredirecting you to {}'.format(redirect_url))
+        FetcherRedirectTest._URL2_ACCESSED = True
+      elif self.path.endswith('url1'):
+        self.send_response(200)
+        self.wfile.write('\nreturned from redirect')
+        FetcherRedirectTest._URL1_ACCESSED = True
+      else:
+        self.send_response(404)
+      self.end_headers()
+
+  @contextmanager
+  def setup_server(self, return_failed=False):
+    httpd = None
+    httpd_thread = None
+    try:
+      handler = self.RedirectHTTPHandler
+      httpd = SocketServer.TCPServer(('localhost', 0), handler)
+      port = httpd.server_address[1]
+      httpd_thread = Thread(target=httpd.serve_forever)
+      httpd_thread.start()
+      yield 'http://localhost:{0}'.format(port)
+    finally:
+      if httpd:
+        httpd.shutdown()
+      if httpd_thread:
+        httpd_thread.join()
+
+  def test_download_redirect(self):
+    """Make sure that a server that returns a redirect is actually followed.
+
+    Test with a real HTTP server that redirects from one URL to another.
+    """
+
+    fetcher = Fetcher()
+    with self.setup_server() as base_url:
+      self._URL = base_url
+      self.assertFalse(self._URL2_ACCESSED)
+      self.assertFalse(self._URL1_ACCESSED)
+
+      path = fetcher.download(base_url + '/url2')
+      self.assertTrue(self._URL2_ACCESSED)
+      self.assertTrue(self._URL1_ACCESSED)
+
+      with open(path) as fp:
+        self.assertEqual('returned from redirect\r\n', fp.read())

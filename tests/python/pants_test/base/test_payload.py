@@ -23,7 +23,7 @@ class PayloadTest(BaseTest):
         'java_library': JavaLibrary,
       },
       context_aware_object_factories={
-        'globs': Globs.factory,
+        'globs': Globs,
       },
     )
 

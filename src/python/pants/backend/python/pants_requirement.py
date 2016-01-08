@@ -12,7 +12,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.base.build_environment import pants_version
 
 
-def pants_requirement(parse_context, name=None):
+class PantsRequirement(object):
   """Exports a `python_requirement_library` pointing at the active pants' corresponding sdist.
 
   This requirement is useful for custom plugin authors who want to build and test their plugin with
@@ -21,9 +21,16 @@ def pants_requirement(parse_context, name=None):
 
   NB: The requirement generated is for official pants releases on pypi; so may not be appropriate
   for use in a repo that tracks `pantsbuild/pants` or otherwise uses custom pants sdists.
-
-  :param string name: The name to use for the target, defaults to the parent dir name.
   """
-  name = name or os.path.basename(parse_context.rel_path)
-  requirement = PythonRequirement(requirement='pantsbuild.pants=={}'.format(pants_version()))
-  parse_context.create_object(PythonRequirementLibrary, name=name, requirements=[requirement])
+
+  def __init__(self, parse_context):
+    self._parse_context = parse_context
+
+  def __call__(self, name=None):
+    """
+    :param string name: The name to use for the target, defaults to the parent dir name.
+    """
+    name = name or os.path.basename(self._parse_context.rel_path)
+    requirement = PythonRequirement(requirement='pantsbuild.pants=={}'.format(pants_version()))
+    self._parse_context.create_object(PythonRequirementLibrary, name=name,
+                                      requirements=[requirement])

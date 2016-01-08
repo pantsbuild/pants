@@ -6,13 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
-import os
 from abc import abstractmethod
 from hashlib import sha1
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_environment import get_buildroot
 from pants.util.meta import AbstractClass
 
 
@@ -110,28 +108,6 @@ class PythonRequirementsField(frozenset, PayloadField):
         )
         yield stable_json_sha1(hash_items)
     return combine_hashes(fingerprint_iter())
-
-
-def hash_bundle(bundle):
-  hasher = sha1()
-  hasher.update(bundle._rel_path)
-  for abs_path in sorted(bundle.filemap.keys()):
-    buildroot_relative_path = os.path.relpath(abs_path, get_buildroot())
-    hasher.update(buildroot_relative_path)
-    hasher.update(bundle.filemap[abs_path])
-    with open(abs_path, 'rb') as f:
-      hasher.update(f.read())
-  return hasher.hexdigest()
-
-
-class BundleField(tuple, PayloadField):
-  """A tuple subclass that mixes in PayloadField.
-
-  Must be initialized with an iterable of Bundle instances.
-  """
-
-  def _compute_fingerprint(self):
-    return combine_hashes(map(hash_bundle, self))
 
 
 class ExcludesField(OrderedSet, PayloadField):

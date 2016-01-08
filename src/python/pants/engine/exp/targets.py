@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import os
+from abc import abstractproperty
 
 from pants.engine.exp.addressable import Exactly, SubclassesOf, addressable, addressable_list
 from pants.engine.exp.configuration import Configuration
@@ -38,7 +39,24 @@ class Sources(Configuration):
     """
     super(Sources, self).__init__(name=name, files=files, globs=globs, rglobs=rglobs, zglobs=zglobs,
                                   **kwargs)
+    if files and self.extensions:
+      for f in files:
+        accepted = False
+        for extension in self.extensions:
+          if f.endswith(extension):
+            accepted = True
+            break
+        if not accepted:
+          # TODO: TargetDefinitionError or similar
+          raise ValueError('Path `{}` selected by {} is not a {} file.'.format(f, self, self.extensions))
     self.excludes = excludes
+
+  @abstractproperty
+  def extensions(self):
+    """A collection of file extensions collected by this Sources instance.
+
+    An empty collection indicates that any extension will be accepted.
+    """
 
   @property
   def excludes(self):
@@ -97,18 +115,15 @@ class Target(Configuration):
   class ConfigurationNotFound(Exception):
     """Indicates a requested configuration of a target could not be found."""
 
-  def __init__(self, name=None, sources=None, configurations=None, dependencies=None, **kwargs):
+  def __init__(self, name=None, configurations=None, dependencies=None, **kwargs):
     """
     :param string name: The name of this target which forms its address in its namespace.
-    :param sources: The relative source file paths of sources this target owns.
-    :type sources: :class:`Sources`
     :param list configurations: The configurations that apply to this target in various contexts.
     :param list dependencies: The direct dependencies of this target.
     """
     super(Target, self).__init__(name=name, **kwargs)
     self.configurations = configurations
     self.dependencies = dependencies
-    self.sources = sources
 
   @addressable_list(SubclassesOf(Configuration))
   def configurations(self):
@@ -124,13 +139,6 @@ class Target(Configuration):
     :rtype: list
     """
 
-  @addressable(Exactly(Sources))
-  def sources(self):
-    """Return the sources this target owns.
-
-    :rtype: :class:`Sources`
-    """
-
   def select_configuration(self, name):
     """Selects a named configuration of this target.
 
@@ -143,10 +151,19 @@ class Target(Configuration):
     if len(configs) != 1:
       configurations = ('{} -> {!r}'.format(repr(c.name) if c.name else '<anonymous>', c)
                         for c in configs)
-      raise self.ConfigurationNotFound('Failed to find a single configuration named {!r} these '
+      raise self.ConfigurationNotFound('Failed to find a single configuration named {!r} for these '
                                        'configurations in {!r}:\n\t{}'
                                        .format(name, self, '\n\t'.join(configurations)))
     return configs[0]
+
+  def select_configuration_type(self, tpe):
+    """Selects configurations of the given type on this target.
+
+    :param type tpe: The exact type of the configuration to select: subclasses will not match.
+    :returns: The configurations with the given type.
+    :rtype: :class:`pants.engine.exp.configuration.Configuration`
+    """
+    return tuple(config for config in self.configurations if type(config) == tpe)
 
   def walk_targets(self, postorder=True):
     """Performs a depth first walk of this target, visiting all reachable targets exactly once.

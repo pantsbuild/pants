@@ -100,7 +100,7 @@ def build_file_aliases():
       'shading_exclude_package': Shading.ExcludePackage.new,
     },
     context_aware_object_factories={
-      'bundle': Bundle.factory,
+      'bundle': Bundle,
     }
   )
 
