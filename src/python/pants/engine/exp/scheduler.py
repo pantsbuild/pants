@@ -26,12 +26,15 @@ from pants.util.meta import AbstractClass
 class Select(namedtuple('Select', ['selector', 'product'])):
 
   class Subject(object):
+    """Selects the Subject provided to the selector."""
     pass
 
-  class SubjectDependencies(object):
+  class Dependencies(namedtuple('Dependencies', ['configuration'])):
+    """Selects the dependencies of a configuration of a Subject."""
     pass
 
   class LiteralSubject(namedtuple('LiteralSubject', ['address'])):
+    """Selects a literal Subject (other than the one applied to the selector)."""
     pass
 
 
@@ -45,6 +48,17 @@ class Subject(object):
     :rtype: :class:`Subject`
     """
     return item if isinstance(item, Subject) else cls(primary=item)
+
+  @classmethod
+  def iter_dependencies(cls, subject, configuration_type):
+    """
+    :returns: An iterator over the subject's dependencies from configuration of the given type.
+    :rtype: :class:`collections.Iterator` of dependency subjects
+    """
+    for config in getattr(subject, 'configurations', []):
+      if isinstance(config, configuration_type) and isinstance(config, StructWithDeps):
+        for dep in config.dependencies:
+          yield dep
 
   @classmethod
   def iter_configured_dependencies(cls, subject):
@@ -568,8 +582,8 @@ class Planners(object):
     """Yields all subjects selected by the given Select for the given subject."""
     if isinstance(selector, Select.Subject):
       yield subject
-    elif isinstance(selector, Select.SubjectDependencies):
-      for dep, _ in Subject.iter_configured_dependencies(subject):
+    elif isinstance(selector, Select.Dependencies):
+      for dep in Subject.iter_dependencies(subject, selector.configuration):
         yield dep
     elif isinstance(selector, Select.LiteralSubject):
       yield build_graph.resolve(selector.address)

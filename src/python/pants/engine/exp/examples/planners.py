@@ -333,9 +333,9 @@ def gen_scrooge_thrift(sources, scrooge_classpath, lang, strict):
 class JvmCompilerPlanner(TaskPlanner):
   @property
   def product_types(self):
-    # Request Sources for a subject, and Classpaths for its dependencies.
+    # Request Sources for a subject, and Classpaths for its source dependencies.
     return {Classpath: [[Select(Select.Subject(), self.source_type),
-                         Select(Select.SubjectDependencies(), Classpath)]]}
+                         Select(Select.Dependencies(self.source_type), Classpath)]]}
 
   @abstractproperty
   def compile_task_type(self):
