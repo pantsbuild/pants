@@ -38,7 +38,13 @@ scala_build_info = {
       'scala_2_11_repl',
       'scalastyle_2_11',
       '0.8.0'),
-  'custom': major_version_info(None, 'scalac', 'runtime_default', 'scala-repl', 'scalastyle', None),
+  'custom': major_version_info(
+    '2.10.4',
+    'scalac',
+    'runtime_default',
+    'scala-repl',
+    'scalastyle',
+    '0.3.2'),
 }
 
 
@@ -102,7 +108,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register('--runtime-spec', advanced=True, default='//:scala-library',
              help='Address to be used for custom scala runtime.')
 
-    # Scala 2.10
+    # Register Scala Compiler's.
     register_scala_compiler('2.10')
     register_scala_compiler('2.11')
     register_scala_compiler('custom')  # This will register default tools
@@ -148,6 +154,8 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                           name = 'scala-compiler',
                                           rev = scala_build_info['2.10'].full_version),
                           ])
+
+    # Register Scala style libraries.
 
   def _get_label(self):
     return getattr(self.get_options(), 'version', 'custom')
