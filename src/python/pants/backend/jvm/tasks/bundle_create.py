@@ -42,8 +42,10 @@ class BundleCreate(JvmBinaryTask):
     register('--archive-prefix', action='store_true', default=False,
              fingerprint=True,
              help='If --archive is specified, prefix archive with target basename or a unique '
-                  'identifier as determined by --use-basename-folder-prefix.')
-    register('--use-basename-folder-prefix', action='store_true', default=False,
+                  'identifier as determined by --use-basename-prefix.')
+    # `target.id` ensures global uniqueness, this flag is provided primarily for
+    # backward compatibility.
+    register('--use-basename-prefix', action='store_true', default=False,
              help='Use target basename to prefix bundle folder or archive; otherwise a unique '
                   'identifier derived from target will be used.')
 
@@ -57,7 +59,7 @@ class BundleCreate(JvmBinaryTask):
     self._prefix = self.get_options().archive_prefix
     self._archiver_type = self.get_options().archive
     self._create_deployjar = self.get_options().deployjar
-    self._use_basename_folder_prefix = self.get_options().use_basename_folder_prefix
+    self._use_basename_prefix = self.get_options().use_basename_prefix
 
   class App(object):
     """A uniform interface to an app."""
@@ -66,13 +68,13 @@ class BundleCreate(JvmBinaryTask):
     def is_app(target):
       return isinstance(target, (JvmApp, JvmBinary))
 
-    def __init__(self, target, use_basename_folder_prefix=False):
+    def __init__(self, target, use_basename_prefix=False):
       assert self.is_app(target), '{} is not a valid app target'.format(target)
 
       self.address = target.address
       self.binary = target if isinstance(target, JvmBinary) else target.binary
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
-      self.basename = target.basename if use_basename_folder_prefix else target.id
+      self.basename = target.basename if use_basename_prefix else target.id
       self.target = target
 
   @property
@@ -81,18 +83,18 @@ class BundleCreate(JvmBinaryTask):
 
   def execute(self):
     def get_bundle_apps():
-      if self._use_basename_folder_prefix:
-        # Using target_roots instead of all transitive targets to avoid possible basename
+      if self._use_basename_prefix:
+        # Using target_roots instead of all transitive targets to reduce possible basename
         # conflicts.  An example is jvm_app A depends on jvm_binary B, both have the same
         # basename, whoever runs the second will destroy the previous one.
-        return [self.App(target, use_basename_folder_prefix=True) for target in self.context.target_roots]
+        return [self.App(target, use_basename_prefix=True) for target in self.context.target_roots]
       return [self.App(target) for target in self.context.targets(predicate=self.App.is_app)]
 
     archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
 
     apps = get_bundle_apps()
 
-    if self._use_basename_folder_prefix:
+    if self._use_basename_prefix:
       self.check_basename_conflicts(apps)
 
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
