@@ -181,7 +181,7 @@ def _execute_binding(categorization, **kwargs):
 
 
 class Plan(Serializable):
-  """Represents an production plan that will yield a given product type for one or more subjects.
+  """Represents a production plan that will yield a given product type for one or more subjects.
 
   A plan can be serialized and executed wherever its task type and and source inputs it needs are
   available.
@@ -368,35 +368,9 @@ class ConflictingProducersError(SchedulingError):
 
 
 class TaskPlanner(AbstractClass):
-  """Produces plans to control execution of a paired task."""
+  """Aggregates plans to control execution of a paired task."""
 
-  class Error(Exception):
-    """Indicates an error creating a product plan for a subject."""
-
-  @abstractproperty
-  def product_types(self):
-    """Return a dict from output products to input product requirements for this planner.
-
-    Each requirement is a `Select`, which indicates that the Planner requires a particular
-    product for some subject/subjects.
-
-    Product requirements are represented in disjunctive normal form (DNF). There are two
-    levels of nested lists: the outer list represents clauses that are ORed; the inner
-    list represents type matches that are ANDed.
-    """
-
-  @abstractmethod
-  def plan(self, product_mapper, product_type, subject, configuration=None):
-    """
-    :param product_mapper: Supplies promises for any inputs needed that the planner cannot supply
-                           on its own to its associated task.
-    :type product_mapper: :class:`ProductMapper`
-    :param type product_type: The type of product this plan should produce given subject when
-                              executed.
-    :param object subject: The subject of the plan.  Any products produced will be for the subject.
-    :param object configuration: An optional requested configuration for the product.
-    """
-
+  @classmethod
   def finalize_plans(self, plans):
     """Subclasses can override to finalize the plans they created.
 
@@ -425,10 +399,10 @@ class Task(object):
 class ProductGraph(object):
   """A DAG of product dependencies, with (Subject, Product, `source`) tuples as nodes."""
 
-  class SourcePlanner(namedtuple('SourcePlanner', ['planner', 'clause'])):
+  class SourceTask(namedtuple('SourceTask', ['task', 'clause', 'promise'])):
     pass
 
-  class SourceNative(object):
+  class SourceNative(namedtuple('SourceNative', ['value', 'promise'])):
     pass
 
   class SourceNone(object):
@@ -465,7 +439,7 @@ class ProductGraph(object):
     A SourceNative node is always satisfied.
     A SourceNone node is never satisfied.
     A SourceOR node is satisfied if any child is satisfied.
-    A SourcePlanner node is satisfied if all children are satisfied."""
+    A SourceTask node is satisfied if all children are satisfied."""
     if isinstance(node.source, ProductGraph.SourceNone):
       return False
     elif isinstance(node.source, ProductGraph.SourceNative):
@@ -475,7 +449,7 @@ class ProductGraph(object):
     if isinstance(node.source, ProductGraph.SourceOR):
       # Any deps satisfied?
       return any(satisfied_deps)
-    elif isinstance(node.source, ProductGraph.SourcePlanner):
+    elif isinstance(node.source, ProductGraph.SourceTask):
       # All deps satisfied?
       return all(satisfied_deps)
     else:
@@ -539,19 +513,14 @@ class Planners(object):
   to validate the graph.
   """
 
-  def __init__(self, products_by_goal, planners):
-    """
-    :param planners: All the task planners registered in the system.
-    :type planners: :class:`collections.Iterable` of :class:`TaskPlanner`
-    :param address_resolver: A function that given an Address returns a Subject.
-    """
+  def __init__(self, products_by_goal, tasks, planners):
     self._products_by_goal = products_by_goal
-    self._product_requirements = defaultdict(dict)
-    self._output_products = set()
-    for planner in planners:
-      for output_type, input_type_requirements in planner.product_types.items():
-        self._product_requirements[output_type][planner] = input_type_requirements
-        self._output_products.add(output_type)
+    self._tasks = defaultdict(set)
+    self._planners = planners
+
+    # Index tasks by their output type.
+    for output_type, input_type_requirements, task in tasks:
+      self._tasks[output_type].add((task, tuple(input_type_requirements)))
 
   def products_for_goal(self, goal_name):
     """Return the set of products required for the given goal.
@@ -562,7 +531,7 @@ class Planners(object):
     return self._products_by_goal[goal_name]
 
   def product_graph(self, build_graph, root_subjects, root_products):
-    """Creates a product graph for the given subjects and products."""
+    """Bootstraps a product graph for the given root subjects and products."""
     product_graph = ProductGraph()
     for subject in root_subjects:
       for product in root_products:
@@ -596,10 +565,9 @@ class Planners(object):
     sources = []
     if product_type in Products.for_subject(subject):
       sources.append(ProductGraph.SourceNative())
-    # And for Planners.
-    for planner, ored_clauses in self._product_requirements[product_type].items():
-      for anded_clause in ored_clauses:
-        sources.append(ProductGraph.SourcePlanner(planner, tuple(anded_clause)))
+    # And for Tasks.
+    for task, anded_clause in self._tasks[product_type]:
+      sources.append(ProductGraph.SourceTask(task, anded_clause))
     # If no Sources were found, return SourceNone to indicate the hole.
     return sources or [ProductGraph.SourceNone()]
 
@@ -614,7 +582,7 @@ class Planners(object):
     if isinstance(node.source, (ProductGraph.SourceNative, ProductGraph.SourceNone)):
       # No dependencies; we're done.
       pass
-    elif isinstance(node.source, ProductGraph.SourcePlanner):
+    elif isinstance(node.source, ProductGraph.SourceTask):
       # Recurse on the dependencies of the anded Select clause.
       for dep_select in node.source.clause:
         for dep_subject in self._select_subjects(build_graph, dep_select.selector, node.subject):
@@ -780,7 +748,7 @@ class Promise(object):
 
 # A synthetic planner that lifts products defined directly on targets into the product
 # namespace.
-class NoPlanner(object):
+class NoPlanner(TaskPlanner):
   @classmethod
   def finalize_plans(cls, plans):
     return plans
@@ -872,7 +840,7 @@ class ProductMapper(object):
                                         subjects=(subject,),
                                         subject=subject,
                                         product_type=product_type)))
-      elif isinstance(source, ProductGraph.SourcePlanner):
+      elif isinstance(source, ProductGraph.SourceTask):
         plan = source.planner.plan(self, product_type, subject, configuration=configuration)
         # TODO: remove None check... there should no longer be any planners failing.
         if plan:
@@ -913,7 +881,24 @@ class ProductMapper(object):
 class LocalScheduler(object):
   """A scheduler that formulates an execution graph locally."""
 
-  def __init__(self, graph, planners):
+  # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
+  # ng-killall, and buildgen.go.
+  #
+  # 1. If not subjects check for a special Planner subtype with a special subject-less
+  #    promise method.
+  # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
+  #    looks for Target or Jar or ... will naturally just skip it and no-op.
+  #
+  # Option 1 allows for failing the build if no such subtypes are amongst the goals;
+  # ie: `./pants compile` would fail since there are no inputs and all compile registered
+  # planners require subjects (don't implement the subtype).
+  # Seems promising - but what about mixed goals and no subjects?
+  #
+  # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
+  # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
+  # a TaskPlanner baseclass.
+
+  def __init__(self, graph, planners, build_request):
     """
     :param graph: The BUILD graph build requests will execute against.
     :type graph: :class:`pants.engine.exp.graph.Graph`
@@ -922,54 +907,37 @@ class LocalScheduler(object):
     """
     self._graph = graph
     self._planners = planners
+    self._build_request = build_request
 
-  def execution_graph(self, build_request):
-    """Create an execution graph that can satisfy the given build request.
 
-    :param build_request: The description of the goals to achieve.
-    :type build_request: :class:`BuildRequest`
-    :returns: An execution graph of plans that, when reduced, can satisfy the given build request.
-    :rtype: :class:`ExecutionGraph`
-    :raises: :class:`SchedulingError` if no execution graph solution could be found.
-    """
-    subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
-
-    root_promises = []
-    # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
-    # ng-killall, and buildgen.go.
-    #
-    # 1. If not subjects check for a special Planner subtype with a special subject-less
-    #    promise method.
-    # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
-    #    looks for Target or Jar or ... will naturally just skip it and no-op.
-    #
-    # Option 1 allows for failing the build if no such subtypes are amongst the goals;
-    # ie: `./pants compile` would fail since there are no inputs and all compile registered
-    # planners require subjects (don't implement the subtype).
-    # Seems promising - but what about mixed goals and no subjects?
-    #
-    # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
-    # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
-    # a TaskPlanner baseclass.
-
-    # Determine which products to request based on the specified goals.
-    root_product_types = OrderedSet()
+    # Determine the root products and subjects based on the request and specified goals.
+    root_subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
+    root_products = OrderedSet()
     for goal in build_request.goals:
-      root_product_types.update(self._planners.products_for_goal(goal))
+      root_products.update(self._planners.products_for_goal(goal))
 
     # Compute a ProductGraph that determines which products are possible to produce for
     # these subjects.
-    product_graph = self._planners.product_graph(self._graph, subjects, root_product_types)
+    product_graph = self._planners.product_graph(self._graph, root_subjects, root_products)
     #print('>>>\n{}'.format('\n'.join(product_graph.edge_strings())))
     product_mapper = ProductMapper(self._graph, product_graph)
 
-    # Request root promises for relevant products for each subject.
-    for subject in subjects:
-      relevant_products = root_product_types & set(product_graph.products_for(subject))
+    # Track the root promises for relevant products for each subject.
+    root_promises = []
+    for subject in root_subjects:
+      relevant_products = root_products & set(product_graph.products_for(subject))
       for product_type in relevant_products:
         root_promises.append(product_mapper.promise(subject, product_type))
+    self._root_promises = tuple(root_promises)
+
+  def schedule(self):
+    """Determines which Promises are ready to execute, and returns them."""
+
 
     # Give aggregating planners a chance to aggregate plans.
     product_mapper.aggregate_plans()
 
     return ExecutionGraph(root_promises, product_mapper)
+
+  def root_promises(self):
+    return self._root_promises

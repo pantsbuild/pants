@@ -92,17 +92,9 @@ class Jar(Struct):
 
 
 class GlobalIvyResolvePlanner(TaskPlanner):
-  @property
-  def product_types(self):
-    return {Classpath: [[Select(Select.Subject(), Jar)]]}
-
-  def plan(self, scheduler, product_type, subject, configuration=None):
-    if isinstance(subject, Jar):
-      # This plan is only used internally, the finalized plan will s/jar/jars/ for a single global
-      # resolve.
-      return Plan(func_or_task_type=IvyResolve, subjects=(subject,), jar=subject)
-
   def finalize_plans(self, plans):
+    # TODO: need a (new) stable strategy to aggregate ivy resolve.
+    # The finalized plan will s/jar/jars/ for a single global resolve.
     subjects = set()
     jars = OrderedSet()
     for plan in plans:
@@ -123,81 +115,11 @@ def isolate_resources(resources):
   pass
 
 
-class ResourcesPlanner(TaskPlanner):
-  """A planner that adds a Classpath entry for targets containing resources."""
-
-  @property
-  def product_types(self):
-    return {Classpath: [[Select(Select.Subject(), ResourceSources)]]}
-
-  def plan(self, scheduler, product_type, subject, configuration=None):
-    resources = []
-    for sources_config in subject.select_configuration_type(ResourceSources):
-      resources.extend(sources_config.iter_paths(base_path=subject.address.spec_path))
-    return Plan(func_or_task_type=isolate_resources, subjects=(subject,), resources=resources)
-
-
 class ThriftConfiguration(StructWithDeps):
   pass
 
 
-class ThriftPlanner(TaskPlanner):
-  @abstractproperty
-  def product_type_by_config_type(self):
-    """A dict of configuration types to product types for this planner."""
-
-  @abstractproperty
-  def extra_product_selectors(self):
-    """A list of additional product selectors required by plans produced by this planner."""
-
-  @abstractproperty
-  def gen_func(self):
-    """Return the code gen function.
-
-    :rtype: function
-    """
-
-  @abstractmethod
-  def plan_parameters(self, scheduler, product_type, subject, config):
-    """Return a dict of any extra parameters besides `sources` needed to execute the code gen plan.
-
-    :rtype: dict
-    """
-
-  @property
-  def product_types(self):
-    return {product_type: [[Select(Select.Subject(), ThriftSources),
-                            Select(Select.Subject(), config_type)] + self.extra_product_selectors]
-            for config_type, product_type in self.product_type_by_config_type.items()}
-
-  def _extract_thrift_config(self, product_type, target, configuration=None):
-    """Return the configuration to be used to produce the given product type for the given target.
-
-    :rtype: :class:`ThriftConfiguration`
-    """
-    configs = (configuration,) if configuration else target.configurations
-    configs = tuple(config for config in configs
-                    if (product_type == self.product_type_by_config_type.get(type(config))))
-    if not configs:
-      # We don't know how to generate these type of sources for this subject.
-      raise self.Error('No configuration for generating {!r} from {!r}.'.format(product_type, target))
-    if len(configs) > 1:
-      raise self.Error('Found more than one configuration for generating {!r} from {!r}:\n\t{}'
-                       .format(product_type, target, '\n\t'.join(repr(c) for c in configs)))
-    return configs[0]
-
-  def plan(self, scheduler, product_type, subject, configuration=None):
-    thrift_sources = []
-    for sources_config in subject.select_configuration_type(ThriftSources):
-      thrift_sources.extend(sources_config.iter_paths(base_path=subject.address.spec_path))
-
-    config = self._extract_thrift_config(product_type, subject, configuration=configuration)
-    subject = Subject(subject, alternate=Target(dependencies=config.dependencies))
-    inputs = self.plan_parameters(scheduler, product_type, subject, config)
-    return Plan(func_or_task_type=self.gen_func, subjects=(subject,), sources=thrift_sources, **inputs)
-
-
-class ApacheThriftJavaConfiguration(ThriftConfiguration):
+class ApacheThriftConfiguration(ThriftConfiguration):
   def __init__(self, rev=None, strict=True, **kwargs):
     """
     :param string rev: The version of the apache thrift compiler to use.
@@ -205,39 +127,13 @@ class ApacheThriftJavaConfiguration(ThriftConfiguration):
     """
     super(ApacheThriftJavaConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
 
-  @abstractproperty
-  def gen(self):
-    pass
+
+class ApacheThriftJavaConfiguration(ApacheThriftConfiguration):
+  pass
 
 
-class ApacheThriftJavaConfiguration(ThriftConfiguration):
-  gen = 'java'
-
-
-class ApacheThriftPythonConfiguration(ThriftConfiguration):
-  gen = 'python'
-
-
-class ApacheThriftPlanner(ThriftPlanner):
-  @property
-  def gen_func(self):
-    return gen_apache_thrift
-
-  @memoized_property
-  def product_type_by_config_type(self):
-    return {
-        ApacheThriftJavaConfiguration: JavaSources,
-        ApacheThriftPythonConfiguration: PythonSources,
-      }
-
-  @memoized_property
-  def extra_product_selectors(self):
-    return []
-
-  def plan_parameters(self, scheduler, product_type, subject, apache_thrift_config):
-    return dict(rev=apache_thrift_config.rev,
-                gen=apache_thrift_config.gen,
-                strict=apache_thrift_config.strict)
+class ApacheThriftPythonConfiguration(ApacheThriftConfiguration):
+  pass
 
 
 class ApacheThriftError(TaskError):
@@ -255,22 +151,6 @@ class BuildPropertiesConfiguration(Struct):
   pass
 
 
-class BuildPropertiesPlanner(TaskPlanner):
-  """A planner that adds a Classpath entry for all targets configured for build_properties.
-
-  NB: In the absence of support for merging multiple Promises for a particular product_type,
-  this serves as a valid example that explodes when it should succeed.
-  """
-
-  @property
-  def product_types(self):
-    return {Classpath: [[Select(Select.Subject(), BuildPropertiesConfiguration)]]}
-
-  def plan(self, scheduler, product_type, subject, configuration=None):
-    assert product_type == Classpath
-    return Plan(func_or_task_type=write_name_file, subjects=(subject,), name=subject.name)
-
-
 def write_name_file(name):
   # Write a file containing the name in CWD
   with safe_open('build.properties') as f:
@@ -285,44 +165,13 @@ class ScroogeConfiguration(ThriftConfiguration):
     """
     super(ScroogeScalaConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
 
-  @abstractproperty
-  def lang(self):
-    pass
+
+class ScroogeScalaConfiguration(ScroogeConfiguration):
+  pass
 
 
-class ScroogeScalaConfiguration(ThriftConfiguration):
-  lang = 'scala'
-
-
-class ScroogeJavaConfiguration(ThriftConfiguration):
-  lang = 'java'
-
-
-class ScroogePlanner(ThriftPlanner):
-  @property
-  def gen_func(self):
-    return gen_scrooge_thrift
-
-  @memoized_property
-  def product_type_by_config_type(self):
-    return {
-        ScroogeJavaConfiguration: JavaSources,
-        ScroogeScalaConfiguration: ScalaSources,
-      }
-
-  @memoized_property
-  def extra_product_selectors(self):
-    # TODO: currently duplicates the literal `def promise` call in `plan_parameters`.
-    # TODO(John Sirois): once the options system is plumbed, make the tool spec configurable.
-    # It could also just be pointed at the scrooge jar at that point.
-    return [Select(Select.LiteralSubject(Address.parse('src/scala/scrooge')), Classpath)]
-
-  def plan_parameters(self, scheduler, product_type, subject, scrooge_config):
-    # This will come via an option default.
-    scrooge_classpath = scheduler.promise(Address.parse('src/scala/scrooge'), Classpath)
-    return dict(scrooge_classpath=scrooge_classpath,
-                lang=scrooge_config.lang,
-                strict=scrooge_config.strict)
+class ScroogeJavaConfiguration(ScroogeConfiguration):
+  pass
 
 
 @printing_func
@@ -330,82 +179,9 @@ def gen_scrooge_thrift(sources, scrooge_classpath, lang, strict):
   pass
 
 
-class JvmCompilerPlanner(TaskPlanner):
-  @property
-  def product_types(self):
-    # Request Sources for a subject, and Classpaths for its source dependencies.
-    return {Classpath: [[Select(Select.Subject(), self.source_type),
-                         Select(Select.Dependencies(self.source_type), Classpath)]]}
-
-  @abstractproperty
-  def compile_task_type(self):
-    """Return the type of the jvm compiler task.
-
-    :rtype: type
-    """
-
-  @abstractproperty
-  def source_type(self):
-    """Return the subclass of Sources that are consumed by this jvm compiler.
-
-    :rtype: string
-    """
-
-  def plan(self, scheduler, product_type, subject, configuration=None):
-    sources = []
-    for sources_config in subject.select_configuration_type(self.source_type):
-      sources.extend(sources_config.iter_paths(base_path=subject.address.spec_path))
-    if not sources:
-      # TODO(John Sirois): Abstract a ~SourcesConsumerPlanner that can grab sources of given types
-      # or else defer to a code generator like we do here.  As it stands, the planner must
-      # explicitly allow for code generators and this repeated code / foresight can easily be
-      # missed in new compilers, and other source-using tasks.  Once done though, code gen can be
-      # introduced to any nesting depth, ie: code gen '.thrift' files.
-
-      # This is a dep graph "hole", we depend on the thing but don't know what it is.  Either it
-      # could be something that gets transformed in to our compile input source extension (codegen)
-      # or transformed into a `Classpath` product by some other compiler targeting the jvm.
-      sources = scheduler.promise(subject,
-                                  self.source_type,
-                                  configuration=configuration)
-      subject = sources.subject
-
-    classpath_promises = []
-    for dep, dep_config in Subject.iter_configured_dependencies(subject):
-      # This could recurse to us (or be satisfied by IvyResolve, another jvm compiler, etc.
-      # depending on the dep type).
-      classpath = scheduler.promise(dep, Classpath, configuration=dep_config)
-      classpath_promises.append(classpath)
-
-    return Plan(func_or_task_type=self.compile_task_type,
-                subjects=(subject,),
-                sources=sources,
-                classpath=classpath_promises)
-
-
-class JavacPlanner(JvmCompilerPlanner):
-  @property
-  def source_type(self):
-    return JavaSources
-
-  @property
-  def compile_task_type(self):
-    return Javac
-
-
 class Javac(PrintingTask):
   def execute(self, sources, classpath):
     return super(Javac, self).execute(sources=sources, classpath=classpath)
-
-
-class ScalacPlanner(JvmCompilerPlanner):
-  @property
-  def source_type(self):
-    return ScalaSources
-
-  @property
-  def compile_task_type(self):
-    return Scalac
 
 
 class Scalac(PrintingTask):
@@ -424,30 +200,9 @@ class UnpickleableResult(object):
   pass
 
 
-class UnpickleableInputsPlanner(TaskPlanner):
-  @property
-  def product_types(self):
-    # A convenient product type only, will never be used outside engine internals.
-    return {UnpickleableInput: [[]]}
-
-  def plan(self, scheduler, product_type, subject, configuration=None):
-    # Nested functions like this lambda are unpicklable.
-    return Plan(lambda: None, (subject,))
-
-
-def unpickable_result_func():
+def unpickleable_func():
   # Nested functions like this lambda are unpicklable.
   return lambda: None
-
-
-class UnpickleableResultPlanner(TaskPlanner):
-  @property
-  def product_types(self):
-    # A convenient product type only, will never be used outside engine internals.
-    return {UnpickleableResult: [[Select(Select.Subject(), UnpickleableInput)]]}
-
-  def plan(self, scheduler, product_type, subject, configuration=None):
-    return Plan(unpickable_result_func, (subject,))
 
 
 def setup_json_scheduler(build_root):
@@ -474,6 +229,10 @@ def setup_json_scheduler(build_root):
                               build_pattern=r'^BLD.json$',
                               parser=json_parser))
 
+  # TODO(John Sirois): once the options system is plumbed, make the tool spec configurable.
+  # It could also just be pointed at the scrooge jar at that point.
+  scrooge_tool_address = Address.parse('src/scala/scrooge')
+
   planners = Planners(
       {
         'compile': [Classpath],
@@ -483,15 +242,50 @@ def setup_json_scheduler(build_root):
         'unpickleable': [UnpickleableResult],
       },
       [
-        ApacheThriftPlanner(),
-        BuildPropertiesPlanner(),
+        (JavaSources,
+         [Select(Select.Subject(), ThriftSources),
+          Select(Select.Subject(), ApacheThriftJavaConfiguration)],
+         gen_apache_thrift),
+        (PythonSources,
+         [Select(Select.Subject(), ThriftSources),
+          Select(Select.Subject(), ApacheThriftPythonConfiguration)],
+         gen_apache_thrift),
+        (ScalaSources,
+         [Select(Select.Subject(), ThriftSources),
+          Select(Select.Subject(), ScroogeScalaConfiguration),
+          Select(Select.LiteralSubject(scrooge_tool_address), Classpath)],
+         gen_scrooge_thrift),
+        (JavaSources,
+         [Select(Select.Subject(), ThriftSources),
+          Select(Select.Subject(), ScroogeJavaConfiguration),
+          Select(Select.LiteralSubject(scrooge_tool_address), Classpath)],
+         gen_scrooge_thrift),
+        (Classpath,
+         [Select(Select.Subject(), Jar)],
+         IvyResolve),
+        (Classpath,
+         [Select(Select.Subject(), ResourceSources)],
+         isolate_resources),
+        (Classpath,
+         [Select(Select.Subject(), BuildPropertiesConfiguration)],
+         write_name_file),
+        (Classpath,
+         [Select(Select.Subject(), JavaSources),
+          Select(Select.Dependencies(JavaSources), Classpath)],
+         Javac),
+        (Classpath,
+         [Select(Select.Subject(), ScalaSources),
+          Select(Select.Dependencies(JavaSources), Classpath)],
+         Scalac),
+        (UnpickleableInput,
+          [],
+          unpickleable_func),
+        (UnpickleableResult,
+         [Select(Select.Subject(), UnpickleableInput)],
+         unpickleable_func),
+      ],
+      [
         GlobalIvyResolvePlanner(),
-        JavacPlanner(),
-        ResourcesPlanner(),
-        ScalacPlanner(),
-        ScroogePlanner(),
-        UnpickleableInputsPlanner(),
-        UnpickleableResultPlanner()
       ]
     )
   scheduler = LocalScheduler(graph, planners)
