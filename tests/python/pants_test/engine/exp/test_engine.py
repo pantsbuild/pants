@@ -88,7 +88,7 @@ class EngineTest(unittest.TestCase):
       self.assert_engine_fail_slow(engine)
 
   def test_multiprocess_unpicklable_inputs(self):
-    build_request = BuildRequest(goals=['unpickleable_inputs'],
+    build_request = BuildRequest(goals=['unpickleable'],
                                  addressable_roots=[self.java.address])
 
     with self.multiprocessing_engine() as engine:
@@ -96,7 +96,7 @@ class EngineTest(unittest.TestCase):
         engine.execute(build_request)
 
   def test_multiprocess_unpicklable_outputs(self):
-    build_request = BuildRequest(goals=['unpickleable_result'],
+    build_request = BuildRequest(goals=['unpickleable'],
                                  addressable_roots=[self.java.address])
 
     with self.multiprocessing_engine() as engine:

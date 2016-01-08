@@ -93,10 +93,6 @@ class Jar(Struct):
 
 class GlobalIvyResolvePlanner(TaskPlanner):
   @property
-  def goal_name(self):
-    return 'resolve'
-
-  @property
   def product_types(self):
     return {Classpath: [[Select(Select.Subject(), Jar)]]}
 
@@ -131,10 +127,6 @@ class ResourcesPlanner(TaskPlanner):
   """A planner that adds a Classpath entry for targets containing resources."""
 
   @property
-  def goal_name(self):
-    return 'compile'
-
-  @property
   def product_types(self):
     return {Classpath: [[Select(Select.Subject(), ResourceSources)]]}
 
@@ -150,10 +142,6 @@ class ThriftConfiguration(StructWithDeps):
 
 
 class ThriftPlanner(TaskPlanner):
-  @property
-  def goal_name(self):
-    return 'gen'
-
   @abstractproperty
   def product_type_by_config_type(self):
     """A dict of configuration types to product types for this planner."""
@@ -275,10 +263,6 @@ class BuildPropertiesPlanner(TaskPlanner):
   """
 
   @property
-  def goal_name(self):
-    return None
-
-  @property
   def product_types(self):
     return {Classpath: [[Select(Select.Subject(), BuildPropertiesConfiguration)]]}
 
@@ -347,10 +331,6 @@ def gen_scrooge_thrift(sources, scrooge_classpath, lang, strict):
 
 
 class JvmCompilerPlanner(TaskPlanner):
-  @property
-  def goal_name(self):
-    return 'compile'
-
   @property
   def product_types(self):
     # Request Sources for a subject, and Classpaths for its dependencies.
@@ -446,10 +426,6 @@ class UnpickleableResult(object):
 
 class UnpickleableInputsPlanner(TaskPlanner):
   @property
-  def goal_name(self):
-    return 'unpickleable_inputs'
-
-  @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
     return {UnpickleableInput: [[]]}
@@ -465,10 +441,6 @@ def unpickable_result_func():
 
 
 class UnpickleableResultPlanner(TaskPlanner):
-  @property
-  def goal_name(self):
-    return 'unpickleable_result'
-
   @property
   def product_types(self):
     # A convenient product type only, will never be used outside engine internals.
@@ -502,14 +474,25 @@ def setup_json_scheduler(build_root):
                               build_pattern=r'^BLD.json$',
                               parser=json_parser))
 
-  planners = Planners([ApacheThriftPlanner(),
-                       BuildPropertiesPlanner(),
-                       GlobalIvyResolvePlanner(),
-                       JavacPlanner(),
-                       ResourcesPlanner(),
-                       ScalacPlanner(),
-                       ScroogePlanner(),
-                       UnpickleableInputsPlanner(),
-                       UnpickleableResultPlanner()])
+  planners = Planners(
+      {
+        'compile': [Classpath],
+        # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
+        'resolve': [Classpath],
+        'gen': [JavaSources, PythonSources, ResourceSources, ScalaSources],
+        'unpickleable': [UnpickleableResult],
+      },
+      [
+        ApacheThriftPlanner(),
+        BuildPropertiesPlanner(),
+        GlobalIvyResolvePlanner(),
+        JavacPlanner(),
+        ResourcesPlanner(),
+        ScalacPlanner(),
+        ScroogePlanner(),
+        UnpickleableInputsPlanner(),
+        UnpickleableResultPlanner()
+      ]
+    )
   scheduler = LocalScheduler(graph, planners)
   return graph, scheduler

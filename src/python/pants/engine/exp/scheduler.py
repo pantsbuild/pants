@@ -345,11 +345,11 @@ class ConflictingProducersError(SchedulingError):
   (mergeable) Classpath for one subject, for example.
   """
 
-  def __init__(self, product_type, subject, planners):
-    msg = ('Collected the following plans for generating {!r} from {!r}\n\t{}'
+  def __init__(self, product_type, subject, plans):
+    msg = ('Collected the following plans for generating {!r} from {!r}:\n\t{}'
             .format(product_type.__name__,
                     subject,
-                    '\n\t'.join(type(p).__name__ for p in planners)))
+                    '\n\t'.join(str(p.func_or_task_type.value) for p in plans)))
     super(ConflictingProducersError, self).__init__(msg)
 
 
@@ -358,13 +358,6 @@ class TaskPlanner(AbstractClass):
 
   class Error(Exception):
     """Indicates an error creating a product plan for a subject."""
-
-  @abstractproperty
-  def goal_name(self):
-    """Return the name of the goal this planner's task should run from.
-
-    :rtype: string
-    """
 
   @abstractproperty
   def product_types(self):
@@ -532,28 +525,27 @@ class Planners(object):
   to validate the graph.
   """
 
-  def __init__(self, planners):
+  def __init__(self, products_by_goal, planners):
     """
     :param planners: All the task planners registered in the system.
     :type planners: :class:`collections.Iterable` of :class:`TaskPlanner`
     :param address_resolver: A function that given an Address returns a Subject.
     """
-    self._planners_by_goal_name = defaultdict(set)
+    self._products_by_goal = products_by_goal
     self._product_requirements = defaultdict(dict)
     self._output_products = set()
     for planner in planners:
-      self._planners_by_goal_name[planner.goal_name].add(planner)
       for output_type, input_type_requirements in planner.product_types.items():
         self._product_requirements[output_type][planner] = input_type_requirements
         self._output_products.add(output_type)
 
-  def for_goal(self, goal_name):
-    """Return the set of task planners installed in the given goal.
+  def products_for_goal(self, goal_name):
+    """Return the set of products required for the given goal.
 
     :param string goal_name:
-    :rtype: set of :class:`TaskPlanner`
+    :rtype: set of product types
     """
-    return self._planners_by_goal_name[goal_name]
+    return self._products_by_goal[goal_name]
 
   def product_graph(self, build_graph, root_subjects, root_products):
     """Creates a product graph for the given subjects and products."""
@@ -862,10 +854,10 @@ class ProductMapper(object):
                                                   product_type,
                                                   consumed_product=configuration):
       if isinstance(source, ProductGraph.SourceNative):
-        plans.append((NoPlanner, Plan(func_or_task_type=lift_native_product,
-                                      subjects=(subject,),
-                                      subject=subject,
-                                      product_type=product_type)))
+        plans.append((NoPlanner(), Plan(func_or_task_type=lift_native_product,
+                                        subjects=(subject,),
+                                        subject=subject,
+                                        product_type=product_type)))
       elif isinstance(source, ProductGraph.SourcePlanner):
         plan = source.planner.plan(self, product_type, subject, configuration=configuration)
         # TODO: remove None check... there should no longer be any planners failing.
@@ -877,8 +869,7 @@ class ProductMapper(object):
 
     # TODO: It should be legal to have multiple plans, and they should be merged.
     if len(plans) > 1:
-      planners = [planner for planner, plan in plans]
-      raise ConflictingProducersError(product_type, subject, planners)
+      raise ConflictingProducersError(product_type, subject, [plan for _, plan in plans])
     elif not plans:
       raise NoProducersError(product_type, subject, configuration)
 
@@ -927,30 +918,30 @@ class LocalScheduler(object):
     :rtype: :class:`ExecutionGraph`
     :raises: :class:`SchedulingError` if no execution graph solution could be found.
     """
-    goals = build_request.goals
     subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
 
     root_promises = []
+    # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
+    # ng-killall, and buildgen.go.
+    #
+    # 1. If not subjects check for a special Planner subtype with a special subject-less
+    #    promise method.
+    # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
+    #    looks for Target or Jar or ... will naturally just skip it and no-op.
+    #
+    # Option 1 allows for failing the build if no such subtypes are amongst the goals;
+    # ie: `./pants compile` would fail since there are no inputs and all compile registered
+    # planners require subjects (don't implement the subtype).
+    # Seems promising - but what about mixed goals and no subjects?
+    #
+    # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
+    # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
+    # a TaskPlanner baseclass.
+
+    # Determine which products to request based on the specified goals.
     root_product_types = OrderedSet()
-    for goal in goals:
-      # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
-      # ng-killall, and buildgen.go.
-      #
-      # 1. If not subjects check for a special Planner subtype with a special subject-less
-      #    promise method.
-      # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
-      #    looks for Target or Jar or ... will naturally just skip it and no-op.
-      #
-      # Option 1 allows for failing the build if no such subtypes are amongst the goals;
-      # ie: `./pants compile` would fail since there are no inputs and all compile registered
-      # planners require subjects (don't implement the subtype).
-      # Seems promising - but what about mixed goals and no subjects?
-      #
-      # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
-      # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
-      # a TaskPlanner baseclass.
-      for planner in self._planners.for_goal(goal):
-        root_product_types.update(planner.product_types.keys())
+    for goal in build_request.goals:
+      root_product_types.update(self._planners.products_for_goal(goal))
 
     # Compute a ProductGraph that determines which products are possible to produce for
     # these subjects.

@@ -24,7 +24,7 @@ class PlannersTest(unittest.TestCase):
         name = b'Planner{}'.format(idx)
         cls = type(name, (object,), {'goal_name': name, 'product_types': product_types})
         yield cls()
-    return Planners(list(mk_planners()))
+    return Planners({}, list(mk_planners()))
 
   def products_for(self, planners, subject, root_products):
     product_graph = planners.product_graph(None, [subject], root_products)
