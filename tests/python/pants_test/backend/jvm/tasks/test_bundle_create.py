@@ -13,6 +13,7 @@ from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.util.contextutil import open_zip
+from pants.util.dirutil import safe_file_dump
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 from pants_test.testutils.file_test_util import check_zip_file_content
 
@@ -24,6 +25,11 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
   @classmethod
   def task_type(cls):
     return BundleCreate
+
+  def setUp(self):
+    super(TestBundleCreate, self).setUp()
+    # This is so that payload fingerprint can be computed.
+    safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
 
   def test_jvm_bundle_products(self):
     jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',

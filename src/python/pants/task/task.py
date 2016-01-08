@@ -10,7 +10,7 @@ import sys
 from abc import abstractmethod
 from contextlib import contextmanager
 from hashlib import sha1
-from itertools import chain, repeat
+from itertools import repeat
 
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
