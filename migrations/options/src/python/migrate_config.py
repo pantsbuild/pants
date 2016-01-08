@@ -396,10 +396,10 @@ ng_daemons_note = ('The global "ng_daemons" option has been replaced by a "use_n
                    'limit the number of overrides by inverting the default with a DEFAULT section '
                    'value of False.')
 
-scala_buildtools_defaults = ('Scala runtime is now determined based on the version specified.'
-                             'Pants will use a default minor version based on the major version'
-                             'specified eg: 2.10.  If custom is specified then the full version'
-                             'may be defined in the spec provided in option --runtime-spec')
+scala_buildtools_defaults = ('Scala runtime is now determined based on the version specified. '
+                             'Pants will use a default minor version based on the major version '
+                             'specified eg: 2.10.  If custom is specified then the full version '
+                             'may be defined in the spec provided in option --runtime-spec ')
 
 scrooge_gen_deps_note = ('The scrooge-gen per-language config fields have been refactored into '
                          'two options: one for service deps, and one for structs deps.')

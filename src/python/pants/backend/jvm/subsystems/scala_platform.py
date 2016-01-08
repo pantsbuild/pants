@@ -50,17 +50,21 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     super(ScalaPlatform, cls).register_options(register)
     register('--version', advanced=True, default='2.10', choices=['2.10', '2.11', 'custom'],
              help='The scala "platform version", which is suffixed onto all published '
-                  'libraries. This should match the declared compiler/library versions.'
+                  'libraries. This should match the declared compiler/library versions. '
                   'Version specified will allow the user provide some sane defaults for common '
                   'versions of scala. If version is something other than one of the common '
                   'versions the user will be able to override the defaults by specifying '
-                  'custom build targets for //:scalac and //:scala-library ')
+                  '"custom" as the --version, custom build targets can be specified in the targets '
+                  'for //:scalac and //:scala-library ')
 
     register('--runtime', advanced=True, type=list_option, default=['//:scala-library'],
              help='Target specs pointing to the scala runtime libraries.',
              deprecated_version='0.0.75',
              deprecated_hint='Option is no longer used, --version is used to specify the major '
-                             'version. The runtime is created based on major version.')
+                             'version. The runtime is created based on major version. '
+                             'The runtime target will be defined at the address //:scala-library '
+                             'unless it is overriden by the option --runtime-spec and a --version '
+                             'is set to custom.')
 
     register('--runtime-spec', advanced=True, default='//:scala-library',
              help='Address to be used for custom scala runtime.')
