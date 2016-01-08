@@ -64,7 +64,7 @@ Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Logs the SUCCESS/FAILURE/ABORTED status of each workunit with stats in run_tracker.
-  `RB #3307 https://rbcommons.com/s/twitter/r/3307`_
+  `RB #3307 <https://rbcommons.com/s/twitter/r/3307>`_
 
 * Simplify build dict/reference information extraction.
   `RB #3301 <https://rbcommons.com/s/twitter/r/3301>`_
