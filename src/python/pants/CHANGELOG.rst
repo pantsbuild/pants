@@ -1,6 +1,100 @@
 RELEASE HISTORY
 ===============
 
+0.0.67 (01/08/2016)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release brings an upgrade to pex 1.1.2 for faster python chroot
+generation as well as bug fixes that get `./pants repl` working for
+scala 2.11 and `./pants test` now handling exceptions in junit
+`@BeforeClass` methods.
+
+There is also a glimpse into the future where a pants daemon awaits.
+Try it out by adding `--enable-pantsd` to your command line - run times
+are 100ms or so faster for many operations.
+
+API Changes
+~~~~~~~~~~~
+
+* Bump pex version pinning to 1.1.2.
+  `RB #3319 <https://rbcommons.com/s/twitter/r/3319>`_
+
+* extend --use-old-naming-style deprecation
+  `RB #3300 <https://rbcommons.com/s/twitter/r/3300>`_
+  `RB #3309 <https://rbcommons.com/s/twitter/r/3309>`_
+
+* Add target id to export
+  `RB #3291 <https://rbcommons.com/s/twitter/r/3291>`_
+
+* Bump junit-runner version
+  `RB #3295 <https://rbcommons.com/s/twitter/r/3295>`_
+
+* Flatten stable classpath for bundle
+  `RB #3261 <https://rbcommons.com/s/twitter/r/3261>`_
+
+Bugfixes
+~~~~~~~~
+
+* Turn on redirects when retrieving a URL in the fetcher API
+  `RB #3275 <https://rbcommons.com/s/twitter/r/3275>`_
+  `RB #3317 <https://rbcommons.com/s/twitter/r/3317>`_
+
+* Remove jline dep for scala 2.11 repl
+  `RB #3318 <https://rbcommons.com/s/twitter/r/3318>`_
+
+* Start the timeout *after* the process is spawned, drop the mutable process handler variable
+  `RB #3202 <https://rbcommons.com/s/twitter/r/3202>`_
+
+* Fix exception in test mechanism in case of exception in @BeforeClass method.
+  `RB #3293 <https://rbcommons.com/s/twitter/r/3293>`_
+
+New Features
+~~~~~~~~~~~~
+
+* New implementation of builddict/reference generation.
+  `RB #3315 <https://rbcommons.com/s/twitter/r/3315>`_
+
+* Save details on exceptions encountered to a file
+  `RB #3289 <https://rbcommons.com/s/twitter/r/3289>`_
+
+* [pantsd] Implement PantsRunner->[LocalPantsRunner,RemotePantsRunner] et al.
+  `RB #3286 <https://rbcommons.com/s/twitter/r/3286>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Logs the SUCCESS/FAILURE/ABORTED status of each workunit with stats in run_tracker.
+  `RB #3307 <https://rbcommons.com/s/twitter/r/3307>`_
+
+* Simplify build dict/reference information extraction.
+  `RB #3301 <https://rbcommons.com/s/twitter/r/3301>`_
+
+* Move Sources to a target's configurations, and add subclasses for each language
+  `RB #3274 <https://rbcommons.com/s/twitter/r/3274>`_
+
+* Convert loose directories in bundle classpath into jars
+  `RB #3297 <https://rbcommons.com/s/twitter/r/3297>`_
+
+* Update pinger timeout in test_pinger_timeout_config and test_global_pinger_memo.
+  `RB #3292 <https://rbcommons.com/s/twitter/r/3292>`_
+
+* Add sanity check to test_cache_read_from
+  `RB #3284 <https://rbcommons.com/s/twitter/r/3284>`_
+  `RB #3299 <https://rbcommons.com/s/twitter/r/3299>`_
+
+* Adding sanity check for locale setting
+  `RB #3296 <https://rbcommons.com/s/twitter/r/3296>`_
+
+* Create a complete product graph for the experimentation engine, and use it to validate inputs
+  `Issue #2525 <https://github.com/pantsbuild/pants/issues/2525>`_
+  `RB #3245 <https://rbcommons.com/s/twitter/r/3245>`_
+
+* Add Unit Test for artifact caching to replace test_scalastyle_cached in test_scalastyle_integration.py, and test_checkstyle_cached in test_checkstyle_integration.py.
+  `RB #3284 <https://rbcommons.com/s/twitter/r/3284>`_
+
 0.0.66 (01/02/2016)
 -------------------
 
