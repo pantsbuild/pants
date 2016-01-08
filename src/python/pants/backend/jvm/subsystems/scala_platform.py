@@ -88,9 +88,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                           'scala_2_10_repl',
                           classpath=[
                             JarDependency(org = 'org.scala-lang',
-                                          name = 'jline',
-                                          rev = scala_build_info['2.10'].full_version),
-                            JarDependency(org = 'org.scala-lang',
                                           name = 'scala-compiler',
                                           rev = scala_build_info['2.10'].full_version),
                           ])
@@ -111,9 +108,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     cls.register_jvm_tool(register,
                           'scala_repl',
                           classpath=[
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'jline',
-                                          rev = scala_build_info['2.10'].full_version),
                             JarDependency(org = 'org.scala-lang',
                                           name = 'scala-compiler',
                                           rev = scala_build_info['2.10'].full_version),
