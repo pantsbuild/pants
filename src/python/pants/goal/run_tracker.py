@@ -343,7 +343,7 @@ class RunTracker(Subsystem):
     self.report.end_workunit(workunit)
     path, duration, self_time, is_tool = workunit.end()
 
-    # These three operations may not be thread-safe, and workunits may run in seperate threads
+    # These three operations may not be thread-safe, and workunits may run in separate threads
     # and thus end concurrently, so we want to lock these operations.
     with self._stats_lock:
       self.cumulative_timings.add_timing(path, duration, is_tool)
