@@ -54,6 +54,9 @@ Bugfixes
 New Features
 ~~~~~~~~~~~~
 
+* New implementation of builddict/reference generation.
+  `RB #3315 <https://rbcommons.com/s/twitter/r/3315>`_
+
 * Save details on exceptions encountered to a file
   `RB #3289 <https://rbcommons.com/s/twitter/r/3289>`_
 
@@ -62,9 +65,6 @@ New Features
 
 Small improvements, Refactoring and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* New implementation of builddict/reference generation.
-  `RB #3315 <https://rbcommons.com/s/twitter/r/3315>`_
 
 * Logs the SUCCESS/FAILURE/ABORTED status of each workunit with stats in run_tracker.
   `RB #3307 <https://rbcommons.com/s/twitter/r/3307>`_
