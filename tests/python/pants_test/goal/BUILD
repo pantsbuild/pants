@@ -30,3 +30,14 @@ python_tests(
     'tests/python/pants_test:base_test',
   ]
 )
+
+python_tests(
+  name='run_tracker_integration',
+  sources=[
+    'test_run_tracker_integration.py'
+  ],
+  dependencies=[
+    'src/python/pants/goal:run_tracker',
+    'tests/python/pants_test:int-test',
+  ]
+)

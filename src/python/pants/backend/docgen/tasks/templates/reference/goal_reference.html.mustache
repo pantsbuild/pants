@@ -1,0 +1,6 @@
+<h2>Available Goals</h2>
+<table>
+  {{#goal_data}}
+    <tr><td><a href="#{{goal}}" onclick="expandGoal('{{goal}}')">{{goal}}</a></td><td>{{goal_description}}</td></tr>
+  {{/goal_data}}
+</table>

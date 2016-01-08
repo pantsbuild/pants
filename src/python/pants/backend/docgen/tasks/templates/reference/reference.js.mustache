@@ -1,0 +1,70 @@
+function toggleTreeView(evt, elem) {
+  if (evt.srcElement == elem) {
+    elem.classList.toggle('expanded');
+    elem.classList.toggle('collapsed');
+  }
+}
+
+function expandAll(evt) {
+  if (evt !== undefined) {
+    evt.preventDefault();
+  }
+  // We copy the returned htmlCollection, because our action changes it, which will
+  // invalidate indexes.
+  var liElems = [].slice.call(document.getElementsByClassName('collapsed'));
+  for (var i = 0; i < liElems.length; i++) {
+    expandLiElem(liElems[i]);
+  }
+}
+
+function collapseAll(evt) {
+  if (evt !== undefined) {
+    evt.preventDefault();
+  }
+  // We copy the returned htmlCollection, because our action changes it, which will
+  // invalidate indexes.
+  var liElems = [].slice.call(document.getElementsByClassName('expanded'));
+  for (var i = 0; i < liElems.length; i++) {
+    collapseLiElem(liElems[i]);
+  }
+}
+
+function expandLiElem(elem) {
+  if (elem !== undefined) {
+    elem.classList.add('expanded');
+    elem.classList.remove('collapsed');
+  }
+}
+
+function collapseLiElem(elem) {
+  if (elem !== undefined) {
+    elem.classList.add('collapsed');
+    elem.classList.remove('expanded');
+  }
+}
+
+function expandGoal(goal) {
+  expandLiElem(document.getElementById(goal));
+  expandLiElem(document.getElementById('task-options'));
+}
+
+window.onload = function() {
+  var liElems = document.getElementsByTagName('li');
+  for (var i = 0; i < liElems.length; i++) {
+    var elem = liElems[i];
+    if (elem.classList.contains('expanded') || elem.classList.contains('collapsed')) {
+      elem.addEventListener('click', function(evt) { toggleTreeView(evt, this); });
+    }
+  }
+
+  // Expand all if the user hits ctrl-f (cmd-f on OSX) to search on the page, so that their
+  // search sees all content. Note that we can't capture Edit->Find via the menus,
+  // but this should be useful in practice.
+  var isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  var ctrlKey = isMac ? 'metaKey' : 'ctrlKey';
+  document.addEventListener('keydown', function(e) {
+    if (e.which == '70' && e[ctrlKey]) {
+      expandAll();
+    }
+  });
+};

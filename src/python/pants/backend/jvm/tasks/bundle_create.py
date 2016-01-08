@@ -18,7 +18,6 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_graph import BuildGraph
 from pants.fs import archive
 from pants.fs.archive import JAR
-from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
@@ -76,6 +75,10 @@ class BundleCreate(JvmBinaryTask):
       self.basename = target.basename if use_basename_folder_prefix else target.id
       self.target = target
 
+  @property
+  def cache_target_dirs(self):
+    return True
+
   def execute(self):
     def get_bundle_apps():
       if self._use_basename_folder_prefix:
@@ -95,7 +98,9 @@ class BundleCreate(JvmBinaryTask):
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    self.consolidate_classpath(self.context.targets(), runtime_classpath)
+    targets_to_consolidate = self.find_consolidate_classpath_candidates(runtime_classpath,
+                                                                        self.context.targets())
+    self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
 
     for app in apps:
       basedir = self.bundle(app)
@@ -193,25 +198,35 @@ class BundleCreate(JvmBinaryTask):
     return bundle_dir
 
   def consolidate_classpath(self, targets, classpath_products):
-    """Convert loose directories in classpath_products into jars.
+    """Convert loose directories in classpath_products into jars. """
 
-    TODO(peiyu): enable artifact caching to take advantage of caching as well saving to
-    the provided target-specific directories.
-    """
-    def jardir(entry):
-      """Jar up the contents of the given ClasspathEntry and return a unique jar path."""
-      root = entry.path
-      with temporary_dir(root_dir=self.workdir, cleanup=False) as destdir:
-        jarpath = JAR.create(root, destdir, 'output')
-      return jarpath
+    with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation:
+      for vt in invalidation.all_vts:
+        entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
+        for index, (conf, entry) in enumerate(entries):
+          if ClasspathUtil.is_dir(entry.path):
+            # regenerate artifact for invalid vts
+            if not vt.valid:
+              JAR.create(entry.path, vt.results_dir, 'output-{}'.format(index))
 
-    safe_mkdir(self.workdir)
+            # replace directory classpath entry with its jarpath
+            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
+            classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
+            classpath_products.add_for_target(vt.target, [(conf, jarpath)])
+
+  def find_consolidate_classpath_candidates(self, classpath_products, targets):
+    targets_with_directory_in_classpath = []
     for target in targets:
       entries = classpath_products.get_internal_classpath_entries_for_targets([target])
       for conf, entry in entries:
         if ClasspathUtil.is_dir(entry.path):
           classpath_products.remove_for_target(target, [(conf, entry.path)])
           classpath_products.add_for_target(target, [(conf, jardir(entry))])
+
+          targets_with_directory_in_classpath.append(target)
+          break
+
+    return targets_with_directory_in_classpath
 
   def check_basename_conflicts(self, apps):
     """Apps' basenames are used as bundle directory names. Ensure they are all unique."""

@@ -1,0 +1,47 @@
+<h2>Option Reference</h2>
+
+{{> reference/expand_bar.html}}
+
+<ul class="nobullets collapsible">
+  <li class="collapsed" id="global-options"><div class="option-category-header">Global Options</div>
+    {{#global_scope_data}}
+      {{> reference/all_options_for_scope.html}}
+    {{/global_scope_data}}
+  </li>
+  <li class="collapsed" id="task-options"><div class="option-category-header">Task Options</div>
+    <ul class="nobullets collapsible">
+      {{#goal_data}}
+        <li class="goal-data" id="{{goal}}">
+          <a pantsmark="oref_goal_{{goal}}"></a>
+          <a name="{{goal}}"></a>
+          <div class="goal-header">
+            <div class="goal-name">{{goal}}</div>
+            <div class="goal-description">{{goal_description}}</div>
+          </div>
+          <ul class="nobullets collapsible">
+            {{#task_data}}
+              <li>
+                <div class="scope">{{scope_info.scope}}</div>
+                <div class="scope-description">{{scope_info.description}}</div>
+                {{> reference/all_options_for_scope.html}}
+              </li>
+            {{/task_data}}
+          </ul>
+        </li>
+      {{/goal_data}}
+    </ul>
+  </li>
+  <li class="collapsed" id="subsystem-options"><div class="option-category-header">Subsystem Options</div>
+    <ul class="nobullets collapsible">
+      {{#global_subsystem_data}}
+        <li>
+          <div class="global-subsystem-header">
+            <div class="scope">{{scope_info.scope}}</div>
+            <div class="scope-description">{{scope_info.description}}</div>
+          </div>
+          {{> reference/all_options_for_scope.html}}
+        </li>
+      {{/global_subsystem_data}}
+    </ul>
+  </li>
+</ul>
