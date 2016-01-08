@@ -1,0 +1,30 @@
+<style>
+    {{> reference/reference.css}}
+</style>
+<script type="text/javascript">
+    {{> reference/reference.js}}
+</script>
+
+<h1>Pants BUILD Dictionary</h1>
+
+<p>
+  A <code>BUILD</code> file defines one or more <em>build targets</em>.
+  A target represents a set of source files, dependencies or other 'nouns' that
+  build commands can act on.  The <em>type</em> of a target determines what actions
+  apply to it. For example, a <code>jvm_binary</code> target can be compiled and run.
+</p>
+
+{{> reference/expand_bar.html}}
+
+<h2>Target Types</h2>
+{{#target_types}}
+{{> reference/build_symbols.html}}
+{{/target_types}}
+<hr>
+
+<h2>Other BUILD Symbols</h2>
+{{#other_symbols}}
+  {{> reference/build_symbols.html}}
+{{/other_symbols}}
+
+<hr>

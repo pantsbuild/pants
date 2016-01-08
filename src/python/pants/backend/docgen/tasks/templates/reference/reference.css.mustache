@@ -1,0 +1,96 @@
+code {
+    color: green;
+    white-space: nowrap;
+}
+pre {
+    color: green;
+    background-color: lightgray;
+    border: 1px solid black;
+    padding: 4px;
+}
+.top-link-bar a {
+    padding-right: 8px;
+}
+.option-category-header {
+    font-size: 16px;
+    font-weight: bold;
+}
+.goal-name {
+    font-size: 14px;
+    font-weight: bold;
+}
+.goal-header {
+    padding-bottom: 8px;
+}
+.global-subsystem-header {
+    padding-bottom: 8px;
+}
+.scope {
+    color: blue;
+    font-size: 14px;
+    font-family: monospace;
+}
+.options-group {
+    padding-top: 4px;
+}
+.option-args {
+    color: blue;
+    font-family: monospace;
+    font-weight: bold;
+}
+.option-default {
+    color: green;
+    font-family: monospace;
+    font-weight: bold;
+}
+.build-symbols {
+    padding-top: 16px;
+}
+.build-symbol {
+    color: blue;
+    font-family: monospace;
+    font-weight: bold;
+}
+.build-symbol-arg-name {
+    color: darkcyan;
+    font-family: monospace;
+    font-weight: bold;
+}
+.build-symbol-arg-default {
+    color: green;
+    font-family: monospace;
+    font-weight: bold;
+}
+.build-symbol-args {
+    margin-left: 48px;
+}
+/* Remove list bullets and substitute our own. */
+ul.nobullets {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+ul.collapsible > li {
+    padding-left: 16px;
+    clear: both;
+}
+ul.collapsible > li.collapsed:before {
+    content: "▶";
+    padding-right: 8px;
+    font-family: monospace;
+    display: block;
+    float: left;
+}
+ul.collapsible > li.expanded:before {
+    content: "▼";
+    padding-right: 8px;
+    font-family: monospace;
+    display: block;
+    float: left;
+}
+ul.collapsible > li.collapsed > ul {
+    display: none;
+}
+ul.collapsible > li.expanded > ul {
+    display: block;
+}
