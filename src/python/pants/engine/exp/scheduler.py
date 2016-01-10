@@ -324,23 +324,13 @@ class ProductGraph(object):
             return State.Return(configuration)
       return State.Throw(ValueError('No native source of {} for {}'.format(self.product, self.subject)))
 
-  def __init__(self, roots):
-    self._roots = tuple(roots)
+  def __init__(self):
     # A dict from Node to its computed value: if a Node hasn't been computed yet, it will not
     # be present here.
-    # TODO: isolate into a ProductMapper type thing for thread safety.
     self._node_results = dict()
     # A dict from Node to list of dependency Nodes.
     self._dependencies = defaultdict(set)
     self._dependents = defaultdict(set)
-
-  @property
-  def roots(self):
-    return self._roots
-
-  @property
-  def roots_completed(self):
-    return all(self.is_completed(root) for root in self.roots)
 
   def complete(self, node, state):
     existing_state = self._node_results.get(node, None)
@@ -361,10 +351,13 @@ class ProductGraph(object):
     for dependency in dependencies:
       self._dependents[dependency].add(node)
 
-  def dependents(self, node):
+  def dependencies(self):
+    return self._dependencies
+
+  def dependents_of(self, node):
     return self._dependents[node]
 
-  def dependencies(self, node):
+  def dependencies_of(self, node):
     return self._dependencies[node]
 
   def sources_for(self, subject, product, consumed_product=None):
@@ -433,11 +426,6 @@ class Planners(object):
     """
     return self._products_by_goal[goal_name]
 
-  def product_graph(self, build_graph, root_subjects, root_products):
-    """Bootstraps a product graph for the given root subjects and products."""
-    roots = [Node.Select(s, p) for s in root_subjects for p in root_products]
-    return ProductGraph(roots)
-
 
 class BuildRequest(object):
   """Describes the user-requested build."""
@@ -473,121 +461,6 @@ class BuildRequest(object):
             .format(self._goals, self._addressable_roots))
 
 
-class ProductMapper(object):
-  """Stores the mapping from promises to the plans whose execution will satisfy them."""
-
-  class InvalidRegistrationError(Exception):
-    """Indicates registration of a plan that does not cover the expected subject."""
-
-  def __init__(self, graph, product_graph):
-    self._graph = graph
-    self._product_graph = product_graph
-    self._promises = {}
-    self._plans_by_product_type_by_planner = defaultdict(lambda: defaultdict(OrderedSet))
-
-  def _register_promises(self, product_type, plan, primary_subject=None, configuration=None):
-    """Registers the promises the given plan will satisfy when executed.
-
-    :param type product_type: The product type the plan will produce when executed.
-    :param plan: The plan to register promises for.
-    :type plan: :class:`Plan`
-    :param primary_subject: An optional primary subject.  If supplied, the registered promise for
-                            this subject will be returned.
-    :param object configuration: An optional promised configuration.
-    :returns: The promise for the primary subject of one was supplied.
-    :rtype: :class:`Promise`
-    :raises: :class:`ProductMapper.InvalidRegistrationError` if a primary subject was supplied but
-             not a member of the given plan's subjects.
-    """
-    # Index by all subjects.  This allows dependencies on products from "chunking" tasks, even
-    # products from tasks that act globally in the extreme.
-    primary_promise = None
-    for subject in plan.subjects:
-      promise = Promise(product_type, subject, configuration=configuration)
-      if primary_subject == subject.primary:
-        primary_promise = promise
-      self._promises[promise] = plan
-
-    if primary_subject and not primary_promise:
-      raise self.InvalidRegistrationError('The subject {} is not part of the final plan!: {}'
-                                          .format(primary_subject, plan))
-    return primary_promise
-
-  def promised(self, promise):
-    """Return the plan that was promised.
-
-    :param promise: The promise to lookup a registered plan for.
-    :type promise: :class:`Promise`
-    :returns: The plan registered for the given promise; or `None`.
-    :rtype: :class:`Plan`
-    """
-    return self._promises.get(promise)
-
-  def promise(self, subject, product_type, configuration=None):
-    """Return a promise for a product of the given `product_type` for the given `subject`.
-
-    The subject can either be a :class:`pants.engine.exp.objects.Serializable` object or else an
-    :class:`Address`, in which case the promise subject is the addressable, serializable object it
-    points to.
-
-    If a configuration is supplied, the promise is for the requested product in that configuration.
-
-    If no production plans can be made a :class:`SchedulingError` is raised.
-
-    :param object subject: The subject that the product type should be created for.
-    :param type product_type: The type of product to promise production of for the given subject.
-    :param object configuration: An optional requested configuration for the product.
-    :returns: A promise to make the given product type available for subject at task execution time.
-    :rtype: :class:`Promise`
-    :raises: :class:`SchedulingError` if no production plans could be made.
-    """
-    if isinstance(subject, Address):
-      subject = self._graph.resolve(subject)
-
-    promise = Promise(product_type, subject, configuration=configuration)
-    plan = self.promised(promise)
-    if plan is not None:
-      return promise
-
-    plans = []
-    # For all sources of the product, request it.
-    for source in self._product_graph.sources_for(subject,
-                                                  product_type,
-                                                  consumed_product=configuration):
-      if isinstance(source, ProductGraph.Node.Native):
-        plans.append((NoPlanner(), Plan(func_or_task_type=lift_native_product,
-                                        subjects=(subject,),
-                                        subject=subject,
-                                        product_type=product_type)))
-      elif isinstance(source, ProductGraph.Node.Task):
-        plan = source.planner.plan(self, product_type, subject, configuration=configuration)
-        # TODO: remove None check... there should no longer be any planners failing.
-        if plan:
-          plans.append((source.planner, plan))
-      else:
-        raise ValueError('Unsupported source for ({}, {}): {}'.format(
-          subject, product_type, source))
-
-    # TODO: It should be legal to have multiple plans, and they should be merged.
-    if len(plans) > 1:
-      raise ConflictingProducersError(product_type, subject, [plan for _, plan in plans])
-    elif not plans:
-      raise NoProducersError(product_type, subject, configuration)
-
-    planner, plan = plans[0]
-    try:
-      primary_promise = self._register_promises(product_type, plan,
-                                                primary_subject=subject,
-                                                configuration=configuration)
-      self._plans_by_product_type_by_planner[planner][product_type].add(plan)
-      return primary_promise
-    except ProductMapper.InvalidRegistrationError:
-      raise SchedulingError('The plan produced for {subject!r} by {planner!r} does not cover '
-                            '{subject!r}:\n\t{plan!r}'.format(subject=subject,
-                                                              planner=type(planner).__name__,
-                                                              plan=plan))
-
-
 class Promise(object):
   """A simple Promise/Future class to hand off a value between threads.
 
@@ -619,14 +492,14 @@ class Promise(object):
       return self._success
 
 
-class Step(namedtuple('Step', ['node', 'promise', 'dependencies'])):
+class Step(namedtuple('Step', ['node', 'promise', 'dependencies']), Serializable):
   @classmethod
   def create(cls, node, product_graph):
     """Creates a Step with the currently available dependencies of the given Node."""
     return cls(node,
                Promise(),
                {dep: product_graph.state(dep)
-                for dep in product_graph.dependencies(node) if dep is not None})
+                for dep in product_graph.dependencies_of(node) if dep is not None})
 
   def __call__(self):
     """Called by the Engine in order to execute this work in parallel. Threadsafe."""
@@ -654,7 +527,7 @@ class Step(namedtuple('Step', ['node', 'promise', 'dependencies'])):
 
 
 class LocalScheduler(object):
-  """A scheduler that formulates an execution graph locally.
+  """A scheduler that expands a ProductGraph locally.
 
   # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
   # ng-killall, and buildgen.go.
@@ -674,7 +547,7 @@ class LocalScheduler(object):
   # a TaskPlanner baseclass.
   """
 
-  def __init__(self, graph, planners, build_request):
+  def __init__(self, graph, planners):
     """
     :param graph: The BUILD graph build requests will execute against.
     :type graph: :class:`pants.engine.exp.graph.Graph`
@@ -683,29 +556,38 @@ class LocalScheduler(object):
     """
     self._graph = graph
     self._planners = planners
-    self._build_request = build_request
+    self._product_graph = ProductGraph()
+    self._roots = set()
 
-
-    # Determine the root products and subjects based on the request and specified goals.
+  def _create_roots(self, build_request):
+    # Determine the root products and subjects based on the request.
     root_subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
     root_products = OrderedSet()
     for goal in build_request.goals:
       root_products.update(self._planners.products_for_goal(goal))
 
-    # Compute a ProductGraph that determines which products are possible to produce for
-    # these subjects.
-    self._product_graph = self._planners.product_graph(self._graph, root_subjects, root_products)
+    # Roots are products that might be possible to produce for these subjects.
+    return [Node.Select(s, p) for s in root_subjects for p in root_products]
 
-  def schedule(self):
-    """Yields batches of Steps until the roots of the product graph have been completed."""
+  def product_graph(self):
+    return self._product_graph
+
+  def schedule(self, build_request):
+    """Yields batches of Steps until the roots specified by the request have been completed.
+    
+    This method should be called by exactly one thread, but the Step objects returned
+    by this method are intended to be executed in multiple threads.
+    """
 
     pg = self._product_graph
 
-    # A list of Nodes that are ready to execute.
-    ready = list(Step.create(root, pg) for root in pg.roots)
+    # A list of Steps that are ready to execute for Nodes.
+    self._roots.extend(self._create_roots(build_request))
+    ready = list(Step.create(root, pg)
+                 for root in self._roots if not pg.is_complete(root))
 
-    while not pg.roots_completed:
-      # Yield nodes that are ready.
+    # Yield nodes that are ready, and then compute new ones.
+    while ready:
       yield ready
 
       candidates = set()
@@ -716,7 +598,7 @@ class LocalScheduler(object):
           # This step has completed; if the Node has completed, its dependents are candidates.
           if pg.is_complete(step.node):
             # The Node is completed: mark any of its dependents as candidates for Steps.
-            candidates.update(d for d in pg.dependents(step.node))
+            candidates.update(d for d in pg.dependents_of(step.node))
           else:
             # Needs more Steps.
             next_ready.append(Step.create(step.node, pg))

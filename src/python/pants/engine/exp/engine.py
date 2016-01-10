@@ -310,22 +310,14 @@ class Engine(AbstractClass):
 class LocalSerialEngine(FailSlowHelper, Engine):
   """An engine that runs tasks locally and serially in-process."""
 
-  def reduce(self, execution_graph, fail_slow=False):
+  def __init__(self, scheduler):
+    self._scheduler = scheduler
+
+  def reduce(self, build_request, fail_slow=False):
     products_by_promise = {}
-    for promise, plan in execution_graph.walk():
-      inputs = self.collect_inputs(products_by_promise, promise, plan)
-      if isinstance(inputs, FailedToProduce):
-        # Short circuit plan execution since we don't have all the inputs it needs.
-        product = inputs
-      else:
-        binding = plan.bind(inputs)
-        product = self.safe_execute(binding.execute, promise, plan, fail_slow=fail_slow)
-
-      # Index the product across all promises we made for it.
-      for subject in plan.subjects:
-        products_by_promise[promise.rebind(subject)] = product
-
-    return self.collect_root_outputs(products_by_promise, execution_graph)
+    for step_batch in self._scheduler.schedule(build_request):
+      for step in step_batch:
+        step()
 
 
 class SerializationError(Exception):
