@@ -238,7 +238,7 @@ def setup_json_scheduler(build_root):
          gen_scrooge_thrift),
         (Classpath,
          [Select(Select.Subject(), Jar)],
-         IvyResolve),
+         ivy_resolve),
         (Classpath,
          [Select(Select.Subject(), ResourceSources)],
          isolate_resources),
