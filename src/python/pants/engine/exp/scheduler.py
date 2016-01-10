@@ -39,99 +39,6 @@ class Select(namedtuple('Select', ['selector', 'input_product'])):
     pass
 
 
-class Subject(object):
-  """The subject of a production plan."""
-
-  @classmethod
-  def as_subject(cls, item):
-    """Return the given item as the primary of a subject if its not already a subject.
-
-    :rtype: :class:`Subject`
-    """
-    return item if isinstance(item, Subject) else cls(primary=item)
-
-  @classmethod
-  def iter_configured_dependencies(cls, subject):
-    """Return an iterator of the given subject's dependencies including any selected configurations.
-
-    If no configuration is selected by a dependency (there is no `@[config-name]` specifier suffix),
-    then `None` is returned for the paired configuration object; otherwise the `[config-name]` is
-    looked for in the subject `configurations` list and returned if found or else an error is
-    raised.
-
-    :returns: An iterator over subjects dependencies as pairs of (dependency, configuration).
-    :rtype: :class:`collections.Iterator` of (object, string)
-    :raises: :class:`TaskPlanner.Error` if a dependency configuration was selected by subject but
-             could not be found or was not unique.
-    """
-    for derivation in Subject.as_subject(subject).iter_derivations:
-      if getattr(derivation, 'configurations', None):
-        for config in derivation.configurations:
-          if isinstance(config, StructWithDeps):
-            for dep in config.dependencies:
-              configuration = None
-              if dep.address:
-                config_specifier = extract_config_selector(dep.address)
-                if config_specifier:
-                  if not dep.configurations:
-                    raise cls.Error('The dependency of {dependee} on {dependency} selects '
-                                    'configuration {config} but {dependency} has no configurations.'
-                                    .format(dependee=derivation,
-                                            dependency=dep,
-                                            config=config_specifier))
-                  configuration = dep.select_configuration(config_specifier)
-              yield dep, configuration
-
-  @classmethod
-  def native_products_for_subject(self, subject):
-    """Return the products that are concretely present for the given subject."""
-    if isinstance(subject, Target):
-      # Config products.
-      for configuration in subject.configurations:
-        yield configuration
-    else:
-      # Any other type of subject is itself a product.
-      yield subject
-
-  def __init__(self, primary, alternate=None):
-    """
-    :param primary: The primary subject of a production plan.
-    :param alternate: An alternate subject as suggested by some other plan.
-    """
-    self._primary = primary
-    self._alternate = alternate
-
-  @property
-  def primary(self):
-    """Return the primary subject."""
-    return self._primary
-
-  @property
-  def iter_derivations(self):
-    """Iterates over all subjects.
-
-    The primary subject will always be returned as the 1st item from the iterator and if there is
-    an alternate, it will be returned next.
-
-    :rtype: :class:`collection.Iterator`
-    """
-    yield self._primary
-    if self._alternate:
-      yield self._alternate
-
-  def __hash__(self):
-    return hash(self._primary)
-
-  def __eq__(self, other):
-    return isinstance(other, Subject) and self._primary == other._primary
-
-  def __ne__(self, other):
-    return not (self == other)
-
-  def __repr__(self):
-    return 'Subject(primary={!r}, alternate={!r})'.format(self._primary, self._alternate)
-
-
 class SchedulingError(Exception):
   """Indicates inability to make a scheduling promise."""
 
@@ -180,149 +87,158 @@ class ConflictingProducersError(SchedulingError):
     super(ConflictingProducersError, self).__init__(msg)
 
 
-class ProductGraph(object):
+class State(Serializable):
+  @classmethod
+  def raise_unrecognized(cls, state):
+    raise ValueError('Unrecognized Node State: {}'.format(state))
 
-  class State(Serializable):
-    @classmethod
-    def raise_unrecognized(cls, state):
-      raise ValueError('Unrecognized Node State: {}'.format(state))
 
-  class Return(namedtuple('Return', ['value']), State):
-    pass
+class Return(namedtuple('Return', ['value']), State):
+  pass
 
-  class Throw(namedtuple('Throw', ['exception']), State):
-    pass
 
-  class Waiting(namedtuple('Waiting', ['dependencies']), State):
-    """Indicates that a Node is waiting for some/all of the dependencies to become available.
+class Throw(namedtuple('Throw', ['exception']), State):
+  pass
 
-    Some Nodes will return different dependency Nodes based on where they are in their lifecycle.
-    """
-    pass
 
-  class Node(Serializable):
-    @abstractproperty
-    def subject(self):
-      """The subject for this Node."""
+class Waiting(namedtuple('Waiting', ['dependencies']), State):
+  """Indicates that a Node is waiting for some/all of the dependencies to become available.
 
-    @abstractproperty
-    def product(self):
-      """The product for this Node."""
+  Some Nodes will return different dependency Nodes based on where they are in their lifecycle.
+  """
+  pass
 
-    @abstractmethod
-    def step(self, dependency_states):
-      """Given a dict of the dependency States for this Node, returns the current State of the Node.
-      
-      After this method returns a non-Waiting state, it will never be visited again for this Node.
-      """
 
-  class Select(namedtuple('Select', ['subject', 'product']), Node):
-    """A Node that selects a product for a subject.
+class Node(Serializable):
+  @abstractproperty
+  def subject(self):
+    """The subject for this Node."""
 
-    A Select can be satisfied by multiple sources, and so it acts like an OR.
+  @abstractproperty
+  def product(self):
+    """The product for this Node."""
+
+  @abstractmethod
+  def step(self, dependency_states):
+    """Given a dict of the dependency States for this Node, returns the current State of the Node.
+
+    After this method returns a non-Waiting state, it will never be visited again for this Node.
     """
 
-    def _dependencies(self):
-      """Returns a sequence of potential source Nodes for this Select."""
-      # Look for native sources.
-      yield ProductGraph.Node.Native(subject, product)
-      # And for Tasks.
-      for task, anded_clause in self._tasks[product_type]:
-        yield ProductGraph.Node.Task(subject, product, task, anded_clause)
 
-    def step(self, dependency_states):
-      # If there are any Return Nodes, return the first.
-      has_waiting_dep = False
-      for dep in self._dependencies:
-        dep_state = dependency_states.get(dep, None)
+class SelectNode(namedtuple('Select', ['subject', 'product']), Node):
+  """A Node that selects a product for a subject.
+
+  A Select can be satisfied by multiple sources, and so it acts like an OR.
+  """
+
+  def _dependencies(self):
+    """Returns a sequence of potential source Nodes for this Select."""
+    # Look for native sources.
+    yield NativeNode(self.subject, self.product)
+    # And for Tasks.
+    for task, anded_clause in self._tasks[product_type]:
+      yield TaskNode(subject, product, task, anded_clause)
+
+  def step(self, dependency_states):
+    # If there are any Return Nodes, return the first.
+    has_waiting_dep = False
+    for dep in self._dependencies():
+      dep_state = dependency_states.get(dep, None)
+      if dep_state is None or type(dep_state) == State.Waiting:
+        has_waiting_dep = True
+      elif type(dep_state) == State.Return:
+        return dep_state
+    if has_waiting_dep:
+      return State.Waiting(list(self._dependencies()))
+    else:
+      return State.Throw(ValueError('No source of {}, {}'.format(self.subject, self.product)))
+
+
+class SelectDependenciesNode(namedtuple('SelectDependencies', ['subject', 'product', 'dep_product']), Node):
+  """A Node that selects products for the dependencies of a product.
+
+  Begins by selecting the `dep_product` for the subject, and then selects a product for each
+  of dep_products' dependencies.
+  """
+
+  def _dep_product_node(self):
+    return SelectNode(subject, dep_product)
+
+  def step(self, dependency_states):
+    dep_product_state = dependency_states.get(self._dep_product_node(), None)
+    if dep_product_state is None or type(dep_product_state) == State.Waiting:
+      # Wait for the product which hosts the dependency list we need.
+      return State.Waiting([self._dep_product_node()])
+    elif type(dep_product_state) == State.Throw:
+      msg = 'Could not compute {}, {} to determine dependencies.'.format(subject, dep_product)
+      return State.Throw(ValueError(msg))
+    elif type(dep_product_state) == State.Return:
+      # The product and its dependency list are available.
+      dependencies = [SelectNode(d, product) for d in dep_product_state.value.dependencies]
+      for dependency in dependencies:
+        dep_state = dependency_states.get(dependency, None)
         if dep_state is None or type(dep_state) == State.Waiting:
-          has_waiting_dep = True
-        elif type(dep_state) == State.Return:
-          return dep_state
-      if has_waiting_dep:
-        return State.Waiting(list(self._dependencies))
+          # One of the dependencies is not yet available. Indicate that we are waiting for all
+          # of them.
+          return State.Waiting([self._dep_product_node()] + dependencies)
+        elif type(dep_state) == State.Throw:
+          msg = 'Failed to compute dependency {}'.format(dependency)
+          return State.Throw(ValueError(msg))
+        elif type(dep_state) != State.Return:
+          raise State.raise_unrecognized(dep_state)
+      # All dependencies are present! Set our value to a list of the resulting values.
+      return State.Return([dependency_states[d].value for d in dependencies])
+    else:
+      State.raise_unrecognized(dep_state)
+
+
+class TaskNode(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Node):
+  def _dependencies(self):
+    for select in self.clause:
+      if isinstance(select.selector, Select.Subject):
+        yield SelectNode(self.subject, select.product)
+      elif isinstance(select.selector, Select.Dependencies):
+        yield SelectNodeDependencies(self.subject, select.product, select.selector.deps_product)
+      elif isinstance(select.selector, Select.LiteralSubject):
+        yield SelectNode(selector.address, self.product)
       else:
-        return State.Throw(ValueError('No source of {}'.format(self.key)))
+        raise ValueError('Unimplemented `Select` type: {}'.format(select))
 
-  class SelectDependencies(namedtuple('SelectDependencies', ['subject', 'product', 'dep_product']), Node):
-    """A Node that selects products for the dependencies of a product.
-
-    Begins by selecting the `dep_product` for the subject, and then selects a product for each
-    of dep_products' dependencies.
-    """
-
-    def _dep_product_node(self):
-      return Node.Select(subject, dep_product)
-
-    def step(self, dependency_states):
-      dep_product_state = dependency_states.get(self._dep_product_key(), None)
-      if dep_product_state is None or type(dep_product_state) == State.Waiting:
-        # Wait for the product which hosts the dependency list we need.
-        return State.Waiting([self._dep_product_node()])
-      elif type(dep_product_state) == State.Throw:
-        msg = 'Could not compute {}, {} to determine dependencies.'.format(subject, dep_product)
-        return State.Throw(ValueError(msg))
-      elif type(dep_product_state) == State.Return:
-        # The product and its dependency list are available.
-        dependencies = [Node.Select(d, product) for d in dep_product_state.value.dependencies]
-        for dependency in dependencies:
-          dep_state = dependency_states.get(dependency, None)
-          if dep_state is None or type(dep_state) == State.Waiting:
-            # One of the dependencies is not yet available. Indicate that we are waiting for all
-            # of them.
-            return State.Waiting([self._dep_product_node()] + dependencies)
-          elif type(dep_state) == State.Throw:
-            msg = 'Failed to compute dependency of {}'.format(self._dep_product_key())
-            return State.Throw(ValueError(msg))
-          elif type(dep_state) != State.Return:
-            raise State.raise_unrecognized(dep_state)
-        # All dependencies are present! Set our value to a list of the resulting values.
-        return State.Return([dependency_states[d].value for d in dependencies])
+  def step(self, dependency_states):
+    # If all dependency Nodes are Return, execute the Node.
+    dep_values = []
+    dependencies = list(self._dependencies())
+    for dep_key in dependencies:
+      dep_state = dependency_states.get(dep_key, None)
+      if dep_state is None:
+        return State.Waiting(dependencies)
+      elif type(dep_state) == Return:
+        dep_values.append(dep_state.value)
+      elif type(dep_state) == Failure:
+        return State.Failure(ValueError('Dependency {} failed.'.format(dep_key)))
       else:
         State.raise_unrecognized(dep_state)
+    try:
+      return State.Return(func(*dep_values))
+    except Exception as e:
+      return State.Failure(e)
 
-  class Task(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Node):
-    @property
-    def _dependencies(self):
-      for select in self.clause:
-        if isinstance(select.selector, Select.Subject):
-          yield Node.Select(subject, select.product)
-        elif isinstance(select.selector, Select.Dependencies):
-          yield Node.SelectDependencies(subject, select.product, select.selector.deps_product)
-        elif isinstance(select.selector, Select.LiteralSubject):
-          yield Node.Select(selector.address, product)
-        else:
-          raise ValueError('Unimplemented `Select` type: {}'.format(select))
 
-    def step(self, dependency_states):
-      # If all dependency Nodes are Return, execute the Node.
-      dep_values = []
-      for dep_key in self._dependencies:
-        dep_state = dependency_states.get(dep_key, None)
-        if dep_state is None:
-          return State.Waiting(self._dependencies)
-        elif type(dep_state) == Return:
-          dep_values.append(dep_state.value)
-        elif type(dep_state) == Failure:
-          return State.Failure(ValueError('Dependency {} failed.'.format(dep_key)))
-        else:
-          State.raise_unrecognized(dep_state)
-      try:
-        return State.Return(func(*dep_values))
-      except e:
-        return State.Failure(e)
+class NativeNode(namedtuple('Native', ['subject', 'product']), Node):
+  def step(self, dependency_states):
+    if type(subject) == product:
+      return State.Return(subject)
+    elif isinstance(subject, Target):
+      for configuration in subject.configurations:
+        # TODO: returning only the first configuration of a given type. Need to define mergeability
+        # for products.
+        if type(configuration) == product:
+          return State.Return(configuration)
+    return State.Throw(ValueError('No native source of {} for {}'.format(self.product, self.subject)))
 
-  class Native(namedtuple('Native', ['subject', 'product']), Node):
-    def step(self, dependency_states):
-      if type(subject) == product:
-        return State.Return(subject)
-      elif isinstance(subject, Target):
-        for configuration in subject.configurations:
-          # TODO: returning only the first configuration of a given type. Need to define mergeability
-          # for products.
-          if type(configuration) == product:
-            return State.Return(configuration)
-      return State.Throw(ValueError('No native source of {} for {}'.format(self.product, self.subject)))
+
+class ProductGraph(object):
 
   def __init__(self):
     # A dict from Node to its computed value: if a Node hasn't been computed yet, it will not
@@ -340,7 +256,7 @@ class ProductGraph(object):
       raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
     self._node_results[node] = state
 
-  def is_completed(self, node):
+  def is_complete(self, node):
     return node in self._node_results
 
   def state(self, node):
@@ -366,7 +282,7 @@ class ProductGraph(object):
     :param subject: The subject that the product will be produced for.
     :param type product: The product type the returned planners are capable of producing.
     :param consumed_product: An optional configuration to require that a planner consumes, or None.
-    :rtype: sequences of ProductGraph.Node. instances.
+    :rtype: sequences of Node. instances.
     """
 
     def consumes_product(node):
@@ -493,6 +409,7 @@ class Promise(object):
 
 
 class Step(namedtuple('Step', ['node', 'promise', 'dependencies']), Serializable):
+
   @classmethod
   def create(cls, node, product_graph):
     """Creates a Step with the currently available dependencies of the given Node."""
@@ -503,22 +420,22 @@ class Step(namedtuple('Step', ['node', 'promise', 'dependencies']), Serializable
 
   def __call__(self):
     """Called by the Engine in order to execute this work in parallel. Threadsafe."""
-    if self._promise.is_complete():
+    if self.promise.is_complete():
       raise ValueError('Step was attempted multiple times!: {}'.format(self))
-    try:
-      self._promise.success(self.node.step(self._dependencies))
-    except e:
-      self._promise.failure(e)
+    #try:
+    self.promise.success(self.node.step(self.dependencies))
+    #except Exception as e:
+    #  self.promise.failure(e)
 
   def finalize(self, product_graph):
     """Called by the Scheduler to collect the result of this Step. Not threadsafe.
 
     If the step is not completed, returns False.
     """
-    if not self._promise.is_complete():
+    if not self.promise.is_complete():
       return False
 
-    result = self._promise.get()
+    result = self.promise.get()
     if type(result) == State.Waiting:
       product_graph.add_edges(self.node, result.dependencies)
     else:
@@ -567,7 +484,7 @@ class LocalScheduler(object):
       root_products.update(self._planners.products_for_goal(goal))
 
     # Roots are products that might be possible to produce for these subjects.
-    return [Node.Select(s, p) for s in root_subjects for p in root_products]
+    return [SelectNode(s, p) for s in root_subjects for p in root_products]
 
   def product_graph(self):
     return self._product_graph
@@ -582,7 +499,7 @@ class LocalScheduler(object):
     pg = self._product_graph
 
     # A list of Steps that are ready to execute for Nodes.
-    self._roots.extend(self._create_roots(build_request))
+    self._roots.update(self._create_roots(build_request))
     ready = list(Step.create(root, pg)
                  for root in self._roots if not pg.is_complete(root))
 
