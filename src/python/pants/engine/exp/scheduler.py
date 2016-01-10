@@ -336,13 +336,41 @@ class ProductGraph(object):
     self._roots = tuple(roots)
     # A dict from Node to its computed value: if a Node hasn't been computed yet, it will not
     # be present here.
+    # TODO: isolate into a ProductMapper type thing for thread safety.
     self._node_results = dict()
     # A dict from Node to list of dependency Nodes.
-    self._nodes = set(roots)
+    self._dependencies = defaultdict(set)
+    self._dependents = defaultdict(set)
 
   @property
   def roots(self):
     return self._roots
+
+  @property
+  def roots_completed(self):
+    return all(self.is_completed(root) for root in self.roots)
+
+  def complete(self, node, state):
+    existing_state = self._node_results.get(node, None)
+    if existing_state is not None:
+      raise ValueError('Node {} is already completed with {}'.format(node, existing_state))
+    elif type(state) not in [State.Return, State.Throw]:
+      raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
+    self._node_results[node] = state
+
+  def is_completed(self, node):
+    return node in self._node_results
+
+  def state(self, node):
+    return self._node_results.get(node, None)
+
+  def add_edges(self, node, dependencies):
+    self._dependencies[node].extend(dependencies)
+    for dependency in dependencies:
+      self._dependents[dependency].add(node)
+
+  def dependents(self, node):
+    return self._dependents[node]
 
   def sources_for(self, subject, product, consumed_product=None):
     """Yields the set of Sources for the given subject and product (which consume the given config).
@@ -448,14 +476,6 @@ class BuildRequest(object):
   def __repr__(self):
     return ('BuildRequest(goals={!r}, addressable_roots={!r})'
             .format(self._goals, self._addressable_roots))
-
-
-# A synthetic planner that lifts products defined directly on targets into the product
-# namespace.
-class NoPlanner(TaskPlanner):
-  @classmethod
-  def finalize_plans(cls, plans):
-    return plans
 
 
 class ProductMapper(object):
@@ -613,29 +633,32 @@ class LocalScheduler(object):
 
     # Compute a ProductGraph that determines which products are possible to produce for
     # these subjects.
-    product_graph = self._planners.product_graph(self._graph, root_subjects, root_products)
-    #print('>>>\n{}'.format('\n'.join(product_graph.edge_strings())))
-    product_mapper = ProductMapper(self._graph, product_graph)
-
-    # Track the root promises for relevant products for each subject.
-    root_promises = []
-    for subject in root_subjects:
-      relevant_products = root_products & set(product_graph.products_for(subject))
-      for product_type in relevant_products:
-        root_promises.append(product_mapper.promise(subject, product_type))
-    self._root_promises = tuple(root_promises)
+    self._product_graph = self._planners.product_graph(self._graph, root_subjects, root_products)
 
   def schedule(self):
-    """Determines which Promises are ready to execute.
-    
-    Each Promise is returned with an execution Plan containing the dependencies.
-    """
+    """A generator that yields batches of work until all work has been completed."""
+
+    pg = self._product_graph
+    # A list of Nodes that are ready to execute.
+    ready = list(self._product_graph.roots)
+
+    class Work(namedtuple('Work', ['node'])):
+      def __call__(self):
+        result = node.step({dep: pg.state(dep) for dep in dependencies[self.node]})
+        if type(result) == State.Waiting:
+          pg.add_edges(self.node, result.dependencies)
+        else:
+          pg.complete(node, result)
 
 
-    # Give aggregating planners a chance to aggregate plans.
-    product_mapper.aggregate_plans()
+    while not pg.roots_completed:
+      # Yield nodes that are ready.
+      yield [Work(node) for node in ready]
+      # Select uncompleted Nodes which have had their dependencies changed since the previous round.
+      next_ready = []
+      for node in ready:
+        if pg.is_completed(node):
+          # TODO: `is_complete` checks are racey.
+          next_ready.extend(d for d in pg.dependents(node) if not pg.is_complete(d))
+      ready = next_ready
 
-    return ExecutionGraph(root_promises, product_mapper)
-
-  def root_promises(self):
-    return self._root_promises
