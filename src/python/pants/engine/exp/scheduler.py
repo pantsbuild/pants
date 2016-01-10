@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 import inspect
 import itertools
-import threading
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict, namedtuple
 
@@ -24,14 +23,14 @@ from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
-class Select(namedtuple('Select', ['selector', 'product'])):
+class Select(namedtuple('Select', ['selector', 'selected_product'])):
 
   class Subject(object):
     """Selects the Subject provided to the selector."""
     pass
 
-  class Dependencies(namedtuple('Dependencies', ['configuration'])):
-    """Selects the dependencies of a configuration of a Subject."""
+  class Dependencies(namedtuple('Dependencies', ['dep_source_product'])):
+    """Selects the dependencies of a product for the Subject."""
     pass
 
   class LiteralSubject(namedtuple('LiteralSubject', ['address'])):
@@ -132,194 +131,6 @@ class Subject(object):
     return 'Subject(primary={!r}, alternate={!r})'.format(self._primary, self._alternate)
 
 
-class Binding(namedtuple('Binding', ['func', 'args', 'kwargs'])):
-  """A binding for a plan that can be executed."""
-
-  def execute(self):
-    """Execute this binding and return the result."""
-    return self.func(*self.args, **self.kwargs)
-
-
-class TaskCategorization(namedtuple('TaskCategorization', ['func', 'task_type'])):
-  """An Either type for a function or `Task` type."""
-
-  @classmethod
-  def of_func(cls, func):
-    return cls(func=func, task_type=None)
-
-  @classmethod
-  def of_task_type(cls, task_type):
-    return cls(func=None, task_type=task_type)
-
-  @property
-  def value(self):
-    """Return the underlying func or task type.
-
-    :rtype: function|type
-    """
-    return self.func or self.task_type
-
-
-def _categorize(func_or_task_type):
-  if isinstance(func_or_task_type, TaskCategorization):
-    return func_or_task_type
-  elif inspect.isclass(func_or_task_type):
-    if not issubclass(func_or_task_type, Task):
-      raise ValueError('A task must be a function or else a subclass of Task, given type {}'
-                       .format(func_or_task_type.__name__))
-    return TaskCategorization.of_task_type(func_or_task_type)
-  else:
-    return TaskCategorization.of_func(func_or_task_type)
-
-
-def _execute_binding(categorization, **kwargs):
-  # A picklable top-level function to help support local multiprocessing uses.
-  # TODO(John Sirois): Plumb (context, workdir) or equivalents to the task_type constructor if
-  # maintaining Task as a bridge to convert old style tasks makes sense.  Otherwise, simplify
-  # things and only accept a func.
-  function = categorization.func if categorization.func else categorization.task_type().execute
-  return function(**kwargs)
-
-
-class Plan(Serializable):
-  """Represents a production plan that will yield a given product type for one or more subjects.
-
-  A plan can be serialized and executed wherever its task type and and source inputs it needs are
-  available.
-  """
-  # TODO(John Sirois): Sources are currently serialized as paths relative to the build root, but
-  # they could also be serialized a a path + blob.  Talks about distributed backend solutions will
-  # shake out if we need this in the near term.  Even if we only need paths for remote execution,
-  # it probably makes sense to ship a path + hash pair so a remote build can fail fast if its source
-  # inputs don't match local expectations.
-  # NB: We don't ship around toolchains, just requirements of them as specified in plan inputs, like
-  # the apache thrift compiler version.  There may need to be a protocol as a result that
-  # pre-screens remote nodes for the capability to execute a given plan in-general (some nodes may
-  # have a required toolchain but some may not and pants may have no intrinsic to fetch the
-  # toolchain).  For example, pants can intrinsically fetch the Go toolchain in a Task today but it
-  # cannot do the same for the jdk and instead only asserts its presence.
-
-  def __init__(self, func_or_task_type, subjects, **inputs):
-    """
-    :param type func_or_task_type: The function that will execute this plan or else a :class:`Task`
-                                   subclass.
-    :param subjects: The subjects the plan will generate products for.
-    :type subjects: :class:`collections.Iterable` of :class:`Subject` or else objects that will
-                    be converted to the primary of a `Subject`.
-    """
-    self._func_or_task_type = _categorize(func_or_task_type)
-    self._subjects = frozenset(Subject.as_subject(subject) for subject in subjects)
-    self._inputs = inputs
-
-  @property
-  def func_or_task_type(self):
-    """Return the function or `Task` type that will execute this plan.
-
-    :rtype: :class:`TaskCategorization`
-    """
-    return self._func_or_task_type
-
-  @property
-  def subjects(self):
-    """Return the subjects of this plan.
-
-    When the plan is executed, its results will be associated with each one of these subjects.
-
-    :rtype: frozenset of :class:`Subject`
-    """
-    return self._subjects
-
-  def __getattr__(self, item):
-    if item in self._inputs:
-      return self._inputs[item]
-    raise AttributeError('{} does not have attribute {!r}'.format(self, item))
-
-  @staticmethod
-  def _is_mapping(value):
-    return isinstance(value, collections.Mapping)
-
-  @staticmethod
-  def _is_iterable(value):
-    return isinstance(value, collections.Iterable) and not isinstance(value, six.string_types)
-
-  @memoized_property
-  def promises(self):
-    """Return an iterator over the unique promises in this plan's inputs.
-
-    A plan's promises indicate its dependency edges on other plans.
-
-    :rtype: :class:`collections.Iterator` of :class:`Promise`
-    """
-    def iter_promises(item):
-      if isinstance(item, Promise):
-        yield item
-      elif self._is_mapping(item):
-        for _, v in item.items():
-          for p in iter_promises(v):
-            yield p
-      elif self._is_iterable(item):
-        for i in item:
-          for p in iter_promises(i):
-            yield p
-
-    promises = set()
-    for _, value in self._inputs.items():
-      promises.update(iter_promises(value))
-    return promises
-
-  def bind(self, products_by_promise):
-    """Bind this plans inputs to functions arguments.
-
-    :param products_by_promise: A mapping containing this plan's satisfied promises.
-    :type products_by_promise: dict of (:class:`Promise`, product)
-    :returns: A binding for this plan to the given satisfied promises.
-    :rtype: :class:`Binding`
-    """
-    def bind_products(item):
-      if isinstance(item, Promise):
-        return products_by_promise[item]
-      elif self._is_mapping(item):
-        return {k: bind_products(v) for k, v in item.items()}
-      elif self._is_iterable(item):
-        return [bind_products(i) for i in item]
-      else:
-        return item
-
-    inputs = {}
-    for key, value in self._inputs.items():
-      inputs[key] = bind_products(value)
-
-    return Binding(_execute_binding, args=(self._func_or_task_type,), kwargs=inputs)
-
-  def _asdict(self):
-    d = self._inputs.copy()
-    d.update(func_or_task_type=self._func_or_task_type, subjects=tuple(self._subjects))
-    return d
-
-  def _key(self):
-    def hashable(value):
-      if self._is_mapping(value):
-        return tuple(sorted((k, hashable(v)) for k, v in value.items()))
-      elif self._is_iterable(value):
-        return tuple(hashable(v) for v in value)
-      else:
-        return value
-    return self._func_or_task_type, self._subjects, hashable(self._inputs)
-
-  def __hash__(self):
-    return hash(self._key())
-
-  def __eq__(self, other):
-    return isinstance(other, Plan) and self._key() == other._key()
-
-  def __ne__(self, other):
-    return not (self == other)
-
-  def __repr__(self):
-    return ('Plan(func_or_task_type={!r}, subjects={!r}, inputs={!r})'
-            .format(self._func_or_task_type, self._subjects, self._inputs))
-
-
 class SchedulingError(Exception):
   """Indicates inability to make a scheduling promise."""
 
@@ -368,72 +179,156 @@ class ConflictingProducersError(SchedulingError):
     super(ConflictingProducersError, self).__init__(msg)
 
 
-class Task(object):
-  """An executable task.
-
-  Tasks form the atoms of work done by pants and when executed generally produce artifacts as a
-  side effect whether these be files on disk (for example compilation outputs) or characters output
-  to the terminal (for example dependency graph metadata).  These outputs are always represented
-  by a product type - sometimes `None`.  The product type instances the task returns can often be
-  used to access the contents side-effect outputs.
-  """
-
-  def execute(self, **inputs):
-    """Executes this task."""
-
-
 class ProductGraph(object):
   """A DAG of product dependencies, with (Subject, Product, `source`) tuples as nodes."""
 
-  class SourceTask(namedtuple('SourceTask', ['task', 'clause'])):
-    pass
+  class State(Serializable):
+    @classmethod
+    def raise_unrecognized(cls, state):
+      raise ValueError('Unrecognized Node State: {}'.format(state))
 
-  class SourceNative(namedtuple('SourceNative', ['value'])):
-    pass
+    class Return(namedtuple('Return', ['value']), State):
+      pass
 
-  class SourceNone(object):
-    pass
+    class Throw(namedtuple('Throw', ['exception']), State):
+      pass
 
-  class SourceOR(object):
-    pass
+    class Waiting(namedtuple('Waiting', ['dependencies']), State):
+      """Indicates that a Node is waiting for some/all of the dependencies to become available.
 
-  class Node(namedtuple('Node', ['subject', 'product', 'source'])):
+      Dependencies are represented as (subject, product) pairs, because a Node should not concern
+      itself with how those pairs will be computed. Some Nodes will return different dependencies
+      based on where they are in their lifecycle.
+      """
+      pass
+
+  class Node(Serializable):
+    @abstractproperty
+    def subject(self):
+      """The subject for this Node."""
+
+    @abstractproperty
+    def product(self):
+      """The product for this Node."""
+
     @property
     def key(self):
-      return (self.subject, self.product)
+      """A uniquely identifying key for this Node.
+      
+      Subclasses may override to include additional info.
+      """
+      return (self.subject, self.product, type(self))
 
-  class StateComplete(object):
-    pass
+    @abstractmethod
+    def step(self, dependency_states):
+      """Given a dict of the dependency States for this Node, returns the current State of the Node.
+      
+      After this method returns a non-Waiting state, it will never be visited again for this Node.
+      """
 
-  class StateIncomplete(object):
-    pass
+    class SelectDependencies(namedtuple('SelectDependencies', ['subject', 'product', 'dep_product']), Node):
+      """A Node that selects products for dependencies of a product.
+      
+      Begins by selecting the `dep_product` for the subject, and then selects the dependencies of
+      `dep_product` for each of them.
+      """
+      @property
+      def key(self):
+        return super(self, SelectDependencies).key + (self.dep_product,)
 
-  class StateUnsatisfiable(object):
-    pass
+      def _dep_product_key(self):
+        return (subject, dep_product)
+
+      def step(self, dependency_states):
+        dep_product_state = dependency_states.get(self._dep_product_key(), None)
+        if dep_product_state is None or type(dep_product_state) == State.Waiting:
+          # Wait for the product which hosts the dependency list we need.
+          return State.Waiting([(subject, dep_product)])
+        elif type(dep_product_state) == State.Throw:
+          msg = 'Could not compute {}, {} to determine dependencies.'.format(subject, dep_product)
+          return State.Throw(ValueError(msg))
+        elif type(dep_product_state) == State.Return:
+          # The product and its dependency list are available.
+          dependencies = dep_product_state.value.dependencies
+          for dependency in dependencies:
+            dep_state = dependency_states.get(dependency, None)
+            if dep_state is None or type(dep_state) == State.Waiting:
+              # One of the dependencies is not yet available. Indicate that we are waiting for all
+              # of them.
+              return State.Waiting([self._dep_product_key()] + dependencies)
+            elif type(dep_state) == State.Throw:
+              msg = 'Failed to compute dependency of {}'.format(self._dep_product_key())
+              return State.Throw(ValueError(msg))
+            elif type(dep_state) != State.Return:
+              raise State.raise_unrecognized(dep_state)
+          # All dependencies are present! Set our value to a list of the resulting values.
+          return State.Return([dependency_states[d].value for d in dependencies])
+        else:
+          State.raise_unrecognized(dep_state)
+
+    class Task(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Node):
+      @property
+      def key(self):
+        # NB: it's possible for the same function to have been registered with multiple clauses, so
+        # both are included in the key.
+        return super(self, Task).key + (func, clause)
+
+      def step(self, dependency_states):
+        # If all dependency Nodes are Return, execute the Node.
+        dep_values = []
+        for dep_key in self.dependencies:
+          dep_state = dependency_states.get(dep_key, None)
+          if dep_state is None:
+            return State.Waiting(self.dependencies)
+          elif type(dep_state) == Return:
+            dep_values.append(dep_state.value)
+          elif type(dep_state) == Failure:
+            return State.Failure(ValueError('Dependency {} failed.'.format(dep_key)))
+          else:
+            State.raise_unrecognized(dep_state)
+        try:
+          return State.Return(func(*dep_values))
+        except e:
+          return State.Failure(e)
+
+    class Literal(namedtuple('Native', ['subject', 'product', 'state']), Node):
+      dependencies = tuple()
+
+      def step(self, dependency_states):
+        return self.state
+
+    class OR(namedtuple('OR', ['subject', 'product', 'dependencies']), Node):
+      def step(self, dependency_states):
+        # If there are any Return Nodes, return the first.
+        has_waiting_dep = False
+        for dep_key in self.dependencies:
+          dep_state = dependency_states.get(dep_key, None)
+          if type(dep_state) == State.Return:
+            return dep_state
+          elif type(dep_state == State.Waiting):
+            has_waiting_dep = True
+        if has_waiting_dep:
+          return State.Waiting(dependencies)
+        else:
+          return State.Throw(ValueError('No source of {}'.format(self.key)))
 
   def __init__(self):
-    # Maps nodes to Promises for their values.
-    self._nodes = dict()
-    self._adjacencies = defaultdict(OrderedSet)
+    # A dict from Node to its computed value: if a Node hasn't been computed yet, it will not
+    # be present here.
+    self._node_values = dict()
+    # A dict from Node to list of dependency Nodes.
+    self._adjacencies = dict()
 
-  def _validate_present(self, node):
-    if node not in self._nodes:
-      raise ValueError('{} is not registered as a Node in {}'.format(node, self))
-
-  def add_node(self, node, promise):
+  def add_node(self, node, dependency_nodes):
     if not isinstance(node, self.Node):
       raise ValueError('{} is not a {}'.format(node, self.Node))
     if node in self._nodes:
       raise ValueError('{} is already registered as {}'.format(node, self._nodes[]))
-    self._nodes[node] = promise
+    self._nodes[node] = tuple(Edge(Promise(), plan) for plan in dependency_plans)
 
-  def add_edge(self, src, dst):
-    self._validate_present(src)
-    self._validate_present(dst)
-    self._adjacencies[src].add(dst)
-
-  def exists_node(self, node):
-    return node in self._nodes
+  def get(self, node):
+    """The Edges for the given Node, or None."""
+    return self._nodes.get(node, None)
 
   def _node_state(self, node):
     """Returns the state of the given Node.
@@ -442,16 +337,16 @@ class ProductGraph(object):
     `None` nodes are always Unsatisfiable.
     `OR` nodes are satisfied if any child is satisfied.
     `Task` nodes are satisfied if all children are satisfied."""
-    if isinstance(node.source, ProductGraph.SourceNone):
+    if isinstance(node.source, ProductGraph.Node.Empty):
       return StateUnsatisfiable
-    elif isinstance(node.source, ProductGraph.SourceNative):
+    elif isinstance(node.source, ProductGraph.Node.Native):
       return True
     # The remaining Source types depend on the makeup of their dependencies.
     satisfied_deps = (self._is_satisfiable(dep_node) for dep_node in self._adjacencies[node])
-    if isinstance(node.source, ProductGraph.SourceOR):
+    if isinstance(node.source, ProductGraph.Node.OR):
       # Any deps satisfied?
       return any(satisfied_deps)
-    elif isinstance(node.source, ProductGraph.SourceTask):
+    elif isinstance(node.source, ProductGraph.Node.Task):
       # All deps satisfied?
       return all(satisfied_deps)
     else:
@@ -463,7 +358,7 @@ class ProductGraph(object):
     :param subject: The subject that the product will be produced for.
     :param type product: The product type the returned planners are capable of producing.
     :param consumed_product: An optional configuration to require that a planner consumes, or None.
-    :rtype: sequences of ProductGraph.Source instances.
+    :rtype: sequences of ProductGraph.Node. instances.
     """
 
     def consumes_product(node):
@@ -485,7 +380,7 @@ class ProductGraph(object):
     # TODO: order N: index by subject
     for node in self._nodes:
       # Yield Sources that were recursively able to consume the configuration.
-      if isinstance(node.source, ProductGraph.SourceOR):
+      if isinstance(node.source, ProductGraph.Node.OR):
         continue
       if node.key == key and self._is_satisfiable(node) and consumes_product(node):
         yield node.source
@@ -540,13 +435,26 @@ class Planners(object):
         parent = None
         # If there are multiple sources of this dependency, introduce a SourceOR node.
         if len(dep_sources) > 1:
-          parent = ProductGraph.Node(subject, product, ProductGraph.SourceOR())
+          parent = ProductGraph.Node(subject, product, ProductGraph.Node.OR())
         for dep_source in dep_sources:
           dep_node = ProductGraph.Node(subject, product, dep_source)
           self._populate_node(product_graph, build_graph, dep_node)
           if parent:
             product_graph.add_edge(parent, dep_node)
     return product_graph
+
+  def _node_sources(self, subject, product_type):
+    """Returns a sequence of sources of the given Subject/Product."""
+    # Look for native sources.
+    sources = []
+    for product in Subject.native_products_for_subject(subject):
+      if type(product) == product_type:
+        sources.append(ProductGraph.Node.Native(product))
+    # And for Tasks.
+    for task, anded_clause in self._tasks[product_type]:
+      sources.append(ProductGraph.Node.Task(task, anded_clause))
+    # If no Sources were found, return Node.Empty to indicate the hole.
+    return sources or [ProductGraph.Node.Empty()]
 
   def _select_subjects(self, build_graph, selector, subject):
     """Yields all subjects selected by the given Select for the given subject."""
@@ -560,37 +468,29 @@ class Planners(object):
     else:
       raise ValueError('Unimplemented `Select` type: {}'.format(select))
 
-  def _node_sources(self, subject, product_type):
-    """Returns a sequence of sources of the given Subject/Product."""
-    # Look for native sources.
-    sources = []
-    for product in Subject.native_products_for_subject(subject):
-      if type(product) == product_type:
-        sources.append(ProductGraph.SourceNative(product))
-    # And for Tasks.
-    for task, anded_clause in self._tasks[product_type]:
-      sources.append(ProductGraph.SourceTask(task, anded_clause))
-    # If no Sources were found, return SourceNone to indicate the hole.
-    return sources or [ProductGraph.SourceNone()]
-
   def _expand_node(self, product_graph, build_graph, node):
-    """Expands the ProductGraph to include the given Node and its children.
+    """Expands the ProductGraph to create the given Node and its children.
     
-    If the Node is already Complete, then this is a noop. If it does not exist or is Incomplete,
+    If the Node has already been created, then this is a noop. If it does not exist,
     this may result in recursion to expand child nodes.
     """
-    if product_graph.exists_node(node):
+    deps = product_graph.get(node)
+    if deps is not None:
       return
-    promise = Promise()
-    product_graph.add_node(node, promise)
 
-    if isinstance(node.source, ProductGraph.SourceNone):
+    if isinstance(node.source, ProductGraph.Node.Empty):
       # Will never be satisfied.
-      pass
-    elif isinstance(node.source, ProductGraph.SourceNative):
+      product_graph.add_node(node, promise)
+    elif isinstance(node.source, ProductGraph.Node.Native):
       # No dependencies; satisfied immediately.
-      promise.success(node.source.value)
-    elif isinstance(node.source, ProductGraph.SourceTask):
+      if not promise.completed():
+        promise.success(node.source.value)
+    elif isinstance(node.source, ProductGraph.Node.Select):
+      # If the Select has completed, apply it to produce its child nodes.
+      if promise.completed():
+        input_product = promise.get()
+
+    elif isinstance(node.source, ProductGraph.Node.Task):
       # Recurse on the dependencies of the anded Select clause.
       for dep_select in node.source.clause:
         for dep_subject in self._select_subjects(build_graph, dep_select.selector, node.subject):
@@ -598,7 +498,7 @@ class Planners(object):
           parent = node
           # If there are multiple sources of this dependency, introduce a SourceOR node.
           if len(dep_sources) > 1:
-            parent = ProductGraph.Node(dep_subject, dep_select.product, ProductGraph.SourceOR())
+            parent = ProductGraph.Node(dep_subject, dep_select.product, ProductGraph.Node.OR())
             product_graph.add_edge(node, parent)
           # Recurse to populate each dependency Node.
           for dep_source in dep_sources:
@@ -693,34 +593,6 @@ class ExecutionGraph(object):
       yield promise, plan
 
 
-class Promise(object):
-  """A simple Promise/Future class to hand off a value between threads.
-  
-  TODO: switch to python's Future when it becomes available.
-  """
-
-  def __init__(self):
-    self._success = None
-    self._failure = None
-    self._event = threading.Event()
-
-  def success(self, success):
-    self._success = success
-    self._event.set()
-
-  def failure(self, exception):
-    self._failure = exception
-    self._event.set()
-
-  def get(self):
-    """Blocks until the resulting value is available, or raises the resulting exception."""
-    self._event.wait()
-    if self._failure:
-      raise self._failure
-    else:
-      return self._success
-
-
 # A synthetic planner that lifts products defined directly on targets into the product
 # namespace.
 class NoPlanner(TaskPlanner):
@@ -810,12 +682,12 @@ class ProductMapper(object):
     for source in self._product_graph.sources_for(subject,
                                                   product_type,
                                                   consumed_product=configuration):
-      if isinstance(source, ProductGraph.SourceNative):
+      if isinstance(source, ProductGraph.Node.Native):
         plans.append((NoPlanner(), Plan(func_or_task_type=lift_native_product,
                                         subjects=(subject,),
                                         subject=subject,
                                         product_type=product_type)))
-      elif isinstance(source, ProductGraph.SourceTask):
+      elif isinstance(source, ProductGraph.Node.Task):
         plan = source.planner.plan(self, product_type, subject, configuration=configuration)
         # TODO: remove None check... there should no longer be any planners failing.
         if plan:

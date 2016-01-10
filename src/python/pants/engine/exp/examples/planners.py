@@ -17,19 +17,9 @@ from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
-from pants.engine.exp.scheduler import LocalScheduler, Planners, Select, Subject, Task
+from pants.engine.exp.scheduler import LocalScheduler, Planners, Select, Subject
 from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized, memoized_property
-
-
-class PrintingTask(Task):
-  @classmethod
-  def fake_product(cls):
-    return '<<<Fake{}Product>>>'.format(cls.__name__)
-
-  def execute(self, **inputs):
-    print('{} being executed with inputs: {}'.format(type(self).__name__, inputs))
-    return self.fake_product()
 
 
 def printing_func(func):
@@ -90,9 +80,9 @@ class Jar(Struct):
     super(Jar, self).__init__(org=org, name=name, rev=rev, **kwargs)
 
 
-class IvyResolve(PrintingTask):
-  def execute(self, jars):
-    return super(IvyResolve, self).execute(jars=jars)
+@printing_func
+def ivy_resolve(jars):
+  pass
 
 
 @printing_func
@@ -165,14 +155,14 @@ def gen_scrooge_thrift(sources, scrooge_classpath, lang, strict):
   pass
 
 
-class Javac(PrintingTask):
-  def execute(self, sources, classpath):
-    return super(Javac, self).execute(sources=sources, classpath=classpath)
+@printing_func
+def javac(sources, classpath):
+  pass
 
 
-class Scalac(PrintingTask):
-  def execute(self, sources, classpath):
-    return super(Scalac, self).execute(sources=sources, classpath=classpath)
+@printing_func
+def scalac(sources, classpath):
+  pass
 
 
 # TODO(John Sirois): When https://github.com/pantsbuild/pants/issues/2413 is resolved, move the
@@ -258,11 +248,11 @@ def setup_json_scheduler(build_root):
         (Classpath,
          [Select(Select.Subject(), JavaSources),
           Select(Select.Dependencies(JavaSources), Classpath)],
-         Javac),
+         javac),
         (Classpath,
          [Select(Select.Subject(), ScalaSources),
           Select(Select.Dependencies(JavaSources), Classpath)],
-         Scalac),
+         scalac),
         (UnpickleableInput,
           [],
           unpickleable_func),
