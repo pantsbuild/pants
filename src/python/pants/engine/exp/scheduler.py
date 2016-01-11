@@ -237,7 +237,7 @@ class TaskNode(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Nod
     dependencies = list(self._dependencies(node_builder))
     for dep_key in dependencies:
       dep_state = dependency_states.get(dep_key, None)
-      if dep_state is None:
+      if dep_state is None or type(dep_state) == Waiting:
         return Waiting(dependencies)
       elif type(dep_state) == Return:
         dep_values.append(dep_state.value)
@@ -245,10 +245,11 @@ class TaskNode(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Nod
         return Throw(ValueError('Dependency {} failed.'.format(dep_key)))
       else:
         State.raise_unrecognized(dep_state)
-    try:
-      return Return(func(*dep_values))
-    except Exception as e:
-      return Throw(e)
+    #try:
+    return Return(self.func(*dep_values))
+    #except Exception as e:
+    #  print('failed to execute {}'.format(self))
+    #  return Throw(e)
 
 
 class NativeNode(namedtuple('Native', ['subject', 'product']), Node):
@@ -289,12 +290,9 @@ class ProductGraph(object):
     return self._node_results.get(node, None)
 
   def add_edges(self, node, dependencies):
-    if not node:
-      raise ValueError('Hmmmsdjgsj!')
     self._dependencies[node].update(dependencies)
     for dependency in dependencies:
-      if not dependency:
-        raise ValueError('Hmkhjgcmmsdjgsj!')
+      #self._dependencies[dependency].update([])
       self._dependents[dependency].add(node)
 
   def dependencies(self):
@@ -525,6 +523,7 @@ class LocalScheduler(object):
     # Roots are products that might be possible to produce for these subjects.
     return [SelectNode(s, p) for s in root_subjects for p in root_products]
 
+  @property
   def product_graph(self):
     return self._product_graph
 

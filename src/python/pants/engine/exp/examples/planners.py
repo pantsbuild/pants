@@ -25,9 +25,9 @@ from pants.util.memo import memoized, memoized_property
 
 def printing_func(func):
   @functools.wraps(func)
-  def wrapper(**inputs):
+  def wrapper(*inputs):
     print('{} being executed with inputs: {}'.format(func.__name__, inputs))
-    product = func(**inputs)
+    product = func(*inputs)
     return product if product else '<<<Fake{}Product>>>'.format(func.__name__)
   return wrapper
 

@@ -14,13 +14,13 @@ from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, Promise
+from pants.engine.exp.scheduler import BuildRequest, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
 def create_digraph(execution_graph):
   def format_node(node):
-    return '{}:{}:{}'.format(node.subject, node.product, type(node))
+    return '{}:{}:{}'.format(type(node).__name__, node.product.__name__, node.subject)
 
   colorscheme = 'set312'
   colors = {}
@@ -34,16 +34,19 @@ def create_digraph(execution_graph):
   yield '  rankdir=LR;'
 
   for node, dependency_nodes in execution_graph.dependencies().items():
+    if type(execution_graph.state(node)) == Throw:
+      continue
     node_str = format_node(node)
-    label = format_label(promise, plan)
-    color = color_index(type(node))
+    color = color_index(node.product)
 
     yield ('  node [style=filled, fillcolor={color}] "{node}";'
             .format(color=color,
                     node=format_node(node)))
 
     for dep in dependency_nodes:
-      yield '  "{}" -> "{}"'.format(node_str, formate_node(dep))
+      if type(execution_graph.state(dep)) == Throw:
+        continue
+      yield '  "{}" -> "{}"'.format(node_str, format_node(dep))
 
   yield '}'
 
