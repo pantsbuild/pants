@@ -76,9 +76,12 @@ class BundleCreate(JvmBinaryTask):
   def execute(self):
     def get_bundle_apps():
       if self.get_options().use_basename_prefix:
-        # Using target_roots instead of all transitive targets to reduce possible basename
-        # conflicts.  An example is jvm_app A depends on jvm_binary B, both have the same
-        # basename, whoever runs the second will destroy the previous one.
+        # NB(peiyu) This special casing is confusing especially given we fail when duplicate
+        # basenames are detected. It's added because a `jvm_app` that depends and another
+        # `jvm_binary` that has the same basename turns out to be fairly common. In this case,
+        # whoever in `self.context.targets()` that runs the second will destroy previously
+        # created bundle directory. Using `target_roots` instead of all transitive targets
+        # won't eliminate but would reduce such basename conflicts.
         return [self.App(target, use_basename_prefix=True) for target in self.context.target_roots]
       return [self.App(target) for target in self.context.targets(predicate=self.App.is_app)]
 
