@@ -31,5 +31,5 @@ python_library(
 
 resources(
   name = 'resources',
-  sources = globs('templates/**/*.mustache'),
+  sources = globs('templates/*/*.mustache'),
 )
