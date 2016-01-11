@@ -260,7 +260,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     invalidate_dependents,
                                     fingerprint_strategy=fingerprint_strategy,
                                     invalidation_report=self.context.invalidation_report,
-                                    task_name=type(self).__name__)
+                                    task_name=type(self).__name__,
+                                    task_version=self.version)
 
   @property
   def cache_target_dirs(self):
@@ -430,7 +431,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         vt.create_results_dir(
           self.workdir,
           allow_incremental=self.incremental,
-          version=self.version
         )
 
   def check_artifact_cache_for(self, invalidation_check):
