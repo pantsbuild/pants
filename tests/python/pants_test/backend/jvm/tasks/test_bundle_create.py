@@ -105,6 +105,19 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     with self.assertRaises(BundleCreate.MissingJarError):
       self.execute(self.task_context)
 
+  def test_conflicting_basename(self):
+    """Test exception is thrown when two targets share the same basename."""
+
+    conflict_app_target = self.make_target(spec='//foo:foo-app-conflict',
+                                           target_type=JvmApp,
+                                           basename='FooApp',
+                                           dependencies=[self.binary_target])
+    self.set_options(use_basename_prefix=True)
+    self.task_context = self.context(target_roots=[self.app_target, conflict_app_target])
+    self._setup_classpath(self.task_context)
+    with self.assertRaises(BundleCreate.BasenameConflictError):
+      self.execute(self.task_context)
+
   def _check_bundle_products(self, bundle_basename):
     products = self.task_context.products.get('jvm_bundles')
     self.assertIsNotNone(products)

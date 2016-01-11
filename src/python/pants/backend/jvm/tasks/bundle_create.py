@@ -53,14 +53,6 @@ class BundleCreate(JvmBinaryTask):
   def product_types(cls):
     return ['jvm_bundles']
 
-  def __init__(self, *args, **kwargs):
-    super(BundleCreate, self).__init__(*args, **kwargs)
-    self._outdir = self.get_options().pants_distdir
-    self._prefix = self.get_options().archive_prefix
-    self._archiver_type = self.get_options().archive
-    self._create_deployjar = self.get_options().deployjar
-    self._use_basename_prefix = self.get_options().use_basename_prefix
-
   class App(object):
     """A uniform interface to an app."""
 
@@ -83,18 +75,19 @@ class BundleCreate(JvmBinaryTask):
 
   def execute(self):
     def get_bundle_apps():
-      if self._use_basename_prefix:
+      if self.get_options().use_basename_prefix:
         # Using target_roots instead of all transitive targets to reduce possible basename
         # conflicts.  An example is jvm_app A depends on jvm_binary B, both have the same
         # basename, whoever runs the second will destroy the previous one.
         return [self.App(target, use_basename_prefix=True) for target in self.context.target_roots]
       return [self.App(target) for target in self.context.targets(predicate=self.App.is_app)]
 
-    archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
+    archiver_type = self.get_options().archive
+    archiver = archive.archiver(archiver_type) if archiver_type else None
 
     apps = get_bundle_apps()
 
-    if self._use_basename_prefix:
+    if self.get_options().use_basename_prefix:
       self.check_basename_conflicts(apps)
 
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
@@ -115,14 +108,17 @@ class BundleCreate(JvmBinaryTask):
       if archiver:
         archivepath = archiver.create(
           basedir,
-          self._outdir,
+          self.get_options().pants_distdir,
           app.basename,
-          prefix=app.basename if self._prefix else None
+          prefix=app.basename if self.get_options().archive_prefix else None
         )
         self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
   class MissingJarError(TaskError):
     """Indicates an unexpected problem finding a jar that a bundle depends on."""
+
+  class BasenameConflictError(TaskError):
+    """Indicates the same basename is used by two targets."""
 
   def bundle(self, app):
     """Create a self-contained application bundle.
@@ -144,7 +140,7 @@ class BundleCreate(JvmBinaryTask):
         self.context.log.error('Unable to create symlink: {0} -> {1}'.format(src, dst))
         raise e
 
-    bundle_dir = os.path.join(self._outdir, '{}-bundle'.format(app.basename))
+    bundle_dir = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(app.basename))
     self.context.log.info('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
     safe_mkdir(bundle_dir, clean=True)
@@ -154,7 +150,7 @@ class BundleCreate(JvmBinaryTask):
     # If creating a deployjar, we add the external dependencies to the bundle as
     # loose classes, and have no classpath. Otherwise we add the external dependencies
     # to the bundle as jars in a libs directory.
-    if not self._create_deployjar:
+    if not self.get_options().deployjar:
       lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
       os.mkdir(lib_dir)
 
@@ -168,7 +164,7 @@ class BundleCreate(JvmBinaryTask):
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
     canonical_classpath_base_dir = None
-    if not self._create_deployjar:
+    if not self.get_options().deployjar:
       canonical_classpath_base_dir = os.path.join(bundle_dir, self.INTERNAL_LIBS_DIR)
     with self.monolithic_jar(app.binary, bundle_jar,
                              canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
@@ -233,8 +229,9 @@ class BundleCreate(JvmBinaryTask):
     basename_seen = {}
     for app in apps:
       if app.basename in basename_seen:
-        raise TaskError('Basename must be unique, found two targets use the same basename:'
-                        "'{}'\n\t{} and \n\t{}"
-                        .format(app.basename, basename_seen[app.basename].address.spec,
-                                app.target.address.spec))
+        raise self.BasenameConflictError('Basename must be unique, found two targets use '
+                                         "the same basename: {}'\n\t{} and \n\t{}"
+                                         .format(app.basename,
+                                                 basename_seen[app.basename].address.spec,
+                                                 app.target.address.spec))
       basename_seen[app.basename] = app.target
