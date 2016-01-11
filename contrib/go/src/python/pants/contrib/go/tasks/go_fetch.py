@@ -121,9 +121,10 @@ class GoFetch(GoTask):
             os.symlink(os.path.join(root_dir, path), os.path.join(dest_dir, path))
 
         # Map the fetched remote sources.
-        go_remote_lib_src[go_remote_lib] = os.path.join(gopath, 'src', go_remote_lib.import_path)
+        pkg = go_remote_lib.import_path
+        go_remote_lib_src[go_remote_lib] = os.path.join(gopath, 'src', pkg)
 
-        for remote_import_path in self._get_remote_import_paths(go_remote_lib, gopath=gopath):
+        for remote_import_path in self._get_remote_import_paths(pkg, gopath=gopath):
           fetcher = self._get_fetcher(remote_import_path)
           remote_root = fetcher.root(remote_import_path)
           spec_path = os.path.join(go_remote_lib.target_base, remote_root)
@@ -193,12 +194,12 @@ class GoFetch(GoTask):
   def _is_relative(import_path):
     return import_path.startswith('.')
 
-  def _get_remote_import_paths(self, go_remote_lib, gopath=None):
-    """Returns the remote import paths declared by the given Go remote library.
+  def _get_remote_import_paths(self, pkg, gopath=None):
+    """Returns the remote import paths declared by the given remote Go `pkg`.
 
     NB: This only includes production code imports, no test code imports.
     """
-    import_listing = self.import_oracle.list_imports(go_remote_lib.import_path, gopath=gopath)
+    import_listing = self.import_oracle.list_imports(pkg, gopath=gopath)
     return [imp for imp in import_listing.imports
             if (not self.import_oracle.is_go_internal_import(imp) and
                 # We assume relative imports are local to the package and skip attempts to
