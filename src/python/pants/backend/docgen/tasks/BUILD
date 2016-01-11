@@ -6,7 +6,7 @@ python_library(
   name = 'tasks',
   sources = globs('*.py'),
   resource_targets = [
-    ':markdown_to_html_resources',
+    ':resources',
   ],
   dependencies = [
     '3rdparty/python:Markdown',
@@ -30,6 +30,6 @@ python_library(
 )
 
 resources(
-  name = 'markdown_to_html_resources',
-  sources = globs('templates/markdown/*.mustache'),
+  name = 'resources',
+  sources = globs('templates/*/*.mustache'),
 )
