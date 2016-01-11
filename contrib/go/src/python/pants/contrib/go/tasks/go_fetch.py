@@ -195,9 +195,12 @@ class GoFetch(GoTask):
     return import_path.startswith('.')
 
   def _get_remote_import_paths(self, pkg, gopath=None):
-    """Returns the remote import paths declared by the given Go `pkg`."""
+    """Returns the remote import paths declared by the given remote Go `pkg`.
+
+    NB: This only includes production code imports, no test code imports.
+    """
     import_listing = self.import_oracle.list_imports(pkg, gopath=gopath)
-    return [imp for imp in import_listing.all_imports
+    return [imp for imp in import_listing.imports
             if (not self.import_oracle.is_go_internal_import(imp) and
                 # We assume relative imports are local to the package and skip attempts to
                 # recursively resolve them.
