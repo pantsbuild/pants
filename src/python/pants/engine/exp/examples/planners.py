@@ -26,9 +26,10 @@ from pants.util.memo import memoized, memoized_property
 def printing_func(func):
   @functools.wraps(func)
   def wrapper(*inputs):
-    print('{} being executed with inputs: {}'.format(func.__name__, inputs))
     product = func(*inputs)
-    return product if product else '<<<Fake{}Product>>>'.format(func.__name__)
+    return_val = product if product else '<<<Fake-{}-Product>>>'.format(func.__name__)
+    print('{} executed for {}, returned: {}'.format(func.__name__, inputs, return_val))
+    return return_val
   return wrapper
 
 
@@ -102,7 +103,7 @@ class ApacheThriftConfiguration(ThriftConfiguration):
     :param string rev: The version of the apache thrift compiler to use.
     :param bool strict: `False` to turn strict compiler warnings off (not recommended).
     """
-    super(ApacheThriftJavaConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
+    super(ApacheThriftConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
 
 
 class ApacheThriftJavaConfiguration(ApacheThriftConfiguration):
@@ -118,10 +119,14 @@ class ApacheThriftError(TaskError):
 
 
 @printing_func
-def gen_apache_thrift(sources, rev, gen, strict):
-  if rev == 'fail':
-    raise ApacheThriftError('Failed to generate via apache thrift for sources: {}, rev: {}, '
-                            'gen:{}, strict: {}'.format(sources, rev, gen, strict))
+def gen_apache_thrift(sources, config):
+  if config.rev == 'fail':
+    raise ApacheThriftError('Failed to generate via apache thrift for '
+                            'sources: {}, config: {}'.format(sources, config))
+  if isinstance(config, ApacheThriftJavaConfiguration):
+    return JavaSources(files=['Fake.java'], dependencies=config.dependencies)
+  elif isinstance(config, ApacheThriftPythonConfiguration):
+    return PythonSources(files=['fake.py'], dependencies=config.dependencies)
 
 
 class BuildPropertiesConfiguration(Struct):
@@ -140,7 +145,7 @@ class ScroogeConfiguration(ThriftConfiguration):
     :param string rev: The version of the scrooge compiler to use.
     :param bool strict: `False` to turn strict compiler warnings off (not recommended).
     """
-    super(ScroogeScalaConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
+    super(ScroogeConfiguration, self).__init__(rev=rev, strict=strict, **kwargs)
 
 
 class ScroogeScalaConfiguration(ScroogeConfiguration):
