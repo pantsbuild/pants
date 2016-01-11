@@ -124,14 +124,14 @@ class VersionedTarget(VersionedTargetSet):
       task_version = self._cache_manager.task_version
       # TODO: Shorten cache_key hashes in general?
       return os.path.join(root_dir, task_version, key.id, sha1(key.hash).hexdigest()[:12])
-    new_dir = dirname(self.cache_key, version)
+    new_dir = dirname(self.cache_key)
     self._results_dir = new_dir
     if self.valid:
       return
 
     if allow_incremental and self.previous_cache_key:
       self.is_incremental = True
-      old_dir = dirname(self.previous_cache_key, version)
+      old_dir = dirname(self.previous_cache_key)
       self._previous_results_dir = old_dir
       if os.path.isdir(old_dir) and not os.path.isdir(new_dir):
         shutil.copytree(old_dir, new_dir)
