@@ -20,7 +20,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
       'Hello world from Foo\n',
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
-        'bundle-example',
+        'testprojects.src.java.org.pantsbuild.testproject.bundle.bundle',
         bundle_jar_name='bundle-example-bin',
         # this is the only thing bundle jar has, which means Class-Path must be properly
         # set for its Manifest.
@@ -43,7 +43,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
       'Hello world from Foo\n',
       self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/bundle',
-        'bundle-example',
+        'testprojects.src.java.org.pantsbuild.testproject.bundle.bundle',
         bundle_jar_name='bundle-example-bin',
         bundle_options=['--deployjar'],
         # this is the only thing bundle zip has, all class files must be there.

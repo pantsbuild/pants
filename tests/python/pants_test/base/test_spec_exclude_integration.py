@@ -19,6 +19,7 @@ class Bundles(object):
   """Container class to hold test bundle specifications."""
 
   phrase_path = 'testprojects/src/java/org/pantsbuild/testproject/phrases'
+  bundle_dir_prefix = 'testprojects.src.java.org.pantsbuild.testproject.phrases'
 
   class Bundle(object):
 
@@ -50,7 +51,9 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
   """Tests the functionality of the --spec-exclude flag in pants."""
 
   def _bundle_path(self, bundle):
-    return os.path.join(get_buildroot(), 'dist', '{name}-bundle'.format(name=bundle))
+    return os.path.join(get_buildroot(), 'dist',
+                        '{prefix}.{name}-bundle'.format(prefix=Bundles.bundle_dir_prefix,
+                                                        name=bundle))
 
   @contextmanager
   def _handle_bundles(self, names):
