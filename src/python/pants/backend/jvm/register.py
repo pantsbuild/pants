@@ -10,6 +10,7 @@ from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository as repo
 from pants.backend.jvm.scala_artifact import ScalaArtifact
+from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagementSetup
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -24,6 +25,7 @@ from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
+from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
@@ -75,6 +77,7 @@ def build_file_aliases():
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
       'jvm_prep_command' : JvmPrepCommand,
+      'managed_jar_dependencies' : ManagedJarDependencies,
       'scala_library': ScalaLibrary,
       'scalac_plugin': ScalacPlugin,
     },
@@ -116,6 +119,8 @@ def register_goals():
 
   Goal.by_name('invalidate').install(ng_killall, first=True)
   Goal.by_name('clean-all').install(ng_killall, first=True)
+
+  task(name='jar-dependency-management', action=JarDependencyManagementSetup).install('bootstrap')
 
   task(name='jvm-platform-explain', action=JvmPlatformExplain).install('jvm-platform-explain')
   task(name='jvm-platform-validate', action=JvmPlatformValidate).install('jvm-platform-validate')

@@ -154,6 +154,22 @@ python_tests(
 )
 
 python_tests(
+  name = 'jar_dependency_management_setup',
+  sources = ['test_jar_dependency_management_setup.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/jvm:jvm_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ],
+)
+
+python_tests(
   name = 'detect_duplicates',
   sources = ['test_detect_duplicates.py'],
   dependencies = [
@@ -164,7 +180,7 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/jvm:jvm_task_test_base'
+    'tests/python/pants_test/jvm:jvm_task_test_base',
   ],
 )
 
@@ -210,6 +226,7 @@ python_tests(
   name = 'ivy_utils',
   sources = ['test_ivy_utils.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/jvm:jar_dependency_utils',
@@ -218,6 +235,7 @@ python_tests(
     'src/python/pants/ivy',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
