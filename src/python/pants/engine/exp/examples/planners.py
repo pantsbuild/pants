@@ -17,7 +17,8 @@ from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
-from pants.engine.exp.scheduler import LocalScheduler, Planners, Select
+from pants.engine.exp.scheduler import (LocalScheduler, SelectAddress, SelectDependencies,
+                                        SelectSubject)
 from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized, memoized_property
 
@@ -209,57 +210,55 @@ def setup_json_scheduler(build_root):
   # It could also just be pointed at the scrooge jar at that point.
   scrooge_tool_address = Address.parse('src/scala/scrooge')
 
-  planners = Planners(
-      {
-        'compile': [Classpath],
-        # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
-        'resolve': [Classpath],
-        'gen': [JavaSources, PythonSources, ResourceSources, ScalaSources],
-        'unpickleable': [UnpickleableResult],
-      },
-      [
-        (JavaSources,
-         [Select(Select.Subject(), ThriftSources),
-          Select(Select.Subject(), ApacheThriftJavaConfiguration)],
-         gen_apache_thrift),
-        (PythonSources,
-         [Select(Select.Subject(), ThriftSources),
-          Select(Select.Subject(), ApacheThriftPythonConfiguration)],
-         gen_apache_thrift),
-        (ScalaSources,
-         [Select(Select.Subject(), ThriftSources),
-          Select(Select.Subject(), ScroogeScalaConfiguration),
-          Select(Select.LiteralSubject(scrooge_tool_address), Classpath)],
-         gen_scrooge_thrift),
-        (JavaSources,
-         [Select(Select.Subject(), ThriftSources),
-          Select(Select.Subject(), ScroogeJavaConfiguration),
-          Select(Select.LiteralSubject(scrooge_tool_address), Classpath)],
-         gen_scrooge_thrift),
-        (Classpath,
-         [Select(Select.Subject(), Jar)],
-         ivy_resolve),
-        (Classpath,
-         [Select(Select.Subject(), ResourceSources)],
-         isolate_resources),
-        (Classpath,
-         [Select(Select.Subject(), BuildPropertiesConfiguration)],
-         write_name_file),
-        (Classpath,
-         [Select(Select.Subject(), JavaSources),
-          Select(Select.Dependencies(JavaSources), Classpath)],
-         javac),
-        (Classpath,
-         [Select(Select.Subject(), ScalaSources),
-          Select(Select.Dependencies(JavaSources), Classpath)],
-         scalac),
-        (UnpickleableInput,
-          [],
-          unpickleable_func),
-        (UnpickleableResult,
-         [Select(Select.Subject(), UnpickleableInput)],
-         unpickleable_func),
-      ],
-    )
-  scheduler = LocalScheduler(graph, planners)
+  products_by_goal = {
+      'compile': [Classpath],
+      # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
+      'resolve': [Classpath],
+      'gen': [JavaSources, PythonSources, ResourceSources, ScalaSources],
+      'unpickleable': [UnpickleableResult],
+    }
+  tasks = [
+      (JavaSources,
+       [SelectSubject(ThriftSources),
+        SelectSubject(ApacheThriftJavaConfiguration)],
+       gen_apache_thrift),
+      (PythonSources,
+       [SelectSubject(ThriftSources),
+        SelectSubject(ApacheThriftPythonConfiguration)],
+       gen_apache_thrift),
+      (ScalaSources,
+       [SelectSubject(ThriftSources),
+        SelectSubject(ScroogeScalaConfiguration),
+        SelectAddress(scrooge_tool_address, Classpath)],
+       gen_scrooge_thrift),
+      (JavaSources,
+       [SelectSubject(ThriftSources),
+        SelectSubject(ScroogeJavaConfiguration),
+        SelectAddress(scrooge_tool_address, Classpath)],
+       gen_scrooge_thrift),
+      (Classpath,
+       [SelectSubject(Jar)],
+       ivy_resolve),
+      (Classpath,
+       [SelectSubject(ResourceSources)],
+       isolate_resources),
+      (Classpath,
+       [SelectSubject(BuildPropertiesConfiguration)],
+       write_name_file),
+      (Classpath,
+       [SelectSubject(JavaSources),
+        SelectDependencies(Classpath, JavaSources)],
+       javac),
+      (Classpath,
+       [SelectSubject(ScalaSources),
+        SelectDependencies(Classpath, ScalaSources)],
+       scalac),
+      (UnpickleableInput,
+        [],
+        unpickleable_func),
+      (UnpickleableResult,
+       [SelectSubject(UnpickleableInput)],
+       unpickleable_func),
+    ]
+  scheduler = LocalScheduler(graph, products_by_goal, tasks)
   return graph, scheduler

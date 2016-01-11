@@ -24,19 +24,47 @@ from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
-class Select(namedtuple('Select', ['selector', 'input_product'])):
+class Select(object):
+  def simplify(self, build_graph):
+    """Simplifies this Select to a serializable version."""
+    return self
 
-  class Subject(object):
-    """Selects the Subject provided to the selector."""
-    pass
+  @abstractmethod
+  def construct_node(subject):
+    """Constructs a Node for this select and the given subject."""
 
-  class Dependencies(namedtuple('Dependencies', ['deps_product'])):
-    """Selects the dependencies of a product for the Subject."""
-    pass
 
-  class LiteralSubject(namedtuple('LiteralSubject', ['address'])):
-    """Selects a literal Subject (other than the one applied to the selector)."""
-    pass
+class SelectSubject(namedtuple('Subject', ['product']), Select):
+  """Selects the Subject provided to the constructor."""
+
+  def construct_node(self, subject):
+    return SelectNode(subject, self.product)
+
+
+class SelectDependencies(namedtuple('Dependencies', ['product', 'deps_product']), Select):
+  """Selects the dependencies of a product for the subject provided to the constructor."""
+
+  def node_constructor(self, subject):
+    return SelectDependenciesNode(subject, self.product, self.deps_product)
+
+
+class SelectAddress(namedtuple('Address', ['address', 'product']), Select):
+  """Selects the Subject represented by the given Address."""
+
+  def simplify(self, build_graph):
+    """Simplifies this Select to an executable version."""
+    return SelectLiteral(build_graph.resolve(self.address), self.product)
+
+  def construct_node(self, subject):
+    raise ValueError('{} must be resolved before it can be constructed.'.format(self))
+
+
+class SelectLiteral(namedtuple('LiteralSubject', ['subject', 'product']), Select):
+  """Selects a literal Subject (other than the one applied to the selector)."""
+
+  def node_constructor(self, subject):
+    # NB: Intentionally ignores subject parameter.
+    return SelectNode(self.subject, product)
 
 
 class SchedulingError(Exception):
@@ -119,8 +147,11 @@ class Node(Serializable):
     """The product for this Node."""
 
   @abstractmethod
-  def step(self, dependency_states):
+  def step(self, dependency_states, node_builder):
     """Given a dict of the dependency States for this Node, returns the current State of the Node.
+
+    The NodeBuilder parameter provides a way to construct Nodes that require information about
+    installed tasks.
 
     After this method returns a non-Waiting state, it will never be visited again for this Node.
     """
@@ -132,27 +163,28 @@ class SelectNode(namedtuple('Select', ['subject', 'product']), Node):
   A Select can be satisfied by multiple sources, and so it acts like an OR.
   """
 
-  def _dependencies(self):
+  def _dependencies(self, node_builder):
     """Returns a sequence of potential source Nodes for this Select."""
     # Look for native sources.
     yield NativeNode(self.subject, self.product)
     # And for Tasks.
-    for task, anded_clause in self._tasks[product_type]:
-      yield TaskNode(subject, product, task, anded_clause)
+    for task_node in node_builder.task_nodes(self.subject, self.product):
+      yield task_node
 
-  def step(self, dependency_states):
+  def step(self, dependency_states, node_builder):
     # If there are any Return Nodes, return the first.
     has_waiting_dep = False
-    for dep in self._dependencies():
+    dependencies = list(self._dependencies(node_builder))
+    for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
-      if dep_state is None or type(dep_state) == State.Waiting:
+      if dep_state is None or type(dep_state) == Waiting:
         has_waiting_dep = True
-      elif type(dep_state) == State.Return:
+      elif type(dep_state) == Return:
         return dep_state
     if has_waiting_dep:
-      return State.Waiting(list(self._dependencies()))
+      return Waiting(dependencies)
     else:
-      return State.Throw(ValueError('No source of {}, {}'.format(self.subject, self.product)))
+      return Throw(ValueError('No source of {}, {}'.format(self.subject, self.product)))
 
 
 class SelectDependenciesNode(namedtuple('SelectDependencies', ['subject', 'product', 'dep_product']), Node):
@@ -165,54 +197,47 @@ class SelectDependenciesNode(namedtuple('SelectDependencies', ['subject', 'produ
   def _dep_product_node(self):
     return SelectNode(subject, dep_product)
 
-  def step(self, dependency_states):
+  def step(self, dependency_states, node_builder):
     dep_product_state = dependency_states.get(self._dep_product_node(), None)
-    if dep_product_state is None or type(dep_product_state) == State.Waiting:
+    if dep_product_state is None or type(dep_product_state) == Waiting:
       # Wait for the product which hosts the dependency list we need.
-      return State.Waiting([self._dep_product_node()])
-    elif type(dep_product_state) == State.Throw:
+      return Waiting([self._dep_product_node()])
+    elif type(dep_product_state) == Throw:
       msg = 'Could not compute {}, {} to determine dependencies.'.format(subject, dep_product)
-      return State.Throw(ValueError(msg))
-    elif type(dep_product_state) == State.Return:
+      return Throw(ValueError(msg))
+    elif type(dep_product_state) == Return:
       # The product and its dependency list are available.
       dependencies = [SelectNode(d, product) for d in dep_product_state.value.dependencies]
       for dependency in dependencies:
         dep_state = dependency_states.get(dependency, None)
-        if dep_state is None or type(dep_state) == State.Waiting:
+        if dep_state is None or type(dep_state) == Waiting:
           # One of the dependencies is not yet available. Indicate that we are waiting for all
           # of them.
-          return State.Waiting([self._dep_product_node()] + dependencies)
-        elif type(dep_state) == State.Throw:
+          return Waiting([self._dep_product_node()] + dependencies)
+        elif type(dep_state) == Throw:
           msg = 'Failed to compute dependency {}'.format(dependency)
-          return State.Throw(ValueError(msg))
-        elif type(dep_state) != State.Return:
+          return Throw(ValueError(msg))
+        elif type(dep_state) != Return:
           raise State.raise_unrecognized(dep_state)
       # All dependencies are present! Set our value to a list of the resulting values.
-      return State.Return([dependency_states[d].value for d in dependencies])
+      return Return([dependency_states[d].value for d in dependencies])
     else:
       State.raise_unrecognized(dep_state)
 
 
 class TaskNode(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Node):
-  def _dependencies(self):
+  def _dependencies(self, node_builder):
     for select in self.clause:
-      if isinstance(select.selector, Select.Subject):
-        yield SelectNode(self.subject, select.product)
-      elif isinstance(select.selector, Select.Dependencies):
-        yield SelectNodeDependencies(self.subject, select.product, select.selector.deps_product)
-      elif isinstance(select.selector, Select.LiteralSubject):
-        yield SelectNode(selector.address, self.product)
-      else:
-        raise ValueError('Unimplemented `Select` type: {}'.format(select))
+      yield select.construct_node(self.subject)
 
-  def step(self, dependency_states):
+  def step(self, dependency_states, node_builder):
     # If all dependency Nodes are Return, execute the Node.
     dep_values = []
-    dependencies = list(self._dependencies())
+    dependencies = list(self._dependencies(node_builder))
     for dep_key in dependencies:
       dep_state = dependency_states.get(dep_key, None)
       if dep_state is None:
-        return State.Waiting(dependencies)
+        return Waiting(dependencies)
       elif type(dep_state) == Return:
         dep_values.append(dep_state.value)
       elif type(dep_state) == Failure:
@@ -220,22 +245,22 @@ class TaskNode(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Nod
       else:
         State.raise_unrecognized(dep_state)
     try:
-      return State.Return(func(*dep_values))
+      return Return(func(*dep_values))
     except Exception as e:
       return State.Failure(e)
 
 
 class NativeNode(namedtuple('Native', ['subject', 'product']), Node):
-  def step(self, dependency_states):
+  def step(self, dependency_states, node_builder):
     if type(subject) == product:
-      return State.Return(subject)
+      return Return(subject)
     elif isinstance(subject, Target):
       for configuration in subject.configurations:
         # TODO: returning only the first configuration of a given type. Need to define mergeability
         # for products.
         if type(configuration) == product:
-          return State.Return(configuration)
-    return State.Throw(ValueError('No native source of {} for {}'.format(self.product, self.subject)))
+          return Return(configuration)
+    return Throw(ValueError('No native source of {} for {}'.format(self.product, self.subject)))
 
 
 class ProductGraph(object):
@@ -252,7 +277,7 @@ class ProductGraph(object):
     existing_state = self._node_results.get(node, None)
     if existing_state is not None:
       raise ValueError('Node {} is already completed with {}'.format(node, existing_state))
-    elif type(state) not in [State.Return, State.Throw]:
+    elif type(state) not in [Return, Throw]:
       raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
     self._node_results[node] = state
 
@@ -263,7 +288,7 @@ class ProductGraph(object):
     return self._node_results.get(node, None)
 
   def add_edges(self, node, dependencies):
-    self._dependencies[node].extend(dependencies)
+    self._dependencies[node].update(dependencies)
     for dependency in dependencies:
       self._dependents[dependency].add(node)
 
@@ -319,28 +344,31 @@ class ProductGraph(object):
     return products
 
 
-class Planners(object):
-  """A registry of task planners indexed by both product type and goal name.
+class NodeBuilder(object):
+  """Encapsulates the details of creating Nodes that involve user-defined functions/tasks.
 
-  Holds a set of input product requirements for each output product, which can be used
-  to validate the graph.
+  This avoids giving Nodes direct access to the build graph, task list, or product graph.
   """
 
-  def __init__(self, products_by_goal, tasks):
-    self._products_by_goal = products_by_goal
-    self._tasks = defaultdict(set)
+  @classmethod
+  def create(cls, graph, tasks):
+    """Indexes tasks by their output type, and simplifies their Select clauses.
 
-    # Index tasks by their output type.
-    for output_type, input_type_requirements, task in tasks:
-      self._tasks[output_type].add((task, tuple(input_type_requirements)))
-
-  def products_for_goal(self, goal_name):
-    """Return the set of products required for the given goal.
-
-    :param string goal_name:
-    :rtype: set of product types
+    This allows this object to carry the minimum of information when it is serialized... in
+    particular, it needn't carry along the entire graph!
     """
-    return self._products_by_goal[goal_name]
+    serializable_tasks = defaultdict(set)
+    for output_type, input_selects, task in tasks:
+      simplified_input_selects = tuple(select.simplify(graph) for select in input_selects)
+      serializable_tasks[output_type].add((task, simplified_input_selects))
+    return cls(serializable_tasks)
+
+  def __init__(self, tasks):
+    self._tasks = tasks
+
+  def task_nodes(self, subject, product):
+    for task, anded_clause in self._tasks[product]:
+      yield TaskNode(subject, product, task, anded_clause)
 
 
 class BuildRequest(object):
@@ -408,22 +436,14 @@ class Promise(object):
       return self._success
 
 
-class Step(namedtuple('Step', ['node', 'promise', 'dependencies']), Serializable):
-
-  @classmethod
-  def create(cls, node, product_graph):
-    """Creates a Step with the currently available dependencies of the given Node."""
-    return cls(node,
-               Promise(),
-               {dep: product_graph.state(dep)
-                for dep in product_graph.dependencies_of(node) if dep is not None})
+class Step(namedtuple('Step', ['node', 'promise', 'dependencies', 'node_builder']), Serializable):
 
   def __call__(self):
     """Called by the Engine in order to execute this work in parallel. Threadsafe."""
     if self.promise.is_complete():
       raise ValueError('Step was attempted multiple times!: {}'.format(self))
     #try:
-    self.promise.success(self.node.step(self.dependencies))
+    self.promise.success(self.node.step(self.dependencies, self.node_builder))
     #except Exception as e:
     #  self.promise.failure(e)
 
@@ -436,7 +456,7 @@ class Step(namedtuple('Step', ['node', 'promise', 'dependencies']), Serializable
       return False
 
     result = self.promise.get()
-    if type(result) == State.Waiting:
+    if type(result) == Waiting:
       product_graph.add_edges(self.node, result.dependencies)
     else:
       product_graph.complete(node, result)
@@ -464,24 +484,33 @@ class LocalScheduler(object):
   # a TaskPlanner baseclass.
   """
 
-  def __init__(self, graph, planners):
+  def __init__(self, graph, products_by_goal, tasks):
     """
     :param graph: The BUILD graph build requests will execute against.
     :type graph: :class:`pants.engine.exp.graph.Graph`
-    :param planners: All the task planners known to the system.
-    :type planners: :class:`Planners`
+    :param products_by_goal: The products that are required for each goal name.
+    :param tasks: 
     """
     self._graph = graph
-    self._planners = planners
+    self._products_by_goal = products_by_goal
+    self._node_builder = NodeBuilder.create(graph, tasks)
     self._product_graph = ProductGraph()
     self._roots = set()
+
+  def _create_step(self, node):
+    """Creates a Step with the currently available dependencies of the given Node."""
+    return Step(node,
+                Promise(),
+                {dep: self._product_graph.state(dep)
+                 for dep in self._product_graph.dependencies_of(node) if dep is not None},
+                self._node_builder)
 
   def _create_roots(self, build_request):
     # Determine the root products and subjects based on the request.
     root_subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
     root_products = OrderedSet()
     for goal in build_request.goals:
-      root_products.update(self._planners.products_for_goal(goal))
+      root_products.update(self._products_by_goal[goal])
 
     # Roots are products that might be possible to produce for these subjects.
     return [SelectNode(s, p) for s in root_subjects for p in root_products]
@@ -500,8 +529,7 @@ class LocalScheduler(object):
 
     # A list of Steps that are ready to execute for Nodes.
     self._roots.update(self._create_roots(build_request))
-    ready = list(Step.create(root, pg)
-                 for root in self._roots if not pg.is_complete(root))
+    ready = list(self._create_step(root) for root in self._roots if not pg.is_complete(root))
 
     # Yield nodes that are ready, and then compute new ones.
     while ready:
@@ -518,7 +546,7 @@ class LocalScheduler(object):
             candidates.update(d for d in pg.dependents_of(step.node))
           else:
             # Needs more Steps.
-            next_ready.append(Step.create(step.node, pg))
+            next_ready.append(self._create_step(step.node))
         else:
           # Still waiting for this step to complete.
           next_ready.append(step)
@@ -526,7 +554,6 @@ class LocalScheduler(object):
       # Create Steps for Nodes which have had their dependencies changed since the previous round.
       for candidate_node in candidates:
         if not pg.is_complete(candidate_node):
-          next_ready.append(Step.create(candidate_node, pg))
+          next_ready.append(self._create_step(candidate_node))
 
       ready = next_ready
-

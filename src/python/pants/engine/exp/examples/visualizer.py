@@ -12,9 +12,9 @@ from textwrap import dedent
 
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
+from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
 from pants.engine.exp.scheduler import BuildRequest, Promise
-from pants.engine.exp.engine import LocalSerialEngine
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
