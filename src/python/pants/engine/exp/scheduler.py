@@ -62,9 +62,9 @@ class SelectAddress(namedtuple('Address', ['address', 'product']), Select):
 class SelectLiteral(namedtuple('LiteralSubject', ['subject', 'product']), Select):
   """Selects a literal Subject (other than the one applied to the selector)."""
 
-  def node_constructor(self, subject):
+  def construct_node(self, subject):
     # NB: Intentionally ignores subject parameter.
-    return SelectNode(self.subject, product)
+    return SelectNode(self.subject, self.product)
 
 
 class SchedulingError(Exception):
@@ -204,11 +204,11 @@ class SelectDependenciesNode(namedtuple('SelectDependencies', ['subject', 'produ
       # Wait for the product which hosts the dependency list we need.
       return Waiting([self._dep_product_node()])
     elif type(dep_product_state) == Throw:
-      msg = 'Could not compute {}, {} to determine dependencies.'.format(subject, dep_product)
+      msg = 'Could not compute {} to determine dependencies.'.format(self._dep_product_node())
       return Throw(ValueError(msg))
     elif type(dep_product_state) == Return:
       # The product and its dependency list are available.
-      dependencies = [SelectNode(d, product) for d in dep_product_state.value.dependencies]
+      dependencies = [SelectNode(d, self.product) for d in dep_product_state.value.dependencies]
       for dependency in dependencies:
         dep_state = dependency_states.get(dependency, None)
         if dep_state is None or type(dep_state) == Waiting:
@@ -254,8 +254,8 @@ class TaskNode(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Nod
 class NativeNode(namedtuple('Native', ['subject', 'product']), Node):
   def step(self, dependency_states, node_builder):
     if type(self.subject) == self.product:
-      return Return(subject)
-    elif getattr(self.subject, 'configurations'):
+      return Return(self.subject)
+    elif getattr(self.subject, 'configurations', None):
       for configuration in self.subject.configurations:
         # TODO: returning only the first configuration of a given type. Need to define mergeability
         # for products.
@@ -289,8 +289,12 @@ class ProductGraph(object):
     return self._node_results.get(node, None)
 
   def add_edges(self, node, dependencies):
+    if not node:
+      raise ValueError('Hmmmsdjgsj!')
     self._dependencies[node].update(dependencies)
     for dependency in dependencies:
+      if not dependency:
+        raise ValueError('Hmkhjgcmmsdjgsj!')
       self._dependents[dependency].add(node)
 
   def dependencies(self):
@@ -503,6 +507,8 @@ class LocalScheduler(object):
 
   def _create_step(self, node):
     """Creates a Step with the currently available dependencies of the given Node."""
+    if not node:
+      raise ValueError('Hmm!!')
     return Step(node,
                 Promise(),
                 {dep: self._product_graph.state(dep)
