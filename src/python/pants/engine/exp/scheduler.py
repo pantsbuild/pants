@@ -30,7 +30,7 @@ class Select(object):
     return self
 
   @abstractmethod
-  def construct_node(subject):
+  def construct_node(self, subject):
     """Constructs a Node for this select and the given subject."""
 
 
@@ -44,7 +44,7 @@ class SelectSubject(namedtuple('Subject', ['product']), Select):
 class SelectDependencies(namedtuple('Dependencies', ['product', 'deps_product']), Select):
   """Selects the dependencies of a product for the subject provided to the constructor."""
 
-  def node_constructor(self, subject):
+  def construct_node(self, subject):
     return SelectDependenciesNode(subject, self.product, self.deps_product)
 
 
@@ -173,6 +173,7 @@ class SelectNode(namedtuple('Select', ['subject', 'product']), Node):
 
   def step(self, dependency_states, node_builder):
     # If there are any Return Nodes, return the first.
+    print('stepping {} with {}'.format(self, dependency_states))
     has_waiting_dep = False
     dependencies = list(self._dependencies(node_builder))
     for dep in dependencies:
@@ -195,7 +196,7 @@ class SelectDependenciesNode(namedtuple('SelectDependencies', ['subject', 'produ
   """
 
   def _dep_product_node(self):
-    return SelectNode(subject, dep_product)
+    return SelectNode(self.subject, self.dep_product)
 
   def step(self, dependency_states, node_builder):
     dep_product_state = dependency_states.get(self._dep_product_node(), None)
@@ -240,25 +241,25 @@ class TaskNode(namedtuple('Task', ['subject', 'product', 'func', 'clause']), Nod
         return Waiting(dependencies)
       elif type(dep_state) == Return:
         dep_values.append(dep_state.value)
-      elif type(dep_state) == Failure:
-        return State.Failure(ValueError('Dependency {} failed.'.format(dep_key)))
+      elif type(dep_state) == Throw:
+        return Throw(ValueError('Dependency {} failed.'.format(dep_key)))
       else:
         State.raise_unrecognized(dep_state)
     try:
       return Return(func(*dep_values))
     except Exception as e:
-      return State.Failure(e)
+      return Throw(e)
 
 
 class NativeNode(namedtuple('Native', ['subject', 'product']), Node):
   def step(self, dependency_states, node_builder):
-    if type(subject) == product:
+    if type(self.subject) == self.product:
       return Return(subject)
-    elif isinstance(subject, Target):
-      for configuration in subject.configurations:
+    elif getattr(self.subject, 'configurations'):
+      for configuration in self.subject.configurations:
         # TODO: returning only the first configuration of a given type. Need to define mergeability
         # for products.
-        if type(configuration) == product:
+        if type(configuration) == self.product:
           return Return(configuration)
     return Throw(ValueError('No native source of {} for {}'.format(self.product, self.subject)))
 
@@ -453,13 +454,16 @@ class Step(namedtuple('Step', ['node', 'promise', 'dependencies', 'node_builder'
     If the step is not completed, returns False.
     """
     if not self.promise.is_complete():
+      print('>> step not yet complete for {}'.format(self.node))
       return False
 
     result = self.promise.get()
     if type(result) == Waiting:
+      print('>> waiting for more inputs for {}'.format(self.node))
       product_graph.add_edges(self.node, result.dependencies)
     else:
-      product_graph.complete(node, result)
+      print('>> node is complete {}'.format(self.node))
+      product_graph.complete(self.node, result)
     return True
 
 
@@ -545,8 +549,8 @@ class LocalScheduler(object):
             # The Node is completed: mark any of its dependents as candidates for Steps.
             candidates.update(d for d in pg.dependents_of(step.node))
           else:
-            # Needs more Steps.
-            next_ready.append(self._create_step(step.node))
+            # Waiting on dependencies: mark them as candidates for Steps.
+            candidates.update(d for d in pg.dependencies_of(step.node))
         else:
           # Still waiting for this step to complete.
           next_ready.append(step)
