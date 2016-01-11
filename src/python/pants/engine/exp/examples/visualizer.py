@@ -14,13 +14,20 @@ from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, Throw
+from pants.engine.exp.scheduler import BuildRequest, TaskNode, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
+def format_node(node, state):
+  if type(node) == TaskNode:
+    name = node.func.__name__
+  else:
+    name = type(node).__name__
+  result = str(state).replace('"', '\\"')
+  return '{}:{}:{}: {}'.format(node.product.__name__, node.subject, name, result)
+
+
 def create_digraph(execution_graph):
-  def format_node(node):
-    return '{}:{}:{}'.format(type(node).__name__, node.product.__name__, node.subject)
 
   colorscheme = 'set312'
   colors = {}
@@ -36,17 +43,18 @@ def create_digraph(execution_graph):
   for node, dependency_nodes in execution_graph.dependencies().items():
     if type(execution_graph.state(node)) == Throw:
       continue
-    node_str = format_node(node)
+
+    node_str = format_node(node, execution_graph.state(node))
     color = color_index(node.product)
 
     yield ('  node [style=filled, fillcolor={color}] "{node}";'
             .format(color=color,
-                    node=format_node(node)))
+                    node=node_str))
 
     for dep in dependency_nodes:
       if type(execution_graph.state(dep)) == Throw:
         continue
-      yield '  "{}" -> "{}"'.format(node_str, format_node(dep))
+      yield '  "{}" -> "{}"'.format(node_str, format_node(dep, execution_graph.state(dep)))
 
   yield '}'
 
@@ -57,7 +65,7 @@ def visualize_execution_graph(execution_graph):
       fp.write(line)
       fp.write('\n')
     fp.close()
-    with temporary_file_path(cleanup=False) as image_file:
+    with temporary_file_path(cleanup=False, suffix='.svg') as image_file:
       subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, fp.name), shell=True)
       binary_util.ui_open(image_file)
 

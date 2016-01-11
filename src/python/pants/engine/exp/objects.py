@@ -129,3 +129,15 @@ class Validatable(AbstractClass):
 
     :raises: :class:`ValidationError` if this object is invalid.
     """
+
+
+def datatype(*args, **kwargs):
+  """A wrapper for `namedtuple` that accounts for the type of the object in equality."""
+  class DataType(namedtuple(*args, **kwargs)):
+    def __eq__(self, other):
+      # Compare types and fields.
+      return type(other) == type(self) and super(DataType, self).__eq__(other)
+
+    def __ne__(self, other):
+      return (not self == other)
+  return DataType

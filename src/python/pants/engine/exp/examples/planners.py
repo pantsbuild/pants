@@ -63,7 +63,7 @@ class Requirement(Struct):
     super(Requirement, self).__init__(req=req, repo=repo, **kwargs)
 
 
-class Classpath(object):
+class Classpath(Struct):
   # Placeholder product.
   pass
 

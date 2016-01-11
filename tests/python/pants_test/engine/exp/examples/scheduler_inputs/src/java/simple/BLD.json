@@ -1,0 +1,10 @@
+{
+  "type_alias": "target",
+  "name": "simple",
+  "configurations": [
+    {
+      "type_alias": "java",
+      "files": ["Simple.java"]
+    }
+  ]
+}
