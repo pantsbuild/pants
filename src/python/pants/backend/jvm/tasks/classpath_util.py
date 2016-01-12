@@ -10,8 +10,13 @@ import re
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_delete, safe_open, safe_walk
+
+
+class MissingClasspathEntryError(Exception):
+  """Indicates an unexpected problem finding a classpath entry."""
 
 
 class ClasspathUtil(object):
@@ -151,7 +156,9 @@ class ClasspathUtil(object):
   @classmethod
   def create_canonical_classpath(cls, classpath_products, targets, basedir,
                                  save_classpath_file=False,
-                                 use_target_id=True):
+                                 use_target_id=True,
+                                 internal_classpath_only=True,
+                                 excludes=set()):
     """Create a stable classpath of symlinks with standardized names.
 
     By default symlinks are created for each target under `basedir` based on its `target.id`.
@@ -174,6 +181,9 @@ class ClasspathUtil(object):
       This is added for backward compatibility. Remove once intellij plugin is ready to use
       `target.id` based output files.  See `use_old_naming_style` option in :class:
       `pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher.RuntimeClasspathPublisher`.
+    :param internal_classpath_only: whether to create symlinks just for internal classpath or
+       all classpath.
+    :param excludes: classpath entries should be excluded.
 
     :returns: Converted canonical classpath.
     :rtype: list of strings
@@ -217,25 +227,43 @@ class ClasspathUtil(object):
         os.makedirs(output_dir)
       return classpath_prefix_for_target
 
+    def get_symlink_path(classpath_prefix_for_target, entry, index):
+      """Get unique symlink path for internal and external jars.
+
+      Both prefixed with `target.id`, internal jars are followed by a unique index, while external
+      jars use their maven style file names.
+      """
+      _, ext = os.path.splitext(entry.path)
+
+      if isinstance(entry, ArtifactClasspathEntry):
+        return '{}{}'.format(classpath_prefix_for_target, entry.coordinate.artifact_filename)
+      return '{}{}{}'.format(classpath_prefix_for_target, index, ext)
+
+    def get_classpath_entries(target):
+      if internal_classpath_only:
+        return classpath_products.get_internal_classpath_entries_for_targets([target])
+      return classpath_products.get_classpath_entries_for_targets([target])
+
     canonical_classpath = []
     for target in targets:
       classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
+      classpath_entries = get_classpath_entries(target)
 
-      classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
-        [target])
-
-      if len(classpath_entries_for_target) > 0:
-
+      if len(classpath_entries) > 0:
         classpath = []
-        for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
-          classpath.append(entry.path)
-          # Create a unique symlink path by prefixing the base file name with a monotonic
-          # increasing `index` to avoid name collisions.
-          _, ext = os.path.splitext(entry.path)
+        for (index, (conf, entry)) in enumerate(classpath_entries):
+          if entry.is_excluded_by(excludes):
+            continue
 
-          symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
+          symlink_path = get_symlink_path(classpath_prefix_for_target, entry, index)
+          if not os.path.exists(entry.path):
+            raise MissingClasspathEntryError('Could not find {src} when attempting to link '
+                                             'it into the {dst}'
+                                             .format(src=entry.path, dst=symlink_path))
+
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
+          classpath.append(entry.path)
 
         if save_classpath_file:
           with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:

@@ -126,6 +126,7 @@ python_library(
   name = 'classpath_util',
   sources = ['classpath_util.py'],
   dependencies = [
+    ':classpath_products',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
