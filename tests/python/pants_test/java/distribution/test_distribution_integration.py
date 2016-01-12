@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from unittest import skipIf
 
-from pants.java.distribution.distribution import DistributionLocator
+from pants.java.distribution.distribution import Distribution, DistributionLocator
 from pants.util.osutil import OS_ALIASES, get_os_name
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
@@ -58,3 +58,73 @@ class DistributionIntegrationTest(PantsRunIntegrationTest):
       for other in OS_ALIASES[os_name]:
         if other != os_name:
           self._test_two_distributions(other)
+
+  def test_no_jvm_restriction(self):
+    with subsystem_instance(DistributionLocator):
+      distribution = DistributionLocator.locate()
+    target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
+    run = self.run_pants(['run', target_spec])
+    self.assert_success(run)
+    self.assertIn('java.home:{}'.format(distribution.home), run.stdout_data)
+
+  def test_jvm_meets_min_and_max_distribution(self):
+    with subsystem_instance(DistributionLocator):
+      distribution = DistributionLocator.locate()
+    target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion'
+    run = self.run_pants(['run', target_spec], config={
+      'jvm-distributions': {
+        'minimum_version': str(distribution.version),
+        'maximum_version': str(distribution.version)
+      }
+    })
+    self.assert_success(run)
+    self.assertIn('java.home:{}'.format(distribution.home), run.stdout_data)
+
+  def test_impossible_distribution_requirements(self):
+    with subsystem_instance(DistributionLocator) as dist_loader:
+      with self.assertRaisesRegexp(Distribution.Error, "impossible constraints"):
+        dist_loader.cached('2', '1', jdk=False)
+
+  def _test_jvm_does_not_meet_distribution_requirements(self,
+                                                        min_version_arg=None,
+                                                        max_version_arg=None,
+                                                        min_version_option=None,
+                                                        max_version_option=None):
+    options = {
+      'jvm-distributions': {
+        'minimum_version': min_version_option,
+        'maximum_version': max_version_option,
+      }
+    }
+    with subsystem_instance(DistributionLocator, **options) as dist_loader:
+      with self.assertRaises(Distribution.Error):
+        dist_loader.cached(min_version_arg, max_version_arg, jdk=False)
+
+  # a version less than all other versions
+  BOTTOM = '0.00001'
+  # a version greater than all other versions
+  TOP = '999999'
+
+  def test_does_not_meet_min_version_option(self):
+    self._test_jvm_does_not_meet_distribution_requirements(min_version_option=self.TOP)
+
+  def test_does_not_meet_min_version_arg(self):
+    self._test_jvm_does_not_meet_distribution_requirements(min_version_arg=self.TOP)
+
+  def test_does_not_meet_max_option(self):
+    self._test_jvm_does_not_meet_distribution_requirements(max_version_option=self.BOTTOM)
+
+  def test_does_not_meet_max_arg(self):
+    self._test_jvm_does_not_meet_distribution_requirements(max_version_arg=self.BOTTOM)
+
+  def test_min_option_trumps_min_arg(self):
+    self._test_jvm_does_not_meet_distribution_requirements(min_version_arg=self.BOTTOM, min_version_option=self.TOP)
+
+  def test_min_arg_trumps_min_option(self):
+    self._test_jvm_does_not_meet_distribution_requirements(min_version_arg=self.TOP, min_version_option=self.BOTTOM)
+
+  def test_max_option_trumps_max_arg(self):
+    self._test_jvm_does_not_meet_distribution_requirements(max_version_arg=self.TOP, max_version_option=self.BOTTOM)
+
+  def test_max_arg_trumps_max_option(self):
+    self._test_jvm_does_not_meet_distribution_requirements(max_version_arg=self.BOTTOM, max_version_option=self.TOP)
