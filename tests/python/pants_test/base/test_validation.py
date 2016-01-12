@@ -47,3 +47,11 @@ class ParseValidation(unittest.TestCase):
     assert_list(['1', '2'], allowable_add=(GeneratorType,))
     with self.assertRaises(ValueError):
       assert_list(generator(), allowable_add=[])
+
+  def test_passthrough(self):
+    input = []
+    output = assert_list(input, passthrough=list)
+    self.assertIs(input, output)
+
+    output = assert_list(input)
+    self.assertIsNot(input, output)
