@@ -65,8 +65,10 @@ class Requirement(Struct):
 
 
 class Classpath(Struct):
-  # Placeholder product.
-  pass
+  """Placeholder product."""
+
+  def __init__(self, creator, **kwargs):
+    super(Classpath, self).__init__(creator=creator, **kwargs)
 
 
 class Jar(Struct):
@@ -84,13 +86,13 @@ class Jar(Struct):
 
 @printing_func
 def ivy_resolve(jars):
-  pass
+  return Classpath(creator='ivy_resolve')
 
 
 @printing_func
 def isolate_resources(resources):
   """Copies resources into a private directory, and provides them as a Classpath entry."""
-  pass
+  return Classpath(creator='isolate_resources')
 
 
 class ThriftConfiguration(StructWithDeps):
@@ -133,10 +135,10 @@ class BuildPropertiesConfiguration(Struct):
   pass
 
 
+@printing_func
 def write_name_file(name):
-  # Write a file containing the name in CWD
-  with safe_open('build.properties') as f:
-    f.write('name={}\n'.format(name))
+  """Write a file containing the name of this target in the CWD."""
+  return Classpath(creator='write_name_file')
 
 
 class ScroogeConfiguration(ThriftConfiguration):
@@ -158,17 +160,20 @@ class ScroogeJavaConfiguration(ScroogeConfiguration):
 
 @printing_func
 def gen_scrooge_thrift(sources, config, scrooge_classpath):
-  pass
+  if isinstance(config, ScroogeJavaConfiguration):
+    return JavaSources(files=['Fake.java'], dependencies=config.dependencies)
+  elif isinstance(config, ScroogeScalaConfiguration):
+    return ScalaSources(files=['Fake.scala'], dependencies=config.dependencies)
 
 
 @printing_func
 def javac(sources, classpath):
-  pass
+  return Classpath(creator='javac')
 
 
 @printing_func
 def scalac(sources, classpath):
-  pass
+  return Classpath(creator='scalac')
 
 
 # TODO(John Sirois): When https://github.com/pantsbuild/pants/issues/2413 is resolved, move the

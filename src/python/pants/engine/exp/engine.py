@@ -286,19 +286,18 @@ class Engine(AbstractClass):
     :returns: The result of the run.
     :rtype: :class:`Engine.Result`
     """
-    execution_graph = self._local_scheduler.execution_graph(build_request)
     try:
-      root_products = self.reduce(execution_graph, fail_slow)
-      return self.Result.finished(root_products)
+      self.reduce(build_request, fail_slow)
+      return self.Result.finished(self._scheduler.root_entries())
     except TaskError as e:
       return self.Result.failure(e)
 
   @abstractmethod
-  def reduce(self, execution_graph, fail_slow=False):
+  def reduce(self, build_request, fail_slow=False):
     """Reduce the given execution graph returning its root products.
 
-    :param execution_graph: An execution graph of plans to reduce.
-    :type execution_graph: :class:`ExecutionGraph`
+    :param build_request: The description of the goals to achieve.
+    :type build_request: :class:`BuildRequest`
     :param bool fail_slow: `True` to run as much of the build request as possible, returning a mix
                            of successfully produced root products and failed products when failures
                            are encountered.

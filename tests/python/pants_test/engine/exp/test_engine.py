@@ -12,9 +12,9 @@ from contextlib import closing, contextmanager
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import (Engine, LocalMultiprocessEngine, LocalSerialEngine,
                                      SerializationError)
-from pants.engine.exp.examples.planners import (ApacheThriftError, Classpath, Javac, JavaSources,
+from pants.engine.exp.examples.planners import (ApacheThriftError, Classpath, JavaSources,
                                                 setup_json_scheduler)
-from pants.engine.exp.scheduler import BuildRequest, Promise
+from pants.engine.exp.scheduler import Return, SelectNode, BuildRequest
 
 
 class EngineTest(unittest.TestCase):
@@ -32,7 +32,7 @@ class EngineTest(unittest.TestCase):
   def assert_engine(self, engine):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])
     result = engine.execute(build_request)
-    self.assertEqual({Promise(Classpath, self.java): Javac.fake_product()},
+    self.assertEqual({SelectNode(self.java, Classpath): Return(Classpath(creator='javac'))},
                      result.root_products)
     self.assertIsNone(result.error)
 
@@ -41,7 +41,7 @@ class EngineTest(unittest.TestCase):
     with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=True)) as e:
       yield e
 
-  def test_serial_engine(self):
+  def test_serial_engine_simple(self):
     engine = LocalSerialEngine(self.scheduler)
     self.assert_engine(engine)
 
@@ -57,7 +57,7 @@ class EngineTest(unittest.TestCase):
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.java.address, self.java_fail_slow.address])
     result = engine.execute(build_request, fail_slow=True)
-    self.assertEqual({Promise(Classpath, self.java): Javac.fake_product()},
+    self.assertEqual({SelectNode(self.java, Classpath): Return(Classpath(creator='javac'))},
                      result.root_products)
 
     self.assertIsInstance(result.error, Engine.PartialFailureError)

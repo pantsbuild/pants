@@ -18,7 +18,6 @@ from twitter.common.collections import OrderedSet
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable, datatype
-from pants.engine.exp.products import Products, lift_native_product
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -541,6 +540,10 @@ class LocalScheduler(object):
     """
     for node in self._product_graph.walk(self._roots):
       yield node
+
+  def root_entries(self):
+    """Returns the roots for this scheduler as a dict from Node to State."""
+    return {root: self._product_graph.state(root) for root in self._roots}
 
   def schedule(self, build_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
