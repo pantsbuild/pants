@@ -268,12 +268,12 @@ class Engine(AbstractClass):
       """
       return cls(error=error, root_products=None)
 
-  def __init__(self, local_scheduler):
+  def __init__(self, scheduler):
     """
-    :param local_scheduler: The local scheduler for creating execution graphs.
-    :type local_scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
+    :param scheduler: The local scheduler for creating execution graphs.
+    :type scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
     """
-    self._local_scheduler = local_scheduler
+    self._scheduler = scheduler
 
   def execute(self, build_request, fail_slow=False):
     """Executes the the requested build.
@@ -309,14 +309,10 @@ class Engine(AbstractClass):
 class LocalSerialEngine(FailSlowHelper, Engine):
   """An engine that runs tasks locally and serially in-process."""
 
-  def __init__(self, scheduler):
-    self._scheduler = scheduler
-
   def reduce(self, build_request, fail_slow=False):
-    products_by_promise = {}
     for step_batch in self._scheduler.schedule(build_request):
-      for step in step_batch:
-        step()
+      for step, promise in step_batch:
+        promise.success(step())
 
 
 class SerializationError(Exception):
@@ -339,28 +335,27 @@ def _try_pickle(obj):
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
-def _execute_plan(func, promise, subjects, debug, *args, **kwargs):
-  # A picklable top-level function to help support local multiprocessing uses.
+def _execute_step(step, debug):
+  """A picklable top-level function to help support local multiprocessing uses."""
   try:
-    product = func(*args, **kwargs)
+    result = step()
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up past the fail slow guards
     # (if enabled) and pass this back to our main thread for handling.
-    return e
+    return (step, e)
 
-  result = (promise, subjects, product)
   if debug:
     try:
       _try_pickle(result)
     except SerializationError as e:
       return e
-  return result
+  return (step, result)
 
 
 class LocalMultiprocessEngine(Engine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, local_scheduler, pool_size=None, debug=False):
+  def __init__(self, scheduler, pool_size=None, debug=False):
     """
     :param local_scheduler: The local scheduler for creating execution graphs.
     :type local_scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
@@ -368,7 +363,7 @@ class LocalMultiprocessEngine(Engine):
                           be used.
     :param bool debug: `True` to turn on pickling error debug mode (slower); false by default.
     """
-    super(LocalMultiprocessEngine, self).__init__(local_scheduler)
+    super(LocalMultiprocessEngine, self).__init__(scheduler)
     self._pool_size = pool_size if pool_size and pool_size > 0 else multiprocessing.cpu_count()
     self._pool = multiprocessing.Pool(self._pool_size)
     self._debug = debug
@@ -383,101 +378,61 @@ class LocalMultiprocessEngine(Engine):
       self._debug = debug
 
       self._results = Queue()
-      self._products_by_promise = {}
 
-    def submit(self, promise, plan):
-      inputs = self.collect_inputs(self._products_by_promise, promise, plan)
-      if isinstance(inputs, FailedToProduce):
-        # Short circuit plan execution since we don't have all the inputs it needs.
-        result = (promise, plan.subjects, inputs)
-        self._results.put(result)
-      else:
-        func, args, kwargs = plan.bind(inputs)
+    def submit(self, step):
+      # A picklable execution that returns the step.
+      execute_step = functools.partial(_execute_step, step, self._debug)
+      if self._debug:
+        _try_pickle(execute_step)
+      self._pool.apply_async(execute_step, callback=self._results.put)
 
-        # A no-arg callable that, when executed, produces the promised product.
-        executable = functools.partial(func, *args, **kwargs)
+    def await_one_result(self):
+      step, result = self._results.get()
+      if isinstance(result, Exception):
+        raise result
+      return step, result
 
-        # A wrapper of executable that handles failing slow as needed.
-        maybe_fail_slow_executor = functools.partial(maybe_fail_slow,
-                                                     executable,
-                                                     promise,
-                                                     plan,
-                                                     self._fail_slow)
-
-        # A picklable execution that returns the promise and subjects in addition to the
-        # product produced by executable.  We need this triple to feed the consume side of the
-        # _results queue.
-        execute_plan = functools.partial(_execute_plan,
-                                         maybe_fail_slow_executor,
-                                         promise,
-                                         plan.subjects,
-                                         self._debug)
-
-        if self._debug:
-          _try_pickle(execute_plan)
-        self._pool.apply_async(execute_plan, callback=self._results.put)
-
-    def gather_one_result(self):
-      results = self._results.get()
-      if isinstance(results, Exception):
-        # If we get an exception here from an execution node, we're either in fail-slow mode and the
-        # exception was uncontrolled (not a TaskError), or else we're not in fail slow mode in which
-        # case any exception should bubble to higher layers.
-        raise results
-
-      promise, subjects, product = results
-      for subject in subjects:
-        promised = promise.rebind(subject)
-        self._products_by_promise[promised] = product
-        yield promised
-
-    def finish(self, execution_graph):
-      return self.collect_root_outputs(self._products_by_promise, execution_graph)
-
-  def reduce(self, execution_graph, fail_slow=False):
+  def reduce(self, build_request, fail_slow=False):
     executor = self.Executor(self._pool, self._pool_size, fail_slow=fail_slow, debug=self._debug)
 
-    # ExecutionGraph nodes move from `pending_submission` to `in_flight` to `satisfied_promises`.
-    pending_submission = {}
-    in_flight = {}
-    satisfied_promises = set()
+    # Steps move from `pending_submission` to `in_flight`.
+    pending_submission = OrderedSet()
+    in_flight = dict()
 
-    def submit_satisfied_pending():
-      for promise, plan in pending_submission.items():
-        if plan.promises.issubset(satisfied_promises):
-          in_flight[promise] = pending_submission.pop(promise)
-          executor.submit(promise, plan)
+    def submit_to_capacity():
+      """Remove and submit pending steps from pending_submission while there is capacity."""
+      while pending_submission and len(in_flight) < self._pool_size:
+        step, promise = pending_submission.pop(last=False)
+        in_flight[step] = promise
+        executor.submit(step)
 
-    def process_one_result():
-      # One result can satisfy many promises when a planner has scheduled bulk operations so index
-      # them all.
-      for satisfied_promise in executor.gather_one_result():
-        if satisfied_promise in in_flight:
-          in_flight.pop(satisfied_promise)
-        satisfied_promises.add(satisfied_promise)
+    def await_one():
+      """Await one completed step, and remove it from in_flight."""
+      if not in_flight:
+        raise Exception('Awaited an empty pool!')
+      step, result = executor.await_one_result()
+      if step not in in_flight:
+        raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight))
+      in_flight.pop(step).success(result)
 
     # The main reduction loop:
-    # 1. Mark nodes that are pending submission to the worker pool.
-    # 2. Submit nodes to the worker pool when their inputs are satisfied.
-    # 3. Gather a single result when the pool is full to free up a processing slot.
-    #
-    # Of note here is the fact that we need build no node-readiness data structures up front and
-    # we limit pending submissions to the number of pool workers.  This gives us a bounded number
-    # of items to check for submission readiness, ie: we'll never need to scan more than the pool
-    # size, commonly the number of cores, no matter the size and shape of the execution graph.
-    for promise, plan in execution_graph.walk():
-      pending_submission[promise] = plan
-      submit_satisfied_pending()
-      # Saturate the pool before we block on a result for maximum processing parallelism.
-      if len(in_flight) == self._pool_size:
-        process_one_result()
+    # 1. Whenever we don't have enough work to saturate the pool, request more.
+    # 2. Whenever the pool is not saturated, submit currently pending work.
+    for step_batch in self._scheduler.schedule(build_request):
+      if not step_batch:
+        # A batch should only be empty if all dependency work is currently blocked/running.
+        if not in_flight and not pending_submission:
+          raise Exception('Scheduler provided an empty batch while no work is in progress!')
+      else:
+        # Submit and wait for work for as long as we're able to keep the pool saturated.
+        pending_submission.update(step_batch)
+        submit_to_capacity()
+      await_one()
 
-    # Consume the tail of pending submissions and nodes in_flight.
+    # Consume all steps.
     while pending_submission or in_flight:
-      submit_satisfied_pending()
-      process_one_result()
-
-    return executor.finish(execution_graph)
+      submit_to_capacity()
+      await_one()
 
   def close(self):
     self._pool.close()

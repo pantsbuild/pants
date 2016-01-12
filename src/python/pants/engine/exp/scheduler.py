@@ -275,10 +275,9 @@ class ProductGraph(object):
   def complete(self, node, state):
     existing_state = self._node_results.get(node, None)
     if existing_state is not None:
-      raise ValueError('Node {} is already completed with {}'.format(node, existing_state))
+      raise ValueError('Node {} is already completed:\n  {}\n  {}'.format(node, existing_state, state))
     elif type(state) not in [Return, Throw]:
       raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
-    #print('>>> completing {} with {}'.format(node, state))
     self._node_results[node] = state
 
   def is_complete(self, node):
@@ -456,31 +455,48 @@ class Promise(object):
       return self._success
 
 
-class Step(datatype('Step', ['node', 'promise', 'dependencies', 'node_builder'])):
+class Step(object):
+  def __init__(self, step_id, node, dependencies, node_builder):
+    self._step_id = step_id
+    self._node = node
+    self._dependencies = dependencies
+    self._node_builder = node_builder
 
   def __call__(self):
     """Called by the Engine in order to execute this work in parallel. Threadsafe."""
-    if self.promise.is_complete():
-      raise ValueError('Step was attempted multiple times!: {}'.format(self))
-    self.promise.success(self.node.step(self.dependencies, self.node_builder))
+    return self._node.step(self._dependencies, self._node_builder)
 
-  def finalize(self, product_graph):
+  @property
+  def node(self):
+    return self._node
+
+  def finalize(self, promise, product_graph):
     """Called by the Scheduler to collect the result of this Step. Not threadsafe.
 
     If the step is not completed, returns False.
     """
-    if not self.promise.is_complete():
+    if not promise.is_complete():
       #print('>> step not yet complete for {}'.format(self.node))
       return False
 
-    result = self.promise.get()
+    result = promise.get()
+    print('>>> finalizing {}:\n\t{}'.format(self._node, result))
     if type(result) == Waiting:
       #print('>> waiting for more inputs for {}'.format(self.node))
-      product_graph.add_edges(self.node, result.dependencies)
+      product_graph.add_edges(self._node, result.dependencies)
     else:
       #print('>> node is complete {}'.format(self.node))
-      product_graph.complete(self.node, result)
+      product_graph.complete(self._node, result)
     return True
+
+  def __eq__(self, other):
+    return type(self) == type(other) and self._step_id == other._step_id
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __hash__(self):
+    return hash(self._step_id)
 
 
 class LocalScheduler(object):
@@ -516,14 +532,17 @@ class LocalScheduler(object):
     self._node_builder = NodeBuilder.create(graph, tasks)
     self._product_graph = ProductGraph()
     self._roots = set()
+    self._step_id = -1
 
   def _create_step(self, node):
-    """Creates a Step with the currently available dependencies of the given Node."""
-    return Step(node,
-                Promise(),
+    """Creates a Step and Promise with the currently available dependencies of the given Node."""
+    self._step_id += 1
+    step = Step(self._step_id,
+                node,
                 {dep: self._product_graph.state(dep)
                  for dep in self._product_graph.dependencies_of(node) if dep is not None},
                 self._node_builder)
+    return (step, Promise())
 
   def _create_roots(self, build_request):
     # Determine the root products and subjects based on the request.
@@ -568,8 +587,9 @@ class LocalScheduler(object):
       candidates = set()
       next_ready = []
       # Gather completed steps.
-      for step in ready:
-        if step.finalize(pg):
+      for entry in ready:
+        step, promise = entry
+        if step.finalize(promise, pg):
           # This step has completed; if the Node has completed, its dependents are candidates.
           if pg.is_complete(step.node):
             # The Node is completed: mark any of its dependents as candidates for Steps.
@@ -579,7 +599,7 @@ class LocalScheduler(object):
             candidates.update(d for d in pg.dependencies_of(step.node))
         else:
           # Still waiting for this step to complete.
-          next_ready.append(step)
+          next_ready.append(entry)
 
       # Create Steps for Nodes which have had their dependencies changed since the previous round.
       for candidate_node in candidates:

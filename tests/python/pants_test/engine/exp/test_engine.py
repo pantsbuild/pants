@@ -41,7 +41,7 @@ class EngineTest(unittest.TestCase):
     with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=True)) as e:
       yield e
 
-  def test_serial_engine_simple(self):
+  def test_serial_engine(self):
     engine = LocalSerialEngine(self.scheduler)
     self.assert_engine(engine)
 
