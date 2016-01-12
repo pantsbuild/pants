@@ -348,7 +348,7 @@ def _execute_step(step, debug):
     try:
       _try_pickle(result)
     except SerializationError as e:
-      return e
+      return (step, e)
   return (step, result)
 
 

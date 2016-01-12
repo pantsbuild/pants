@@ -463,7 +463,7 @@ class Step(object):
     self._node_builder = node_builder
 
   def __call__(self):
-    """Called by the Engine in order to execute this work in parallel. Threadsafe."""
+    """Called by the Engine in order to execute this Step."""
     return self._node.step(self._dependencies, self._node_builder)
 
   @property
@@ -480,7 +480,6 @@ class Step(object):
       return False
 
     result = promise.get()
-    print('>>> finalizing {}:\n\t{}'.format(self._node, result))
     if type(result) == Waiting:
       #print('>> waiting for more inputs for {}'.format(self.node))
       product_graph.add_edges(self._node, result.dependencies)
@@ -578,16 +577,16 @@ class LocalScheduler(object):
 
     # A list of Steps that are ready to execute for Nodes.
     self._roots.update(self._create_roots(build_request))
-    ready = list(self._create_step(root) for root in self._roots if not pg.is_complete(root))
+    ready = {root: self._create_step(root) for root in self._roots if not pg.is_complete(root)}
 
     # Yield nodes that are ready, and then compute new ones.
     while ready:
-      yield ready
+      yield ready.values()
 
       candidates = set()
-      next_ready = []
+      next_ready = dict()
       # Gather completed steps.
-      for entry in ready:
+      for node, entry in ready.items():
         step, promise = entry
         if step.finalize(promise, pg):
           # This step has completed; if the Node has completed, its dependents are candidates.
@@ -599,11 +598,12 @@ class LocalScheduler(object):
             candidates.update(d for d in pg.dependencies_of(step.node))
         else:
           # Still waiting for this step to complete.
-          next_ready.append(entry)
+          next_ready[node] = entry
 
       # Create Steps for Nodes which have had their dependencies changed since the previous round.
       for candidate_node in candidates:
-        if not pg.is_complete(candidate_node):
-          next_ready.append(self._create_step(candidate_node))
+        if candidate_node in next_ready or pg.is_complete(candidate_node):
+          continue
+        next_ready[candidate_node] = self._create_step(candidate_node)
 
       ready = next_ready

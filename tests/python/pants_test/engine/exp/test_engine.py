@@ -14,7 +14,7 @@ from pants.engine.exp.engine import (Engine, LocalMultiprocessEngine, LocalSeria
                                      SerializationError)
 from pants.engine.exp.examples.planners import (ApacheThriftError, Classpath, JavaSources,
                                                 setup_json_scheduler)
-from pants.engine.exp.scheduler import Return, SelectNode, BuildRequest
+from pants.engine.exp.scheduler import BuildRequest, Return, SelectNode
 
 
 class EngineTest(unittest.TestCase):
