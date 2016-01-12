@@ -157,7 +157,7 @@ class ScroogeJavaConfiguration(ScroogeConfiguration):
 
 
 @printing_func
-def gen_scrooge_thrift(sources, scrooge_classpath, lang, strict):
+def gen_scrooge_thrift(sources, config, scrooge_classpath):
   pass
 
 
