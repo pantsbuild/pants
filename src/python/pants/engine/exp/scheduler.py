@@ -476,15 +476,14 @@ class Step(object):
     If the step is not completed, returns False.
     """
     if not promise.is_complete():
-      #print('>> step not yet complete for {}'.format(self.node))
       return False
 
     result = promise.get()
     if type(result) == Waiting:
-      #print('>> waiting for more inputs for {}'.format(self.node))
+      #print('>> waiting for more inputs for {}'.format(self._node))
       product_graph.add_edges(self._node, result.dependencies)
     else:
-      #print('>> node is complete {}'.format(self.node))
+      #print('>> completed {} with: {}'.format(self._node, result))
       product_graph.complete(self._node, result)
     return True
 
@@ -496,6 +495,12 @@ class Step(object):
 
   def __hash__(self):
     return hash(self._step_id)
+
+  def __repr__(self):
+    return str(self)
+
+  def __str__(self):
+    return 'Step({}, {})'.format(self._step_id, self._node)
 
 
 class LocalScheduler(object):
@@ -574,36 +579,48 @@ class LocalScheduler(object):
     """
 
     pg = self._product_graph
-
-    # A list of Steps that are ready to execute for Nodes.
     self._roots.update(self._create_roots(build_request))
-    ready = {root: self._create_step(root) for root in self._roots if not pg.is_complete(root)}
+
+    # A dict from Node to a possibly executing Step. Only one Step exists for a Node at a time.
+    ready = {}
+    # Nodes that should have Steps created (after any outstanding Step returns).
+    candidates = set(root for root in self._roots)
 
     # Yield nodes that are ready, and then compute new ones.
-    while ready:
+    i = 0
+    while True:
+
+      # Create Steps for candidates that are not already running.
+      for candidate_node in list(candidates):
+        if candidate_node in ready:
+          # Node is still a candidate, but is currently running.
+          continue
+        if pg.is_complete(candidate_node):
+          # Previous Step for the Node caused it be completed.
+          candidates.discard(candidate_node)
+          continue
+        ready[candidate_node] = self._create_step(candidate_node)
+
+      if not ready:
+        if candidates:
+          raise Exception('No running tasks, but {} candidates to run!'.format(len(candidates)))
+        break
+
+      print('!!! {} scheduling iteration; {} steps.'.format(i, self._step_id))
+      i += 1
       yield ready.values()
 
-      candidates = set()
-      next_ready = dict()
-      # Gather completed steps.
-      for node, entry in ready.items():
+      # Finalize completed Steps.
+      for node, entry in ready.items()[:]:
         step, promise = entry
-        if step.finalize(promise, pg):
-          # This step has completed; if the Node has completed, its dependents are candidates.
-          if pg.is_complete(step.node):
-            # The Node is completed: mark any of its dependents as candidates for Steps.
-            candidates.update(d for d in pg.dependents_of(step.node))
-          else:
-            # Waiting on dependencies: mark them as candidates for Steps.
-            candidates.update(d for d in pg.dependencies_of(step.node))
-        else:
-          # Still waiting for this step to complete.
-          next_ready[node] = entry
-
-      # Create Steps for Nodes which have had their dependencies changed since the previous round.
-      for candidate_node in candidates:
-        if candidate_node in next_ready or pg.is_complete(candidate_node):
+        if not step.finalize(promise, pg):
+          # Still executing.
           continue
-        next_ready[candidate_node] = self._create_step(candidate_node)
-
-      ready = next_ready
+        # This step has completed; if the Node has completed, its dependents are candidates.
+        ready.pop(node)
+        if pg.is_complete(step.node):
+          # The Node is completed: mark any of its dependents as candidates for Steps.
+          candidates.update(d for d in pg.dependents_of(step.node))
+        else:
+          # Waiting on dependencies: mark them as candidates for Steps.
+          candidates.update(d for d in pg.dependencies_of(step.node))

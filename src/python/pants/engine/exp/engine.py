@@ -276,7 +276,7 @@ class Engine(AbstractClass):
     self._scheduler = scheduler
 
   def execute(self, build_request, fail_slow=False):
-    """Executes the the requested build.
+    """Executes the requested build.
 
     :param build_request: The description of the goals to achieve.
     :type build_request: :class:`BuildRequest`
@@ -398,6 +398,7 @@ class LocalMultiprocessEngine(Engine):
     # Steps move from `pending_submission` to `in_flight`.
     pending_submission = OrderedSet()
     in_flight = dict()
+    completed = set()
 
     def submit_to_capacity():
       """Remove and submit pending steps from pending_submission while there is capacity."""
@@ -413,6 +414,9 @@ class LocalMultiprocessEngine(Engine):
       step, result = executor.await_one_result()
       if step not in in_flight:
         raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight))
+      if step._step_id in completed:
+        raise Exception('Step {} has already been completed.'.format(step))
+      completed.add(step._step_id)
       in_flight.pop(step).success(result)
 
     # The main reduction loop:
@@ -433,6 +437,13 @@ class LocalMultiprocessEngine(Engine):
     while pending_submission or in_flight:
       submit_to_capacity()
       await_one()
+
+    print('completed')
+    prev = None
+    for step_id in sorted(completed):
+      if prev and prev + 1 != step_id:
+        print('  >>> missing! {} vs {}'.format(prev, step_id))
+      prev = step_id
 
   def close(self):
     self._pool.close()
