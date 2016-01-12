@@ -120,17 +120,20 @@ class State(object):
 
 
 class Return(datatype('Return', ['value']), State):
+  """Indicates that a Node successfully returned a value."""
   pass
 
 
 class Throw(datatype('Throw', ['msg']), State):
+  """Indicates that a Node should have been able to return a value, but failed."""
   pass
 
 
 class Waiting(datatype('Waiting', ['dependencies']), State):
   """Indicates that a Node is waiting for some/all of the dependencies to become available.
 
-  Some Nodes will return different dependency Nodes based on where they are in their lifecycle.
+  Some Nodes will return different dependency Nodes based on where they are in their lifecycle,
+  but all returned dependencies are recorded for the lifetime of a ProductGraph.
   """
   pass
 
