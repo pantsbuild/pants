@@ -227,18 +227,6 @@ class ClasspathUtil(object):
         os.makedirs(output_dir)
       return classpath_prefix_for_target
 
-    def get_symlink_path(classpath_prefix_for_target, entry, index):
-      """Get unique symlink path for internal and external jars.
-
-      Both prefixed with `target.id`, internal jars are followed by a unique index, while external
-      jars use their maven style file names.
-      """
-      _, ext = os.path.splitext(entry.path)
-
-      if isinstance(entry, ArtifactClasspathEntry):
-        return '{}{}'.format(classpath_prefix_for_target, entry.coordinate.artifact_filename)
-      return '{}{}{}'.format(classpath_prefix_for_target, index, ext)
-
     def get_classpath_entries(target):
       if internal_classpath_only:
         return classpath_products.get_internal_classpath_entries_for_targets([target])
@@ -247,15 +235,21 @@ class ClasspathUtil(object):
     canonical_classpath = []
     for target in targets:
       classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
-      classpath_entries = get_classpath_entries(target)
+      classpath_entries_for_target = get_classpath_entries(target)
 
-      if len(classpath_entries) > 0:
+      if len(classpath_entries_for_target) > 0:
         classpath = []
-        for (index, (conf, entry)) in enumerate(classpath_entries):
+        # Note: for internal targets pants has only one classpath entry, but user plugins
+        # might generate additional entries, for example, build.properties for the target.
+        # Also it's common to have multiple classpath entries associated with 3rdparty targets.
+        for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
           if entry.is_excluded_by(excludes):
             continue
 
-          symlink_path = get_symlink_path(classpath_prefix_for_target, entry, index)
+          # Create a unique symlink path by prefixing the base file name with a monotonic
+          # increasing `index` to avoid name collisions.
+          _, ext = os.path.splitext(entry.path)
+          symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
           if not os.path.exists(entry.path):
             raise MissingClasspathEntryError('Could not find {src} when attempting to link '
                                              'it into the {dst}'

@@ -30,7 +30,7 @@ class TestJvmAppIntegrationTest(PantsRunIntegrationTest):
         expected_bundle_content=[
           'bundle-example-bin.jar',
           'data/exampledata.txt',
-          'libs/3rdparty.guava-com.google.guava-guava-18.0.jar',
+          'libs/3rdparty.guava-0.jar',
           'libs/testprojects.src.java.org.pantsbuild.testproject.bundle.bundle-bin-0.jar',
           'libs/testprojects.src.resources.org.pantsbuild.testproject.bundleresources.resources-0.jar']))
 

@@ -130,10 +130,10 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     bundle_root = os.path.join(dist_root, '{basename}-bundle'.format(basename=bundle_basename))
     self.assertEqual(sorted(['foo-binary.jar',
                              'libs/foo.foo-binary-0.jar',
-                             'libs/3rdparty.jvm.org.example.foo-org.example-foo-1.0.0.jar',
-                             'libs/3rdparty.jvm.org.example.foo-org.pantsbuild-bar-2.0.0.zip',
-                             'libs/3rdparty.jvm.org.example.foo-org.apache-baz-3.0.0-tests.jar',
-                             'libs/3rdparty.jvm.org.example.foo-org.gnu-gary-4.0.0.tar.gz']),
+                             'libs/3rdparty.jvm.org.example.foo-0.jar',
+                             'libs/3rdparty.jvm.org.example.foo-1.zip',
+                             'libs/3rdparty.jvm.org.example.foo-2.jar',
+                             'libs/3rdparty.jvm.org.example.foo-3.gz']),
                      sorted(self.iter_files(bundle_root)))
     check_zip_file_content(os.path.join(bundle_root, 'libs/foo.foo-binary-0.jar'),
                            self.FOO_JAR)

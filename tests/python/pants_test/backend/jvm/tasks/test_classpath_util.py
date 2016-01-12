@@ -11,7 +11,7 @@ from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil, MissingClasspathEntryError
 from pants.goal.products import UnionProducts
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import relativize_paths
@@ -106,7 +106,7 @@ class ClasspathUtilTest(BaseTest):
                                             [
                                               'a.b.b-0.jar',
                                               'a.b.b-1',
-                                              'a.b.b-org-x-1.0.jar',
+                                              'a.b.b-2.jar',
                                             ],
                                             {
                                               'a.b.b-classpath.txt':
@@ -179,6 +179,25 @@ class ClasspathUtilTest(BaseTest):
                                               'a/b/b/c/c/classpath.txt':
                                                 '{}/c.jar\n'.format(self.pants_workdir),
                                             })
+
+  def test_create_canonical_classpath_with_broken_classpath(self):
+    """Test exception is thrown when the jar file is missing."""
+
+    a = self.make_target('a/b', JvmTarget)
+    classpath_products = ClasspathProducts(self.pants_workdir)
+    jar_path = 'ivy/jars/org.x/lib/x-1.0.jar'
+
+    # this sets the path for the artifact without actually materializing it.
+    resolved_jar = ResolvedJar(M2Coordinate(org='org', name='x', rev='1.0'),
+                               cache_path='somewhere',
+                               pants_path=os.path.join(self.pants_workdir, jar_path))
+    classpath_products.add_jars_for_targets([a], 'default', [resolved_jar])
+
+    with temporary_dir() as base_dir:
+      with self.assertRaises(MissingClasspathEntryError):
+        self._test_canonical_classpath_helper(classpath_products, [a],
+                                              base_dir, False,
+                                              [], {})
 
   def _test_canonical_classpath_helper(self, classpath_products, targets,
                                        libs_dir,
