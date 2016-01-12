@@ -27,7 +27,7 @@ def format_node(node, state):
   return '{}:{}:{}: {}'.format(node.product.__name__, node.subject, name, result)
 
 
-def create_digraph(execution_graph):
+def create_digraph(walk_execution_graph):
 
   colorscheme = 'set312'
   colors = {}
@@ -40,28 +40,22 @@ def create_digraph(execution_graph):
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for node, dependency_nodes in execution_graph.dependencies().items():
-    if type(execution_graph.state(node)) == Throw:
-      continue
-
-    node_str = format_node(node, execution_graph.state(node))
-    color = color_index(node.product)
+  for ((node, node_state), dependency_entries) in walk_execution_graph():
+    node_str = format_node(node, node_state)
 
     yield ('  node [style=filled, fillcolor={color}] "{node}";'
-            .format(color=color,
+            .format(color=color_index(node.product),
                     node=node_str))
 
-    for dep in dependency_nodes:
-      if type(execution_graph.state(dep)) == Throw:
-        continue
-      yield '  "{}" -> "{}"'.format(node_str, format_node(dep, execution_graph.state(dep)))
+    for (dep, dep_state) in dependency_entries:
+      yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
 
   yield '}'
 
 
-def visualize_execution_graph(execution_graph):
+def visualize_execution_graph(walk_execution_graph):
   with temporary_file() as fp:
-    for line in create_digraph(execution_graph):
+    for line in create_digraph(walk_execution_graph):
       fp.write(line)
       fp.write('\n')
     fp.close()
@@ -73,7 +67,7 @@ def visualize_execution_graph(execution_graph):
 def visualize_build_request(build_root, build_request):
   _, scheduler = setup_json_scheduler(build_root)
   LocalSerialEngine(scheduler).reduce(build_request)
-  visualize_execution_graph(scheduler.product_graph)
+  visualize_execution_graph(scheduler.walk_product_graph)
 
 
 def main():

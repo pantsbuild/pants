@@ -300,6 +300,25 @@ class ProductGraph(object):
   def dependencies_of(self, node):
     return self._dependencies[node]
 
+  def walk(self, roots):
+    def _entry(node):
+      return (node, self.state(node))
+
+    walked = set()
+    def _walk(nodes):
+      for node in nodes:
+        if node in walked:
+          continue
+        walked.add(node)
+        dependencies = self.dependencies_of(node)
+        dependency_entries = [_entry(d) for d in dependencies]
+        yield (_entry(node), dependency_entries)
+        for d in _walk(dependencies):
+          yield d
+
+    for node in _walk(roots):
+      yield node
+
   def sources_for(self, subject, product, consumed_product=None):
     """Yields the set of Sources for the given subject and product (which consume the given config).
 
@@ -514,9 +533,14 @@ class LocalScheduler(object):
     # Roots are products that might be possible to produce for these subjects.
     return [SelectNode(s, p) for s in root_subjects for p in root_products]
 
-  @property
-  def product_graph(self):
-    return self._product_graph
+  def walk_product_graph(self):
+    """Yields successful Nodes, starting from the roots for this Scheduler.
+
+    Each node entry is actually a tuple of (Node, State), and each yielded value is
+    a tuple of (node_entry, dependency_node_entries)
+    """
+    for node in self._product_graph.walk(self._roots):
+      yield node
 
   def schedule(self, build_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
