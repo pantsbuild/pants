@@ -7,7 +7,25 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 
 class RecursiveVersion(object):
-  """Descriptor Class for Task Versions"""
+  """Descriptor Class for Task Versions
+
+  This is used to describe the version attribute on a class.
+
+  Ex:
+    class Foo(object):
+      version = RecursiveVersion(1)
+
+
+    class Bar(Foo):
+      pass
+
+
+    class Baz(Bar):
+      version = RecursiveVersion(2)
+
+    o = Baz()
+    assert o.version == '1._.2'
+  """
 
   def __init__(self, value):
     self.value = str(value)

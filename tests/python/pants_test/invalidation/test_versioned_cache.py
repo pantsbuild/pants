@@ -19,7 +19,6 @@ from pants_test.base_test import BaseTest
 
 class VersionedTaskCacheTester(TaskBase):
   options_scope = 'versioned-cache-test'
-  pass
 
 
 class TaskV1(VersionedTaskCacheTester):
