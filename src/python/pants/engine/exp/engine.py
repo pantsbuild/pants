@@ -407,12 +407,16 @@ class LocalMultiprocessEngine(Engine):
     pending_submission = OrderedSet()
     in_flight = dict()
 
-    def submit_to_capacity():
-      """Remove and submit pending steps from pending_submission while there is capacity."""
-      while pending_submission and len(in_flight) < self._pool_size:
+    def submit_until(n):
+      """Submit pending while there's capacity, and more than `n` items pending_submission."""
+      submitted = 0
+      while len(pending_submission) > n and len(in_flight) < self._pool_size:
         step, promise = pending_submission.pop(last=False)
         in_flight[step] = promise
         executor.submit(step)
+        submitted += 1
+      #print('>>> submitted {}/{} items'.format(submitted, n))
+      return submitted
 
     def await_one():
       """Await one completed step, and remove it from in_flight."""
@@ -422,6 +426,7 @@ class LocalMultiprocessEngine(Engine):
       if step not in in_flight:
         raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight))
       in_flight.pop(step).success(result)
+      #print('>>> awaited one item')
 
     # The main reduction loop:
     # 1. Whenever we don't have enough work to saturate the pool, request more.
@@ -434,9 +439,14 @@ class LocalMultiprocessEngine(Engine):
       else:
         # Submit and wait for work for as long as we're able to keep the pool saturated.
         pending_submission.update(step_batch)
-        submit_to_capacity()
-      await_one()
-      print('>>> there are {} outstanding and {} pending submission!'.format(len(in_flight), len(pending_submission)))
+        while submit_until(self._pool_size) > 0:
+          #print('>>> awaiting one after receiving a batch')
+          await_one()
+      # Await at least one entry per scheduling loop.
+      submit_until(0)
+      if in_flight:
+        await_one()
+      #print('>>> there are {} outstanding and {} pending submission!'.format(len(in_flight), len(pending_submission)))
 
     # Consume all steps.
     while pending_submission or in_flight:
