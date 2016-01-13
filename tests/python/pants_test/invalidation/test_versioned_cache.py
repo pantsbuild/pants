@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -48,21 +48,15 @@ class VersionedClassTests(BaseTest):
 
     with temporary_dir() as workdir:
       cache_dir = os.path.join(workdir, 'cache_test')
-      #Create a task instance
+      # Create a task instance
       task1 = TaskV1(context, workdir)
       task2 = TaskV2(context, workdir)
 
-      #Fetch the cacheManager to use in VTS
-      cm_1 = task1.create_cache_manager(False)
-      cm_2 = task2.create_cache_manager(False)
+      # Create results dir for target with both task versions.
+      for t_vn in (task1, task2):
+        cm = t_vn.create_cache_manager(False)
+        vt = VersionedTarget(cm, target, cache_key)
+        vt.create_results_dir(cache_dir, True)
 
-      #Create versionedTarget and pass it cm1.
-      vt1 = VersionedTarget(cm_1, target, cache_key)
-      vt1.create_results_dir(cache_dir, True)
-
-      #Create versionedTarget and pass it cm1.
-      vt2 = VersionedTarget(cm_2, target, cache_key)
-      vt2.create_results_dir(cache_dir, True)
-
-      cached_dirs = os.listdir(os.path.join(workdir,cache_dir))
+      cached_dirs = os.listdir(os.path.join(workdir, cache_dir))
       self.assertEquals(len(cached_dirs), 2)

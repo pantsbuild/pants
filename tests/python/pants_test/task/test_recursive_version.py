@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -68,3 +68,37 @@ def test_missing_base():
 
   o = Baz()
   assert o.version == '_.2.3'
+
+
+def test_toplevel_mixin():
+  class Foo(object):
+    pass
+
+  class Bar(Foo):
+    version = RecursiveVersion(2)
+
+  class TopMixin(object):
+    version = RecursiveVersion(20)
+
+  class Baz(Bar, TopMixin):
+    version = RecursiveVersion(3)
+
+  o = Baz()
+  assert o.version == '20._.2.3'
+
+
+def test_inherited_mixin():
+  class Foo(object):
+    pass
+
+  class MidMixin(object):
+    version = RecursiveVersion(20)
+
+  class Bar(Foo, MidMixin):
+    version = RecursiveVersion(2)
+
+  class Baz(Bar, ):
+    version = RecursiveVersion(3)
+
+  o = Baz()
+  assert o.version == '20._.2.3'

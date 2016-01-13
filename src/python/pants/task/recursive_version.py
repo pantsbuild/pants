@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -18,27 +18,31 @@ class RecursiveVersion(object):
     a version isn't specified use an _ to indicate a null version.
 
     We use an _ to indicate non specified versions to differentiate between:
-      1.x.2 and 1.2 where the first version is nested 3 classes deep and the
-      second only 2
+      1._.2 and 1.2 where the first version is nested 3 classes deep and the
+      second only 2.
 
-    We use a . to differentiate between cases like 1.11 and 11.1
+    We use a . to differentiate between cases like 1.11 and 11.1.
 
-    Versions will be returned in the following format where where a,b and c are
+    Versions will be returned in the following format where where a, b and c are
     presented in resolution order:
     a.b.c
     """
-    def has_version(klass):
-      return 'version' in klass.__dict__
+    def class_version(klass):
+      """Ensure that if version isn't specified we return a value to avoid ambigous versions"""
+      if 'version' in klass.__dict__:
+        return klass.version
+      else:
+        return '_'
 
-    if type is None:
-      raise AttributeError(
-        "Direct invocation of __get__ is not allowed on RecursiveVersion objects"
-      )
+    # self is the instance of the descriptor. obj is instance its attached to.
+    mro = obj.__class__.mro()
 
-    parent = type.mro()[1]
-    version = str(self.value) if has_version(type) else "_"
-    # Stop recursing at object
-    if parent is object:
-      return version
+    # Ignore self and object from MRO to get parents.
+    parents = [klass for klass in mro[1:-1]]
+    parent_versions = map(class_version, parents)
+    if 'version' in type.__dict__:
+      cur = self.value
     else:
-      return "{}.{}".format(getattr(parent, 'version', '_'), version)
+      cur = '_'
+    versions = [cur] + parent_versions
+    return ".".join(map(str, versions[::-1]))
