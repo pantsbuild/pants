@@ -23,14 +23,15 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     start = time.time()
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
+                                '--test-pytest-coverage=1',
                                 '--test-pytest-options="-k sleep_long"',
                                 '--timeout-default=1',
                                 'testprojects/tests/python/pants/timeout:sleeping_target'])
     end = time.time()
     self.assert_failure(pants_run)
 
-    # Ensure that the failure took less than 120 seconds to run.
-    self.assertLess(end - start, 120)
+    # Ensure that the failure took less than 5 seconds to run.
+    self.assertLess(end - start, 5)
 
     # Ensure that the timeout message triggered.
     self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
