@@ -24,10 +24,10 @@ def format_node(node, state):
   else:
     name = type(node).__name__
   result = str(state).replace('"', '\\"')
-  return '{}:{}:{}: {}'.format(node.product.__name__, node.subject, name, result)
+  return '{}:{}:{} == {}'.format(node.product.__name__, node.subject, name, result)
 
 
-def create_digraph(walk_execution_graph):
+def create_digraph(scheduler):
 
   colorscheme = 'set312'
   colors = {}
@@ -40,7 +40,7 @@ def create_digraph(walk_execution_graph):
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state), dependency_entries) in walk_execution_graph():
+  for ((node, node_state), dependency_entries) in scheduler.walk_product_graph():
     node_str = format_node(node, node_state)
 
     yield ('  node [style=filled, fillcolor={color}] "{node}";'
@@ -53,9 +53,9 @@ def create_digraph(walk_execution_graph):
   yield '}'
 
 
-def visualize_execution_graph(walk_execution_graph):
+def visualize_execution_graph(scheduler):
   with temporary_file() as fp:
-    for line in create_digraph(walk_execution_graph):
+    for line in create_digraph(scheduler):
       fp.write(line)
       fp.write('\n')
     fp.close()
@@ -67,7 +67,7 @@ def visualize_execution_graph(walk_execution_graph):
 def visualize_build_request(build_root, build_request):
   _, scheduler = setup_json_scheduler(build_root)
   LocalMultiprocessEngine(scheduler).reduce(build_request)
-  visualize_execution_graph(scheduler.walk_product_graph)
+  visualize_execution_graph(scheduler)
 
 
 def main():

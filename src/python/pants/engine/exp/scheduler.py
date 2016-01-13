@@ -301,23 +301,31 @@ class ProductGraph(object):
   def dependencies_of(self, node):
     return self._dependencies[node]
 
-  def walk(self, roots):
-    def _entry(node):
-      return (node, self.state(node))
+  def walk(self, roots, predicate=None):
+    def _default_walk_predicate(entry):
+      node, state = entry
+      return type(state) != Throw
+    predicate = predicate or _default_walk_predicate
+
+    def _filtered_entries(nodes):
+      all_entries = [(n, self.state(n)) for n in nodes]
+      if not predicate:
+        return all_entries
+      return [entry for entry in all_entries if predicate(entry)]
 
     walked = set()
-    def _walk(nodes):
-      for node in nodes:
+    def _walk(entries):
+      for entry in entries:
+        node, state = entry
         if node in walked:
           continue
         walked.add(node)
-        dependencies = self.dependencies_of(node)
-        dependency_entries = [_entry(d) for d in dependencies]
-        yield (_entry(node), dependency_entries)
-        for d in _walk(dependencies):
-          yield d
+        dependencies = _filtered_entries(self.dependencies_of(node))
+        yield (entry, dependencies)
+        for e in _walk(dependencies):
+          yield e
 
-    for node in _walk(roots):
+    for node in _walk(_filtered_entries(roots)):
       yield node
 
   def sources_for(self, subject, product, consumed_product=None):
@@ -556,13 +564,16 @@ class LocalScheduler(object):
     # Roots are products that might be possible to produce for these subjects.
     return [SelectNode(s, p) for s in root_subjects for p in root_products]
 
-  def walk_product_graph(self):
-    """Yields successful Nodes, starting from the roots for this Scheduler.
+  def walk_product_graph(self, predicate=None):
+    """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
 
     Each node entry is actually a tuple of (Node, State), and each yielded value is
-    a tuple of (node_entry, dependency_node_entries)
+    a tuple of (node_entry, dependency_node_entries).
+
+    The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
+    that don't match it. The default predicate eliminates all `Throw` subgraphs.
     """
-    for node in self._product_graph.walk(self._roots):
+    for node in self._product_graph.walk(self._roots, predicate=predicate):
       yield node
 
   def root_entries(self):
