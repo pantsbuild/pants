@@ -327,7 +327,7 @@ class SerializationError(Exception):
 def _try_pickle(obj):
   with open(os.devnull, 'w') as devnull:
     try:
-      print('>>> pickle of len {} (with strlen {})'.format(len(pickle.dumps(obj)), len(str(obj))))#), devnull)
+      pickle.dump(obj, devnull)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
@@ -355,21 +355,22 @@ def _execute_step(step, debug):
 class LocalMultiprocessEngine(Engine):
   """An engine that runs tasks locally and in parallel when possible using a process pool."""
 
-  def __init__(self, scheduler, pool_size=None, debug=False):
+  def __init__(self, scheduler, pool_size=None, debug=True):
     """
     :param local_scheduler: The local scheduler for creating execution graphs.
     :type local_scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
-    :param int pool_size: The number of worker processes to use; by default 1 process per core will
+    :param int pool_size: The number of worker processes to use; by default 2 processes per core will
                           be used.
-    :param bool debug: `True` to turn on pickling error debug mode (slower); false by default.
+    :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
+                       TODO: disable by default, and enable in the pantsbuild/pants repo.
     """
     super(LocalMultiprocessEngine, self).__init__(scheduler)
-    self._pool_size = pool_size if pool_size and pool_size > 0 else multiprocessing.cpu_count()
+    self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
     self._pool = multiprocessing.Pool(self._pool_size)
     self._debug = debug
 
   class Executor(FailSlowHelper):
-    def __init__(self, pool, pool_size, fail_slow=False, debug=False):
+    def __init__(self, pool, pool_size, fail_slow, debug):
       super(LocalMultiprocessEngine.Executor, self).__init__()
 
       self._pool = pool

@@ -38,7 +38,7 @@ class EngineTest(unittest.TestCase):
 
   @contextmanager
   def multiprocessing_engine(self, pool_size=None):
-    with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=False)) as e:
+    with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=True)) as e:
       yield e
 
   def test_serial_engine_simple(self):
@@ -87,15 +87,7 @@ class EngineTest(unittest.TestCase):
     with self.multiprocessing_engine(pool_size=1) as engine:
       self.assert_engine_fail_slow(engine)
 
-  def test_multiprocess_unpicklable_inputs(self):
-    build_request = BuildRequest(goals=['unpickleable'],
-                                 addressable_roots=[self.java.address])
-
-    with self.multiprocessing_engine() as engine:
-      with self.assertRaises(SerializationError):
-        engine.execute(build_request)
-
-  def test_multiprocess_unpicklable_outputs(self):
+  def test_multiprocess_unpickleable(self):
     build_request = BuildRequest(goals=['unpickleable'],
                                  addressable_roots=[self.java.address])
 

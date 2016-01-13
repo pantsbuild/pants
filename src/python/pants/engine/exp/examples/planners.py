@@ -179,7 +179,7 @@ def scalac(sources, classpath):
 # TODO(John Sirois): When https://github.com/pantsbuild/pants/issues/2413 is resolved, move the
 # unpickleable input and output test planners below to engine test.  There will be less setup
 # required at that point since no target addresses will need to be supplied in the build_request.
-class UnpickleableInput(object):
+class UnpickleableOutput(object):
   pass
 
 
@@ -187,9 +187,14 @@ class UnpickleableResult(object):
   pass
 
 
-def unpickleable_func():
+def unpickleable_output():
+  """Generates an unpickleable output."""
   # Nested functions like this lambda are unpicklable.
   return lambda: None
+
+
+def unpickleable_input(unpickleable):
+  raise Exception('This function should never run, because its selected input is unpickleable.')
 
 
 def setup_json_scheduler(build_root):
@@ -263,12 +268,12 @@ def setup_json_scheduler(build_root):
        [SelectSubject(ScalaSources),
         SelectDependencies(Classpath, ScalaSources)],
        scalac),
-      (UnpickleableInput,
+      (UnpickleableOutput,
         [],
-        unpickleable_func),
+        unpickleable_output),
       (UnpickleableResult,
-       [SelectSubject(UnpickleableInput)],
-       unpickleable_func),
+       [SelectSubject(UnpickleableOutput)],
+       unpickleable_input),
     ]
   scheduler = LocalScheduler(graph, products_by_goal, tasks)
   return graph, scheduler
