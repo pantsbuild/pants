@@ -286,11 +286,19 @@ class Engine(AbstractClass):
     :returns: The result of the run.
     :rtype: :class:`Engine.Result`
     """
+    def reduce():
+      try:
+        self.reduce(build_request, fail_slow)
+        return self.Result.finished(self._scheduler.root_entries())
+      except TaskError as e:
+        return self.Result.failure(e)
+
+    import cProfile
+    profiler = cProfile.Profile()
     try:
-      self.reduce(build_request, fail_slow)
-      return self.Result.finished(self._scheduler.root_entries())
-    except TaskError as e:
-      return self.Result.failure(e)
+      return profiler.runcall(reduce)
+    finally:
+      profiler.dump_stats('/Users/stuhood/Desktop/profile.txt')
 
   @abstractmethod
   def reduce(self, build_request, fail_slow=False):
@@ -327,7 +335,7 @@ class SerializationError(Exception):
 def _try_pickle(obj):
   with open(os.devnull, 'w') as devnull:
     try:
-      pickle.dump(obj, devnull)
+      print('>>> pickle of len {} (with strlen {})'.format(len(pickle.dumps(obj)), len(str(obj))))#), devnull)
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
@@ -398,7 +406,6 @@ class LocalMultiprocessEngine(Engine):
     # Steps move from `pending_submission` to `in_flight`.
     pending_submission = OrderedSet()
     in_flight = dict()
-    completed = set()
 
     def submit_to_capacity():
       """Remove and submit pending steps from pending_submission while there is capacity."""
@@ -414,9 +421,6 @@ class LocalMultiprocessEngine(Engine):
       step, result = executor.await_one_result()
       if step not in in_flight:
         raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight))
-      if step._step_id in completed:
-        raise Exception('Step {} has already been completed.'.format(step))
-      completed.add(step._step_id)
       in_flight.pop(step).success(result)
 
     # The main reduction loop:
@@ -432,18 +436,12 @@ class LocalMultiprocessEngine(Engine):
         pending_submission.update(step_batch)
         submit_to_capacity()
       await_one()
+      print('>>> there are {} outstanding and {} pending submission!'.format(len(in_flight), len(pending_submission)))
 
     # Consume all steps.
     while pending_submission or in_flight:
       submit_to_capacity()
       await_one()
-
-    print('completed')
-    prev = None
-    for step_id in sorted(completed):
-      if prev and prev + 1 != step_id:
-        print('  >>> missing! {} vs {}'.format(prev, step_id))
-      prev = step_id
 
   def close(self):
     self._pool.close()

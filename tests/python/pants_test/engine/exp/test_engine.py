@@ -35,10 +35,11 @@ class EngineTest(unittest.TestCase):
     self.assertEqual({SelectNode(self.java, Classpath): Return(Classpath(creator='javac'))},
                      result.root_products)
     self.assertIsNone(result.error)
+    self.assertFalse(True)
 
   @contextmanager
   def multiprocessing_engine(self, pool_size=None):
-    with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=True)) as e:
+    with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=False)) as e:
       yield e
 
   def test_serial_engine(self):

@@ -425,30 +425,28 @@ class BuildRequest(object):
 
 
 class Promise(object):
-  """A simple Promise/Future class to hand off a value between threads.
-
-  TODO: switch to python's Future when it becomes available.
-  """
+  """An extremely simple _non-threadsafe_ Promise class."""
 
   def __init__(self):
     self._success = None
     self._failure = None
-    self._event = threading.Event()
+    self._is_complete = False
 
   def is_complete(self):
-    return self._event.is_set()
+    return self._is_complete
 
   def success(self, success):
     self._success = success
-    self._event.set()
+    self._is_complete = True
 
   def failure(self, exception):
     self._failure = exception
-    self._event.set()
+    self._is_complete = True
 
   def get(self):
-    """Blocks until the resulting value is available, or raises the resulting exception."""
-    self._event.wait()
+    """Returns the resulting value, or raises the resulting exception."""
+    if not self._is_complete:
+      raise ValueError('{} has not been completed.'.format(self))
     if self._failure:
       raise self._failure
     else:
@@ -587,7 +585,6 @@ class LocalScheduler(object):
     candidates = set(root for root in self._roots)
 
     # Yield nodes that are ready, and then compute new ones.
-    i = 0
     while True:
 
       # Create Steps for candidates that are not already running.
@@ -606,8 +603,7 @@ class LocalScheduler(object):
           raise Exception('No running tasks, but {} candidates to run!'.format(len(candidates)))
         break
 
-      print('!!! {} scheduling iteration; {} steps.'.format(i, self._step_id))
-      i += 1
+      print('>>> yielding {}'.format(len(ready)))
       yield ready.values()
 
       # Finalize completed Steps.
@@ -624,3 +620,5 @@ class LocalScheduler(object):
         else:
           # Waiting on dependencies: mark them as candidates for Steps.
           candidates.update(d for d in pg.dependencies_of(step.node))
+
+    print('>>> there are {} nodes in the graph'.format(len(pg.dependencies())))
