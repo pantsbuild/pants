@@ -580,15 +580,16 @@ class LocalScheduler(object):
     self._roots.update(self._create_roots(build_request))
 
     # A dict from Node to a possibly executing Step. Only one Step exists for a Node at a time.
-    ready = {}
-    # Nodes that should have Steps created (after any outstanding Step returns).
+    outstanding = {}
+    # Nodes that might need to have Steps created (after any outstanding Step returns).
     candidates = set(root for root in self._roots)
 
     # Yield nodes that are ready, and then compute new ones.
     while True:
       # Create Steps for candidates that are not already running.
+      ready = dict()
       for candidate_node in list(candidates):
-        if candidate_node in ready:
+        if candidate_node in outstanding:
           # Node is still a candidate, but is currently running.
           continue
         if pg.is_complete(candidate_node):
@@ -597,21 +598,20 @@ class LocalScheduler(object):
           continue
         ready[candidate_node] = self._create_step(candidate_node)
 
-      if not ready:
-        if candidates:
-          raise Exception('No running tasks, but {} candidates to run!'.format(len(candidates)))
+      if not ready and not outstanding:
+        # Finished.
         break
-
       yield ready.values()
+      outstanding.update(ready)
 
       # Finalize completed Steps.
-      for node, entry in ready.items()[:]:
+      for node, entry in outstanding.items()[:]:
         step, promise = entry
         if not step.finalize(promise, pg):
           # Still executing.
           continue
         # This step has completed; if the Node has completed, its dependents are candidates.
-        ready.pop(node)
+        outstanding.pop(node)
         if pg.is_complete(step.node):
           # The Node is completed: mark any of its dependents as candidates for Steps.
           candidates.update(d for d in pg.dependents_of(step.node))

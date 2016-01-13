@@ -286,19 +286,11 @@ class Engine(AbstractClass):
     :returns: The result of the run.
     :rtype: :class:`Engine.Result`
     """
-    def reduce():
-      try:
-        self.reduce(build_request, fail_slow)
-        return self.Result.finished(self._scheduler.root_entries())
-      except TaskError as e:
-        return self.Result.failure(e)
-
-    import cProfile
-    profiler = cProfile.Profile()
     try:
-      return profiler.runcall(reduce)
-    finally:
-      profiler.dump_stats('/Users/stuhood/Desktop/profile.txt')
+      self.reduce(build_request, fail_slow)
+      return self.Result.finished(self._scheduler.root_entries())
+    except TaskError as e:
+      return self.Result.failure(e)
 
   @abstractmethod
   def reduce(self, build_request, fail_slow=False):
@@ -412,6 +404,8 @@ class LocalMultiprocessEngine(Engine):
       to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
       for _ in range(to_submit):
         step, promise = pending_submission.pop(last=False)
+        if step in in_flight:
+          raise Exception('{} is already in_flight!'.format(step))
         in_flight[step] = promise
         executor.submit(step)
       return to_submit
@@ -422,9 +416,8 @@ class LocalMultiprocessEngine(Engine):
         raise Exception('Awaited an empty pool!')
       step, result = executor.await_one_result()
       if step not in in_flight:
-        raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight))
+        raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight.keys()))
       in_flight.pop(step).success(result)
-      #print('>>> awaited one item')
 
     # The main reduction loop:
     # 1. Whenever we don't have enough work to saturate the pool, request more.

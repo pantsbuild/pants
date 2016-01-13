@@ -12,7 +12,7 @@ from textwrap import dedent
 
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
-from pants.engine.exp.engine import LocalSerialEngine
+from pants.engine.exp.engine import LocalMultiprocessEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
 from pants.engine.exp.scheduler import BuildRequest, TaskNode, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
@@ -66,7 +66,7 @@ def visualize_execution_graph(walk_execution_graph):
 
 def visualize_build_request(build_root, build_request):
   _, scheduler = setup_json_scheduler(build_root)
-  LocalSerialEngine(scheduler).reduce(build_request)
+  LocalMultiprocessEngine(scheduler).reduce(build_request)
   visualize_execution_graph(scheduler.walk_product_graph)
 
 
