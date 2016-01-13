@@ -34,10 +34,16 @@ class JvmPrepCommand(JvmTarget):
   triggered when running targets that depend on the `prep_command()` target or when the
   target is referenced from the command line.
   """
+  _goals=frozenset()
+
+  @staticmethod
+  def add_goal(goal):
+    """Add a named goal to the list of valid goals for the 'goal' parameter."""
+    JvmPrepCommand._goals = frozenset(list(JvmPrepCommand._goals) + [goal])
 
   @staticmethod
   def goals():
-    return ['compile', 'test', 'binary']
+    return JvmPrepCommand._goals
 
   def __init__(self, payload=None, mainclass=None, args=None, jvm_options=None, goal=None,
       **kwargs):
