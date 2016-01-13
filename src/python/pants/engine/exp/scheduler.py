@@ -586,7 +586,6 @@ class LocalScheduler(object):
 
     # Yield nodes that are ready, and then compute new ones.
     while True:
-
       # Create Steps for candidates that are not already running.
       for candidate_node in list(candidates):
         if candidate_node in ready:
@@ -603,7 +602,6 @@ class LocalScheduler(object):
           raise Exception('No running tasks, but {} candidates to run!'.format(len(candidates)))
         break
 
-      print('>>> yielding {}'.format(len(ready)))
       yield ready.values()
 
       # Finalize completed Steps.
@@ -620,5 +618,3 @@ class LocalScheduler(object):
         else:
           # Waiting on dependencies: mark them as candidates for Steps.
           candidates.update(d for d in pg.dependencies_of(step.node))
-
-    print('>>> there are {} nodes in the graph'.format(len(pg.dependencies())))

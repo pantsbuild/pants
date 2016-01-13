@@ -409,14 +409,12 @@ class LocalMultiprocessEngine(Engine):
 
     def submit_until(n):
       """Submit pending while there's capacity, and more than `n` items pending_submission."""
-      submitted = 0
-      while len(pending_submission) > n and len(in_flight) < self._pool_size:
+      to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
+      for _ in range(to_submit):
         step, promise = pending_submission.pop(last=False)
         in_flight[step] = promise
         executor.submit(step)
-        submitted += 1
-      #print('>>> submitted {}/{} items'.format(submitted, n))
-      return submitted
+      return to_submit
 
     def await_one():
       """Await one completed step, and remove it from in_flight."""
