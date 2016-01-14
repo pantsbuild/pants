@@ -233,3 +233,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
                       else self._depinfo.structs[language])
     deps.update(target.dependencies)
     return deps
+
+  @property
+  def _copy_target_attributes(self):
+    return ['provides']
