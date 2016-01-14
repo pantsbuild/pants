@@ -33,5 +33,8 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     # Ensure that the failure took less than 5 seconds to run.
     self.assertLess(end - start, 5)
 
+    # Ensure that a warning about coverage reporting was emitted.
+    self.assertIn("No .coverage file was found! Skipping coverage reporting", pants_run.stderr_data)
+
     # Ensure that the timeout message triggered.
     self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
