@@ -22,7 +22,7 @@ from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
-class Select(object):
+class Selector(object):
   def simplify(self, build_graph):
     """Simplifies this Select to a serializable version."""
     return self
@@ -32,21 +32,21 @@ class Select(object):
     """Constructs a Node for this select and the given subject."""
 
 
-class SelectSubject(datatype('Subject', ['product']), Select):
-  """Selects the Subject provided to the constructor."""
+class Select(datatype('Subject', ['product']), Selector):
+  """Selects the given Product for the Subject provided to the constructor."""
 
   def construct_node(self, subject):
     return SelectNode(subject, self.product)
 
 
-class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Select):
-  """Selects the dependencies of a product for the subject provided to the constructor."""
+class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Selector):
+  """Selects the dependencies of a Product for the Subject provided to the constructor."""
 
   def construct_node(self, subject):
     return SelectDependenciesNode(subject, self.product, self.deps_product)
 
 
-class SelectAddress(datatype('Address', ['address', 'product']), Select):
+class SelectAddress(datatype('Address', ['address', 'product']), Selector):
   """Selects the Subject represented by the given Address."""
 
   def simplify(self, build_graph):
@@ -57,7 +57,7 @@ class SelectAddress(datatype('Address', ['address', 'product']), Select):
     raise ValueError('{} must be resolved before it can be constructed.'.format(self))
 
 
-class SelectLiteral(datatype('LiteralSubject', ['subject', 'product']), Select):
+class SelectLiteral(datatype('LiteralSubject', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
 
   def construct_node(self, subject):
@@ -161,7 +161,7 @@ class Node(object):
 class SelectNode(datatype('SelectNode', ['subject', 'product']), Node):
   """A Node that selects a product for a subject.
 
-  A Select can be satisfied by multiple sources, and so it acts like an OR.
+  A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR.
   """
 
   def _dependencies(self, node_builder):

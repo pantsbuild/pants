@@ -18,7 +18,7 @@ from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
 from pants.engine.exp.scheduler import (LocalScheduler, SelectAddress, SelectDependencies,
-                                        SelectSubject)
+                                        Select)
 from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized, memoized_property
 
@@ -234,45 +234,45 @@ def setup_json_scheduler(build_root):
     }
   tasks = [
       (JavaSources,
-       [SelectSubject(ThriftSources),
-        SelectSubject(ApacheThriftJavaConfiguration)],
+       [Select(ThriftSources),
+        Select(ApacheThriftJavaConfiguration)],
        gen_apache_thrift),
       (PythonSources,
-       [SelectSubject(ThriftSources),
-        SelectSubject(ApacheThriftPythonConfiguration)],
+       [Select(ThriftSources),
+        Select(ApacheThriftPythonConfiguration)],
        gen_apache_thrift),
       (ScalaSources,
-       [SelectSubject(ThriftSources),
-        SelectSubject(ScroogeScalaConfiguration),
+       [Select(ThriftSources),
+        Select(ScroogeScalaConfiguration),
         SelectAddress(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
       (JavaSources,
-       [SelectSubject(ThriftSources),
-        SelectSubject(ScroogeJavaConfiguration),
+       [Select(ThriftSources),
+        Select(ScroogeJavaConfiguration),
         SelectAddress(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
       (Classpath,
-       [SelectSubject(Jar)],
+       [Select(Jar)],
        ivy_resolve),
       (Classpath,
-       [SelectSubject(ResourceSources)],
+       [Select(ResourceSources)],
        isolate_resources),
       (Classpath,
-       [SelectSubject(BuildPropertiesConfiguration)],
+       [Select(BuildPropertiesConfiguration)],
        write_name_file),
       (Classpath,
-       [SelectSubject(JavaSources),
+       [Select(JavaSources),
         SelectDependencies(Classpath, JavaSources)],
        javac),
       (Classpath,
-       [SelectSubject(ScalaSources),
+       [Select(ScalaSources),
         SelectDependencies(Classpath, ScalaSources)],
        scalac),
       (UnpickleableOutput,
         [],
         unpickleable_output),
       (UnpickleableResult,
-       [SelectSubject(UnpickleableOutput)],
+       [Select(UnpickleableOutput)],
        unpickleable_input),
     ]
   scheduler = LocalScheduler(graph, products_by_goal, tasks)
