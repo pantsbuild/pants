@@ -53,7 +53,7 @@ class RecursiveVersion(object):
         return '_'
 
     # self is the instance of the descriptor. obj is instance its attached to.
-    mro = obj.__class__.mro()
+    mro = type(obj).mro()
 
     # Ignore self and object from MRO to get parents.
     parents = [klass for klass in mro[1:-1]]
@@ -63,4 +63,4 @@ class RecursiveVersion(object):
     else:
       cur = '_'
     versions = [cur] + parent_versions
-    return ".".join(map(str, versions[::-1]))
+    return ".".join(map(str, reversed(versions)))
