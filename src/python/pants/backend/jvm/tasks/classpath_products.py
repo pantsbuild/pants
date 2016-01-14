@@ -222,13 +222,13 @@ class ClasspathProducts(object):
     return self.get_for_targets_by_product(targets, respect_excludes).keys()
 
   def get_for_targets_by_product(self, targets, respect_excludes=True):
-    """Gets the classpath products for the given targets, grouped by targets.
+    """Gets the classpath products for the given targets, grouped by products.
 
     Products are returned in order, optionally respecting target excludes.
 
     :param targets: The targets to lookup classpath products for.
     :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
-    :returns: The ordered ((string, :class:`ClasspathEntry`), targets) mappings.
+    :returns: The ordered (classpath products, an OrderedSet of targets) mappings.
     :rtype: OrderedDict
     """
     classpath_by_product = self._classpaths.get_for_targets_by_product(targets)
