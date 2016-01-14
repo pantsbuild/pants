@@ -230,7 +230,7 @@ class ClasspathProducts(object):
 
     :param targets: The targets to lookup classpath products for.
     :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
-    :returns: The ordered (classpath, target) tuples.
+    :returns: The ordered (classpath products, target) tuples.
     """
     classpath_target_tuples = self._classpaths.get_product_target_mappings_for_targets(targets)
     if respect_excludes:
