@@ -30,7 +30,7 @@ class RecursiveVersion(object):
   def __init__(self, value):
     self.value = str(value)
 
-  def __get__(self, obj, type=None):
+  def __get__(self, obj, obj_type=None):
     """Get method for Descriptor protocol
     Fetch the version for an object and the version of its parents.  If
     a version isn't specified use an _ to indicate a null version.
@@ -58,7 +58,7 @@ class RecursiveVersion(object):
     # Ignore self and object from MRO to get parents.
     parents = [klass for klass in mro[1:-1]]
     parent_versions = map(class_version, parents)
-    if 'version' in type.__dict__:
+    if 'version' in obj_type.__dict__:
       cur = self.value
     else:
       cur = '_'
