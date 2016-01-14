@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 
 import six
 from twitter.common.collections import OrderedSet
@@ -62,10 +62,22 @@ class UnionProducts(object):
 
   def get_for_targets(self, targets):
     """Gets the union of the products for the given targets, preserving the input order."""
-    products = OrderedSet()
+    return self.get_for_targets_by_product(targets).keys()
+
+  def get_for_targets_by_product(self, targets):
+    """Gets the products for the given targets, grouped by products, preserving the input order.
+
+    :param targets: The targets to lookup products for.
+    :returns: The ordered (product, targets) tuples.
+    """
+    targets_by_product = OrderedDict()
     for target in targets:
-      products.update(self._products_by_target[target])
-    return products
+      for product in self._products_by_target[target]:
+        if not product in targets_by_product:
+          targets_by_product[product] = OrderedSet()
+        targets_by_product[product].add(target)
+
+    return targets_by_product
 
   def target_for_product(self, product):
     """Looks up the target key for a product.

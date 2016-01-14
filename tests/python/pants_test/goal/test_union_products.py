@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from collections import OrderedDict
+
 from twitter.common.collections import OrderedSet
 
 from pants.goal.products import UnionProducts
@@ -30,6 +32,19 @@ class UnionProductsTest(BaseTest):
     self.assertEquals(self.products.get_for_target(a), OrderedSet([1]))
     self.assertEquals(self.products.get_for_target(b), OrderedSet([2]))
     self.assertEquals(self.products.get_for_target(c), OrderedSet([3]))
+
+  def test_get_for_targets_by_product(self):
+    b = self.make_target('b')
+    a = self.make_target('a', dependencies=[b])
+    self.products.add_for_target(a, [1, 3])
+    self.products.add_for_target(b, [2, 3])
+
+    self.assertEquals(self.products.get_for_targets(a.closure(bfs=True)), OrderedSet([1, 3, 2]))
+    self.assertEquals(self.products.get_for_targets(b.closure(bfs=True)), OrderedSet([2, 3]))
+
+    self.assertEquals(self.products.get_for_targets_by_product(a.closure(bfs=True)),
+                      OrderedDict([(1, OrderedSet([a])), (3, OrderedSet([a, b])),
+                                   (2, OrderedSet([b]))]))
 
   def test_copy(self):
     c = self.make_target('c')

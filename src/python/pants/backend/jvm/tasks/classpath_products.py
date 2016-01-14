@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import OrderedDict
 
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -114,7 +115,8 @@ def _matches_exclude(coordinate, exclude):
 
 
 def _not_excluded_filter(excludes):
-  def not_excluded(path_tuple):
+  def not_excluded(product_to_targets):
+    path_tuple = product_to_targets[0]
     conf, classpath_entry = path_tuple
     return not classpath_entry.is_excluded_by(excludes)
   return not_excluded
@@ -217,11 +219,23 @@ class ClasspathProducts(object):
     :returns: The ordered (conf, classpath entry) tuples.
     :rtype: list of (string, :class:`ClasspathEntry`)
     """
-    classpath_tuples = self._classpaths.get_for_targets(targets)
+    return self.get_for_targets_by_product(targets, respect_excludes).keys()
+
+  def get_for_targets_by_product(self, targets, respect_excludes=True):
+    """Gets the classpath products for the given targets, grouped by targets.
+
+    Products are returned in order, optionally respecting target excludes.
+
+    :param targets: The targets to lookup classpath products for.
+    :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
+    :returns: The ordered ((string, :class:`ClasspathEntry`), targets) mappings.
+    :rtype: OrderedDict
+    """
+    classpath_by_product = self._classpaths.get_for_targets_by_product(targets)
     if respect_excludes:
-      return self._filter_by_excludes(classpath_tuples, targets)
+      return self._filter_by_excludes(classpath_by_product, targets)
     else:
-      return classpath_tuples
+      return classpath_by_product
 
   def get_artifact_classpath_entries_for_targets(self, targets, respect_excludes=True):
     """Gets the artifact classpath products for the given targets.
@@ -255,12 +269,12 @@ class ClasspathProducts(object):
     return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
             if not isinstance(cp_entry, ArtifactClasspathEntry)]
 
-  def _filter_by_excludes(self, classpath_tuples, root_targets):
+  def _filter_by_excludes(self, classpath_by_product, root_targets):
     # Excludes are always applied transitively, so regardless of whether a transitive
     # set of targets was included here, their closure must be included.
     closure = BuildGraph.closure(root_targets, bfs=True)
     excludes = self._excludes.get_for_targets(closure)
-    return filter(_not_excluded_filter(excludes), classpath_tuples)
+    return OrderedDict(filter(_not_excluded_filter(excludes), classpath_by_product.items()))
 
   def _add_excludes_for_target(self, target):
     if target.is_exported:
