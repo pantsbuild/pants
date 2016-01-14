@@ -17,8 +17,8 @@ from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
-from pants.engine.exp.scheduler import (LocalScheduler, SelectAddress, SelectDependencies,
-                                        Select)
+from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectAddress, SelectDependencies,
+                                        SelectVariant)
 from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized, memoized_property
 
@@ -71,6 +71,16 @@ class Classpath(Struct):
     super(Classpath, self).__init__(creator=creator, **kwargs)
 
 
+class ManagedResolve(Struct):
+  """A frozen ivy resolve that when combined with a ManagedJar can produce a Jar."""
+
+  def __init__(self, revs, **kwargs):
+    """
+    :param dict revs: A dict of artifact name to version.
+    """
+    super(Requirement, self).__init__(req=req, repo=repo, **kwargs)
+
+
 class Jar(Struct):
   """A java jar."""
 
@@ -82,6 +92,29 @@ class Jar(Struct):
     :param string rev: The Maven ``version`` of this dependency.
     """
     super(Jar, self).__init__(org=org, name=name, rev=rev, **kwargs)
+
+
+class ManagedJar(Struct):
+  """A java jar template, which can be merged with a ManagedResolve to determine a concrete version."""
+
+  def __init__(self, org=None, name=None, **kwargs):
+    """
+    :param string org: The Maven ``groupId`` of this dependency.
+    :param string name: The Maven ``artifactId`` of this dependency; also serves as the name portion
+                        of the address of this jar if defined at the top level of a BUILD file.
+    :param string rev: The Maven ``version`` of this dependency.
+    """
+    super(Jar, self).__init__(org=org, name=name, rev=rev, **kwargs)
+
+
+@printing_func
+def select_rev(managed_jar, managed_resolve):
+  (org, name) = entry = (managed_jar.org, managed_jar.name)
+  rev = managed_resolve.revs.get(entry, None)
+  if not rev:
+    # User error: attempting to use a ManagedJar that hasn't has its version frozen .
+    raise TaskError('{} does not have a managed version in {}.'.format(managed_jar, managed_resolve))
+  return Jar(org=managed_jar.org, name=managed_jar.name, rev=rev)
 
 
 @printing_func
@@ -235,25 +268,29 @@ def setup_json_scheduler(build_root):
   tasks = [
       (JavaSources,
        [Select(ThriftSources),
-        Select(ApacheThriftJavaConfiguration)],
+        SelectVariant('thrift', ApacheThriftJavaConfiguration)],
        gen_apache_thrift),
       (PythonSources,
        [Select(ThriftSources),
-        Select(ApacheThriftPythonConfiguration)],
+        SelectVariant('thrift', ApacheThriftPythonConfiguration)],
        gen_apache_thrift),
       (ScalaSources,
        [Select(ThriftSources),
-        Select(ScroogeScalaConfiguration),
+        SelectVariant('thrift', ScroogeScalaConfiguration),
         SelectAddress(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
       (JavaSources,
        [Select(ThriftSources),
-        Select(ScroogeJavaConfiguration),
+        SelectVariant('thrift', ScroogeJavaConfiguration),
         SelectAddress(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
       (Classpath,
        [Select(Jar)],
        ivy_resolve),
+      (Jar,
+       [Select(ManagedJar),
+        SelectVariant('resolve', ManagedResolve)],
+       select_rev),
       (Classpath,
        [Select(ResourceSources)],
        isolate_resources),

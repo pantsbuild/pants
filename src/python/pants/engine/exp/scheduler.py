@@ -16,7 +16,7 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import extract_config_selector
+from pants.engine.exp.addressable import extract_variants
 from pants.engine.exp.objects import Serializable, datatype
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -28,22 +28,36 @@ class Selector(object):
     return self
 
   @abstractmethod
-  def construct_node(self, subject):
-    """Constructs a Node for this select and the given subject."""
+  def construct_node(self, subject, variants):
+    """Constructs a Node for this Selector and the given Subject/Variants."""
 
 
 class Select(datatype('Subject', ['product']), Selector):
   """Selects the given Product for the Subject provided to the constructor."""
 
-  def construct_node(self, subject):
-    return SelectNode(subject, self.product)
+  def construct_node(self, subject, variants):
+    return SelectNode(subject, self.product, variants)
+
+
+class SelectVariant(datatype('Subject', ['variant', 'product']), Selector):
+  """Selects the Product matching the given variant for the Subject provided to the constructor.
+
+  TODO: better explain the relationship.
+  """
+
+  def construct_node(self, subject, variants):
+    variant_values = [value for key, value in variants
+                      if key == self.variant] if variants else None
+    return NativeNode(subject,
+                      self.product,
+                      variant_values[0] if variant_values else None)
 
 
 class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Selector):
   """Selects the dependencies of a Product for the Subject provided to the constructor."""
 
-  def construct_node(self, subject):
-    return SelectDependenciesNode(subject, self.product, self.deps_product)
+  def construct_node(self, subject, variants):
+    return SelectDependenciesNode(subject, self.product, variants, self.deps_product)
 
 
 class SelectAddress(datatype('Address', ['address', 'product']), Selector):
@@ -53,16 +67,36 @@ class SelectAddress(datatype('Address', ['address', 'product']), Selector):
     """Simplifies this Select to an executable version."""
     return SelectLiteral(build_graph.resolve(self.address), self.product)
 
-  def construct_node(self, subject):
+  def construct_node(self, subject, variants):
     raise ValueError('{} must be resolved before it can be constructed.'.format(self))
 
 
 class SelectLiteral(datatype('LiteralSubject', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
 
-  def construct_node(self, subject):
-    # NB: Intentionally ignores subject parameter.
-    return SelectNode(self.subject, self.product)
+  def construct_node(self, subject, variants):
+    # NB: Intentionally ignores subject parameter to provide a literal subject.
+    return SelectNode(self.subject, self.product, variants)
+
+
+class Variants(object):
+  """Variants are key-value pairs representing uniquely identifying parameters for a target.
+
+  They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
+  stored as sorted nested tuples of key-value strings.
+  """
+
+  @classmethod
+  def merge(cls, left, right):
+    if not left:
+      return right
+    if not right:
+      return left
+    # Merge by key, and then return sorted by key.
+    merged = dict(left)
+    for key, value in right:
+      merged[key] = value
+    return tuple(sorted(merged.items(), key=lambda x: x[0]))
 
 
 class SchedulingError(Exception):
@@ -158,7 +192,7 @@ class Node(object):
     """
 
 
-class SelectNode(datatype('SelectNode', ['subject', 'product']), Node):
+class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants']), Node):
   """A Node that selects a product for a subject.
 
   A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR.
@@ -167,9 +201,9 @@ class SelectNode(datatype('SelectNode', ['subject', 'product']), Node):
   def _dependencies(self, node_builder):
     """Returns a sequence of potential source Nodes for this Select."""
     # Look for native sources.
-    yield NativeNode(self.subject, self.product)
+    yield NativeNode(self.subject, self.product, None)
     # And for Tasks.
-    for task_node in node_builder.task_nodes(self.subject, self.product):
+    for task_node in node_builder.task_nodes(self.subject, self.product, self.variants):
       yield task_node
 
   def step(self, dependency_states, node_builder):
@@ -189,7 +223,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product']), Node):
       return Throw('No source of {}, {}'.format(self.subject, self.product))
 
 
-class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'product', 'dep_product']), Node):
+class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'product', 'variants', 'dep_product']), Node):
   """A Node that selects products for the dependencies of a product.
 
   Begins by selecting the `dep_product` for the subject, and then selects a product for each
@@ -197,7 +231,13 @@ class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'pro
   """
 
   def _dep_product_node(self):
-    return SelectNode(self.subject, self.dep_product)
+    return SelectNode(self.subject, self.dep_product, self.variants)
+
+  def _product_node(self, dependency):
+    dep_variants = None
+    if dependency.address:
+      dep_variants = extract_variants(dependency.address)
+    return SelectNode(dependency, self.product, Variants.merge(self.variants, dep_variants))
 
   def step(self, dependency_states, node_builder):
     dep_product_state = dependency_states.get(self._dep_product_node(), None)
@@ -209,7 +249,7 @@ class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'pro
     elif type(dep_product_state) == Return:
       #print('have dep product {} for {}'.format(dep_product_state, self))
       # The product and its dependency list are available.
-      dependencies = [SelectNode(d, self.product) for d in dep_product_state.value.dependencies]
+      dependencies = [self._product_node(d) for d in dep_product_state.value.dependencies]
       for dependency in dependencies:
         dep_state = dependency_states.get(dependency, None)
         if dep_state is None or type(dep_state) == Waiting:
@@ -227,10 +267,10 @@ class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'pro
       State.raise_unrecognized(dep_state)
 
 
-class TaskNode(datatype('TaskNode', ['subject', 'product', 'func', 'clause']), Node):
+class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', 'clause']), Node):
   def _dependencies(self, node_builder):
     for select in self.clause:
-      yield select.construct_node(self.subject)
+      yield select.construct_node(self.subject, self.variants)
 
   def step(self, dependency_states, node_builder):
     # If all dependency Nodes are Return, execute the Node.
@@ -249,17 +289,22 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'func', 'clause']), N
     return Return(self.func(*dep_values))
 
 
-class NativeNode(datatype('NativeNode', ['subject', 'product']), Node):
+class NativeNode(datatype('NativeNode', ['subject', 'product', 'variant']), Node):
   def step(self, dependency_states, node_builder):
+    product_value = None
     if type(self.subject) == self.product:
-      return Return(self.subject)
+      product_value = self.subject
     elif getattr(self.subject, 'configurations', None):
       for configuration in self.subject.configurations:
-        # TODO: returning only the first configuration of a given type. Need to define mergeability
-        # for products.
         if type(configuration) == self.product:
-          return Return(configuration)
-    return Throw('No native source of {} for {}'.format(self.product, self.subject))
+          product_value = configuration
+    # TODO: returning only the last configuration of a given type. Need to define
+    # mergeability for products.
+    if not product_value:
+      return Throw('No native source of {} for {}'.format(self.product, self.subject))
+    if self.variant and not getattr(product_value, 'name', None) == self.variant:
+      return Throw('No variant of {} matching {} for {}'.format(self.product, self.variant, self.subject))
+    return Return(product_value)
 
 
 class ProductGraph(object):
@@ -393,9 +438,9 @@ class NodeBuilder(object):
   def __init__(self, tasks):
     self._tasks = tasks
 
-  def task_nodes(self, subject, product):
+  def task_nodes(self, subject, product, variants):
     for task, anded_clause in self._tasks[product]:
-      yield TaskNode(subject, product, task, anded_clause)
+      yield TaskNode(subject, product, variants, task, anded_clause)
 
 
 class BuildRequest(object):
@@ -562,7 +607,8 @@ class LocalScheduler(object):
       root_products.update(self._products_by_goal[goal])
 
     # Roots are products that might be possible to produce for these subjects.
-    return [SelectNode(s, p) for s in root_subjects for p in root_products]
+    # TODO: allow specifying variants per Subject as part BuildRequest parsing.
+    return [SelectNode(s, p, None) for s in root_subjects for p in root_products]
 
   def walk_product_graph(self, predicate=None):
     """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.

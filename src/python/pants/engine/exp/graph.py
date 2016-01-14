@@ -11,7 +11,7 @@ import six
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import (AddressableDescriptor, TypeConstraintError,
-                                          strip_config_selector)
+                                          strip_variants)
 from pants.engine.exp.mapper import MappingError
 from pants.engine.exp.objects import Resolvable, Serializable, SerializableFactory, Validatable
 
@@ -118,7 +118,7 @@ class Graph(object):
                                            for a in resolve_path + [address])))
     resolve_path.append(address)
 
-    obj = self._address_mapper.resolve(strip_config_selector(address))
+    obj = self._address_mapper.resolve(strip_variants(address))
 
     def parse_addr(a):
       return Address.parse(a, relative_to=address.spec_path)
