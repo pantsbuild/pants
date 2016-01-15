@@ -1,0 +1,22 @@
+<div class="build-symbols">
+  <ul class="nobullets collapsible">
+    {{#infos}}
+      <a pantsmark="bdict_{{symbol}}"></a>
+      <li class="collapsed">
+        <code class="build-symbol">{{symbol}}</code>: <span class="build-symbol-description">{{description}}</span>
+        <ul class="nobullets">
+          <li>
+            <table class="build-symbol-args">
+              {{#args}}
+                <tr>
+                  <td><span class="build-symbol-arg-name">{{name}} = ...,</span></td>
+                  <td>{{description}}{{#has_default}}<span class="build-symbol-arg-default"> (default: {{default}})</span>{{/has_default}}</td>
+                </tr>
+              {{/args}}
+            </table>
+          </li>
+        </ul>
+      </li>
+    {{/infos}}
+  </ul>
+</div>

@@ -30,6 +30,7 @@ python_library(
   dependencies=[
     ':go_target',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:parse_context',
     'src/python/pants/base:payload',
     'src/python/pants/source',
   ],

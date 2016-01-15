@@ -11,37 +11,31 @@ Docs in the Code
 "Reference" information tends to live in the code. (Information for Pants developers, of course,
 lives in docstrings and comments; but some information for Pants *users* lives in the code, too.)
 
-### Goals, Tasks, and Options
+### Goals, tasks, and options
 
 When a user views a goal's options by entering `./pants compile -h` or browsing the
 <a pantsref="oref_goal_compile">Pants Options Reference</a>, they see text that "lives" in the
 Pants source code. If you [develop a `Task`](dev_tasks.html), document it:
 
-**Goal description:** If a goal will have multiple tasks in it, register its description
-using `Goal.register(name, description`.
+**Goal description:** You can explicitly register a goal's description
+using `Goal.register(name, description)`.
 
-In the common case where a goal will contain only a single task with the same name as the goal,
-the goal will default to using the first sentence of the task's docstring as its description.
+This description will default to the description of a task in that goal with the same name
+as the goal, if any.
+
+**Task description:** Task descriptions are derived from the first sentence of the docstring
+of the task class.
 
 **Option help** When registering a `Task` option, pass a `help` parameter to describe that option.
 
 !inc[start-at=register_options&end-at=help=](../core_tasks/list_goals.py)
 
-### Targets and other `BUILD` File Things
+### Target types and other `BUILD` file symbols
 
 When a user views a target's parameters by entering `./pants targets --details=java_library` or
-by browsing the <a pantsref="bdict_java_library">Pants BUILD Dictionary</a>, they're mostly
-seeing information from a docstring. Pants extracts the useful information with some reflection
-code.
+by browsing the <a pantsref="bdict_java_library">Pants BUILD Dictionary</a>, that information
+is derived from the docstrings of the classes implementing those symbols.
 
-In a few cases, the reflection code doesn't do the right thing without some "steering". E.g.,
-a Target is implemented by a Python class. *Most* of those class' methods aren't useful in
-`BUILD` files, but a few are. To reveal only the useful methods in the docs, Pants omits them
-by default, except those that have been tagged for inclusion.
-
-To "steer" the reflection, use a `@manual.builddict` annotation. See its
-[docstring](https://github.com/pantsbuild/pants/blob/master/src/python/pants/base/build_manual.py)
-for details about what it can show/hide.
 
 Generating the site
 -------------------

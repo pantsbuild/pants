@@ -24,6 +24,8 @@ class BinaryCreate(JvmBinaryTask):
     return ['jvm_binaries']
 
   def execute(self):
+    # TODO (peiyu) switch to `target.id` based naming to avoid potential `basename`
+    # conflicts among binary targets.
     for binary in self.context.targets(self.is_binary):
       self.create_binary(binary)
 

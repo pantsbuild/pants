@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 from textwrap import dedent
 
 from pants.util.contextutil import temporary_dir
@@ -15,12 +14,13 @@ from pants.util.contextutil import temporary_dir
 class ResolveJarsTestMixin(object):
   """Mixin for evaluating tasks which resolve their own source and javadoc jars (such as Export)."""
 
-  def evaluate_subtask(self, targets, workdir, load_extra_confs, expected_jars):
+  def evaluate_subtask(self, targets, workdir, load_extra_confs, extra_args, expected_jars):
     """Evaluate the underlying task with the given target specs.
 
     :param targets: the list of targets.
     :param string workdir: the working directory to execute in.
     :param bool load_extra_confs: whether to attempt to download sources and javadocs.
+    :param list extra_args: extra args to pass to the task.
     :param list expected_jars: list of jars that were expected to be resolved.
     """
     raise NotImplementedError()

@@ -19,7 +19,7 @@ def contains_exact_files(directory, expected_files, ignore_links=False):
   :param bool ignore_links: Indicates to ignore any file links.
   """
   found = []
-  for root, _, files in os.walk(directory):
+  for root, _, files in os.walk(directory, followlinks=not ignore_links):
     for f in files:
       p = os.path.join(root, f)
       if ignore_links and os.path.islink(p):

@@ -20,7 +20,9 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/protobuf/distance'])
     self.assert_success(pants_run)
-    out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-example-bundle')
+    out_path = os.path.join(get_buildroot(), 'dist',
+                            ('examples.src.java.org.pantsbuild.example.protobuf.distance'
+                             '.distance-bundle'))
     java_run = subprocess.Popen(['java', '-cp', 'protobuf-example.jar',
                                  'org.pantsbuild.example.protobuf.distance.ExampleProtobuf'],
                                 stdout=subprocess.PIPE,
@@ -35,7 +37,9 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/protobuf/imports'])
     self.assert_success(pants_run)
-    out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-imports-example-bundle')
+    out_path = os.path.join(get_buildroot(), 'dist',
+                            ('examples.src.java.org.pantsbuild.example.protobuf.imports'
+                             '.imports-bundle'))
     java_run = subprocess.Popen(['java', '-cp', 'protobuf-imports-example.jar',
                                  'org.pantsbuild.example.protobuf.imports.ExampleProtobufImports'],
                                 stdout=subprocess.PIPE,
@@ -55,7 +59,9 @@ class ProtobufIntegrationTest(PantsRunIntegrationTest):
                       "got stdout:\n{2}\n".format(pants_run.returncode,
                                                   pants_run.stderr_data,
                                                   pants_run.stdout_data))
-    out_path = os.path.join(get_buildroot(), 'dist', 'protobuf-unpacked-jars-example-bundle')
+    out_path = os.path.join(get_buildroot(), 'dist',
+                            ('examples.src.java.org.pantsbuild.example.protobuf.unpacked_jars'
+                             '.unpacked_jars-bundle'))
     args = ['java', '-cp', 'protobuf-unpacked-jars-example.jar',
             'org.pantsbuild.example.protobuf.unpacked_jars.ExampleProtobufExternalArchive']
     java_run = subprocess.Popen(args, stdout=subprocess.PIPE, cwd=out_path)

@@ -10,7 +10,6 @@ import os
 from pants.backend.jvm.ossrh_publication_metadata import (Developer, License,
                                                           OSSRHPublicationMetadata, Scm)
 from pants.backend.jvm.repository import Repository
-from pants.base.build_manual import manual
 from pants.build_graph.build_file_aliases import BuildFileAliases
 
 
@@ -45,12 +44,6 @@ def org_pantsbuild_publication_metadata(description):
       repo='pants'
     )
   )
-
-
-# Your repositories don't need this manual.builddict magic.
-# It keeps these examples out of http://pantsbuild.github.io/build_dictionary.html
-manual.builddict(suppress=True)(public_repo)
-manual.builddict(suppress=True)(testing_repo)
 
 
 def build_file_aliases():

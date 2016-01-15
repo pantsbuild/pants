@@ -74,7 +74,8 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
       },
       json.loads(self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/shading:third',
-        'third',
+        'testprojects.src.java.org.pantsbuild.testproject.shading.third',
+        bundle_jar_name='third',
         bundle_options=['--no-deployjar'],
         # The shaded jars are no longer symlinks to .pants.d, they are actual files.
         library_jars_are_symlinks=False,
@@ -91,7 +92,8 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
       },
       json.loads(self.bundle_and_run(
         'testprojects/src/java/org/pantsbuild/testproject/shading:third',
-        'third',
+        'testprojects.src.java.org.pantsbuild.testproject.shading.third',
+        bundle_jar_name='third',
         bundle_options=['--deployjar'],
         expected_bundle_content=[
           'third.jar']).strip()))

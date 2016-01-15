@@ -41,8 +41,8 @@ pre {
 }
 
 ul, ol, dl {
-  margin: 0px;
-  padding: 0px;
+  margin: 0;
+  padding: 0;
 }
 
 ul li, ol li {
@@ -53,7 +53,7 @@ ul li, ol li {
  *  copy-pasting section links in chat.
  */
 table.h-plus-pilcrow {
-  border-spacing: 0px;
+  border-spacing: 0;
 }
 
 table.h-plus-pilcrow td {
@@ -62,7 +62,7 @@ table.h-plus-pilcrow td {
 }
 
 div.pilcrow-div {
-  margin: 1em 0.5em;
+  margin: 0;
 }
 
 /* Pilcrow links are transparent until hovered over */
@@ -117,7 +117,8 @@ nav {
 
 /* "breadcrumbs" arrow-nav at top of content*/
 nav.breadcrumbs ul {
-  margin: 0px; padding: 0px;
+  margin: 0;
+  padding: 0;
 }
 
 nav.breadcrumbs ul li {
@@ -138,9 +139,9 @@ nav.breadcrumbs ul li:first-child:before {
 nav.bignav {
   font-size: larger;
   position: absolute;
-  top: 0px;
-  left: 0px;
-  margin: 0px;
+  top: 0;
+  left: 0;
+  margin: 0;
   max-width: 272px;
   background-color: #55acee;
 }
@@ -155,7 +156,7 @@ nav.bignav {
 }
 
 nav.bignav form.search {
-  padding: 1em 0px;
+  padding: 1em 0;
 }
 
 /* text entry for search terms */
@@ -175,7 +176,7 @@ nav.bignav .site-toc {
 }
 
 .site-toc ul {
-  padding: 0.3rem 0px;
+  padding: 0.3rem 0;
   list-style-type: none;
 }
 
@@ -228,13 +229,13 @@ nav.bignav .site-toc {
 /* page's table of contents */
 nav.pagetoc {
   float: right;
-  margin: 0px 1em 0px 1em;
+  margin: 0 1em 0 1em;
   background-color: #55acee;
   width: 300px;
 }
 
 nav.pagetoc ul {
-  padding: 1.0em 0px;
+  padding: 1.0em 0;
   list-style-type: none;
   background-color: #dde;
 }
@@ -267,7 +268,8 @@ nav.pagetoc ul li.toc-h4 {
 /* show the build/test/coverage status on each page */
 div.ci-status {
   position: absolute;
-  top: 0px; right: 0px;
+  top: 0;
+  right: 0;
 }
 
 div.ci-status img {

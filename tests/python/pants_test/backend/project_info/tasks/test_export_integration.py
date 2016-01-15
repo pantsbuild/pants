@@ -27,7 +27,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
   def run_export(self, test_target, workdir, load_libs=False, only_default=False, extra_args=None):
     """Runs ./pants export ... and returns its json output.
 
-    :param string test_target: spec of the target to run on.
+    :param string|list test_target: spec of the targets to run on.
     :param string workdir: working directory to run pants with.
     :param bool load_libs: whether to load external libraries (of any conf).
     :param bool only_default: if loading libraries, whether to only resolve the default conf, or to
@@ -234,6 +234,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['binary']))
       self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['chroot']))
 
-      core_target = json_data['targets']['src/python/pants/backend/core:plugin']
-      self.assertIsNotNone(core_target)
-      self.assertEquals(default_interpreter, core_target['python_interpreter'])
+      python_target = json_data['targets']['src/python/pants/backend/python/targets:python']
+      self.assertIsNotNone(python_target)
+      self.assertEquals(default_interpreter, python_target['python_interpreter'])

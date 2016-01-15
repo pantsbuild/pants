@@ -24,10 +24,10 @@ var ToggleNavs = function() {
       navs[ix].style.display = new_visibility;
     }
   }
-}
+};
 
 window.onload = function(e) {
   var navtoggler = document.getElementById('navtoggler');
   navtoggler.onclick = ToggleNavs;
-}
+};
 

@@ -18,7 +18,6 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.build_graph import BuildGraph
 from pants.fs import archive
 from pants.fs.archive import JAR
-from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
 
 
@@ -42,18 +41,17 @@ class BundleCreate(JvmBinaryTask):
              help='Create an archive of this type from the bundle.')
     register('--archive-prefix', action='store_true', default=False,
              fingerprint=True,
-             help='If --archive is specified, use the target basename as the path prefix.')
+             help='If --archive is specified, prefix archive with target basename or a unique '
+                  'identifier as determined by --use-basename-prefix.')
+    # `target.id` ensures global uniqueness, this flag is provided primarily for
+    # backward compatibility.
+    register('--use-basename-prefix', action='store_true', default=False,
+             help='Use target basename to prefix bundle folder or archive; otherwise a unique '
+                  'identifier derived from target will be used.')
 
   @classmethod
   def product_types(cls):
     return ['jvm_bundles']
-
-  def __init__(self, *args, **kwargs):
-    super(BundleCreate, self).__init__(*args, **kwargs)
-    self._outdir = self.get_options().pants_distdir
-    self._prefix = self.get_options().archive_prefix
-    self._archiver_type = self.get_options().archive
-    self._create_deployjar = self.get_options().deployjar
 
   class App(object):
     """A uniform interface to an app."""
@@ -62,42 +60,68 @@ class BundleCreate(JvmBinaryTask):
     def is_app(target):
       return isinstance(target, (JvmApp, JvmBinary))
 
-    def __init__(self, target):
+    def __init__(self, target, use_basename_prefix=False):
       assert self.is_app(target), '{} is not a valid app target'.format(target)
 
       self.address = target.address
       self.binary = target if isinstance(target, JvmBinary) else target.binary
       self.bundles = [] if isinstance(target, JvmBinary) else target.payload.bundles
-      self.basename = target.basename
+      self.basename = target.basename if use_basename_prefix else target.id
+      self.target = target
+
+  @property
+  def cache_target_dirs(self):
+    return True
 
   def execute(self):
-    archiver = archive.archiver(self._archiver_type) if self._archiver_type else None
+    def get_bundle_apps():
+      if self.get_options().use_basename_prefix:
+        # NB(peiyu) This special casing is confusing especially given we fail when duplicate
+        # basenames are detected. It's added because a `jvm_app` that depends and another
+        # `jvm_binary` that has the same basename turns out to be fairly common. In this case,
+        # whoever in `self.context.targets()` that runs the second will destroy previously
+        # created bundle directory. Using `target_roots` instead of all transitive targets
+        # won't eliminate but would reduce such basename conflicts.
+        return [self.App(target, use_basename_prefix=True) for target in self.context.target_roots]
+      return [self.App(target) for target in self.context.targets(predicate=self.App.is_app)]
+
+    archiver_type = self.get_options().archive
+    archiver = archive.archiver(archiver_type) if archiver_type else None
+
+    apps = get_bundle_apps()
+
+    if self.get_options().use_basename_prefix:
+      self.check_basename_conflicts(apps)
 
     # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
     # more efficient than loading them as individual files.
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    self.consolidate_classpath(self.context.targets(), runtime_classpath)
+    targets_to_consolidate = self.find_consolidate_classpath_candidates(runtime_classpath,
+                                                                        self.context.targets())
+    self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
 
-    for target in self.context.targets():
-      for app in map(self.App, filter(self.App.is_app, [target])):
-        basedir = self.bundle(app)
-        # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
-        # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
-        # expect the product to be cached, a user running an 'rm' on the dist/ directory could
-        # cause inconsistencies.
-        jvm_bundles_product = self.context.products.get('jvm_bundles')
-        jvm_bundles_product.add(target, os.path.dirname(basedir)).append(os.path.basename(basedir))
-        if archiver:
-          archivepath = archiver.create(
-            basedir,
-            self._outdir,
-            app.basename,
-            prefix=app.basename if self._prefix else None
-          )
-          self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
+    for app in apps:
+      basedir = self.bundle(app)
+      # NB(Eric Ayers): Note that this product is not housed/controlled under .pants.d/  Since
+      # the bundle is re-created every time, this shouldn't cause a problem, but if we ever
+      # expect the product to be cached, a user running an 'rm' on the dist/ directory could
+      # cause inconsistencies.
+      jvm_bundles_product = self.context.products.get('jvm_bundles')
+      jvm_bundles_product.add(app.target, os.path.dirname(basedir)).append(os.path.basename(basedir))
+      if archiver:
+        archivepath = archiver.create(
+          basedir,
+          self.get_options().pants_distdir,
+          app.basename,
+          prefix=app.basename if self.get_options().archive_prefix else None
+        )
+        self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
   class MissingJarError(TaskError):
     """Indicates an unexpected problem finding a jar that a bundle depends on."""
+
+  class BasenameConflictError(TaskError):
+    """Indicates the same basename is used by two targets."""
 
   def bundle(self, app):
     """Create a self-contained application bundle.
@@ -119,7 +143,7 @@ class BundleCreate(JvmBinaryTask):
         self.context.log.error('Unable to create symlink: {0} -> {1}'.format(src, dst))
         raise e
 
-    bundle_dir = os.path.join(self._outdir, '{}-bundle'.format(app.basename))
+    bundle_dir = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(app.basename))
     self.context.log.info('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
     safe_mkdir(bundle_dir, clean=True)
@@ -129,7 +153,7 @@ class BundleCreate(JvmBinaryTask):
     # If creating a deployjar, we add the external dependencies to the bundle as
     # loose classes, and have no classpath. Otherwise we add the external dependencies
     # to the bundle as jars in a libs directory.
-    if not self._create_deployjar:
+    if not self.get_options().deployjar:
       lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
       os.mkdir(lib_dir)
 
@@ -143,7 +167,7 @@ class BundleCreate(JvmBinaryTask):
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
 
     canonical_classpath_base_dir = None
-    if not self._create_deployjar:
+    if not self.get_options().deployjar:
       canonical_classpath_base_dir = os.path.join(bundle_dir, self.INTERNAL_LIBS_DIR)
     with self.monolithic_jar(app.binary, bundle_jar,
                              canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
@@ -175,22 +199,42 @@ class BundleCreate(JvmBinaryTask):
     return bundle_dir
 
   def consolidate_classpath(self, targets, classpath_products):
-    """Convert loose directories in classpath_products into jars.
+    """Convert loose directories in classpath_products into jars. """
 
-    TODO(peiyu): enable artifact caching to take advantage of caching as well saving to
-    the provided target-specific directories.
-    """
-    def jardir(entry):
-      """Jar up the contents of the given ClasspathEntry and return a unique jar path."""
-      root = entry.path
-      with temporary_dir(root_dir=self.workdir, cleanup=False) as destdir:
-        jarpath = JAR.create(root, destdir, 'output')
-      return jarpath
+    with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation:
+      for vt in invalidation.all_vts:
+        entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
+        for index, (conf, entry) in enumerate(entries):
+          if ClasspathUtil.is_dir(entry.path):
+            # regenerate artifact for invalid vts
+            if not vt.valid:
+              JAR.create(entry.path, vt.results_dir, 'output-{}'.format(index))
 
-    safe_mkdir(self.workdir)
+            # replace directory classpath entry with its jarpath
+            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
+            classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
+            classpath_products.add_for_target(vt.target, [(conf, jarpath)])
+
+  def find_consolidate_classpath_candidates(self, classpath_products, targets):
+    targets_with_directory_in_classpath = []
     for target in targets:
       entries = classpath_products.get_internal_classpath_entries_for_targets([target])
       for conf, entry in entries:
         if ClasspathUtil.is_dir(entry.path):
-          classpath_products.remove_for_target(target, [(conf, entry.path)])
-          classpath_products.add_for_target(target, [(conf, jardir(entry))])
+          targets_with_directory_in_classpath.append(target)
+          break
+
+    return targets_with_directory_in_classpath
+
+  def check_basename_conflicts(self, apps):
+    """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
+
+    basename_seen = {}
+    for app in apps:
+      if app.basename in basename_seen:
+        raise self.BasenameConflictError('Basename must be unique, found two targets use '
+                                         "the same basename: {}'\n\t{} and \n\t{}"
+                                         .format(app.basename,
+                                                 basename_seen[app.basename].address.spec,
+                                                 app.target.address.spec))
+      basename_seen[app.basename] = app.target
