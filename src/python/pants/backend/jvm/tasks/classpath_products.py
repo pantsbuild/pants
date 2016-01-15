@@ -53,6 +53,14 @@ class ClasspathEntry(object):
   def __repr__(self):
     return 'ClasspathEntry(path={!r})'.format(self.path)
 
+  @classmethod
+  def is_artifact_classpath_entry(cls, classpath_entry):
+    return isinstance(classpath_entry, ArtifactClasspathEntry)
+
+  @classmethod
+  def is_internal_classpath_entry(cls, classpath_entry):
+    return not cls.is_artifact_classpath_entry(classpath_entry)
+
 
 class ArtifactClasspathEntry(ClasspathEntry):
   """Represents a resolved third party classpath entry."""
@@ -254,7 +262,7 @@ class ClasspathProducts(object):
     classpath_tuples = self.get_classpath_entries_for_targets(targets,
                                                               respect_excludes=respect_excludes)
     return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
-            if isinstance(cp_entry, ArtifactClasspathEntry)]
+            if ClasspathEntry.is_artifact_classpath_entry(cp_entry)]
 
   def get_internal_classpath_entries_for_targets(self, targets, respect_excludes=True):
     """Gets the internal classpath products for the given targets.
@@ -270,7 +278,7 @@ class ClasspathProducts(object):
     classpath_tuples = self.get_classpath_entries_for_targets(targets,
                                                               respect_excludes=respect_excludes)
     return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
-            if not isinstance(cp_entry, ArtifactClasspathEntry)]
+            if ClasspathEntry.is_internal_classpath_entry(cp_entry)]
 
   def _filter_by_excludes(self, classpath_target_tuples, root_targets):
     # Excludes are always applied transitively, so regardless of whether a transitive
