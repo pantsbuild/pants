@@ -5,12 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
 import re
+from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry
+from pants.backend.jvm.tasks.classpath_products import is_internal_classpath_entry
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_delete, safe_open, safe_walk
 
@@ -79,11 +81,45 @@ class ClasspathUtil(object):
     return [entry.path for entry in cls._entries_iter(filtered_tuples_iter)]
 
   @classmethod
+  def classpath_by_targets(cls, targets, classpath_products, confs=('default',)):
+    """Return classpath entries grouped by their targets for the given `targets`.
+
+    Any classpath entries contributed by external dependencies will be omitted.
+
+    :param targets: The targets to lookup classpath products for.
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
+    :param confs: The list of confs for use by this classpath.
+    :returns: The ordered (target, classpath) mappings.
+    :rtype: OrderedDict
+    """
+    def filter_func(conf):
+      accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
+      return accept(conf)
+    classpath_target_tuples = classpath_products.get_product_target_mappings_for_targets(targets)
+    filtered_items_iter = itertools.ifilter(cls._accept_conf_filter(confs, lambda x: x[0][0]),
+                                            classpath_target_tuples)
+
+    # group (classpath_entry, target) tuples by targets
+    target_to_classpath = OrderedDict()
+    for classpath_entry, target in filtered_items_iter:
+      _, entry = classpath_entry
+      if not target in target_to_classpath:
+        target_to_classpath[target] = []
+      target_to_classpath[target].append(entry)
+    return target_to_classpath
+
+  @classmethod
+  def _accept_conf_filter(cls, confs, unpack_func):
+    def accept_conf_in_confs(item):
+      conf = unpack_func(item)
+      accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
+      return accept(conf)
+    return accept_conf_in_confs
+
+  @classmethod
   def _filtered_classpath_by_confs_iter(cls, classpath_tuples, confs):
-    accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
-    for conf, entry in classpath_tuples:
-      if accept(conf):
-        yield conf, entry
+    filter_func = cls._accept_conf_filter(confs, lambda x: x[0])
+    return itertools.ifilter(filter_func, classpath_tuples)
 
   @classmethod
   def _entries_iter(cls, classpath):
@@ -227,22 +263,21 @@ class ClasspathUtil(object):
         os.makedirs(output_dir)
       return classpath_prefix_for_target
 
-    def get_classpath_entries(target):
-      if internal_classpath_only:
-        return classpath_products.get_internal_classpath_entries_for_targets([target])
-      return classpath_products.get_classpath_entries_for_targets([target])
-
     canonical_classpath = []
-    for target in targets:
-      classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
-      classpath_entries_for_target = get_classpath_entries(target)
+    target_to_classpath = cls.classpath_by_targets(targets, classpath_products)
 
+    for target, classpath_entries_for_target in target_to_classpath.items():
+      if internal_classpath_only:
+        classpath_entries_for_target = filter(is_internal_classpath_entry,
+                                              classpath_entries_for_target)
       if len(classpath_entries_for_target) > 0:
+        classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
+
         classpath = []
         # Note: for internal targets pants has only one classpath entry, but user plugins
         # might generate additional entries, for example, build.properties for the target.
         # Also it's common to have multiple classpath entries associated with 3rdparty targets.
-        for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
+        for (index, entry) in enumerate(classpath_entries_for_target):
           if entry.is_excluded_by(excludes):
             continue
 
