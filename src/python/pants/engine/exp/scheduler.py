@@ -370,48 +370,6 @@ class ProductGraph(object):
     for node in _walk(_filtered_entries(roots)):
       yield node
 
-  def sources_for(self, subject, product, consumed_product=None):
-    """Yields the set of Sources for the given subject and product (which consume the given config).
-
-    :param subject: The subject that the product will be produced for.
-    :param type product: The product type the returned planners are capable of producing.
-    :param consumed_product: An optional configuration to require that a planner consumes, or None.
-    :rtype: sequences of Node. instances.
-    """
-
-    def consumes_product(node):
-      """Returns True if the given Node recursively consumes the given product.
-
-      TODO: This is matching on type only, while selectors are usually implemented
-      as by-name. Convert config selectors to configuration mergers.
-      """
-      if not consumed_product:
-        return True
-      for dep_node in self._adjacencies[node]:
-        if dep_node.product == type(consumed_product):
-          return True
-        elif consumes_product(dep_node):
-          return True
-      return False
-
-    key = (subject, product)
-    # TODO: order N: index by subject
-    for node in self._nodes:
-      # Yield Sources that were recursively able to consume the configuration.
-      if isinstance(node.source, ProductGraph.Node.OR):
-        continue
-      if node.key == key and self._is_satisfiable(node) and consumes_product(node):
-        yield node.source
-
-  def products_for(self, subject):
-    """Returns a set of products that are possible to produce for the given subject."""
-    products = set()
-    # TODO: order N: index by subject
-    for node in self._nodes:
-      if node.subject == subject and self._is_satisfiable(node):
-        products.add(node.product)
-    return products
-
 
 class NodeBuilder(object):
   """Encapsulates the details of creating Nodes that involve user-defined functions/tasks.
@@ -624,9 +582,10 @@ class LocalScheduler(object):
 
   def schedule(self, build_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
-    
-    This method should be called by exactly one thread, but the Step objects returned
-    by this method are intended to be executed in multiple threads.
+
+    This method should be called by exactly one scheduling thread, but the Step objects returned
+    by this method are intended to be executed in multiple threads, and then satisfied by the
+    scheduling thread.
     """
 
     pg = self._product_graph
