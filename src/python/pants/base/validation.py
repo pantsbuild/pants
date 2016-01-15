@@ -11,7 +11,7 @@ from twitter.common.dirutil.fileset import Fileset
 
 
 def assert_list(obj, expected_type=string_types, can_be_none=True, default=(), key_arg=None,
-    allowable=(list, Fileset, OrderedSet, set, tuple), allowable_add=(), passthrough=(Fileset,),
+    allowable=(list, Fileset, OrderedSet, set, tuple), allowable_add=(),
     raise_type=ValueError):
   """
   This function is used to ensure that parameters set by users in BUILD files are of acceptable types.
@@ -23,7 +23,6 @@ def assert_list(obj, expected_type=string_types, can_be_none=True, default=(), k
   :param allowable     : the acceptable types for obj. We do not want to allow any iterable (eg string).
   :param allowable_add : additional acceptable types; pass this to add to the default allowable types,
                          rather than to replace them.
-  :param passthrough   : the acceptable types which are passed through without being copied into a list.
   :param raise_type    : the error to throw if the type is not correct.
   """
   def get_key_msg(key=None):
@@ -44,11 +43,7 @@ def assert_list(obj, expected_type=string_types, can_be_none=True, default=(), k
         '{}Expected an object of acceptable type {}, received None and can_be_none is False'
           .format(key_msg, allowable))
 
-  if not isinstance(val, allowable):
-    raise raise_type(
-        '{}Expected an object of acceptable type {}, received {} instead'
-        .format(key_msg, allowable, val))
-  elif not isinstance(val, passthrough):
+  if isinstance(val, allowable):
     lst = list(val)
     for e in lst:
       if not isinstance(e, expected_type):
@@ -57,4 +52,6 @@ def assert_list(obj, expected_type=string_types, can_be_none=True, default=(), k
             .format(key_msg, expected_type, e, e.__class__))
     return lst
   else:
-    return val
+    raise raise_type(
+        '{}Expected an object of acceptable type {}, received {} instead'
+        .format(key_msg, allowable, val))
