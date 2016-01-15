@@ -88,7 +88,7 @@ function pkg_node_install_test() {
 PKG_SCALAJS=(
   "pantsbuild.pants.contrib.scalajs"
   "//contrib/scalajs/src/python/pants/contrib/scalajs:plugin"
-  "pkg_node_install_test"
+  "pkg_scalajs_install_test"
 )
 function pkg_scalajs_install_test() {
   execute_packaged_pants_with_internal_backends \
