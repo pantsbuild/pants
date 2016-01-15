@@ -107,9 +107,7 @@ class ClasspathUtil(object):
   def _accept_conf_filter(cls, confs, unpack_func=None):
     def accept_conf_in_item(item):
       conf = unpack_func(item)
-      if confs is not None:
-        return conf in confs
-      return True
+      return confs is None or conf in confs
 
     unpack_func = unpack_func or (lambda x: x)
     return accept_conf_in_item
