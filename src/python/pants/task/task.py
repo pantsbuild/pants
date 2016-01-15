@@ -24,6 +24,7 @@ from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.task.recursive_version import RecursiveVersion
 from pants.util.meta import AbstractClass
 
 
@@ -56,6 +57,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   # We set this explicitly on the synthetic subclass, so that it shares a stable name with
   # its superclass, which is not necessary for regular use, but can be convenient in tests.
   _stable_name = None
+
+  # Used to check implementation version to invalidate caches.
+  version = RecursiveVersion(1)
 
   @classmethod
   def stable_name(cls):
@@ -226,6 +230,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       # TODO: this is not recursive, but should be: see #2739
       for dep in self.subsystem_dependencies_iter():
         hasher.update(self._options_fingerprint(dep.options_scope()))
+      hasher.update(self.version)
       self._fingerprint = str(hasher.hexdigest())
     return self._fingerprint
 
@@ -255,7 +260,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     invalidate_dependents,
                                     fingerprint_strategy=fingerprint_strategy,
                                     invalidation_report=self.context.invalidation_report,
-                                    task_name=type(self).__name__)
+                                    task_name=type(self).__name__,
+                                    task_version=self.version)
 
   @property
   def cache_target_dirs(self):
