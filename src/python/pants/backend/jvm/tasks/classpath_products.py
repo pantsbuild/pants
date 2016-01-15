@@ -220,13 +220,15 @@ class ClasspathProducts(object):
     :returns: The ordered (conf, classpath entry) tuples.
     :rtype: list of (string, :class:`ClasspathEntry`)
     """
-    return OrderedSet([cp for cp, target in self.get_for_targets_by_product(targets,
-                                                                            respect_excludes)])
 
-  def get_for_targets_by_product(self, targets, respect_excludes=True):
-    """Gets the classpath products for the given targets, grouped by products.
+    # remove the duplicate, preserve the ordering.
+    return list(OrderedSet([cp for cp, target in self.get_product_target_mappings_for_targets(
+                            targets, respect_excludes)]))
 
-    Products are returned in order, optionally respecting target excludes.
+  def get_product_target_mappings_for_targets(self, targets, respect_excludes=True):
+    """Gets the classpath products-target associations for the given targets.
+
+    Product-target tuples are returned in order, optionally respecting target excludes.
 
     :param targets: The targets to lookup classpath products for.
     :param bool respect_excludes: `True` to respect excludes; `False` to ignore them.
