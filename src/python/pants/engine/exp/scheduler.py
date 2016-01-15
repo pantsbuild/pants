@@ -601,14 +601,15 @@ class LocalScheduler(object):
 
   def _create_roots(self, build_request):
     # Determine the root products and subjects based on the request.
-    root_subjects = [self._graph.resolve(a) for a in build_request.addressable_roots]
+    root_subjects = [(self._graph.resolve(a), extract_variants(a))
+                     for a in build_request.addressable_roots]
     root_products = OrderedSet()
     for goal in build_request.goals:
       root_products.update(self._products_by_goal[goal])
 
     # Roots are products that might be possible to produce for these subjects.
     # TODO: allow specifying variants per Subject as part BuildRequest parsing.
-    return [SelectNode(s, p, None) for s in root_subjects for p in root_products]
+    return [SelectNode(s, p, v) for s, v in root_subjects for p in root_products]
 
   def walk_product_graph(self, predicate=None):
     """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
