@@ -60,6 +60,7 @@ class Scalastyle(NailgunTask):
 
   _MAIN = 'org.scalastyle.Main'
 
+  @classmethod
   def subsystem_dependencies(cls):
     return super(Scalastyle, cls).subsystem_dependencies() + (ScalaPlatform, )
 
@@ -151,7 +152,7 @@ class Scalastyle(NailgunTask):
           def to_java_boolean(x):
             return str(x).lower()
 
-          cp = self.tool_classpath('scalastyle')
+          cp = ScalaPlatform.global_instance().style_classpath(self.context.products)
           scalastyle_args = [
             '-c', scalastyle_config,
             '-v', to_java_boolean(scalastyle_verbose),
