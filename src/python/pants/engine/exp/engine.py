@@ -432,13 +432,11 @@ class LocalMultiprocessEngine(Engine):
         # Submit and wait for work for as long as we're able to keep the pool saturated.
         pending_submission.update(step_batch)
         while submit_until(self._pool_size) > 0:
-          #print('>>> awaiting one after receiving a batch')
           await_one()
       # Await at least one entry per scheduling loop.
       submit_until(0)
       if in_flight:
         await_one()
-      #print('>>> there are {} outstanding and {} pending submission!'.format(len(in_flight), len(pending_submission)))
 
     # Consume all steps.
     while pending_submission or in_flight:

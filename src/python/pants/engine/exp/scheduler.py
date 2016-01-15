@@ -208,7 +208,6 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants']), Nod
 
   def step(self, dependency_states, node_builder):
     # If there are any Return Nodes, return the first.
-    #print('stepping {} with {}'.format(self, dependency_states))
     has_waiting_dep = False
     dependencies = list(self._dependencies(node_builder))
     for dep in dependencies:
@@ -247,7 +246,6 @@ class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'pro
     elif type(dep_product_state) == Throw:
       return Throw('Could not compute {} to determine dependencies.'.format(self._dep_product_node()))
     elif type(dep_product_state) == Return:
-      #print('have dep product {} for {}'.format(dep_product_state, self))
       # The product and its dependency list are available.
       dependencies = [self._product_node(d) for d in dep_product_state.value.dependencies]
       for dependency in dependencies:
@@ -255,7 +253,6 @@ class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'pro
         if dep_state is None or type(dep_state) == Waiting:
           # One of the dependencies is not yet available. Indicate that we are waiting for all
           # of them.
-          #print('>> still waiting for {}'.format(dependencies))
           return Waiting([self._dep_product_node()] + dependencies)
         elif type(dep_state) == Throw:
           return Throw('Failed to compute dependency {}'.format(dependency))
@@ -531,10 +528,8 @@ class Step(object):
 
     result = promise.get()
     if type(result) == Waiting:
-      #print('>> waiting for more inputs for {}'.format(self._node))
       product_graph.add_edges(self._node, result.dependencies)
     else:
-      #print('>> completed {} with: {}'.format(self._node, result))
       product_graph.complete(self._node, result)
     return True
 
