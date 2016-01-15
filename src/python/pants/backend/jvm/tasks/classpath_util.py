@@ -84,8 +84,6 @@ class ClasspathUtil(object):
   def classpath_by_targets(cls, targets, classpath_products, confs=('default',)):
     """Return classpath entries grouped by their targets for the given `targets`.
 
-    Any classpath entries contributed by external dependencies will be omitted.
-
     :param targets: The targets to lookup classpath products for.
     :param ClasspathProducts classpath_products: Product containing classpath elements.
     :param confs: The list of confs for use by this classpath.
@@ -106,16 +104,22 @@ class ClasspathUtil(object):
     return target_to_classpath
 
   @classmethod
-  def _accept_conf_filter(cls, confs, unpack_func):
-    def accept_conf_in_confs(item):
+  def _accept_conf_filter(cls, confs, unpack_func=None):
+    def accept_conf(conf):
+      if confs is not None:
+        return conf in confs
+      return True
+
+    def accept_conf_in_item(item):
       conf = unpack_func(item)
-      accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
-      return accept(conf)
-    return accept_conf_in_confs
+      return accept_conf(conf)
+
+    unpack_func = unpack_func or (lambda x: x)
+    return accept_conf_in_item
 
   @classmethod
   def _filtered_classpath_by_confs_iter(cls, classpath_tuples, confs):
-    filter_func = cls._accept_conf_filter(confs, lambda x: x[0])
+    filter_func = cls._accept_conf_filter(confs, unpack_func=lambda x: x[0])
     return itertools.ifilter(filter_func, classpath_tuples)
 
   @classmethod
@@ -191,7 +195,7 @@ class ClasspathUtil(object):
                                  save_classpath_file=False,
                                  use_target_id=True,
                                  internal_classpath_only=True,
-                                 excludes=set()):
+                                 excludes=None):
     """Create a stable classpath of symlinks with standardized names.
 
     By default symlinks are created for each target under `basedir` based on its `target.id`.
@@ -260,6 +264,7 @@ class ClasspathUtil(object):
         os.makedirs(output_dir)
       return classpath_prefix_for_target
 
+    excludes = excludes or set()
     canonical_classpath = []
     target_to_classpath = cls.classpath_by_targets(targets, classpath_products)
 

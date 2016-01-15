@@ -54,12 +54,12 @@ class ClasspathEntry(object):
     return 'ClasspathEntry(path={!r})'.format(self.path)
 
   @classmethod
-  def is_artifact_classpath_entry(clz, classpath_entry):
+  def is_artifact_classpath_entry(cls, classpath_entry):
     return isinstance(classpath_entry, ArtifactClasspathEntry)
 
   @classmethod
-  def is_internal_classpath_entry(clz, classpath_entry):
-    return not clz.is_artifact_classpath_entry(classpath_entry)
+  def is_internal_classpath_entry(cls, classpath_entry):
+    return not cls.is_artifact_classpath_entry(classpath_entry)
 
 
 class ArtifactClasspathEntry(ClasspathEntry):
