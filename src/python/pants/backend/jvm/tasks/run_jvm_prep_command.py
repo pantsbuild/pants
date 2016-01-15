@@ -24,6 +24,20 @@ class RunJvmPrepCommandBase(Task):
   goal = None
   classpath_product_only = False
 
+  def __init__(self, context, workdir):
+    super(RunJvmPrepCommandBase, self).__init__(context, workdir)
+    JvmPrepCommand.add_goal(self.goal)
+
+  @classmethod
+  def register_options(cls, register):
+    """Register options for this optionable.
+
+    In this case, there are no special options, but we want to use this opportunity to setup
+    goal validation in JvmPrepCommand before the build graph is parsed.
+    """
+    super(RunJvmPrepCommandBase, cls).register_options(register)
+    JvmPrepCommand.add_goal(cls.goal)
+
   @classmethod
   def prepare(cls, options, round_manager):
     super(RunJvmPrepCommandBase, cls).prepare(options, round_manager)
@@ -84,7 +98,7 @@ class RunBinaryJvmPrepCommand(RunJvmPrepCommandBase):
 
   Register this tasks to run code at the beginning of the binary goal in register.py
 
-   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
+  task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   """
   goal = 'binary'
 
@@ -104,7 +118,7 @@ class RunCompileJvmPrepCommand(RunJvmPrepCommandBase):
 
   Register this tasks to run code at the beginning of the compile goal in register.py
 
-   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)
+  task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)
   """
   goal = 'compile'
   classpath_product_only = True

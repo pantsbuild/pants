@@ -115,8 +115,6 @@ def load_build_configuration_from_source(build_configuration, additional_backend
                       'pants.core_tasks',
                       'pants.backend.graph_info',
                       'pants.backend.docgen',
-                      'pants.backend.authentication',
-                      'pants.backend.core',
                       'pants.backend.python',
                       'pants.backend.jvm',
                       'pants.backend.codegen',

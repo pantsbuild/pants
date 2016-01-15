@@ -132,7 +132,7 @@ if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
   banner "Sanity checking bootstrapped pants and repo BUILD files"
   sanity_tests=(
     "bash-completion"
-    "builddict"
+    "reference"
     "clean-all"
     "goals"
     "list ::"
