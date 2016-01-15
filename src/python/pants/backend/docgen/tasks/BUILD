@@ -6,7 +6,7 @@ python_library(
   name = 'tasks',
   sources = globs('*.py'),
   resource_targets = [
-    ':markdown_to_html_resources',
+    ':resources',
   ],
   dependencies = [
     '3rdparty/python:Markdown',
@@ -17,16 +17,19 @@ python_library(
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:generator',
+    'src/python/pants/base:mustache',
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
+    'src/python/pants/goal',
+    'src/python/pants/help',
+    'src/python/pants/option',
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
 )
 
 resources(
-  name = 'markdown_to_html_resources',
-  sources = globs('templates/markdown/*.mustache'),
+  name = 'resources',
+  sources = globs('templates/*/*.mustache'),
 )

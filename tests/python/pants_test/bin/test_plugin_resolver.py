@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 import pytest
+from pex.crawler import Crawler
 from pex.installer import Packager
 from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
@@ -121,6 +122,7 @@ def test_inexact_requirements():
     # pex to a TLL expiry resolve and then fail.
     safe_rmtree(repo_dir)
     safe_rmtree(cache_dir)
+    Crawler.reset_cache()
     time.sleep(1.5)
 
     with pytest.raises(Unsatisfiable):

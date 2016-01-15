@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 from hashlib import sha1
 
-from pants.base.build_manual import manual
 from pants.base.payload_field import PayloadField
 
 
@@ -73,7 +72,6 @@ class PythonArtifact(PayloadField):
                            allow_nan=False,
                            sort_keys=True)).hexdigest()
 
-  @manual.builddict()
   def with_binaries(self, *args, **kw):
     """Add binaries tagged to this artifact.
 

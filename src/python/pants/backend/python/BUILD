@@ -98,7 +98,6 @@ python_library(
   name = 'python_artifact',
   sources = ['python_artifact.py'],
   dependencies = [
-    'src/python/pants/base:build_manual',
     'src/python/pants/base:payload_field',
   ],
 )

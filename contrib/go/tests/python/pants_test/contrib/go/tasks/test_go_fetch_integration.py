@@ -31,23 +31,10 @@ class GoFetchIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
 
-  def test_issues_2004(self):
-    # The target used here has test imports outside those used by the source code it tests (that
-    # code only depends on the stdlib).  These must be resolved for the test to be compiled and run:
-    #
-    # github.com/bitly/go-simplejson
-    # -> github.com/bmizerany/assert (testing)
-    #    -> github.com/kr/pretty (testing)
-    #       -> github.com/kr/text (testing)
-    args = ['test.go',
-            '--remote',
-            'contrib/go/examples/3rdparty/go/github.com/bitly/go-simplejson']
-    pants_run = self.run_pants(args)
-    self.assert_success(pants_run)
-
   def test_issues_2229(self):
     # The target used here has tests that use relative imports.  In order to resolve the target
-    # and compile it, pants must be able to handle the relative imports.
+    # and compile it, pants must be able to handle the relative imports (it does so by not placing
+    # remote test code in workspaces).
     args = ['compile',
             'contrib/go/examples/3rdparty/go/github.com/robertkrimen/otto']
     pants_run = self.run_pants(args)

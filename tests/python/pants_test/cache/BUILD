@@ -77,3 +77,15 @@ python_tests(
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
+
+python_tests(
+  name = 'cache_cleanup_integration',
+  sources = ['test_cache_cleanup_integration.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'}
+)

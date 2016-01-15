@@ -215,7 +215,8 @@ class Fetcher(object):
       raise ValueError('listener must be a Listener instance, given {}'.format(listener))
 
     try:
-      with closing(self._requests.get(url, stream=True, timeout=timeout_secs)) as resp:
+      with closing(self._requests.get(url, stream=True, timeout=timeout_secs,
+                                      allow_redirects=True)) as resp:
         if resp.status_code != requests.codes.ok:
           listener.status(resp.status_code)
           raise self.PermanentError('GET request to {} failed with status code {}'

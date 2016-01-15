@@ -33,7 +33,9 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   deprecated_hint: A deprecation hint message registered for this option (None otherwise).
   choices: If this option has a constrained list of choices, a csv list of the choices.
   """
-  pass
+
+  def comma_separated_display_args(self):
+    return ', '.join(self.display_args)
 
 
 class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
@@ -62,7 +64,7 @@ class HelpInfoExtracter(object):
     """Compute the default value to display in help for an option registered with these kwargs."""
     ranked_default = kwargs.get('default')
     action = kwargs.get('action')
-    typ = kwargs.get('type', str)
+    typ = None if action in ['store_true', 'store_false'] else kwargs.get('type', str)
 
     default = ranked_default.value if ranked_default else None
     if default is None:
@@ -73,11 +75,13 @@ class HelpInfoExtracter(object):
       else:
         return 'None'
 
-    if typ == list_option:
+    if typ == list_option or action == 'append':
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
     elif typ == dict_option:
       default_str = '{{ {} }}'.format(
         ','.join(["'{}':'{}'".format(k, v) for k, v in default.items()]))
+    elif typ == str:
+      default_str = "'{}'".format(default).replace('\n', ' ')
     else:
       default_str = str(default)
     return default_str
