@@ -12,7 +12,7 @@ from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.tasks.classpath_products import is_internal_classpath_entry
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_delete, safe_open, safe_walk
 
@@ -92,9 +92,6 @@ class ClasspathUtil(object):
     :returns: The ordered (target, classpath) mappings.
     :rtype: OrderedDict
     """
-    def filter_func(conf):
-      accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
-      return accept(conf)
     classpath_target_tuples = classpath_products.get_product_target_mappings_for_targets(targets)
     filtered_items_iter = itertools.ifilter(cls._accept_conf_filter(confs, lambda x: x[0][0]),
                                             classpath_target_tuples)
@@ -268,7 +265,7 @@ class ClasspathUtil(object):
 
     for target, classpath_entries_for_target in target_to_classpath.items():
       if internal_classpath_only:
-        classpath_entries_for_target = filter(is_internal_classpath_entry,
+        classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
                                               classpath_entries_for_target)
       if len(classpath_entries_for_target) > 0:
         classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
