@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import time
 
+from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -38,3 +40,13 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
 
     # Ensure that the timeout message triggered.
     self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
+
+  def test_pytest_explicit_coverage(self):
+    with temporary_dir() as coverage_dir:
+      pants_run = self.run_pants(['clean-all',
+                                  'test.pytest',
+                                  '--test-pytest-coverage=path:testprojects',
+                                  '--test-pytest-coverage-output-dir={dir}'.format(dir=coverage_dir),
+                                  'testprojects/tests/python/pants/constants_only:constants_only'])
+      self.assert_success(pants_run)
+      self.assertTrue(os.path.exists(os.path.join(coverage_dir, 'coverage.xml')))
