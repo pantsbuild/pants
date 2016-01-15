@@ -347,15 +347,17 @@ class ClasspathProductsTest(BaseTest):
     a = self.make_target('a', JvmTarget, dependencies=[b])
     classpath_product = ClasspathProducts(self.pants_workdir)
     example_jar_path = self._example_jar_path()
-    resolved_jar_a = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path,
-                                                             conf='fred-conf')
+
+    # resolved_jar is added for both a and b but should return only as one classpath entry
+    resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path,
+                                                           conf='fred-conf')
     self.add_jar_classpath_element_for_path(classpath_product, b, example_jar_path,
-                                                            conf='fred-conf')
+                                            conf='fred-conf')
     classpath_target_tuples = classpath_product.get_classpath_entries_for_targets([a], respect_excludes=False)
 
     expected_entry = ArtifactClasspathEntry(example_jar_path,
-                                            resolved_jar_a.coordinate,
-                                            resolved_jar_a.cache_path)
+                                            resolved_jar.coordinate,
+                                            resolved_jar.cache_path)
     self.assertEqual([('fred-conf', expected_entry)], classpath_target_tuples)
 
   def test_get_artifact_classpath_entries_for_targets(self):
