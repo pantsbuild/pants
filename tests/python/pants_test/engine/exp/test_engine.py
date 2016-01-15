@@ -32,7 +32,7 @@ class EngineTest(unittest.TestCase):
   def assert_engine(self, engine):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])
     result = engine.execute(build_request)
-    self.assertEqual({SelectNode(self.java, Classpath): Return(Classpath(creator='javac'))},
+    self.assertEqual({SelectNode(self.java, Classpath, None): Return(Classpath(creator='javac'))},
                      result.root_products)
     self.assertIsNone(result.error)
 
@@ -57,7 +57,7 @@ class EngineTest(unittest.TestCase):
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.java.address, self.java_fail_slow.address])
     result = engine.execute(build_request, fail_slow=True)
-    self.assertEqual({SelectNode(self.java, Classpath): Return(Classpath(creator='javac'))},
+    self.assertEqual({SelectNode(self.java, Classpath, None): Return(Classpath(creator='javac'))},
                      result.root_products)
 
     self.assertIsInstance(result.error, Engine.PartialFailureError)
