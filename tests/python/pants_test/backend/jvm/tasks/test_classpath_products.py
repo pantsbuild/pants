@@ -271,7 +271,7 @@ class ClasspathProductsTest(BaseTest):
       'Jar: org:name:::jar has no specified path.',
       str(cm.exception))
 
-  def test_get_classpath_entries_for_targets_respect_excludes(self):
+  def test_get_product_target_mappings_for_targets_respect_excludes(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
 
     classpath_product = ClasspathProducts(self.pants_workdir)
@@ -279,11 +279,11 @@ class ClasspathProductsTest(BaseTest):
     self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path)
     self.add_excludes_for_targets(classpath_product, a)
 
-    classpath = classpath_product.get_classpath_entries_for_targets([a])
+    classpath_by_product = classpath_product.get_product_target_mappings_for_targets([a])
 
-    self.assertEqual([], classpath)
+    self.assertEqual([], classpath_by_product)
 
-  def test_get_classpath_entries_for_targets_ignore_excludes(self):
+  def test_get_product_target_mappings_for_targets_ignore_excludes(self):
     a = self.make_target('a', JvmTarget, excludes=[Exclude('com.example', 'lib')])
 
     classpath_product = ClasspathProducts(self.pants_workdir)
@@ -292,14 +292,14 @@ class ClasspathProductsTest(BaseTest):
                                                            conf='fred-conf')
     self.add_excludes_for_targets(classpath_product, a)
 
-    classpath = classpath_product.get_classpath_entries_for_targets([a], respect_excludes=False)
+    classpath_target_tuples = classpath_product.get_product_target_mappings_for_targets([a], respect_excludes=False)
 
     expected_entry = ArtifactClasspathEntry(example_jar_path,
                                             resolved_jar.coordinate,
                                             resolved_jar.cache_path)
-    self.assertEqual([('fred-conf', expected_entry)], list(classpath))
+    self.assertEqual([(('fred-conf', expected_entry), a)], classpath_target_tuples)
 
-  def test_get_classpath_entries_for_targets_transitive(self):
+  def test_get_product_target_mappings_for_targets_transitive(self):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
@@ -311,16 +311,17 @@ class ClasspathProductsTest(BaseTest):
     classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
                                          ('default', self.path('an/internally/generated.jar'))])
 
-    classpath = classpath_product.get_classpath_entries_for_targets(a.closure(bfs=True))
-    self.assertEqual([('default', ArtifactClasspathEntry(example_jar_path,
-                                                         resolved_jar.coordinate,
-                                                         resolved_jar.cache_path)),
-                      ('default', ClasspathEntry(self.path('a/loose/classes/dir'))),
-                      ('default', ClasspathEntry(self.path('an/internally/generated.jar'))),
-                      ('default', ClasspathEntry(self.path('b/loose/classes/dir')))],
-                     classpath)
+    classpath_target_tuples = classpath_product.get_product_target_mappings_for_targets(a.closure(bfs=True))
+    self.assertEqual([
+      (('default', ArtifactClasspathEntry(example_jar_path,
+                                          resolved_jar.coordinate,
+                                          resolved_jar.cache_path)), a),
+      (('default', ClasspathEntry(self.path('a/loose/classes/dir'))), a),
+      (('default', ClasspathEntry(self.path('an/internally/generated.jar'))), a),
+      (('default', ClasspathEntry(self.path('b/loose/classes/dir'))), b)],
+      classpath_target_tuples)
 
-  def test_get_classpath_entries_for_targets_intransitive(self):
+  def test_get_product_target_mappings_for_targets_intransitive(self):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
     a = self.make_target('a', JvmTarget, dependencies=[b])
 
@@ -332,13 +333,32 @@ class ClasspathProductsTest(BaseTest):
     classpath_product.add_for_target(a, [('default', self.path('a/loose/classes/dir')),
                                          ('default', self.path('an/internally/generated.jar'))])
 
-    classpath = classpath_product.get_classpath_entries_for_targets([a])
-    self.assertEqual([('default', ArtifactClasspathEntry(example_jar_path,
-                                                         resolved_jar.coordinate,
-                                                         resolved_jar.cache_path)),
-                      ('default', ClasspathEntry(self.path('a/loose/classes/dir'))),
-                      ('default', ClasspathEntry(self.path('an/internally/generated.jar')))],
-                     classpath)
+    classpath_target_tuples = classpath_product.get_product_target_mappings_for_targets([a])
+    self.assertEqual([
+      (('default', ArtifactClasspathEntry(example_jar_path,
+                                          resolved_jar.coordinate,
+                                          resolved_jar.cache_path)), a),
+      (('default', ClasspathEntry(self.path('a/loose/classes/dir'))), a),
+      (('default', ClasspathEntry(self.path('an/internally/generated.jar'))), a)],
+      classpath_target_tuples)
+
+  def test_get_classpath_entries_for_targets_dedup(self):
+    b = self.make_target('b', JvmTarget)
+    a = self.make_target('a', JvmTarget, dependencies=[b])
+    classpath_product = ClasspathProducts(self.pants_workdir)
+    example_jar_path = self._example_jar_path()
+
+    # resolved_jar is added for both a and b but should return only as one classpath entry
+    resolved_jar = self.add_jar_classpath_element_for_path(classpath_product, a, example_jar_path,
+                                                           conf='fred-conf')
+    self.add_jar_classpath_element_for_path(classpath_product, b, example_jar_path,
+                                            conf='fred-conf')
+    classpath_target_tuples = classpath_product.get_classpath_entries_for_targets([a], respect_excludes=False)
+
+    expected_entry = ArtifactClasspathEntry(example_jar_path,
+                                            resolved_jar.coordinate,
+                                            resolved_jar.cache_path)
+    self.assertEqual([('fred-conf', expected_entry)], classpath_target_tuples)
 
   def test_get_artifact_classpath_entries_for_targets(self):
     b = self.make_target('b', JvmTarget, excludes=[Exclude('com.example', 'lib')])
