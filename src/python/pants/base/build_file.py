@@ -67,7 +67,7 @@ class BuildFile(AbstractClass):
     """Returns all the BUILD files on a path"""
     results = []
     for build in self._glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
-      if self._is_buildfile_name(build) and self._isfile(os.path.join(path, build)):
+      if self._is_buildfile_name(build) and self.file_system.isfile(os.path.join(path, build)):
         results.append(build)
     return sorted(results)
 
@@ -77,6 +77,11 @@ class BuildFile(AbstractClass):
 
   @classmethod
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
+    return cls.scan_file_system_buildfiles(cls._cls_file_system,
+                                           root_dir, base_path, spec_excludes)
+
+  @classmethod
+  def scan_file_system_buildfiles(cls, file_system, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files
     :param root_dir: the root of the repo containing sources
     :param base_path: directory under root_dir to scan
@@ -114,7 +119,7 @@ class BuildFile(AbstractClass):
 
     root_dir = os.path.realpath(root_dir)
 
-    if base_path and not cls._isdir(os.path.join(root_dir, base_path)):
+    if base_path and not file_system.isdir(os.path.join(root_dir, base_path)):
       raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
                               .format(base_path))
 
@@ -124,7 +129,7 @@ class BuildFile(AbstractClass):
     else:
       exclude_roots = calc_exclude_roots(root_dir, spec_excludes)
 
-    for root, dirs, files in cls._walk(root_dir, base_path or '', topdown=True):
+    for root, dirs, files in file_system.walk(root_dir, base_path or '', topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
       # For performance, ignore hidden dirs such as .git, .pants.d and .local_artifact_cache.
       # TODO: Instead of this heuristic, only walk known source_roots.  But we can't do this
@@ -144,16 +149,19 @@ class BuildFile(AbstractClass):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
     return cls._cls_file_system.walk(root_dir, relpath, topdown)
 
+  # todo: deprecate
   @classmethod
   def _isdir(cls, path):
     """Returns True if path is a directory"""
     return cls._cls_file_system.isdir(path)
 
+  # todo: deprecate
   @classmethod
   def _isfile(cls, path):
     """Returns True if path is a file"""
     return cls._cls_file_system.isfile(path)
 
+  # todo: deprecate
   @classmethod
   def _exists(cls, path):
     """Returns True if path exists"""
@@ -181,24 +189,24 @@ class BuildFile(AbstractClass):
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
-    buildfile = os.path.join(path, self._build_basename) if self._isdir(path) else path
+    buildfile = os.path.join(path, self._build_basename) if file_system.isdir(path) else path
 
     # There is no BUILD file without a prefix so select any viable sibling
-    if not self._exists(buildfile) or self._isdir(buildfile):
+    if not file_system.exists(buildfile) or file_system.isdir(buildfile):
       for build in self._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
         break
 
     if must_exist:
-      if not self._exists(buildfile):
+      if not file_system.exists(buildfile):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
                                          .format(path=buildfile))
 
       # If a build file must exist then we want to make sure it's not a dir.
       # In other cases we are ok with it being a dir, for example someone might have
       # repo/scripts/build/doit.sh.
-      if self._isdir(buildfile):
+      if file_system.isdir(buildfile):
         raise self.MissingBuildFileError('Path to buildfile ({buildfile}) is a directory, '
                                          'but it must be a file.'.format(buildfile=buildfile))
 
@@ -216,7 +224,7 @@ class BuildFile(AbstractClass):
 
   def file_exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
-    return self._isfile(self.full_path)
+    return self.file_system.isfile(self.full_path)
 
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
