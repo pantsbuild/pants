@@ -21,6 +21,14 @@ python_library(
 )
 
 python_library(
+  name = 'scm_file_system',
+  sources = ['scm_file_system.py'],
+  dependencies = [
+    ':file_system',
+  ]
+)
+
+python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
@@ -36,6 +44,7 @@ python_library(
   sources = ['scm_build_file.py'],
   dependencies = [
     ':build_file',
+    ':scm_file_system',
   ]
 )
 

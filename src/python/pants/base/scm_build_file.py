@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.build_file import BuildFile
-from pants.base.file_system import ScmFilesystem
+from pants.base.scm_file_system import ScmFilesystem
 
 
 # todo: deprecate
