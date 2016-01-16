@@ -69,6 +69,7 @@ class BuildFile(AbstractClass):
       BuildFile._cache[cache_key] = BuildFile.create(file_system, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
+  # todo: deprecate
   def _glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
     return self.file_system.glob1(path, glob)
@@ -76,7 +77,7 @@ class BuildFile(AbstractClass):
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
-    for build in self._glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+    for build in self.file_system.glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
       if self._is_buildfile_name(build) and self.file_system.isfile(os.path.join(path, build)):
         results.append(build)
     return sorted(results)
@@ -298,19 +299,20 @@ class BuildFile(AbstractClass):
     return compile(self.source(), self.full_path, 'exec', flags=0, dont_inherit=True)
 
   def __eq__(self, other):
-    result = other and (
-      type(other) == type(self)) and (
-      self.full_path == other.full_path)
+    result = other and \
+             (type(other) == type(self)) and \
+             (self.full_path == other.full_path) and \
+             (self.file_system == other.file_system)
     return result
 
   def __hash__(self):
-    return hash(self.full_path)
+    return hash(self.full_path) ^ hash(self.file_system)
 
   def __ne__(self, other):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return '{}({})'.format(self.__class__.__name__, self.full_path)
+    return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.file_system)
 
 
 # todo: deprecate
