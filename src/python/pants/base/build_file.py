@@ -42,6 +42,8 @@ class BuildFile(AbstractClass):
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
+  # todo: remove after deprication, instead of old cls inheritance
+  _cls_file_system = None
   _cache = {}
 
   @classmethod
@@ -137,24 +139,25 @@ class BuildFile(AbstractClass):
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   # todo: deprecate
-  def _walk(self, root_dir, relpath, topdown=False):
+  @classmethod
+  def _walk(cls, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
-    return self.file_system.walk(root_dir, relpath, topdown)
+    return cls._cls_file_system.walk(root_dir, relpath, topdown)
 
   @classmethod
   def _isdir(cls, path):
     """Returns True if path is a directory"""
-    raise NotImplementedError()
+    return cls._cls_file_system.isdir(path)
 
   @classmethod
   def _isfile(cls, path):
     """Returns True if path is a file"""
-    raise NotImplementedError()
+    return cls._cls_file_system.isfile(path)
 
   @classmethod
   def _exists(cls, path):
     """Returns True if path exists"""
-    raise NotImplementedError()
+    return cls._cls_file_system.exists(path)
 
   def __init__(self, file_system, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
@@ -292,28 +295,12 @@ class BuildFile(AbstractClass):
 
 # todo: deprecate
 class FilesystemBuildFile(BuildFile):
-  _file_system = IoFilesystem()
+  _cls_file_system = IoFilesystem()
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
-    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._file_system,
+    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._cls_file_system,
                                               root_dir, relpath=relpath, must_exist=must_exist)
 
   @classmethod
   def from_cache(cls, root_dir, relpath, must_exist=True):
     return FilesystemBuildFile.create(IoFilesystem(), root_dir, relpath, must_exist)
-
-  @classmethod
-  def _isdir(cls, path):
-    return cls._file_system.isdir(path)
-
-  @classmethod
-  def _isfile(cls, path):
-    return cls._file_system.isfile(path)
-
-  @classmethod
-  def _exists(cls, path):
-    return cls._file_system.exists(path)
-
-  @classmethod
-  def _walk(cls, root_dir, relpath, topdown=False):
-    return cls._file_system.walk(root_dir, relpath, topdown)
