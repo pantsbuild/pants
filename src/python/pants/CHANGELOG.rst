@@ -1,6 +1,75 @@
 RELEASE HISTORY
 ===============
 
+0.0.68 (01/15/2016)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release concludes the deprecation cycle for backend/core,
+which has been removed.  It also simplifies the output directories
+for internal and external jars when creating jvm bundles.
+
+API Changes
+~~~~~~~~~~~
+
+* bundle_create cleanup: merge internal-libs and libs
+  `RB #3261 <https://rbcommons.com/s/twitter/r/3261>`_
+  `RB #3329 <https://rbcommons.com/s/twitter/r/3329>`_
+
+* Get rid of backend/authentication.
+  `RB #3335 <https://rbcommons.com/s/twitter/r/3335>`_
+
+* Kill the build.manual annotation and the old source_roots.py.
+  `RB #3333 <https://rbcommons.com/s/twitter/r/3333>`_
+
+* Remove backend core.
+  `RB #3324 <https://rbcommons.com/s/twitter/r/3324>`_
+
+* Add a method call to allow adding a new goal to jvm_prep_command in a custom plugin
+  `RB #3325 <https://rbcommons.com/s/twitter/r/3325>`_
+
+* add --jvm-distributions-{min,max}imum-version options
+  `Issue #2396 <https://github.com/pantsbuild/pants/issues/2396>`_
+  `RB #3310 <https://rbcommons.com/s/twitter/r/3310>`_
+
+Bugfixes
+~~~~~~~~
+
+* Bug fix: use target.id as bundle prefix to avoid conflict from basenames
+  `RB #3119 <https://rbcommons.com/s/twitter/r/3119>`_
+  `RB #3250 <https://rbcommons.com/s/twitter/r/3250>`_
+  `RB #3272 <https://rbcommons.com/s/twitter/r/3272>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support `go test` blackbox tests.
+  `RB #3327 <https://rbcommons.com/s/twitter/r/3327>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Group classpath products by their targets
+  `RB #3329 <https://rbcommons.com/s/twitter/r/3329>`_
+  `RB #3338 <https://rbcommons.com/s/twitter/r/3338>`_
+
+* Improve test.pytest failure when coverage is enabled.
+  `RB #3334 <https://rbcommons.com/s/twitter/r/3334>`_
+
+* Add RecursiveVersion and tests
+  `RB #3331 <https://rbcommons.com/s/twitter/r/3331>`_
+
+* Bump the default Go distribution to 1.5.3.
+  `RB #3337 <https://rbcommons.com/s/twitter/r/3337>`_
+
+* Fixup links in `Test{Parallel,Serial}`.
+  `RB #3326 <https://rbcommons.com/s/twitter/r/3326>`_
+
+* Follow-up options/documentation changes after scala removed from BUILD.tools
+  `RB #3302 <https://rbcommons.com/s/twitter/r/3302>`_
+
 0.0.67 (01/08/2016)
 -------------------
 
