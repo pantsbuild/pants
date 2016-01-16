@@ -12,7 +12,7 @@ from collections import defaultdict
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.base.build_file import FilesystemBuildFile
+from pants.base.build_file import BuildFile, FilesystemBuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
@@ -92,8 +92,8 @@ class BaseTest(unittest.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
-    cls = self.address_mapper._build_file_type
-    return cls(root_dir=self.build_root, relpath=self.build_path(relpath))
+    return BuildFile.create(self.address_mapper._file_system,
+                            root_dir=self.build_root, relpath=self.build_path(relpath))
 
   def make_target(self,
                   spec='',

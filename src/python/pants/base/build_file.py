@@ -55,14 +55,18 @@ class BuildFile(AbstractClass):
 
   @classmethod
   def create(cls, file_system, root_dir, relpath, must_exist=True):
-    cache_key = (file_system, root_dir, relpath, must_exist)
     init_key = (root_dir, relpath, must_exist)
+    # TODO: Change to BuildFile._cache[key] = BuildFile(*key), after depricated classes removing.
+    if isinstance(file_system, IoFilesystem):
+      return FilesystemBuildFile(*init_key)
+    elif isinstance(file_system, ScmFilesystem):
+      return  cls._scm_cls(*init_key)
+
+  @classmethod
+  def cached(cls, file_system, root_dir, relpath, must_exist=True):
+    cache_key = (file_system, root_dir, relpath, must_exist)
     if cache_key not in BuildFile._cache:
-      # TODO: Change to BuildFile._cache[key] = BuildFile(*key), after depricated classes removing.
-      if isinstance(file_system, IoFilesystem):
-        BuildFile._cache[cache_key] = FilesystemBuildFile(*init_key)
-      elif isinstance(file_system, ScmFilesystem):
-        BuildFile._cache[cache_key] = cls._scm_cls(*init_key)
+      BuildFile._cache[cache_key] = BuildFile.create(file_system, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
   def _glob1(self, path, glob):
@@ -81,6 +85,7 @@ class BuildFile(AbstractClass):
   def _is_buildfile_name(cls, name):
     return cls._PATTERN.match(name)
 
+  # todo: deprecate
   @classmethod
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
     return cls.scan_file_system_buildfiles(cls._cls_file_system,
@@ -235,7 +240,8 @@ class BuildFile(AbstractClass):
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_buildfiles(self.root_dir, self.parent_path, spec_excludes=spec_excludes)
+    descendants = self.scan_file_system_buildfiles(self.file_system,
+                                                   self.root_dir, self.parent_path, spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants
@@ -317,4 +323,4 @@ class FilesystemBuildFile(BuildFile):
 
   @classmethod
   def from_cache(cls, root_dir, relpath, must_exist=True):
-    return FilesystemBuildFile.create(IoFilesystem(), root_dir, relpath, must_exist)
+    return FilesystemBuildFile.cached(IoFilesystem(), root_dir, relpath, must_exist)
