@@ -24,27 +24,27 @@ major_version_info = namedtuple(
 scala_build_info = {
   '2.10':
     major_version_info(
-      '2.10.4',
-      'scalac_2_10',
-      'runtime_2_10',
-      'scala_2_10_repl',
-      'scalastyle_2_10',
-      '0.3.2'),
+      full_version='2.10.4',
+      compiler_name='scalac_2_10',
+      runtime_name='runtime_2_10',
+      repl_name='scala_2_10_repl',
+      style_name='scalastyle_2_10',
+      style_version='0.3.2'),
   '2.11':
     major_version_info(
-      '2.11.7',
-      'scalac_2_11',
-      'runtime_2_11',
-      'scala_2_11_repl',
-      'scalastyle_2_11',
-      '0.8.0'),
+      full_version='2.11.7',
+      compiler_name='scalac_2_11',
+      runtime_name='runtime_2_11',
+      repl_name='scala_2_11_repl',
+      style_name='scalastyle_2_11',
+      style_version='0.8.0'),
   'custom': major_version_info(
-    '2.10.4',
-    'scalac',
-    'runtime_default',
-    'scala-repl',
-    'scalastyle',
-    '0.3.2'),
+    full_version='2.10.4',
+    compiler_name='scalac',
+    runtime_name='runtime_default',
+    repl_name='scala-repl',
+    style_name='scalastyle',
+    style_version='0.3.2'),
 }
 
 
@@ -115,6 +115,9 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register('--runtime-spec', advanced=True, default='//:scala-library',
              help='Address to be used for custom scala runtime.')
 
+    register('--suffix-version', advanced=True, default=None,
+             help='Scala suffix to be used when a custom version is specified.  For example 2.10')
+
     # Register Scala Compiler's.
     register_scala_compiler('2.10')
     register_scala_compiler('2.11')
@@ -158,6 +161,13 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
     Also validates that the name doesn't already end with the version.
     """
+    if self._get_label() == 'custom':
+      suffix = self.get_options().suffix_version
+      if suffix:
+        return '{0}_{1}'.format(name, suffix)
+      else:
+        raise RuntimeError('Suffix version must be specified if using a custom version.')
+
     if name.endswith(self.version):
       raise ValueError('The name "{0}" should not be suffixed with the scala platform version '
                       '({1}): it will be added automatically.'.format(name, self.version))
