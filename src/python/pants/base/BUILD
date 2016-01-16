@@ -12,12 +12,22 @@ python_library(
 )
 
 python_library(
+  name = 'file_system',
+  sources = ['file_system.py'],
+  dependencies = [
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+    ':file_system',
   ]
 )
 
