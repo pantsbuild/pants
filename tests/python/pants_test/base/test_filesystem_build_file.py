@@ -126,7 +126,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_directory_called_build_skipped(self):
     # Ensure the buildfiles found do not include grandparent/BUILD since it is a dir.
-    buildfiles = FilesystemBuildFile.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
+    buildfiles = self.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
 
     self.assertEquals(OrderedSet([
       self.create_buildfile('grandparent/parent/BUILD'),
@@ -139,7 +139,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       ]), buildfiles)
 
   def test_scan_buildfiles_exclude_abspath(self):
-    buildfiles = FilesystemBuildFile.scan_buildfiles(
+    buildfiles = self.scan_buildfiles(
       self.root_dir, '', spec_excludes=[
         os.path.join(self.root_dir, 'grandparent/parent/child1'),
         os.path.join(self.root_dir, 'grandparent/parent/child2')
@@ -155,7 +155,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
                       buildfiles)
 
   def test_scan_buildfiles_exclude_relpath(self):
-    buildfiles = FilesystemBuildFile.scan_buildfiles(
+    buildfiles = self.scan_buildfiles(
       self.root_dir, '', spec_excludes=[
         'grandparent/parent/child1',
         'grandparent/parent/child2'

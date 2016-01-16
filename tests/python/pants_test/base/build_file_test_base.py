@@ -10,6 +10,8 @@ import shutil
 import tempfile
 import unittest
 
+from pants.base.build_file import BuildFile
+from pants.base.file_system import IoFilesystem
 from pants.util.dirutil import safe_mkdir, touch
 
 
@@ -22,6 +24,9 @@ class BuildFileTestBase(unittest.TestCase):
 
   def touch(self, path):
     touch(self.fullpath(path))
+
+  def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
+    return BuildFile.scan_file_system_buildfiles(IoFilesystem(), root_dir, base_path, spec_excludes)
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
