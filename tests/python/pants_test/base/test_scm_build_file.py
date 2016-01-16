@@ -10,6 +10,7 @@ import subprocess
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.build_file import BuildFile
 from pants.base.scm_build_file import ScmBuildFile
 from pants.scm.git import Git
 from pants.util.contextutil import pushd
@@ -25,6 +26,9 @@ class ScmBuildFileTest(BuildFileTestBase):
 
   def create_buildfile(self, path):
     return ScmBuildFile(self.root_dir, path)
+
+  def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
+    return BuildFile.scan_file_system_buildfiles(ScmBuildFile._cls_file_system, root_dir, base_path, spec_excludes)
 
   def test_build_file_rev(self):
     # Test that the build_file_rev global option works.  Because the

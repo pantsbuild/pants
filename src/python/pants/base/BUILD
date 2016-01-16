@@ -13,18 +13,14 @@ python_library(
 
 python_library(
   name = 'file_system',
-  sources = ['file_system.py'],
+  sources = [
+    'file_system.py',
+    # todo: move to separate target after removing, need in the same for from_cache method
+    'scm_file_system.py',
+  ],
   dependencies = [
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
-  ]
-)
-
-python_library(
-  name = 'scm_file_system',
-  sources = ['scm_file_system.py'],
-  dependencies = [
-    ':file_system',
   ]
 )
 
@@ -44,7 +40,6 @@ python_library(
   sources = ['scm_build_file.py'],
   dependencies = [
     ':build_file',
-    ':scm_file_system',
   ]
 )
 

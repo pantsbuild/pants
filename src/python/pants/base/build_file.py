@@ -13,6 +13,7 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.base.file_system import IoFilesystem
+from pants.base.scm_file_system import ScmFilesystem
 from pants.util.meta import AbstractClass
 
 
@@ -44,6 +45,8 @@ class BuildFile(AbstractClass):
 
   # todo: remove after deprication, instead of old cls inheritance
   _cls_file_system = None
+  _scm_cls = None
+
   _cache = {}
 
   @classmethod
@@ -56,7 +59,10 @@ class BuildFile(AbstractClass):
     init_key = (root_dir, relpath, must_exist)
     if cache_key not in BuildFile._cache:
       # TODO: Change to BuildFile._cache[key] = BuildFile(*key), after depricated classes removing.
-      BuildFile._cache[cache_key] = cls(*init_key)
+      if isinstance(file_system, IoFilesystem):
+        BuildFile._cache[cache_key] = FilesystemBuildFile(*init_key)
+      elif isinstance(file_system, ScmFilesystem):
+        BuildFile._cache[cache_key] = cls._scm_cls(*init_key)
     return BuildFile._cache[cache_key]
 
   def _glob1(self, path, glob):
@@ -140,7 +146,7 @@ class BuildFile(AbstractClass):
       for filename in files:
         if cls._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
-          buildfiles.append(cls.from_cache(root_dir, buildfile_relpath))
+          buildfiles.append(cls.create(file_system, root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   # todo: deprecate
