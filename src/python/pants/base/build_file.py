@@ -8,14 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import re
-from abc import abstractmethod
 from collections import defaultdict
-from glob import glob1
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.file_system import IoFilesystem
-from pants.util.dirutil import safe_walk
 from pants.util.meta import AbstractClass
 
 
@@ -53,12 +50,12 @@ class BuildFile(AbstractClass):
 
   @classmethod
   def create(cls, file_system, root_dir, relpath, must_exist=True):
-    key = (file_system, root_dir, relpath, must_exist)
+    cache_key = (file_system, root_dir, relpath, must_exist)
     init_key = (root_dir, relpath, must_exist)
-    if key not in BuildFile._cache:
+    if cache_key not in BuildFile._cache:
       # TODO: Change to BuildFile._cache[key] = BuildFile(*key), after depricated classes removing.
-      BuildFile._cache[key] = cls(*init_key)
-    return BuildFile._cache[key]
+      BuildFile._cache[cache_key] = cls(*init_key)
+    return BuildFile._cache[cache_key]
 
   def _glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
@@ -295,8 +292,11 @@ class BuildFile(AbstractClass):
 
 # todo: deprecate
 class FilesystemBuildFile(BuildFile):
+  _file_system = IoFilesystem()
+
   def __init__(self, root_dir, relpath=None, must_exist=True):
-    super(FilesystemBuildFile, self).__init__(IoFilesystem(), root_dir, relpath=relpath, must_exist=must_exist)
+    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._file_system,
+                                              root_dir, relpath=relpath, must_exist=must_exist)
 
   @classmethod
   def from_cache(cls, root_dir, relpath, must_exist=True):
@@ -304,17 +304,16 @@ class FilesystemBuildFile(BuildFile):
 
   @classmethod
   def _isdir(cls, path):
-    return os.path.isdir(path)
+    return cls._file_system.isdir(path)
 
   @classmethod
   def _isfile(cls, path):
-    return os.path.isfile(path)
+    return cls._file_system.isfile(path)
 
   @classmethod
   def _exists(cls, path):
-    return os.path.exists(path)
+    return cls._file_system.exists(path)
 
   @classmethod
-  def _walk(self, root_dir, relpath, topdown=False):
-    path = os.path.join(root_dir, relpath)
-    return safe_walk(path, topdown=True)
+  def _walk(cls, root_dir, relpath, topdown=False):
+    return cls._file_system.walk(root_dir, relpath, topdown)

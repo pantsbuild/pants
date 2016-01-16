@@ -82,8 +82,7 @@ class IoFilesystem(Filesystem):
 
 
 class ScmFilesystem(Filesystem):
-  def __init__(self, root_dir, scm, rev):
-    self._root_dir = root_dir
+  def __init__(self, scm, rev):
     self._scm = scm
     self._rev = rev
     self._reader = scm.repo_reader(rev)
