@@ -22,24 +22,24 @@ logger = logging.getLogger(__name__)
 # Target separated appropriately.  Don't add references to those other types to this module.
 class Filesystem(AbstractClass):
   @abstractmethod
-  def _glob1(self, path, glob):
+  def glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
 
   @abstractmethod
-  def _walk(self, root_dir, relpath, topdown=False):
+  def walk(self, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
 
   @abstractmethod
-  def _isdir(self, path):
+  def isdir(self, path):
     """Returns True if path is a directory"""
     raise NotImplementedError()
 
   @abstractmethod
-  def _isfile(self, path):
+  def isfile(self, path):
     """Returns True if path is a file"""
 
   @abstractmethod
-  def _exists(self, path):
+  def exists(self, path):
     """Returns True if path exists"""
 
   @abstractmethod
@@ -49,24 +49,25 @@ class Filesystem(AbstractClass):
   def __ne__(self, other):
     return not self.__eq__(other)
 
+
 class IoFilesystem(Filesystem):
-  def _glob1(self, path, glob):
+  def glob1(self, path, glob):
     return glob1(path, glob)
 
   def source(self, path):
     with open(path, 'rb') as source:
       return source.read()
 
-  def _isdir(self, path):
+  def isdir(self, path):
     return os.path.isdir(path)
 
-  def _isfile(self, path):
+  def isfile(self, path):
     return os.path.isfile(path)
 
-  def _exists(self, path):
+  def exists(self, path):
     return os.path.exists(path)
 
-  def _walk(self, root_dir, relpath, topdown=False):
+  def walk(self, root_dir, relpath, topdown=False):
     path = os.path.join(root_dir, relpath)
     return safe_walk(path, topdown=True)
 
@@ -74,10 +75,11 @@ class IoFilesystem(Filesystem):
     return other and (type(other) == type(self))
 
   def __hash__(self):
-    return hash(IoFilesystem.cls.__hash__())
+    return hash(self.__repr__().__hash__())
 
   def __repr__(self):
     return '{}()'.format(self.__class__.__name__)
+
 
 class ScmFilesystem(Filesystem):
   def __init__(self, root_dir, scm, rev):
@@ -91,7 +93,7 @@ class ScmFilesystem(Filesystem):
       cls._cached_scm_worktree = os.path.realpath(cls._scm.detect_worktree())
     return cls._cached_scm_worktree
 
-  def _glob1(self, path, glob):
+  def glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
     relpath = os.path.relpath(path, self._scm_worktree())
     files = self._reader.listdir(relpath)
@@ -103,22 +105,22 @@ class ScmFilesystem(Filesystem):
     with self._reader.open(relpath) as source:
       return source.read()
 
-  def _isdir(self, path):
+  def isdir(self, path):
     """Returns True if path is a directory"""
     relpath = os.path.relpath(path, self._scm_worktree())
     return self._reader.isdir(relpath)
 
-  def _isfile(self, path):
+  def isfile(self, path):
     """Returns True if path is a file"""
     relpath = os.path.relpath(path, self._scm_worktree())
     return self._reader.isfile(relpath)
 
-  def _exists(self, path):
+  def exists(self, path):
     """Returns True if path exists"""
     relpath = os.path.relpath(path, self._scm_worktree())
     return self._reader.exists(relpath)
 
-  def _walk(self, root_dir, root, topdown=False):
+  def walk(self, root_dir, root, topdown=False):
     """Walk a file tree.  If root is non-empty, the absolute path of the
     tree is root_dir/root; else it is just root_dir.
 

@@ -14,6 +14,7 @@ from glob import glob1
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.file_system import IoFilesystem
 from pants.util.dirutil import safe_walk
 from pants.util.meta import AbstractClass
 
@@ -44,21 +45,24 @@ class BuildFile(AbstractClass):
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
-  # Subclasses must have an _cache field.
+  _cache = {}
+
   @classmethod
   def clear_cache(cls):
-    cls._cache = {}
+    BuildFile._cache = {}
 
   @classmethod
-  def from_cache(cls, root_dir, relpath, must_exist=True):
-    key = (root_dir, relpath, must_exist)
-    if key not in cls._cache:
-      cls._cache[key] = cls(*key)
-    return cls._cache[key]
+  def create(cls, file_system, root_dir, relpath, must_exist=True):
+    key = (file_system, root_dir, relpath, must_exist)
+    init_key = (root_dir, relpath, must_exist)
+    if key not in BuildFile._cache:
+      # TODO: Change to BuildFile._cache[key] = BuildFile(*key), after depricated classes removing.
+      BuildFile._cache[key] = cls(*init_key)
+    return BuildFile._cache[key]
 
-  @abstractmethod
   def _glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
+    return self.file_system.glob1(path, glob)
 
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
@@ -135,9 +139,10 @@ class BuildFile(AbstractClass):
           buildfiles.append(cls.from_cache(root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  @abstractmethod
+  # todo: deprecate
   def _walk(self, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
+    return self.file_system.walk(root_dir, relpath, topdown)
 
   @classmethod
   def _isdir(cls, path):
@@ -154,12 +159,13 @@ class BuildFile(AbstractClass):
     """Returns True if path exists"""
     raise NotImplementedError()
 
-  def __init__(self, root_dir, relpath=None, must_exist=True):
+  def __init__(self, file_system, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
     :param string root_dir: The base directory of the project.
     :param string relpath: The path relative to root_dir where the BUILD file is found - this can
         either point directly at the BUILD file or else to a directory which contains BUILD files.
+    :param string file_system: File system the BUILD file exist in.
     :param bool must_exist: If True, at least one BUILD file must exist at the given location or
         else an` `MissingBuildFileError` is thrown
     :raises IOError: if the root_dir path is not absolute.
@@ -170,6 +176,7 @@ class BuildFile(AbstractClass):
       raise self.InvalidRootDirError('BuildFile root_dir {root_dir} must be an absolute path.'
                                      .format(root_dir=root_dir))
 
+    self.file_system = file_system
     self.root_dir = os.path.realpath(root_dir)
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
@@ -262,9 +269,9 @@ class BuildFile(AbstractClass):
     for sibling in self.siblings():
       yield sibling
 
-  @abstractmethod
   def source(self):
     """Returns the source code for this BUILD file."""
+    return self.file_system.source(self.full_path)
 
   def code(self):
     """Returns the code object for this BUILD file."""
@@ -286,18 +293,14 @@ class BuildFile(AbstractClass):
     return '{}({})'.format(self.__class__.__name__, self.full_path)
 
 
+# todo: deprecate
 class FilesystemBuildFile(BuildFile):
-  # TODO(dturner): this cache should really be in BuildFileAddressMapper, but unfortunately this
-  # class needs to access it, so it can't be moved yet.
-  _cache = {}
+  def __init__(self, root_dir, relpath=None, must_exist=True):
+    super(FilesystemBuildFile, self).__init__(IoFilesystem(), root_dir, relpath=relpath, must_exist=must_exist)
 
-  def _glob1(self, path, glob):
-    return glob1(path, glob)
-
-  def source(self):
-    """Returns the source code for this BUILD file."""
-    with open(self.full_path, 'rb') as source:
-      return source.read()
+  @classmethod
+  def from_cache(cls, root_dir, relpath, must_exist=True):
+    return FilesystemBuildFile.create(IoFilesystem(), root_dir, relpath, must_exist)
 
   @classmethod
   def _isdir(cls, path):

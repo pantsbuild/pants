@@ -5,17 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import fnmatch
 import os
 
 from pants.base.build_file import BuildFile
+from pants.base.file_system import ScmFilesystem
 
 
+# todo: deprecate
 class ScmBuildFile(BuildFile):
-  # TODO(dturner): this cache should really be in BuildFileAddressMapper, but unfortunately this
-  # class needs to access it, so it can't be moved yet.
-  _cache = {}
-
   _rev = None
   _scm = None
   _root_dir = None
@@ -39,26 +36,12 @@ class ScmBuildFile(BuildFile):
     return cls._cached_scm_worktree
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
-    super(ScmBuildFile, self).__init__(root_dir, relpath=relpath, must_exist=must_exist)
+    super(ScmBuildFile, self).__init__(ScmFilesystem(root_dir, ScmBuildFile._scm, ScmBuildFile._rev),
+                                       root_dir, relpath=relpath, must_exist=must_exist)
 
   @classmethod
   def from_cache(cls, root_dir, relpath, must_exist=True):
-    key = (root_dir, relpath, must_exist)
-    if key not in cls._cache:
-      cls._cache[key] = cls(*key)
-    return cls._cache[key]
-
-  def _glob1(self, path, glob):
-    """Returns a list of paths in path that match glob"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    files = self._reader.listdir(relpath)
-    return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
-
-  def source(self):
-    """Returns the source code for this BUILD file."""
-    relpath = os.path.relpath(self.full_path, self._scm_worktree())
-    with self._reader.open(relpath) as source:
-      return source.read()
+    return ScmBuildFile.create(ScmFilesystem(root_dir, cls._scm, cls._rev), root_dir, relpath, must_exist)
 
   @classmethod
   def _isdir(cls, path):
