@@ -52,6 +52,7 @@ class BuildFile(AbstractClass):
       BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
+  # todo: remove
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
@@ -237,14 +238,19 @@ class BuildFile(AbstractClass):
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
         yield self.cached(self.project_tree, siblingpath)
 
+  @classmethod
+  def get_project_tree_build_files_family(cls, project_tree, dir_relpath):
+    """Returns all the BUILD files on a path"""
+    for build in project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX)):
+      if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
+        yield BuildFile.cached(project_tree, os.path.join(dir_relpath, build))
+
+  # todo: deprecate
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
     BUILD file itself.  The family forms a single logical BUILD file composed of the canonical BUILD
     file if it exists and sibling build files each with their own extension, eg: BUILD.extras."""
-
-    yield self
-    for sibling in self.siblings():
-      yield sibling
+    return BuildFile.get_project_tree_build_files_family(self.project_tree, os.path.dirname(self.relpath))
 
   def source(self):
     """Returns the source code for this BUILD file."""
