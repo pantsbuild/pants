@@ -12,6 +12,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile
 from pants.base.scm_build_file import ScmBuildFile
+from pants.base.scm_file_system import ScmFilesystem
 from pants.scm.git import Git
 from pants.util.contextutil import pushd
 from pants_test.base.build_file_test_base import BuildFileTestBase
@@ -21,14 +22,15 @@ class ScmBuildFileTest(BuildFileTestBase):
 
   def setUp(self):
     super(ScmBuildFileTest, self).setUp()
-    ScmBuildFile.set_rev('HEAD')
-    ScmBuildFile.set_scm(Git(worktree=self.root_dir))
+
+  def create_file_system(self):
+    return ScmFilesystem(Git(worktree=self.root_dir), 'HEAD')
 
   def create_buildfile(self, path):
-    return ScmBuildFile(self.root_dir, path)
+    # I need this import to have _scm_cls field initialized
+    ScmBuildFile._rev
 
-  def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
-    return BuildFile.scan_file_system_buildfiles(ScmBuildFile._cls_file_system, root_dir, base_path, spec_excludes)
+    return BuildFile.create(self._file_system, self.root_dir, path)
 
   def test_build_file_rev(self):
     # Test that the build_file_rev global option works.  Because the

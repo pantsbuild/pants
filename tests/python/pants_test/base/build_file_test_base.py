@@ -26,7 +26,10 @@ class BuildFileTestBase(unittest.TestCase):
     touch(self.fullpath(path))
 
   def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
-    return BuildFile.scan_file_system_buildfiles(IoFilesystem(), root_dir, base_path, spec_excludes)
+    return BuildFile.scan_file_system_buildfiles(self._file_system, root_dir, base_path, spec_excludes)
+
+  def create_file_system(self):
+    return IoFilesystem()
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
@@ -57,6 +60,8 @@ class BuildFileTestBase(unittest.TestCase):
     # sibling.
     self.makedirs('issue_1742/BUILD')
     self.touch('issue_1742/BUILD.sibling')
+
+    self._file_system = self.create_file_system()
 
   def tearDown(self):
     shutil.rmtree(self.base_dir)

@@ -56,11 +56,15 @@ class BuildFile(AbstractClass):
   @classmethod
   def create(cls, file_system, root_dir, relpath, must_exist=True):
     init_key = (root_dir, relpath, must_exist)
-    # TODO: Change to BuildFile._cache[key] = BuildFile(*key), after depricated classes removing.
+    # TODO: Change to BuildFile(*init_key), after depricated classes removing.
     if isinstance(file_system, IoFilesystem):
       return FilesystemBuildFile(*init_key)
     elif isinstance(file_system, ScmFilesystem):
-      return  cls._scm_cls(*init_key)
+      if cls._scm_cls is not None:
+        cls._scm_cls._cls_file_system = file_system
+        return cls._scm_cls(*init_key)
+      else:
+        return BuildFile(*init_key)
 
   @classmethod
   def cached(cls, file_system, root_dir, relpath, must_exist=True):
