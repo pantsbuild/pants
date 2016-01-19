@@ -10,7 +10,7 @@ import os
 import six
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_file import BuildFile, FilesystemBuildFile
+from pants.base.build_file import BuildFile
 from pants.base.file_system import IoFilesystem
 from pants.util.dirutil import safe_open
 from pants_test.base.build_file_test_base import BuildFileTestBase
@@ -64,7 +64,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.buildfile.descendants(spec_excludes=['grandparent/parent/child1']))
 
   def testMustExistFalse(self):
-    buildfile = FilesystemBuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
+    buildfile = self.create_buildfile("path-that-does-not-exist/BUILD", must_exist=False)
     self.assertEquals(OrderedSet([buildfile]), buildfile.family())
 
   def testMustExistTrue(self):
