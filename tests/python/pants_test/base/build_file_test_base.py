@@ -26,14 +26,14 @@ class BuildFileTestBase(unittest.TestCase):
     touch(self.fullpath(path))
 
   def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
-    return BuildFile.scan_file_system_buildfiles(self._file_system, root_dir, base_path, spec_excludes)
+    return BuildFile.scan_filesystem_buildfiles(self._filesystem, root_dir, base_path, spec_excludes)
 
   @abstractmethod
-  def create_file_system(self):
+  def create_filesystem(self):
     pass
 
   def create_buildfile(self, path, must_exist=True):
-    return BuildFile._create(self._file_system, self.root_dir, path, must_exist=must_exist)
+    return BuildFile._create(self._filesystem, self.root_dir, path, must_exist=must_exist)
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
@@ -65,7 +65,7 @@ class BuildFileTestBase(unittest.TestCase):
     self.makedirs('issue_1742/BUILD')
     self.touch('issue_1742/BUILD.sibling')
 
-    self._file_system = self.create_file_system()
+    self._filesystem = self.create_filesystem()
 
   def tearDown(self):
     shutil.rmtree(self.base_dir)

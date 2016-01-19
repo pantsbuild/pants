@@ -9,7 +9,7 @@ import fnmatch
 import logging
 import os
 
-from pants.base.file_system import Filesystem
+from pants.base.filesystem import Filesystem
 
 
 logger = logging.getLogger(__name__)

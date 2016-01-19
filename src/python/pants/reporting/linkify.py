@@ -10,7 +10,7 @@ import re
 
 from pants.base.build_file import BuildFile
 # A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
-from pants.base.file_system import IoFilesystem
+from pants.base.filesystem import IoFilesystem
 
 
 _PREFIX = r'(https?://)?/?'  # http://, https:// or / or nothing.

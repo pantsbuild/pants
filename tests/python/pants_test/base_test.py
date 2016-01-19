@@ -16,7 +16,7 @@ from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.file_system import IoFilesystem
+from pants.base.filesystem import IoFilesystem
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -93,7 +93,7 @@ class BaseTest(unittest.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
-    return BuildFile._create(self.address_mapper._file_system,
+    return BuildFile._create(self.address_mapper._filesystem,
                              root_dir=self.build_root, relpath=self.build_path(relpath))
 
   def make_target(self,

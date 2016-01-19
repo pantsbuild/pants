@@ -11,7 +11,7 @@ from contextlib import contextmanager
 
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
-from pants.base.file_system import IoFilesystem
+from pants.base.filesystem import IoFilesystem
 from pants.build_graph.address import Address, BuildFileAddress, parse_spec
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import touch

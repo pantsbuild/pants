@@ -12,8 +12,8 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.file_system import IoFilesystem
-from pants.base.scm_file_system import ScmFilesystem
+from pants.base.filesystem import IoFilesystem
+from pants.base.scm_filesystem import ScmFilesystem
 from pants.util.meta import AbstractClass
 
 
@@ -44,7 +44,7 @@ class BuildFile(AbstractClass):
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
   # todo: remove after deprication, instead of old cls inheritance
-  _cls_file_system = None
+  _cls_filesystem = None
   _scm_cls = None
 
   _cache = {}
@@ -55,16 +55,16 @@ class BuildFile(AbstractClass):
 
   @classmethod
   # TODO: remove after depricated classes removing, use regular create instead
-  def _create(cls, file_system, root_dir, relpath, must_exist=True):
+  def _create(cls, filesystem, root_dir, relpath, must_exist=True):
     init_key = (root_dir, relpath, must_exist)
-    if isinstance(file_system, IoFilesystem):
+    if isinstance(filesystem, IoFilesystem):
       return FilesystemBuildFile(*init_key)
-    elif isinstance(file_system, ScmFilesystem):
+    elif isinstance(filesystem, ScmFilesystem):
       if cls._scm_cls is not None:
-        cls._scm_cls._cls_file_system = file_system
+        cls._scm_cls._cls_filesystem = filesystem
         return cls._scm_cls(*init_key)
       else:
-        return BuildFile(file_system, root_dir, relpath, must_exist)
+        return BuildFile(filesystem, root_dir, relpath, must_exist)
 
   @classmethod
   def cached(cls, file_system, root_dir, relpath, must_exist=True):
@@ -93,11 +93,11 @@ class BuildFile(AbstractClass):
   # todo: deprecate
   @classmethod
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
-    return cls.scan_file_system_buildfiles(cls._cls_file_system,
-                                           root_dir, base_path, spec_excludes)
+    return cls.scan_filesystem_buildfiles(cls._cls_filesystem,
+                                          root_dir, base_path, spec_excludes)
 
   @classmethod
-  def scan_file_system_buildfiles(cls, file_system, root_dir, base_path=None, spec_excludes=None):
+  def scan_filesystem_buildfiles(cls, file_system, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files
     :param root_dir: the root of the repo containing sources
     :param base_path: directory under root_dir to scan
@@ -163,25 +163,25 @@ class BuildFile(AbstractClass):
   @classmethod
   def _walk(cls, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
-    return cls._cls_file_system.walk(root_dir, relpath, topdown)
+    return cls._cls_filesystem.walk(root_dir, relpath, topdown)
 
   # todo: deprecate
   @classmethod
   def _isdir(cls, path):
     """Returns True if path is a directory"""
-    return cls._cls_file_system.isdir(path)
+    return cls._cls_filesystem.isdir(path)
 
   # todo: deprecate
   @classmethod
   def _isfile(cls, path):
     """Returns True if path is a file"""
-    return cls._cls_file_system.isfile(path)
+    return cls._cls_filesystem.isfile(path)
 
   # todo: deprecate
   @classmethod
   def _exists(cls, path):
     """Returns True if path exists"""
-    return cls._cls_file_system.exists(path)
+    return cls._cls_filesystem.exists(path)
 
   def __init__(self, file_system, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
@@ -245,8 +245,8 @@ class BuildFile(AbstractClass):
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_file_system_buildfiles(self.file_system,
-                                                   self.root_dir, self.parent_path, spec_excludes=spec_excludes)
+    descendants = self.scan_filesystem_buildfiles(self.file_system,
+                                                  self.root_dir, self.parent_path, spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants
@@ -321,10 +321,10 @@ class BuildFile(AbstractClass):
 
 # todo: deprecate
 class FilesystemBuildFile(BuildFile):
-  _cls_file_system = IoFilesystem()
+  _cls_filesystem = IoFilesystem()
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
-    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._cls_file_system,
+    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._cls_filesystem,
                                               root_dir, relpath=relpath, must_exist=must_exist)
 
   @classmethod

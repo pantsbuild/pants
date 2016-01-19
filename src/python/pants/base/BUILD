@@ -12,11 +12,11 @@ python_library(
 )
 
 python_library(
-  name = 'file_system',
+  name = 'filesystem',
   sources = [
-    'file_system.py',
-    # todo: move to separate target after removing, need in the same for from_cache method
-    'scm_file_system.py',
+    'filesystem.py',
+    # TODO(tabishev): Move to separate target after deprecation removing, needed in transition period only.
+    'scm_filesystem.py',
   ],
   dependencies = [
     'src/python/pants/util:dirutil',
@@ -31,7 +31,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
-    ':file_system',
+    ':filesystem',
   ]
 )
 

@@ -14,9 +14,9 @@ from pants.base.build_environment import get_scm, pants_version
 from pants.base.build_file import BuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
-from pants.base.file_system import IoFilesystem
+from pants.base.filesystem import IoFilesystem
 from pants.base.scm_build_file import ScmBuildFile
-from pants.base.scm_file_system import ScmFilesystem
+from pants.base.scm_filesystem import ScmFilesystem
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.extension_loader import load_plugins_and_backends
 from pants.bin.plugin_resolver import PluginResolver
@@ -181,9 +181,9 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    self._file_system = self._get_file_system(self._global_options.build_file_rev)
+    self._filesystem = self._get_filesystem(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._file_system)
+    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._filesystem)
     self._build_graph = BuildGraph(self._address_mapper)
     self._spec_parser = CmdLineSpecParser(
       self._root_dir,
@@ -192,7 +192,7 @@ class GoalRunnerFactory(object):
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
 
-  def _get_file_system(self, build_file_rev):
+  def _get_filesystem(self, build_file_rev):
     # todo: remove after deprication
     BuildFile._scm_cls = ScmBuildFile
 

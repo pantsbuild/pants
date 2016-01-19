@@ -10,7 +10,7 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.build_file import BuildFile
-from pants.base.file_system import IoFilesystem
+from pants.base.filesystem import IoFilesystem
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target

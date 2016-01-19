@@ -11,7 +11,7 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile
-from pants.base.file_system import IoFilesystem
+from pants.base.filesystem import IoFilesystem
 from pants.util.dirutil import safe_open
 from pants_test.base.build_file_test_base import BuildFileTestBase
 
@@ -22,7 +22,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     super(FilesystemBuildFileTest, self).setUp()
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
 
-  def create_file_system(self):
+  def create_filesystem(self):
     return IoFilesystem()
 
   def testSiblings(self):
@@ -178,7 +178,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
     with self.assertRaises(BuildFile.InvalidRootDirError):
-      BuildFile(self._file_system, 'tmp', 'grandparent/BUILD')
+      BuildFile(self._filesystem, 'tmp', 'grandparent/BUILD')
 
   def test_exception_class_hierarchy(self):
     """Exception handling code depends on the fact that all exceptions from BuildFile are

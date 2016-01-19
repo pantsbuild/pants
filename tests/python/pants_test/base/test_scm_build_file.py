@@ -12,7 +12,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile
 from pants.base.scm_build_file import ScmBuildFile
-from pants.base.scm_file_system import ScmFilesystem
+from pants.base.scm_filesystem import ScmFilesystem
 from pants.scm.git import Git
 from pants.util.contextutil import pushd
 from pants_test.base.build_file_test_base import BuildFileTestBase
@@ -25,7 +25,7 @@ class ScmBuildFileTest(BuildFileTestBase):
     # todo: remove after deprication
     BuildFile._scm_cls = ScmBuildFile
 
-  def create_file_system(self):
+  def create_filesystem(self):
     return ScmFilesystem(Git(worktree=self.root_dir), 'HEAD')
 
   def test_build_file_rev(self):

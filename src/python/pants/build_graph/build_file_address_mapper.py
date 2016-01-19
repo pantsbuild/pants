@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.file_system import Filesystem
+from pants.base.filesystem import Filesystem
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_parser import BuildFileParser
@@ -46,7 +46,7 @@ class BuildFileAddressMapper(object):
   class InvalidRootError(BuildFileScanError):
     """Indicates an invalid scan root was supplied."""
 
-  def __init__(self, build_file_parser, file_system):
+  def __init__(self, build_file_parser, filesystem):
     """Create a BuildFileAddressMapper.
 
     :param build_file_parser: An instance of BuildFileParser
@@ -54,11 +54,11 @@ class BuildFileAddressMapper(object):
     """
     self._build_file_parser = build_file_parser
     self._spec_path_to_address_map_map = {}  # {spec_path: {address: addressable}} mapping
-    if isinstance(file_system, Filesystem):
-      self._file_system = file_system
+    if isinstance(filesystem, Filesystem):
+      self._filesystem = filesystem
     else:
       # todo: for support deprecated stuff
-      self._file_system = file_system._cls_file_system
+      self._filesystem = filesystem._cls_filesystem
 
   @property
   def root_dir(self):
@@ -121,7 +121,7 @@ class BuildFileAddressMapper(object):
     """
     address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      build_file = BuildFile.cached(self._file_system,
+      build_file = BuildFile.cached(self._filesystem,
                                     self.root_dir, address.spec_path, must_exist=False)
       self._raise_incorrect_address_error(build_file, address.target_name, address_map)
     else:
@@ -144,7 +144,7 @@ class BuildFileAddressMapper(object):
     if spec_path not in self._spec_path_to_address_map_map:
       try:
         try:
-          build_file = BuildFile.cached(self._file_system, self.root_dir, spec_path)
+          build_file = BuildFile.cached(self._filesystem, self.root_dir, spec_path)
         except BuildFile.BuildFileError as e:
           raise self.BuildFileScanError("{message}\n searching {spec_path}"
                                         .format(message=e,
@@ -167,7 +167,7 @@ class BuildFileAddressMapper(object):
 
     :returns: a BuildFile
     """
-    return BuildFile.cached(self._file_system, root_dir, relpath, must_exist)
+    return BuildFile.cached(self._filesystem, root_dir, relpath, must_exist)
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct address.
@@ -192,7 +192,7 @@ class BuildFileAddressMapper(object):
 
     :returns: an OrderedSet of BuildFile instances.
     """
-    return BuildFile.scan_file_system_buildfiles(self._file_system, root_dir, base_path, spec_excludes)
+    return BuildFile.scan_filesystem_buildfiles(self._filesystem, root_dir, base_path, spec_excludes)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
@@ -221,10 +221,10 @@ class BuildFileAddressMapper(object):
 
     addresses = set()
     try:
-      for build_file in BuildFile.scan_file_system_buildfiles(self._file_system,
-                                                              root_dir=root_dir,
-                                                              base_path=base_path,
-                                                              spec_excludes=spec_excludes):
+      for build_file in BuildFile.scan_filesystem_buildfiles(self._filesystem,
+                                                             root_dir=root_dir,
+                                                             base_path=base_path,
+                                                             spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
     except BuildFile.BuildFileError as e:
