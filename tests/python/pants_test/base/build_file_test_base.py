@@ -9,9 +9,9 @@ import os
 import shutil
 import tempfile
 import unittest
+from abc import abstractmethod
 
 from pants.base.build_file import BuildFile
-from pants.base.file_system import IoFilesystem
 from pants.util.dirutil import safe_mkdir, touch
 
 
@@ -28,8 +28,9 @@ class BuildFileTestBase(unittest.TestCase):
   def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
     return BuildFile.scan_file_system_buildfiles(self._file_system, root_dir, base_path, spec_excludes)
 
+  @abstractmethod
   def create_file_system(self):
-    return IoFilesystem()
+    pass
 
   def create_buildfile(self, path, must_exist=True):
     return BuildFile.create(self._file_system, self.root_dir, path, must_exist=must_exist)

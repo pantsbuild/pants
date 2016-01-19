@@ -11,6 +11,7 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile, FilesystemBuildFile
+from pants.base.file_system import IoFilesystem
 from pants.util.dirutil import safe_open
 from pants_test.base.build_file_test_base import BuildFileTestBase
 
@@ -20,6 +21,9 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def setUp(self):
     super(FilesystemBuildFileTest, self).setUp()
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
+
+  def create_file_system(self):
+    return IoFilesystem()
 
   def testSiblings(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
@@ -112,14 +116,14 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_buildfile_with_dir_must_exist_false(self):
     # We should be able to create a BuildFile against a dir called BUILD if must_exist is false.
     # This is used in what_changed for example.
-    buildfile = FilesystemBuildFile(self.root_dir, 'grandparent/BUILD', must_exist=False)
+    buildfile = self.create_buildfile('grandparent/BUILD', must_exist=False)
     self.assertFalse(buildfile.file_exists())
 
   def test_buildfile_with_dir_must_exist_true(self):
     # We should NOT be able to create a BuildFile instance against a dir called BUILD
     # in the default case.
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      FilesystemBuildFile(self.root_dir, 'grandparent/BUILD')
+      self.create_buildfile('grandparent/BUILD')
 
   def test_directory_called_build_skipped(self):
     # Ensure the buildfiles found do not include grandparent/BUILD since it is a dir.
@@ -174,7 +178,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
     with self.assertRaises(BuildFile.InvalidRootDirError):
-      FilesystemBuildFile('tmp', 'grandparent/BUILD')
+      BuildFile(self._file_system, 'tmp', 'grandparent/BUILD')
 
   def test_exception_class_hierarchy(self):
     """Exception handling code depends on the fact that all exceptions from BuildFile are
