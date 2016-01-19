@@ -64,7 +64,7 @@ class BuildFile(AbstractClass):
         cls._scm_cls._cls_file_system = file_system
         return cls._scm_cls(*init_key)
       else:
-        return BuildFile(*init_key)
+        return BuildFile(file_system, root_dir, relpath, must_exist)
 
   @classmethod
   def cached(cls, file_system, root_dir, relpath, must_exist=True):
