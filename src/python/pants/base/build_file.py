@@ -323,7 +323,7 @@ class BuildFile(AbstractClass):
     return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.filesystem)
 
 
-@deprecated('0.0.72', hint_message='Create BuildFile with IoFilesystem instead.')
+# Deprecated, will be removed after 0.0.72. Create BuildFile with IoFilesystem instead.
 class FilesystemBuildFile(BuildFile):
   _cls_filesystem = IoFilesystem()
 

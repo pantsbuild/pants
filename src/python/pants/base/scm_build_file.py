@@ -9,7 +9,7 @@ from pants.base.build_file import BuildFile
 from pants.base.scm_filesystem import ScmFilesystem
 
 
-# todo: deprecate
+# Deprecated, will be removed after 0.0.72. Create BuildFile with ScmFilesystem instead.
 class ScmBuildFile(BuildFile):
   _rev = None
   _scm = None

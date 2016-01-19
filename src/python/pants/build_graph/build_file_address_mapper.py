@@ -57,7 +57,8 @@ class BuildFileAddressMapper(object):
     if isinstance(filesystem, Filesystem):
       self._filesystem = filesystem
     else:
-      # todo: for support deprecated stuff
+      # If filesystem is BuildFile class actually.
+      # TODO(tabishev): Remove after transition period.
       self._filesystem = filesystem._cls_filesystem
 
   @property

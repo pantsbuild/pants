@@ -193,7 +193,7 @@ class GoalRunnerFactory(object):
     )
 
   def _get_filesystem(self, build_file_rev):
-    # todo: remove after deprication
+    # TODO(tabishev): Remove after transition period.
     BuildFile._scm_cls = ScmBuildFile
 
     """Selects the file system for build files for use in a given pants run."""

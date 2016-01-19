@@ -22,7 +22,7 @@ class ScmBuildFileTest(BuildFileTestBase):
 
   def setUp(self):
     super(ScmBuildFileTest, self).setUp()
-    # todo: remove after deprication
+    # TODO(tabishev): Remove after transition period.
     BuildFile._scm_cls = ScmBuildFile
 
   def create_filesystem(self):
