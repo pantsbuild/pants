@@ -258,7 +258,7 @@ class BuildFile(AbstractClass):
       parent = os.path.dirname(dir)
       for parent_buildfile in self._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        return parent, self.from_cache(self.root_dir, os.path.relpath(buildfile, self.root_dir))
+        return parent, self.cached(self.file_system, self.root_dir, os.path.relpath(buildfile, self.root_dir))
       return parent, None
 
     parent_buildfiles = OrderedSet()
@@ -283,7 +283,7 @@ class BuildFile(AbstractClass):
     for build in self._get_all_build_files(self.parent_path):
       if self.name != build:
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        yield self.from_cache(self.root_dir, siblingpath)
+        yield self.cached(self.file_system, self.root_dir, siblingpath)
 
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
