@@ -31,6 +31,9 @@ class BuildFileTestBase(unittest.TestCase):
   def create_file_system(self):
     return IoFilesystem()
 
+  def create_buildfile(self, path):
+    return BuildFile.create(self._file_system, self.root_dir, path)
+
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
 

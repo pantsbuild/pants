@@ -22,15 +22,11 @@ class ScmBuildFileTest(BuildFileTestBase):
 
   def setUp(self):
     super(ScmBuildFileTest, self).setUp()
-
-  def create_file_system(self):
-    return ScmFilesystem(Git(worktree=self.root_dir), 'HEAD')
-
-  def create_buildfile(self, path):
     # todo: remove after deprication
     BuildFile._scm_cls = ScmBuildFile
 
-    return BuildFile.create(self._file_system, self.root_dir, path)
+  def create_file_system(self):
+    return ScmFilesystem(Git(worktree=self.root_dir), 'HEAD')
 
   def test_build_file_rev(self):
     # Test that the build_file_rev global option works.  Because the

@@ -21,9 +21,6 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     super(FilesystemBuildFileTest, self).setUp()
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
 
-  def create_buildfile(self, path):
-    return FilesystemBuildFile(self.root_dir, path)
-
   def testSiblings(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
     self.assertEquals(OrderedSet([buildfile]), OrderedSet(self.buildfile.siblings()))
