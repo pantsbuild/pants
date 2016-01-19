@@ -65,11 +65,11 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def testMustExistTrue(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      FilesystemBuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=True)
+      self.create_buildfile("path-that-does-not-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      FilesystemBuildFile(self.root_dir, "path-that-does-exist/BUILD", must_exist=True)
+      self.create_buildfile("path-that-does-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      FilesystemBuildFile(self.root_dir, "path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
+      self.create_buildfile("path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
 
   def testSuffixOnly(self):
     self.makedirs('suffix-test')
