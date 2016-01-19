@@ -10,6 +10,8 @@ import warnings
 
 import six
 
+from pants.base.deprecated import deprecated
+
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +71,7 @@ class BuildFileParser(object):
       address_map.update(sibling_address_map)
     return address_map
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use address_map_from_build_files instead.')
   def address_map_from_build_file(self, build_file):
     return self.address_map_from_build_files(build_file.family())
 
@@ -89,7 +91,7 @@ class BuildFileParser(object):
       family_address_map_by_build_file[bf] = bf_address_map
     return family_address_map_by_build_file
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use parse_build_files instead.')
   def parse_build_file_family(self, build_file):
     return self.parse_build_files(build_file.family())
 
