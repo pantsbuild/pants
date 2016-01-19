@@ -9,6 +9,7 @@ import os
 from collections import defaultdict
 
 from pants.base.build_environment import get_buildroot
+from pants.base.build_file import BuildFile
 from pants.source.payload_fields import DeferredSourcesField
 
 
@@ -47,9 +48,8 @@ class SpecSourceMapper(SourceMapper):
     # a top-level source has empty dirname, so do/while instead of straight while loop.
     while path:
       path = os.path.dirname(path)
-      candidate = self._address_mapper.get_build_file(relpath=path, must_exist=False)
-      if candidate.file_exists():
-        result.extend(list(self._find_targets_for_source(source, candidate.family())))
+      build_files = BuildFile.get_buildfiles_family(self._address_mapper._project_tree, path)
+      result.extend(list(self._find_targets_for_source(source, build_files)))
       if self._stop_after_match and len(result) > 0:
         break
 
@@ -128,9 +128,8 @@ class LazySourceMapper(SourceMapper):
     while walking:
       # It is possible
       if path not in self._mapped_paths:
-        candidate = self._address_mapper.get_build_file(relpath=path, must_exist=False)
-        if candidate.file_exists():
-          self._map_sources_from_family(candidate.family())
+        build_files = BuildFile.get_project_tree_build_files_family(self._address_mapper._project_tree, path)
+        self._map_sources_from_family(build_files)
         self._mapped_paths.add(path)
       elif not self._stop_after_match:
         # If not in stop-after-match mode, once a path is seen visited, all parents can be assumed.
