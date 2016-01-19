@@ -8,10 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.base.build_file import FilesystemBuildFile
-
-
+from pants.base.build_file import BuildFile
 # A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
+from pants.base.file_system import IoFilesystem
+
+
 _PREFIX = r'(https?://)?/?'  # http://, https:// or / or nothing.
 _OPTIONAL_PORT = r'(:\d+)?'
 _REL_PATH_COMPONENT = r'(\w|[-.])+'  # One or more alphanumeric, underscore, dash or dot.
@@ -62,7 +63,7 @@ def linkify(buildroot, s, memoized_urls):
       else:
         putative_dir = path
       if os.path.isdir(os.path.join(buildroot, putative_dir)):
-        build_file = FilesystemBuildFile.from_cache(buildroot, putative_dir, must_exist=False)
+        build_file = BuildFile.cached(IoFilesystem(), buildroot, putative_dir, must_exist=False)
         path = build_file.relpath
     if os.path.exists(os.path.join(buildroot, path)):
       # The reporting server serves file content at /browse/<path_from_buildroot>.
