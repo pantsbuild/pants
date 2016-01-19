@@ -71,22 +71,22 @@ class BuildFile(AbstractClass):
         return BuildFile(filesystem, root_dir, relpath, must_exist)
 
   @classmethod
-  def cached(cls, file_system, root_dir, relpath, must_exist=True):
-    cache_key = (file_system, root_dir, relpath, must_exist)
+  def cached(cls, filesystem, root_dir, relpath, must_exist=True):
+    cache_key = (filesystem, root_dir, relpath, must_exist)
     if cache_key not in BuildFile._cache:
-      BuildFile._cache[cache_key] = BuildFile._create(file_system, root_dir, relpath, must_exist)
+      BuildFile._cache[cache_key] = BuildFile._create(filesystem, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
   @deprecated('0.0.72', hint_message='Use Filesystem#glob1 instead.')
   def _glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
-    return self.file_system.glob1(path, glob)
+    return self.filesystem.glob1(path, glob)
 
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
-    for build in self.file_system.glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
-      if self._is_buildfile_name(build) and self.file_system.isfile(os.path.join(path, build)):
+    for build in self.filesystem.glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+      if self._is_buildfile_name(build) and self.filesystem.isfile(os.path.join(path, build)):
         results.append(build)
     return sorted(results)
 
@@ -101,7 +101,7 @@ class BuildFile(AbstractClass):
                                           root_dir, base_path, spec_excludes)
 
   @classmethod
-  def scan_filesystem_buildfiles(cls, file_system, root_dir, base_path=None, spec_excludes=None):
+  def scan_filesystem_buildfiles(cls, filesystem, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files
     :param root_dir: the root of the repo containing sources
     :param base_path: directory under root_dir to scan
@@ -139,7 +139,7 @@ class BuildFile(AbstractClass):
 
     root_dir = os.path.realpath(root_dir)
 
-    if base_path and not file_system.isdir(os.path.join(root_dir, base_path)):
+    if base_path and not filesystem.isdir(os.path.join(root_dir, base_path)):
       raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
                               .format(base_path))
 
@@ -149,7 +149,7 @@ class BuildFile(AbstractClass):
     else:
       exclude_roots = calc_exclude_roots(root_dir, spec_excludes)
 
-    for root, dirs, files in file_system.walk(root_dir, base_path or '', topdown=True):
+    for root, dirs, files in filesystem.walk(root_dir, base_path or '', topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
       # For performance, ignore hidden dirs such as .git, .pants.d and .local_artifact_cache.
       # TODO: Instead of this heuristic, only walk known source_roots.  But we can't do this
@@ -160,7 +160,7 @@ class BuildFile(AbstractClass):
       for filename in files:
         if cls._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
-          buildfiles.append(cls._create(file_system, root_dir, buildfile_relpath))
+          buildfiles.append(cls._create(filesystem, root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   @deprecated('0.0.72', hint_message='Use Filesystem#walk instead.')
@@ -187,13 +187,13 @@ class BuildFile(AbstractClass):
     """Returns True if path exists"""
     return cls._cls_filesystem.exists(path)
 
-  def __init__(self, file_system, root_dir, relpath=None, must_exist=True):
+  def __init__(self, filesystem, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
     :param string root_dir: The base directory of the project.
     :param string relpath: The path relative to root_dir where the BUILD file is found - this can
         either point directly at the BUILD file or else to a directory which contains BUILD files.
-    :param string file_system: File system the BUILD file exist in.
+    :param string filesystem: File system the BUILD file exist in.
     :param bool must_exist: If True, at least one BUILD file must exist at the given location or
         else an` `MissingBuildFileError` is thrown
     :raises IOError: if the root_dir path is not absolute.
@@ -204,29 +204,29 @@ class BuildFile(AbstractClass):
       raise self.InvalidRootDirError('BuildFile root_dir {root_dir} must be an absolute path.'
                                      .format(root_dir=root_dir))
 
-    self.file_system = file_system
+    self.filesystem = filesystem
     self.root_dir = os.path.realpath(root_dir)
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
-    buildfile = os.path.join(path, self._build_basename) if file_system.isdir(path) else path
+    buildfile = os.path.join(path, self._build_basename) if filesystem.isdir(path) else path
 
     # There is no BUILD file without a prefix so select any viable sibling
-    if not file_system.exists(buildfile) or file_system.isdir(buildfile):
+    if not filesystem.exists(buildfile) or filesystem.isdir(buildfile):
       for build in self._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
         break
 
     if must_exist:
-      if not file_system.exists(buildfile):
+      if not filesystem.exists(buildfile):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
                                          .format(path=buildfile))
 
       # If a build file must exist then we want to make sure it's not a dir.
       # In other cases we are ok with it being a dir, for example someone might have
       # repo/scripts/build/doit.sh.
-      if file_system.isdir(buildfile):
+      if filesystem.isdir(buildfile):
         raise self.MissingBuildFileError('Path to buildfile ({buildfile}) is a directory, '
                                          'but it must be a file.'.format(buildfile=buildfile))
 
@@ -244,12 +244,12 @@ class BuildFile(AbstractClass):
 
   def file_exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
-    return self.file_system.isfile(self.full_path)
+    return self.filesystem.isfile(self.full_path)
 
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_filesystem_buildfiles(self.file_system,
+    descendants = self.scan_filesystem_buildfiles(self.filesystem,
                                                   self.root_dir, self.parent_path, spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
@@ -262,7 +262,7 @@ class BuildFile(AbstractClass):
       parent = os.path.dirname(dir)
       for parent_buildfile in self._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        return parent, self.cached(self.file_system, self.root_dir, os.path.relpath(buildfile, self.root_dir))
+        return parent, self.cached(self.filesystem, self.root_dir, os.path.relpath(buildfile, self.root_dir))
       return parent, None
 
     parent_buildfiles = OrderedSet()
@@ -287,7 +287,7 @@ class BuildFile(AbstractClass):
     for build in self._get_all_build_files(self.parent_path):
       if self.name != build:
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        yield self.cached(self.file_system, self.root_dir, siblingpath)
+        yield self.cached(self.filesystem, self.root_dir, siblingpath)
 
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
@@ -300,7 +300,7 @@ class BuildFile(AbstractClass):
 
   def source(self):
     """Returns the source code for this BUILD file."""
-    return self.file_system.source(self.full_path)
+    return self.filesystem.source(self.full_path)
 
   def code(self):
     """Returns the code object for this BUILD file."""
@@ -310,17 +310,17 @@ class BuildFile(AbstractClass):
     result = other and \
              (type(other) == type(self)) and \
              (self.full_path == other.full_path) and \
-             (self.file_system == other.file_system)
+             (self.filesystem == other.filesystem)
     return result
 
   def __hash__(self):
-    return hash(self.full_path) ^ hash(self.file_system)
+    return hash(self.full_path) ^ hash(self.filesystem)
 
   def __ne__(self, other):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.file_system)
+    return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.filesystem)
 
 
 @deprecated('0.0.72', hint_message='Create BuildFile with IoFilesystem instead.')
