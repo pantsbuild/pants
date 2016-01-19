@@ -12,6 +12,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.deprecated import deprecated
 from pants.base.filesystem import IoFilesystem
 from pants.base.scm_filesystem import ScmFilesystem
 from pants.util.meta import AbstractClass
@@ -43,7 +44,8 @@ class BuildFile(AbstractClass):
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
-  # todo: remove after deprication, instead of old cls inheritance
+  # This fields used to emulate old class inheritance and provide compatibility in transition period.
+  # TODO(tabishev): Remove after transition period.
   _cls_filesystem = None
   _scm_cls = None
 
@@ -54,7 +56,9 @@ class BuildFile(AbstractClass):
     BuildFile._cache = {}
 
   @classmethod
-  # TODO: remove after depricated classes removing, use regular create instead
+  # Do not use this method, it's only for transition period.
+  # Create BuildFile directly or use 'cached' method instead.
+  # TODO(tabishev): Remove after transition period.
   def _create(cls, filesystem, root_dir, relpath, must_exist=True):
     init_key = (root_dir, relpath, must_exist)
     if isinstance(filesystem, IoFilesystem):
@@ -73,7 +77,7 @@ class BuildFile(AbstractClass):
       BuildFile._cache[cache_key] = BuildFile._create(file_system, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use Filesystem#glob1 instead.')
   def _glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
     return self.file_system.glob1(path, glob)
@@ -90,7 +94,7 @@ class BuildFile(AbstractClass):
   def _is_buildfile_name(cls, name):
     return cls._PATTERN.match(name)
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use scan_filesystem_buildfiles instead.')
   @classmethod
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
     return cls.scan_filesystem_buildfiles(cls._cls_filesystem,
@@ -159,25 +163,25 @@ class BuildFile(AbstractClass):
           buildfiles.append(cls._create(file_system, root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use Filesystem#walk instead.')
   @classmethod
   def _walk(cls, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
     return cls._cls_filesystem.walk(root_dir, relpath, topdown)
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use Filesystem#isdir instead.')
   @classmethod
   def _isdir(cls, path):
     """Returns True if path is a directory"""
     return cls._cls_filesystem.isdir(path)
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use Filesystem#isfile instead.')
   @classmethod
   def _isfile(cls, path):
     """Returns True if path is a file"""
     return cls._cls_filesystem.isfile(path)
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use Filesystem#exists instead.')
   @classmethod
   def _exists(cls, path):
     """Returns True if path exists"""
@@ -319,7 +323,7 @@ class BuildFile(AbstractClass):
     return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.file_system)
 
 
-# todo: deprecate
+@deprecated('0.0.72', hint_message='Create BuildFile with IoFilesystem instead.')
 class FilesystemBuildFile(BuildFile):
   _cls_filesystem = IoFilesystem()
 
