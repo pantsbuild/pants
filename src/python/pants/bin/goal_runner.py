@@ -11,10 +11,10 @@ import sys
 import pkg_resources
 
 from pants.base.build_environment import get_scm, pants_version
-from pants.base.build_file import FilesystemBuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
-from pants.base.scm_build_file import ScmBuildFile
+from pants.base.file_system import IoFilesystem
+from pants.base.scm_file_system import ScmFilesystem
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.extension_loader import load_plugins_and_backends
 from pants.bin.plugin_resolver import PluginResolver
@@ -179,9 +179,9 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    self._build_file_type = self._get_buildfile_type(self._global_options.build_file_rev)
+    self._file_system = self._get_file_system(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._build_file_type)
+    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._file_system)
     self._build_graph = BuildGraph(self._address_mapper)
     self._spec_parser = CmdLineSpecParser(
       self._root_dir,
@@ -190,14 +190,12 @@ class GoalRunnerFactory(object):
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
 
-  def _get_buildfile_type(self, build_file_rev):
-    """Selects the BuildFile type for use in a given pants run."""
+  def _get_file_system(self, build_file_rev):
+    """Selects the file system for build files for use in a given pants run."""
     if build_file_rev:
-      ScmBuildFile.set_rev(build_file_rev)
-      ScmBuildFile.set_scm(get_scm())
-      return ScmBuildFile
+      return ScmFilesystem(get_scm(), build_file_rev)
     else:
-      return FilesystemBuildFile
+      return IoFilesystem()
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""
