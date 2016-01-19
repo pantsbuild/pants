@@ -1,0 +1,45 @@
+{
+  "type_alias": "managed_resolve",
+  "name": "latest-hadoop",
+  "revs": {
+    "org.apache.hadoop#hadoop-common": "2.7.0",
+    "com.google.guava#guava": "18.0"
+  }
+}
+
+{
+  "type_alias": "managed_resolve",
+  "name": "hadoop-1",
+  "revs": {
+    "org.apache.hadoop#hadoop-common": "0.23.11",
+    "com.google.guava#guava": "11.0"
+  }
+}
+
+{
+  "type_alias": "target",
+  "name": "hadoop-common",
+  "configurations": [
+    {
+      "type_alias": "managed_jar",
+      "org": "org.apache.hadoop",
+      "name": "hadoop-common"
+    },
+    ":latest-hadoop",
+    ":hadoop-1"
+  ]
+}
+
+{
+  "type_alias": "target",
+  "name": "guava",
+  "configurations": [
+    {
+      "type_alias": "managed_jar",
+      "org": "com.google.guava",
+      "name": "guava"
+    },
+    ":latest-hadoop",
+    ":hadoop-1"
+  ]
+}

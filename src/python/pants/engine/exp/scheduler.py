@@ -48,6 +48,7 @@ class SelectVariant(datatype('Subject', ['variant', 'product']), Selector):
   def construct_node(self, subject, variants):
     variant_values = [value for key, value in variants
                       if key == self.variant] if variants else None
+    print('>>> variant values for {}, {}, {}, {} are: {}'.format(self.variant, self.product, subject, variants, variant_values))
     return NativeNode(subject,
                       self.product,
                       variant_values[0] if variant_values else None)
@@ -80,7 +81,7 @@ class SelectLiteral(datatype('LiteralSubject', ['subject', 'product']), Selector
 
 
 class Variants(object):
-  """Variants are key-value pairs representing uniquely identifying parameters for a target.
+  """Variants are key-value pairs representing uniquely identifying parameters for a Node.
 
   They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
   stored as sorted nested tuples of key-value strings.
@@ -88,10 +89,14 @@ class Variants(object):
 
   @classmethod
   def merge(cls, left, right):
+    """Merges right over left, ensuring that the return value is a tuple of tuples, or None."""
     if not left:
-      return right
+      if right:
+        return tuple(right)
+      else:
+        return None
     if not right:
-      return left
+      return tuple(left)
     # Merge by key, and then return sorted by key.
     merged = dict(left)
     for key, value in right:
@@ -233,10 +238,14 @@ class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'pro
     return SelectNode(self.subject, self.dep_product, self.variants)
 
   def _product_node(self, dependency):
-    dep_variants = None
+    variants = self.variants
+    if getattr(self.subject, 'variants', None):
+      # A subject's default variants are only used if a dependent has not overridden them.
+      variants = Variants.merge(self.subject.variants.items(), variants)
     if dependency.address:
-      dep_variants = extract_variants(dependency.address)
-    return SelectNode(dependency, self.product, Variants.merge(self.variants, dep_variants))
+      # If a subject has a literal variant for particular dependencies, it wins over all else.
+      variants = Variants.merge(variants, extract_variants(dependency.address))
+    return SelectNode(dependency, self.product, variants)
 
   def step(self, dependency_states, node_builder):
     dep_product_state = dependency_states.get(self._dep_product_node(), None)
@@ -288,20 +297,24 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
 
 class NativeNode(datatype('NativeNode', ['subject', 'product', 'variant']), Node):
   def step(self, dependency_states, node_builder):
-    product_value = None
-    if type(self.subject) == self.product:
-      product_value = self.subject
-    elif getattr(self.subject, 'configurations', None):
-      for configuration in self.subject.configurations:
-        if type(configuration) == self.product:
-          product_value = configuration
+    def candidates():
+      yield self.subject
+      if getattr(self.subject, 'configurations', None):
+        for configuration in self.subject.configurations:
+          yield configuration
+
     # TODO: returning only the last configuration of a given type. Need to define
     # mergeability for products.
-    if not product_value:
-      return Throw('No native source of {} for {}'.format(self.product, self.subject))
-    if self.variant and not getattr(product_value, 'name', None) == self.variant:
-      return Throw('No variant of {} matching {} for {}'.format(self.product, self.variant, self.subject))
-    return Return(product_value)
+    for candidate in candidates():
+      if type(candidate) != self.product:
+        continue
+      if self.variant and not getattr(candidate, 'name', None) == self.variant:
+        continue
+      return Return(candidate)
+    return Throw('No native source of {} for {}{}'.format(
+        self.product,
+        self.subject,
+        '(with variant {})'.format(self.variant) if self.variant else ''))
 
 
 class ProductGraph(object):
