@@ -142,7 +142,8 @@ class BuildFileParserTargetTest(BaseTest):
     base_build_file = self.create_buildfile('BUILD')
     foo_build_file = self.create_buildfile('BUILD.foo')
 
-    address_map = self.build_file_parser.address_map_from_build_file(bar_build_file)
+    address_map = self.build_file_parser.address_map_from_build_files(
+      BuildFile.get_project_tree_build_files_family(FileSystemProjectTree(self.build_root), "."))
     addresses = address_map.keys()
     self.assertEqual({bar_build_file, base_build_file, foo_build_file},
                      set([address.build_file for address in addresses]))
@@ -182,8 +183,8 @@ class BuildFileParserTargetTest(BaseTest):
       """))
 
     with self.assertRaises(BuildFileParser.SiblingConflictException):
-      base_build_file = self.create_buildfile('BUILD')
-      self.build_file_parser.address_map_from_build_file(base_build_file)
+      self.build_file_parser.address_map_from_build_files(
+        BuildFile.get_project_tree_build_files_family(FileSystemProjectTree(self.build_root), '.'))
 
 
 class BuildFileParserExposedObjectTest(BaseTest):
