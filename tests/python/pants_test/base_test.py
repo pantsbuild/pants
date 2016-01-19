@@ -92,8 +92,8 @@ class BaseTest(unittest.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
-    return BuildFile.create(self.address_mapper._file_system,
-                            root_dir=self.build_root, relpath=self.build_path(relpath))
+    return BuildFile._create(self.address_mapper._file_system,
+                             root_dir=self.build_root, relpath=self.build_path(relpath))
 
   def make_target(self,
                   spec='',

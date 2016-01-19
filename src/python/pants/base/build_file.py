@@ -54,9 +54,9 @@ class BuildFile(AbstractClass):
     BuildFile._cache = {}
 
   @classmethod
-  def create(cls, file_system, root_dir, relpath, must_exist=True):
+  # TODO: remove after depricated classes removing, use regular create instead
+  def _create(cls, file_system, root_dir, relpath, must_exist=True):
     init_key = (root_dir, relpath, must_exist)
-    # TODO: Change to BuildFile(*init_key), after depricated classes removing.
     if isinstance(file_system, IoFilesystem):
       return FilesystemBuildFile(*init_key)
     elif isinstance(file_system, ScmFilesystem):
@@ -70,7 +70,7 @@ class BuildFile(AbstractClass):
   def cached(cls, file_system, root_dir, relpath, must_exist=True):
     cache_key = (file_system, root_dir, relpath, must_exist)
     if cache_key not in BuildFile._cache:
-      BuildFile._cache[cache_key] = BuildFile.create(file_system, root_dir, relpath, must_exist)
+      BuildFile._cache[cache_key] = BuildFile._create(file_system, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
   # todo: deprecate
@@ -156,7 +156,7 @@ class BuildFile(AbstractClass):
       for filename in files:
         if cls._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
-          buildfiles.append(cls.create(file_system, root_dir, buildfile_relpath))
+          buildfiles.append(cls._create(file_system, root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   # todo: deprecate

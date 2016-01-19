@@ -31,4 +31,4 @@ class ScmBuildFile(BuildFile):
 
   @classmethod
   def from_cache(cls, root_dir, relpath, must_exist=True):
-    return ScmBuildFile.create(cls._cls_file_system, root_dir, relpath, must_exist)
+    return ScmBuildFile.cached(cls._cls_file_system, root_dir, relpath, must_exist)

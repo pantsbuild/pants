@@ -33,7 +33,7 @@ class BuildFileTestBase(unittest.TestCase):
     pass
 
   def create_buildfile(self, path, must_exist=True):
-    return BuildFile.create(self._file_system, self.root_dir, path, must_exist=must_exist)
+    return BuildFile._create(self._file_system, self.root_dir, path, must_exist=must_exist)
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
