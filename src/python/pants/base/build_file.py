@@ -94,8 +94,8 @@ class BuildFile(AbstractClass):
   def _is_buildfile_name(cls, name):
     return cls._PATTERN.match(name)
 
-  @deprecated('0.0.72', hint_message='Use scan_filesystem_buildfiles instead.')
   @classmethod
+  @deprecated('0.0.72', hint_message='Use scan_filesystem_buildfiles instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
     return cls.scan_filesystem_buildfiles(cls._cls_filesystem,
                                           root_dir, base_path, spec_excludes)
@@ -163,26 +163,26 @@ class BuildFile(AbstractClass):
           buildfiles.append(cls._create(filesystem, root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  @deprecated('0.0.72', hint_message='Use Filesystem#walk instead.')
   @classmethod
+  @deprecated('0.0.72', hint_message='Use Filesystem#walk instead.')
   def _walk(cls, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
     return cls._cls_filesystem.walk(root_dir, relpath, topdown)
 
-  @deprecated('0.0.72', hint_message='Use Filesystem#isdir instead.')
   @classmethod
+  @deprecated('0.0.72', hint_message='Use Filesystem#isdir instead.')
   def _isdir(cls, path):
     """Returns True if path is a directory"""
     return cls._cls_filesystem.isdir(path)
 
-  @deprecated('0.0.72', hint_message='Use Filesystem#isfile instead.')
   @classmethod
+  @deprecated('0.0.72', hint_message='Use Filesystem#isfile instead.')
   def _isfile(cls, path):
     """Returns True if path is a file"""
     return cls._cls_filesystem.isfile(path)
 
-  @deprecated('0.0.72', hint_message='Use Filesystem#exists instead.')
   @classmethod
+  @deprecated('0.0.72', hint_message='Use Filesystem#exists instead.')
   def _exists(cls, path):
     """Returns True if path exists"""
     return cls._cls_filesystem.exists(path)
