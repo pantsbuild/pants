@@ -11,6 +11,7 @@ import sys
 import pkg_resources
 
 from pants.base.build_environment import get_scm, pants_version
+from pants.base.build_file import BuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
 from pants.base.file_system import IoFilesystem
@@ -192,8 +193,8 @@ class GoalRunnerFactory(object):
     )
 
   def _get_file_system(self, build_file_rev):
-    # I need this import to have _scm_cls field initialized, remove after deprication
-    ScmBuildFile._rev
+    # todo: remove after deprication
+    BuildFile._scm_cls = ScmBuildFile
 
     """Selects the file system for build files for use in a given pants run."""
     if build_file_rev:

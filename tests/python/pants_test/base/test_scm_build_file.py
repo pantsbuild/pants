@@ -27,8 +27,8 @@ class ScmBuildFileTest(BuildFileTestBase):
     return ScmFilesystem(Git(worktree=self.root_dir), 'HEAD')
 
   def create_buildfile(self, path):
-    # I need this import to have _scm_cls field initialized
-    ScmBuildFile._rev
+    # todo: remove after deprication
+    BuildFile._scm_cls = ScmBuildFile
 
     return BuildFile.create(self._file_system, self.root_dir, path)
 
