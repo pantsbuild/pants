@@ -25,15 +25,15 @@ class BuildFileTestBase(unittest.TestCase):
   def touch(self, path):
     touch(self.fullpath(path))
 
-  def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
-    return BuildFile.scan_project_tree_buildfiles(self._project_tree, root_dir, base_path, spec_excludes)
-
   @abstractmethod
   def create_project_tree(self, build_root):
     pass
 
+  def scan_buildfiles(self, base_path=None, spec_excludes=None):
+    return BuildFile.scan_project_tree_buildfiles(self._project_tree, base_path, spec_excludes)
+
   def create_buildfile(self, path, must_exist=True):
-    return BuildFile(self._project_tree, self.root_dir, path, must_exist=must_exist)
+    return BuildFile(self._project_tree, path, must_exist=must_exist)
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()

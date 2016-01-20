@@ -141,7 +141,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_scan_buildfiles_exclude_abspath(self):
     buildfiles = self.scan_buildfiles(
-      self.root_dir, '', spec_excludes=[
+      '', spec_excludes=[
         os.path.join(self.root_dir, 'grandparent/parent/child1'),
         os.path.join(self.root_dir, 'grandparent/parent/child2')
       ])
@@ -157,7 +157,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_scan_buildfiles_exclude_relpath(self):
     buildfiles = self.scan_buildfiles(
-      self.root_dir, '', spec_excludes=[
+      '', spec_excludes=[
         'grandparent/parent/child1',
         'grandparent/parent/child2'
       ])
@@ -178,7 +178,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
     with self.assertRaises(BuildFile.InvalidRootDirError):
-      BuildFile(self._project_tree, 'tmp', 'grandparent/BUILD')
+      BuildFile(FileSystemProjectTree('tmp'), 'grandparent/BUILD')
 
   def test_exception_class_hierarchy(self):
     """Exception handling code depends on the fact that all exceptions from BuildFile are

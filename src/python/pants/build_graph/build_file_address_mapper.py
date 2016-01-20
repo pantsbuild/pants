@@ -122,8 +122,7 @@ class BuildFileAddressMapper(object):
     """
     address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      build_file = BuildFile.cached(self._project_tree,
-                                    self.root_dir, address.spec_path, must_exist=False)
+      build_file = BuildFile.cached(self._project_tree, address.spec_path, must_exist=False)
       self._raise_incorrect_address_error(build_file, address.target_name, address_map)
     else:
       return address_map[address]
@@ -145,7 +144,7 @@ class BuildFileAddressMapper(object):
     if spec_path not in self._spec_path_to_address_map_map:
       try:
         try:
-          build_file = BuildFile.cached(self._project_tree, self.root_dir, spec_path)
+          build_file = BuildFile.cached(self._project_tree, spec_path)
         except BuildFile.BuildFileError as e:
           raise self.BuildFileScanError("{message}\n searching {spec_path}"
                                         .format(message=e,
@@ -163,12 +162,13 @@ class BuildFileAddressMapper(object):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()
 
+  # todo: deprecate
   def from_cache(self, root_dir, relpath, must_exist=True):
     """Return a BuildFile instance.  Args as per BuildFile.from_cache
 
     :returns: a BuildFile
     """
-    return BuildFile.cached(self._project_tree, root_dir, relpath, must_exist)
+    return BuildFile.cached(self._project_tree, relpath, must_exist)
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct address.
@@ -188,12 +188,13 @@ class BuildFileAddressMapper(object):
                                            .format(message=e, spec=spec))
     return Address(spec_path, name)
 
+  # todo: deprecate
   def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files in root_dir or its descendant directories.
 
     :returns: an OrderedSet of BuildFile instances.
     """
-    return BuildFile.scan_project_tree_buildfiles(self._project_tree, root_dir, base_path, spec_excludes)
+    return BuildFile.scan_project_tree_buildfiles(self._project_tree, base_path, spec_excludes)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.

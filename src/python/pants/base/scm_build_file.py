@@ -24,8 +24,8 @@ class ScmBuildFile(BuildFile):
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
     super(ScmBuildFile, self).__init__(ScmBuildFile._get_project_tree(root_dir),
-                                       root_dir, relpath=relpath, must_exist=must_exist)
+                                       relpath=relpath, must_exist=must_exist)
 
   @classmethod
   def _get_project_tree(cls, root_dir):
-    return ScmProjectTree(cls._scm, cls._rev)
+    return ScmProjectTree(root_dir, cls._scm, cls._rev)
