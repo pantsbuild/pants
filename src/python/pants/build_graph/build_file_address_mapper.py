@@ -224,9 +224,8 @@ class BuildFileAddressMapper(object):
     addresses = set()
     try:
       for build_file in BuildFile.scan_project_tree_buildfiles(self._project_tree,
-                                                             root_dir=root_dir,
-                                                             base_path=base_path,
-                                                             spec_excludes=spec_excludes):
+                                                               base_path=base_path,
+                                                               spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
     except BuildFile.BuildFileError as e:
