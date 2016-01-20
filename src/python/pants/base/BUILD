@@ -12,11 +12,11 @@ python_library(
 )
 
 python_library(
-  name = 'filesystem',
+  name = 'project_tree',
   sources = [
-    'filesystem.py',
+    'project_tree.py',
     # TODO(tabishev): Move to separate target after deprecation removing, needed in transition period only.
-    'scm_filesystem.py',
+    'scm_project_tree.py',
   ],
   dependencies = [
     'src/python/pants/util:dirutil',
@@ -31,7 +31,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
-    ':filesystem',
+    ':project_tree',
     ':deprecated',
   ]
 )

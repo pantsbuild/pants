@@ -13,8 +13,8 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
-from pants.base.filesystem import IoFilesystem
-from pants.base.scm_filesystem import ScmFilesystem
+from pants.base.project_tree import FileSystemProjectTree
+from pants.base.scm_project_tree import ScmProjectTree
 from pants.util.meta import AbstractClass
 
 
@@ -61,9 +61,9 @@ class BuildFile(AbstractClass):
   # TODO(tabishev): Remove after transition period.
   def _create(cls, filesystem, root_dir, relpath, must_exist=True):
     init_key = (root_dir, relpath, must_exist)
-    if isinstance(filesystem, IoFilesystem):
+    if isinstance(filesystem, FileSystemProjectTree):
       return FilesystemBuildFile(*init_key)
-    elif isinstance(filesystem, ScmFilesystem):
+    elif isinstance(filesystem, ScmProjectTree):
       if cls._scm_cls is not None:
         cls._scm_cls._cls_filesystem = filesystem
         return cls._scm_cls(*init_key)
@@ -104,7 +104,7 @@ class BuildFile(AbstractClass):
   def scan_filesystem_buildfiles(cls, filesystem, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files
     :param filesystem: File system to scan in.
-    :type filesystem: :class:`pants.base.filesystem.Filesystem`
+    :type filesystem: :class:`pants.base.project_tree.ProjectTree`
     :param root_dir: The root of the repo containing sources.
     :param base_path: Directory under root_dir to scan.
     :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
@@ -193,7 +193,7 @@ class BuildFile(AbstractClass):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
     :param filesystem: File system the BUILD file exist in.
-    :type filesystem: :class:`pants.base.filesystem.Filesystem`
+    :type filesystem: :class:`pants.base.project_tree.ProjectTree`
     :param string root_dir: The base directory of the project.
     :param string relpath: The path relative to root_dir where the BUILD file is found - this can
         either point directly at the BUILD file or else to a directory which contains BUILD files.
@@ -328,7 +328,7 @@ class BuildFile(AbstractClass):
 
 # Deprecated, will be removed after 0.0.72. Create BuildFile with IoFilesystem instead.
 class FilesystemBuildFile(BuildFile):
-  _cls_filesystem = IoFilesystem()
+  _cls_filesystem = FileSystemProjectTree()
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
     super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._cls_filesystem,
@@ -336,4 +336,4 @@ class FilesystemBuildFile(BuildFile):
 
   @classmethod
   def from_cache(cls, root_dir, relpath, must_exist=True):
-    return FilesystemBuildFile.cached(IoFilesystem(), root_dir, relpath, must_exist)
+    return FilesystemBuildFile.cached(FileSystemProjectTree(), root_dir, relpath, must_exist)

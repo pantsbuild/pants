@@ -14,9 +14,9 @@ from pants.base.build_environment import get_scm, pants_version
 from pants.base.build_file import BuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
-from pants.base.filesystem import IoFilesystem
+from pants.base.project_tree import FileSystemProjectTree
 from pants.base.scm_build_file import ScmBuildFile
-from pants.base.scm_filesystem import ScmFilesystem
+from pants.base.scm_project_tree import ScmProjectTree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.extension_loader import load_plugins_and_backends
 from pants.bin.plugin_resolver import PluginResolver
@@ -198,9 +198,9 @@ class GoalRunnerFactory(object):
 
     """Selects the file system for build files for use in a given pants run."""
     if build_file_rev:
-      return ScmFilesystem(get_scm(), build_file_rev)
+      return ScmProjectTree(get_scm(), build_file_rev)
     else:
-      return IoFilesystem()
+      return FileSystemProjectTree()
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""

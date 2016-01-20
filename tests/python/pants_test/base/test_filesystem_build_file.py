@@ -11,7 +11,7 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile
-from pants.base.filesystem import IoFilesystem
+from pants.base.project_tree import FileSystemProjectTree
 from pants.util.dirutil import safe_open
 from pants_test.base.build_file_test_base import BuildFileTestBase
 
@@ -23,7 +23,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
 
   def create_filesystem(self):
-    return IoFilesystem()
+    return FileSystemProjectTree()
 
   def testSiblings(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')

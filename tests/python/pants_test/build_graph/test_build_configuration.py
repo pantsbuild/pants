@@ -10,7 +10,7 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.build_file import BuildFile
-from pants.base.filesystem import IoFilesystem
+from pants.base.project_tree import FileSystemProjectTree
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
@@ -40,7 +40,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(fred=Fred), aliases.target_types)
 
-    build_file = BuildFile._create(IoFilesystem(), '/tmp', 'fred', must_exist=False)
+    build_file = BuildFile._create(FileSystemProjectTree(), '/tmp', 'fred', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
@@ -82,7 +82,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(fred=factory), aliases.target_macro_factories)
 
-    build_file = BuildFile._create(IoFilesystem(), '/tmp', 'fred', must_exist=False)
+    build_file = BuildFile._create(FileSystemProjectTree(), '/tmp', 'fred', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
@@ -106,7 +106,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(jane=42), aliases.objects)
 
-    build_file = BuildFile._create(IoFilesystem(), '/tmp', 'jane', must_exist=False)
+    build_file = BuildFile._create(FileSystemProjectTree(), '/tmp', 'jane', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
@@ -166,7 +166,7 @@ class BuildConfigurationTest(unittest.TestCase):
     with temporary_dir() as root:
       build_file_path = os.path.join(root, 'george', 'BUILD')
       touch(build_file_path)
-      build_file = BuildFile._create(IoFilesystem(), root, 'george')
+      build_file = BuildFile._create(FileSystemProjectTree(), root, 'george')
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
       self.assertEqual(0, len(parse_state.registered_addressable_instances))

@@ -9,13 +9,13 @@ import fnmatch
 import logging
 import os
 
-from pants.base.filesystem import Filesystem
+from pants.base.project_tree import ProjectTree
 
 
 logger = logging.getLogger(__name__)
 
 
-class ScmFilesystem(Filesystem):
+class ScmProjectTree(ProjectTree):
   def __init__(self, scm, rev):
     self._scm = scm
     self._rev = rev

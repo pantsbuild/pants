@@ -17,7 +17,7 @@ from pants.util.meta import AbstractClass
 logger = logging.getLogger(__name__)
 
 
-class Filesystem(AbstractClass):
+class ProjectTree(AbstractClass):
   """A class used to abstract filesystem behaviour needed to load build files.
   Currently regular filesystem or SCM are supported.
   """
@@ -51,7 +51,7 @@ class Filesystem(AbstractClass):
     return not self.__eq__(other)
 
 
-class IoFilesystem(Filesystem):
+class FileSystemProjectTree(ProjectTree):
   def glob1(self, path, glob):
     return glob1(path, glob)
 

@@ -12,7 +12,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile
 from pants.base.scm_build_file import ScmBuildFile
-from pants.base.scm_filesystem import ScmFilesystem
+from pants.base.scm_project_tree import ScmProjectTree
 from pants.scm.git import Git
 from pants.util.contextutil import pushd
 from pants_test.base.build_file_test_base import BuildFileTestBase
@@ -26,7 +26,7 @@ class ScmBuildFileTest(BuildFileTestBase):
     BuildFile._scm_cls = ScmBuildFile
 
   def create_filesystem(self):
-    return ScmFilesystem(Git(worktree=self.root_dir), 'HEAD')
+    return ScmProjectTree(Git(worktree=self.root_dir), 'HEAD')
 
   def test_build_file_rev(self):
     # Test that the build_file_rev global option works.  Because the

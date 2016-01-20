@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.filesystem import Filesystem
+from pants.base.project_tree import ProjectTree
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_parser import BuildFileParser
@@ -54,7 +54,7 @@ class BuildFileAddressMapper(object):
     """
     self._build_file_parser = build_file_parser
     self._spec_path_to_address_map_map = {}  # {spec_path: {address: addressable}} mapping
-    if isinstance(filesystem, Filesystem):
+    if isinstance(filesystem, ProjectTree):
       self._filesystem = filesystem
     else:
       # If filesystem is BuildFile class actually.

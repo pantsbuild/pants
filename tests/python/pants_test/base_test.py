@@ -16,7 +16,7 @@ from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.filesystem import IoFilesystem
+from pants.base.project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -174,7 +174,7 @@ class BaseTest(unittest.TestCase):
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, IoFilesystem())
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree())
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def buildroot_files(self, relpath=None):
@@ -192,7 +192,7 @@ class BaseTest(unittest.TestCase):
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, IoFilesystem())
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree())
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def set_options_for_scope(self, scope, **kwargs):
