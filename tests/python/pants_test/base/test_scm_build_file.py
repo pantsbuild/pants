@@ -25,7 +25,7 @@ class ScmBuildFileTest(BuildFileTestBase):
     # TODO(tabishev): Remove after transition period.
     BuildFile._scm_cls = ScmBuildFile
 
-  def create_filesystem(self):
+  def create_project_tree(self):
     return ScmProjectTree(Git(worktree=self.root_dir), 'HEAD')
 
   def test_build_file_rev(self):

@@ -181,9 +181,9 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    self._filesystem = self._get_filesystem(self._global_options.build_file_rev)
+    self._project_tree = self._get_project_tree(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._filesystem)
+    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._project_tree)
     self._build_graph = BuildGraph(self._address_mapper)
     self._spec_parser = CmdLineSpecParser(
       self._root_dir,
@@ -192,7 +192,7 @@ class GoalRunnerFactory(object):
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
 
-  def _get_filesystem(self, build_file_rev):
+  def _get_project_tree(self, build_file_rev):
     # TODO(tabishev): Remove after transition period.
     BuildFile._scm_cls = ScmBuildFile
 

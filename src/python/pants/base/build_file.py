@@ -46,7 +46,7 @@ class BuildFile(AbstractClass):
 
   # This fields used to emulate old class inheritance and provide compatibility in transition period.
   # TODO(tabishev): Remove after transition period.
-  _cls_filesystem = None
+  _cls_project_tree = None
   _scm_cls = None
 
   _cache = {}
@@ -59,34 +59,34 @@ class BuildFile(AbstractClass):
   # Do not use this method, it's only for transition period.
   # Create BuildFile directly or use 'cached' method instead.
   # TODO(tabishev): Remove after transition period.
-  def _create(cls, filesystem, root_dir, relpath, must_exist=True):
+  def _create(cls, project_tree, root_dir, relpath, must_exist=True):
     init_key = (root_dir, relpath, must_exist)
-    if isinstance(filesystem, FileSystemProjectTree):
+    if isinstance(project_tree, FileSystemProjectTree):
       return FilesystemBuildFile(*init_key)
-    elif isinstance(filesystem, ScmProjectTree):
+    elif isinstance(project_tree, ScmProjectTree):
       if cls._scm_cls is not None:
-        cls._scm_cls._cls_filesystem = filesystem
+        cls._scm_cls._cls_project_tree = project_tree
         return cls._scm_cls(*init_key)
       else:
-        return BuildFile(filesystem, root_dir, relpath, must_exist)
+        return BuildFile(project_tree, root_dir, relpath, must_exist)
 
   @classmethod
-  def cached(cls, filesystem, root_dir, relpath, must_exist=True):
-    cache_key = (filesystem, root_dir, relpath, must_exist)
+  def cached(cls, project_tree, root_dir, relpath, must_exist=True):
+    cache_key = (project_tree, root_dir, relpath, must_exist)
     if cache_key not in BuildFile._cache:
-      BuildFile._cache[cache_key] = BuildFile._create(filesystem, root_dir, relpath, must_exist)
+      BuildFile._cache[cache_key] = BuildFile._create(project_tree, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
   @deprecated('0.0.72', hint_message='Use Filesystem#glob1 instead.')
   def _glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
-    return self.filesystem.glob1(path, glob)
+    return self.project_tree.glob1(path, glob)
 
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
-    for build in self.filesystem.glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
-      if self._is_buildfile_name(build) and self.filesystem.isfile(os.path.join(path, build)):
+    for build in self.project_tree.glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+      if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(path, build)):
         results.append(build)
     return sorted(results)
 
@@ -97,14 +97,14 @@ class BuildFile(AbstractClass):
   @classmethod
   @deprecated('0.0.72', hint_message='Use scan_filesystem_buildfiles instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
-    return cls.scan_filesystem_buildfiles(cls._cls_filesystem,
+    return cls.scan_project_tree_buildfiles(cls._cls_project_tree,
                                           root_dir, base_path, spec_excludes)
 
   @classmethod
-  def scan_filesystem_buildfiles(cls, filesystem, root_dir, base_path=None, spec_excludes=None):
+  def scan_project_tree_buildfiles(cls, project_tree, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files
-    :param filesystem: File system to scan in.
-    :type filesystem: :class:`pants.base.project_tree.ProjectTree`
+    :param project_tree: Project tree to scan in.
+    :type project_tree: :class:`pants.base.project_tree.ProjectTree`
     :param root_dir: The root of the repo containing sources.
     :param base_path: Directory under root_dir to scan.
     :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
@@ -141,7 +141,7 @@ class BuildFile(AbstractClass):
 
     root_dir = os.path.realpath(root_dir)
 
-    if base_path and not filesystem.isdir(os.path.join(root_dir, base_path)):
+    if base_path and not project_tree.isdir(os.path.join(root_dir, base_path)):
       raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
                               .format(base_path))
 
@@ -151,7 +151,7 @@ class BuildFile(AbstractClass):
     else:
       exclude_roots = calc_exclude_roots(root_dir, spec_excludes)
 
-    for root, dirs, files in filesystem.walk(root_dir, base_path or '', topdown=True):
+    for root, dirs, files in project_tree.walk(root_dir, base_path or '', topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
       # For performance, ignore hidden dirs such as .git, .pants.d and .local_artifact_cache.
       # TODO: Instead of this heuristic, only walk known source_roots.  But we can't do this
@@ -162,38 +162,38 @@ class BuildFile(AbstractClass):
       for filename in files:
         if cls._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
-          buildfiles.append(cls._create(filesystem, root_dir, buildfile_relpath))
+          buildfiles.append(cls._create(project_tree, root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   @classmethod
   @deprecated('0.0.72', hint_message='Use Filesystem#walk instead.')
   def _walk(cls, root_dir, relpath, topdown=False):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
-    return cls._cls_filesystem.walk(root_dir, relpath, topdown)
+    return cls._cls_project_tree.walk(root_dir, relpath, topdown)
 
   @classmethod
   @deprecated('0.0.72', hint_message='Use Filesystem#isdir instead.')
   def _isdir(cls, path):
     """Returns True if path is a directory"""
-    return cls._cls_filesystem.isdir(path)
+    return cls._cls_project_tree.isdir(path)
 
   @classmethod
   @deprecated('0.0.72', hint_message='Use Filesystem#isfile instead.')
   def _isfile(cls, path):
     """Returns True if path is a file"""
-    return cls._cls_filesystem.isfile(path)
+    return cls._cls_project_tree.isfile(path)
 
   @classmethod
   @deprecated('0.0.72', hint_message='Use Filesystem#exists instead.')
   def _exists(cls, path):
     """Returns True if path exists"""
-    return cls._cls_filesystem.exists(path)
+    return cls._cls_project_tree.exists(path)
 
-  def __init__(self, filesystem, root_dir, relpath=None, must_exist=True):
+  def __init__(self, project_tree, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
-    :param filesystem: File system the BUILD file exist in.
-    :type filesystem: :class:`pants.base.project_tree.ProjectTree`
+    :param project_tree: Project tree the BUILD file exist in.
+    :type project_tree: :class:`pants.base.project_tree.ProjectTree`
     :param string root_dir: The base directory of the project.
     :param string relpath: The path relative to root_dir where the BUILD file is found - this can
         either point directly at the BUILD file or else to a directory which contains BUILD files.
@@ -207,29 +207,29 @@ class BuildFile(AbstractClass):
       raise self.InvalidRootDirError('BuildFile root_dir {root_dir} must be an absolute path.'
                                      .format(root_dir=root_dir))
 
-    self.filesystem = filesystem
+    self.project_tree = project_tree
     self.root_dir = os.path.realpath(root_dir)
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
-    buildfile = os.path.join(path, self._build_basename) if filesystem.isdir(path) else path
+    buildfile = os.path.join(path, self._build_basename) if project_tree.isdir(path) else path
 
     # There is no BUILD file without a prefix so select any viable sibling
-    if not filesystem.exists(buildfile) or filesystem.isdir(buildfile):
+    if not project_tree.exists(buildfile) or project_tree.isdir(buildfile):
       for build in self._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
         break
 
     if must_exist:
-      if not filesystem.exists(buildfile):
+      if not project_tree.exists(buildfile):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
                                          .format(path=buildfile))
 
       # If a build file must exist then we want to make sure it's not a dir.
       # In other cases we are ok with it being a dir, for example someone might have
       # repo/scripts/build/doit.sh.
-      if filesystem.isdir(buildfile):
+      if project_tree.isdir(buildfile):
         raise self.MissingBuildFileError('Path to buildfile ({buildfile}) is a directory, '
                                          'but it must be a file.'.format(buildfile=buildfile))
 
@@ -247,12 +247,12 @@ class BuildFile(AbstractClass):
 
   def file_exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
-    return self.filesystem.isfile(self.full_path)
+    return self.project_tree.isfile(self.full_path)
 
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_filesystem_buildfiles(self.filesystem,
+    descendants = self.scan_project_tree_buildfiles(self.project_tree,
                                                   self.root_dir, self.parent_path, spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
@@ -265,7 +265,7 @@ class BuildFile(AbstractClass):
       parent = os.path.dirname(dir)
       for parent_buildfile in self._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        return parent, self.cached(self.filesystem, self.root_dir, os.path.relpath(buildfile, self.root_dir))
+        return parent, self.cached(self.project_tree, self.root_dir, os.path.relpath(buildfile, self.root_dir))
       return parent, None
 
     parent_buildfiles = OrderedSet()
@@ -290,7 +290,7 @@ class BuildFile(AbstractClass):
     for build in self._get_all_build_files(self.parent_path):
       if self.name != build:
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        yield self.cached(self.filesystem, self.root_dir, siblingpath)
+        yield self.cached(self.project_tree, self.root_dir, siblingpath)
 
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
@@ -303,7 +303,7 @@ class BuildFile(AbstractClass):
 
   def source(self):
     """Returns the source code for this BUILD file."""
-    return self.filesystem.source(self.full_path)
+    return self.project_tree.source(self.full_path)
 
   def code(self):
     """Returns the code object for this BUILD file."""
@@ -313,25 +313,25 @@ class BuildFile(AbstractClass):
     result = other and \
              (type(other) == type(self)) and \
              (self.full_path == other.full_path) and \
-             (self.filesystem == other.filesystem)
+             (self.project_tree == other.project_tree)
     return result
 
   def __hash__(self):
-    return hash(self.full_path) ^ hash(self.filesystem)
+    return hash(self.full_path) ^ hash(self.project_tree)
 
   def __ne__(self, other):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.filesystem)
+    return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.project_tree)
 
 
 # Deprecated, will be removed after 0.0.72. Create BuildFile with IoFilesystem instead.
 class FilesystemBuildFile(BuildFile):
-  _cls_filesystem = FileSystemProjectTree()
+  _cls_project_tree = FileSystemProjectTree()
 
   def __init__(self, root_dir, relpath=None, must_exist=True):
-    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._cls_filesystem,
+    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._cls_project_tree,
                                               root_dir, relpath=relpath, must_exist=must_exist)
 
   @classmethod

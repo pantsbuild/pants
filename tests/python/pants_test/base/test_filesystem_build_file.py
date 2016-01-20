@@ -22,7 +22,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     super(FilesystemBuildFileTest, self).setUp()
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
 
-  def create_filesystem(self):
+  def create_project_tree(self):
     return FileSystemProjectTree()
 
   def testSiblings(self):
@@ -178,7 +178,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
     with self.assertRaises(BuildFile.InvalidRootDirError):
-      BuildFile(self._filesystem, 'tmp', 'grandparent/BUILD')
+      BuildFile(self._project_tree, 'tmp', 'grandparent/BUILD')
 
   def test_exception_class_hierarchy(self):
     """Exception handling code depends on the fact that all exceptions from BuildFile are
