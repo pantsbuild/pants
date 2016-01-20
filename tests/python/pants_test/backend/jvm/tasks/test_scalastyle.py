@@ -63,24 +63,27 @@ class ScalastyleTest(NailgunTaskTestBase):
     return self.context(target_roots=target_roots)
 
   def _create_scalastyle_task(self, scalastyle_config):
-    return self.execute(self._create_context(scalastyle_config))
+    return self.prepare_execute(self._create_context(scalastyle_config))
 
   def setUp(self):
     super(ScalastyleTest, self).setUp()
     self.context()  # We don't need the context, but this ensures subsystem option registration.
 
   def test_initialize_config_no_config_settings(self):
-    with self.assertRaises(Scalastyle.UnspecifiedConfig):
-      self._create_scalastyle_task(scalastyle_config=None).validate_scalastyle_config()
+    with self.scala_platform_setup():
+      with self.assertRaises(Scalastyle.UnspecifiedConfig):
+        self._create_scalastyle_task(scalastyle_config=None).validate_scalastyle_config()
 
   def test_initialize_config_config_setting_exist_but_invalid(self):
-    with self.assertRaises(Scalastyle.MissingConfig):
-      self._create_scalastyle_task(
-        scalastyle_config='file_does_not_exist.xml').validate_scalastyle_config()
+    with self.scala_platform_setup():
+      with self.assertRaises(Scalastyle.MissingConfig):
+        self._create_scalastyle_task(
+          scalastyle_config='file_does_not_exist.xml').validate_scalastyle_config()
 
   def test_excludes_setting_exists_but_invalid(self):
-    with self.assertRaises(TaskError):
-      FileExcluder('file_does_not_exist.txt', logger)
+    with self.scala_platform_setup():
+      with self.assertRaises(TaskError):
+        FileExcluder('file_does_not_exist.txt', logger)
 
   def test_excludes_parsed_loaded_correctly(self):
     excludes_text = dedent('''
