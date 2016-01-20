@@ -33,7 +33,7 @@ class ScmProjectTree(ProjectTree):
     files = self._reader.listdir(relpath)
     return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
 
-  def source(self, path):
+  def content(self, path):
     """Returns the source code for this BUILD file."""
     relpath = os.path.relpath(self.path, self._scm_worktree())
     with self._reader.open(relpath) as source:

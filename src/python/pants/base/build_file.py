@@ -261,7 +261,7 @@ class BuildFile(AbstractClass):
 
   def source(self):
     """Returns the source code for this BUILD file."""
-    return self.project_tree.source(self.full_path)
+    return self.project_tree.content(self.full_path)
 
   def code(self):
     """Returns the code object for this BUILD file."""

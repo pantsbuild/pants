@@ -47,8 +47,8 @@ class ProjectTree(AbstractClass):
     """Returns True if path exists"""
 
   @abstractmethod
-  def source(self, path):
-    """Returns the source code for this BUILD file."""
+  def content(self, path):
+    """Returns the content for file at path."""
 
   def __ne__(self, other):
     return not self.__eq__(other)
@@ -61,7 +61,7 @@ class FileSystemProjectTree(ProjectTree):
   def glob1(self, path, glob):
     return glob1(path, glob)
 
-  def source(self, path):
+  def content(self, path):
     with open(path, 'rb') as source:
       return source.read()
 
