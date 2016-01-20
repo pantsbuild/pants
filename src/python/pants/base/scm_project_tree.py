@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 
 class ScmProjectTree(ProjectTree):
-  def __init__(self, scm, rev):
+  def __init__(self, build_root, scm, rev):
+    super(ScmProjectTree, self).__init__(build_root)
     self._scm = scm
     self._rev = rev
     self._reader = scm.repo_reader(rev)

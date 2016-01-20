@@ -22,8 +22,8 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     super(FilesystemBuildFileTest, self).setUp()
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
 
-  def create_project_tree(self):
-    return FileSystemProjectTree()
+  def create_project_tree(self, build_root):
+    return FileSystemProjectTree(build_root)
 
   def testSiblings(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')

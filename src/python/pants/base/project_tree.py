@@ -22,6 +22,9 @@ class ProjectTree(AbstractClass):
   Currently regular filesystem or SCM are supported.
   """
 
+  def __init__(self, build_root):
+    self.build_root = build_root
+
   @abstractmethod
   def glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""

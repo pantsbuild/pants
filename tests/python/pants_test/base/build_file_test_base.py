@@ -29,7 +29,7 @@ class BuildFileTestBase(unittest.TestCase):
     return BuildFile.scan_project_tree_buildfiles(self._project_tree, root_dir, base_path, spec_excludes)
 
   @abstractmethod
-  def create_project_tree(self):
+  def create_project_tree(self, build_root):
     pass
 
   def create_buildfile(self, path, must_exist=True):
@@ -65,7 +65,7 @@ class BuildFileTestBase(unittest.TestCase):
     self.makedirs('issue_1742/BUILD')
     self.touch('issue_1742/BUILD.sibling')
 
-    self._project_tree = self.create_project_tree()
+    self._project_tree = self.create_project_tree(self.root_dir)
 
   def tearDown(self):
     shutil.rmtree(self.base_dir)

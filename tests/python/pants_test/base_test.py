@@ -174,7 +174,7 @@ class BaseTest(unittest.TestCase):
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree())
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree(self.build_root))
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def buildroot_files(self, relpath=None):
@@ -192,7 +192,7 @@ class BaseTest(unittest.TestCase):
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree())
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree(self.build_root))
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def set_options_for_scope(self, scope, **kwargs):

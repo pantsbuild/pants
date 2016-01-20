@@ -18,8 +18,8 @@ from pants_test.base.build_file_test_base import BuildFileTestBase
 
 class ScmBuildFileTest(BuildFileTestBase):
 
-  def create_project_tree(self):
-    return ScmProjectTree(Git(worktree=self.root_dir), 'HEAD')
+  def create_project_tree(self, build_root):
+    return ScmProjectTree(build_root, Git(worktree=self.root_dir), 'HEAD')
 
   def test_build_file_rev(self):
     # Test that the build_file_rev global option works.  Because the
