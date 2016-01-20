@@ -75,16 +75,12 @@ class CacheCompileIntegrationTest(BaseCompileIT):
       self.run_compile(cachetest_spec, config, workdir)
 
       root = os.path.join(workdir, 'compile', 'zinc')
-
-      versioned_root = os.path.join(root, os.listdir(root)[0])
-      self.assertEqual(len(os.listdir(root)), 1, 'Expected 1 version.')
-
-      target_root = os.path.join(root, os.listdir(root)[0])
-      self.assertEqual(len(os.listdir(target_root)), 1, 'Expected 1 Target.')
-
-      target_workdir_root = os.path.join(versioned_root, os.listdir(versioned_root)[0])
+      # One target.
+      self.assertEqual(len(os.listdir(root)), 1)
+      target_workdir_root = os.path.join(root, os.listdir(root)[0])
       target_workdirs = os.listdir(target_workdir_root)
-      self.assertEqual(len(target_workdirs), 2, 'Expected 2 workdirs.')
+      # Two workdirs.
+      self.assertEqual(len(target_workdirs), 2)
 
       def classfiles(d):
         cd = os.path.join(target_workdir_root, d, 'classes', 'org', 'pantsbuild', 'cachetest')
