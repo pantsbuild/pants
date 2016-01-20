@@ -61,11 +61,6 @@ class BuildFile(AbstractClass):
       BuildFile._cache[cache_key] = BuildFile(project_tree, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
-  @classmethod
-  @deprecated('0.0.72', 'Use cached method instead.')
-  def from_cache(cls, root_dir, relpath, must_exist=True):
-    return BuildFile.cached(cls._get_project_tree(root_dir), root_dir, relpath, must_exist)
-
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
@@ -88,6 +83,11 @@ class BuildFile(AbstractClass):
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
     return cls.scan_project_tree_buildfiles(cls._get_project_tree(root_dir),
                                             root_dir, base_path, spec_excludes)
+
+  @classmethod
+  @deprecated('0.0.72', 'Use cached method instead.')
+  def from_cache(cls, root_dir, relpath, must_exist=True):
+    return BuildFile.cached(cls._get_project_tree(root_dir), root_dir, relpath, must_exist)
 
   @classmethod
   def scan_project_tree_buildfiles(cls, project_tree, root_dir, base_path=None, spec_excludes=None):
