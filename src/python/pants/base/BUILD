@@ -13,14 +13,18 @@ python_library(
 
 python_library(
   name = 'project_tree',
-  sources = [
-    'project_tree.py',
-    # TODO(tabishev): Move to separate target after deprecation removing, needed in transition period only.
-    'scm_project_tree.py',
-  ],
+  sources = ['project_tree.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
+  name = 'scm_project_tree',
+  sources = ['scm_project_tree.py'],
+  dependencies = [
+    ':project_tree',
   ]
 )
 
