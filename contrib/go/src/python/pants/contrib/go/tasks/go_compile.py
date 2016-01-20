@@ -11,6 +11,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
 
+from pants.contrib.go.targets.go_target import GoTarget
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
@@ -40,6 +41,8 @@ class GoCompile(GoWorkspaceTask):
       lib_binary_map = {}
       for vt in invalidation_check.all_vts:
         gopath = self.get_gopath(vt.target)
+        if not isinstance(vt.target, GoTarget):
+          continue
         if not vt.valid:
           self.ensure_workspace(vt.target)
           self._sync_binary_dep_links(vt.target, gopath, lib_binary_map)
@@ -77,6 +80,8 @@ class GoCompile(GoWorkspaceTask):
     required_links = set()
     for dep in target.closure():
       if dep == target:
+        continue
+      if not isinstance(dep, GoTarget):
         continue
       lib_binary = lib_binary_map[dep]
       lib_binary_link = os.path.join(gopath, os.path.relpath(lib_binary, self.get_gopath(dep)))

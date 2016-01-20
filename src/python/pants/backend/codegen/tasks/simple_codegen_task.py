@@ -162,6 +162,9 @@ class SimpleCodegenTask(Task):
     """Return a list of attributes to be copied from the target to derived synthetic targets."""
     return []
 
+  def synthetic_target_dir(self, target, target_workdir):
+    return target_workdir
+
   def _inject_synthetic_target(self, target, target_workdir):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
@@ -171,6 +174,9 @@ class SimpleCodegenTask(Task):
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
       copied_attributes[attribute] = getattr(target, attribute)
+
+    target_workdir = self.synthetic_target_dir(target, target_workdir)
+
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, target_workdir),
       target_type=self.synthetic_target_type(target),
