@@ -89,7 +89,6 @@ class BuildFile(AbstractClass):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
-    :param root_dir: The root of the repo containing sources.
     :param base_path: Directory under root_dir to scan.
     :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
       or paths that are relative to the root_dir.
