@@ -74,7 +74,7 @@ class BuildFile(AbstractClass):
     raise NotImplementedError()
 
   @classmethod
-  @deprecated('0.0.72', hint_message='Use scan_filesystem_buildfiles instead.')
+  @deprecated('0.0.72', hint_message='Use scan_project_tree_buildfiles instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
     return cls.scan_project_tree_buildfiles(cls._get_project_tree(root_dir),
                                             base_path, spec_excludes)
@@ -153,7 +153,6 @@ class BuildFile(AbstractClass):
 
     :param project_tree: Project tree the BUILD file exist in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
-    :param string root_dir: The base directory of the project.
     :param string relpath: The path relative to root_dir where the BUILD file is found - this can
         either point directly at the BUILD file or else to a directory which contains BUILD files.
     :param bool must_exist: If True, at least one BUILD file must exist at the given location or
