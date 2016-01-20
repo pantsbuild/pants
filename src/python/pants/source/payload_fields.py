@@ -91,7 +91,7 @@ class SourcesField(PayloadField):
     if isinstance(sources, FilesetWithSpec):
       return sources
     else:
-      return assert_list(sources, key_arg='sources', allowable_add=(FilesetWithSpec,))
+      return assert_list(sources, key_arg='sources')
 
 
 class DeferredSourcesField(SourcesField):
