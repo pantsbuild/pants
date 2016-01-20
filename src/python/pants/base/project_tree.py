@@ -53,6 +53,9 @@ class ProjectTree(AbstractClass):
   def __ne__(self, other):
     return not self.__eq__(other)
 
+  def __hash__(self):
+    return hash(self.__repr__())
+
 
 class FileSystemProjectTree(ProjectTree):
   def glob1(self, path, glob):
@@ -76,10 +79,7 @@ class FileSystemProjectTree(ProjectTree):
     return safe_walk(path, topdown=True)
 
   def __eq__(self, other):
-    return other and (type(other) == type(self))
-
-  def __hash__(self):
-    return hash(self.__repr__().__hash__())
+    return other and (type(other) == type(self)) and (self.build_root == other.build_root)
 
   def __repr__(self):
-    return '{}()'.format(self.__class__.__name__)
+    return '{}({})'.format(self.__class__.__name__, self.build_root)

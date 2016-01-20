@@ -173,16 +173,16 @@ class CmdLineSpecParserBadBuildTest(BaseTest):
     self.NO_FAIL_FAST_RE = re.compile(r"""^--------------------
 .*
 Exception message: name 'a_is_bad' is not defined
- while executing BUILD file BuildFile\((/[^/]+)*/bad/a/BUILD, FileSystemProjectTree\(\)\)
+ while executing BUILD file BuildFile\((/[^/]+)*/bad/a/BUILD, FileSystemProjectTree\(.*\)\)
  Loading addresses from 'bad/a' failed\.
 .*
 Exception message: name 'b_is_bad' is not defined
- while executing BUILD file BuildFile\((/[^/]+)*T/bad/b/BUILD, FileSystemProjectTree\(\)\)
+ while executing BUILD file BuildFile\((/[^/]+)*T/bad/b/BUILD, FileSystemProjectTree\(.*\)\)
  Loading addresses from 'bad/b' failed\.
 Invalid BUILD files for \[::\]$""", re.DOTALL)
 
     self.FAIL_FAST_RE = """^name 'a_is_bad' is not defined
- while executing BUILD file BuildFile\((/[^/]+)*/bad/a/BUILD\, FileSystemProjectTree\(\)\)
+ while executing BUILD file BuildFile\((/[^/]+)*/bad/a/BUILD\, FileSystemProjectTree\(.*\)\)
  Loading addresses from 'bad/a' failed.$"""
 
   def test_bad_build_files(self):

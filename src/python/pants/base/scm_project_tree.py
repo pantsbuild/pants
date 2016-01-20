@@ -97,11 +97,9 @@ class ScmProjectTree(ProjectTree):
   def __eq__(self, other):
     return other and \
            (type(other) == type(self)) and \
+           (self.build_root == other.build_root) and \
            (self._scm == other._scm) and \
            (self._rev == other._rev)
 
-  def __hash__(self):
-    return hash(self._scm) ^ hash(self._rev)
-
   def __repr__(self):
-    return '{}({}, {})'.format(self.__class__.__name__, self._scm, self._rev)
+    return '{}({}, {}, {})'.format(self.__class__.__name__, self.build_root, self._scm, self._rev)
