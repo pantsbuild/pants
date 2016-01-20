@@ -148,7 +148,7 @@ class BuildFile(AbstractClass):
           buildfiles.append(BuildFile(project_tree, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  def __init__(self, project_tree, relpath=None, must_exist=True):
+  def __init__(self, project_tree, relpath, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
     :param project_tree: Project tree the BUILD file exist in.
