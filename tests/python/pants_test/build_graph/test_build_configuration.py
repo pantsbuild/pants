@@ -40,7 +40,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(fred=Fred), aliases.target_types)
 
-    build_file = BuildFile._create(FileSystemProjectTree(), '/tmp', 'fred', must_exist=False)
+    build_file = BuildFile(FileSystemProjectTree(), '/tmp', 'fred', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
@@ -82,7 +82,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(fred=factory), aliases.target_macro_factories)
 
-    build_file = BuildFile._create(FileSystemProjectTree(), '/tmp', 'fred', must_exist=False)
+    build_file = BuildFile(FileSystemProjectTree(), '/tmp', 'fred', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
@@ -106,7 +106,7 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(jane=42), aliases.objects)
 
-    build_file = BuildFile._create(FileSystemProjectTree(), '/tmp', 'jane', must_exist=False)
+    build_file = BuildFile(FileSystemProjectTree(), '/tmp', 'jane', must_exist=False)
     parse_state = self.build_configuration.initialize_parse_state(build_file)
 
     self.assertEqual(0, len(parse_state.registered_addressable_instances))
@@ -166,7 +166,7 @@ class BuildConfigurationTest(unittest.TestCase):
     with temporary_dir() as root:
       build_file_path = os.path.join(root, 'george', 'BUILD')
       touch(build_file_path)
-      build_file = BuildFile._create(FileSystemProjectTree(), root, 'george')
+      build_file = BuildFile(FileSystemProjectTree(), root, 'george')
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
       self.assertEqual(0, len(parse_state.registered_addressable_instances))

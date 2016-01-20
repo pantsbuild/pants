@@ -46,7 +46,6 @@ class BuildFile(AbstractClass):
 
   # This fields used to emulate old class inheritance and provide compatibility in transition period.
   # TODO(tabishev): Remove after transition period.
-  _cls_project_tree = None
   _scm_cls = None
 
   _cache = {}
@@ -56,26 +55,16 @@ class BuildFile(AbstractClass):
     BuildFile._cache = {}
 
   @classmethod
-  # Do not use this method, it's only for transition period.
-  # Create BuildFile directly or use 'cached' method instead.
-  # TODO(tabishev): Remove after transition period.
-  def _create(cls, project_tree, root_dir, relpath, must_exist=True):
-    init_key = (root_dir, relpath, must_exist)
-    if isinstance(project_tree, FileSystemProjectTree):
-      return FilesystemBuildFile(*init_key)
-    elif isinstance(project_tree, ScmProjectTree):
-      if cls._scm_cls is not None:
-        cls._scm_cls._cls_project_tree = project_tree
-        return cls._scm_cls(*init_key)
-      else:
-        return BuildFile(project_tree, root_dir, relpath, must_exist)
-
-  @classmethod
   def cached(cls, project_tree, root_dir, relpath, must_exist=True):
     cache_key = (project_tree, root_dir, relpath, must_exist)
     if cache_key not in BuildFile._cache:
-      BuildFile._cache[cache_key] = BuildFile._create(project_tree, root_dir, relpath, must_exist)
+      BuildFile._cache[cache_key] = BuildFile(project_tree, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
+
+  @classmethod
+  @deprecated('0.0.72', 'Use cached method instead.')
+  def from_cache(cls, root_dir, relpath, must_exist=True):
+    return BuildFile.cached(cls._get_project_tree(root_dir), root_dir, relpath, must_exist)
 
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
@@ -89,11 +78,16 @@ class BuildFile(AbstractClass):
   def _is_buildfile_name(cls, name):
     return cls._PATTERN.match(name)
 
+  # TODO(tabishev): remove after transition period
+  @classmethod
+  def _get_project_tree(cls, root_dir):
+    raise NotImplementedError()
+
   @classmethod
   @deprecated('0.0.72', hint_message='Use scan_filesystem_buildfiles instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
-    return cls.scan_project_tree_buildfiles(cls._cls_project_tree,
-                                          root_dir, base_path, spec_excludes)
+    return cls.scan_project_tree_buildfiles(cls._get_project_tree(root_dir),
+                                            root_dir, base_path, spec_excludes)
 
   @classmethod
   def scan_project_tree_buildfiles(cls, project_tree, root_dir, base_path=None, spec_excludes=None):
@@ -157,7 +151,7 @@ class BuildFile(AbstractClass):
       for filename in files:
         if cls._is_buildfile_name(filename):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
-          buildfiles.append(cls._create(project_tree, root_dir, buildfile_relpath))
+          buildfiles.append(cls(project_tree, root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   def __init__(self, project_tree, root_dir, relpath=None, must_exist=True):
@@ -299,12 +293,10 @@ class BuildFile(AbstractClass):
 
 # Deprecated, will be removed after 0.0.72. Create BuildFile with IoFilesystem instead.
 class FilesystemBuildFile(BuildFile):
-  _cls_project_tree = FileSystemProjectTree()
-
   def __init__(self, root_dir, relpath=None, must_exist=True):
-    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._cls_project_tree,
+    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._get_project_tree(root_dir),
                                               root_dir, relpath=relpath, must_exist=must_exist)
 
   @classmethod
-  def from_cache(cls, root_dir, relpath, must_exist=True):
-    return FilesystemBuildFile.cached(FileSystemProjectTree(), root_dir, relpath, must_exist)
+  def _get_project_tree(cls, root_dir):
+    return FileSystemProjectTree()

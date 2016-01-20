@@ -35,7 +35,7 @@ class BuildFileParserBasicsTest(BaseTest):
                                      'java_library': ErrorTarget})
 
   def create_buildfile(self, path, must_exist=True):
-    return BuildFile._create(FileSystemProjectTree(), self.build_root, path, must_exist=must_exist)
+    return BuildFile(FileSystemProjectTree(), self.build_root, path, must_exist=must_exist)
 
   def test_addressable_exceptions(self):
     self.add_to_build_file('a/BUILD', 'target()')
@@ -103,7 +103,7 @@ class BuildFileParserTargetTest(BaseTest):
     return BuildFileAliases(targets={'fake': ErrorTarget})
 
   def create_buildfile(self, path, must_exist=True):
-    return BuildFile._create(FileSystemProjectTree(), self.build_root, path, must_exist=must_exist)
+    return BuildFile(FileSystemProjectTree(), self.build_root, path, must_exist=must_exist)
 
   def test_trivial_target(self):
     self.add_to_build_file('BUILD', 'fake(name="foozle")')
@@ -197,7 +197,7 @@ class BuildFileParserExposedObjectTest(BaseTest):
 
   def test_exposed_object(self):
     self.add_to_build_file('BUILD', """fake_object""")
-    build_file = BuildFile._create(FileSystemProjectTree(), self.build_root, 'BUILD')
+    build_file = BuildFile(FileSystemProjectTree(), self.build_root, 'BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
     self.assertEqual(len(address_map), 0)
 
@@ -300,7 +300,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
                """)
     self.create_file('3rdparty/BUILD', contents)
 
-    build_file = BuildFile._create(FileSystemProjectTree(), self.build_root, '3rdparty/BUILD')
+    build_file = BuildFile(FileSystemProjectTree(), self.build_root, '3rdparty/BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
     registered_proxies = set(address_map.values())
 
@@ -321,7 +321,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
 
   def test_raises_parse_error(self):
     self.add_to_build_file('BUILD', 'foo(name = = "baz")')
-    build_file = BuildFile._create(FileSystemProjectTree(), self.build_root, 'BUILD')
+    build_file = BuildFile(FileSystemProjectTree(), self.build_root, 'BUILD')
     with self.assertRaises(BuildFileParser.ParseError):
       self.build_file_parser.parse_build_file(build_file)
 
@@ -377,7 +377,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
 
   def test_raises_execute_error(self):
     self.add_to_build_file('BUILD', 'undefined_alias(name="baz")')
-    build_file = BuildFile._create(FileSystemProjectTree(), self.build_root, 'BUILD')
+    build_file = BuildFile(FileSystemProjectTree(), self.build_root, 'BUILD')
     with self.assertRaises(BuildFileParser.ExecuteError):
       self.build_file_parser.parse_build_file(build_file)
 
