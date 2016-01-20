@@ -57,7 +57,7 @@ special targets in your workspace to specify versions of the tools to fetch. The
 in the `BUILD.tools` file by convention. For example, when Pants fetches `scalastyle`, it looks in
 `BUILD.tools` for that target:
 
-!inc[start-at=scalastyle&end-before=scrooge-gen](../../BUILD.tools)
+!inc[start-at=scala-js-library&end-before=scrooge-gen](../../BUILD.tools)
 
 When setting up your Pants repo, you may want to copy this file over from a working Pants repo and
 perhaps change some version numbers to fit your situation.

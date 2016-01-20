@@ -14,7 +14,6 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
 from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
-from pants.task.recursive_version import RecursiveVersion
 
 
 major_version_info = namedtuple(
@@ -54,7 +53,6 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
   TODO: Rework so there's a way to specify a default as direct pointers to jar coordinates,
   so we don't require specs in BUILD.tools if the default is acceptable.
   """
-  version = RecursiveVersion(1)
 
   options_scope = 'scala-platform'
 
