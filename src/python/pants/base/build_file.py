@@ -103,9 +103,11 @@ class BuildFile(AbstractClass):
   @classmethod
   def scan_filesystem_buildfiles(cls, filesystem, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files
-    :param root_dir: the root of the repo containing sources
-    :param base_path: directory under root_dir to scan
-    :param spec_excludes: list of paths to exclude from the scan.  These can be absolute paths
+    :param filesystem: File system to scan in.
+    :type filesystem: :class:`pants.base.filesystem.Filesystem`
+    :param root_dir: The root of the repo containing sources.
+    :param base_path: Directory under root_dir to scan.
+    :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
       or paths that are relative to the root_dir.
     """
 
@@ -190,10 +192,11 @@ class BuildFile(AbstractClass):
   def __init__(self, filesystem, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
+    :param filesystem: File system the BUILD file exist in.
+    :type filesystem: :class:`pants.base.filesystem.Filesystem`
     :param string root_dir: The base directory of the project.
     :param string relpath: The path relative to root_dir where the BUILD file is found - this can
         either point directly at the BUILD file or else to a directory which contains BUILD files.
-    :param string filesystem: File system the BUILD file exist in.
     :param bool must_exist: If True, at least one BUILD file must exist at the given location or
         else an` `MissingBuildFileError` is thrown
     :raises IOError: if the root_dir path is not absolute.

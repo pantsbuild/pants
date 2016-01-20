@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class Filesystem(AbstractClass):
+  """A class used to abstract filesystem behaviour needed to load build files.
+  Currently regular filesystem or SCM are supported.
+  """
+
   @abstractmethod
   def glob1(self, path, glob):
     """Returns a list of paths in path that match glob"""
