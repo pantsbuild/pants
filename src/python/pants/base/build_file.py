@@ -77,11 +77,6 @@ class BuildFile(AbstractClass):
       BuildFile._cache[cache_key] = BuildFile._create(project_tree, root_dir, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
-  @deprecated('0.0.72', hint_message='Use Filesystem#glob1 instead.')
-  def _glob1(self, path, glob):
-    """Returns a list of paths in path that match glob"""
-    return self.project_tree.glob1(path, glob)
-
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
@@ -164,30 +159,6 @@ class BuildFile(AbstractClass):
           buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
           buildfiles.append(cls._create(project_tree, root_dir, buildfile_relpath))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
-
-  @classmethod
-  @deprecated('0.0.72', hint_message='Use Filesystem#walk instead.')
-  def _walk(cls, root_dir, relpath, topdown=False):
-    """Walk the file tree rooted at `path`.  Works like os.walk."""
-    return cls._cls_project_tree.walk(root_dir, relpath, topdown)
-
-  @classmethod
-  @deprecated('0.0.72', hint_message='Use Filesystem#isdir instead.')
-  def _isdir(cls, path):
-    """Returns True if path is a directory"""
-    return cls._cls_project_tree.isdir(path)
-
-  @classmethod
-  @deprecated('0.0.72', hint_message='Use Filesystem#isfile instead.')
-  def _isfile(cls, path):
-    """Returns True if path is a file"""
-    return cls._cls_project_tree.isfile(path)
-
-  @classmethod
-  @deprecated('0.0.72', hint_message='Use Filesystem#exists instead.')
-  def _exists(cls, path):
-    """Returns True if path exists"""
-    return cls._cls_project_tree.exists(path)
 
   def __init__(self, project_tree, root_dir, relpath=None, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
