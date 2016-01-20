@@ -10,8 +10,6 @@ import subprocess
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_file import BuildFile
-from pants.base.scm_build_file import ScmBuildFile
 from pants.base.scm_project_tree import ScmProjectTree
 from pants.scm.git import Git
 from pants.util.contextutil import pushd
@@ -19,11 +17,6 @@ from pants_test.base.build_file_test_base import BuildFileTestBase
 
 
 class ScmBuildFileTest(BuildFileTestBase):
-
-  def setUp(self):
-    super(ScmBuildFileTest, self).setUp()
-    # TODO(tabishev): Remove after transition period.
-    BuildFile._scm_cls = ScmBuildFile
 
   def create_project_tree(self):
     return ScmProjectTree(Git(worktree=self.root_dir), 'HEAD')

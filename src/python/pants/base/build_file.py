@@ -14,7 +14,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
 from pants.base.project_tree import FileSystemProjectTree
-from pants.base.scm_project_tree import ScmProjectTree
 from pants.util.meta import AbstractClass
 
 
@@ -43,10 +42,6 @@ class BuildFile(AbstractClass):
 
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
-
-  # This fields used to emulate old class inheritance and provide compatibility in transition period.
-  # TODO(tabishev): Remove after transition period.
-  _scm_cls = None
 
   _cache = {}
 
