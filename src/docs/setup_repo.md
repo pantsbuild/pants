@@ -52,10 +52,20 @@ Configure Pants' own Runtime Dependencies
 -----------------------------------------
 
 Pants calls out to other tools. E.g., it optionally uses `scalastyle` to check scala source code.
-Most tools come pre-configured by Pants. A few do require more setup though and these rely on
-special targets in your workspace to specify versions of the tools to fetch. These targets all live
-in the `BUILD.tools` file by convention. For example, when Pants fetches `scalastyle`, it looks in
-`BUILD.tools` for that target:
+Most tools come pre-configured by Pants. A few tools are configured based on the major scala version 
+provided with the --version flag.  You can specify custom tool versions by passing "custom" to 
+--version. If a custom version of scala is desired some of these tools require more setup though and 
+these rely on special targets in your workspace to specify versions of the tools to fetch . These 
+targets all live in the `BUILD.tools` file by convention. 
+
+For example, the following targts are used to provide custom scala tools:
+
+`scalastyle`: Scala style checking.
+`scalac`: Scala compiler.
+`scala-repl`: Scala REPL environment.
+`scala-library`: Scala runtime environment.
+
+Pants fetches looks in `BUILD.tools` for that target.
 
 !inc[start-at=scala-js-library&end-before=scrooge-gen](../../BUILD.tools)
 
