@@ -200,7 +200,7 @@ class GoalRunnerFactory(object):
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""
     for goal in goals:
-      if self._address_mapper.from_cache(self._root_dir, goal, must_exist=False).file_exists():
+      if self._address_mapper.get_build_file(goal, must_exist=False).file_exists():
         logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 

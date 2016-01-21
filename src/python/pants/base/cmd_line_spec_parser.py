@@ -164,7 +164,7 @@ class CmdLineSpecParser(object):
       spec_parts[0] = normalize_spec_path(spec_parts[0])
       spec_path, target_name = parse_spec(':'.join(spec_parts))
       try:
-        self._address_mapper.from_cache(self._root_dir, spec_path)
+        self._address_mapper.get_build_file(spec_path)
       except BuildFile.BuildFileError as e:
         raise self.BadSpecError(e)
       return {Address(spec_path, target_name)}

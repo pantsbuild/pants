@@ -47,7 +47,7 @@ class SpecSourceMapper(SourceMapper):
     # a top-level source has empty dirname, so do/while instead of straight while loop.
     while path:
       path = os.path.dirname(path)
-      candidate = self._address_mapper.from_cache(root_dir=root, relpath=path, must_exist=False)
+      candidate = self._address_mapper.get_build_file(relpath=path, must_exist=False)
       if candidate.file_exists():
         result.extend(list(self._find_targets_for_source(source, candidate.family())))
       if self._stop_after_match and len(result) > 0:
@@ -128,7 +128,7 @@ class LazySourceMapper(SourceMapper):
     while walking:
       # It is possible
       if path not in self._mapped_paths:
-        candidate = self._address_mapper.from_cache(root_dir=root, relpath=path, must_exist=False)
+        candidate = self._address_mapper.get_build_file(relpath=path, must_exist=False)
         if candidate.file_exists():
           self._map_sources_from_family(candidate.family())
         self._mapped_paths.add(path)

@@ -163,13 +163,13 @@ class BuildFileAddressMapper(object):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use get_build_file instead.')
   def from_cache(self, root_dir, relpath, must_exist=True):
     """Return a BuildFile instance.  Args as per BuildFile.from_cache
 
     :returns: a BuildFile
     """
-    return BuildFile.cached(self._project_tree, relpath, must_exist)
+    return self.get_build_file(relpath, must_exist)
 
   def get_build_file(self, relpath, must_exist=True):
     return BuildFile.cached(self._project_tree, relpath, must_exist)
@@ -186,7 +186,7 @@ class BuildFileAddressMapper(object):
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     try:
-      self.from_cache(self.root_dir, spec_path)
+      self.get_build_file(spec_path)
     except BuildFile.BuildFileError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
@@ -198,7 +198,7 @@ class BuildFileAddressMapper(object):
 
     :returns: an OrderedSet of BuildFile instances.
     """
-    return BuildFile.scan_project_tree_buildfiles(self._project_tree, base_path, spec_excludes)
+    return self.scan_project_tree_buildfiles(base_path, spec_excludes)
 
   def scan_project_tree_buildfiles(self, base_path, spec_excludes):
     return BuildFile.scan_project_tree_buildfiles(self._project_tree, base_path, spec_excludes)
