@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import re
-from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
