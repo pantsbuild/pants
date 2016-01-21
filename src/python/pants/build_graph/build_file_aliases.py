@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import inspect
 from abc import abstractmethod
 from collections import defaultdict
@@ -75,14 +74,7 @@ class TargetMacro(object):
       """
       macro = self.macro(parse_context)
 
-      class BuildFileTargetFactoryMacro(BuildFileTargetFactory, TargetMacro):
-        @property
-        def target_types(_):
-          return self.target_types
-
-        expand = macro.expand
-
-      return BuildFileTargetFactoryMacro()
+      return _BuildFileTargetFactoryMacro(macro.expand, self.target_types)
 
   def __call__(self, *args, **kwargs):
     self.expand(*args, **kwargs)
@@ -281,3 +273,12 @@ class BuildFileAliases(object):
 
   def __hash__(self):
     return hash(self._tuple())
+
+
+class _BuildFileTargetFactoryMacro(BuildFileTargetFactory, TargetMacro):
+  def __init__(self, expand, target_types):
+    self._target_types = target_types
+    self.expand = expand
+
+  def target_types(self):
+    return self._target_types
