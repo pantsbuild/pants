@@ -30,7 +30,7 @@ class BuildFileTestBase(unittest.TestCase):
     pass
 
   def scan_buildfiles(self, base_path=None, spec_excludes=None):
-    return BuildFile.scan_project_tree_buildfiles(self._project_tree, base_path, spec_excludes)
+    return BuildFile.scan_project_tree_build_files(self._project_tree, base_path, spec_excludes)
 
   def create_buildfile(self, path, must_exist=True):
     return BuildFile(self._project_tree, path, must_exist=must_exist)

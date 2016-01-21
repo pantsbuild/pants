@@ -192,16 +192,16 @@ class BuildFileAddressMapper(object):
                                            .format(message=e, spec=spec))
     return Address(spec_path, name)
 
-  @deprecated('0.0.72', hint_message='Use scan_project_tree_buildfiles instead.')
+  @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
   def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files in root_dir or its descendant directories.
 
     :returns: an OrderedSet of BuildFile instances.
     """
-    return self.scan_project_tree_buildfiles(base_path, spec_excludes)
+    return self.scan_project_tree_build_files(base_path, spec_excludes)
 
-  def scan_project_tree_buildfiles(self, base_path, spec_excludes):
-    return BuildFile.scan_project_tree_buildfiles(self._project_tree, base_path, spec_excludes)
+  def scan_project_tree_build_files(self, base_path, spec_excludes):
+    return BuildFile.scan_project_tree_build_files(self._project_tree, base_path, spec_excludes)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
@@ -230,7 +230,7 @@ class BuildFileAddressMapper(object):
 
     addresses = set()
     try:
-      for build_file in BuildFile.scan_project_tree_buildfiles(self._project_tree,
+      for build_file in BuildFile.scan_project_tree_build_files(self._project_tree,
                                                                base_path=base_path,
                                                                spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):

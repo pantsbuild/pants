@@ -32,7 +32,7 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
 
   def console_output(self, _):
     address_mapper = self.context.address_mapper
-    buildfiles = address_mapper.scan_project_tree_buildfiles(base_path=None,
+    buildfiles = address_mapper.scan_project_tree_build_files(base_path=None,
                                                              spec_excludes=self._spec_excludes)
 
     build_graph = self.context.build_graph

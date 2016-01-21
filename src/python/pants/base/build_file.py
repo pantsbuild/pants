@@ -74,9 +74,9 @@ class BuildFile(AbstractClass):
     raise NotImplementedError()
 
   @classmethod
-  @deprecated('0.0.72', hint_message='Use scan_project_tree_buildfiles instead.')
+  @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
-    return cls.scan_project_tree_buildfiles(cls._get_project_tree(root_dir),
+    return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir),
                                             base_path, spec_excludes)
 
   @classmethod
@@ -85,7 +85,7 @@ class BuildFile(AbstractClass):
     return BuildFile.cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @classmethod
-  def scan_project_tree_buildfiles(cls, project_tree, base_path=None, spec_excludes=None):
+  def scan_project_tree_build_files(cls, project_tree, base_path=None, spec_excludes=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
@@ -211,7 +211,7 @@ class BuildFile(AbstractClass):
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_project_tree_buildfiles(self.project_tree, self.parent_path, spec_excludes=spec_excludes)
+    descendants = self.scan_project_tree_build_files(self.project_tree, self.parent_path, spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants
