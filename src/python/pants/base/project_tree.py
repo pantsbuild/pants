@@ -49,7 +49,7 @@ class ProjectTree(AbstractClass):
     """Returns True if path is a file"""
 
   @abstractmethod
-  def exists(self, path):
+  def exists(self, relpath):
     """Returns True if path exists"""
 
   @abstractmethod
@@ -77,8 +77,8 @@ class FileSystemProjectTree(ProjectTree):
   def isfile(self, path):
     return os.path.isfile(path)
 
-  def exists(self, path):
-    return os.path.exists(path)
+  def exists(self, relpath):
+    return os.path.exists(os.path.join(self.build_root, relpath))
 
   def walk(self, root_dir, relpath, topdown=False):
     path = os.path.join(root_dir, relpath)

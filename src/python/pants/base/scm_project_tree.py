@@ -50,10 +50,9 @@ class ScmProjectTree(ProjectTree):
     relpath = os.path.relpath(path, self._scm_worktree())
     return self._reader.isfile(relpath)
 
-  def exists(self, path):
+  def exists(self, relpath):
     """Returns True if path exists"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.exists(relpath)
+    return self._reader.exists(self._scm_relpath(relpath))
 
   def walk(self, root_dir, root, topdown=False):
     """Walk a file tree.  If root is non-empty, the absolute path of the

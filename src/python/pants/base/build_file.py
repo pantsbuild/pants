@@ -165,14 +165,14 @@ class BuildFile(AbstractClass):
     buildfile = os.path.join(path, self._build_basename) if project_tree.isdir(path) else path
 
     # There is no BUILD file without a prefix so select any viable sibling
-    if not project_tree.exists(buildfile) or project_tree.isdir(buildfile):
+    if not project_tree.exists(os.path.relpath(buildfile, self.root_dir)) or project_tree.isdir(buildfile):
       for build in self._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
         break
 
     if must_exist:
-      if not project_tree.exists(buildfile):
+      if not project_tree.exists(os.path.relpath(buildfile, self.root_dir)):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
                                          .format(path=buildfile))
 
