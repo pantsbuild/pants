@@ -230,13 +230,12 @@ class IvyUtils(object):
     return TemplateData(org=jar.org, module=jar.name, version=jar.rev)
 
   @staticmethod
-  @contextmanager
-  def cachepath(path):
+  def load_classpath_from_cachepath(path):
     if not os.path.exists(path):
-      yield ()
+      return []
     else:
       with safe_open(path, 'r') as cp:
-        yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
+        return [path.strip() for path in cp.read().split(os.pathsep) if path.strip()]
 
   @classmethod
   def exec_ivy(cls, ivy, confs_to_resolve, ivyxml, args,

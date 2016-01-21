@@ -283,9 +283,8 @@ class IvyTaskMixin(TaskBase):
                                                symlink_dir,
                                                target_classpath_file)
 
-      with IvyUtils.cachepath(target_classpath_file) as classpath:
-        stripped_classpath = [path.strip() for path in classpath]
-        return stripped_classpath, symlink_map, resolve_hash_name
+      classpath = IvyUtils.load_classpath_from_cachepath(target_classpath_file)
+      return classpath, symlink_map, resolve_hash_name
 
   def _exec_ivy(self,
                target_workdir,
