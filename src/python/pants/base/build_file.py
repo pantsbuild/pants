@@ -77,7 +77,7 @@ class BuildFile(AbstractClass):
   @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
     return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir),
-                                            base_path, spec_excludes)
+                                             base_path, spec_excludes)
 
   @classmethod
   @deprecated('0.0.72', 'Use cached method instead.')
@@ -85,7 +85,7 @@ class BuildFile(AbstractClass):
     return BuildFile.cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @classmethod
-  def scan_project_tree_build_files(cls, project_tree, base_path=None, spec_excludes=None):
+  def scan_project_tree_build_files(cls, project_tree, base_path, spec_excludes=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`

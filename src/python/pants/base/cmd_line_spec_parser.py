@@ -131,7 +131,7 @@ class CmdLineSpecParser(object):
       spec_dir = normalize_spec_path(spec_path)
       try:
         build_files = self._address_mapper.scan_project_tree_build_files(base_path=spec_dir,
-                                                                        spec_excludes=self._spec_excludes)
+                                                                         spec_excludes=self._spec_excludes)
       except (BuildFile.BuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
 
