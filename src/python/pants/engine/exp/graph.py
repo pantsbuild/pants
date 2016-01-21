@@ -10,8 +10,7 @@ import collections
 import six
 
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import (AddressableDescriptor, TypeConstraintError,
-                                          strip_variants)
+from pants.engine.exp.addressable import AddressableDescriptor, TypeConstraintError, strip_variants
 from pants.engine.exp.mapper import MappingError
 from pants.engine.exp.objects import Resolvable, Serializable, SerializableFactory, Validatable
 

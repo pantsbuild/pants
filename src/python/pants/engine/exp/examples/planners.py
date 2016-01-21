@@ -13,12 +13,12 @@ from twitter.common.collections import OrderedSet
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
-from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.engine.exp.graph import Graph
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json
 from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectAddress, SelectDependencies,
                                         SelectVariant)
+from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Sources, Target
 from pants.util.memo import memoized, memoized_property
 

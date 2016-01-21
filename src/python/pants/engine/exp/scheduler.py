@@ -18,6 +18,7 @@ from twitter.common.collections import OrderedSet
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import extract_variants
 from pants.engine.exp.objects import Serializable, datatype
+from pants.engine.exp.struct import StructWithDeps
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 

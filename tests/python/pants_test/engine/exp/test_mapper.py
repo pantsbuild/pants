@@ -15,11 +15,11 @@ from textwrap import dedent
 
 from pants.build_graph.address import Address
 from pants.engine.exp import parsers
-from pants.engine.exp.configuration import Struct
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
 from pants.engine.exp.parsers import parse_json
+from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch

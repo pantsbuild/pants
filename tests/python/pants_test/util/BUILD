@@ -50,14 +50,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'osutil',
-  sources = ['test_osutil.py'],
-  dependencies = [
-    'src/python/pants/util:osutil',
-  ]
-)
-
-python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
@@ -74,27 +66,27 @@ python_tests(
 )
 
 python_tests(
-  name = 'strutil',
-  sources = ['test_strutil.py'],
+  name = 'netrc',
+  sources = ['test_netrc.py'],
   dependencies = [
-    'src/python/pants/util:strutil',
+    '3rdparty/python:mock',
+    'src/python/pants/util:netrc',
   ]
 )
 
 python_tests(
-  name = 'xml_parser',
-  sources = ['test_xml_parser.py'],
+  name = 'osutil',
+  sources = ['test_osutil.py'],
   dependencies = [
-    'src/python/pants/util:xml_parser',
-    'src/python/pants/util:contextutil',
+    'src/python/pants/util:osutil',
   ]
 )
 
 python_tests(
-  name = 'timeout',
-  sources = ['test_timeout.py'],
+  name = 'process_handler',
+  sources = ['test_process_handler.py'],
   dependencies = [
-    'src/python/pants/util:timeout',
+    'src/python/pants/util:process_handler'
   ]
 )
 
@@ -109,9 +101,26 @@ python_tests(
 )
 
 python_tests(
-  name = 'process_handler',
-  sources = ['test_process_handler.py'],
+  name = 'strutil',
+  sources = ['test_strutil.py'],
   dependencies = [
-    'src/python/pants/util:process_handler'
+    'src/python/pants/util:strutil',
+  ]
+)
+
+python_tests(
+  name = 'timeout',
+  sources = ['test_timeout.py'],
+  dependencies = [
+    'src/python/pants/util:timeout',
+  ]
+)
+
+python_tests(
+  name = 'xml_parser',
+  sources = ['test_xml_parser.py'],
+  dependencies = [
+    'src/python/pants/util:xml_parser',
+    'src/python/pants/util:contextutil',
   ]
 )

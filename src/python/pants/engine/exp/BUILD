@@ -17,8 +17,8 @@ python_library(
 )
 
 python_library(
-  name='configuration',
-  sources=['configuration.py'],
+  name='struct',
+  sources=['struct.py'],
   dependencies=[
     ':addressable',
     ':objects',
@@ -98,7 +98,7 @@ python_library(
   sources=['targets.py'],
   dependencies=[
     ':addressable',
-    ':configuration',
+    ':struct',
     'src/python/pants/source',
   ]
 )

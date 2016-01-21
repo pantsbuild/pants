@@ -14,6 +14,7 @@ from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
+from pants.util.netrc import Netrc
 
 
 """Register the elementary BUILD file constructs."""
@@ -39,6 +40,7 @@ def build_file_aliases():
     },
     objects={
       'get_buildroot': get_buildroot,
+      'netrc': Netrc,
       'pants_version': pants_version,
     },
     context_aware_object_factories={
