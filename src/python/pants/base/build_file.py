@@ -68,7 +68,7 @@ class BuildFile(AbstractClass):
   def _is_buildfile_name(cls, name):
     return cls._PATTERN.match(name)
 
-  # TODO(tabishev): remove after transition period
+  # TODO(tabishev): Remove after transition period.
   @classmethod
   def _get_project_tree(cls, root_dir):
     raise NotImplementedError()
