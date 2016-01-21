@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.deprecated import deprecated
 from pants.base.project_tree import ProjectTree
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -170,6 +171,9 @@ class BuildFileAddressMapper(object):
     """
     return BuildFile.cached(self._project_tree, relpath, must_exist)
 
+  def get_build_file(self, relpath, must_exist=True):
+    return BuildFile.cached(self._project_tree, relpath, must_exist)
+
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct address.
 
@@ -188,12 +192,15 @@ class BuildFileAddressMapper(object):
                                            .format(message=e, spec=spec))
     return Address(spec_path, name)
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use scan_project_tree_buildfiles instead.')
   def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files in root_dir or its descendant directories.
 
     :returns: an OrderedSet of BuildFile instances.
     """
+    return BuildFile.scan_project_tree_buildfiles(self._project_tree, base_path, spec_excludes)
+
+  def scan_project_tree_buildfiles(self, base_path, spec_excludes):
     return BuildFile.scan_project_tree_buildfiles(self._project_tree, base_path, spec_excludes)
 
   def specs_to_addresses(self, specs, relative_to=''):
