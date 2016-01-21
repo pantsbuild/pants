@@ -297,34 +297,30 @@ class IvyTaskMixin(TaskBase):
                workunit_name='ivy',
                use_soft_excludes=False,
                resolve_hash_name=None):
-    ivy_jvm_options = self.get_options().jvm_options[:]
-    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
-    ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
-
-    ivy = ivy or Bootstrapper.default_ivy()
-    ivyxml = os.path.join(target_workdir, 'ivy.xml')
-
-    ivy_args = ['-ivy', ivyxml]
-
     confs_to_resolve = confs or ('default',)
-    ivy_args.append('-confs')
-    ivy_args.extend(confs_to_resolve)
-    ivy_args.extend(args)
 
     # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
     # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
     # See: https://github.com/pantsbuild/pants/issues/2239
-    try:
-      jars, excludes = IvyUtils.calculate_classpath(targets, gather_excludes=not use_soft_excludes)
-      with IvyUtils.ivy_lock:
-        IvyUtils.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve, resolve_hash_name)
-        runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
-        try:
-          result = execute_runner(runner, workunit_factory=self.context.new_workunit,
-                                  workunit_name=workunit_name)
-          if result != 0:
-            raise self.Error('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
-        except runner.executor.Error as e:
-          raise self.Error(e)
-    except IvyUtils.IvyError as e:
-      raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
+    jars, global_excludes = IvyUtils.calculate_classpath(targets)
+
+    # Don't pass global excludes to ivy when using soft excludes.
+    if use_soft_excludes:
+      global_excludes = []
+
+    with IvyUtils.ivy_lock:
+      ivyxml = os.path.join(target_workdir, 'ivy.xml')
+      try:
+        IvyUtils.generate_ivy(targets, jars, global_excludes, ivyxml, confs_to_resolve,
+                            resolve_hash_name)
+      except IvyUtils.IvyError as e:
+        raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
+
+      try:
+        IvyUtils.exec_ivy(ivy, confs_to_resolve, ivyxml, args,
+                          jvm_options=self.get_options().jvm_options,
+                          executor=executor,
+                          workunit_name=workunit_name,
+                          workunit_factory=self.context.new_workunit)
+      except IvyUtils.IvyError as e:
+        raise self.Error('Ivy resolve failed: {}'.format(e))

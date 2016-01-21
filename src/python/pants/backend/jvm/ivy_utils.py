@@ -26,6 +26,8 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.build_graph.target import Target
+from pants.ivy.bootstrapper import Bootstrapper
+from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
@@ -237,6 +239,32 @@ class IvyUtils(object):
         yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
 
   @classmethod
+  def exec_ivy(cls, ivy, confs_to_resolve, ivyxml, args,
+               jvm_options,
+               executor,
+               workunit_name,
+               workunit_factory):
+    ivy = ivy or Bootstrapper.default_ivy()
+
+    ivy_args = ['-ivy', ivyxml]
+    ivy_args.append('-confs')
+    ivy_args.extend(confs_to_resolve)
+    ivy_args.extend(args)
+
+    ivy_jvm_options = list(jvm_options)
+    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
+    ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
+
+    runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
+    try:
+      result = execute_runner(runner, workunit_factory=workunit_factory,
+                              workunit_name=workunit_name)
+      if result != 0:
+        raise IvyUtils.IvyError('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
+    except runner.executor.Error as e:
+      raise IvyUtils.IvyError(e)
+
+  @classmethod
   def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
     """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
@@ -418,7 +446,15 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  def calculate_classpath(cls, targets, gather_excludes=True):
+  def calculate_classpath(cls, targets):
+    """Resolve conflicts and creates a consistent classpath for the passed targets.
+
+    TODO rename to calculate_jars or something
+
+    :param targets
+
+    :returns: jars.values(), global_excludes
+    """
     jars = OrderedDict()
     global_excludes = set()
     provide_excludes = set()
@@ -462,8 +498,7 @@ class IvyUtils(object):
     def collect_elements(target):
       targets_processed.add(target)
       collect_jars(target)
-      if gather_excludes:
-        collect_excludes(target)
+      collect_excludes(target)
       collect_provide_excludes(target)
 
     for target in targets:
