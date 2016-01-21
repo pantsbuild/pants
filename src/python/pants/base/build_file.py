@@ -72,8 +72,7 @@ class BuildFile(AbstractClass):
   @classmethod
   @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
-    return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir), base_path,
-                                             cls._relativize(spec_excludes, root_dir))
+    return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir), base_path, spec_excludes)
 
   @classmethod
   @deprecated('0.0.72', 'Use cached method instead.')
