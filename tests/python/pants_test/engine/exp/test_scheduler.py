@@ -11,9 +11,12 @@ import unittest
 import pytest
 
 from pants.build_graph.address import Address
-from pants.engine.exp.examples.planners import (Classpath, IvyResolve, Jar, Javac, Sources,
-                                                gen_apache_thrift, setup_json_scheduler)
-from pants.engine.exp.scheduler import BuildRequest, ConflictingProducersError, Plan, Promise
+from pants.engine.exp.examples.planners import (Classpath, IvyResolve, Jar, Javac, JavaSources,
+                                                gen_apache_thrift, isolate_resources,
+                                                setup_json_scheduler)
+from pants.engine.exp.products import lift_native_product
+from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError,
+                                        PartiallyConsumedInputsError, Plan, Promise)
 
 
 class SchedulerTest(unittest.TestCase):
@@ -25,6 +28,9 @@ class SchedulerTest(unittest.TestCase):
     self.thrift = self.graph.resolve(Address.parse('src/thrift/codegen/simple'))
     self.java = self.graph.resolve(Address.parse('src/java/codegen/simple'))
     self.java_multi = self.graph.resolve(Address.parse('src/java/multiple_classpath_entries'))
+    self.unconfigured_thrift = self.graph.resolve(Address.parse('src/thrift/codegen/unconfigured'))
+    self.resources = self.graph.resolve(Address.parse('src/resources/simple'))
+    self.consumes_resources = self.graph.resolve(Address.parse('src/java/consumes_resources'))
 
   def extract_product_type_and_plan(self, plan):
     promise, plan = plan
@@ -60,7 +66,14 @@ class SchedulerTest(unittest.TestCase):
     execution_graph = self.scheduler.execution_graph(build_request)
 
     plans = list(execution_graph.walk())
-    self.assertEqual(0, len(plans))
+    self.assertEqual(1, len(plans))
+
+    self.assertEqual((JavaSources,
+                      Plan(func_or_task_type=lift_native_product,
+                           subjects=[self.java],
+                           subject=self.java,
+                           product_type=JavaSources)),
+                     self.extract_product_type_and_plan(plans[0]))
 
   def test_gen(self):
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.thrift.address])
@@ -69,7 +82,7 @@ class SchedulerTest(unittest.TestCase):
     plans = list(execution_graph.walk())
     self.assertEqual(1, len(plans))
 
-    self.assertEqual((Sources.of('.java'),
+    self.assertEqual((JavaSources,
                       Plan(func_or_task_type=gen_apache_thrift,
                            subjects=[self.thrift],
                            strict=True,
@@ -92,7 +105,7 @@ class SchedulerTest(unittest.TestCase):
     jars = [self.guava] + thrift_jars
 
     # Independent leaves 1st
-    self.assertEqual({(Sources.of('.java'),
+    self.assertEqual({(JavaSources,
                        Plan(func_or_task_type=gen_apache_thrift,
                             subjects=[self.thrift],
                             strict=True,
@@ -106,7 +119,7 @@ class SchedulerTest(unittest.TestCase):
     self.assertEqual((Classpath,
                       Plan(func_or_task_type=Javac,
                            subjects=[self.thrift],
-                           sources=Promise(Sources.of('.java'), self.thrift),
+                           sources=Promise(JavaSources, self.thrift),
                            classpath=[Promise(Classpath, jar) for jar in thrift_jars])),
                      self.extract_product_type_and_plan(plans[2]))
 
@@ -118,8 +131,43 @@ class SchedulerTest(unittest.TestCase):
                                       Promise(Classpath, self.thrift)])),
                      self.extract_product_type_and_plan(plans[3]))
 
+  def test_consumes_resources(self):
+    build_request = BuildRequest(goals=['compile'], addressable_roots=[self.consumes_resources.address])
+    execution_graph = self.scheduler.execution_graph(build_request)
+
+    plans = list(execution_graph.walk())
+    self.assertEqual(3, len(plans))
+
+    jars = [self.guava]
+
+    # Independent leaves 1st
+    self.assertEqual({(Classpath,
+                       Plan(func_or_task_type=isolate_resources,
+                            subjects=[self.resources],
+                            resources=['src/resources/simple/simple.txt'])),
+                      (Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=jars))},
+                     set(self.extract_product_type_and_plan(p) for p in plans[0:2]))
+
+    # The rest is linked.
+    self.assertEqual((Classpath,
+                      Plan(func_or_task_type=Javac,
+                           subjects=[self.consumes_resources],
+                           sources=['src/java/consumes_resources/UseAResource.java'],
+                           classpath=[Promise(Classpath, self.guava),
+                                      Promise(Classpath, self.resources)])),
+                     self.extract_product_type_and_plan(plans[2]))
+
   @pytest.mark.xfail(raises=ConflictingProducersError)
   def test_multiple_classpath_entries(self):
     """Multiple Classpath products for a single subject currently cause a failure."""
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java_multi.address])
     execution_graph = self.scheduler.execution_graph(build_request)
+
+  def test_no_configured_thrift_planner(self):
+    """Tests that even though the BuildPropertiesPlanner is able to produce a Classpath,
+    we still fail when a target with thrift sources doesn't have a thrift config.
+    """
+    build_request = BuildRequest(goals=['compile'],
+                                 addressable_roots=[self.unconfigured_thrift.address])
+    with self.assertRaises(PartiallyConsumedInputsError):
+      execution_graph = self.scheduler.execution_graph(build_request)

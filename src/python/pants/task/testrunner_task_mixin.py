@@ -6,7 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from abc import abstractmethod
+from textwrap import dedent
 
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout, TimeoutReached
 
@@ -17,6 +19,10 @@ class TestRunnerTaskMixin(object):
   The intent is to migrate logic over time out of JUnitRun and PytestRun, so the functionality
   expressed can support both languages, and any additional languages that are added to pants.
   """
+
+  @staticmethod
+  def _timeout_for_target(target):
+    return getattr(target, 'timeout', None)
 
   @classmethod
   def register_options(cls, register):
@@ -30,11 +36,24 @@ class TestRunnerTaskMixin(object):
              'all tests are run with the total timeout covering the entire run of tests. If a single target '
              'in a test run has no timeout and there is no default, the entire run will have no timeout. This '
              'should change in the future to provide more granularity.')
-    register('--timeout-default', action='store', default=0, type=int,
+    register('--timeout-default', action='store', type=int, advanced=True,
              help='The default timeout (in seconds) for a test if timeout is not set on the target.')
+    register('--timeout-maximum', action='store', type=int, advanced=True,
+             help='The maximum timeout (in seconds) that can be set on a test target.')
 
   def execute(self):
     """Run the task."""
+
+    # Ensure that the timeout_maximum is higher than the timeout default.
+    if (self.get_options().timeout_maximum is not None
+        and self.get_options().timeout_default is not None
+        and self.get_options().timeout_maximum < self.get_options().timeout_default):
+      message = "Error: timeout-default: {} exceeds timeout-maximum: {}".format(
+        self.get_options().timeout_maximum,
+        self.get_options().timeout_default
+      )
+      self.context.log.error(message)
+      raise TestFailedTaskError(message)
 
     if not self.get_options().skip:
       test_targets = self._get_test_targets()
@@ -42,16 +61,49 @@ class TestRunnerTaskMixin(object):
       for target in test_targets:
         self._validate_target(target)
 
-      timeout = self._timeout_for_targets(test_targets)
+      self._execute(all_targets)
 
-      try:
-        with Timeout(timeout, abort_handler=self._timeout_abort_handler):
-          self._execute(all_targets)
-      except TimeoutReached as e:
-        raise TestFailedTaskError(str(e), failed_targets=test_targets)
+  def _spawn_and_wait(self, *args, **kwargs):
+    """Spawn the actual test runner process, and wait for it to complete."""
+
+    test_targets = self._get_test_targets()
+    timeout = self._timeout_for_targets(test_targets)
+
+    process_handler = self._spawn(*args, **kwargs)
+
+    # TODO(sbrenn): We use process_handler.kill here because we want to aggressively terminate the
+    # process. It may make sense in the future to do a multi-stage approach
+    # where first we do process_handler.terminate to let it die gracefully, and
+    # then do process_handler.kill if that doesn't work. It will probably require
+    # adding poll() support to ProcessHandler.
+    try:
+      with Timeout(timeout, abort_handler=process_handler.kill):
+        return process_handler.wait()
+    except TimeoutReached as e:
+      raise TestFailedTaskError(str(e), failed_targets=test_targets)
+
+  @abstractmethod
+  def _spawn(self, *args, **kwargs):
+    """Spawn the actual test runner process.
+
+    :rtype: ProcessHandler
+    """
+
+    raise NotImplementedError
 
   def _timeout_for_target(self, target):
-    return getattr(target, 'timeout', None)
+    timeout = getattr(target, 'timeout', None)
+    timeout_maximum = self.get_options().timeout_maximum
+    if timeout is not None and timeout_maximum is not None:
+      if timeout > timeout_maximum:
+        self.context.log.warn(
+          "Warning: Timeout for {target} ({timeout}s) exceeds {timeout_maximum}s. Capping.".format(
+            target=target.address.spec,
+            timeout=timeout,
+            timeout_maximum=timeout_maximum))
+        return timeout_maximum
+
+    return timeout
 
   def _timeout_for_targets(self, targets):
     """Calculate the total timeout based on the timeout configuration for all the targets.
@@ -61,6 +113,10 @@ class TestRunnerTaskMixin(object):
     have no timeout configured (or set to 0), their timeout will be set to the default timeout.
     If there is no default timeout, or if it is set to zero, there will be no timeout, if any of the test targets
     have a timeout set to 0 or no timeout configured.
+
+    TODO(sbrenn): This behavior where timeout=0 is the same as timeout=None has turned out to be very confusing,
+    and should change so that timeout=0 actually sets the timeout to 0, and only timeout=None
+    should set the timeout to the default timeout. This will require a deprecation cycle.
 
     :param targets: list of test targets
     :return: timeout to cover all the targets, in seconds
@@ -74,16 +130,18 @@ class TestRunnerTaskMixin(object):
     # Gather up all the timeouts.
     timeouts = [self._timeout_for_target(target) for target in targets]
 
-    # If any target's timeout is None or 0, then set it to the default timeout
+    # If any target's timeout is None or 0, then set it to the default timeout.
+    # TODO(sbrenn): Change this so that only if the timeout is None, set it to default timeout.
     timeouts_w_default = [timeout or timeout_default for timeout in timeouts]
 
     # Even after we've done that, there may be a 0 or None in the timeout list if the
     # default timeout is set to 0 or None. So if that's the case, then the timeout is
-    # disabled
+    # disabled.
+    # TODO(sbrenn): Change this so that if the timeout is 0, it is actually 0.
     if 0 in timeouts_w_default or None in timeouts_w_default:
       return None
     else:
-      # Sum the timeouts for all the targets, using the default timeout where one is not set
+      # Sum the timeouts for all the targets, using the default timeout where one is not set.
       return sum(timeouts_w_default)
 
   def _get_targets(self):
@@ -100,15 +158,12 @@ class TestRunnerTaskMixin(object):
     return test_targets
 
   @abstractmethod
-  def _timeout_abort_handler(self):
-    """Abort the test process when it has been timed out."""
-
-  @abstractmethod
   def _test_target_filter(self):
     """A filter to run on targets to see if they are relevant to this test task.
 
     :return: function from target->boolean
     """
+    raise NotImplementedError
 
   @abstractmethod
   def _validate_target(self, target):
@@ -116,10 +171,11 @@ class TestRunnerTaskMixin(object):
 
     We don't need the type check here because _get_targets() combines with _test_target_type to
     filter the list of targets to only the targets relevant for this test task.
-im
+
     :param target: the target to validate
     :raises: TargetDefinitionException
     """
+    raise NotImplementedError
 
   @abstractmethod
   def _execute(self, all_targets):
@@ -127,3 +183,4 @@ im
 
     :param targets: list of the targets whose tests are to be run
     """
+    raise NotImplementedError

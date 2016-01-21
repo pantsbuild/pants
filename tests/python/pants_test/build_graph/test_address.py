@@ -134,4 +134,4 @@ class BuildFileAddressTest(BaseAddressTest):
     with self.workspace('BUILD') as root_dir:
       build_file = FilesystemBuildFile(root_dir, relpath='')
       self.assert_address('', 'foo', BuildFileAddress(build_file, target_name='foo'))
-      self.assertEqual(':foo', BuildFileAddress(build_file, target_name='foo').spec)
+      self.assertEqual('//:foo', BuildFileAddress(build_file, target_name='foo').spec)

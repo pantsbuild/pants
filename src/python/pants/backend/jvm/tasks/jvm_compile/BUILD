@@ -61,8 +61,6 @@ python_library(
   dependencies = [
     ':compile_context',
     ':execution_graph',
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/core/tasks:group_task',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
@@ -117,6 +115,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )
 

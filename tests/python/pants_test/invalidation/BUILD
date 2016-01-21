@@ -7,7 +7,7 @@ python_tests(
   sources = ['test_cache_manager.py'],
   dependencies = [
     'src/python/pants/invalidation',
-    'tests/python/pants_test/testutils',
+    'tests/python/pants_test/testutils:mock_logger',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )

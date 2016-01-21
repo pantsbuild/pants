@@ -60,10 +60,25 @@ def safe_mkdir_for(path):
   safe_mkdir(os.path.dirname(path), clean=False)
 
 
-def safe_file_dump(path, content):
-  safe_mkdir_for(path)
-  with open(path, 'w') as outfile:
-    outfile.write(content)
+def safe_file_dump(filename, payload):
+  """Write a string to a file.
+
+  :param string filename: The filename of the file to write to.
+  :param string payload: The string to write to the file.
+  """
+  with safe_open(filename, 'wb') as f:
+    f.write(payload)
+
+
+def read_file(filename):
+  """Read and return the contents of a file in a single file.read().
+
+  :param string filename: The filename of the file to read.
+  :returns: The contents of the file.
+  :rtype: string
+  """
+  with open(filename, 'rb') as f:
+    return f.read()
 
 
 def safe_walk(path, **kwargs):
@@ -132,7 +147,7 @@ def safe_rmtree(directory):
 
 def safe_open(filename, *args, **kwargs):
   """Open a file safely, ensuring that its directory exists."""
-  safe_mkdir(os.path.dirname(filename))
+  safe_mkdir_for(filename)
   return open(filename, *args, **kwargs)
 
 

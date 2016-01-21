@@ -1,22 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'util',
-  dependencies = [
-    ':contextutil',
-    ':dirutil',
-    ':eval',
-    ':fileutil',
-    ':memo',
-    ':meta',
-    ':osutil',
-    ':strutil',
-    ':xml_parser',
-    ':timeout',
-  ]
-)
-
 python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],
@@ -66,14 +50,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'osutil',
-  sources = ['test_osutil.py'],
-  dependencies = [
-    'src/python/pants/util:osutil',
-  ]
-)
-
-python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
@@ -90,10 +66,53 @@ python_tests(
 )
 
 python_tests(
+  name = 'netrc',
+  sources = ['test_netrc.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:netrc',
+  ]
+)
+
+python_tests(
+  name = 'osutil',
+  sources = ['test_osutil.py'],
+  dependencies = [
+    'src/python/pants/util:osutil',
+  ]
+)
+
+python_tests(
+  name = 'process_handler',
+  sources = ['test_process_handler.py'],
+  dependencies = [
+    'src/python/pants/util:process_handler'
+  ]
+)
+
+python_tests(
+  name = 'socket',
+  sources = ['test_socket.py'],
+  coverage = ['pants.util.socket'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/util:socket',
+  ]
+)
+
+python_tests(
   name = 'strutil',
   sources = ['test_strutil.py'],
   dependencies = [
     'src/python/pants/util:strutil',
+  ]
+)
+
+python_tests(
+  name = 'timeout',
+  sources = ['test_timeout.py'],
+  dependencies = [
+    'src/python/pants/util:timeout',
   ]
 )
 
@@ -104,22 +123,4 @@ python_tests(
     'src/python/pants/util:xml_parser',
     'src/python/pants/util:contextutil',
   ]
-)
-
-python_tests(
-  name = 'timeout',
-  sources = ['test_timeout.py'],
-  dependencies = [
-    'src/python/pants/util:timeout',
-  ],
-)
-
-python_tests(
-  name = 'socket',
-  sources = ['test_socket.py'],
-  coverage = ['pants.util.socket'],
-  dependencies = [
-    '3rdparty/python:mock',
-    'src/python/pants/util:socket',
-  ],
 )

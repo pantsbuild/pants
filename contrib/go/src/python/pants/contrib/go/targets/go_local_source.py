@@ -7,11 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.core.wrapped_globs import Globs
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.parse_context import ParseContext
 from pants.base.payload import Payload
 from pants.build_graph.address import Address
+from pants.source.wrapped_globs import Globs
 
 from pants.contrib.go.targets.go_target import GoTarget
 
@@ -65,7 +65,7 @@ class GoLocalSource(GoTarget):
     # 2. resources: Even though go does not support them; ie by providing a protocol to embed them
     #    in binaries, it does allow them to be placed in a directory where a test might use them
     #    for example via plain old filesystem access.
-    globs = Globs(rel_path=os.path.join(get_buildroot(), address.spec_path))
+    globs = Globs(ParseContext(rel_path=address.spec_path, type_aliases={}))
     sources = globs('*', exclude=[globs('BUILD*'),
                                   # This skips dirents.
                                   globs('*/')])

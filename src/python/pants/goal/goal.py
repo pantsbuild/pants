@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.deprecated import deprecated
 from pants.goal.error import GoalError
 
 
@@ -45,7 +44,7 @@ class Goal(object):
   def clear(cls):
     """Remove all goals and tasks.
 
-    This method is EXCLUSIVELY for use in tests.
+    This method is EXCLUSIVELY for use in tests and during pantsd startup.
     """
     cls._goal_by_name.clear()
 
@@ -87,8 +86,11 @@ class _Goal(object):
     # Return the docstring for the Task registered under the same name as this goal, if any.
     # This is a very common case, and therefore a useful idiom.
     namesake_task = self._task_type_by_name.get(self.name)
-    if namesake_task:
-      return namesake_task.__doc__
+    if namesake_task and namesake_task.__doc__:
+      # First line of docstring.
+      # TODO: This is repetitive of Optionable.get_description(). We should probably just
+      # make Goal an Optionable, for uniformity.
+      return namesake_task.__doc__.partition('\n')[0].strip()
     return ''
 
   def register_options(self, options):
@@ -124,7 +126,9 @@ class _Goal(object):
                                       options_scope.replace('.', '_').replace('-', '_'))
     task_type = type(subclass_name, (superclass,), {
       '__doc__': superclass.__doc__,
-      'options_scope': options_scope
+      '__module__': superclass.__module__,
+      'options_scope': options_scope,
+      '_stable_name': superclass.stable_name()
     })
 
     otn = self._ordered_task_names
@@ -147,14 +151,6 @@ class _Goal(object):
     if task_registrar.serialize:
       self.serialize = True
 
-    return self
-
-  @deprecated('0.0.66', "Single-task goals will take their description from the first sentence "
-                        "of that task's docstring.  Multiple-task goals can register a description "
-                        "explicitly using Goal.register(name, description).")
-  def with_description(self, description):
-    """Add a description to this goal."""
-    self._description = description
     return self
 
   def uninstall_task(self, name):

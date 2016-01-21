@@ -51,8 +51,18 @@ python_library(
 )
 
 python_library(
+  name = 'netrc',
+  sources = ['netrc.py'],
+)
+
+python_library(
   name = 'osutil',
   sources = ['osutil.py'],
+)
+
+python_library(
+  name = 'process_handler',
+  sources = ['process_handler.py'],
 )
 
 python_library(
@@ -64,6 +74,11 @@ python_library(
 )
 
 python_library(
+  name = 'socket',
+  sources = ['socket.py']
+)
+
+python_library(
   name = 'strutil',
   sources = ['strutil.py'],
   dependencies = [
@@ -72,16 +87,11 @@ python_library(
 )
 
 python_library(
-  name = 'xml_parser',
-  sources = ['xml_parser.py'],
-)
-
-python_library(
   name = 'timeout',
   sources = ['timeout.py'],
 )
 
 python_library(
-  name = 'socket',
-  sources = ['socket.py']
+  name = 'xml_parser',
+  sources = ['xml_parser.py'],
 )

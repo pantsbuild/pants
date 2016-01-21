@@ -14,6 +14,7 @@ from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
+from pants.util.strutil import ensure_binary
 from pants_test.base_test import BaseTest
 
 
@@ -26,6 +27,11 @@ class ErrorTarget(Target):
 
 
 class BuildFileParserBasicsTest(BaseTest):
+
+  @property
+  def alias_groups(self):
+    return BuildFileAliases(targets={'jvm_binary': ErrorTarget,
+                                     'java_library': ErrorTarget})
 
   def test_addressable_exceptions(self):
     self.add_to_build_file('a/BUILD', 'target()')
@@ -58,6 +64,33 @@ class BuildFileParserBasicsTest(BaseTest):
     build_file = FilesystemBuildFile(self.build_root, '')
     address_map = set(self.build_file_parser.parse_build_file(build_file))
     self.assertEqual(len(address_map), 0)
+
+  def test_invalid_unicode_in_build_file(self):
+    """Demonstrate that unicode characters causing parse errors raise real parse errors."""
+    self.add_to_build_file('BUILD', ensure_binary(dedent(
+      """
+      jvm_binary(name = ‘hello’,  # Parse error due to smart quotes (non ascii characters)
+        source = 'HelloWorld.java'
+        main = 'foo.HelloWorld',
+      )
+      """
+    )))
+    build_file = FilesystemBuildFile(self.build_root, 'BUILD')
+    with self.assertRaises(BuildFileParser.BuildFileParserError):
+      self.build_file_parser.parse_build_file(build_file)
+
+  def test_unicode_string_in_build_file(self):
+    """Demonstrates that a string containing unicode should work in a BUILD file."""
+    self.add_to_build_file('BUILD', ensure_binary(dedent(
+        """
+        java_library(
+          name='foo',
+          sources=['א.java']
+        )
+        """
+    )))
+    build_file = FilesystemBuildFile(self.build_root, 'BUILD')
+    self.build_file_parser.parse_build_file(build_file)
 
 
 class BuildFileParserTargetTest(BaseTest):
@@ -107,7 +140,7 @@ class BuildFileParserTargetTest(BaseTest):
     addresses = address_map.keys()
     self.assertEqual({bar_build_file, base_build_file, foo_build_file},
                      set([address.build_file for address in addresses]))
-    self.assertEqual({':base', ':foo', ':bat'},
+    self.assertEqual({'//:base', '//:foo', '//:bat'},
                      set([address.spec for address in addresses]))
 
   def test_build_file_duplicates(self):

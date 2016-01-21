@@ -38,11 +38,6 @@ python_library(
 )
 
 python_library(
-  name = 'build_manual',
-  sources = ['build_manual.py'],
-)
-
-python_library(
   name = 'build_root',
   sources = ['build_root.py'],
   dependencies = [
@@ -111,8 +106,6 @@ python_library(
   sources = ['payload_field.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':build_environment',
-    ':validation',
     'src/python/pants/util:meta',
   ]
 )
@@ -143,23 +136,6 @@ python_library(
 )
 
 python_library(
-  name = 'source_root',
-  sources = ['source_root.py'],
-  dependencies = [
-    ':build_environment',
-    ':build_file_target_factory',
-    ':build_manual',
-    ':deprecated',
-    ':exceptions',
-    ':parse_context',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    # TEMPORARY dep during migration to new source roots mechanism.
-    # I've verified that this does not introduce a circular dep.
-    'src/python/pants/source',
-  ],
-)
-
-python_library(
   name = 'worker_pool',
   sources = ['worker_pool.py'],
   dependencies = [
@@ -182,9 +158,8 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    'src/python/pants/backend/core:wrapped_globs',
+    '3rdparty/python:six',
   ],
 )

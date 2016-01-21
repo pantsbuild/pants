@@ -1,33 +1,3 @@
-target(
-  name='all',
-  dependencies=[
-    ':integration',
-    ':unit',
-  ]
-)
-
-target(
-  name='unit',
-  dependencies=[
-    ':go_binary_create',
-    ':go_buildgen',
-    ':go_compile',
-    ':go_fetch',
-    ':go_go',
-    ':go_workspace_task',
-  ]
-)
-
-target(
-  name='integration',
-  dependencies=[
-    ':go_compile_integration',
-    ':go_fetch_integration',
-    ':go_run_integration',
-    ':go_test_integration',
-  ]
-)
-
 python_tests(
   name='go_binary_create',
   sources=['test_go_binary_create.py'],
@@ -112,8 +82,10 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/testutils:file_test_util',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags={'integration'},
 )
 
 python_tests(
@@ -121,7 +93,8 @@ python_tests(
   sources=['test_go_test_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags={'integration'},
 )
 
 python_tests(
@@ -129,7 +102,8 @@ python_tests(
   sources=['test_go_run_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags={'integration'},
 )
 
 python_tests(
@@ -137,7 +111,8 @@ python_tests(
   sources=['test_go_fetch_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags={'integration'},
 )
 
 python_tests(
@@ -146,5 +121,5 @@ python_tests(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/tasks:go_task',
     'tests/python/pants_test/tasks:task_test_base',
-  ]
+  ],
 )

@@ -1,21 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-target(
-  name = 'all',
-  dependencies = [
-    ':address',
-    ':build_configuration',
-    ':build_file_address_mapper',
-    ':build_file_aliases',
-    ':build_file_parser',
-    ':build_graph',
-    ':source_mapper',
-    ':target',
-  ]
-)
-
 python_tests(
   name = 'address',
   sources = ['test_address.py'],
@@ -85,7 +70,6 @@ python_tests(
     'tests/python/pants_test:base_test',
   ]
 )
-
 
 python_tests(
   name = 'target',

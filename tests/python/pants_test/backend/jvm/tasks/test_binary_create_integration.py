@@ -49,7 +49,8 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
     self.build_and_run(
       pants_args=['bundle',
                   'testprojects/src/java/org/pantsbuild/testproject/manifest:manifest-app'],
-      rel_out_path=os.path.join('dist', 'manifest-app-bundle'),
+      rel_out_path=os.path.join('dist', ('testprojects.src.java.org.pantsbuild.testproject'
+                                         '.manifest.manifest-app-bundle')),
       java_args=['-cp', 'manifest-no-source.jar', 'org.pantsbuild.testproject.manifest.Manifest'],
       expected_output='Hello World!  Version: null',
     )
@@ -61,7 +62,8 @@ class BinaryCreateIntegrationTest(PantsRunIntegrationTest):
       pants_args=['bundle',
                   'testprojects/src/java/org/pantsbuild/testproject/manifest:manifest-app',
                   '--bundle-jvm-deployjar'],
-      rel_out_path=os.path.join('dist', 'manifest-app-bundle'),
+      rel_out_path=os.path.join('dist', ('testprojects.src.java.org.pantsbuild.testproject'
+                                         '.manifest.manifest-app-bundle')),
       java_args=['-cp', 'manifest-no-source.jar', 'org.pantsbuild.testproject.manifest.Manifest'],
       expected_output='Hello World!  Version: 4.5.6',
     )

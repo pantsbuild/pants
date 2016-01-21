@@ -17,7 +17,7 @@ from contextlib import closing, contextmanager
 
 import requests
 from pants.fs.archive import archiver_for_path
-from pants.option.custom_types import dict_option
+from pants.option.custom_types import dict_option, list_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.memo import memoized_method, memoized_property
@@ -47,6 +47,8 @@ class Fetcher(AbstractClass):
     Many remote import paths may share the same root; ie: all the 20+ docker packages hosted at
     https://github.com/docker/docker share the 'github.com/docker/docker' root.
 
+    This is called the import-prefix in 'https://golang.org/cmd/go/#hdr-Remote_import_paths'
+
     :param string import_path: The remote import path to extract the root from.
     :returns: The root portion of the import path.
     :rtype: string
@@ -68,7 +70,7 @@ class Fetcher(AbstractClass):
 
 
 class Fetchers(Subsystem):
-  """A registry of installed :class:`Fetcher`s."""
+  """A registry of installed remote code fetchers."""
 
   class AdvertisementError(Exception):
     """Indicates an error advertising a :class:`Fetcher`."""
@@ -186,9 +188,9 @@ class Fetchers(Subsystem):
              help="A mapping from a remote import path matching regex to a fetcher type to use "
                   "to fetch the remote sources.  The regex must match the beginning of the remote "
                   "import path; no '^' anchor is needed, it is assumed.  The Fetcher types are "
-                  "fully qualified class names or else an installed alias for a fetcher type; ie "
-                  "the builtin `contrib.go.subsystems.fetchers.ArchiveFetcher` is aliased as "
-                  "'ArchiveFetcher'.")
+                  "fully qualified class names or else an installed alias for a fetcher type; "
+                  "I.e., the built-in 'contrib.go.subsystems.fetchers.ArchiveFetcher' is aliased "
+                  "as 'ArchiveFetcher'.")
 
   class GetFetcherError(Exception):
     """Indicates an error finding an appropriate Fetcher."""
@@ -300,22 +302,21 @@ class ArchiveFetcher(Fetcher, Subsystem):
   def register_options(cls, register):
     register('--matchers', metavar='<mapping>', type=dict_option,
              default=cls._DEFAULT_MATCHERS, advanced=True,
-             # NB: The newlines used below are for reading the logical structure here only.
-             # They're converted to a single space by the help formatting and the resulting long
-             # line of help text is simply wrapped.
              help="A mapping from a remote import path matching regex to an UrlInfo struct "
                   "describing how to fetch and unpack a remote import path.  The regex must match "
-                  "the beginning of the remote import path; no '^' anchor is needed, it is "
-                  "assumed. The UrlInfo struct is a 3-tuple with the following slots:\n"
+                  "the beginning of the remote import path (no '^' anchor is needed, it is "
+                  "assumed) until the first path element that is contained in the archive. (e.g. for "
+                  "'bazil.org/fuse/fs', which lives in the archive of 'bazil.org/fuse', it must match "
+                  "'bazil.org/fuse'.) The UrlInfo struct is a 3-tuple with the following slots:\n"
                   "0. An url format string that is supplied to the regex match\'s `.template` "
-                  "method and then formatted with the remote import path\'s `rev` and `pkg`.\n"
+                  "method and then formatted with the remote import path\'s `rev`, `import_prefix`, "
+                  "and `pkg`.\n"
                   "1. The default revision string to use when no `rev` is supplied; ie 'HEAD' or "
-                  "'master' for git.\n"
+                  "'master' for git. "
                   "2. An integer indicating the number of leading path components to strip from "
-                  "files upacked from the archive.\n"
-                  "\n"
-                  "An example configuration that works against github.com is:\n"
-                  "{r'github.com/(?P<user>[^/]+)/(?P<repo>[^/]+)':\n"
+                  "files upacked from the archive. "
+                  "An example configuration that works against github.com is: "
+                  "{r'github.com/(?P<user>[^/]+)/(?P<repo>[^/]+)': "
                   " ('https://github.com/\g<user>/\g<repo>/archive/{rev}.zip', 'master', 1)}")
     register('--buffer-size', metavar='<bytes>', type=int, advanced=True,
              default=10 * 1024,  # 10KB in case jumbo frames are in play.
@@ -323,6 +324,9 @@ class ArchiveFetcher(Fetcher, Subsystem):
                   'disk when downloading an archive.')
     register('--retries', default=1, advanced=True,
              help='How many times to retry to fetch a remote library.')
+    register('--prefixes', metavar='<paths>', type=list_option, advanced=True,
+             fromfile=True, default=[],
+             help="Known import-prefixes for go packages")
 
   @memoized_property
   def _matchers(self):
@@ -333,6 +337,15 @@ class ArchiveFetcher(Fetcher, Subsystem):
       matchers.append((matcher, url_info))
     return matchers
 
+  @memoized_property
+  def _prefixes(self):
+    """Returns known prefixes of Go packages that are the root of archives."""
+    # The Go get meta protocol involves reading the HTML to find a meta tag with the name go-import
+    # that lists a prefix. Knowing this prefix ahead of time allows the ArchiveFetcher to fetch
+    # the archive. This is especially useful if running in an environment where there is no
+    # network access other than to a repository of tarballs of the source.
+    return self.get_options().prefixes
+
   @memoized_method
   def _matcher(self, import_path):
     for matcher, url_info in self._matchers:
@@ -342,13 +355,17 @@ class ArchiveFetcher(Fetcher, Subsystem):
     raise self.FetchError("Don't know how to fetch {}".format(import_path))
 
   def root(self, import_path):
+    for prefix in self._prefixes:
+      if import_path.startswith(prefix):
+        return prefix
     match, _ = self._matcher(import_path)
     return match.string[:match.end()]
 
   def fetch(self, import_path, dest, rev=None):
     match, url_info = self._matcher(import_path)
     pkg = GoRemoteLibrary.remote_package_path(self.root(import_path), import_path)
-    archive_url = match.expand(url_info.url_format).format(rev=url_info.rev(rev), pkg=pkg)
+    archive_url = match.expand(url_info.url_format).format(
+      rev=url_info.rev(rev), pkg=pkg, import_prefix=self.root(import_path))
     try:
       archiver = archiver_for_path(archive_url)
     except ValueError:

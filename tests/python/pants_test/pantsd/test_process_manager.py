@@ -13,8 +13,10 @@ from contextlib import contextmanager
 import mock
 import psutil
 
-from pants.pantsd.process_manager import ProcessGroup, ProcessManager, swallow_psutil_exceptions
+from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessMetadataManager,
+                                          swallow_psutil_exceptions)
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_file_dump
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -61,15 +63,84 @@ class TestProcessGroup(unittest.TestCase):
         self.assertTrue('_test' in item.name)
 
 
+class TestProcessMetadataManager(unittest.TestCase):
+  NAME = '_test_'
+  TEST_KEY = 'TEST'
+  TEST_VALUE = '300'
+  TEST_VALUE_INT = 300
+  BUILDROOT = '/mock_buildroot/'
+
+  def test_maybe_cast(self):
+    self.assertIsNone(ProcessMetadataManager._maybe_cast(None, int))
+    self.assertEqual(ProcessMetadataManager._maybe_cast('3333', int), 3333)
+    self.assertEqual(ProcessMetadataManager._maybe_cast('ssss', int), 'ssss')
+
+  def test_get_metadata_dir_by_name(self):
+    with mock.patch('pants.pantsd.process_manager.get_buildroot') as mock_buildroot:
+      mock_buildroot.return_value = self.BUILDROOT
+      self.assertEqual(ProcessMetadataManager._get_metadata_dir_by_name(self.NAME),
+                       os.path.join(self.BUILDROOT, '.pids', self.NAME))
+
+  def test_maybe_init_metadata_dir_by_name(self):
+    with mock.patch('pants.pantsd.process_manager.safe_mkdir', **PATCH_OPTS) as mock_mkdir:
+      ProcessMetadataManager._maybe_init_metadata_dir_by_name(self.NAME)
+      mock_mkdir.assert_called_once_with(
+        ProcessMetadataManager._get_metadata_dir_by_name(self.NAME))
+
+  def test_readwrite_metadata_by_name(self):
+    with temporary_dir() as tmpdir, \
+         mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
+      ProcessMetadataManager.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
+      self.assertEqual(
+        ProcessMetadataManager.read_metadata_by_name(self.NAME, self.TEST_KEY),
+        self.TEST_VALUE
+      )
+      self.assertEqual(
+        ProcessMetadataManager.read_metadata_by_name(self.NAME, self.TEST_KEY, int),
+        self.TEST_VALUE_INT
+      )
+
+  def test_deadline_until(self):
+    with self.assertRaises(ProcessMetadataManager.Timeout):
+      ProcessMetadataManager._deadline_until(lambda: False, timeout=.1)
+
+  def test_wait_for_file(self):
+    with temporary_dir() as td:
+      test_filename = os.path.join(td, 'test.out')
+      safe_file_dump(test_filename, 'test')
+      ProcessMetadataManager._wait_for_file(test_filename, timeout=.1)
+
+  def test_wait_for_file_timeout(self):
+    with temporary_dir() as td:
+      with self.assertRaises(ProcessMetadataManager.Timeout):
+        ProcessMetadataManager._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
+
+  def test_await_metadata_by_name(self):
+    with temporary_dir() as tmpdir, \
+         mock.patch('pants.pantsd.process_manager.get_buildroot', return_value=tmpdir):
+      ProcessMetadataManager.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
+
+      self.assertEquals(
+        ProcessMetadataManager.await_metadata_by_name(self.NAME, self.TEST_KEY, .1),
+        self.TEST_VALUE
+      )
+
+  def test_purge_metadata(self):
+    with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
+      ProcessMetadataManager.purge_metadata_by_name(self.NAME)
+    self.assertGreater(mock_rm.call_count, 0)
+
+  def test_purge_metadata_error(self):
+    with mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm:
+      mock_rm.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
+      with self.assertRaises(ProcessManager.MetadataError):
+        ProcessMetadataManager.purge_metadata_by_name(self.NAME)
+    self.assertGreater(mock_rm.call_count, 0)
+
+
 class TestProcessManager(unittest.TestCase):
   def setUp(self):
     self.pm = ProcessManager('test')
-
-  def test_callbacks(self):
-    # For coverage.
-    self.pm.pre_fork()
-    self.pm.post_fork_child()
-    self.pm.post_fork_parent()
 
   def test_process_properties(self):
     with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
@@ -90,17 +161,42 @@ class TestProcessManager(unittest.TestCase):
       self.assertEqual(self.pm.cmdline, None)
       self.assertEqual(self.pm.cmd, None)
 
-  def test_maybe_cast(self):
-    self.assertIsNone(self.pm._maybe_cast(None, int))
-    self.assertEqual(self.pm._maybe_cast('3333', int), 3333)
-    self.assertEqual(self.pm._maybe_cast('ssss', int), 'ssss')
+  def test_get_subprocess_output(self):
+    test_str = '333'
+    self.assertEqual(self.pm.get_subprocess_output(['echo', '-n', test_str]), test_str)
 
-  def test_readwrite_file(self):
-    with temporary_dir() as td:
-      test_filename = os.path.join(td, 'test.out')
-      test_content = '3333'
-      self.pm._write_file(test_filename, test_content)
-      self.assertEqual(self.pm._read_file(test_filename), test_content)
+  def test_get_subprocess_output_oserror_exception(self):
+    with self.assertRaises(self.pm.ExecutionError):
+      self.pm.get_subprocess_output(['i_do_not_exist'])
+
+  def test_get_subprocess_output_failure_exception(self):
+    with self.assertRaises(self.pm.ExecutionError):
+      self.pm.get_subprocess_output(['false'])
+
+  def test_await_pid(self):
+    with mock.patch.object(ProcessManager, 'await_metadata_by_name') as mock_await:
+      self.pm.await_pid(5)
+    mock_await.assert_called_once_with(self.pm.name, 'pid', 5, mock.ANY)
+
+  def test_await_socket(self):
+    with mock.patch.object(ProcessManager, 'await_metadata_by_name') as mock_await:
+      self.pm.await_socket(5)
+    mock_await.assert_called_once_with(self.pm.name, 'socket', 5, mock.ANY)
+
+  def test_write_pid(self):
+    with mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
+      self.pm.write_pid(31337)
+    mock_write.assert_called_once_with(self.pm.name, 'pid', '31337')
+
+  def test_write_socket(self):
+    with mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
+      self.pm.write_socket('/path/to/unix/socket')
+    mock_write.assert_called_once_with(self.pm.name, 'socket', '/path/to/unix/socket')
+
+  def test_write_named_socket(self):
+    with mock.patch.object(ProcessManager, 'write_metadata_by_name') as mock_write:
+      self.pm.write_named_socket('pailgun', '31337')
+    mock_write.assert_called_once_with(self.pm.name, 'socket_pailgun', '31337')
 
   def test_as_process(self):
     sentinel = 3333
@@ -119,108 +215,6 @@ class TestProcessManager(unittest.TestCase):
 
   def test_as_process_none(self):
     self.assertEqual(self.pm._as_process(), None)
-
-  def test_deadline_until(self):
-    with self.assertRaises(self.pm.Timeout):
-      self.pm._deadline_until(lambda: False, timeout=.1)
-
-  def test_wait_for_file(self):
-    with temporary_dir() as td:
-      test_filename = os.path.join(td, 'test.out')
-      self.pm._write_file(test_filename, 'test')
-      self.pm._wait_for_file(test_filename, timeout=.1)
-
-  def test_wait_for_file_timeout(self):
-    with temporary_dir() as td:
-      with self.assertRaises(self.pm.Timeout):
-        self.pm._wait_for_file(os.path.join(td, 'non_existent_file'), timeout=.1)
-
-  def test_await_pid(self):
-    with temporary_dir() as td:
-      test_filename = os.path.join(td, 'test.pid')
-      self.pm._write_file(test_filename, '3333')
-
-      with mock.patch.object(ProcessManager, 'get_pid_path', **PATCH_OPTS) as patched_pid:
-        patched_pid.return_value = test_filename
-        self.assertEqual(self.pm.await_pid(.1), 3333)
-
-  def test_await_socket(self):
-    with temporary_dir() as td:
-      test_filename = os.path.join(td, 'test.sock')
-      self.pm._write_file(test_filename, '3333')
-
-      with mock.patch.object(ProcessManager, 'get_socket_path', **PATCH_OPTS) as patched_socket:
-        patched_socket.return_value = test_filename
-        self.assertEqual(self.pm.await_socket(.1), 3333)
-
-  def test_maybe_init_metadata_dir(self):
-    with mock.patch('pants.pantsd.process_manager.safe_mkdir', **PATCH_OPTS) as mock_mkdir:
-      self.pm._maybe_init_metadata_dir()
-      mock_mkdir.assert_called_once_with(self.pm.get_metadata_dir())
-
-  def test_purge_metadata_abort(self):
-    with mock.patch.object(ProcessManager, 'is_alive') as mock_alive:
-      mock_alive.return_value = True
-      with self.assertRaises(AssertionError):
-        self.pm.purge_metadata()
-
-  def test_purge_metadata(self):
-    with mock.patch.object(ProcessManager, 'is_alive') as mock_alive, \
-         mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
-      mock_alive.return_value = False
-      self.pm.purge_metadata()
-      mock_rm_rf.assert_called_once_with(self.pm.get_metadata_dir())
-
-  def test_purge_metadata_alive_but_forced(self):
-    with mock.patch.object(ProcessManager, 'is_alive') as mock_alive, \
-         mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
-      mock_alive.return_value = True
-      self.pm.purge_metadata(force=True)
-      mock_rm_rf.assert_called_once_with(self.pm.get_metadata_dir())
-
-  def test_purge_metadata_metadata_error(self):
-    with mock.patch.object(ProcessManager, 'is_alive') as mock_alive, \
-         mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
-      mock_alive.return_value = False
-      mock_rm_rf.side_effect = OSError(errno.EACCES, os.strerror(errno.EACCES))
-      with self.assertRaises(ProcessManager.MetadataError):
-        self.pm.purge_metadata()
-
-  def test_get_metadata_dir(self):
-    self.assertEqual(self.pm.get_metadata_dir(),
-                     os.path.join(self.pm._buildroot, '.pids', self.pm._name))
-
-  def test_get_pid_path(self):
-    self.assertEqual(self.pm.get_pid_path(),
-                     os.path.join(self.pm._buildroot, '.pids', self.pm._name, 'pid'))
-
-  def test_get_socket_path(self):
-    self.assertEqual(self.pm.get_socket_path(),
-                     os.path.join(self.pm._buildroot, '.pids', self.pm._name, 'socket'))
-
-  def test_write_pid(self):
-    with mock.patch.object(ProcessManager, '_write_file') as patched_write, \
-         mock.patch.object(ProcessManager, '_maybe_init_metadata_dir') as patched_init:
-      self.pm.write_pid(3333)
-      patched_write.assert_called_once_with(self.pm.get_pid_path(), '3333')
-      patched_init.assert_called_once_with()
-
-  def test_write_socket(self):
-    with mock.patch.object(ProcessManager, '_write_file') as patched_write, \
-         mock.patch.object(ProcessManager, '_maybe_init_metadata_dir') as patched_init:
-      self.pm.write_socket(3333)
-      patched_write.assert_called_once_with(self.pm.get_socket_path(), '3333')
-      patched_init.assert_called_once_with()
-
-  def test_get_pid(self):
-    with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_pm:
-      patched_pm.return_value = '3333'
-      self.assertEqual(self.pm._get_pid(), 3333)
-
-  def test_get_socket(self):
-    with mock.patch.object(ProcessManager, '_read_file', **PATCH_OPTS) as patched_pm:
-      patched_pm.return_value = '3333'
-      self.assertEqual(self.pm._get_socket(), 3333)
 
   def test_is_alive_neg(self):
     with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
@@ -253,6 +247,17 @@ class TestProcessManager(unittest.TestCase):
       self.pm._process_name = 'test'
       self.assertFalse(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
+
+  def test_purge_metadata_aborts(self):
+    with mock.patch.object(ProcessManager, 'is_alive', return_value=True):
+      with self.assertRaises(self.pm.MetadataError):
+        self.pm.purge_metadata()
+
+  def test_purge_metadata_alive_but_forced(self):
+    with mock.patch.object(ProcessManager, 'is_alive', return_value=True), \
+         mock.patch('pants.pantsd.process_manager.rm_rf') as mock_rm_rf:
+      self.pm.purge_metadata(force=True)
+      self.assertGreater(mock_rm_rf.call_count, 0)
 
   def test_kill(self):
     with mock.patch('os.kill', **PATCH_OPTS) as mock_kill:
@@ -304,27 +309,16 @@ class TestProcessManager(unittest.TestCase):
       self.assertEqual(mock_kill.call_count, len(ProcessManager.KILL_CHAIN))
       self.assertEqual(mock_purge.call_count, 0)
 
-  def test_get_subprocess_output(self):
-    test_str = '333'
-    self.assertEqual(self.pm.get_subprocess_output(['echo', '-n', test_str]), test_str)
-
-  def test_get_subprocess_output_oserror_exception(self):
-    with self.assertRaises(self.pm.ExecutionError):
-      self.pm.get_subprocess_output(['i_do_not_exist'])
-
-  def test_get_subprocess_output_failure_exception(self):
-    with self.assertRaises(self.pm.ExecutionError):
-      self.pm.get_subprocess_output(['false'])
-
   @contextmanager
   def mock_daemonize_context(self, chk_pre=True, chk_post_child=False, chk_post_parent=False):
     with mock.patch.object(ProcessManager, 'post_fork_parent', **PATCH_OPTS) as mock_post_parent, \
          mock.patch.object(ProcessManager, 'post_fork_child', **PATCH_OPTS) as mock_post_child, \
          mock.patch.object(ProcessManager, 'pre_fork', **PATCH_OPTS) as mock_pre, \
          mock.patch.object(ProcessManager, 'purge_metadata', **PATCH_OPTS) as mock_purge, \
-         mock.patch('os.chdir', **PATCH_OPTS), \
          mock.patch('os._exit', **PATCH_OPTS), \
+         mock.patch('os.chdir', **PATCH_OPTS), \
          mock.patch('os.setsid', **PATCH_OPTS), \
+         mock.patch('os.waitpid', **PATCH_OPTS), \
          mock.patch('os.fork', **PATCH_OPTS) as mock_fork:
       yield mock_fork
 
@@ -357,3 +351,9 @@ class TestProcessManager(unittest.TestCase):
     with self.mock_daemonize_context(chk_post_child=True) as mock_fork:
       mock_fork.return_value = 0        # Simulate the child.
       self.pm.daemon_spawn()
+
+  def test_callbacks(self):
+    # For coverage.
+    self.pm.pre_fork()
+    self.pm.post_fork_child()
+    self.pm.post_fork_parent()

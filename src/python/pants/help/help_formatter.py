@@ -63,10 +63,17 @@ class HelpFormatter(object):
     return lines
 
   def format_option(self, ohi):
+    """Format the help output for a single option.
+
+    :param OptionHelpInfo ohi: Extracted information for option to print
+    :return: Formatted help text for this option
+    :rtype: list of string
+    """
     lines = []
+    choices = 'one of: [{}] '.format(ohi.choices) if ohi.choices else ''
     arg_line = ('{args} {fromfile}{dflt}'
                 .format(args=self._maybe_cyan(', '.join(ohi.display_args)),
-                        dflt=self._maybe_green('(default: {})'.format(ohi.default)),
+                        dflt=self._maybe_green('({}default: {})'.format(choices, ohi.default)),
                         fromfile=self._maybe_green('(@fromfile value supported) ' if ohi.fromfile
                                                    else '')))
     lines.append(arg_line)

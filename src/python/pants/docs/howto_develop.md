@@ -124,11 +124,13 @@ contribute a change or merge it to master:
     :::bash
     $ ./build-support/bin/ci.sh
 
-To run just Pants' *unit* tests (skipping the can-be-slow integration tests), use the
-`tests/python/pants_test:all` target:
+To run just Pants' *unit* tests (skipping the can-be-slow integration tests), filter out
+the python tests tagged with 'integration':
 
     :::bash
-    $ ./pants test tests/python/pants_test:all
+    $ ./pants test tests/python/pants_test:: --tag=-integration
+
+For convenience, this is wrapped up in a script `build-support/bin/unit-test.sh`.
 
 If you only want to run tests for changed targets, then you can use the
 `test-changed` goal:
@@ -190,13 +192,13 @@ use the usual `./pants py` on a `python_library` target that builds (or
 depends on) the modules you want:
 
     :::bash
-    $ ./pants py src/python/pants/backend/core/targets:common
-    /Users/lhosken/workspace/pants src/python/pants/backend/core/targets:common
+    $ ./pants py src/python/pants/build_graph
+    /Users/lhosken/workspace/pants src/python/pants/build_graph
     Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
     (InteractiveConsole)
-    >>> from pants.backend.core.targets import repository
+    >>> from pants.build_graph.target import Target
     >>>
 
 Developing and Debugging a JVM Tool

@@ -9,7 +9,7 @@ from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrar
 
 
 class JavaLibrary(ExportableJvmLibrary):
-  """A collection of Java code.
+  """A Java library.
 
   Normally has conceptually-related sources; invoking the ``compile`` goal
   on this target compiles Java and generates classes. Invoking the ``jar``

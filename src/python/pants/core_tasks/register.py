@@ -13,10 +13,12 @@ from pants.core_tasks.explain_options_task import ExplainOptionsTask
 from pants.core_tasks.invalidate import Invalidate
 from pants.core_tasks.list_goals import ListGoals
 from pants.core_tasks.noop import NoopCompile, NoopTest
+from pants.core_tasks.pantsd_kill import PantsDaemonKill
 from pants.core_tasks.reporting_server_kill import ReportingServerKill
 from pants.core_tasks.reporting_server_run import ReportingServerRun
 from pants.core_tasks.roots import ListRoots
 from pants.core_tasks.run_prep_command import RunPrepCommand
+from pants.core_tasks.targets_help import TargetsHelp
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -48,7 +50,12 @@ def register_goals():
 
   # Cleaning.
   task(name='invalidate', action=Invalidate).install()
-  task(name='clean-all', action=Clean).install()
+  task(name='clean-all', action=Clean).install('clean-all')
+
+  # Pantsd.
+  kill_pantsd = task(name='kill-pantsd', action=PantsDaemonKill)
+  kill_pantsd.install()
+  kill_pantsd.install('clean-all')
 
   # Reporting server.
   # TODO: The reporting server should be subsumed into pantsd, and not run via a task.
@@ -58,6 +65,7 @@ def register_goals():
   # Getting help.
   task(name='goals', action=ListGoals).install()
   task(name='options', action=ExplainOptionsTask).install()
+  task(name='targets', action=TargetsHelp).install()
 
   # Stub for other goals to schedule 'compile'. See noop_exec_task.py for why this is useful.
   task(name='compile', action=NoopCompile).install('compile')

@@ -7,6 +7,7 @@ python_tests(
   sources=['test_zinc_compile_integration.py'],
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
-  ]
+  ],
+  tags = {'integration'},
 )
 

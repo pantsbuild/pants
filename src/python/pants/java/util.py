@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import sys
 from zipfile import ZIP_STORED
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -15,9 +16,25 @@ from pants.java.jar.manifest import Manifest
 from pants.java.nailgun_executor import NailgunExecutor
 from pants.util.contextutil import open_zip, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdtemp
+from pants.util.process_handler import ProcessHandler, SubprocessProcessHandler
 
 
 logger = logging.getLogger(__name__)
+
+
+def _get_runner(classpath, main, jvm_options, args, executor,
+               cwd, distribution,
+               create_synthetic_jar, synthetic_jar_dir):
+  """Gets the java runner for execute_java and execute_java_async."""
+
+  executor = executor or SubprocessExecutor(distribution)
+
+  safe_cp = classpath
+  if create_synthetic_jar:
+    safe_cp = safe_classpath(classpath, synthetic_jar_dir)
+    logger.debug('Bundling classpath {} into {}'.format(':'.join(classpath), safe_cp))
+
+  return executor.runner(safe_cp, main, args=args, jvm_options=jvm_options, cwd=cwd)
 
 
 def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
@@ -47,25 +64,58 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
   Returns the exit code of the java program.
   Raises `pants.java.Executor.Error` if there was a problem launching java itself.
   """
-  executor = executor or SubprocessExecutor(distribution)
-  if not isinstance(executor, Executor):
-    raise ValueError('The executor argument must be a java Executor instance, give {} of type {}'
-                     .format(executor, type(executor)))
 
+  runner = _get_runner(classpath, main, jvm_options, args, executor, cwd, distribution,
+                       create_synthetic_jar, synthetic_jar_dir)
   workunit_name = workunit_name or main
 
-  safe_cp = classpath
-  if create_synthetic_jar:
-    safe_cp = safe_classpath(classpath, synthetic_jar_dir)
-    logger.debug('Bundling classpath {} into {}'.format(':'.join(classpath), safe_cp))
-
-  runner = executor.runner(safe_cp, main, args=args, jvm_options=jvm_options, cwd=cwd)
   return execute_runner(runner,
                         workunit_factory=workunit_factory,
                         workunit_name=workunit_name,
                         workunit_labels=workunit_labels,
                         cwd=cwd,
                         workunit_log_config=workunit_log_config)
+
+
+def execute_java_async(classpath, main, jvm_options=None, args=None, executor=None,
+                       workunit_factory=None, workunit_name=None, workunit_labels=None,
+                       cwd=None, workunit_log_config=None, distribution=None,
+                       create_synthetic_jar=True, synthetic_jar_dir=None):
+  """This is just like execute_java except that it returns a ProcessHandler rather than a return code.
+
+
+  If `workunit_factory` is supplied, does so in the context of a workunit.
+
+  :param list classpath: the classpath for the java program
+  :param string main: the fully qualified class name of the java program's entry point
+  :param list jvm_options: an optional sequence of options for the underlying jvm
+  :param list args: an optional sequence of args to pass to the java program
+  :param executor: an optional java executor to use to launch the program; defaults to a subprocess
+    spawn of the default java distribution
+  :param workunit_factory: an optional callable that can produce a workunit context
+  :param string workunit_name: an optional name for the work unit; defaults to the main
+  :param list workunit_labels: an optional sequence of labels for the work unit
+  :param string cwd: optionally set the working directory
+  :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
+  :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
+    classpath in its manifest.
+  :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
+    a temporary directory will be provided and cleaned up upon process exit.
+
+  Returns a ProcessHandler to the java program.
+  Raises `pants.java.Executor.Error` if there was a problem launching java itself.
+  """
+
+  runner = _get_runner(classpath, main, jvm_options, args, executor, cwd, distribution,
+                       create_synthetic_jar, synthetic_jar_dir)
+  workunit_name = workunit_name or main
+
+  return execute_runner_async(runner,
+                              workunit_factory=workunit_factory,
+                              workunit_name=workunit_name,
+                              workunit_labels=workunit_labels,
+                              cwd=cwd,
+                              workunit_log_config=workunit_log_config)
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
@@ -101,6 +151,68 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
       ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
       workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
       return ret
+
+
+def execute_runner_async(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
+                         cwd=None, workunit_log_config=None):
+  """Executes the given java runner asynchronously.
+
+  We can't use 'with' here because the workunit_generator's __exit__ function
+  must be called after the process exits, in the return_code_handler.
+  The wrapper around process.wait() needs to handle the same exceptions
+  as the contextmanager does, so we have code duplication.
+
+  We're basically faking the 'with' call to deal with asynchronous
+  results.
+
+  If `workunit_factory` is supplied, does so in the context of a workunit.
+
+  :param runner: the java runner to run
+  :param workunit_factory: an optional callable that can produce a workunit context
+  :param string workunit_name: an optional name for the work unit; defaults to the main
+  :param list workunit_labels: an optional sequence of labels for the work unit
+  :param string cwd: optionally set the working directory
+  :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
+
+  Returns a ProcessHandler to the java process that is spawned.
+  Raises `pants.java.Executor.Error` if there was a problem launching java itself.
+  """
+
+  if not isinstance(runner, Executor.Runner):
+    raise ValueError('The runner argument must be a java Executor.Runner instance, '
+                     'given {} of type {}'.format(runner, type(runner)))
+
+  if workunit_factory is None:
+    return SubprocessProcessHandler(runner.spawn())
+  else:
+    workunit_labels = [
+                        WorkUnitLabel.TOOL,
+                        WorkUnitLabel.NAILGUN if isinstance(runner.executor, NailgunExecutor) else WorkUnitLabel.JVM
+                      ] + (workunit_labels or [])
+
+    workunit_generator = workunit_factory(name=workunit_name, labels=workunit_labels,
+                                cmd=runner.cmd, log_config=workunit_log_config)
+    workunit = workunit_generator.__enter__()
+    process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
+
+    class WorkUnitProcessHandler(ProcessHandler):
+      def wait(_):
+        try:
+          ret = process.wait()
+          workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
+          workunit_generator.__exit__(None, None, None)
+          return ret
+        except BaseException:
+          if not workunit_generator.__exit__(*sys.exc_info()):
+            raise
+
+      def kill(_):
+        return process.kill()
+
+      def terminate(_):
+        return process.terminate()
+
+    return WorkUnitProcessHandler()
 
 
 def relativize_classpath(classpath, root_dir, followlinks=True):

@@ -13,7 +13,6 @@ import six
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.ivy_utils import IvyModuleRef
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -28,6 +27,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.option.errors import OptionsError
@@ -37,7 +37,7 @@ from pants.util.memo import memoized_property
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
-# Please add fkorotkov, tdesai to reviews for this file.
+# Please add tdesai to reviews for this file.
 class ExportTask(IvyTaskMixin, PythonTask):
   """Base class for generating a json-formattable blob of data about the target graph.
 
@@ -56,7 +56,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.4'
+  DEFAULT_EXPORT_VERSION = '1.0.5'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -187,6 +187,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
         'targets': [],
         'libraries': [],
         'roots': [],
+        'id': current_target.id,
         'target_type': get_target_type(current_target),
         'is_code_gen': current_target.is_codegen,
         'pants_target_type': self._get_pants_target_alias(type(current_target))

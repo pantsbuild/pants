@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import six
 
+from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -254,7 +256,7 @@ class BuildGraphTest(BaseTest):
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
                                  '^BUILD file does not exist at:.*/non-existent-path/BUILD'
                                  '\s+when translating spec non-existent-path:b'
-                                 '\s+referenced from :a$'):
+                                 '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
   def test_invalid_address_two_hops(self):
@@ -270,8 +272,19 @@ class BuildGraphTest(BaseTest):
                                  '^BUILD file does not exist at: .*/non-existent-path/BUILD'
                                  '\s+when translating spec non-existent-path:c'
                                  '\s+referenced from goodpath:b'
-                                 '\s+referenced from :a$'):
+                                 '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
+
+  def test_synthetic_address(self):
+    """Verify that synthetic targets don't raise an exception on inject_address_closure"""
+    self.build_graph.inject_synthetic_target(
+       Address.parse('//:synth_library_address'),
+       JarLibrary,
+       jars=[JarDependency(org = 'org.scala-lang',
+                           name = 'scala-library',
+                           rev = '2.11.5')]
+    )
+    self.inject_address_closure('//:synth_library_address')
 
   def test_invalid_address_two_hops_same_file(self):
     self.add_to_build_file('BUILD',
@@ -290,7 +303,7 @@ class BuildGraphTest(BaseTest):
                                  '\s+when translating spec non-existent-path:d'
                                  '\s+referenced from goodpath:c'
                                  '\s+referenced from goodpath:b'
-                                 '\s+referenced from :a$'):
+                                 '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
   def test_raise_on_duplicate_dependencies(self):
@@ -306,5 +319,5 @@ class BuildGraphTest(BaseTest):
     with self.assertRaisesRegexp(
         BuildGraph.TransitiveLookupError,
         '^Addresses in dependencies must be unique. \'other:b\' is referenced more than once.'
-        '\s+referenced from :a$'):
+        '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')

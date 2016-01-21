@@ -12,7 +12,7 @@ from contextlib import closing, contextmanager
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import (Engine, LocalMultiprocessEngine, LocalSerialEngine,
                                      SerializationError)
-from pants.engine.exp.examples.planners import (ApacheThriftError, Classpath, Javac, Sources,
+from pants.engine.exp.examples.planners import (ApacheThriftError, Classpath, Javac, JavaSources,
                                                 setup_json_scheduler)
 from pants.engine.exp.scheduler import BuildRequest, Promise
 
@@ -65,7 +65,7 @@ class EngineTest(unittest.TestCase):
     failed_promise = Promise(Classpath, self.java_fail_slow)
     failed_to_produce = result.error.failed_to_produce[failed_promise]
     failing_configuration = self.failing_thrift.select_configuration('failing')
-    self.assertEqual([Promise(Sources.of('.java'), self.failing_thrift, failing_configuration),
+    self.assertEqual([Promise(JavaSources, self.failing_thrift, failing_configuration),
                       Promise(Classpath, self.failing_thrift, failing_configuration),
                       Promise(Classpath, self.java_fail_slow)],
                      [ftp.promise for ftp in failed_to_produce.walk(postorder=True)])

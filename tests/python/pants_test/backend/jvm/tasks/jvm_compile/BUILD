@@ -1,14 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='jvm_compile',
-  dependencies=[
-    ':jvm_classpath_published',
-    'tests/python/pants_test/backend/jvm/tasks/jvm_compile/java',
-  ],
-)
-
 python_tests(
   name = 'jvm_classpath_published',
   sources = ['test_jvm_classpath_published.py'],
@@ -27,7 +19,7 @@ python_library(
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-  ]
+  ],
 )
 
 python_tests(
@@ -35,5 +27,6 @@ python_tests(
   sources=['test_declared_deps_integration.py'],
   dependencies=[
     ':base_compile_integration_test',
-  ]
+  ],
+  tags={'integration'},
 )

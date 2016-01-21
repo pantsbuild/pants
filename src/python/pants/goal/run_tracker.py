@@ -70,6 +70,8 @@ class RunTracker(Subsystem):
     register('--num-background-workers', advanced=True, type=int,
              default=multiprocessing.cpu_count(),
              help='Number of threads for background work.')
+    register('--stats-local-json-file', advanced=True, default=None,
+             help='Write stats to this local json file on run completion.')
 
   def __init__(self, *args, **kwargs):
     super(RunTracker, self).__init__(*args, **kwargs)
@@ -93,6 +95,10 @@ class RunTracker(Subsystem):
 
     relative_symlink(self.run_info_dir, link_to_latest)
 
+    # A lock to ensure that adding to stats at the end of a workunit
+    # operates thread-safely.
+    self._stats_lock = threading.Lock()
+
     # Time spent in a workunit, including its children.
     self.cumulative_timings = AggregatedTimings(os.path.join(self.run_info_dir,
                                                              'cumulative_timings'))
@@ -103,6 +109,9 @@ class RunTracker(Subsystem):
     # Hit/miss stats for the artifact cache.
     self.artifact_cache_stats = \
       ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
+
+    # Log of success/failure/aborted for each workunit.
+    self.outcomes = {}
 
     # Number of threads for foreground work.
     self._num_foreground_workers = self.get_options().num_foreground_workers
@@ -248,13 +257,30 @@ class RunTracker(Subsystem):
       return error("Error: {}".format(e))
     return True
 
+  @classmethod
+  def write_stats_to_json(cls, file_name, stats):
+    """Write stats to a local json file.
+
+    :return: True if successfully written, False otherwise.
+    """
+    params = json.dumps(stats)
+    try:
+      with open(file_name, 'w') as f:
+        f.write(params)
+    except Exception as e:  # Broad catch - we don't want to fail in stats related failure.
+      print('WARNING: Failed to write stats to {} due to Error: {}'.format(file_name, e),
+            file=sys.stderr)
+      return False
+    return True
+
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
     stats = {
       'run_info': self.run_info.get_as_dict(),
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
-      'artifact_cache_stats': self.artifact_cache_stats.get_all()
+      'artifact_cache_stats': self.artifact_cache_stats.get_all(),
+      'outcomes': self.outcomes
     }
     # Dump individual stat file.
     # TODO(benjy): Do we really need these, once the statsdb is mature?
@@ -269,6 +295,11 @@ class RunTracker(Subsystem):
     stats_url = self.get_options().stats_upload_url
     if stats_url:
       self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
+
+    # Write stats to local json file.
+    stats_json_file_name = self.get_options().stats_local_json_file
+    if stats_json_file_name:
+      self.write_stats_to_json(stats_json_file_name, stats)
 
   _log_levels = [Report.ERROR, Report.ERROR, Report.WARN, Report.INFO, Report.INFO]
 
@@ -286,7 +317,7 @@ class RunTracker(Subsystem):
         self._background_worker_pool.shutdown()
       self.end_workunit(self._background_root_workunit)
 
-    SubprocPool.shutdown(self._aborted)
+    self.shutdown_worker_pool()
 
     # Run a dummy work unit to write out one last timestamp.
     with self.new_workunit("complete"):
@@ -311,8 +342,13 @@ class RunTracker(Subsystem):
   def end_workunit(self, workunit):
     self.report.end_workunit(workunit)
     path, duration, self_time, is_tool = workunit.end()
-    self.cumulative_timings.add_timing(path, duration, is_tool)
-    self.self_timings.add_timing(path, self_time, is_tool)
+
+    # These three operations may not be thread-safe, and workunits may run in separate threads
+    # and thus end concurrently, so we want to lock these operations.
+    with self._stats_lock:
+      self.cumulative_timings.add_timing(path, duration, is_tool)
+      self.self_timings.add_timing(path, self_time, is_tool)
+      self.outcomes[path] = workunit.outcome_string(workunit.outcome())
 
   def get_background_root_workunit(self):
     if self._background_root_workunit is None:
@@ -328,3 +364,10 @@ class RunTracker(Subsystem):
                                                 run_tracker=self,
                                                 num_workers=self._num_background_workers)
     return self._background_worker_pool
+
+  def shutdown_worker_pool(self):
+    """Shuts down the SubprocPool.
+
+    N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
+    """
+    SubprocPool.shutdown(self._aborted)

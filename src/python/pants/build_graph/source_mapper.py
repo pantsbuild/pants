@@ -9,7 +9,7 @@ import os
 from collections import defaultdict
 
 from pants.base.build_environment import get_buildroot
-from pants.base.payload_field import DeferredSourcesField
+from pants.source.payload_fields import DeferredSourcesField
 
 
 class SourceMapper(object):
@@ -68,7 +68,7 @@ class SpecSourceMapper(SourceMapper):
         if target.has_resources:
           for resource in target.resources:
             """
-            :type resource: pants.backend.core.targets.resources.Resources
+            :type resource: pants.build_graph.resources.Resources
             """
             if resource.payload.sources.matches(source):
               yield address

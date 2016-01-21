@@ -14,7 +14,10 @@ jvm_app(name='bundle',
 jvm_binary(name = 'bundle-bin',
   source = 'BundleMain.java',
   main = 'org.pantsbuild.testproject.bundle.BundleMain',
-  basename = 'bundle-example',
+  basename = 'bundle-example-bin',
+  resources = [
+    'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
+  ],
   dependencies = [
     '3rdparty:guava',
   ]

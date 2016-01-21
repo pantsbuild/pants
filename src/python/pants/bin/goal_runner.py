@@ -29,9 +29,9 @@ from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.logging.setup import setup_logging
-from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
@@ -61,10 +61,7 @@ class OptionsInitializer(object):
     """Sets global logging."""
     # N.B. quiet help says 'Squelches all console output apart from errors'.
     level = 'ERROR' if global_options.quiet else global_options.level.upper()
-    setup_logging(level, log_dir=global_options.logdir)
-
-    # This routes warnings through our loggers instead of straight to raw stderr.
-    logging.captureWarnings(True)
+    setup_logging(level, console_stream=sys.stderr, log_dir=global_options.logdir)
 
   def _register_options(self, subsystems, options):
     """Registers global options."""
@@ -231,10 +228,19 @@ class GoalRunnerFactory(object):
           if tag_filter(target):
             self._targets.append(target)
 
+  def _maybe_launch_pantsd(self):
+    """Launches pantsd if configured to do so."""
+    if self._global_options.enable_pantsd:
+      # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
+      with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
+        PantsDaemonLauncher.global_instance().maybe_launch()
+
   def _is_quiet(self):
     return any(goal.has_task_of_type(QuietTaskMixin) for goal in self._goals) or self._explain
 
   def _setup_context(self):
+    self._maybe_launch_pantsd()
+
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._expand_goals(self._requested_goals)
       self._expand_specs(self._target_specs, self._fail_fast)
@@ -294,7 +300,7 @@ class GoalRunner(object):
   @classmethod
   def subsystems(cls):
     # Subsystems used outside of any task.
-    return {SourceRootConfig, Reporting, Reproducer, RunTracker}
+    return {SourceRootConfig, Reporting, Reproducer, RunTracker, PantsDaemonLauncher}
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir

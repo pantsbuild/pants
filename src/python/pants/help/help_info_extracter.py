@@ -14,7 +14,7 @@ from pants.option.option_util import is_boolean_flag
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
     ['registering_class', 'display_args', 'scoped_cmd_line_args', 'unscoped_cmd_line_args',
      'typ', 'fromfile', 'default', 'help', 'deprecated_version', 'deprecated_message',
-     'deprecated_hint'])):
+     'deprecated_hint', 'choices'])):
   """A container for help information for a single option.
 
   registering_class: The type that registered the option.
@@ -31,8 +31,11 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   deprecated_version: The version at which this option is to be removed, if any (None otherwise).
   deprecated_message: A more verbose message explaining the deprecated_version (None otherwise).
   deprecated_hint: A deprecation hint message registered for this option (None otherwise).
+  choices: If this option has a constrained list of choices, a csv list of the choices.
   """
-  pass
+
+  def comma_separated_display_args(self):
+    return ', '.join(self.display_args)
 
 
 class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
@@ -61,7 +64,7 @@ class HelpInfoExtracter(object):
     """Compute the default value to display in help for an option registered with these kwargs."""
     ranked_default = kwargs.get('default')
     action = kwargs.get('action')
-    typ = kwargs.get('type', str)
+    typ = None if action in ['store_true', 'store_false'] else kwargs.get('type', str)
 
     default = ranked_default.value if ranked_default else None
     if default is None:
@@ -72,11 +75,13 @@ class HelpInfoExtracter(object):
       else:
         return 'None'
 
-    if typ == list_option:
+    if typ == list_option or action == 'append':
       default_str = '[{}]'.format(','.join(["'{}'".format(s) for s in default]))
     elif typ == dict_option:
       default_str = '{{ {} }}'.format(
         ','.join(["'{}':'{}'".format(k, v) for k, v in default.items()]))
+    elif typ == str:
+      default_str = "'{}'".format(default).replace('\n', ' ')
     else:
       default_str = str(default)
     return default_str
@@ -159,6 +164,7 @@ class HelpInfoExtracter(object):
     deprecated_message = ('DEPRECATED. Will be removed in version {}.'.format(deprecated_version)
                           if deprecated_version else None)
     deprecated_hint = kwargs.get('deprecated_hint')
+    choices = ', '.join(kwargs.get('choices')) if kwargs.get('choices') else None
 
     ret = OptionHelpInfo(registering_class=kwargs.get('registering_class', type(None)),
                          display_args=display_args,
@@ -170,5 +176,6 @@ class HelpInfoExtracter(object):
                          help=help_msg,
                          deprecated_version=deprecated_version,
                          deprecated_message=deprecated_message,
-                         deprecated_hint=deprecated_hint)
+                         deprecated_hint=deprecated_hint,
+                         choices=choices)
     return ret

@@ -74,6 +74,15 @@ python_library(
 )
 
 python_library(
+  name='products',
+  sources=['products.py'],
+  dependencies=[
+    'src/python/pants/engine/exp:targets',
+    'src/python/pants/util:memo',
+  ],
+)
+
+python_library(
   name='scheduler',
   sources=['scheduler.py'],
   dependencies=[
@@ -82,6 +91,8 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:addressable',
     'src/python/pants/engine/exp:objects',
+    'src/python/pants/engine/exp:products',
+    'src/python/pants/engine/exp:targets',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ]
@@ -93,5 +104,6 @@ python_library(
   dependencies=[
     ':addressable',
     ':configuration',
+    'src/python/pants/source',
   ]
 )

@@ -5,11 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.core.wrapped_globs import Globs
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.source.wrapped_globs import Globs
 from pants_test.base_test import BaseTest
 
 
@@ -19,10 +19,11 @@ class PayloadTest(BaseTest):
   def alias_groups(self):
     return BuildFileAliases(
       targets={
+        # TODO: Use a dummy task type here, instead of depending on the jvm backend.
         'java_library': JavaLibrary,
       },
       context_aware_object_factories={
-        'globs': Globs.factory,
+        'globs': Globs,
       },
     )
 

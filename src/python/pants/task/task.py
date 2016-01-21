@@ -10,7 +10,7 @@ import sys
 from abc import abstractmethod
 from contextlib import contextmanager
 from hashlib import sha1
-from itertools import chain, repeat
+from itertools import repeat
 
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
@@ -53,8 +53,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   """
   options_scope_category = ScopeInfo.TASK
 
-  # Tests may override this to provide a stable name despite the class name being a unique,
-  # synthetic name.
+  # We set this explicitly on the synthetic subclass, so that it shares a stable name with
+  # its superclass, which is not necessary for regular use, but can be convenient in tests.
   _stable_name = None
 
   @classmethod
@@ -223,6 +223,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     if not self._fingerprint:
       hasher = sha1()
       hasher.update(self._options_fingerprint(self.options_scope))
+      # TODO: this is not recursive, but should be: see #2739
       for dep in self.subsystem_dependencies_iter():
         hasher.update(self._options_fingerprint(dep.options_scope()))
       self._fingerprint = str(hasher.hexdigest())

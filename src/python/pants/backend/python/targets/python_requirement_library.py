@@ -13,7 +13,7 @@ from pants.build_graph.target import Target
 
 
 class PythonRequirementLibrary(Target):
-  """Named target for some pip requirements."""
+  """A set of pip requirements."""
 
   def __init__(self, payload=None, requirements=None, **kwargs):
     """

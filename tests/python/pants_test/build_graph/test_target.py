@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os.path
 
 from pants.base.payload import Payload
-from pants.base.payload_field import DeferredSourcesField
 from pants.build_graph.target import Target
+from pants.source.payload_fields import DeferredSourcesField
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
@@ -38,6 +38,20 @@ class TargetTest(BaseTest):
     self.assertEquals(list(syn_one.derived_from_chain), [concrete])
     self.assertEquals(list(concrete.derived_from_chain), [])
 
+  def test_is_synthetic(self):
+    # add concrete target
+    concrete = self.make_target('y:concrete', Target)
+
+    # add synthetic targets
+    syn_one = self.make_target('y:syn_one', Target, derived_from=concrete)
+    syn_two = self.make_target('y:syn_two', Target, derived_from=syn_one)
+    syn_three = self.make_target('y:syn_three', Target, synthetic=True)
+
+    self.assertFalse(concrete.is_synthetic)
+    self.assertTrue(syn_one.is_synthetic)
+    self.assertTrue(syn_two.is_synthetic)
+    self.assertTrue(syn_three.is_synthetic)
+
   def test_empty_traversable_properties(self):
     target = self.make_target(':foo', Target)
     self.assertSequenceEqual([], list(target.traversable_specs))
@@ -49,7 +63,7 @@ class TargetTest(BaseTest):
                               TestDeferredSourcesTarget,
                               deferred_sources_address=foo.address)
     self.assertSequenceEqual([], list(target.traversable_specs))
-    self.assertSequenceEqual([':foo'], list(target.traversable_dependency_specs))
+    self.assertSequenceEqual(['//:foo'], list(target.traversable_dependency_specs))
 
   def test_illegal_kwargs(self):
     with subsystem_instance(Target.UnknownArguments):

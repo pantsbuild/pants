@@ -1,0 +1,14 @@
+{
+  "type_alias": "target",
+  "name": "consumes_resources",
+  "dependencies": [
+    "3rdparty/jvm:guava",
+    "src/resources/simple"
+  ],
+  "configurations": [
+    {
+      "type_alias": "java",
+      "files": ["UseAResource.java"]
+    }
+  ]
+}
