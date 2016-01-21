@@ -192,9 +192,6 @@ class BuildFileParserExposedObjectTest(BaseTest):
   def alias_groups(self):
     return BuildFileAliases(objects={'fake_object': object()})
 
-  def create_buildfile(self, path, must_exist=True):
-    return
-
   def test_exposed_object(self):
     self.add_to_build_file('BUILD', """fake_object""")
     build_file = BuildFile(FileSystemProjectTree(self.build_root), 'BUILD')

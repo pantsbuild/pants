@@ -58,9 +58,9 @@ class BuildFileAddressMapper(object):
     if isinstance(project_tree, ProjectTree):
       self._project_tree = project_tree
     else:
-      # If filesystem is BuildFile class actually.
+      # If project_tree is BuildFile class actually.
       # TODO(tabishev): Remove after transition period.
-      self._project_tree = project_tree._cls_project_tree
+      self._project_tree = project_tree._get_project_tree(self.root_dir)
 
   @property
   def root_dir(self):

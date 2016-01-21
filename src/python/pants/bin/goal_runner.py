@@ -191,7 +191,7 @@ class GoalRunnerFactory(object):
     )
 
   def _get_project_tree(self, build_file_rev):
-    """Selects the file system for build files for use in a given pants run."""
+    """Creates the project tree for build files for use in a given pants run."""
     if build_file_rev:
       return ScmProjectTree(self._root_dir, get_scm(), build_file_rev)
     else:

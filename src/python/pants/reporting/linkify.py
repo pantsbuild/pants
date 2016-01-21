@@ -9,10 +9,10 @@ import os
 import re
 
 from pants.base.build_file import BuildFile
-# A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
 from pants.base.project_tree import FileSystemProjectTree
 
 
+# A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
 _PREFIX = r'(https?://)?/?'  # http://, https:// or / or nothing.
 _OPTIONAL_PORT = r'(:\d+)?'
 _REL_PATH_COMPONENT = r'(\w|[-.])+'  # One or more alphanumeric, underscore, dash or dot.
