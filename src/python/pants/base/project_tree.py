@@ -53,7 +53,7 @@ class ProjectTree(AbstractClass):
     """Returns True if path exists"""
 
   @abstractmethod
-  def content(self, path):
+  def content(self, file_relpath):
     """Returns the content for file at path."""
 
   def __ne__(self, other):
@@ -67,8 +67,8 @@ class FileSystemProjectTree(ProjectTree):
   def glob1(self, dir_relpath, glob):
     return glob1(os.path.join(self.build_root, dir_relpath), glob)
 
-  def content(self, path):
-    with open(path, 'rb') as source:
+  def content(self, file_relpath):
+    with open(os.path.join(self.build_root, file_relpath), 'rb') as source:
       return source.read()
 
   def isdir(self, path):
