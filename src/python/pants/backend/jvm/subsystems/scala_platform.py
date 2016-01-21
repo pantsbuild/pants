@@ -48,11 +48,7 @@ scala_build_info = {
 
 
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
-  """A scala platform.
-
-  TODO: Rework so there's a way to specify a default as direct pointers to jar coordinates,
-  so we don't require specs in BUILD.tools if the default is acceptable.
-  """
+  """A scala platform."""
 
   options_scope = 'scala-platform'
 
@@ -121,7 +117,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register_scala_compiler('2.11')
     register_scala_compiler('custom')  # This will register default tools
 
-    #Register repl tools.
+    # Register repl tools.
     jline_dep = JarDependency(
         org = 'org.scala-lang',
         name = 'jline',
@@ -164,7 +160,12 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       if suffix:
         return '{0}_{1}'.format(name, suffix)
       else:
-        raise RuntimeError('Suffix version must be specified if using a custom version.')
+        raise RuntimeError('Suffix version must be specified if using a custom scala version.'
+                           'Suffix version is used for bootstrapping jars.  If a custom '
+                           'scala version is not specified, then the version specified in '
+                           '--scala-platform-suffix-version is used.  For example for Scala '
+                           '2.10.7 you would use the suffix version "2.10"'
+              )
 
     if name.endswith(self.version):
       raise ValueError('The name "{0}" should not be suffixed with the scala platform version '
