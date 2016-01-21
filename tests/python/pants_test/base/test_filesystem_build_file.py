@@ -36,10 +36,12 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
-    ]), self.buildfile.family())
+    ]), BuildFile.get_project_tree_build_files_family(self._project_tree, 'grandparent/parent'))
 
     buildfile = self.create_buildfile('grandparent/parent/child2/child3/BUILD')
-    self.assertEquals(OrderedSet([buildfile]), buildfile.family())
+    self.assertEquals(OrderedSet([buildfile]),
+                      BuildFile.get_project_tree_build_files_family(self._project_tree,
+                                                                    'grandparent/parent/child2/child3'))
 
   def testAncestors(self):
     self.assertEquals(OrderedSet([
@@ -86,7 +88,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         OrderedSet(buildfile.siblings()))
     self.assertEquals(OrderedSet([self.create_buildfile('suffix-test/BUILD.suffix'),
         self.create_buildfile('suffix-test/BUILD.suffix2')]),
-        buildfile.family())
+        BuildFile.get_project_tree_build_files_family(self._project_tree, 'suffix-test'))
     self.assertEquals(OrderedSet([self.create_buildfile('suffix-test/child/BUILD.suffix3')]),
         buildfile.descendants())
 
@@ -172,8 +174,8 @@ class FilesystemBuildFileTest(BuildFileTestBase):
                       buildfiles)
 
   def test_dir_is_primary(self):
-    buildfile = self.create_buildfile('issue_1742')
-    self.assertEqual([self.create_buildfile('issue_1742/BUILD.sibling')], list(buildfile.family()))
+    self.assertEqual([self.create_buildfile('issue_1742/BUILD.sibling')],
+                     list(BuildFile.get_project_tree_build_files_family(self._project_tree, 'issue_1742')))
 
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')

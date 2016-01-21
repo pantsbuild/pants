@@ -245,7 +245,7 @@ class BuildFile(AbstractClass):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
         yield BuildFile.cached(project_tree, os.path.join(dir_relpath, build))
 
-  # todo: deprecate
+  @deprecated('0.0.72', hint_message='Use get_project_tree_build_files_family instead.')
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
     BUILD file itself.  The family forms a single logical BUILD file composed of the canonical BUILD
