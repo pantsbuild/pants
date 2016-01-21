@@ -45,7 +45,7 @@ class ProjectTree(AbstractClass):
     raise NotImplementedError()
 
   @abstractmethod
-  def isfile(self, path):
+  def isfile(self, relpath):
     """Returns True if path is a file"""
 
   @abstractmethod
@@ -74,8 +74,8 @@ class FileSystemProjectTree(ProjectTree):
   def isdir(self, path):
     return os.path.isdir(path)
 
-  def isfile(self, path):
-    return os.path.isfile(path)
+  def isfile(self, relpath):
+    return os.path.isfile(os.path.join(self.build_root, relpath))
 
   def exists(self, relpath):
     return os.path.exists(os.path.join(self.build_root, relpath))

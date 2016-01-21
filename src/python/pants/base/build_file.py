@@ -55,9 +55,9 @@ class BuildFile(AbstractClass):
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
-    for build in self.project_tree.glob1(os.path.relpath(path, self.root_dir),
-                                         '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
-      if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(path, build)):
+    relpath = os.path.relpath(path, self.root_dir)
+    for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+      if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(relpath, build)):
         results.append(build)
     return sorted(results)
 
@@ -197,7 +197,7 @@ class BuildFile(AbstractClass):
 
   def file_exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
-    return self.project_tree.isfile(self.full_path)
+    return self.project_tree.exists(self.relpath) and self.project_tree.isfile(self.relpath)
 
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""

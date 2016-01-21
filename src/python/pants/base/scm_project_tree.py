@@ -45,10 +45,9 @@ class ScmProjectTree(ProjectTree):
     relpath = os.path.relpath(path, self._scm_worktree())
     return self._reader.isdir(relpath)
 
-  def isfile(self, path):
+  def isfile(self, relpath):
     """Returns True if path is a file"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.isfile(relpath)
+    return self._reader.isfile(self._scm_relpath(relpath))
 
   def exists(self, relpath):
     """Returns True if path exists"""
