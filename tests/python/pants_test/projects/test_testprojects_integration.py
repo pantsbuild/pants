@@ -26,8 +26,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
       'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
-      # This won't work without special config until https://rbcommons.com/s/twitter/r/3367/ lands.
-      'testprojects/3rdparty/managed',
     ]
 
     # Targets that are intended to fail
@@ -52,6 +50,9 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/python/pants/dummies:failing_target',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
+      # These don't pass without special config.
+      'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
+      'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
     ]
 
     # May not succeed without java8 installed

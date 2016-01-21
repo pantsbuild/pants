@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
                                                                 ManagedJarLibraries)
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.build_graph.target import Target
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
@@ -30,6 +31,14 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     scoped_options = {'jar-dependency-management': options}
     with subsystem_instance(JarDependencyManagement, **scoped_options) as manager:
       yield manager
+
+  def _single_artifact_set(self, manager, targets):
+    sets = manager.targets_by_artifact_set(targets)
+    sets = {a: tgts for a, tgts in sets.items()
+            if any(isinstance(t, JarLibrary) for t in tgts)}
+    if len(sets) != 1:
+      raise ValueError('Test expected there to be only one artifact set! {}'.format(sets))
+    return next(iter(sets))
 
   def test_default_target(self):
     default_target = self.make_target(spec='//foo:management',
@@ -240,7 +249,38 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     with self._subsystem(default_target='//foo:management') as manager:
       task = self.create_task(context)
       task.execute()
-      artifact_set = manager.for_targets([jar_library1, jar_library2, unpacked_target])
+      artifact_set = self._single_artifact_set(manager, [jar_library1, jar_library2,
+                                                         unpacked_target])
+      self.assertFalse(artifact_set is None)
+      self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+
+  def test_indirection(self):
+    management_target = self.make_target(
+      target_type=ManagedJarDependencies,
+      spec='//foo:management_indirect',
+      artifacts=[
+        JarDependency(org='foobar', name='foobar', rev='2'),
+      ],
+    )
+    default_target = self.make_target(
+      target_type=Target,
+      spec='//foo:management',
+      dependencies=[
+        management_target,
+      ],
+    )
+    jar_library1 = self.make_target(
+      target_type=JarLibrary,
+      spec='//foo:library',
+      jars=[
+        JarDependency(org='foobar', name='foobar'),
+      ],
+    )
+    context = self.context(target_roots=[default_target, jar_library1, management_target])
+    with self._subsystem(default_target='//foo:management') as manager:
+      task = self.create_task(context)
+      task.execute()
+      artifact_set = self._single_artifact_set(manager, [jar_library1])
       self.assertFalse(artifact_set is None)
       self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
 
@@ -263,3 +303,107 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
           JarDependency(org='fruit', name='apple', rev='2', classifier='orange'),
         ],
       )
+
+  def test_simple_dependency_override(self):
+    management_target = self.make_target(
+      target_type=ManagedJarDependencies,
+      spec='//foo:management_indirect',
+      artifacts=[
+        JarDependency(org='foobar', name='foobar', rev='2'),
+        JarDependency(org='barfoo', name='barfoo', rev='1'),
+        JarDependency(org='foobar', name='foobar', rev='7', ext='tar'),
+      ],
+    )
+    default_target = self.make_target(
+      target_type=ManagedJarDependencies,
+      spec='//foo:management',
+      artifacts=[
+        JarDependency(org='foobar', name='foobar', rev='3'),
+        JarDependency(org='fruit', name='apple', rev='4'),
+      ],
+      dependencies=[
+        management_target,
+      ],
+    )
+    jar_library1 = self.make_target(
+      target_type=JarLibrary,
+      spec='//foo:library',
+      jars=[
+        JarDependency(org='foobar', name='foobar'),
+      ],
+    )
+
+    def check_task_execution(manager):
+      context = self.context(target_roots=[default_target, jar_library1, management_target])
+      task = self.create_task(context)
+      task.execute()
+      artifact_set = self._single_artifact_set(manager, [jar_library1])
+      self.assertFalse(artifact_set is None)
+      self.assertEquals('3', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+      self.assertEquals('1', artifact_set[M2Coordinate('barfoo', 'barfoo')].rev)
+      self.assertEquals('4', artifact_set[M2Coordinate('fruit', 'apple')].rev)
+      self.assertEquals('7', artifact_set[M2Coordinate('foobar', 'foobar', ext='tar')].rev)
+
+    with self._subsystem(default_target='//foo:management') as manager:
+      with self.assertRaises(JarDependencyManagementSetup.IllegalVersionOverride):
+        check_task_execution(manager)
+
+  def test_double_dependency_override(self):
+    management_target = self.make_target(
+      target_type=ManagedJarDependencies,
+      spec='//foo:management_indirect',
+      artifacts=[
+        JarDependency(org='foobar', name='foobar', rev='2'),
+        JarDependency(org='barfoo', name='barfoo', rev='1'),
+        JarDependency(org='foobar', name='foobar', rev='7', ext='tar'),
+      ],
+    )
+    management_target2 = self.make_target(
+      target_type=ManagedJarDependencies,
+      spec='//foo:management_indirect2',
+      artifacts=[
+        JarDependency(org='foobar', name='foobar', rev='7', ext='tar'),
+      ],
+    )
+    indirection_2 = self.make_target(
+      target_type=Target,
+      spec='//foo:indirection_2',
+      dependencies=[
+        management_target2,
+      ],
+    )
+    default_target = self.make_target(
+      target_type=ManagedJarDependencies,
+      spec='//foo:management',
+      artifacts=[
+        JarDependency(org='foobar', name='foobar', rev='3'),
+        JarDependency(org='fruit', name='apple', rev='4'),
+      ],
+      dependencies=[
+        management_target,
+        indirection_2,
+      ],
+    )
+    jar_library1 = self.make_target(
+      target_type=JarLibrary,
+      spec='//foo:library',
+      jars=[
+        JarDependency(org='foobar', name='foobar'),
+      ],
+    )
+
+    def check_task_execution(manager):
+      context = self.context(target_roots=[default_target, jar_library1, management_target,
+                                           management_target2, indirection_2])
+      task = self.create_task(context)
+      task.execute()
+      artifact_set = self._single_artifact_set(manager, [jar_library1])
+      self.assertFalse(artifact_set is None)
+      self.assertEquals('3', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+      self.assertEquals('1', artifact_set[M2Coordinate('barfoo', 'barfoo')].rev)
+      self.assertEquals('4', artifact_set[M2Coordinate('fruit', 'apple')].rev)
+      self.assertEquals('7', artifact_set[M2Coordinate('foobar', 'foobar', ext='tar')].rev)
+
+    with self._subsystem(default_target='//foo:management') as manager:
+      with self.assertRaises(JarDependencyManagementSetup.IllegalVersionOverride):
+        check_task_execution(manager)

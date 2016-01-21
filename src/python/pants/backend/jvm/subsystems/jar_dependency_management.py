@@ -173,33 +173,6 @@ class JarDependencyManagement(Subsystem):
       sets_to_targets[self.for_target(target)].append(target)
     return dict(sets_to_targets)
 
-  def for_targets(self, targets):
-    """Attempts to find a single PinnedJarArtifactSet that works for all input targets.
-
-    This just partitions the targets using the targets_by_artifact_set partitioning logic, and
-    returns the key that works for all targets (ie the only key in the resulting map).
-
-    Returns None if the resulting map has no entries, and raises an error if it has more than one.
-
-    :param list targets: the input targets.
-    :return: the single PinnedJarArtifactSet that works for everything, or None.
-    :rtype: PinnedJarArtifactSet
-    :raises: JarDependencyManagement.IncompatibleManagedJarDependencies
-    """
-    # TODO(gmalmquist): Remove this method once we properly run multiple ivy resolves for different
-    # sets of pinned artifacts.
-    sets_to_targets = self.targets_by_artifact_set(targets)
-    sets = [artifact_set for artifact_set in sets_to_targets
-            if any(isinstance(target, JarLibrary) for target in sets_to_targets[artifact_set])]
-    if not sets:
-      return None
-    if len(sets) == 1:
-      return next(iter(sets))
-    raise self.IncompatibleManagedJarDependencies(
-      'Targets use multiple incompatible managed_jar_dependencies: {}'
-      .format(', '.join(map(str, sets)))
-    )
-
   def for_target(self, target):
     """Computes and returns the PinnedJarArtifactSet that should be used to manage the given target.
 
@@ -332,6 +305,10 @@ class JarDependencyManagementSetup(Task):
         )
       )
 
+  class IllegalVersionOverride(TaskError):
+    """An artifact version in a managed_jar_dependencies() target differs from that of a dependency.
+    """
+
   class MissingVersion(TargetDefinitionException):
     """A jar used to construct a managed_jar_dependencies artifact set is missing a version."""
 
@@ -355,15 +332,6 @@ class JarDependencyManagementSetup(Task):
       if library.managed_dependencies:
         targets.add(library.managed_dependencies)
     self._compute_artifact_sets(targets)
-    self._validate_managed_jar_dependencies_targets(targets)
-
-  def _validate_managed_jar_dependencies_targets(self, targets):
-    for target in targets:
-      if target.dependencies:
-        # TODO(gmalmquist): Remove this when we handle merging of transitive
-        # managed_jar_dependencies.
-        self.context.warn('{}: Chaining managed_jar_dependencies objects is not yet supported.'
-                          .format(target.address.spec))
 
   def _resolve_default_target(self):
     manager = JarDependencyManagement.global_instance()
@@ -377,9 +345,10 @@ class JarDependencyManagementSetup(Task):
         'Unable to resolve default managed_jar_dependencies target: {}'.format(spec))
     target = targets[0]
     if not isinstance(target, ManagedJarDependencies):
-      raise self.InvalidDefaultTarget(
-        'Default managed_jar_dependencies target is an invalid target type: "{}" is a {}.'
-        .format(spec, type(target).__name__))
+      if not any(isinstance(t, ManagedJarDependencies) for t in target.closure()):
+        raise self.InvalidDefaultTarget(
+          'Neither the default target nor any of its transitive dependencies is a '
+          'managed_jar_dependencies() target! "{}" is a {}.'.format(spec, type(target).__name__))
     manager._artifact_set_map[target.id] = self._compute_artifact_set(target)
     manager._default_target = target
 
@@ -407,16 +376,56 @@ class JarDependencyManagementSetup(Task):
                                         'Artifacts must be jar() objects or the addresses of '
                                         'jar_library objects.')
 
-  def _compute_artifact_set(self, managed_jar_dependencies):
-    # TODO(gmalmquist): Extend this to be the union of any pinned artifacts from transitive
-    # dependencies of this managed_jar_dependencies object. If there are conflicts between the versions
-    # specified by parents and children, the children should win.
+  def _compute_artifact_set(self, management_target):
+    """Computes the set of pinned artifacts specified by this target, and any of its dependencies.
+
+    An error is raised if a conflict exists between a pinned version between a
+    ManagedJarDependencies target and any of its dependencies, or if two versions of a jar exist in
+    the same ManagedJarDependencies target.
+
+    :param Target management_target: a target object which is (or at least depends on) a
+      ManagedJarDependencies target.
+    :return: the computed transitive artifact set (approximately the union of all pinned artifacts
+      in the transitive closure of the input target).
+    :rtype: PinnedJarArtifactSet
+    """
     artifact_set = PinnedJarArtifactSet()
-    for jar in self._jar_iterator(managed_jar_dependencies):
-      if jar.rev is None:
-        raise self.MissingVersion(managed_jar_dependencies, jar)
-      if jar in artifact_set and artifact_set[jar].rev != jar.rev:
-        raise self.DuplicateCoordinateError(managed_jar_dependencies, jar, artifact_set[jar].rev,
-                                            jar.rev)
-      artifact_set.put(jar)
+
+    # Keeps track of where pinned artifacts came from for logging purposes.
+    specs_by_coordinate = {}
+
+    def handle_managed_jar_dependencies(target):
+      subset = PinnedJarArtifactSet()
+      for jar in self._jar_iterator(target):
+        if jar.rev is None:
+          raise self.MissingVersion(target, jar)
+        if jar in subset and subset[jar].rev != jar.rev:
+          raise self.DuplicateCoordinateError(target, jar, artifact_set[jar].rev, jar.rev)
+        subset.put(jar)
+      return subset
+
+    def handle_conflict(artifact, target):
+      previous_coord = artifact_set[artifact]
+      previous_spec = specs_by_coordinate[previous_coord]
+      message = ('Artifact {previous_coord} (from {previous_target}) overridden by {new_coord} '
+                 '(in {new_target}).'.format(previous_coord=previous_coord,
+                                             previous_target=previous_spec,
+                                             new_coord=artifact,
+                                             new_target=target.address.spec))
+      raise self.IllegalVersionOverride(message)
+
+    def handle_target(target):
+      if not isinstance(target, ManagedJarDependencies):
+        return
+      for artifact in handle_managed_jar_dependencies(target):
+        if artifact.rev != artifact_set[artifact].rev:
+          handle_conflict(artifact, target)
+        specs_by_coordinate[M2Coordinate.create(artifact)] = target.address.spec
+        artifact_set.put(artifact)
+
+    self.context.build_graph.walk_transitive_dependency_graph(
+      addresses=[management_target.address],
+      work=handle_target,
+      postorder=True, # Process dependencies first.
+    )
     return artifact_set
