@@ -31,33 +31,23 @@ class ScmProjectTree(ProjectTree):
     return os.path.relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree())
 
   def glob1(self, dir_relpath, glob):
-    """Returns a list of paths in path that match glob"""
     files = self._reader.listdir(self._scm_relpath(dir_relpath))
     return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
 
   def content(self, file_relpath):
-    """Returns the source code for this BUILD file."""
     with self._reader.open(self._scm_relpath(file_relpath)) as source:
       return source.read()
 
   def isdir(self, relpath):
-    """Returns True if path is a directory"""
     return self._reader.isdir(self._scm_relpath(relpath))
 
   def isfile(self, relpath):
-    """Returns True if path is a file"""
     return self._reader.isfile(self._scm_relpath(relpath))
 
   def exists(self, relpath):
-    """Returns True if path exists"""
     return self._reader.exists(self._scm_relpath(relpath))
 
   def walk(self, relpath, topdown=True):
-    """Walk a file tree.  If relpath is non-empty, the absolute path of the
-    tree is root_dir/relpath; else it is just root_dir.
-
-    Works like os.walk.
-    """
     worktree = self._scm_worktree()
     for path, dirnames, filenames in self._do_walk(self._scm_relpath(relpath), topdown=topdown):
       yield (os.path.relpath(os.path.join(worktree, path), self.build_root), dirnames, filenames)
