@@ -121,7 +121,7 @@ class BuildFile(AbstractClass):
 
     root_dir = os.path.realpath(project_tree.build_root)
 
-    if base_path and not project_tree.isdir(os.path.join(root_dir, base_path)):
+    if base_path and not project_tree.isdir(base_path):
       raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
                               .format(base_path))
 
@@ -162,24 +162,29 @@ class BuildFile(AbstractClass):
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
-    buildfile = os.path.join(path, self._build_basename) if project_tree.isdir(path) else path
+    if project_tree.isdir(os.path.relpath(path, self.root_dir)):
+      buildfile = os.path.join(path, self._build_basename)
+    else:
+      buildfile = path
 
     # There is no BUILD file without a prefix so select any viable sibling
-    if not project_tree.exists(os.path.relpath(buildfile, self.root_dir)) or project_tree.isdir(buildfile):
+    buildfile_relpath = os.path.relpath(buildfile, self.root_dir)
+    if not project_tree.exists(buildfile_relpath) or project_tree.isdir(buildfile_relpath):
       for build in self._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
+        buildfile_relpath = os.path.relpath(buildfile, self.root_dir)
         break
 
     if must_exist:
-      if not project_tree.exists(os.path.relpath(buildfile, self.root_dir)):
+      if not project_tree.exists(buildfile_relpath):
         raise self.MissingBuildFileError('BUILD file does not exist at: {path}'
                                          .format(path=buildfile))
 
       # If a build file must exist then we want to make sure it's not a dir.
       # In other cases we are ok with it being a dir, for example someone might have
       # repo/scripts/build/doit.sh.
-      if project_tree.isdir(buildfile):
+      if project_tree.isdir(buildfile_relpath):
         raise self.MissingBuildFileError('Path to buildfile ({buildfile}) is a directory, '
                                          'but it must be a file.'.format(buildfile=buildfile))
 

@@ -40,10 +40,9 @@ class ScmProjectTree(ProjectTree):
     with self._reader.open(self._scm_relpath(file_relpath)) as source:
       return source.read()
 
-  def isdir(self, path):
+  def isdir(self, relpath):
     """Returns True if path is a directory"""
-    relpath = os.path.relpath(path, self._scm_worktree())
-    return self._reader.isdir(relpath)
+    return self._reader.isdir(self._scm_relpath(relpath))
 
   def isfile(self, relpath):
     """Returns True if path is a file"""

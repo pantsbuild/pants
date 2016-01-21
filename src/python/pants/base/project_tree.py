@@ -40,7 +40,7 @@ class ProjectTree(AbstractClass):
     """Walk the file tree rooted at `path`.  Works like os.walk."""
 
   @abstractmethod
-  def isdir(self, path):
+  def isdir(self, relpath):
     """Returns True if path is a directory"""
     raise NotImplementedError()
 
@@ -71,8 +71,8 @@ class FileSystemProjectTree(ProjectTree):
     with open(os.path.join(self.build_root, file_relpath), 'rb') as source:
       return source.read()
 
-  def isdir(self, path):
-    return os.path.isdir(path)
+  def isdir(self, relpath):
+    return os.path.isdir(os.path.join(self.build_root, relpath))
 
   def isfile(self, relpath):
     return os.path.isfile(os.path.join(self.build_root, relpath))
