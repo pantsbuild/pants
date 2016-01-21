@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 
 from pants.build_graph.address import Address
-from pants.engine.exp.configuration import Struct
 from pants.engine.exp.objects import ValidationError
+from pants.engine.exp.struct import Struct
 
 
 class StructTest(unittest.TestCase):

@@ -11,12 +11,12 @@ python_tests(
 
 
 python_tests(
-  name='configuration',
-  sources=['test_configuration.py'],
+  name='struct`',
+  sources=['test_struct.py'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:objects',
+    'src/python/pants/engine/exp:struct',
   ]
 )
 
@@ -36,10 +36,10 @@ python_tests(
   sources=['test_graph.py'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:struct',
     'src/python/pants/engine/exp:targets',
   ]
 )
@@ -49,9 +49,9 @@ python_tests(
   sources=['test_mapper.py'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine/exp:configuration',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:struct',
     'src/python/pants/engine/exp:targets',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

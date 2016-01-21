@@ -10,7 +10,7 @@ import os
 from abc import abstractproperty
 
 from pants.engine.exp.addressable import Exactly, SubclassesOf, addressable, addressable_list
-from pants.engine.exp.configuration import Struct, StructWithDeps
+from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 
 

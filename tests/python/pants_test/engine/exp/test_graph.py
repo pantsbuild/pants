@@ -11,11 +11,11 @@ from functools import partial
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
-from pants.engine.exp.configuration import Struct, StructWithDeps
 from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
                                     Resolver)
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json, python_assignments_parser, python_callbacks_parser
+from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
 
