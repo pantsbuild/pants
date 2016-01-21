@@ -36,8 +36,8 @@ class ProjectTree(AbstractClass):
     """Returns a list of paths in path that match glob"""
 
   @abstractmethod
-  def walk(self, root_dir, relpath, topdown=False):
-    """Walk the file tree rooted at `path`.  Works like os.walk."""
+  def walk(self, relpath, topdown=True):
+    """Walk the file tree rooted at `path`.  Works like os.walk but returned root value is relative path."""
 
   @abstractmethod
   def isdir(self, relpath):
@@ -80,9 +80,9 @@ class FileSystemProjectTree(ProjectTree):
   def exists(self, relpath):
     return os.path.exists(os.path.join(self.build_root, relpath))
 
-  def walk(self, root_dir, relpath, topdown=False):
-    path = os.path.join(root_dir, relpath)
-    return safe_walk(path, topdown=True)
+  def walk(self, relpath, topdown=True):
+    for root, dirs, files in safe_walk(os.path.join(self.build_root, relpath), topdown=topdown):
+      yield os.path.relpath(root, self.build_root), dirs, files
 
   def __eq__(self, other):
     return other and (type(other) == type(self)) and (self.build_root == other.build_root)

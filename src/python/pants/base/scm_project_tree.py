@@ -52,30 +52,24 @@ class ScmProjectTree(ProjectTree):
     """Returns True if path exists"""
     return self._reader.exists(self._scm_relpath(relpath))
 
-  def walk(self, root_dir, root, topdown=False):
-    """Walk a file tree.  If root is non-empty, the absolute path of the
-    tree is root_dir/root; else it is just root_dir.
+  def walk(self, relpath, topdown=True):
+    """Walk a file tree.  If relpath is non-empty, the absolute path of the
+    tree is root_dir/relpath; else it is just root_dir.
 
     Works like os.walk.
     """
     worktree = self._scm_worktree()
-    scm_rootpath = os.path.relpath(os.path.realpath(root_dir), worktree)
+    for path, dirnames, filenames in self._do_walk(self._scm_relpath(relpath), topdown=topdown):
+      yield (os.path.relpath(os.path.join(worktree, path), self.build_root), dirnames, filenames)
 
-    if root:
-      relpath = os.path.join(scm_rootpath, root)
-    else:
-      relpath = scm_rootpath
-    for path, dirnames, filenames in self._do_walk(relpath, topdown=topdown):
-      yield (os.path.join(worktree, path), dirnames, filenames)
-
-  def _do_walk(self, root, topdown=False):
+  def _do_walk(self, scm_relpath, topdown):
     """Helper method for _walk"""
-    if self._reader.isdir(root):
+    if self._reader.isdir(scm_relpath):
       filenames = []
       dirnames = []
       dirpaths = []
-      for filename in self._reader.listdir(root):
-        path = os.path.join(root, filename)
+      for filename in self._reader.listdir(scm_relpath):
+        path = os.path.join(scm_relpath, filename)
         if self._reader.isdir(path):
           dirnames.append(filename)
           dirpaths.append(path)
@@ -83,14 +77,14 @@ class ScmProjectTree(ProjectTree):
           filenames.append(filename)
 
       if topdown:
-        yield (root, dirnames, filenames)
+        yield (scm_relpath, dirnames, filenames)
 
       for dirpath in dirpaths:
         for item in self._do_walk(dirpath, topdown=topdown):
           yield item
 
       if not topdown:
-        yield (root, dirnames, filenames)
+        yield (scm_relpath, dirnames, filenames)
 
   def __eq__(self, other):
     return other and \

@@ -142,8 +142,8 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_scan_buildfiles_exclude_abspath(self):
     buildfiles = self.scan_buildfiles(
       '', spec_excludes=[
-        os.path.join(self.root_dir, 'grandparent/parent/child1'),
-        os.path.join(self.root_dir, 'grandparent/parent/child2')
+        'grandparent/parent/child1',
+        'grandparent/parent/child2'
       ])
 
     self.assertEquals([self.create_buildfile('BUILD'),

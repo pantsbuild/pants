@@ -73,8 +73,8 @@ class BuildFile(AbstractClass):
   @classmethod
   @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
-    return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir),
-                                             base_path, spec_excludes)
+    return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir), base_path,
+                                             cls._relativize(spec_excludes, root_dir))
 
   @classmethod
   @deprecated('0.0.72', 'Use cached method instead.')
@@ -82,7 +82,7 @@ class BuildFile(AbstractClass):
     return BuildFile.cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @classmethod
-  def scan_project_tree_build_files(cls, project_tree, base_path, spec_excludes=None):
+  def scan_project_tree_build_files(cls, project_tree, base_relpath, spec_excludes=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
@@ -91,47 +91,37 @@ class BuildFile(AbstractClass):
       or paths that are relative to the root_dir.
     """
 
-    def calc_exclude_roots(root_dir, excludes):
-      """Return a map of root directories to subdirectory names suitable for a quick evaluation
-      inside safe_walk()
-      """
-      result = defaultdict(set)
-      for exclude in excludes:
-        if exclude:
-          if os.path.isabs(exclude):
-            exclude = os.path.realpath(exclude)
-          else:
-            exclude = os.path.join(root_dir, exclude)
-          if exclude.startswith(root_dir):
-            result[os.path.dirname(exclude)].add(os.path.basename(exclude))
-
+    def relativize(paths, project_tree):
+      result = []
+      for path in paths:
+        if os.path.isabs(path):
+          realpath = os.path.realpath(path)
+          if realpath.startswith(project_tree.build_root):
+            result.append(os.path.relpath(realpath, project_tree.build_root))
+        else:
+          result.append(path)
       return result
 
     def find_excluded(root, dirs, exclude_roots):
       """Removes any of the directories specified in exclude_roots from dirs.
       """
       to_remove = set()
-      for exclude_root in exclude_roots:
-        # root ends with a /, trim it off
-        if root.rstrip('/') == exclude_root:
-          for subdir in exclude_roots[exclude_root]:
-            if subdir in dirs:
-              to_remove.add(subdir)
+      for dir in dirs:
+        if os.path.join(root, dir) in exclude_roots or (root == '.' and (dir in exclude_roots)):
+          to_remove.add(dir)
       return to_remove
 
-    root_dir = os.path.realpath(project_tree.build_root)
-
-    if base_path and not project_tree.isdir(base_path):
+    if base_relpath and not project_tree.isdir(base_relpath):
       raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
-                              .format(base_path))
+                              .format(base_relpath))
 
     buildfiles = []
-    if not spec_excludes:
-      exclude_roots = {}
+    if spec_excludes:
+      exclude_roots = set(relativize(spec_excludes, project_tree))
     else:
-      exclude_roots = calc_exclude_roots(root_dir, spec_excludes)
+      exclude_roots = set()
 
-    for root, dirs, files in project_tree.walk(root_dir, base_path or '', topdown=True):
+    for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
       # For performance, ignore hidden dirs such as .git, .pants.d and .local_artifact_cache.
       # TODO: Instead of this heuristic, only walk known source_roots.  But we can't do this
@@ -141,8 +131,7 @@ class BuildFile(AbstractClass):
         dirs.remove(subdir)
       for filename in files:
         if cls._is_buildfile_name(filename):
-          buildfile_relpath = os.path.relpath(os.path.join(root, filename), root_dir)
-          buildfiles.append(BuildFile(project_tree, buildfile_relpath))
+          buildfiles.append(BuildFile(project_tree, os.path.join(root, filename)))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   def __init__(self, project_tree, relpath, must_exist=True):
@@ -207,7 +196,9 @@ class BuildFile(AbstractClass):
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_project_tree_build_files(self.project_tree, self.parent_path, spec_excludes=spec_excludes)
+    descendants = self.scan_project_tree_build_files(self.project_tree,
+                                                     os.path.relpath(self.parent_path, self.root_dir),
+                                                     spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants
