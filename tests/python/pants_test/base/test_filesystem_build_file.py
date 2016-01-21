@@ -11,7 +11,7 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile
-from pants.base.project_tree import FileSystemProjectTree
+from pants.base.project_tree import FileSystemProjectTree, ProjectTree
 from pants.util.dirutil import safe_open
 from pants_test.base.build_file_test_base import BuildFileTestBase
 
@@ -177,14 +177,13 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
-    with self.assertRaises(BuildFile.InvalidRootDirError):
+    with self.assertRaises(ProjectTree.InvalidBuildRootError):
       BuildFile(FileSystemProjectTree('tmp'), 'grandparent/BUILD')
 
   def test_exception_class_hierarchy(self):
     """Exception handling code depends on the fact that all exceptions from BuildFile are
     subclassed from the BuildFileError base class.
     """
-    self.assertIsInstance(BuildFile.InvalidRootDirError(), BuildFile.BuildFileError)
     self.assertIsInstance(BuildFile.MissingBuildFileError(), BuildFile.BuildFileError)
 
   def test_code(self):

@@ -22,11 +22,17 @@ class ProjectTree(AbstractClass):
   Have two implementations: based on file system and based on SCM.
   """
 
+  class InvalidBuildRootError(Exception):
+    """Raised when the build_root specified to a ProjectTree is not valid."""
+    pass
+
   def __init__(self, build_root):
-    self.build_root = build_root
+    if not os.path.isabs(build_root):
+      raise self.InvalidBuildRootError('ProjectTree build_root {} must be an absolute path.'.format(build_root))
+    self.build_root = os.path.realpath(build_root)
 
   @abstractmethod
-  def glob1(self, path, glob):
+  def glob1(self, dir_relpath, glob):
     """Returns a list of paths in path that match glob"""
 
   @abstractmethod
@@ -58,8 +64,8 @@ class ProjectTree(AbstractClass):
 
 
 class FileSystemProjectTree(ProjectTree):
-  def glob1(self, path, glob):
-    return glob1(path, glob)
+  def glob1(self, dir_relpath, glob):
+    return glob1(os.path.join(self.build_root, dir_relpath), glob)
 
   def content(self, path):
     with open(path, 'rb') as source:

@@ -32,10 +32,6 @@ class BuildFile(AbstractClass):
     """Raised when a BUILD file cannot be found at the path in the spec."""
     pass
 
-  class InvalidRootDirError(BuildFileError):
-    """Raised when the root_dir specified to a BUILD file is not valid."""
-    pass
-
   class BadPathError(BuildFileError):
     """Raised when scan_buildfiles is called on a nonexistent directory."""
     pass
@@ -59,7 +55,8 @@ class BuildFile(AbstractClass):
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
-    for build in self.project_tree.glob1(path, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+    for build in self.project_tree.glob1(os.path.relpath(path, self.root_dir),
+                                         '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
       if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(path, build)):
         results.append(build)
     return sorted(results)
@@ -160,14 +157,8 @@ class BuildFile(AbstractClass):
     :raises IOError: if the root_dir path is not absolute.
     :raises MissingBuildFileError: if the path does not house a BUILD file and must_exist is `True`.
     """
-    root_dir = project_tree.build_root
-
-    if not os.path.isabs(root_dir):
-      raise self.InvalidRootDirError('BuildFile root_dir {root_dir} must be an absolute path.'
-                                     .format(root_dir=root_dir))
-
     self.project_tree = project_tree
-    self.root_dir = os.path.realpath(root_dir)
+    self.root_dir = project_tree.build_root
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX

@@ -27,9 +27,9 @@ class ScmProjectTree(ProjectTree):
       cls._cached_scm_worktree = os.path.realpath(cls._scm.detect_worktree())
     return cls._cached_scm_worktree
 
-  def glob1(self, path, glob):
+  def glob1(self, dir_relpath, glob):
     """Returns a list of paths in path that match glob"""
-    relpath = os.path.relpath(path, self._scm_worktree())
+    relpath = os.path.relpath(os.path.join(self.build_root, dir_relpath), self._scm_worktree())
     files = self._reader.listdir(relpath)
     return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
 
