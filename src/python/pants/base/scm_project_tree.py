@@ -27,16 +27,17 @@ class ScmProjectTree(ProjectTree):
       cls._cached_scm_worktree = os.path.realpath(cls._scm.detect_worktree())
     return cls._cached_scm_worktree
 
+  def _scm_relpath(self, build_root_relpath):
+    return os.path.relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree())
+
   def glob1(self, dir_relpath, glob):
     """Returns a list of paths in path that match glob"""
-    relpath = os.path.relpath(os.path.join(self.build_root, dir_relpath), self._scm_worktree())
-    files = self._reader.listdir(relpath)
+    files = self._reader.listdir(self._scm_relpath(dir_relpath))
     return [filename for filename in files if fnmatch.fnmatch(filename, glob)]
 
   def content(self, file_relpath):
     """Returns the source code for this BUILD file."""
-    relpath = os.path.relpath(os.path.join(self.build_root, file_relpath), self._scm_worktree())
-    with self._reader.open(relpath) as source:
+    with self._reader.open(self._scm_relpath(file_relpath)) as source:
       return source.read()
 
   def isdir(self, path):
