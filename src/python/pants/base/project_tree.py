@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectTree(AbstractClass):
-  """A class to represent project tree which used to load build files from.
-  Have two implementations: based on file system and based on SCM.
+  """Represents project tree which is used to locate and read build files.
+  Has two implementations: one backed by file system and one backed by SCM.
   """
 
   class InvalidBuildRootError(Exception):
