@@ -107,14 +107,14 @@ class SerializableFactory(AbstractClass):
 
 
 class ValidationError(Exception):
-  """Indicates an invalid configuration was provided."""
+  """Indicates invalid fields on an object."""
 
   def __init__(self, identifier, message):
     """Creates a validation error pertaining to the identified invalid object.
 
     :param object identifier: Any object whose string representation identifies the invalid object
                               that led to this validation error.
-    :param string message: A message describing the invalid configuration.
+    :param string message: A message describing the invalid Struct field.
     """
     super(ValidationError, self).__init__('Failed to validate {id}: {msg}'
                                           .format(id=identifier, msg=message))
@@ -125,7 +125,7 @@ class Validatable(AbstractClass):
 
   @abstractmethod
   def validate(self):
-    """Check this object's configuration is valid.
+    """Check that this object's fields are valid.
 
     :raises: :class:`ValidationError` if this object is invalid.
     """
