@@ -21,3 +21,15 @@ python_tests(
     'tests/python/pants_test:base_test',
   ]
 )
+
+python_tests(
+  name = 'versioned_cache',
+  sources = ['test_versioned_cache.py'],
+  dependencies = [
+    'src/python/pants/build_graph:build_graph',
+    'src/python/pants/invalidation:invalidation',
+    'src/python/pants/task:task',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test',
+  ]
+)

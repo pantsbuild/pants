@@ -32,6 +32,14 @@ python_tests(
 )
 
 python_tests(
+  name='recursive_version',
+  sources=['test_recursive_version.py'],
+  dependencies=[
+    'src/python/pants/task',
+  ]
+)
+
+python_tests(
   name='task',
   sources=['test_task.py'],
   dependencies=[
