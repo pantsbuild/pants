@@ -41,12 +41,12 @@ class BuildFile(AbstractClass):
 
   _cache = {}
 
-  @classmethod
-  def clear_cache(cls):
+  @staticmethod
+  def clear_cache():
     BuildFile._cache = {}
 
-  @classmethod
-  def cached(cls, project_tree, relpath, must_exist=True):
+  @staticmethod
+  def cached(project_tree, relpath, must_exist=True):
     cache_key = (project_tree, relpath, must_exist)
     if cache_key not in BuildFile._cache:
       BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist)
@@ -62,9 +62,9 @@ class BuildFile(AbstractClass):
         results.append(build)
     return sorted(results)
 
-  @classmethod
-  def _is_buildfile_name(cls, name):
-    return cls._PATTERN.match(name)
+  @staticmethod
+  def _is_buildfile_name(name):
+    return BuildFile._PATTERN.match(name)
 
   # TODO(tabishev): Remove after transition period.
   @classmethod
@@ -83,8 +83,8 @@ class BuildFile(AbstractClass):
   def from_cache(cls, root_dir, relpath, must_exist=True):
     return BuildFile.cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
-  @classmethod
-  def scan_project_tree_build_files(cls, project_tree, base_relpath, spec_excludes=None):
+  @staticmethod
+  def scan_project_tree_build_files(project_tree, base_relpath, spec_excludes=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
@@ -115,8 +115,8 @@ class BuildFile(AbstractClass):
       raise Exception('base_relpath parameter should be a relative path.')
 
     if base_relpath and not project_tree.isdir(base_relpath):
-      raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
-                              .format(base_relpath))
+      raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir'
+                                   .format(base_relpath))
 
     buildfiles = []
     if spec_excludes:
@@ -131,7 +131,7 @@ class BuildFile(AbstractClass):
       for subdir in to_remove:
         dirs.remove(subdir)
       for filename in files:
-        if cls._is_buildfile_name(filename):
+        if BuildFile._is_buildfile_name(filename):
           buildfiles.append(BuildFile.cached(project_tree, os.path.join(root, filename)))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
