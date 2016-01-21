@@ -48,7 +48,7 @@ class SpecSourceMapper(SourceMapper):
     # a top-level source has empty dirname, so do/while instead of straight while loop.
     while path:
       path = os.path.dirname(path)
-      build_files = BuildFile.get_buildfiles_family(self._address_mapper._project_tree, path)
+      build_files = BuildFile.get_project_tree_build_files_family(self._address_mapper._project_tree, path)
       result.extend(list(self._find_targets_for_source(source, build_files)))
       if self._stop_after_match and len(result) > 0:
         break
