@@ -12,10 +12,10 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.examples.planners import (Classpath, Jar, JavaSources, gen_apache_thrift,
-                                                isolate_resources, ivy_resolve, javac,
+from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, Jar,
+                                                JavaSources, isolate_resources, ivy_resolve, javac,
                                                 setup_json_scheduler)
-from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError,
+from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError, NativeNode,
                                         PartiallyConsumedInputsError, Return, SelectNode)
 
 
@@ -75,29 +75,26 @@ class SchedulerTest(unittest.TestCase):
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.java.address])
     walk = self.build_and_walk(build_request)
 
-    self.assertEqual(1, len(walk))
+    self.assertEqual(2, len(walk))
 
-    self.assertEqual((JavaSources,
-                      Plan(func_or_task_type=lift_native_product,
-                           subjects=[self.java],
-                           subject=self.java,
-                           product_type=JavaSources)),
-                     self.extract_product_type_and_plan(plans[0]))
+    self.assert_product_for_subjects(walk, JavaSources, [self.java])
 
   def test_gen(self):
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.thrift.address])
     walk = self.build_and_walk(build_request)
 
-    self.assertEqual(1, len(walk))
+    self.assertEqual(5, len(walk))
 
-    self.assertEqual((JavaSources,
-                      Plan(func_or_task_type=gen_apache_thrift,
-                           subjects=[self.thrift],
-                           strict=True,
-                           rev='0.9.2',
-                           gen='java',
-                           sources=['src/thrift/codegen/simple/simple.thrift'])),
-                     self.extract_product_type_and_plan(plans[0]))
+    # Root: expect JavaSources.
+    root_entry = walk[0][0]
+    self.assertEqual(SelectNode(self.thrift, JavaSources, None), root_entry[0])
+    self.assertIsInstance(root_entry[1], Return)
+
+    # Expect an ApacheThriftJavaConfiguration to have been used.
+    product = ApacheThriftJavaConfiguration
+    self.assertEqual({NativeNode(self.thrift, product, None)},
+                     {node for (node, _), _ in walk
+                      if node.product == product and isinstance(node, NativeNode)})
 
   def test_codegen_simple(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])

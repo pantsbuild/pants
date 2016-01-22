@@ -41,9 +41,10 @@ class Select(datatype('Subject', ['product']), Selector):
 
 
 class SelectVariant(datatype('Subject', ['variant', 'product']), Selector):
-  """Selects the Product matching the given variant for the Subject provided to the constructor.
+  """Selects the matching Product with the variant name for the Subject provided to the constructor.
 
-  TODO: better explain the relationship.
+  NB: variants only work for native Products currently. Products produced by tasks would
+  likely not have a useful reason to be named.
   """
 
   def construct_node(self, subject, variants):
