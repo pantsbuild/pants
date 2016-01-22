@@ -40,19 +40,19 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(fred=Fred), aliases.target_types)
 
-    build_file = BuildFile(FileSystemProjectTree('/tmp'), 'fred', must_exist=False)
-    parse_state = self.build_configuration.initialize_parse_state(build_file)
+    with self._create_mock_build_file('fred') as build_file:
+      parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-    self.assertEqual(0, len(parse_state.registered_addressable_instances))
-    self.assertEqual(1, len(parse_state.parse_globals))
+      self.assertEqual(0, len(parse_state.registered_addressable_instances))
+      self.assertEqual(1, len(parse_state.parse_globals))
 
-    target_call_proxy = parse_state.parse_globals['fred']
-    target_call_proxy(name='jake')
+      target_call_proxy = parse_state.parse_globals['fred']
+      target_call_proxy(name='jake')
 
-    self.assertEqual(1, len(parse_state.registered_addressable_instances))
-    name, target_proxy = parse_state.registered_addressable_instances.pop()
-    self.assertEqual('jake', target_proxy.addressed_name)
-    self.assertEqual(Fred, target_proxy.addressed_type)
+      self.assertEqual(1, len(parse_state.registered_addressable_instances))
+      name, target_proxy = parse_state.registered_addressable_instances.pop()
+      self.assertEqual('jake', target_proxy.addressed_name)
+      self.assertEqual(Fred, target_proxy.addressed_type)
 
   def test_register_target_macro_facory(self):
     class Fred(Target):
@@ -82,20 +82,20 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(fred=factory), aliases.target_macro_factories)
 
-    build_file = BuildFile(FileSystemProjectTree('/tmp'), 'fred', must_exist=False)
-    parse_state = self.build_configuration.initialize_parse_state(build_file)
+    with self._create_mock_build_file('fred') as build_file:
+      parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-    self.assertEqual(0, len(parse_state.registered_addressable_instances))
-    self.assertEqual(1, len(parse_state.parse_globals))
+      self.assertEqual(0, len(parse_state.registered_addressable_instances))
+      self.assertEqual(1, len(parse_state.parse_globals))
 
-    target_call_proxy = parse_state.parse_globals['fred']
-    target_call_proxy(name='jake')
+      target_call_proxy = parse_state.parse_globals['fred']
+      target_call_proxy(name='jake')
 
-    self.assertEqual(1, len(parse_state.registered_addressable_instances))
-    name, target_proxy = parse_state.registered_addressable_instances.pop()
-    self.assertEqual('frog', target_proxy.addressed_name)
-    self.assertEqual(Fred, target_proxy.addressed_type)
-    self.assertEqual(['jake'], target_proxy.dependency_specs)
+      self.assertEqual(1, len(parse_state.registered_addressable_instances))
+      name, target_proxy = parse_state.registered_addressable_instances.pop()
+      self.assertEqual('frog', target_proxy.addressed_name)
+      self.assertEqual(Fred, target_proxy.addressed_type)
+      self.assertEqual(['jake'], target_proxy.dependency_specs)
 
   def test_register_exposed_object(self):
     self._register_aliases(objects={'jane': 42})
@@ -106,12 +106,12 @@ class BuildConfigurationTest(unittest.TestCase):
     self.assertEqual({}, aliases.context_aware_object_factories)
     self.assertEqual(dict(jane=42), aliases.objects)
 
-    build_file = BuildFile(FileSystemProjectTree('/tmp'), 'jane', must_exist=False)
-    parse_state = self.build_configuration.initialize_parse_state(build_file)
+    with self._create_mock_build_file('jane') as build_file:
+      parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-    self.assertEqual(0, len(parse_state.registered_addressable_instances))
-    self.assertEqual(1, len(parse_state.parse_globals))
-    self.assertEqual(42, parse_state.parse_globals['jane'])
+      self.assertEqual(0, len(parse_state.registered_addressable_instances))
+      self.assertEqual(1, len(parse_state.parse_globals))
+      self.assertEqual(42, parse_state.parse_globals['jane'])
 
   def test_register_exposed_context_aware_function(self):
     self.do_test_exposed_context_aware_function(lambda context: lambda: context.rel_path)
@@ -172,3 +172,10 @@ class BuildConfigurationTest(unittest.TestCase):
       self.assertEqual(0, len(parse_state.registered_addressable_instances))
       self.assertEqual(1, len(parse_state.parse_globals))
       yield parse_state.parse_globals['george']
+
+  @contextmanager
+  def _create_mock_build_file(self, dirname):
+    with temporary_dir() as root:
+      os.mkdir(os.path.join(root, dirname))
+      touch(os.path.join(root, dirname, 'BUILD'))
+      yield BuildFile(FileSystemProjectTree(root), os.path.join(dirname, 'BUILD'))
