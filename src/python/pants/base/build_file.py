@@ -219,7 +219,7 @@ class BuildFile(AbstractClass):
   @classmethod
   def get_project_tree_build_files_family(cls, project_tree, dir_relpath):
     """Returns all the BUILD files on a path"""
-    for build in project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX)):
+    for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
         yield BuildFile.cached(project_tree, os.path.join(dir_relpath, build))
 

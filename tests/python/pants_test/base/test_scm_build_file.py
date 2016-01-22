@@ -37,7 +37,7 @@ class ScmBuildFileTest(BuildFileTestBase):
       my_buildfile = self.create_buildfile('grandparent/parent/BUILD')
       buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
 
-      self.assertEquals(OrderedSet([buildfile, my_buildfile]),
+      self.assertEquals(OrderedSet([my_buildfile, buildfile]),
                         OrderedSet(self.get_build_files_family('grandparent/parent')))
 
       self.assertEquals(OrderedSet([self.create_buildfile('grandparent/parent/child2/child3/BUILD')]),
