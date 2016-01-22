@@ -112,10 +112,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register('--suffix-version', advanced=True, default=None,
              help='Scala suffix to be used when a custom version is specified.  For example 2.10')
 
-    # Register Scala Compiler's.
+    # Register Scala compilers.
     register_scala_compiler('2.10')
     register_scala_compiler('2.11')
-    register_scala_compiler('custom')  # This will register default tools
+    register_scala_compiler('custom')  # This will register default tools.
 
     # Register repl tools.
     jline_dep = JarDependency(
