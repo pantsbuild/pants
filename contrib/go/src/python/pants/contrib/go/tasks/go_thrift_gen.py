@@ -22,9 +22,8 @@ from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from twitter.common.collections import OrderedSet
 
-from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
-from pants.contrib.go.targets.go_thrift_library import GoThriftLibrary
+from pants.contrib.go.targets.go_thrift_library import GoThriftGenLibrary, GoThriftLibrary
 
 
 class GoThriftGen(SimpleCodegenTask):
@@ -95,7 +94,7 @@ class GoThriftGen(SimpleCodegenTask):
     return self._deps
 
   def synthetic_target_type(self, target):
-    return GoLibrary
+    return GoThriftGenLibrary
 
   def is_gentarget(self, target):
     return isinstance(target, GoThriftLibrary)

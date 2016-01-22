@@ -67,11 +67,10 @@ class GoLocalSource(GoTarget):
     #    in binaries, it does allow them to be placed in a directory where a test might use them
     #    for example via plain old filesystem access.
 
-    if not sources:
-      globs = Globs(ParseContext(rel_path=address.spec_path, type_aliases={}))
-      sources = globs('*', exclude=[globs('BUILD*'),
-                                    # This skips dirents.
-                                    globs('*/')])
+    globs = Globs(ParseContext(rel_path=address.spec_path, type_aliases={}))
+    sources = globs('*', exclude=[globs('BUILD*'),
+                                  # This skips dirents.
+                                  globs('*/')])
 
     payload = payload or Payload()
     payload.add_fields({

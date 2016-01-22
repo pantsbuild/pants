@@ -60,6 +60,8 @@ python_library(
   name='go_thrift_library',
   sources=['go_thrift_library.py'],
   dependencies=[
+    ':go_local_source',
+    'src/python/pants/base:parse_context',
     'src/python/pants/base:payload',
     'src/python/pants/build_graph',
   ]

@@ -19,6 +19,7 @@ from pants.contrib.go.targets.go_binary import GoBinary
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
+from pants.contrib.go.targets.go_thrift_library import GoThriftGenLibrary
 
 
 class GoTask(Task):
@@ -45,7 +46,7 @@ class GoTask(Task):
 
   @staticmethod
   def is_go(target):
-    return isinstance(target, (GoLocalSource, GoRemoteLibrary))
+    return isinstance(target, (GoLocalSource, GoRemoteLibrary, GoThriftGenLibrary))
 
   @memoized_property
   def go_dist(self):
