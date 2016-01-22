@@ -125,7 +125,7 @@ class BuildFile(AbstractClass):
           buildfiles.append(BuildFile.cached(project_tree, os.path.join(root, filename)))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  def __init__(self, project_tree, relpath, must_exist=True):
+  def __init__(self, project_tree, relpath, must_exist=True, strict_mode=False):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
     :param project_tree: Project tree the BUILD file exist in.
@@ -137,6 +137,10 @@ class BuildFile(AbstractClass):
     :raises IOError: if the root_dir path is not absolute.
     :raises MissingBuildFileError: if the path does not house a BUILD file and must_exist is `True`.
     """
+
+    if strict_mode and not must_exist:
+      raise Exception("BuildFile must_exist parameter must be True in strict mode.")
+
     self.project_tree = project_tree
     self.root_dir = project_tree.build_root
 
@@ -149,6 +153,9 @@ class BuildFile(AbstractClass):
 
     # There is no BUILD file without a prefix so select any viable sibling
     buildfile_relpath = fast_relpath(buildfile, self.root_dir)
+    if strict_mode and project_tree.isdir(buildfile_relpath):
+      raise Exception("BuildFile can be created only from path to file in strict mode.")
+
     if not project_tree.exists(buildfile_relpath) or project_tree.isdir(buildfile_relpath):
       relpath = os.path.dirname(buildfile_relpath)
       for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
