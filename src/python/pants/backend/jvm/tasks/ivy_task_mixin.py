@@ -222,34 +222,22 @@ class IvyTaskMixin(TaskBase):
         return [], {}, None
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
-      # If a report file is not present, we need to exec ivy, even if all the individual
-      # targets up to date... See https://rbcommons.com/s/twitter/r/2015
-      report_missing = False
-      report_confs = confs or ['default']
-      report_paths = []
       resolve_hash_name = global_vts.cache_key.hash
-      for conf in report_confs:
-        report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
-        if not os.path.exists(report_path):
-          report_missing = True
-          break
-        else:
-          report_paths.append(report_path)
+
       target_workdir = os.path.join(ivy_workdir, resolve_hash_name)
+
       target_classpath_file = os.path.join(target_workdir, 'classpath')
       raw_target_classpath_file = target_classpath_file + '.raw'
-      raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
-      # A common dir for symlinks into the ivy2 cache. This ensures that paths to jars
-      # in artifact-cached analysis files are consistent across systems.
-      # Note that we have one global, well-known symlink dir, again so that paths are
-      # consistent across builds.
-      symlink_dir = os.path.join(ivy_workdir, 'jars')
+
+      # If a report file is not present, we need to exec ivy, even if all the individual
+      # targets up to date... See https://rbcommons.com/s/twitter/r/2015
+      any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
+      has_missing_results = (any_report_missing or not os.path.exists(raw_target_classpath_file))
 
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
-      if (report_missing or
-          invalidation_check.invalid_vts or
-          not os.path.exists(raw_target_classpath_file)):
+      if (invalidation_check.invalid_vts or has_missing_results):
+        raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
         args = ['-cachepath', raw_target_classpath_file_tmp] + (custom_args if custom_args else [])
 
         self._exec_ivy(
@@ -272,12 +260,17 @@ class IvyTaskMixin(TaskBase):
         if self.artifact_cache_writes_enabled():
           self.update_artifact_cache([(global_vts, [raw_target_classpath_file])])
       else:
-        logger.debug("Using previously resolved reports: {}".format(report_paths))
+        logger.debug("Using previously resolved reports: {}".format(existing_report_paths))
 
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
     with IvyTaskMixin.symlink_map_lock:
+      # A common dir for symlinks into the ivy2 cache. This ensures that paths to jars
+      # in artifact-cached analysis files are consistent across systems.
+      # Note that we have one global, well-known symlink dir, again so that paths are
+      # consistent across builds.
+      symlink_dir = os.path.join(ivy_workdir, 'jars')
       symlink_map = IvyUtils.symlink_cachepath(self.ivy_cache_dir,
                                                raw_target_classpath_file,
                                                symlink_dir,
@@ -285,6 +278,19 @@ class IvyTaskMixin(TaskBase):
 
       classpath = IvyUtils.load_classpath_from_cachepath(target_classpath_file)
       return classpath, symlink_map, resolve_hash_name
+
+  def _collect_existing_reports(self, confs, resolve_hash_name):
+    report_missing = False
+    report_paths = []
+    report_confs = confs or ['default']
+    for conf in report_confs:
+      report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+      if not os.path.exists(report_path):
+        report_missing = True
+        break
+      else:
+        report_paths.append(report_path)
+    return report_missing, report_paths
 
   def _exec_ivy(self,
                target_workdir,
