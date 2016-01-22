@@ -13,6 +13,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.util.dirutil import fast_relpath
 from pants.util.meta import AbstractClass
 
 
@@ -54,7 +55,7 @@ class BuildFile(AbstractClass):
   def _get_all_build_files(self, path):
     """Returns all the BUILD files on a path"""
     results = []
-    relpath = os.path.relpath(path, self.root_dir)
+    relpath = fast_relpath(path, self.root_dir)
     for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
       if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(relpath, build)):
         results.append(build)
@@ -72,6 +73,8 @@ class BuildFile(AbstractClass):
   @classmethod
   @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
+    if base_path and os.path.isabs(base_path):
+      base_path = fast_relpath(base_path, root_dir)
     return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir), base_path, spec_excludes)
 
   @classmethod
@@ -95,7 +98,7 @@ class BuildFile(AbstractClass):
         if os.path.isabs(path):
           realpath = os.path.realpath(path)
           if realpath.startswith(project_tree.build_root):
-            result.append(os.path.relpath(realpath, project_tree.build_root))
+            result.append(fast_relpath(realpath, project_tree.build_root))
         else:
           result.append(path)
       return result
@@ -108,6 +111,9 @@ class BuildFile(AbstractClass):
         if os.path.join(root, dirname) in exclude_roots or (root == '.' and (dirname in exclude_roots)):
           to_remove.add(dirname)
       return to_remove
+
+    if base_relpath and os.path.isabs(base_relpath):
+      raise Exception('base_relpath parameter should be a relative path.')
 
     if base_relpath and not project_tree.isdir(base_relpath):
       raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
@@ -147,18 +153,18 @@ class BuildFile(AbstractClass):
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
-    if project_tree.isdir(os.path.relpath(path, self.root_dir)):
+    if project_tree.isdir(fast_relpath(path, self.root_dir)):
       buildfile = os.path.join(path, self._build_basename)
     else:
       buildfile = path
 
     # There is no BUILD file without a prefix so select any viable sibling
-    buildfile_relpath = os.path.relpath(buildfile, self.root_dir)
+    buildfile_relpath = fast_relpath(buildfile, self.root_dir)
     if not project_tree.exists(buildfile_relpath) or project_tree.isdir(buildfile_relpath):
       for build in self._get_all_build_files(os.path.dirname(buildfile)):
         self._build_basename = build
         buildfile = os.path.join(path, self._build_basename)
-        buildfile_relpath = os.path.relpath(buildfile, self.root_dir)
+        buildfile_relpath = fast_relpath(buildfile, self.root_dir)
         break
 
     if must_exist:
@@ -182,7 +188,7 @@ class BuildFile(AbstractClass):
     self.name = os.path.basename(self.full_path)
     self.parent_path = os.path.dirname(self.full_path)
 
-    self.relpath = os.path.relpath(self.full_path, self.root_dir)
+    self.relpath = fast_relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
 
   def file_exists(self):
@@ -193,7 +199,7 @@ class BuildFile(AbstractClass):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
     descendants = self.scan_project_tree_build_files(self.project_tree,
-                                                     os.path.relpath(self.parent_path, self.root_dir),
+                                                     fast_relpath(self.parent_path, self.root_dir),
                                                      spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
@@ -206,7 +212,7 @@ class BuildFile(AbstractClass):
       parent = os.path.dirname(dirname)
       for parent_buildfile in self._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        return parent, self.cached(self.project_tree, os.path.relpath(buildfile, self.root_dir))
+        return parent, self.cached(self.project_tree, fast_relpath(buildfile, self.root_dir))
       return parent, None
 
     parent_buildfiles = OrderedSet()

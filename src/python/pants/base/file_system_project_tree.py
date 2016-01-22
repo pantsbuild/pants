@@ -9,7 +9,7 @@ import os
 from glob import glob1
 
 from pants.base.project_tree import ProjectTree
-from pants.util.dirutil import safe_walk
+from pants.util.dirutil import fast_relpath, safe_walk
 
 
 class FileSystemProjectTree(ProjectTree):
@@ -31,7 +31,7 @@ class FileSystemProjectTree(ProjectTree):
 
   def walk(self, relpath, topdown=True):
     for root, dirs, files in safe_walk(os.path.join(self.build_root, relpath), topdown=topdown):
-      yield os.path.relpath(root, self.build_root), dirs, files
+      yield fast_relpath(root, self.build_root), dirs, files
 
   def __eq__(self, other):
     return other and (type(other) == type(self)) and (self.build_root == other.build_root)
