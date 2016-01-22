@@ -32,11 +32,15 @@ class SchedulerTest(unittest.TestCase):
     self.unconfigured_thrift = self.graph.resolve(Address.parse('src/thrift/codegen/unconfigured'))
     self.resources = self.graph.resolve(Address.parse('src/resources/simple'))
     self.consumes_resources = self.graph.resolve(Address.parse('src/java/consumes_resources'))
+    self.consumes_managed_thirdparty = self.graph.resolve(Address.parse('src/java/managed_thirdparty'))
+    self.managed_guava = self.graph.resolve(Address.parse('3rdparty/jvm/managed:guava'))
+    self.managed_hadoop = self.graph.resolve(Address.parse('3rdparty/jvm/managed:hadoop-common'))
 
-  def assert_product_for_subjects(self, walk, product, subjects):
-    self.assertEqual({SelectNode(subject, product, None) for subject in subjects},
+  def assert_product_for_subjects(self, walk, product, subjects, variants=None):
+    variants = tuple(variants.items()) if variants else None
+    self.assertEqual({SelectNode(subject, product, variants) for subject in subjects},
                      {node for (node, _), _ in walk
-                      if node.product == product and isinstance(node, SelectNode)})
+                      if node.product == product and isinstance(node, SelectNode) and node.variants == variants})
 
   def build_and_walk(self, build_request):
     """Build and then walk the given build_request, returning the walked graph as a list."""
@@ -83,8 +87,6 @@ class SchedulerTest(unittest.TestCase):
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.thrift.address])
     walk = self.build_and_walk(build_request)
 
-    self.assertEqual(5, len(walk))
-
     # Root: expect JavaSources.
     root_entry = walk[0][0]
     self.assertEqual(SelectNode(self.thrift, JavaSources, None), root_entry[0])
@@ -99,8 +101,6 @@ class SchedulerTest(unittest.TestCase):
   def test_codegen_simple(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])
     walk = self.build_and_walk(build_request)
-
-    self.assertEqual(29, len(walk))
 
     subjects = [self.guava,
                 Jar(org='org.apache.thrift', name='libthrift', rev='0.9.2'),
@@ -120,8 +120,6 @@ class SchedulerTest(unittest.TestCase):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.consumes_resources.address])
     walk = self.build_and_walk(build_request)
 
-    self.assertEqual(13, len(walk))
-
     # Validate the root.
     self.assertEqual((SelectNode(self.consumes_resources, Classpath, None),
                       Return(Classpath(creator='javac'))),
@@ -134,17 +132,40 @@ class SchedulerTest(unittest.TestCase):
                 self.guava]
     self.assert_product_for_subjects(walk, Classpath, subjects)
 
+  def test_managed_resolve(self):
+    """A managed resolve should consume a ManagedResolve and ManagedJars to produce Jars."""
+    build_request = BuildRequest(goals=['compile'],
+                                 addressable_roots=[self.consumes_managed_thirdparty.address])
+    walk = self.build_and_walk(build_request)
+
+    # Validate the root.
+    self.assertEqual((SelectNode(self.consumes_managed_thirdparty, Classpath, None),
+                      Return(Classpath(creator='javac'))),
+                     walk[0][0])
+
+    # Confirm that we produced classpaths for the managed jars.
+    managed_jars = [self.managed_guava,
+                    self.managed_hadoop]
+    self.assert_product_for_subjects(walk, Classpath, [self.consumes_managed_thirdparty])
+    self.assert_product_for_subjects(walk, Classpath, managed_jars, variants={'resolve': 'latest-hadoop'})
+
+    # Confirm that the produced jars had the appropriate versions.
+    self.assertEquals({Jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
+                       Jar('com.google.guava', 'guava', '18.0')},
+                      {ret.value for (node, ret), _ in walk
+                       if node.product == Jar and isinstance(node, SelectNode)})
+
   @pytest.mark.xfail(raises=ConflictingProducersError)
   def test_multiple_classpath_entries(self):
     """Multiple Classpath products for a single subject currently cause a failure."""
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java_multi.address])
     walk = self.build_and_walk(build_request)
 
+  @pytest.mark.xfail(raises=PartiallyConsumedInputsError)
   def test_no_configured_thrift_planner(self):
-    """Tests that even though the BuildPropertiesPlanner is able to produce a Classpath,
+    """Even though the BuildPropertiesPlanner is able to produce a Classpath,
     we still fail when a target with thrift sources doesn't have a thrift config.
     """
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.unconfigured_thrift.address])
-    with self.assertRaises(PartiallyConsumedInputsError):
-      self.build_and_walk(build_request)
+    walk = self.build_and_walk(build_request)
