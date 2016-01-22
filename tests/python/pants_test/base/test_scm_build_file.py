@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import subprocess
 
 from twitter.common.collections import OrderedSet
@@ -17,9 +16,6 @@ from pants_test.base.build_file_test_base import BuildFileTestBase
 
 
 class ScmBuildFileTest(BuildFileTestBase):
-
-  def create_project_tree(self, build_root):
-    return ScmProjectTree(build_root, Git(worktree=self.root_dir), 'HEAD')
 
   def test_build_file_rev(self):
     # Test that the build_file_rev global option works.  Because the
@@ -35,6 +31,8 @@ class ScmBuildFileTest(BuildFileTestBase):
 
       subprocess.check_call(['rm', '-rf', 'path-that-does-exist',
                              'grandparent', 'BUILD', 'BUILD.twitter'])
+
+      self._project_tree = ScmProjectTree(self.root_dir, Git(worktree=self.root_dir), 'HEAD')
 
       my_buildfile = self.create_buildfile('grandparent/parent/BUILD')
       buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')

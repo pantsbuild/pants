@@ -21,14 +21,10 @@ class ScmProjectTree(ProjectTree):
     self._scm = scm
     self._rev = rev
     self._reader = scm.repo_reader(rev)
-
-  def _scm_worktree(cls):
-    if not hasattr(cls, '_cached_scm_worktree'):
-      cls._cached_scm_worktree = os.path.realpath(cls._scm.detect_worktree())
-    return cls._cached_scm_worktree
+    self._scm_worktree = os.path.realpath(scm.detect_worktree())
 
   def _scm_relpath(self, build_root_relpath):
-    return os.path.relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree())
+    return os.path.relpath(os.path.join(self.build_root, build_root_relpath), self._scm_worktree)
 
   def glob1(self, dir_relpath, glob):
     files = self._reader.listdir(self._scm_relpath(dir_relpath))
@@ -48,9 +44,8 @@ class ScmProjectTree(ProjectTree):
     return self._reader.exists(self._scm_relpath(relpath))
 
   def walk(self, relpath, topdown=True):
-    worktree = self._scm_worktree()
     for path, dirnames, filenames in self._do_walk(self._scm_relpath(relpath), topdown=topdown):
-      yield (os.path.relpath(os.path.join(worktree, path), self.build_root), dirnames, filenames)
+      yield (os.path.relpath(os.path.join(self._scm_worktree, path), self.build_root), dirnames, filenames)
 
   def _do_walk(self, scm_relpath, topdown):
     """Helper method for _walk"""

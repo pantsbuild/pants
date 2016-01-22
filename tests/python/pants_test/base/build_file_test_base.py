@@ -25,10 +25,6 @@ class BuildFileTestBase(unittest.TestCase):
   def touch(self, path):
     touch(self.fullpath(path))
 
-  @abstractmethod
-  def create_project_tree(self, build_root):
-    pass
-
   def scan_buildfiles(self, base_path=None, spec_excludes=None):
     return BuildFile.scan_project_tree_build_files(self._project_tree, base_path, spec_excludes)
 
@@ -37,6 +33,7 @@ class BuildFileTestBase(unittest.TestCase):
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
+    self._project_tree = None
 
     # Seed a BUILD outside the build root that should not be detected
     touch(os.path.join(self.base_dir, 'BUILD'))
@@ -64,8 +61,6 @@ class BuildFileTestBase(unittest.TestCase):
     # sibling.
     self.makedirs('issue_1742/BUILD')
     self.touch('issue_1742/BUILD.sibling')
-
-    self._project_tree = self.create_project_tree(self.root_dir)
 
   def tearDown(self):
     shutil.rmtree(self.base_dir)
