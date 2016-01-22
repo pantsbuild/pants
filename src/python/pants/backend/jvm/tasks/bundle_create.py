@@ -15,7 +15,6 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.build_graph.build_graph import BuildGraph
 from pants.fs import archive
 from pants.fs.archive import JAR
 from pants.util.dirutil import safe_mkdir
@@ -23,10 +22,8 @@ from pants.util.dirutil import safe_mkdir
 
 class BundleCreate(JvmBinaryTask):
 
-  # Directory for 3rdparty libraries.
+  # Directory for both internal and external libraries.
   LIBS_DIR = 'libs'
-  # Directory for internal libraries.
-  INTERNAL_LIBS_DIR = 'internal-libs'
 
   @classmethod
   def register_options(cls, register):
@@ -117,9 +114,6 @@ class BundleCreate(JvmBinaryTask):
         )
         self.context.log.info('created {}'.format(os.path.relpath(archivepath, get_buildroot())))
 
-  class MissingJarError(TaskError):
-    """Indicates an unexpected problem finding a jar that a bundle depends on."""
-
   class BasenameConflictError(TaskError):
     """Indicates the same basename is used by two targets."""
 
@@ -130,19 +124,6 @@ class BundleCreate(JvmBinaryTask):
     """
     assert(isinstance(app, BundleCreate.App))
 
-    def verbose_symlink(src, dst):
-      if not os.path.exists(src):
-        raise self.MissingJarError('Could not find {src} when attempting to link it into the '
-                                   'bundle for {app_spec} at {dst}'
-                                   .format(src=src,
-                                           app_spec=app.address.reference(),
-                                           dst=os.path.relpath(dst, get_buildroot())))
-      try:
-        os.symlink(src, dst)
-      except OSError as e:
-        self.context.log.error('Unable to create symlink: {0} -> {1}'.format(src, dst))
-        raise e
-
     bundle_dir = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(app.basename))
     self.context.log.info('creating {}'.format(os.path.relpath(bundle_dir, get_buildroot())))
 
@@ -150,35 +131,25 @@ class BundleCreate(JvmBinaryTask):
 
     classpath = OrderedSet()
 
-    # If creating a deployjar, we add the external dependencies to the bundle as
-    # loose classes, and have no classpath. Otherwise we add the external dependencies
-    # to the bundle as jars in a libs directory.
+    # Create symlinks for both internal and external dependencies under `lib_dir`. This is
+    # only needed when not creating a deployjar
+    lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
     if not self.get_options().deployjar:
-      lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
       os.mkdir(lib_dir)
-
-      # Add external dependencies to the bundle.
-      for path, coordinate in self.list_external_jar_dependencies(app.binary):
-        external_jar = coordinate.artifact_filename
-        destination = os.path.join(lib_dir, external_jar)
-        verbose_symlink(path, destination)
-        classpath.add(destination)
+      runtime_classpath = self.context.products.get_data('runtime_classpath')
+      classpath.update(ClasspathUtil.create_canonical_classpath(runtime_classpath,
+                                                                app.target.closure(bfs=True),
+                                                                lib_dir,
+                                                                internal_classpath_only=False,
+                                                                excludes=app.binary.deploy_excludes))
 
     bundle_jar = os.path.join(bundle_dir, '{}.jar'.format(app.binary.basename))
-
-    canonical_classpath_base_dir = None
-    if not self.get_options().deployjar:
-      canonical_classpath_base_dir = os.path.join(bundle_dir, self.INTERNAL_LIBS_DIR)
     with self.monolithic_jar(app.binary, bundle_jar,
-                             canonical_classpath_base_dir=canonical_classpath_base_dir) as jar:
+                             manifest_classpath=classpath) as jar:
       self.add_main_manifest_entry(jar, app.binary)
-      if classpath:
-        # append external dependencies to monolithic jar's classpath,
-        # eventually will be saved in the Class-Path entry of its Manifest.
-        jar.append_classpath(classpath)
 
-      # Make classpath complete by adding internal classpath and monolithic jar.
-      classpath.update(jar.classpath + [jar.path])
+      # Make classpath complete by adding the monolithic jar.
+      classpath.update([jar.path])
 
     if app.binary.shading_rules:
       for jar_path in classpath:
@@ -194,7 +165,7 @@ class BundleCreate(JvmBinaryTask):
           raise TaskError('Given path: {} does not exist in target {}'.format(
             path, app.address.spec))
         safe_mkdir(os.path.dirname(bundle_path))
-        verbose_symlink(path, bundle_path)
+        os.symlink(path, bundle_path)
 
     return bundle_dir
 

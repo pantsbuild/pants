@@ -18,6 +18,7 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import extract_config_selector
 from pants.engine.exp.objects import Serializable
 from pants.engine.exp.products import Products, lift_native_product
+from pants.engine.exp.struct import StructWithDeps
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -351,20 +352,21 @@ class TaskPlanner(AbstractClass):
              could not be found or was not unique.
     """
     for derivation in Subject.as_subject(subject).iter_derivations:
-      if derivation.dependencies:
-        for dep in derivation.dependencies:
-          configuration = None
-          if dep.address:
-            config_specifier = extract_config_selector(dep.address)
-            if config_specifier:
-              if not dep.configurations:
-                raise cls.Error('The dependency of {dependee} on {dependency} selects '
-                                'configuration {config} but {dependency} has no configurations.'
-                                .format(dependee=derivation,
-                                        dependency=dep,
-                                        config=config_specifier))
-              configuration = dep.select_configuration(config_specifier)
-          yield dep, configuration
+      for config in derivation.configurations:
+        if isinstance(config, StructWithDeps):
+          for dep in config.dependencies:
+            configuration = None
+            if dep.address:
+              config_specifier = extract_config_selector(dep.address)
+              if config_specifier:
+                if not dep.configurations:
+                  raise cls.Error('The dependency of {dependee} on {dependency} selects '
+                                  'configuration {config} but {dependency} has no configurations.'
+                                  .format(dependee=derivation,
+                                          dependency=dep,
+                                          config=config_specifier))
+                configuration = dep.select_configuration(config_specifier)
+            yield dep, configuration
 
   @abstractproperty
   def goal_name(self):

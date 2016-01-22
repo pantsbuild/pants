@@ -145,7 +145,7 @@ class AddressableDescriptor(object):
      allow wrapping of either class functions - typical - or @property descriptors.  The property
      descriptor case sets up an idiom for recursive addressables.  The idiom looks like:
 
-     >>> class Thing(Configuration):
+     >>> class Thing(Struct):
      ...   def __init__(self, thing):
      ...     super(Thing, self).__init__()
      ...     self.thing = thing
@@ -277,7 +277,7 @@ def _addressable_wrapper(addressable_descriptor, type_constraint):
     # We allow for wrapping property objects to support the following idiom for defining recursive
     # addressables:
     #
-    # class Thing(Configuration):
+    # class Thing(Struct):
     #   def __init__(self, thing):
     #      super(Thing, self).__init__()
     #      self.thing = thing

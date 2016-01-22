@@ -11,7 +11,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
-from pants.base.payload_field import ExcludesField, JarsField
+from pants.base.payload_field import ExcludesField, JarsField, PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 
@@ -27,21 +27,37 @@ class JarLibrary(Target):
     """Thrown if an object that is not an address."""
     pass
 
-  def __init__(self, payload=None, jars=None, **kwargs):
+  def __init__(self, payload=None, jars=None, managed_dependencies=None, **kwargs):
     """
     :param jars: List of `jar <#jar>`_\s to depend upon.
+    :param managed_dependencies: Address of a managed_jar_dependencies() target to use. If omitted, uses
+      the default managed_jar_dependencies() target set by --jar-dependency-management-default-target.
     """
     jars = self.assert_list(jars, expected_type=JarDependency, key_arg='jars')
     payload = payload or Payload()
     payload.add_fields({
       'jars': JarsField(jars),
       'excludes': ExcludesField([]),
+      'managed_dependencies': PrimitiveField(managed_dependencies),
     })
     super(JarLibrary, self).__init__(payload=payload, **kwargs)
     # NB: Waiting to validate until superclasses are initialized.
     if not jars:
       raise TargetDefinitionException(self, 'Must have a non-empty list of jars.')
     self.add_labels('jars', 'jvm')
+
+  @property
+  def managed_dependencies(self):
+    """The managed_jar_dependencies target this jar_library specifies, or None."""
+    if self.payload.managed_dependencies:
+      return self._build_graph.get_target(Address.parse(self.payload.managed_dependencies,
+                                                        relative_to=self.address.spec_path))
+    return None
+
+  @property
+  def traversable_dependency_specs(self):
+    if self.payload.managed_dependencies:
+      yield self.payload.managed_dependencies
 
   @property
   def jar_dependencies(self):

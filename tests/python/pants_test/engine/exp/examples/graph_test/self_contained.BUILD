@@ -5,27 +5,24 @@ Target(
   name='thrift1',
 )
 
-Target(
+StructWithDeps(
   name='thrift2',
   dependencies=[
     ':thrift1',
   ]
 )
 
-# Right now the base Config class only allows either `extends` or `merges`, but more complex chains
+# Right now the base Struct class only allows either `extends` or `merges`, but more complex chains
 # can always be built up via a sequence of objects extending or merging others.
 Target(
   name='java1',
   merges=[':production_thrift_configs'],
   sources={},
-  dependencies=[
-    ':thrift2',
-  ],
   configurations=[
     PublishConfig(
       default_repo=':public',
       repos={
-        'jake': Config(
+        'jake': Struct(
           url='https://dl.bintray.com/pantsbuild/maven'
         ),
         'jane': ':public'
@@ -41,7 +38,7 @@ ApacheThriftConfig(
   lang='java'
 )
 
-Config(
+Struct(
   name='public',
   url='https://oss.sonatype.org/#stagingRepositories'
 )
@@ -80,6 +77,9 @@ Target(
       version='0.9.2',
       strict=True,
       lang='java',
+      dependencies=[
+        ':thrift2',
+      ]
     ),
     ':nonstrict'
   ]

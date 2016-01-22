@@ -1,4 +1,4 @@
 {
-  "type_alias": "configuration",
+  "type_alias": "struct",
   "name": "root"
 }

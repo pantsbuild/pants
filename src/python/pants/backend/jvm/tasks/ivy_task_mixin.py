@@ -13,9 +13,9 @@ from hashlib import sha1
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.jar_dependency_utils import ResolvedJar
+from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -39,6 +39,9 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     hasher = sha1()
     for conf in self._confs:
       hasher.update(conf)
+    managed_jar_dependencies_artifacts = JarDependencyManagement.global_instance().for_target(target)
+    if managed_jar_dependencies_artifacts:
+      hasher.update(str(managed_jar_dependencies_artifacts.id))
     if isinstance(target, JarLibrary):
       hasher.update(target.payload.fingerprint())
       return hasher.hexdigest()
@@ -46,7 +49,6 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
       if target.payload.excludes:
         hasher.update(target.payload.fingerprint(field_keys=('excludes',)))
         return hasher.hexdigest()
-
     return None
 
   def __hash__(self):
@@ -67,7 +69,7 @@ class IvyTaskMixin(TaskBase):
 
   @classmethod
   def global_subsystems(cls):
-    return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, )
+    return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, JarDependencyManagement)
 
   @classmethod
   def register_options(cls, register):
@@ -210,6 +212,8 @@ class IvyTaskMixin(TaskBase):
 
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
+    # TODO(gmalmquist): Targets should be partitioned and resolved in separate groups depending on
+    # what sets of pinned artifacts they depend on.
     with self.invalidated(targets,
                           invalidate_dependents=invalidate_dependents,
                           silent=silent,

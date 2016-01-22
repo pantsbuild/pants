@@ -11,15 +11,15 @@ from functools import partial
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
-from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
                                     Resolver)
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import parse_json, python_assignments_parser, python_callbacks_parser
+from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
 
-class ApacheThriftConfiguration(Configuration):
+class ApacheThriftConfiguration(StructWithDeps):
   # An example of a mixed-mode object - can be directly embedded without a name or else referenced
   # via address if both top-level and carrying a name.
   #
@@ -43,7 +43,7 @@ class ApacheThriftConfiguration(Configuration):
       self.report_validation_error('A thrift gen `lang` is required.')
 
 
-class PublishConfiguration(Configuration):
+class PublishConfiguration(Struct):
   # An example of addressable and addressable_mapping field wrappers.
 
   def __init__(self, default_repo, repos, name=None, **kwargs):
@@ -51,11 +51,11 @@ class PublishConfiguration(Configuration):
     self.default_repo = default_repo
     self.repos = repos
 
-  @addressable(Exactly(Configuration))
+  @addressable(Exactly(Struct))
   def default_repo(self):
     """"""
 
-  @addressable_dict(Exactly(Configuration))
+  @addressable_dict(Exactly(Struct))
   def repos(self):
     """"""
 
@@ -63,7 +63,8 @@ class PublishConfiguration(Configuration):
 class GraphTestBase(unittest.TestCase):
   def setUp(self):
     self.symbol_table = {'ApacheThriftConfig': ApacheThriftConfiguration,
-                         'Config': Configuration,
+                         'Struct': Struct,
+                         'StructWithDeps': StructWithDeps,
                          'PublishConfig': PublishConfiguration,
                          'Target': Target}
 
@@ -92,7 +93,7 @@ class InlinedGraphTest(GraphTestBase):
                                           version='0.9.2',
                                           strict=False,
                                           lang='java')
-    public = Configuration(address=address('public'),
+    public = Struct(address=address('public'),
                            url='https://oss.sonatype.org/#stagingRepositories')
     thrift1 = Target(address=address('thrift1'))
     thrift2 = Target(address=address('thrift2'), dependencies=[thrift1])
@@ -104,7 +105,7 @@ class InlinedGraphTest(GraphTestBase):
                                 default_repo=public,
                                 repos={
                                   'jake':
-                                    Configuration(url='https://dl.bintray.com/pantsbuild/maven'),
+                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
                                   'jane': public
                                 }
                               )
@@ -205,18 +206,22 @@ class LazyResolvingGraphTest(GraphTestBase):
     expected_java1 = Target(address=java1_address,
                             sources={},
                             configurations=[
-                              ApacheThriftConfiguration(version='0.9.2', strict=True, lang='java'),
+                              ApacheThriftConfiguration(
+                                version='0.9.2',
+                                strict=True,
+                                lang='java',
+                                dependencies=[resolver(thrift2_address)]
+                              ),
                               resolver(nonstrict_address),
                               PublishConfiguration(
                                 default_repo=resolver(public_address),
                                 repos={
                                   'jake':
-                                    Configuration(url='https://dl.bintray.com/pantsbuild/maven'),
+                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
                                   'jane': resolver(public_address)
                                 }
                               )
-                            ],
-                            dependencies=[resolver(thrift2_address)])
+                            ])
 
     self.assertEqual(expected_java1, resolved_java1)
 
@@ -229,7 +234,7 @@ class LazyResolvingGraphTest(GraphTestBase):
     self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
     self.assertIs(expected_java1.configurations[1], resolved_nonstrict)
 
-    expected_public = Configuration(address=public_address,
+    expected_public = Struct(address=public_address,
                                     url='https://oss.sonatype.org/#stagingRepositories')
     resolved_public = graph.resolve(public_address)
     self.assertEqual(expected_public, resolved_public)
@@ -242,8 +247,10 @@ class LazyResolvingGraphTest(GraphTestBase):
     expected_thrift2 = Target(address=thrift2_address, dependencies=[resolver(thrift1_address)])
     resolved_thrift2 = graph.resolve(thrift2_address)
     self.assertEqual(expected_thrift2, resolved_thrift2)
-    self.assertEqual(expected_thrift2, resolved_java1.dependencies[0])
-    self.assertIs(resolved_java1.dependencies[0], resolved_thrift2)
+    resolved_thrift_config = [config for config in resolved_java1.configurations
+                              if isinstance(config, ApacheThriftConfiguration)]
+    self.assertEqual(expected_thrift2, resolved_thrift_config[0].dependencies[0])
+    self.assertIs(resolved_thrift_config[0].dependencies[0], resolved_thrift2)
 
     expected_thrift1 = Target(address=thrift1_address)
     resolved_thrift1 = graph.resolve(thrift1_address)
