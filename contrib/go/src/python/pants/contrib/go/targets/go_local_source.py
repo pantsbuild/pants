@@ -58,15 +58,13 @@ class GoLocalSource(GoTarget):
     """
     raise NotImplementedError()
 
-  def __init__(self, sources=None, address=None, payload=None, **kwargs):
-    # Unless otherwise specified, we grab all files in the current directory except BUILD files
-    # for 2 reasons:
+  def __init__(self, address=None, payload=None, **kwargs):
+    # We grab all files in the current directory except BUILD files for 2 reasons:
     # 1. cgo: If a file imports "C" then it may rely on sibling .c, .cc, etc files that `go build`
     #    will compile.
     # 2. resources: Even though go does not support them; ie by providing a protocol to embed them
     #    in binaries, it does allow them to be placed in a directory where a test might use them
     #    for example via plain old filesystem access.
-
     globs = Globs(ParseContext(rel_path=address.spec_path, type_aliases={}))
     sources = globs('*', exclude=[globs('BUILD*'),
                                   # This skips dirents.
