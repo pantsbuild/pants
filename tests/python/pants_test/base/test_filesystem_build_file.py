@@ -49,11 +49,13 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def testDescendants(self):
     self.assertEquals(OrderedSet([
+        self.create_buildfile('grandparent/parent/BUILD'),
+        self.create_buildfile('grandparent/parent/BUILD.twitter'),
         self.create_buildfile('grandparent/parent/child1/BUILD'),
         self.create_buildfile('grandparent/parent/child1/BUILD.twitter'),
         self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
-        self.create_buildfile('grandparent/parent/child5'),
-    ]), self.buildfile.descendants())
+        self.create_buildfile('grandparent/parent/child5/BUILD'),
+    ]), self.scan_buildfiles('grandparent/parent'))
 
   def test_descendants_with_spec_excludes(self):
     self.assertEquals(OrderedSet([
@@ -90,7 +92,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         self.create_buildfile('suffix-test/BUILD.suffix2')]),
         self.get_build_files_family('suffix-test'))
     self.assertEquals(OrderedSet([self.create_buildfile('suffix-test/child/BUILD.suffix3')]),
-        buildfile.descendants())
+        self.scan_buildfiles('suffix-test/child'))
 
   def testAncestorsSuffix1(self):
     self.makedirs('suffix-test1/parent')
