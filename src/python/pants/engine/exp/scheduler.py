@@ -49,7 +49,6 @@ class SelectVariant(datatype('Subject', ['variant', 'product']), Selector):
   def construct_node(self, subject, variants):
     variant_values = [value for key, value in variants
                       if key == self.variant] if variants else None
-    print('>>> variant values for {}, {}, {}, {} are: {}'.format(self.variant, self.product, subject, variants, variant_values))
     return NativeNode(subject,
                       self.product,
                       variant_values[0] if variant_values else None)
