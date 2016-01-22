@@ -150,7 +150,7 @@ class BuildFile(AbstractClass):
     # There is no BUILD file without a prefix so select any viable sibling
     buildfile_relpath = fast_relpath(buildfile, self.root_dir)
     if not project_tree.exists(buildfile_relpath) or project_tree.isdir(buildfile_relpath):
-      relpath = fast_relpath(path, self.root_dir)
+      relpath = os.path.dirname(buildfile_relpath)
       for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
         if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(relpath, build)):
           self._build_basename = build
