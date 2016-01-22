@@ -588,11 +588,11 @@ class Project(object):
         target_dirset = find_source_basedirs(target)
         if not isinstance(target.address, BuildFileAddress):
           return []  # Siblings only make sense for BUILD files.
-        candidates = self.target_util.get_all_addresses(target.address.build_file)
+        candidates = OrderedSet()
+        for sibling in target.address.build_file.family():
+          candidates.update(self.target_util.get_all_addresses(sibling))
         for ancestor in target.address.build_file.ancestors():
           candidates.update(self.target_util.get_all_addresses(ancestor))
-        for sibling in target.address.build_file.siblings():
-          candidates.update(self.target_util.get_all_addresses(sibling))
         for descendant in target.address.build_file.descendants(spec_excludes=self.spec_excludes):
           candidates.update(self.target_util.get_all_addresses(descendant))
 

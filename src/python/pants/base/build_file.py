@@ -206,6 +206,7 @@ class BuildFile(AbstractClass):
       parent_buildfiles.update(BuildFile.get_project_tree_build_files_family(self.project_tree, parentdir))
     return parent_buildfiles
 
+  @deprecated('0.0.72')
   def siblings(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including
     this BUILD file itself"""
