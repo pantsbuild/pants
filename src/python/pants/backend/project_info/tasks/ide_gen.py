@@ -591,12 +591,13 @@ class Project(object):
           return []  # Siblings only make sense for BUILD files.
         candidates = OrderedSet()
         build_file = target.address.build_file
-        for descendant in BuildFile.scan_project_tree_build_files(build_file.project_tree,
-                                                                  os.path.dirname(build_file.relpath),
+        dir_relpath = os.path.dirname(build_file.relpath)
+        for descendant in BuildFile.scan_project_tree_build_files(build_file.project_tree, dir_relpath,
                                                                   spec_excludes=self.spec_excludes):
           candidates.update(self.target_util.get_all_addresses(descendant))
-        for ancestor in build_file.ancestors():
-          candidates.update(self.target_util.get_all_addresses(ancestor))
+        if not Project._is_root_relpath(dir_relpath):
+          for ancestor in Project._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath)):
+            candidates.update(self.target_util.get_all_addresses(ancestor))
 
         def is_sibling(target):
           return source_target(target) and target_dirset.intersection(find_source_basedirs(target))
@@ -685,3 +686,16 @@ class Project(object):
   def set_tool_classpaths(self, checkstyle_classpath, scalac_classpath):
     self.checkstyle_classpath = checkstyle_classpath
     self.scala_compiler_classpath = scalac_classpath
+
+  @staticmethod
+  def _collect_ancestor_build_files(project_tree, dir_relpath):
+    for build_file in BuildFile.get_project_tree_build_files_family(project_tree, dir_relpath):
+      yield build_file
+    while not Project._is_root_relpath(dir_relpath):
+      dir_relpath = os.path.dirname(dir_relpath)
+      for build_file in BuildFile.get_project_tree_build_files_family(project_tree, dir_relpath):
+        yield build_file
+
+  @staticmethod
+  def _is_root_relpath(relpath):
+    return relpath == '.' or relpath == ''
