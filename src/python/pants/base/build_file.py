@@ -197,9 +197,9 @@ class BuildFile(AbstractClass):
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_project_tree_build_files(self.project_tree,
-                                                     fast_relpath(self.parent_path, self.root_dir),
-                                                     spec_excludes=spec_excludes)
+    descendants = BuildFile.scan_project_tree_build_files(self.project_tree,
+                                                          fast_relpath(self.parent_path, self.root_dir),
+                                                          spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants
@@ -211,7 +211,7 @@ class BuildFile(AbstractClass):
       parent = os.path.dirname(dirname)
       for parent_buildfile in self._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
-        return parent, self.cached(self.project_tree, fast_relpath(buildfile, self.root_dir))
+        return parent, BuildFile.cached(self.project_tree, fast_relpath(buildfile, self.root_dir))
       return parent, None
 
     parent_buildfiles = OrderedSet()
@@ -236,7 +236,7 @@ class BuildFile(AbstractClass):
     for build in self._get_all_build_files(self.parent_path):
       if self.name != build:
         siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        yield self.cached(self.project_tree, siblingpath)
+        yield BuildFile.cached(self.project_tree, siblingpath)
 
   @classmethod
   def get_project_tree_build_files_family(cls, project_tree, dir_relpath):
