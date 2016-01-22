@@ -73,12 +73,12 @@ the default minor version for 2.10.  For these changes to take effect you would 
                 jars = [
                   jar(org = 'org.scala-lang', name = 'scala-compiler', rev = 2.10.3),
                 ])
-    
+
     jar_library(name = 'scala-library',
                 jars = [
                   jar(org = 'org.scala-lang', name = 'scala-library', rev = 2.10.3),
                 ])
-    
+
     jar_library(name = 'scala-repl',
                 jars = [
                   jar(org = 'org.scala-lang', name = 'jline', rev = 2.10.3, intransitive = True),
