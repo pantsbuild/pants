@@ -41,12 +41,6 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     buildfile = self.create_buildfile('grandparent/parent/child2/child3/BUILD')
     self.assertEquals(OrderedSet([buildfile]), self.get_build_files_family('grandparent/parent/child2/child3'))
 
-  def testAncestors(self):
-    self.assertEquals(OrderedSet([
-        self.create_buildfile('BUILD'),
-        self.create_buildfile('BUILD.twitter'),
-    ]), self.buildfile.ancestors())
-
   def testDescendants(self):
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
@@ -66,11 +60,6 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       ]),
       self.scan_buildfiles('grandparent/parent', spec_excludes=['grandparent/parent/child1']))
 
-  # # todo: just remove, not working, but meaningless
-  # def testMustExistFalse(self):
-  #   buildfile = self.create_buildfile("path-that-does-not-exist/BUILD", must_exist=False)
-  #   self.assertEquals(OrderedSet([buildfile]), buildfile.family())
-  #
   def testMustExistTrue(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):
       self.create_buildfile("path-that-does-not-exist/BUILD", must_exist=True)
@@ -93,29 +82,6 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         self.get_build_files_family('suffix-test'))
     self.assertEquals(OrderedSet([self.create_buildfile('suffix-test/child/BUILD.suffix3')]),
         self.scan_buildfiles('suffix-test/child'))
-
-  def testAncestorsSuffix1(self):
-    self.makedirs('suffix-test1/parent')
-    self.touch('suffix-test1/parent/BUILD.suffix')
-    self.touch('suffix-test1/BUILD')
-    buildfile = self.create_buildfile('suffix-test1/parent/BUILD.suffix')
-    self.assertEquals(OrderedSet([
-        self.create_buildfile('suffix-test1/BUILD'),
-        self.create_buildfile('BUILD'),
-        self.create_buildfile('BUILD.twitter')]),
-        buildfile.ancestors())
-
-  def testAncestorsSuffix2(self):
-    self.makedirs('suffix-test2')
-    self.makedirs('suffix-test2/subdir')
-    self.touch('suffix-test2/subdir/BUILD.foo')
-    self.touch('suffix-test2/BUILD.bar')
-    buildfile = self.create_buildfile('suffix-test2/subdir/BUILD.foo')
-    self.assertEquals(OrderedSet([
-        self.create_buildfile('suffix-test2/BUILD.bar'),
-        self.create_buildfile('BUILD'),
-        self.create_buildfile('BUILD.twitter')]),
-        buildfile.ancestors())
 
   def test_buildfile_with_dir_must_exist_false(self):
     # We should be able to create a BuildFile against a dir called BUILD if must_exist is false.

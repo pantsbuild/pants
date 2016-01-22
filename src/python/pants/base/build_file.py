@@ -197,6 +197,7 @@ class BuildFile(AbstractClass):
       descendants.discard(sibling)
     return descendants
 
+  @deprecated('0.0.72')
   def ancestors(self):
     """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
 
