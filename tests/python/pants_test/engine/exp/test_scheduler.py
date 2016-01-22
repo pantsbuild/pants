@@ -16,7 +16,7 @@ from pants.engine.exp.examples.planners import (Classpath, Jar, JavaSources, gen
                                                 isolate_resources, ivy_resolve, javac,
                                                 setup_json_scheduler)
 from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError,
-                                        PartiallyConsumedInputsError)
+                                        PartiallyConsumedInputsError, Return, SelectNode)
 
 
 class SchedulerTest(unittest.TestCase):
@@ -33,25 +33,29 @@ class SchedulerTest(unittest.TestCase):
     self.resources = self.graph.resolve(Address.parse('src/resources/simple'))
     self.consumes_resources = self.graph.resolve(Address.parse('src/java/consumes_resources'))
 
+  def assert_product_for_subjects(self, walk, product, subjects):
+    self.assertEqual({SelectNode(subject, product, None) for subject in subjects},
+                     {node for (node, _), _ in walk
+                      if node.product == product and isinstance(node, SelectNode)})
+
   def build_and_walk(self, build_request):
     """Build and then walk the given build_request, returning the walked graph as a list."""
     result = self.engine.execute(build_request)
     self.assertIsNone(result.error)
-    return list(self.scheduler.walk_product_graph())
-
-  def extract_product_type_and_plan(self, plan):
-    promise, plan = plan
-    return promise.product_type, plan
+    walk = list(self.scheduler.walk_product_graph())
+    for entry in walk:
+      print('>>> {}'.format(entry))
+    return walk
 
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = BuildRequest(goals=goals,
                                  addressable_roots=[Address.parse(spec) for spec in root_specs])
     walk = self.build_and_walk(build_request)
 
-    self.assertEqual(1, len(walk))
-    self.assertEqual((Classpath,
-                      Plan(func_or_task_type=IvyResolve, subjects=jars, jars=list(jars))),
-                     self.extract_product_type_and_plan(plans[0]))
+    # Expect a SelectNode for each of the Jar and Classpath, and a TaskNode and NativeNode.
+    self.assertEqual(4 * len(jars), len(walk))
+    self.assert_product_for_subjects(walk, Jar, jars)
+    self.assert_product_for_subjects(walk, Classpath, jars)
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
@@ -99,65 +103,39 @@ class SchedulerTest(unittest.TestCase):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])
     walk = self.build_and_walk(build_request)
 
-    self.assertEqual(4, len(walk))
+    self.assertEqual(29, len(walk))
 
-    thrift_jars = [Jar(org='org.apache.thrift', name='libthrift', rev='0.9.2'),
-                   Jar(org='commons-lang', name='commons-lang', rev='2.5'),
-                   self.graph.resolve(Address.parse('src/thrift:slf4j-api'))]
+    subjects = [self.guava,
+                Jar(org='org.apache.thrift', name='libthrift', rev='0.9.2'),
+                Jar(org='commons-lang', name='commons-lang', rev='2.5'),
+                self.graph.resolve(Address.parse('src/thrift:slf4j-api')),
+                self.java,
+                self.thrift]
 
-    jars = [self.guava] + thrift_jars
+    # Root: expect compilation via javac.
+    self.assertEqual((SelectNode(self.java, Classpath, None), Return(Classpath(creator='javac'))),
+                     walk[0][0])
 
-    # Independent leaves 1st
-    self.assertEqual({(JavaSources,
-                       Plan(func_or_task_type=gen_apache_thrift,
-                            subjects=[self.thrift],
-                            strict=True,
-                            rev='0.9.2',
-                            gen='java',
-                            sources=['src/thrift/codegen/simple/simple.thrift'])),
-                      (Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=jars))},
-                     set(self.extract_product_type_and_plan(p) for p in plans[0:2]))
-
-    # The rest is linked.
-    self.assertEqual((Classpath,
-                      Plan(func_or_task_type=Javac,
-                           subjects=[self.thrift],
-                           sources=Promise(JavaSources, self.thrift),
-                           classpath=[Promise(Classpath, jar) for jar in thrift_jars])),
-                     self.extract_product_type_and_plan(plans[2]))
-
-    self.assertEqual((Classpath,
-                      Plan(func_or_task_type=Javac,
-                           subjects=[self.java],
-                           sources=['src/java/codegen/simple/Simple.java'],
-                           classpath=[Promise(Classpath, self.guava),
-                                      Promise(Classpath, self.thrift)])),
-                     self.extract_product_type_and_plan(plans[3]))
+    # Confirm that exactly the expected subjects got Classpaths.
+    self.assert_product_for_subjects(walk, Classpath, subjects)
 
   def test_consumes_resources(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.consumes_resources.address])
     walk = self.build_and_walk(build_request)
 
-    self.assertEqual(3, len(walk))
+    self.assertEqual(13, len(walk))
 
-    jars = [self.guava]
+    # Validate the root.
+    self.assertEqual((SelectNode(self.consumes_resources, Classpath, None),
+                      Return(Classpath(creator='javac'))),
+                     walk[0][0])
 
-    # Independent leaves 1st
-    self.assertEqual({(Classpath,
-                       Plan(func_or_task_type=isolate_resources,
-                            subjects=[self.resources],
-                            resources=['src/resources/simple/simple.txt'])),
-                      (Classpath, Plan(func_or_task_type=IvyResolve, subjects=jars, jars=jars))},
-                     set(self.extract_product_type_and_plan(p) for p in plans[0:2]))
-
-    # The rest is linked.
-    self.assertEqual((Classpath,
-                      Plan(func_or_task_type=Javac,
-                           subjects=[self.consumes_resources],
-                           sources=['src/java/consumes_resources/UseAResource.java'],
-                           classpath=[Promise(Classpath, self.guava),
-                                      Promise(Classpath, self.resources)])),
-                     self.extract_product_type_and_plan(plans[2]))
+    # Confirm a classpath for the resources target and other subjects. We know that they are
+    # reachable from the root (since it was involved in this walk).
+    subjects = [self.resources,
+                self.consumes_resources,
+                self.guava]
+    self.assert_product_for_subjects(walk, Classpath, subjects)
 
   @pytest.mark.xfail(raises=ConflictingProducersError)
   def test_multiple_classpath_entries(self):
