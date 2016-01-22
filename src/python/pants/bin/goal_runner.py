@@ -13,7 +13,7 @@ import pkg_resources
 from pants.base.build_environment import get_scm, pants_version
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
-from pants.base.project_tree import FileSystemProjectTree
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.scm_project_tree import ScmProjectTree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.extension_loader import load_plugins_and_backends

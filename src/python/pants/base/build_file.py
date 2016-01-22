@@ -12,7 +12,7 @@ import re
 from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
-from pants.base.project_tree import FileSystemProjectTree
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.util.meta import AbstractClass
 
 

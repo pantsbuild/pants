@@ -13,7 +13,9 @@ python_library(
 
 python_library(
   name = 'project_tree',
-  sources = ['project_tree.py'],
+  # TODO(tabishev): Move file_system_project_tree.py to separate target after transition period.
+  # Currently needed because of FilesystemBuildFile declared in build_file.py.
+  sources = ['project_tree.py', 'file_system_project_tree.py'],
   dependencies = [
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',

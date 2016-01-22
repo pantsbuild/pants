@@ -9,7 +9,7 @@ import os
 import re
 
 from pants.base.build_file import BuildFile
-from pants.base.project_tree import FileSystemProjectTree
+from pants.base.file_system_project_tree import FileSystemProjectTree
 
 
 # A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.

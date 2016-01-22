@@ -11,7 +11,8 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_file import BuildFile
-from pants.base.project_tree import FileSystemProjectTree, ProjectTree
+from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.project_tree import ProjectTree
 from pants.util.dirutil import safe_open
 from pants_test.base.build_file_test_base import BuildFileTestBase
 

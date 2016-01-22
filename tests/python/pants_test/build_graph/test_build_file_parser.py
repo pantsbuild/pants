@@ -10,7 +10,7 @@ from collections import namedtuple
 from textwrap import dedent
 
 from pants.base.build_file import BuildFile
-from pants.base.project_tree import FileSystemProjectTree
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
