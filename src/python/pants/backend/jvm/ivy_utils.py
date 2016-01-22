@@ -238,7 +238,7 @@ class IvyUtils(object):
         return [path.strip() for path in cp.read().split(os.pathsep) if path.strip()]
 
   @classmethod
-  def exec_ivy(cls, ivy, confs_to_resolve, ivyxml, args,
+  def exec_ivy(cls, ivy, confs, ivyxml, args,
                jvm_options,
                executor,
                workunit_name,
@@ -247,7 +247,7 @@ class IvyUtils(object):
 
     ivy_args = ['-ivy', ivyxml]
     ivy_args.append('-confs')
-    ivy_args.extend(confs_to_resolve)
+    ivy_args.extend(confs)
     ivy_args.extend(args)
 
     ivy_jvm_options = list(jvm_options)
@@ -446,13 +446,14 @@ class IvyUtils(object):
 
   @classmethod
   def calculate_classpath(cls, targets):
-    """Resolve conflicts and creates a consistent classpath for the passed targets.
+    """Creates a consistent classpath and list of excludes for the passed targets.
 
-    TODO rename to calculate_jars or something
+    It also modifies the JarDependency objects excludes to include all the jars excluded by
+    provides.
 
-    :param targets
+    :param iterable targets: List of targets to collect JarDependencies and excludes from.
 
-    :returns: jars.values(), global_excludes
+    :returns: A tuple of a list of JarDependencies, and a set of excludes to apply globally
     """
     jars = OrderedDict()
     global_excludes = set()

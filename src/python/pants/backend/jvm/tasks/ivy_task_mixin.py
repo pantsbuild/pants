@@ -21,7 +21,6 @@ from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.java.util import execute_runner
 from pants.task.task import TaskBase
 from pants.util.memo import memoized_property
 
@@ -203,6 +202,7 @@ class IvyTaskMixin(TaskBase):
               under .pants.d, and the id of the reports associated with the resolve.
     :rtype: tuple of (list, dict, string)
     """
+    confs = confs or ('default',)
     if not targets:
       return [], {}, None
 
@@ -231,12 +231,12 @@ class IvyTaskMixin(TaskBase):
 
       # If a report file is not present, we need to exec ivy, even if all the individual
       # targets up to date... See https://rbcommons.com/s/twitter/r/2015
-      any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
-      has_missing_results = (any_report_missing or not os.path.exists(raw_target_classpath_file))
-
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
-      if (invalidation_check.invalid_vts or has_missing_results):
+      any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
+      if (invalidation_check.invalid_vts or
+          any_report_missing or
+          not os.path.exists(raw_target_classpath_file)):
         raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
         args = ['-cachepath', raw_target_classpath_file_tmp] + (custom_args if custom_args else [])
 
@@ -282,8 +282,7 @@ class IvyTaskMixin(TaskBase):
   def _collect_existing_reports(self, confs, resolve_hash_name):
     report_missing = False
     report_paths = []
-    report_confs = confs or ['default']
-    for conf in report_confs:
+    for conf in confs:
       report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
       if not os.path.exists(report_path):
         report_missing = True
@@ -296,14 +295,12 @@ class IvyTaskMixin(TaskBase):
                target_workdir,
                targets,
                args,
+               confs,
                executor=None,
-               confs=None,
                ivy=None,
                workunit_name='ivy',
                use_soft_excludes=False,
                resolve_hash_name=None):
-    confs_to_resolve = confs or ('default',)
-
     # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
     # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
     # See: https://github.com/pantsbuild/pants/issues/2239
@@ -316,13 +313,13 @@ class IvyTaskMixin(TaskBase):
     with IvyUtils.ivy_lock:
       ivyxml = os.path.join(target_workdir, 'ivy.xml')
       try:
-        IvyUtils.generate_ivy(targets, jars, global_excludes, ivyxml, confs_to_resolve,
-                            resolve_hash_name)
+        IvyUtils.generate_ivy(targets, jars, global_excludes, ivyxml, confs,
+                              resolve_hash_name)
       except IvyUtils.IvyError as e:
         raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
 
       try:
-        IvyUtils.exec_ivy(ivy, confs_to_resolve, ivyxml, args,
+        IvyUtils.exec_ivy(ivy, confs, ivyxml, args,
                           jvm_options=self.get_options().jvm_options,
                           executor=executor,
                           workunit_name=workunit_name,
