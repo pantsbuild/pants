@@ -52,16 +52,6 @@ class BuildFile(AbstractClass):
       BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
-  # todo: remove
-  def _get_all_build_files(self, path):
-    """Returns all the BUILD files on a path"""
-    results = []
-    relpath = fast_relpath(path, self.root_dir)
-    for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
-      if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(relpath, build)):
-        results.append(build)
-    return sorted(results)
-
   @staticmethod
   def _is_buildfile_name(name):
     return BuildFile._PATTERN.match(name)
@@ -160,11 +150,13 @@ class BuildFile(AbstractClass):
     # There is no BUILD file without a prefix so select any viable sibling
     buildfile_relpath = fast_relpath(buildfile, self.root_dir)
     if not project_tree.exists(buildfile_relpath) or project_tree.isdir(buildfile_relpath):
-      for build in self._get_all_build_files(os.path.dirname(buildfile)):
-        self._build_basename = build
-        buildfile = os.path.join(path, self._build_basename)
-        buildfile_relpath = fast_relpath(buildfile, self.root_dir)
-        break
+      relpath = fast_relpath(path, self.root_dir)
+      for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+        if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(relpath, build)):
+          self._build_basename = build
+          buildfile = os.path.join(path, self._build_basename)
+          buildfile_relpath = fast_relpath(buildfile, self.root_dir)
+          break
 
     if must_exist:
       if not project_tree.exists(buildfile_relpath):
@@ -207,25 +199,18 @@ class BuildFile(AbstractClass):
   def ancestors(self):
     """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
 
-    def find_parent(dirname):
-      parent = os.path.dirname(dirname)
-      for parent_buildfile in self._get_all_build_files(parent):
-        buildfile = os.path.join(parent, parent_buildfile)
-        return parent, BuildFile.cached(self.project_tree, fast_relpath(buildfile, self.root_dir))
-      return parent, None
-
     parent_buildfiles = OrderedSet()
 
     def is_root(path):
       return os.path.abspath(self.root_dir) == os.path.abspath(path)
 
-    parentdir = os.path.dirname(self.full_path)
+    parentdir = self.parent_path
     visited = set()
     while parentdir not in visited and not is_root(parentdir):
       visited.add(parentdir)
-      parentdir, buildfile = find_parent(parentdir)
-      if buildfile:
-        parent_buildfiles.update(buildfile.family())
+      parentdir = os.path.dirname(parentdir)
+      parent_buildfiles.update(BuildFile.get_project_tree_build_files_family(self.project_tree,
+                                                                             fast_relpath(parentdir, self.root_dir)))
 
     return parent_buildfiles
 
@@ -233,10 +218,10 @@ class BuildFile(AbstractClass):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including
     this BUILD file itself"""
 
-    for build in self._get_all_build_files(self.parent_path):
-      if self.name != build:
-        siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        yield BuildFile.cached(self.project_tree, siblingpath)
+    for build in BuildFile.get_project_tree_build_files_family(self.project_tree,
+                                                               fast_relpath(self.parent_path, self.root_dir)):
+      if self != build:
+        yield build
 
   @classmethod
   def get_project_tree_build_files_family(cls, project_tree, dir_relpath):
