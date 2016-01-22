@@ -22,7 +22,6 @@ class ProjectTree(AbstractClass):
 
   class InvalidBuildRootError(Exception):
     """Raised when the build_root specified to a ProjectTree is not valid."""
-    pass
 
   def __init__(self, build_root):
     if not os.path.isabs(build_root):
@@ -40,7 +39,6 @@ class ProjectTree(AbstractClass):
   @abstractmethod
   def isdir(self, relpath):
     """Returns True if path is a directory"""
-    raise NotImplementedError()
 
   @abstractmethod
   def isfile(self, relpath):
@@ -53,9 +51,3 @@ class ProjectTree(AbstractClass):
   @abstractmethod
   def content(self, file_relpath):
     """Returns the content for file at path."""
-
-  def __ne__(self, other):
-    return not self.__eq__(other)
-
-  def __hash__(self):
-    return hash(self.__repr__())

@@ -84,7 +84,7 @@ class BuildFile(AbstractClass):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
-    :param base_path: Directory under root_dir to scan.
+    :param base_relpath: Directory under root_dir to scan.
     :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
       or paths that are relative to the root_dir.
     """
@@ -100,13 +100,13 @@ class BuildFile(AbstractClass):
           result.append(path)
       return result
 
-    def find_excluded(root, dirs, exclude_roots):
+    def find_excluded(root, dirnames, exclude_roots):
       """Removes any of the directories specified in exclude_roots from dirs.
       """
       to_remove = set()
-      for dir in dirs:
-        if os.path.join(root, dir) in exclude_roots or (root == '.' and (dir in exclude_roots)):
-          to_remove.add(dir)
+      for dirname in dirnames:
+        if os.path.join(root, dirname) in exclude_roots or (root == '.' and (dirname in exclude_roots)):
+          to_remove.add(dirname)
       return to_remove
 
     if base_relpath and not project_tree.isdir(base_relpath):
@@ -122,14 +122,12 @@ class BuildFile(AbstractClass):
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
       to_remove = find_excluded(root, dirs, exclude_roots)
       # For performance, ignore hidden dirs such as .git, .pants.d and .local_artifact_cache.
-      # TODO: Instead of this heuristic, only walk known source_roots.  But we can't do this
-      # until we're able to express source_roots in some way other than bootstrap BUILD files...
       to_remove.update(d for d in dirs if d.startswith('.'))
       for subdir in to_remove:
         dirs.remove(subdir)
       for filename in files:
         if cls._is_buildfile_name(filename):
-          buildfiles.append(BuildFile(project_tree, os.path.join(root, filename)))
+          buildfiles.append(BuildFile.cached(project_tree, os.path.join(root, filename)))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   def __init__(self, project_tree, relpath, must_exist=True):
@@ -204,8 +202,8 @@ class BuildFile(AbstractClass):
   def ancestors(self):
     """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
 
-    def find_parent(dir):
-      parent = os.path.dirname(dir)
+    def find_parent(dirname):
+      parent = os.path.dirname(dirname)
       for parent_buildfile in self._get_all_build_files(parent):
         buildfile = os.path.join(parent, parent_buildfile)
         return parent, self.cached(self.project_tree, os.path.relpath(buildfile, self.root_dir))
@@ -253,14 +251,14 @@ class BuildFile(AbstractClass):
     return compile(self.source(), self.full_path, 'exec', flags=0, dont_inherit=True)
 
   def __eq__(self, other):
-    result = other and \
-             (type(other) == type(self)) and \
-             (self.full_path == other.full_path) and \
-             (self.project_tree == other.project_tree)
-    return result
+    return (
+      other and
+      (type(other) == type(self)) and
+      (self.full_path == other.full_path) and
+      (self.project_tree == other.project_tree))
 
   def __hash__(self):
-    return hash(self.full_path) ^ hash(self.project_tree)
+    return hash((self.project_tree, self.full_path))
 
   def __ne__(self, other):
     return not self.__eq__(other)
