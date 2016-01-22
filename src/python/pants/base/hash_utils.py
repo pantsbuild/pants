@@ -31,3 +31,8 @@ def hash_file(path, digest=None):
       digest.update(s)
       s = fd.read(8192)
   return digest.hexdigest()
+
+
+def compute_shard(str, mod):
+  """Computes the mod-hash of the given string, using a sha1 hash."""
+  return int(hash_all([str]), 16) % mod

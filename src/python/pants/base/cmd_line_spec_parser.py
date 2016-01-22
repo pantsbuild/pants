@@ -15,6 +15,7 @@ import six
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_file import BuildFile
+from pants.base.hash_utils import compute_shard
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 
@@ -74,7 +75,7 @@ class CmdLineSpecParser(object):
   def parse_addresses(self, specs, fail_fast=False):
     """Process a list of command line specs and perform expansion.  This method can expand a list
     of command line specs.
-    :param list specs: either a single spec string or a list of spec strings.
+    :param string|list specs: either a single spec string or a list of spec strings.
     :return: a generator of specs parsed into addresses.
     :raises: CmdLineSpecParser.BadSpecError if any of the address selectors could not be parsed.
     """
@@ -125,9 +126,10 @@ class CmdLineSpecParser(object):
 
     errored_out = []
 
-    if spec.endswith('::'):
+    mo = re.search(r'::((?P<shard>\d+)\/(?P<nshards>\d+))?$', spec)
+    if mo:
       addresses = set()
-      spec_path = spec[:-len('::')]
+      spec_path = spec[:mo.start()]
       spec_dir = normalize_spec_path(spec_path)
       try:
         build_files = self._address_mapper.scan_buildfiles(self._root_dir, spec_dir,
@@ -150,7 +152,16 @@ class CmdLineSpecParser(object):
       if errored_out:
         error_msg = '\n'.join(errored_out + ["Invalid BUILD files for [{0}]".format(spec)])
         raise self.BadSpecError(error_msg)
-      return addresses
+
+      if mo.group('shard') is not None:
+        shard = int(mo.group('shard'))
+        nshards = int(mo.group('nshards'))
+        if shard >= nshards:
+          raise self.BadSpecError('shard number must be less than the total number of shards in '
+                                  '::{}/{}'.format(shard, nshards))
+        return set(addr for addr in addresses if compute_shard(addr.spec, nshards) == shard)
+      else:
+        return addresses
 
     elif spec.endswith(':'):
       spec_path = spec[:-len(':')]
