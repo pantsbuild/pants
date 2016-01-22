@@ -19,6 +19,7 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.extension_loader import load_plugins_and_backends
 from pants.bin.plugin_resolver import PluginResolver
 from pants.bin.repro import Reproducer
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.build_graph import BuildGraph
@@ -200,9 +201,13 @@ class GoalRunnerFactory(object):
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""
     for goal in goals:
-      if self._address_mapper.get_build_file(goal, must_exist=False).file_exists():
+      try:
+        self._address_mapper.resolve_spec(goal)
         logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
+      except AddressLookupError:
+        # Goal name should not be possible to look up.
+        pass
 
     if self._help_request:
       help_printer = HelpPrinter(self._options)
