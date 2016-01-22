@@ -36,7 +36,11 @@ class GoThriftGen(SimpleCodegenTask):
     register('--strict', default=True, fingerprint=True, action='store_true',
              help='Run thrift compiler with strict warnings.')
     register('--gen-options', advanced=True, fingerprint=True,
-             help='Use these apache thrift go gen options.')
+            help='Use these apache thrift go gen options.')
+    register('--thrift-import', advanced=True, fingerprint=True,
+             help='Use this thrift-import gen option to thrift.')
+    register('--thrift-import-target', advanced=True, fingerprint=True,
+             help='Use this thrift import on symbolic defs.')
 
   @classmethod
   def global_subsystems(cls):
@@ -60,23 +64,10 @@ class GoThriftGen(SimpleCodegenTask):
     return thrift_binary.path
 
   @memoized_property
-  def _thrift_dep(self):
-    remote_address = Address('3rdparty/go/github.com/apache/thrift/lib/go', 'thrift')
-
-    build_graph = self.context.build_graph
-    remote = build_graph.get_target(remote_address)
-    if not remote:
-      remote = GoRemoteLibrary(name='thrift',
-                               build_graph=build_graph,
-                               address=remote_address,
-                               pkg='thrift',
-                               rev='217a44b9dcd3ae199571fe584cb13ad8528d6814')
-      build_graph.inject_target(remote)
-    return remote
-
-  @memoized_property
   def _deps(self):
-    return [self._thrift_dep]
+    thrift_import_target = self.get_options().thrift_import_target
+    thrift_imports = self.context.resolve(thrift_import_target)
+    return thrift_imports
 
   @memoized_property
   def _service_deps(self):
@@ -112,9 +103,8 @@ class GoThriftGen(SimpleCodegenTask):
   @memoized_property
   def _thrift_cmd(self):
     cmd = [self._thrift_binary]
-
+    thrift_import = 'thrift_import={}'.format(self.get_options().thrift_import)
     gen_options = self.get_options().gen_options
-    thrift_import = 'thrift_import=github.com/apache/thrift/lib/go/thrift'
     if gen_options:
       gen_options += ',' + thrift_import
     else:
@@ -169,4 +159,3 @@ class GoThriftGen(SimpleCodegenTask):
     source = all_sources[0]
     namespace = self._get_go_namespace(source)
     return os.path.join(target_workdir, 'src', 'go', namespace.replace(".", os.path.sep))
-#    return target_workdir + "/src/go/thrifttest/duck"
