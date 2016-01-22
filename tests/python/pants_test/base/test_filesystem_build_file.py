@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 import six
 from twitter.common.collections import OrderedSet
 
@@ -22,7 +24,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     self._project_tree = FileSystemProjectTree(self.root_dir)
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
 
-  def testSiblings(self):
+  def test_build_files_family_lookup_1(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
     self.assertEquals({buildfile, self.buildfile},
                       set(self.get_build_files_family('grandparent/parent')))
@@ -32,7 +34,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     self.assertEquals({self.create_buildfile('grandparent/parent/child2/child3/BUILD')},
                       set(self.get_build_files_family('grandparent/parent/child2/child3')))
 
-  def testFamily(self):
+  def test_build_files_family_lookup_2(self):
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
@@ -41,7 +43,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     buildfile = self.create_buildfile('grandparent/parent/child2/child3/BUILD')
     self.assertEquals(OrderedSet([buildfile]), self.get_build_files_family('grandparent/parent/child2/child3'))
 
-  def testDescendants(self):
+  def test_build_files_scan(self):
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
@@ -51,16 +53,42 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         self.create_buildfile('grandparent/parent/child5/BUILD'),
     ]), self.scan_buildfiles('grandparent/parent'))
 
-  def test_descendants_with_spec_excludes(self):
+  def test_build_files_scan_with_relpath_excludes(self):
+    buildfiles = self.scan_buildfiles('', spec_excludes=[
+        'grandparent/parent/child1',
+        'grandparent/parent/child2'])
+    self.assertEquals(OrderedSet([
+        self.create_buildfile('BUILD'),
+        self.create_buildfile('BUILD.twitter'),
+        self.create_buildfile('grandparent/parent/BUILD'),
+        self.create_buildfile('grandparent/parent/BUILD.twitter'),
+        self.create_buildfile('grandparent/parent/child5/BUILD'),
+        self.create_buildfile('issue_1742/BUILD.sibling'),
+    ]), buildfiles)
+
+    buildfiles = self.scan_buildfiles('grandparent/parent', spec_excludes=['grandparent/parent/child1'])
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
         self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
         self.create_buildfile('grandparent/parent/child5/BUILD'),
-      ]),
-      self.scan_buildfiles('grandparent/parent', spec_excludes=['grandparent/parent/child1']))
+      ]), buildfiles)
 
-  def testMustExistTrue(self):
+  def test_build_files_scan_with_abspath_excludes(self):
+    buildfiles = self.scan_buildfiles('', spec_excludes=[
+        os.path.join(self.root_dir, 'grandparent/parent/child1'),
+        os.path.join(self.root_dir, 'grandparent/parent/child2')])
+
+    self.assertEquals(OrderedSet([
+        self.create_buildfile('BUILD'),
+        self.create_buildfile('BUILD.twitter'),
+        self.create_buildfile('grandparent/parent/BUILD'),
+        self.create_buildfile('grandparent/parent/BUILD.twitter'),
+        self.create_buildfile('grandparent/parent/child5/BUILD'),
+        self.create_buildfile('issue_1742/BUILD.sibling'),
+    ]), buildfiles)
+
+  def test_must_exist_true(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):
       self.create_buildfile("path-that-does-not-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
@@ -68,7 +96,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     with self.assertRaises(BuildFile.MissingBuildFileError):
       self.create_buildfile("path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
 
-  def testSuffixOnly(self):
+  def test_suffix_only(self):
     self.makedirs('suffix-test')
     self.touch('suffix-test/BUILD.suffix')
     self.touch('suffix-test/BUILD.suffix2')
@@ -108,38 +136,6 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.create_buildfile('grandparent/parent/child5/BUILD'),
 
       ]), buildfiles)
-
-  def test_scan_buildfiles_exclude_abspath(self):
-    buildfiles = self.scan_buildfiles(
-      '', spec_excludes=[
-        'grandparent/parent/child1',
-        'grandparent/parent/child2'
-      ])
-
-    self.assertEquals([self.create_buildfile('BUILD'),
-                       self.create_buildfile('BUILD.twitter'),
-                       self.create_buildfile('grandparent/parent/BUILD'),
-                       self.create_buildfile('grandparent/parent/BUILD.twitter'),
-                       self.create_buildfile('grandparent/parent/child5/BUILD'),
-                       self.create_buildfile('issue_1742/BUILD.sibling'),
-                       ],
-                      buildfiles)
-
-  def test_scan_buildfiles_exclude_relpath(self):
-    buildfiles = self.scan_buildfiles(
-      '', spec_excludes=[
-        'grandparent/parent/child1',
-        'grandparent/parent/child2'
-      ])
-
-    self.assertEquals([self.create_buildfile('BUILD'),
-                       self.create_buildfile('BUILD.twitter'),
-                       self.create_buildfile('grandparent/parent/BUILD'),
-                       self.create_buildfile('grandparent/parent/BUILD.twitter'),
-                       self.create_buildfile('grandparent/parent/child5/BUILD'),
-                       self.create_buildfile('issue_1742/BUILD.sibling'),
-                       ],
-                      buildfiles)
 
   def test_dir_is_primary(self):
     self.assertEqual([self.create_buildfile('issue_1742/BUILD.sibling')],
