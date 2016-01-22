@@ -93,15 +93,13 @@ class BuildFile(AbstractClass):
     """
 
     def relativize(paths, project_tree):
-      result = []
       for path in paths:
         if os.path.isabs(path):
           realpath = os.path.realpath(path)
           if realpath.startswith(project_tree.build_root):
-            result.append(fast_relpath(realpath, project_tree.build_root))
+            yield fast_relpath(realpath, project_tree.build_root)
         else:
-          result.append(path)
-      return result
+          yield path
 
     def find_excluded(root, dirnames, exclude_roots):
       """Removes any of the directories specified in exclude_roots from dirs.
@@ -258,7 +256,6 @@ class BuildFile(AbstractClass):
 
   def __eq__(self, other):
     return (
-      other and
       (type(other) == type(self)) and
       (self.full_path == other.full_path) and
       (self.project_tree == other.project_tree))

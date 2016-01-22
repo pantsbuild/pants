@@ -72,11 +72,11 @@ class ScmProjectTree(ProjectTree):
         yield (scm_relpath, dirnames, filenames)
 
   def __eq__(self, other):
-    return other and \
-           (type(other) == type(self)) and \
-           (self.build_root == other.build_root) and \
-           (self._scm == other._scm) and \
-           (self._rev == other._rev)
+    return (
+      (type(other) == type(self)) and
+      (self.build_root == other.build_root) and
+      (self._scm == other._scm) and
+      (self._rev == other._rev))
 
   def __ne__(self, other):
     return not self.__eq__(other)
