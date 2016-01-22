@@ -110,6 +110,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     register('--coverage',
              help='Emit coverage information for specified paths/modules. Value has two forms: '
                   '"module:list,of,modules" or "path:list,of,paths"')
+    register('--coverage-output-dir', metavar='<DIR>', default=None,
+             help='Directory to emit coverage reports to.'
+             'If not specified, a default within dist is used.')
     register('--shard',
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
                   'run tests number 2, 5, 8, 11, ...')
@@ -410,9 +413,12 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
             # consider combining coverage files from all runs in this Tasks's execute and then
             # producing just 1 console and 1 html report whether or not the tests are run in fast
             # mode.
-            relpath = Target.maybe_readable_identify(targets)
-            pants_distdir = self.context.options.for_global_scope().pants_distdir
-            target_dir = os.path.join(pants_distdir, 'coverage', relpath)
+            if self.get_options().coverage_output_dir:
+              target_dir = self.get_options().coverage_output_dir
+            else:
+              relpath = Target.maybe_readable_identify(targets)
+              pants_distdir = self.context.options.for_global_scope().pants_distdir
+              target_dir = os.path.join(pants_distdir, 'coverage', relpath)
             safe_mkdir(target_dir)
             pex_run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir])
             coverage_xml = os.path.join(target_dir, 'coverage.xml')

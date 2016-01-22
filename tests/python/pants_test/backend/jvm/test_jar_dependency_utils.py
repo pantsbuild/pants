@@ -93,3 +93,33 @@ class JarDependencyUtilsTest(unittest.TestCase):
     jar2 = ResolvedJar(M2Coordinate('org.example', 'lib'), 'ivy2/path', 'path')
 
     self.assertEqual(jar1, jar2)
+
+  def test_m2_coordinate_create_noop(self):
+    m2 = M2Coordinate(org='a', name='b', rev='c', classifier='d', ext='e')
+    m2_new = M2Coordinate.create(m2) # Should just return the original object.
+    self.assertIs(m2, m2_new)
+
+  def test_m2_coordinate_create(self):
+    attrs = ('org', 'name', 'rev', 'classifier', 'ext')
+
+    class CoordinateLike(object):
+      def __init__(self):
+        for i, a in enumerate(attrs):
+          setattr(self, a, chr(i+ord('a'))) # Set attrs to the first few letters in the alphabet.
+
+    coord = CoordinateLike()
+    m2 = M2Coordinate.create(coord)
+    self.assertNotEqual(m2, coord)
+    self.assertEquals(tuple(getattr(coord, a) for a in attrs),
+                      tuple(getattr(m2, a) for a in attrs))
+
+  def test_m2_coordinate_unversioned_noop(self):
+    m2 = M2Coordinate(org='a', name='b', rev=None, classifier='d', ext='e')
+    m2_un = M2Coordinate.unversioned(m2) # Should just return the original object.
+    self.assertIs(m2, m2_un)
+
+  def test_m2_coordinate_unversioned(self):
+    m2 = M2Coordinate(org='a', name='b', rev='c', classifier='d', ext='e')
+    m2_un = M2Coordinate.unversioned(m2)
+    self.assertNotEquals(m2, m2_un)
+    self.assertTrue(m2_un.rev is None)

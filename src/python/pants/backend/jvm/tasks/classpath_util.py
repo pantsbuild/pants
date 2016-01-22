@@ -5,13 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
 import re
+from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import fast_relpath, safe_delete, safe_open, safe_walk
+
+
+class MissingClasspathEntryError(Exception):
+  """Indicates an unexpected problem finding a classpath entry."""
 
 
 class ClasspathUtil(object):
@@ -74,11 +81,41 @@ class ClasspathUtil(object):
     return [entry.path for entry in cls._entries_iter(filtered_tuples_iter)]
 
   @classmethod
+  def classpath_by_targets(cls, targets, classpath_products, confs=('default',)):
+    """Return classpath entries grouped by their targets for the given `targets`.
+
+    :param targets: The targets to lookup classpath products for.
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
+    :param confs: The list of confs for use by this classpath.
+    :returns: The ordered (target, classpath) mappings.
+    :rtype: OrderedDict
+    """
+    classpath_target_tuples = classpath_products.get_product_target_mappings_for_targets(targets)
+    filtered_items_iter = itertools.ifilter(cls._accept_conf_filter(confs, lambda x: x[0][0]),
+                                            classpath_target_tuples)
+
+    # group (classpath_entry, target) tuples by targets
+    target_to_classpath = OrderedDict()
+    for classpath_entry, target in filtered_items_iter:
+      _, entry = classpath_entry
+      if not target in target_to_classpath:
+        target_to_classpath[target] = []
+      target_to_classpath[target].append(entry)
+    return target_to_classpath
+
+  @classmethod
+  def _accept_conf_filter(cls, confs, unpack_func=None):
+    def accept_conf_in_item(item):
+      conf = unpack_func(item)
+      return confs is None or conf in confs
+
+    unpack_func = unpack_func or (lambda x: x)
+    return accept_conf_in_item
+
+  @classmethod
   def _filtered_classpath_by_confs_iter(cls, classpath_tuples, confs):
-    accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
-    for conf, entry in classpath_tuples:
-      if accept(conf):
-        yield conf, entry
+    filter_func = cls._accept_conf_filter(confs, unpack_func=lambda x: x[0])
+    return itertools.ifilter(filter_func, classpath_tuples)
 
   @classmethod
   def _entries_iter(cls, classpath):
@@ -151,7 +188,9 @@ class ClasspathUtil(object):
   @classmethod
   def create_canonical_classpath(cls, classpath_products, targets, basedir,
                                  save_classpath_file=False,
-                                 use_target_id=True):
+                                 use_target_id=True,
+                                 internal_classpath_only=True,
+                                 excludes=None):
     """Create a stable classpath of symlinks with standardized names.
 
     By default symlinks are created for each target under `basedir` based on its `target.id`.
@@ -174,6 +213,9 @@ class ClasspathUtil(object):
       This is added for backward compatibility. Remove once intellij plugin is ready to use
       `target.id` based output files.  See `use_old_naming_style` option in :class:
       `pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher.RuntimeClasspathPublisher`.
+    :param internal_classpath_only: whether to create symlinks just for internal classpath or
+       all classpath.
+    :param excludes: classpath entries should be excluded.
 
     :returns: Converted canonical classpath.
     :rtype: list of strings
@@ -217,25 +259,37 @@ class ClasspathUtil(object):
         os.makedirs(output_dir)
       return classpath_prefix_for_target
 
+    excludes = excludes or set()
     canonical_classpath = []
-    for target in targets:
-      classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
+    target_to_classpath = cls.classpath_by_targets(targets, classpath_products)
 
-      classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
-        [target])
-
+    for target, classpath_entries_for_target in target_to_classpath.items():
+      if internal_classpath_only:
+        classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
+                                              classpath_entries_for_target)
       if len(classpath_entries_for_target) > 0:
+        classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
         classpath = []
-        for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
-          classpath.append(entry.path)
+        # Note: for internal targets pants has only one classpath entry, but user plugins
+        # might generate additional entries, for example, build.properties for the target.
+        # Also it's common to have multiple classpath entries associated with 3rdparty targets.
+        for (index, entry) in enumerate(classpath_entries_for_target):
+          if entry.is_excluded_by(excludes):
+            continue
+
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
           _, ext = os.path.splitext(entry.path)
-
           symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
+          if not os.path.exists(entry.path):
+            raise MissingClasspathEntryError('Could not find {src} when attempting to link '
+                                             'it into the {dst}'
+                                             .format(src=entry.path, dst=symlink_path))
+
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
+          classpath.append(entry.path)
 
         if save_classpath_file:
           with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:

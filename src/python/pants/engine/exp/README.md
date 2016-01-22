@@ -80,7 +80,7 @@ objects.  These namedtuple-like objects that are amenable to serialization, incl
 json and via pickling.  This is a key requirement for both eventual RPC distribution of execution
 data as well as supporting a target graph daemon with out-of-process clients.  The engine experiment
 uses 
-[`Struct`](https://github.com/pantsbuild/pants/blob/67e492d05ab97035ec86e4bd025e953ba9af1d99/src/python/pants/engine/exp/configuration.py#L14)
+[`Struct`](https://github.com/pantsbuild/pants/blob/0f8eb2c1a965dd55893a6220ca137a7d79cf50aa/src/python/pants/engine/exp/struct.py)
 as a convenient baseclass for most of its `Serializable` objects.
 
 ### Target Graph
