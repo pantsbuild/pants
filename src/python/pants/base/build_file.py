@@ -200,18 +200,10 @@ class BuildFile(AbstractClass):
     """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
 
     parent_buildfiles = OrderedSet()
-
-    def is_root(path):
-      return os.path.abspath(self.root_dir) == os.path.abspath(path)
-
-    parentdir = self.parent_path
-    visited = set()
-    while parentdir not in visited and not is_root(parentdir):
-      visited.add(parentdir)
+    parentdir = fast_relpath(self.parent_path, self.root_dir)
+    while parentdir != '':
       parentdir = os.path.dirname(parentdir)
-      parent_buildfiles.update(BuildFile.get_project_tree_build_files_family(self.project_tree,
-                                                                             fast_relpath(parentdir, self.root_dir)))
-
+      parent_buildfiles.update(BuildFile.get_project_tree_build_files_family(self.project_tree, parentdir))
     return parent_buildfiles
 
   def siblings(self):
