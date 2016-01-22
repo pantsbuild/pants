@@ -186,6 +186,7 @@ class BuildFile(AbstractClass):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
     return self.project_tree.exists(self.relpath) and self.project_tree.isfile(self.relpath)
 
+  @deprecated('0.0.72')
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
@@ -251,7 +252,7 @@ class BuildFile(AbstractClass):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.project_tree)
+    return '{}({}, {})'.format(self.__class__.__name__, self.relpath, self.project_tree)
 
 
 # Deprecated, will be removed after 0.0.72. Create BuildFile with IoFilesystem instead.

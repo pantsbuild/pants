@@ -57,10 +57,12 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_descendants_with_spec_excludes(self):
     self.assertEquals(OrderedSet([
+        self.create_buildfile('grandparent/parent/BUILD'),
+        self.create_buildfile('grandparent/parent/BUILD.twitter'),
         self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
-        self.create_buildfile('grandparent/parent/child5'),
+        self.create_buildfile('grandparent/parent/child5/BUILD'),
       ]),
-      self.buildfile.descendants(spec_excludes=['grandparent/parent/child1']))
+      self.scan_buildfiles('grandparent/parent', spec_excludes=['grandparent/parent/child1']))
 
   # # todo: just remove, not working, but meaningless
   # def testMustExistFalse(self):

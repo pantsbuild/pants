@@ -24,7 +24,7 @@ class BuildFileTestBase(unittest.TestCase):
   def touch(self, path):
     touch(self.fullpath(path))
 
-  def scan_buildfiles(self, base_relpath=None, spec_excludes=None):
+  def scan_buildfiles(self, base_relpath, spec_excludes=None):
     return BuildFile.scan_project_tree_build_files(self._project_tree, base_relpath, spec_excludes)
 
   def create_buildfile(self, relpath, must_exist=True):

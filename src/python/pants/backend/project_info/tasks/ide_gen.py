@@ -18,6 +18,7 @@ from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
+from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
 from pants.build_graph.address import BuildFileAddress
@@ -589,12 +590,13 @@ class Project(object):
         if not isinstance(target.address, BuildFileAddress):
           return []  # Siblings only make sense for BUILD files.
         candidates = OrderedSet()
-        for sibling in target.address.build_file.family():
-          candidates.update(self.target_util.get_all_addresses(sibling))
-        for ancestor in target.address.build_file.ancestors():
-          candidates.update(self.target_util.get_all_addresses(ancestor))
-        for descendant in target.address.build_file.descendants(spec_excludes=self.spec_excludes):
+        build_file = target.address.build_file
+        for descendant in BuildFile.scan_project_tree_build_files(build_file.project_tree,
+                                                                  os.path.dirname(build_file.relpath),
+                                                                  spec_excludes=self.spec_excludes):
           candidates.update(self.target_util.get_all_addresses(descendant))
+        for ancestor in build_file.ancestors():
+          candidates.update(self.target_util.get_all_addresses(ancestor))
 
         def is_sibling(target):
           return source_target(target) and target_dirset.intersection(find_source_basedirs(target))
