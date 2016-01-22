@@ -13,12 +13,18 @@ python_library(
 
 python_library(
   name = 'project_tree',
-  # TODO(tabishev): Move file_system_project_tree.py to separate target after transition period.
-  # Currently needed because of FilesystemBuildFile declared in build_file.py.
-  sources = ['project_tree.py', 'file_system_project_tree.py'],
+  sources = ['project_tree.py'],
   dependencies = [
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
+  name = 'file_system_project_tree',
+  sources = ['file_system_project_tree.py'],
+  dependencies = [
+    ':project_tree',
+    'src/python/pants/util:dirutil',
   ]
 )
 
@@ -38,6 +44,9 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     ':project_tree',
+    # TODO(tabishev): Remove this dependency after transition period.
+    # Currently needed because of FilesystemBuildFile declared in build_file.py.
+    ':file_system_project_tree',
     ':deprecated',
   ]
 )
