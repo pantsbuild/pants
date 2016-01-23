@@ -46,10 +46,10 @@ class BuildFile(AbstractClass):
     BuildFile._cache = {}
 
   @staticmethod
-  def cached(project_tree, relpath, must_exist=True, strict_mode=False):
+  def cached(project_tree, relpath, must_exist=True):
     cache_key = (project_tree, relpath, must_exist)
     if cache_key not in BuildFile._cache:
-      BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist, strict_mode)
+      BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
   @staticmethod
@@ -125,7 +125,7 @@ class BuildFile(AbstractClass):
           buildfiles.append(BuildFile.cached(project_tree, os.path.join(root, filename)))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
-  def __init__(self, project_tree, relpath, must_exist=True, strict_mode=False):
+  def __init__(self, project_tree, relpath, must_exist=True, strict_mode=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
 
     :param project_tree: Project tree the BUILD file exist in.
