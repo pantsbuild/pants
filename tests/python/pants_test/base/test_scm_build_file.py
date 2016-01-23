@@ -5,26 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import subprocess
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.scm_build_file import ScmBuildFile
+from pants.base.scm_project_tree import ScmProjectTree
 from pants.scm.git import Git
 from pants.util.contextutil import pushd
 from pants_test.base.build_file_test_base import BuildFileTestBase
 
 
 class ScmBuildFileTest(BuildFileTestBase):
-
-  def setUp(self):
-    super(ScmBuildFileTest, self).setUp()
-    ScmBuildFile.set_rev('HEAD')
-    ScmBuildFile.set_scm(Git(worktree=self.root_dir))
-
-  def create_buildfile(self, path):
-    return ScmBuildFile(self.root_dir, path)
 
   def test_build_file_rev(self):
     # Test that the build_file_rev global option works.  Because the
@@ -41,6 +32,8 @@ class ScmBuildFileTest(BuildFileTestBase):
       subprocess.check_call(['rm', '-rf', 'path-that-does-exist',
                              'grandparent', 'BUILD', 'BUILD.twitter'])
 
+      self._project_tree = ScmProjectTree(self.root_dir, Git(worktree=self.root_dir), 'HEAD')
+
       my_buildfile = self.create_buildfile('grandparent/parent/BUILD')
       buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
 
@@ -50,7 +43,7 @@ class ScmBuildFileTest(BuildFileTestBase):
       buildfile = self.create_buildfile('grandparent/parent/child2/child3/BUILD')
       self.assertEquals(OrderedSet(), OrderedSet(buildfile.siblings()))
 
-      buildfiles = ScmBuildFile.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
+      buildfiles = self.scan_buildfiles('grandparent')
 
       self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),

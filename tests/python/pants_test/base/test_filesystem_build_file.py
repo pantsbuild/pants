@@ -10,7 +10,9 @@ import os
 import six
 from twitter.common.collections import OrderedSet
 
-from pants.base.build_file import BuildFile, FilesystemBuildFile
+from pants.base.build_file import BuildFile
+from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.project_tree import ProjectTree
 from pants.util.dirutil import safe_open
 from pants_test.base.build_file_test_base import BuildFileTestBase
 
@@ -19,10 +21,8 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def setUp(self):
     super(FilesystemBuildFileTest, self).setUp()
+    self._project_tree = FileSystemProjectTree(self.root_dir)
     self.buildfile = self.create_buildfile('grandparent/parent/BUILD')
-
-  def create_buildfile(self, path):
-    return FilesystemBuildFile(self.root_dir, path)
 
   def testSiblings(self):
     buildfile = self.create_buildfile('grandparent/parent/BUILD.twitter')
@@ -63,16 +63,16 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.buildfile.descendants(spec_excludes=['grandparent/parent/child1']))
 
   def testMustExistFalse(self):
-    buildfile = FilesystemBuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=False)
+    buildfile = self.create_buildfile("path-that-does-not-exist/BUILD", must_exist=False)
     self.assertEquals(OrderedSet([buildfile]), buildfile.family())
 
   def testMustExistTrue(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      FilesystemBuildFile(self.root_dir, "path-that-does-not-exist/BUILD", must_exist=True)
+      self.create_buildfile("path-that-does-not-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      FilesystemBuildFile(self.root_dir, "path-that-does-exist/BUILD", must_exist=True)
+      self.create_buildfile("path-that-does-exist/BUILD", must_exist=True)
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      FilesystemBuildFile(self.root_dir, "path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
+      self.create_buildfile("path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
 
   def testSuffixOnly(self):
     self.makedirs('suffix-test')
@@ -115,18 +115,18 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_buildfile_with_dir_must_exist_false(self):
     # We should be able to create a BuildFile against a dir called BUILD if must_exist is false.
     # This is used in what_changed for example.
-    buildfile = FilesystemBuildFile(self.root_dir, 'grandparent/BUILD', must_exist=False)
+    buildfile = self.create_buildfile('grandparent/BUILD', must_exist=False)
     self.assertFalse(buildfile.file_exists())
 
   def test_buildfile_with_dir_must_exist_true(self):
     # We should NOT be able to create a BuildFile instance against a dir called BUILD
     # in the default case.
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      FilesystemBuildFile(self.root_dir, 'grandparent/BUILD')
+      self.create_buildfile('grandparent/BUILD')
 
   def test_directory_called_build_skipped(self):
     # Ensure the buildfiles found do not include grandparent/BUILD since it is a dir.
-    buildfiles = FilesystemBuildFile.scan_buildfiles(os.path.join(self.root_dir, 'grandparent'))
+    buildfiles = self.scan_buildfiles('grandparent')
 
     self.assertEquals(OrderedSet([
       self.create_buildfile('grandparent/parent/BUILD'),
@@ -139,10 +139,10 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       ]), buildfiles)
 
   def test_scan_buildfiles_exclude_abspath(self):
-    buildfiles = FilesystemBuildFile.scan_buildfiles(
-      self.root_dir, '', spec_excludes=[
-        os.path.join(self.root_dir, 'grandparent/parent/child1'),
-        os.path.join(self.root_dir, 'grandparent/parent/child2')
+    buildfiles = self.scan_buildfiles(
+      '', spec_excludes=[
+        'grandparent/parent/child1',
+        'grandparent/parent/child2'
       ])
 
     self.assertEquals([self.create_buildfile('BUILD'),
@@ -155,8 +155,8 @@ class FilesystemBuildFileTest(BuildFileTestBase):
                       buildfiles)
 
   def test_scan_buildfiles_exclude_relpath(self):
-    buildfiles = FilesystemBuildFile.scan_buildfiles(
-      self.root_dir, '', spec_excludes=[
+    buildfiles = self.scan_buildfiles(
+      '', spec_excludes=[
         'grandparent/parent/child1',
         'grandparent/parent/child2'
       ])
@@ -176,14 +176,13 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_invalid_root_dir_error(self):
     self.touch('BUILD')
-    with self.assertRaises(BuildFile.InvalidRootDirError):
-      FilesystemBuildFile('tmp', 'grandparent/BUILD')
+    with self.assertRaises(ProjectTree.InvalidBuildRootError):
+      BuildFile(FileSystemProjectTree('tmp'), 'grandparent/BUILD')
 
   def test_exception_class_hierarchy(self):
     """Exception handling code depends on the fact that all exceptions from BuildFile are
     subclassed from the BuildFileError base class.
     """
-    self.assertIsInstance(BuildFile.InvalidRootDirError(), BuildFile.BuildFileError)
     self.assertIsInstance(BuildFile.MissingBuildFileError(), BuildFile.BuildFileError)
 
   def test_code(self):

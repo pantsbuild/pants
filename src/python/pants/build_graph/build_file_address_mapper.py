@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.deprecated import deprecated
+from pants.base.project_tree import ProjectTree
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_parser import BuildFileParser
@@ -45,7 +47,7 @@ class BuildFileAddressMapper(object):
   class InvalidRootError(BuildFileScanError):
     """Indicates an invalid scan root was supplied."""
 
-  def __init__(self, build_file_parser, build_file_type):
+  def __init__(self, build_file_parser, project_tree):
     """Create a BuildFileAddressMapper.
 
     :param build_file_parser: An instance of BuildFileParser
@@ -53,7 +55,12 @@ class BuildFileAddressMapper(object):
     """
     self._build_file_parser = build_file_parser
     self._spec_path_to_address_map_map = {}  # {spec_path: {address: addressable}} mapping
-    self._build_file_type = build_file_type
+    if isinstance(project_tree, ProjectTree):
+      self._project_tree = project_tree
+    else:
+      # If project_tree is BuildFile class actually.
+      # TODO(tabishev): Remove after transition period.
+      self._project_tree = project_tree._get_project_tree(self.root_dir)
 
   @property
   def root_dir(self):
@@ -116,8 +123,7 @@ class BuildFileAddressMapper(object):
     """
     address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      build_file = self._build_file_type.from_cache(self.root_dir, address.spec_path,
-                                                    must_exist=False)
+      build_file = BuildFile.cached(self._project_tree, address.spec_path, must_exist=False)
       self._raise_incorrect_address_error(build_file, address.target_name, address_map)
     else:
       return address_map[address]
@@ -139,7 +145,7 @@ class BuildFileAddressMapper(object):
     if spec_path not in self._spec_path_to_address_map_map:
       try:
         try:
-          build_file = self._build_file_type.from_cache(self.root_dir, spec_path)
+          build_file = BuildFile.cached(self._project_tree, spec_path)
         except BuildFile.BuildFileError as e:
           raise self.BuildFileScanError("{message}\n searching {spec_path}"
                                         .format(message=e,
@@ -157,12 +163,16 @@ class BuildFileAddressMapper(object):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()
 
-  def from_cache(self, *args, **kwargs):
+  @deprecated('0.0.72', hint_message='Use get_build_file instead.')
+  def from_cache(self, root_dir, relpath, must_exist=True):
     """Return a BuildFile instance.  Args as per BuildFile.from_cache
 
     :returns: a BuildFile
     """
-    return self._build_file_type.from_cache(*args, **kwargs)
+    return self.get_build_file(relpath, must_exist)
+
+  def get_build_file(self, relpath, must_exist=True):
+    return BuildFile.cached(self._project_tree, relpath, must_exist)
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct address.
@@ -176,18 +186,22 @@ class BuildFileAddressMapper(object):
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     try:
-      self.from_cache(self.root_dir, spec_path)
+      self.get_build_file(spec_path)
     except BuildFile.BuildFileError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
     return Address(spec_path, name)
 
-  def scan_buildfiles(self, root_dir, *args, **kwargs):
+  @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
+  def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files in root_dir or its descendant directories.
 
     :returns: an OrderedSet of BuildFile instances.
     """
-    return self._build_file_type.scan_buildfiles(root_dir, *args, **kwargs)
+    return self.scan_project_tree_build_files(base_path, spec_excludes)
+
+  def scan_project_tree_build_files(self, base_path, spec_excludes):
+    return BuildFile.scan_project_tree_build_files(self._project_tree, base_path, spec_excludes)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
@@ -216,9 +230,9 @@ class BuildFileAddressMapper(object):
 
     addresses = set()
     try:
-      for build_file in self._build_file_type.scan_buildfiles(root_dir=root_dir,
-                                                              base_path=base_path,
-                                                              spec_excludes=spec_excludes):
+      for build_file in BuildFile.scan_project_tree_build_files(self._project_tree,
+                                                                base_relpath=base_path,
+                                                                spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
     except BuildFile.BuildFileError as e:
