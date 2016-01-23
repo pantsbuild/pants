@@ -170,9 +170,6 @@ class BuildFileAddressMapper(object):
 
     :returns: a BuildFile
     """
-    return self.get_build_file(relpath, must_exist)
-
-  def get_build_file(self, relpath, must_exist=True):
     return BuildFile.cached(self._project_tree, relpath, must_exist, strict_mode=False)
 
   def spec_to_address(self, spec, relative_to=''):
@@ -187,7 +184,7 @@ class BuildFileAddressMapper(object):
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     try:
-      self.get_build_file(spec_path)
+      BuildFile.cached(self._project_tree, spec_path, strict_mode=False)
     except BuildFile.BuildFileError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
