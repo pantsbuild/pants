@@ -70,17 +70,20 @@ class ScalastyleTest(NailgunTaskTestBase):
     self.context()  # We don't need the context, but this ensures subsystem option registration.
 
   def test_initialize_config_no_config_settings(self):
-    with self.assertRaises(Scalastyle.UnspecifiedConfig):
-      self._create_scalastyle_task(scalastyle_config=None).validate_scalastyle_config()
+    with self.scala_platform_setup():
+      with self.assertRaises(Scalastyle.UnspecifiedConfig):
+        self._create_scalastyle_task(scalastyle_config=None).validate_scalastyle_config()
 
   def test_initialize_config_config_setting_exist_but_invalid(self):
-    with self.assertRaises(Scalastyle.MissingConfig):
-      self._create_scalastyle_task(
-        scalastyle_config='file_does_not_exist.xml').validate_scalastyle_config()
+    with self.scala_platform_setup():
+      with self.assertRaises(Scalastyle.MissingConfig):
+        self._create_scalastyle_task(
+          scalastyle_config='file_does_not_exist.xml').validate_scalastyle_config()
 
   def test_excludes_setting_exists_but_invalid(self):
-    with self.assertRaises(TaskError):
-      FileExcluder('file_does_not_exist.txt', logger)
+    with self.scala_platform_setup():
+      with self.assertRaises(TaskError):
+        FileExcluder('file_does_not_exist.txt', logger)
 
   def test_excludes_parsed_loaded_correctly(self):
     excludes_text = dedent('''
@@ -98,6 +101,14 @@ class ScalastyleTest(NailgunTaskTestBase):
   @contextmanager
   def scala_platform_setup(self):
     with subsystem_instance(ScalaPlatform):
+      self.make_target(':scalastyle',
+                       JarLibrary,
+                       jars=[JarDependency('org.scalastyle', 'scalastyle_2.10', '0.3.2')]
+      )
+      self.make_target(':scalastyle_211',
+                       JarLibrary,
+                       jars=[JarDependency('org.scalastyle', 'scalastyle_2.11', '0.8.0')]
+      )
       self.make_target(':scala-compiler',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.10.5')])
@@ -139,6 +150,9 @@ class ScalastyleTest(NailgunTaskTestBase):
       self.set_options_for_scope(ScalaPlatform.options_scope, scala_2_10_repl=':scala-repl')
       self.set_options_for_scope(ScalaPlatform.options_scope, scala_2_11_repl=':scala-repl_211')
       self.set_options_for_scope(ScalaPlatform.options_scope, scala_repl=':scala-repl')
+
+      self.set_options_for_scope(ScalaPlatform.options_scope, scalastyle_2_10=':scalastyle')
+      self.set_options_for_scope(ScalaPlatform.options_scope, scalastyle_2_11=':scalastyle_211')
       yield
 
   def test_get_non_synthetic_scala_targets(self):

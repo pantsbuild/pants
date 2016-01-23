@@ -52,12 +52,50 @@ Configure Pants' own Runtime Dependencies
 -----------------------------------------
 
 Pants calls out to other tools. E.g., it optionally uses `scalastyle` to check scala source code.
-Most tools come pre-configured by Pants. A few do require more setup though and these rely on
-special targets in your workspace to specify versions of the tools to fetch. These targets all live
-in the `BUILD.tools` file by convention. For example, when Pants fetches `scalastyle`, it looks in
-`BUILD.tools` for that target:
+Most tools come pre-configured by Pants. If you use scala a few tools are configured based on the
+major scala version provided with the --version flag.  You can specify custom tool versions by
+passing "custom" to --scala-platform-version. If a custom version of scala is desired some of these
+tools require more setup though and these rely on special targets in your workspace to specify
+versions of the tools to fetch .These targets all live in the `BUILD.tools` file by convention.
 
-!inc[start-at=scalastyle&end-before=scrooge-gen](../../BUILD.tools)
+For example, the following targets are used to provide custom scala tools:
+
+`//:scalastyle`: Scala style checking.
+`//:scalac`: Scala compiler.
+`//:scala-repl`: Scala REPL environment.
+`//:scala-library`: Scala runtime environment.
+
+Pants looks in `BUILD.tools` for that target.  Below is an example of BUILD.tools that overrides
+the default minor version for 2.10.  For these changes to take effect you would need to set
+--scala-platform-version to 'custom'.
+
+    jar_library(name = 'scalac',
+                jars = [
+                  jar(org = 'org.scala-lang', name = 'scala-compiler', rev = 2.10.3),
+                ])
+
+    jar_library(name = 'scala-library',
+                jars = [
+                  jar(org = 'org.scala-lang', name = 'scala-library', rev = 2.10.3),
+                ])
+
+    jar_library(name = 'scala-repl',
+                jars = [
+                  jar(org = 'org.scala-lang', name = 'jline', rev = 2.10.3, intransitive = True),
+                ],
+                dependencies = [
+                  ':scala-compiler',
+                  ':scala-library',
+                ])
+
+    jar_library(name = 'scalastyle',
+                jars = [
+                  scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
+                ])
+
+Additional tools can be defined as follows in BUILD.tools:
+
+!inc[start-at=scala-js-library&end-before=scrooge-gen](../../BUILD.tools)
 
 When setting up your Pants repo, you may want to copy this file over from a working Pants repo and
 perhaps change some version numbers to fit your situation.
