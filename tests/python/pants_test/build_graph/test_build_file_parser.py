@@ -34,8 +34,8 @@ class BuildFileParserBasicsTest(BaseTest):
     return BuildFileAliases(targets={'jvm_binary': ErrorTarget,
                                      'java_library': ErrorTarget})
 
-  def create_buildfile(self, path, must_exist=True):
-    return BuildFile(FileSystemProjectTree(self.build_root), path, must_exist=must_exist)
+  def create_buildfile(self, path):
+    return BuildFile(FileSystemProjectTree(self.build_root), path)
 
   def test_addressable_exceptions(self):
     self.add_to_build_file('a/BUILD', 'target()')
@@ -102,8 +102,8 @@ class BuildFileParserTargetTest(BaseTest):
   def alias_groups(self):
     return BuildFileAliases(targets={'fake': ErrorTarget})
 
-  def create_buildfile(self, path, must_exist=True):
-    return BuildFile(FileSystemProjectTree(self.build_root), path, must_exist=must_exist)
+  def create_buildfile(self, path):
+    return BuildFile(FileSystemProjectTree(self.build_root), path)
 
   def test_trivial_target(self):
     self.add_to_build_file('BUILD', 'fake(name="foozle")')
