@@ -161,7 +161,7 @@ class HelpInfoExtracter(object):
     default = self.compute_default(kwargs)
     help_msg = kwargs.get('help', 'No help available.')
     deprecated_version = kwargs.get('deprecated_version')
-    deprecated_message = ('DEPRECATED. Will be removed in version {}.'.format(deprecated_version)
+    deprecated_message = ('DEPRECATED. Removal version: {}'.format(deprecated_version)
                           if deprecated_version else None)
     deprecated_hint = kwargs.get('deprecated_hint')
     choices = ', '.join(kwargs.get('choices')) if kwargs.get('choices') else None
