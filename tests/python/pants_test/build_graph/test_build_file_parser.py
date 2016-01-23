@@ -65,7 +65,7 @@ class BuildFileParserBasicsTest(BaseTest):
 
   def test_noop_parse(self):
     self.add_to_build_file('BUILD', '')
-    build_file = self.create_buildfile('')
+    build_file = self.create_buildfile('BUILD')
     address_map = set(self.build_file_parser.parse_build_file(build_file))
     self.assertEqual(len(address_map), 0)
 

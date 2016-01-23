@@ -166,7 +166,7 @@ class BuildConfigurationTest(unittest.TestCase):
     with temporary_dir() as root:
       build_file_path = os.path.join(root, 'george', 'BUILD')
       touch(build_file_path)
-      build_file = BuildFile(FileSystemProjectTree(root), 'george')
+      build_file = BuildFile(FileSystemProjectTree(root), 'george/BUILD')
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
       self.assertEqual(0, len(parse_state.registered_addressable_instances))
