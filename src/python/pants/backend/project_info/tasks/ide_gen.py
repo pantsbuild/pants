@@ -595,8 +595,8 @@ class Project(object):
         for descendant in BuildFile.scan_project_tree_build_files(build_file.project_tree, dir_relpath,
                                                                   spec_excludes=self.spec_excludes):
           candidates.update(self.target_util.get_all_addresses(descendant))
-        if not Project._is_root_relpath(dir_relpath):
-          for ancestor in Project._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath)):
+        if not self._is_root_relpath(dir_relpath):
+          for ancestor in self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath)):
             candidates.update(self.target_util.get_all_addresses(ancestor))
 
         def is_sibling(target):
@@ -687,15 +687,15 @@ class Project(object):
     self.checkstyle_classpath = checkstyle_classpath
     self.scala_compiler_classpath = scalac_classpath
 
-  @staticmethod
-  def _collect_ancestor_build_files(project_tree, dir_relpath):
+  @classmethod
+  def _collect_ancestor_build_files(cls, project_tree, dir_relpath):
     for build_file in BuildFile.get_project_tree_build_files_family(project_tree, dir_relpath):
       yield build_file
-    while not Project._is_root_relpath(dir_relpath):
+    while not cls._is_root_relpath(dir_relpath):
       dir_relpath = os.path.dirname(dir_relpath)
       for build_file in BuildFile.get_project_tree_build_files_family(project_tree, dir_relpath):
         yield build_file
 
-  @staticmethod
-  def _is_root_relpath(relpath):
+  @classmethod
+  def _is_root_relpath(cls, relpath):
     return relpath == '.' or relpath == ''

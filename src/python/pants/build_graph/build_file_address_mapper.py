@@ -148,8 +148,8 @@ class BuildFileAddressMapper(object):
       try:
         build_files = list(BuildFile.get_project_tree_build_files_family(self._project_tree, spec_path))
         if len(build_files) == 0:
-          raise self.BuildFileScanError("There is no build files found in "
-                                        "{spec_path}".format(spec_path=os.path.join(self.root_dir, spec_path)))
+          raise self.BuildFileScanError("{spec_path} does not contains any BUILD files."
+                                        .format(spec_path=os.path.join(self.root_dir, spec_path)))
         mapping = self._build_file_parser.address_map_from_build_files(build_files)
       except BuildFileParser.BuildFileParserError as e:
         raise AddressLookupError("{message}\n Loading addresses from '{spec_path}' failed."
