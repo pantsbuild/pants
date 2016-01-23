@@ -146,6 +146,10 @@ class BuildFile(AbstractClass):
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
+
+    if strict_mode and project_tree.isdir(fast_relpath(path, self.root_dir)):
+      raise Exception("BuildFile can be created only from path to file in strict mode.")
+
     if project_tree.isdir(fast_relpath(path, self.root_dir)):
       buildfile = os.path.join(path, self._build_basename)
     else:
@@ -153,8 +157,6 @@ class BuildFile(AbstractClass):
 
     # There is no BUILD file without a prefix so select any viable sibling
     buildfile_relpath = fast_relpath(buildfile, self.root_dir)
-    if strict_mode and project_tree.isdir(buildfile_relpath):
-      raise Exception("BuildFile can be created only from path to file in strict mode.")
 
     if not project_tree.exists(buildfile_relpath) or project_tree.isdir(buildfile_relpath):
       relpath = os.path.dirname(buildfile_relpath)
