@@ -84,7 +84,7 @@ class BuildFileAddressMapper(object):
     def are_siblings(a, b):  # Are the targets in the same directory?
       return path_parts(a)[0] == path_parts(b)[0]
 
-    build_file = BuildFile.cached(self._project_tree, spec_path)
+    build_file = BuildFile.cached(self._project_tree, spec_path, strict_mode=False)
 
     valid_specs = []
     all_same = True
@@ -173,7 +173,7 @@ class BuildFileAddressMapper(object):
     return self.get_build_file(relpath, must_exist)
 
   def get_build_file(self, relpath, must_exist=True):
-    return BuildFile.cached(self._project_tree, relpath, must_exist)
+    return BuildFile.cached(self._project_tree, relpath, must_exist, strict_mode=False)
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct address.

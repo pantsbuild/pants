@@ -46,10 +46,10 @@ class BuildFile(AbstractClass):
     BuildFile._cache = {}
 
   @staticmethod
-  def cached(project_tree, relpath, must_exist=True):
+  def cached(project_tree, relpath, must_exist=True, strict_mode=True):
     cache_key = (project_tree, relpath, must_exist)
     if cache_key not in BuildFile._cache:
-      BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist)
+      BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist, strict_mode)
     return BuildFile._cache[cache_key]
 
   @staticmethod
