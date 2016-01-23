@@ -170,7 +170,7 @@ class BuildFileAddressMapper(object):
 
     :returns: a BuildFile
     """
-    return BuildFile.cached(self._project_tree, relpath, must_exist, strict_mode=False)
+    return BuildFile.cached(self._project_tree, relpath, must_exist)
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct address.
