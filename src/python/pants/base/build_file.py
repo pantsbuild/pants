@@ -139,10 +139,13 @@ class BuildFile(AbstractClass):
     """
 
     if strict_mode and not must_exist:
-      raise Exception("BuildFile must_exist parameter must be True in strict mode.")
+      raise Exception("BuildFile's must_exist parameter must be True in strict mode.")
 
     self.project_tree = project_tree
     self.root_dir = project_tree.build_root
+
+    if strict_mode and relpath is None:
+      raise Exception("BuildFile's relpath parameter must be not None in strict mode.")
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
