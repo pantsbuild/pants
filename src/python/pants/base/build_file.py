@@ -193,6 +193,7 @@ class BuildFile(AbstractClass):
     self.relpath = fast_relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
 
+  @deprecated('0.0.72')
   def file_exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
     return self.project_tree.exists(self.relpath) and self.project_tree.isfile(self.relpath)
