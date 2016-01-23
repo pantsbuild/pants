@@ -111,7 +111,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     self.assertEquals(OrderedSet([self.create_buildfile('suffix-test/child/BUILD.suffix3')]),
         self.scan_buildfiles('suffix-test/child'))
 
-  def test_buildfile_with_dir_must_exist_true(self):
+  def test_buildfile_with_build_dir(self):
     # We should NOT be able to create a BuildFile instance against a dir called BUILD
     # in the default case.
     with self.assertRaises(BuildFile.MissingBuildFileError):
