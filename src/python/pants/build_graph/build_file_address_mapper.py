@@ -68,7 +68,7 @@ class BuildFileAddressMapper(object):
   def root_dir(self):
     return self._build_file_parser.root_dir
 
-  def _raise_incorrect_address_error(self, build_file, wrong_target_name, targets):
+  def _raise_incorrect_address_error(self, spec_path, wrong_target_name, targets):
     """Search through the list of targets and return those which originate from the same folder
     which wrong_target_name resides in.
 
@@ -83,6 +83,8 @@ class BuildFileAddressMapper(object):
 
     def are_siblings(a, b):  # Are the targets in the same directory?
       return path_parts(a)[0] == path_parts(b)[0]
+
+    build_file = BuildFile.cached(self._project_tree, spec_path)
 
     valid_specs = []
     all_same = True
@@ -125,8 +127,7 @@ class BuildFileAddressMapper(object):
     """
     address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      build_file = BuildFile.cached(self._project_tree, address.spec_path, must_exist=False)
-      self._raise_incorrect_address_error(build_file, address.target_name, address_map)
+      self._raise_incorrect_address_error(address.spec_path, address.target_name, address_map)
     else:
       return address_map[address]
 
