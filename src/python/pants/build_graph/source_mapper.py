@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.source.payload_fields import DeferredSourcesField
 
 
@@ -45,7 +46,11 @@ class SpecSourceMapper(SourceMapper):
     # a top-level source has empty dirname, so do/while instead of straight while loop.
     while path:
       path = os.path.dirname(path)
-      result.extend(list(self._find_targets_for_source(source, path)))
+      try:
+        result.extend(self._find_targets_for_source(source, path))
+      except AddressLookupError:
+        # Ignore address lookup errors.
+        pass
       if self._stop_after_match and len(result) > 0:
         break
 
@@ -122,7 +127,11 @@ class LazySourceMapper(SourceMapper):
     while walking:
       # It is possible
       if path not in self._mapped_paths:
-        self._map_sources_from_spec_path(path)
+        try:
+          self._map_sources_from_spec_path(path)
+        except AddressLookupError:
+          # Ignore address lookup errors.
+          pass
         self._mapped_paths.add(path)
       elif not self._stop_after_match:
         # If not in stop-after-match mode, once a path is seen visited, all parents can be assumed.
