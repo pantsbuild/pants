@@ -18,21 +18,38 @@ from pants.subsystem.subsystem import Subsystem
 
 major_version_info = namedtuple(
   'major_version_info',
-  'full_version compiler_name runtime_name repl_name')
+  'full_version compiler_name runtime_name repl_name style_name style_version')
 
 scala_build_info = {
-  '2.10': major_version_info('2.10.4', 'scalac_2_10', 'runtime_2_10', 'scala_2_10_repl'),
-  '2.11': major_version_info('2.11.7', 'scalac_2_11', 'runtime_2_11', 'scala_2_11_repl'),
-  'custom': major_version_info(None, 'scalac', 'runtime_default', 'scala-repl'),
+  '2.10':
+    major_version_info(
+      full_version='2.10.4',
+      compiler_name='scalac_2_10',
+      runtime_name='runtime_2_10',
+      repl_name='scala_2_10_repl',
+      style_name='scalastyle_2_10',
+      style_version='0.3.2'),
+  '2.11':
+    major_version_info(
+      full_version='2.11.7',
+      compiler_name='scalac_2_11',
+      runtime_name='runtime_2_11',
+      repl_name='scala_2_11_repl',
+      style_name='scalastyle_2_11',
+      style_version='0.8.0'),
+  'custom': major_version_info(
+    full_version='2.10.4',
+    compiler_name='scalac',
+    runtime_name='runtime_default',
+    repl_name='scala-repl',
+    style_name='scalastyle',
+    style_version='0.3.2'),
 }
 
 
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
-  """A scala platform.
+  """A scala platform."""
 
-  TODO: Rework so there's a way to specify a default as direct pointers to jar coordinates,
-  so we don't require specs in BUILD.tools if the default is acceptable.
-  """
   options_scope = 'scala-platform'
 
   runtime_2_10 = JarDependency(org = 'org.scala-lang',
@@ -47,6 +64,29 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   @classmethod
   def register_options(cls, register):
+    def _register_tool(org, dep_name, name, version, extra_deps=None):
+      classpaths = [JarDependency(org=org, name=dep_name, rev=version)]
+      if extra_deps:
+        classpaths.extend(extra_deps)
+
+      cls.register_jvm_tool(register, name, classpath=classpaths)
+
+    def register_scala_compiler(version):
+      name = scala_build_info[version].compiler_name
+      version = scala_build_info[version].full_version
+      _register_tool('org.scala-lang', 'scala-compiler', name, version)
+
+    def register_scala_repl(version, extra_deps=None):
+      name, version = scala_build_info[version].repl_name, scala_build_info[version].full_version
+      _register_tool('org.scala-lang', 'scala-compiler', name, version, extra_deps)
+
+    def register_style_tool(version):
+      # Note: Since we can't use ScalaJarDependency without creating a import loop we need to
+      # specify the version info in the name.
+      name = scala_build_info[version].style_name
+      style_version = scala_build_info[version].style_version
+      _register_tool('org.scalastyle', 'scalastyle_{}'.format(version), name, style_version)
+
     super(ScalaPlatform, cls).register_options(register)
     register('--version', advanced=True, default='2.10', choices=['2.10', '2.11', 'custom'],
              help='The scala "platform version", which is suffixed onto all published '
@@ -69,66 +109,29 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register('--runtime-spec', advanced=True, default='//:scala-library',
              help='Address to be used for custom scala runtime.')
 
-    # Scala 2.10
-    cls.register_jvm_tool(register,
-                          'scalac_2_10',
-                          classpath=[
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'scala-compiler',
-                                          rev = scala_build_info['2.10'].full_version),
-                          ])
+    register('--suffix-version', advanced=True, default=None,
+             help='Scala suffix to be used when a custom version is specified.  For example 2.10')
 
+    # Register Scala compilers.
+    register_scala_compiler('2.10')
+    register_scala_compiler('2.11')
+    register_scala_compiler('custom')  # This will register default tools.
 
-    # Scala 2.11
-    cls.register_jvm_tool(register,
-                          'scalac_2_11',
-                          classpath=[
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'scala-compiler',
-                                          rev = scala_build_info['2.11'].full_version),
-                          ])
+    # Register repl tools.
+    jline_dep = JarDependency(
+        org = 'org.scala-lang',
+        name = 'jline',
+        rev = scala_build_info['2.10'].full_version
+    )  # Dep is only used by scala 2.10.x
 
-    # Provide a classpath default for scala-compiler since all jvm tools are bootstrapped.
-    cls.register_jvm_tool(register,
-                          'scalac',
-                          classpath=[
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'scala-compiler',
-                                          rev = scala_build_info['2.10'].full_version),
-                          ])
+    register_scala_repl('2.10', extra_deps=[jline_dep])
+    register_scala_repl('2.11')
+    register_scala_repl('custom', extra_deps=[jline_dep])
 
-    # Scala 2.10 repl
-    cls.register_jvm_tool(register,
-                          'scala_2_10_repl',
-                          classpath=[
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'jline',
-                                          rev = scala_build_info['2.10'].full_version),
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'scala-compiler',
-                                          rev = scala_build_info['2.10'].full_version),
-                          ])
-
-    # Scala 2.11 repl
-    cls.register_jvm_tool(register,
-                          'scala_2_11_repl',
-                          classpath=[
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'scala-compiler',
-                                          rev = scala_build_info['2.11'].full_version),
-                          ])
-
-    # Provide a classpath default for scala-repl since all jvm tools are bootstrapped.
-    cls.register_jvm_tool(register,
-                          'scala_repl',
-                          classpath=[
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'jline',
-                                          rev = scala_build_info['2.10'].full_version),
-                            JarDependency(org = 'org.scala-lang',
-                                          name = 'scala-compiler',
-                                          rev = scala_build_info['2.10'].full_version),
-                          ])
+    # Register Scala style libraries.
+    register_style_tool('2.10')
+    register_style_tool('2.11')
+    register_style_tool('custom')
 
   def _get_label(self):
     return getattr(self.get_options(), 'version', 'custom')
@@ -137,6 +140,11 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper classpath based on products and scala version."""
     compiler_name = scala_build_info.get(self._get_label()).compiler_name
     return self.tool_classpath_from_products(products, compiler_name, scope=self.options_scope)
+
+  def style_classpath(self, products):
+    """Return the proper classpath based on products and scala version."""
+    style_name = scala_build_info.get(self._get_label()).style_name
+    return self.tool_classpath_from_products(products, style_name, scope=self.options_scope)
 
   @property
   def version(self):
@@ -147,6 +155,18 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
     Also validates that the name doesn't already end with the version.
     """
+    if self._get_label() == 'custom':
+      suffix = self.get_options().suffix_version
+      if suffix:
+        return '{0}_{1}'.format(name, suffix)
+      else:
+        raise RuntimeError('Suffix version must be specified if using a custom scala version.'
+                           'Suffix version is used for bootstrapping jars.  If a custom '
+                           'scala version is not specified, then the version specified in '
+                           '--scala-platform-suffix-version is used.  For example for Scala '
+                           '2.10.7 you would use the suffix version "2.10"'
+              )
+
     if name.endswith(self.version):
       raise ValueError('The name "{0}" should not be suffixed with the scala platform version '
                       '({1}): it will be added automatically.'.format(name, self.version))

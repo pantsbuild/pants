@@ -1,6 +1,48 @@
 RELEASE HISTORY
 ===============
 
+0.0.69 (01/22/2016)
+-------------------
+
+Release Notes
+~~~~~~~~~~~~~
+
+This release contains the new `managed_dependencies()` target which
+allows you to pin the versions of transitive dependencies on jvm
+artifacts.  This is equivalent to the `<dependencyManagement>`
+feature in Maven.
+
+Bugfixes
+~~~~~~~~
+
+* Revert "Add RecursiveVersion and tests"
+  `RB #3331 <https://rbcommons.com/s/twitter/r/3331>`_
+  `RB #3351 <https://rbcommons.com/s/twitter/r/3351>`_
+
+New Features
+~~~~~~~~~~~~
+
+* First pass at dependency management implementation.
+  `RB #3336 <https://rbcommons.com/s/twitter/r/3336>`_
+
+Small improvements, Refactoring and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* SimpleCodegenTask: Add copy_target_attributes
+  `RB #3352 <https://rbcommons.com/s/twitter/r/3352>`_
+
+* Make more glob usages lazy; Pass FilesetWithSpec through source field validation, Make BundleProps.filemap lazy
+  `RB #3344 <https://rbcommons.com/s/twitter/r/3344>`_
+
+* Update the docs for the ./pants bash-completion script
+  `RB #3349 <https://rbcommons.com/s/twitter/r/3349>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Move dependencies onto configuration
+  `RB #3316 <https://rbcommons.com/s/twitter/r/3316>`_
+
 0.0.68 (01/15/2016)
 -------------------
 

@@ -1,11 +1,6 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-jar_library(name = 'scalastyle',
-            jars = [
-              scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
-            ])
-
 target(name = 'scala-js-cli', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:cli'])
 target(name = 'scala-js-compiler', dependencies=[
   'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',

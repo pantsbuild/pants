@@ -130,8 +130,8 @@ class CmdLineSpecParser(object):
       spec_path = spec[:-len('::')]
       spec_dir = normalize_spec_path(spec_path)
       try:
-        build_files = self._address_mapper.scan_buildfiles(self._root_dir, spec_dir,
-                                                           spec_excludes=self._spec_excludes)
+        build_files = self._address_mapper.scan_project_tree_build_files(base_path=spec_dir,
+                                                                         spec_excludes=self._spec_excludes)
       except (BuildFile.BuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
 
@@ -164,7 +164,7 @@ class CmdLineSpecParser(object):
       spec_parts[0] = normalize_spec_path(spec_parts[0])
       spec_path, target_name = parse_spec(':'.join(spec_parts))
       try:
-        self._address_mapper.from_cache(self._root_dir, spec_path)
+        self._address_mapper.get_build_file(spec_path)
       except BuildFile.BuildFileError as e:
         raise self.BadSpecError(e)
       return {Address(spec_path, target_name)}

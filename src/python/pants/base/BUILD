@@ -12,12 +12,42 @@ python_library(
 )
 
 python_library(
+  name = 'project_tree',
+  sources = ['project_tree.py'],
+  dependencies = [
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
+  name = 'file_system_project_tree',
+  sources = ['file_system_project_tree.py'],
+  dependencies = [
+    ':project_tree',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
+python_library(
+  name = 'scm_project_tree',
+  sources = ['scm_project_tree.py'],
+  dependencies = [
+    ':project_tree',
+  ]
+)
+
+python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+    ':project_tree',
+    # TODO(tabishev): Remove this dependency after transition period.
+    # Currently needed because of FilesystemBuildFile declared in build_file.py.
+    ':file_system_project_tree',
+    ':deprecated',
   ]
 )
 
