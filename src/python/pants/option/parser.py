@@ -310,7 +310,7 @@ class Parser(object):
   _allowed_registration_kwargs = {
     'type', 'action', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'deprecated_version', 'deprecated_hint', 'fromfile'
+    'fingerprint', 'deprecated_version', 'deprecated_hint', 'removal_version', 'fromfile'
   }
 
   _allowed_actions = {
