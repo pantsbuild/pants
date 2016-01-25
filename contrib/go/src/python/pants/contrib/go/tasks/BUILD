@@ -113,7 +113,7 @@ python_library(
     'contrib/go/src/python/pants/contrib/go/targets:go_library',
     'contrib/go/src/python/pants/contrib/go/targets:go_local_source',
     'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
-    'contrib/go/src/python/pants/contrib/go/targets:go_thrift_library',
+    'contrib/go/src/python/pants/contrib/go/targets:go_target',
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ]
