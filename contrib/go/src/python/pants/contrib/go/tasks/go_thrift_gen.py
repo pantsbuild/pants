@@ -36,9 +36,9 @@ class GoThriftGen(SimpleCodegenTask):
              help='Run thrift compiler with strict warnings.')
     register('--gen-options', advanced=True, fingerprint=True,
             help='Use these apache thrift go gen options.')
-    register('--thrift-import', advanced=True, fingerprint=True,
+    register('--thrift-import', advanced=True,
              help='Use this thrift-import gen option to thrift.')
-    register('--thrift-import-target', advanced=True, fingerprint=True,
+    register('--thrift-import-target', advanced=True,
              help='Use this thrift import on symbolic defs.')
 
   @classmethod
@@ -53,9 +53,6 @@ class GoThriftGen(SimpleCodegenTask):
   def subsystem_dependencies(cls):
     return (super(GoThriftGen, cls).subsystem_dependencies() +
             (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))
-
-  def __init__(self, *args, **kwargs):
-    super(GoThriftGen, self).__init__(*args, **kwargs)
 
   @memoized_property
   def _thrift_binary(self):
