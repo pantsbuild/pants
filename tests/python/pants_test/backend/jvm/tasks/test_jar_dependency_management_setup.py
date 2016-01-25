@@ -12,7 +12,8 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependenc
                                                                     JarDependencyManagementSetup)
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
+from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
+                                                                ManagedJarLibraries)
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
@@ -242,3 +243,23 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
       artifact_set = manager.for_targets([jar_library1, jar_library2, unpacked_target])
       self.assertFalse(artifact_set is None)
       self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+
+  def test_invalid_managed_jar_libraries(self):
+    target_aliases = {
+      'managed_jar_dependencies': ManagedJarDependencies,
+      'jar_library': JarLibrary,
+    }
+
+    class FakeContext(object):
+      def create_object(fake, target_type, name, **kwargs):
+        return self.make_target(target_type=target_aliases[target_type],
+                                spec='//foo:{}'.format(name), **kwargs)
+
+    with self.assertRaises(ManagedJarLibraries.JarLibraryNameCollision):
+      ManagedJarLibraries(FakeContext())(
+        name='management',
+        artifacts=[
+          JarDependency(org='fruit.apple', name='orange', rev='2'),
+          JarDependency(org='fruit', name='apple', rev='2', classifier='orange'),
+        ],
+      )

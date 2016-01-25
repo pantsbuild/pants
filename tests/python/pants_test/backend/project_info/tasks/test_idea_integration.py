@@ -397,9 +397,13 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
                     })
 
   def test_all_targets(self):
-    # The android targets won't work if the Android ADK is not installed.
-    self._idea_test(['src::', 'tests::', 'examples::', 'testprojects::',
-                     '--exclude-target-regexp=.*android.*'])
+    self._idea_test([
+      'src::', 'tests::', 'examples::', 'testprojects::',
+      # The android targets won't work if the Android ADK is not installed.
+      '--exclude-target-regexp=.*android.*',
+      # Won't work until https://rbcommons.com/s/twitter/r/3367/ lands.
+      '--exclude-target-regexp=testprojects/3rdparty/managed.*',
+    ])
 
   def test_ivy_classifiers(self):
     def do_check(path):
