@@ -121,7 +121,9 @@ class VersionedTarget(VersionedTargetSet):
     to the new results dir. Otherwise, simply ensures that the results dir exists.
     """
     def dirname(key):
-      task_version = self._cache_manager.task_version
+      def version_to_string(task_ver):
+        return '.'.join(['_'.join(map(str, x)) for x in task_ver])
+      task_version = version_to_string(self._cache_manager.task_version)
       # TODO: Shorten cache_key hashes in general?
       return os.path.join(root_dir, sha1(task_version), key.id, sha1(key.hash).hexdigest()[:12])
     new_dir = dirname(self.cache_key)

@@ -259,7 +259,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     invalidate_dependents,
                                     fingerprint_strategy=fingerprint_strategy,
                                     invalidation_report=self.context.invalidation_report,
-                                    task_name=type(self).__name__)
+                                    task_name=type(self).__name__,
+                                    task_version=self.implementation_version())
 
   @property
   def cache_target_dirs(self):
