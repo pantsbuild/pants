@@ -147,7 +147,7 @@ class BuildFileAddressMapper(object):
     if spec_path not in self._spec_path_to_address_map_map:
       try:
         build_files = list(BuildFile.get_project_tree_build_files_family(self._project_tree, spec_path))
-        if len(build_files) == 0:
+        if not build_files:
           raise self.BuildFileScanError("{spec_path} does not contains any BUILD files."
                                         .format(spec_path=os.path.join(self.root_dir, spec_path)))
         mapping = self._build_file_parser.address_map_from_build_files(build_files)

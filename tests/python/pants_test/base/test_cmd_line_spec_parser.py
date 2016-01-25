@@ -107,13 +107,13 @@ class CmdLineSpecParserTest(BaseTest):
 
   def test_does_not_exist(self):
     with self.assertRaises(self.spec_parser.BadSpecError):
-      self.spec_parser.parse_addresses('c').next()
+      list(self.spec_parser.parse_addresses('c'))
 
     with self.assertRaises(self.spec_parser.BadSpecError):
-      self.spec_parser.parse_addresses('c:').next()
+      list(self.spec_parser.parse_addresses('c:'))
 
     with self.assertRaises(self.spec_parser.BadSpecError):
-      self.spec_parser.parse_addresses('c::').next()
+      list(self.spec_parser.parse_addresses('c::'))
 
   def assert_parsed(self, cmdline_spec, expected):
     def sort(addresses):
