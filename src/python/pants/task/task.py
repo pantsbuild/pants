@@ -58,6 +58,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   _stable_name = None
 
   @classmethod
+  def implementation_version(cls):
+    return [('TaskBase', 1)]
+
+  @classmethod
   def stable_name(cls):
     """The stable name of this task type.
 

@@ -31,6 +31,10 @@ class PythonTask(Task):
   CHROOT_EXECUTABLE_NAME = '__pants_executable__'
 
   @classmethod
+  def implementation_version(cls):
+    return super(PythonTask, cls).implementation_version() + [('PythonTask', 1)]
+
+  @classmethod
   def global_subsystems(cls):
     return super(PythonTask, cls).global_subsystems() + (IvySubsystem, PythonSetup, PythonRepos)
 
