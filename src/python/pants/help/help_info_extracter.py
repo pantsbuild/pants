@@ -7,8 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import namedtuple
 
+from pants.base.revision import Revision
 from pants.option.custom_types import dict_option, list_option
 from pants.option.option_util import is_boolean_flag
+from pants.version import VERSION
 
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
@@ -126,6 +128,12 @@ class HelpInfoExtracter(object):
                                recursive=recursive_options,
                                advanced=advanced_options)
 
+  def _get_deprecated_tense(self, deprecated_version, future_tense='Will be', past_tense='Was'):
+    """Provides the grammatical tense for a given deprecated version vs the current version."""
+    return future_tense if (
+      Revision.semver(deprecated_version) >= Revision.semver(VERSION)
+    ) else past_tense
+
   def get_option_help_info(self, args, kwargs):
     """Returns an OptionHelpInfo for the option registered with the given (args, kwargs)."""
     display_args = []
@@ -161,8 +169,11 @@ class HelpInfoExtracter(object):
     default = self.compute_default(kwargs)
     help_msg = kwargs.get('help', 'No help available.')
     deprecated_version = kwargs.get('deprecated_version')
-    deprecated_message = ('DEPRECATED. Will be removed in version {}.'.format(deprecated_version)
-                          if deprecated_version else None)
+    deprecated_message = None
+    if deprecated_version:
+      deprecated_tense = self._get_deprecated_tense(deprecated_version)
+      deprecated_message = 'DEPRECATED. {} removed in version: {}'.format(deprecated_tense,
+                                                                          deprecated_version)
     deprecated_hint = kwargs.get('deprecated_hint')
     choices = ', '.join(kwargs.get('choices')) if kwargs.get('choices') else None
 

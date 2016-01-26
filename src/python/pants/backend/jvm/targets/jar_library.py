@@ -50,14 +50,11 @@ class JarLibrary(Target):
   def managed_dependencies(self):
     """The managed_jar_dependencies target this jar_library specifies, or None."""
     if self.payload.managed_dependencies:
-      return self._build_graph.get_target(Address.parse(self.payload.managed_dependencies,
-                                                        relative_to=self.address.spec_path))
+      address = Address.parse(self.payload.managed_dependencies,
+                              relative_to=self.address.spec_path)
+      self._build_graph.inject_address_closure(address)
+      return self._build_graph.get_target(address)
     return None
-
-  @property
-  def traversable_dependency_specs(self):
-    if self.payload.managed_dependencies:
-      yield self.payload.managed_dependencies
 
   @property
   def jar_dependencies(self):

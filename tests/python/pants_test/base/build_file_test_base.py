@@ -10,6 +10,7 @@ import shutil
 import tempfile
 import unittest
 
+from pants.base.build_file import BuildFile
 from pants.util.dirutil import safe_mkdir, touch
 
 
@@ -23,8 +24,18 @@ class BuildFileTestBase(unittest.TestCase):
   def touch(self, path):
     touch(self.fullpath(path))
 
+  def scan_buildfiles(self, base_relpath, spec_excludes=None):
+    return BuildFile.scan_project_tree_build_files(self._project_tree, base_relpath, spec_excludes)
+
+  def create_buildfile(self, relpath, must_exist=True):
+    return BuildFile(self._project_tree, relpath, must_exist=must_exist)
+
+  def get_build_files_family(self, relpath):
+    return BuildFile.get_project_tree_build_files_family(self._project_tree, relpath)
+
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
+    self._project_tree = None
 
     # Seed a BUILD outside the build root that should not be detected
     touch(os.path.join(self.base_dir, 'BUILD'))

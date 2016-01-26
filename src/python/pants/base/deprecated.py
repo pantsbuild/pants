@@ -41,7 +41,7 @@ class BadDecoratorNestingError(DeprecationApplicationError):
   """Indicates the @deprecated decorator was innermost in a sequence of layered decorators."""
 
 
-def check_deprecated_semver(removal_version):
+def check_deprecated_semver(removal_version, check_expired=True):
   """Check to see if the removal version is < the current Pants version.
    :param str removal_version: The pantsbuild.pants version which will remove the deprecated
                               function.
@@ -57,7 +57,7 @@ def check_deprecated_semver(removal_version):
     raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
                                  '{}'.format(removal_version, e))
 
-  if removal_semver <= _PANTS_SEMVER:
+  if check_expired and removal_semver <= _PANTS_SEMVER:
     raise PastRemovalVersionError('The removal version must be greater than the current pants '
                                   'version of {} - given {}'.format(VERSION, removal_version))
 

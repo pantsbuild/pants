@@ -10,7 +10,6 @@ from pants.option.arg_splitter import GLOBAL_SCOPE
 
 class OptionsError(Exception):
   """An options system-related error."""
-  pass
 
 
 class RegistrationError(OptionsError):
@@ -24,7 +23,10 @@ class RegistrationError(OptionsError):
 
 class ParseError(OptionsError):
   """An error at flag parsing time."""
-  pass
+
+
+class DeprecatedOptionError(OptionsError):
+  """An error raised when deprecated options are used beyond their expiration."""
 
 
 # Subclasses of RegistrationError. The distinction between them is useful mainly for testing

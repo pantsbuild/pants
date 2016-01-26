@@ -150,7 +150,7 @@ python_tests(
   dependencies = [
     ':build_file_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:scm_build_file',
+    'src/python/pants/base:scm_project_tree',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
   ]

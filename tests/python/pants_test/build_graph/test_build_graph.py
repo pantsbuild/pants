@@ -245,8 +245,7 @@ class BuildGraphTest(BaseTest):
     self.build_graph.inject_address_closure(Address.parse(spec))
 
   def test_invalid_address(self):
-    with self.assertRaisesRegexp(AddressLookupError,
-                                 '^BUILD file does not exist at:.*/BUILD'):
+    with self.assertRaisesRegexp(AddressLookupError, '^.* does not contains any BUILD files.$'):
       self.inject_address_closure('//:a')
 
     self.add_to_build_file('BUILD',
