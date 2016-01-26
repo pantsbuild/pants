@@ -139,9 +139,9 @@ class BuildFile(AbstractClass):
     """
 
     if not must_exist:
-      raise Exception('BuildFile\'s must_exist parameter must be True.')
+      logger.warn('BuildFile\'s must_exist parameter must be True.')
     if relpath is None:
-      raise Exception('BuildFile\'s relpath parameter must be not None.')
+      logger.warn('BuildFile\'s relpath parameter must be not None.')
 
     self.project_tree = project_tree
     self.root_dir = project_tree.build_root
@@ -150,7 +150,7 @@ class BuildFile(AbstractClass):
     self._build_basename = self._BUILD_FILE_PREFIX
 
     if project_tree.isdir(fast_relpath(path, self.root_dir)):
-      raise Exception('BuildFile can be created only from path to file.')
+      logger.warn('BuildFile can be created only from path to file.')
 
     if project_tree.isdir(fast_relpath(path, self.root_dir)):
       buildfile = os.path.join(path, self._build_basename)
