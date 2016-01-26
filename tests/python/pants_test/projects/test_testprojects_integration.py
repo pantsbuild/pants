@@ -26,6 +26,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
       'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
+      # This won't work without special config until https://rbcommons.com/s/twitter/r/3367/ lands.
+      'testprojects/3rdparty/managed',
     ]
 
     # Targets that are intended to fail

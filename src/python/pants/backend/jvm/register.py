@@ -25,7 +25,8 @@ from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
-from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
+from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
+                                                                ManagedJarLibraries)
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
@@ -104,6 +105,7 @@ def build_file_aliases():
     },
     context_aware_object_factories={
       'bundle': Bundle,
+      'managed_jar_libraries': ManagedJarLibraries,
     }
   )
 
