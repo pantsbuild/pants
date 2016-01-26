@@ -14,16 +14,18 @@ from collections import defaultdict
 import six
 
 from pants.base.deprecated import check_deprecated_semver
+from pants.base.revision import Revision
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import list_option
 from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
-                                 BooleanOptionType, FrozenRegistration, ImplicitValIsNone,
-                                 InvalidAction, InvalidKwarg, NoOptionNames, OptionNameDash,
-                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
-                                 Shadowing)
+                                 BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
+                                 ImplicitValIsNone, InvalidAction, InvalidKwarg, NoOptionNames,
+                                 OptionNameDash, OptionNameDoubleDash, ParseError,
+                                 RecursiveSubsystemOption, Shadowing)
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
+from pants.version import VERSION
 
 
 class Parser(object):
@@ -287,20 +289,28 @@ class Parser(object):
     self._known_args.update(args)
 
   def _check_deprecated(self, dest, kwargs):
-    """Checks option for deprecation and issues a warning if necessary."""
+    """Checks option for deprecation and issues a warning/error if necessary."""
     deprecated_ver = kwargs.get('deprecated_version', None)
     if deprecated_ver is not None:
-      msg = 'Option {dest} in {scope} is deprecated and will be removed in version ' \
-            '{removal_version}.  {hint}'.format(dest=dest, scope=self._scope_str(),
-                                                removal_version=deprecated_ver,
-                                                hint=kwargs.get('deprecated_hint', ''))
-      warnings.warn('*** {}'.format(msg), DeprecationWarning,
-                    stacklevel=9999)  # Out of range stacklevel to suppress printing src line.
+      msg = (
+        "Option '{dest}' in {scope} is deprecated and removed in version {removal_version}. {hint}"
+      ).format(dest=dest,
+               scope=self._scope_str(),
+               removal_version=deprecated_ver,
+               hint=kwargs.get('deprecated_hint', ''))
+
+      if Revision.semver(VERSION) >= Revision.semver(deprecated_ver):
+        # Once we've hit the deprecated_version, raise an error instead of warning. This allows for
+        # more actionable options hinting to continue beyond the deprecation period until removal.
+        raise DeprecatedOptionError(msg)
+      else:
+        # Out of range stacklevel to suppress printing src line.
+        warnings.warn('*** {}'.format(msg), DeprecationWarning, stacklevel=9999)
 
   _allowed_registration_kwargs = {
     'type', 'action', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'deprecated_version', 'deprecated_hint', 'fromfile'
+    'fingerprint', 'deprecated_version', 'deprecated_hint', 'removal_version', 'fromfile'
   }
 
   _allowed_actions = {
@@ -340,7 +350,7 @@ class Parser(object):
 
     deprecated_ver = kwargs.get('deprecated_version')
     if deprecated_ver is not None:
-      check_deprecated_semver(deprecated_ver)
+      check_deprecated_semver(deprecated_ver, check_expired=False)
 
   def _existing_scope(self, arg):
     if arg in self._known_args:
