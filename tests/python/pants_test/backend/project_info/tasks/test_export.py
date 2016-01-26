@@ -50,6 +50,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
                                  'java6': {'source': '1.6', 'target': '1.6'}
                                })
 
+    self.set_options_for_scope('scala-platform', version='custom')
+
     with subsystem_instance(ScalaPlatform):
       self.make_target(':scala-library',
                        JarLibrary,
