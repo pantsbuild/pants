@@ -41,29 +41,20 @@ class BuildFile(AbstractClass):
 
   _cache = {}
 
-  @classmethod
-  def clear_cache(cls):
+  @staticmethod
+  def clear_cache():
     BuildFile._cache = {}
 
-  @classmethod
-  def cached(cls, project_tree, relpath, must_exist=True):
+  @staticmethod
+  def cached(project_tree, relpath, must_exist=True):
     cache_key = (project_tree, relpath, must_exist)
     if cache_key not in BuildFile._cache:
       BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist)
     return BuildFile._cache[cache_key]
 
-  def _get_all_build_files(self, path):
-    """Returns all the BUILD files on a path"""
-    results = []
-    relpath = fast_relpath(path, self.root_dir)
-    for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
-      if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(relpath, build)):
-        results.append(build)
-    return sorted(results)
-
-  @classmethod
-  def _is_buildfile_name(cls, name):
-    return cls._PATTERN.match(name)
+  @staticmethod
+  def _is_buildfile_name(name):
+    return BuildFile._PATTERN.match(name)
 
   # TODO(tabishev): Remove after transition period.
   @classmethod
@@ -82,8 +73,8 @@ class BuildFile(AbstractClass):
   def from_cache(cls, root_dir, relpath, must_exist=True):
     return BuildFile.cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
-  @classmethod
-  def scan_project_tree_build_files(cls, project_tree, base_relpath, spec_excludes=None):
+  @staticmethod
+  def scan_project_tree_build_files(project_tree, base_relpath, spec_excludes=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
@@ -114,8 +105,8 @@ class BuildFile(AbstractClass):
       raise Exception('base_relpath parameter should be a relative path.')
 
     if base_relpath and not project_tree.isdir(base_relpath):
-      raise cls.BadPathError('Can only scan directories and {0} is not a valid dir'
-                              .format(base_relpath))
+      raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir'
+                                   .format(base_relpath))
 
     buildfiles = []
     if spec_excludes:
@@ -130,7 +121,7 @@ class BuildFile(AbstractClass):
       for subdir in to_remove:
         dirs.remove(subdir)
       for filename in files:
-        if cls._is_buildfile_name(filename):
+        if BuildFile._is_buildfile_name(filename):
           buildfiles.append(BuildFile.cached(project_tree, os.path.join(root, filename)))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
@@ -159,11 +150,13 @@ class BuildFile(AbstractClass):
     # There is no BUILD file without a prefix so select any viable sibling
     buildfile_relpath = fast_relpath(buildfile, self.root_dir)
     if not project_tree.exists(buildfile_relpath) or project_tree.isdir(buildfile_relpath):
-      for build in self._get_all_build_files(os.path.dirname(buildfile)):
-        self._build_basename = build
-        buildfile = os.path.join(path, self._build_basename)
-        buildfile_relpath = fast_relpath(buildfile, self.root_dir)
-        break
+      relpath = os.path.dirname(buildfile_relpath)
+      for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):
+        if self._is_buildfile_name(build) and self.project_tree.isfile(os.path.join(relpath, build)):
+          self._build_basename = build
+          buildfile = os.path.join(path, self._build_basename)
+          buildfile_relpath = fast_relpath(buildfile, self.root_dir)
+          break
 
     if must_exist:
       if not project_tree.exists(buildfile_relpath):
@@ -193,58 +186,51 @@ class BuildFile(AbstractClass):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
     return self.project_tree.exists(self.relpath) and self.project_tree.isfile(self.relpath)
 
+  @deprecated('0.0.72')
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = self.scan_project_tree_build_files(self.project_tree,
-                                                     fast_relpath(self.parent_path, self.root_dir),
-                                                     spec_excludes=spec_excludes)
+    descendants = BuildFile.scan_project_tree_build_files(self.project_tree,
+                                                          fast_relpath(self.parent_path, self.root_dir),
+                                                          spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants
 
+  @deprecated('0.0.72')
   def ancestors(self):
     """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
 
-    def find_parent(dirname):
-      parent = os.path.dirname(dirname)
-      for parent_buildfile in self._get_all_build_files(parent):
-        buildfile = os.path.join(parent, parent_buildfile)
-        return parent, self.cached(self.project_tree, fast_relpath(buildfile, self.root_dir))
-      return parent, None
-
     parent_buildfiles = OrderedSet()
-
-    def is_root(path):
-      return os.path.abspath(self.root_dir) == os.path.abspath(path)
-
-    parentdir = os.path.dirname(self.full_path)
-    visited = set()
-    while parentdir not in visited and not is_root(parentdir):
-      visited.add(parentdir)
-      parentdir, buildfile = find_parent(parentdir)
-      if buildfile:
-        parent_buildfiles.update(buildfile.family())
-
+    parentdir = fast_relpath(self.parent_path, self.root_dir)
+    while parentdir != '':
+      parentdir = os.path.dirname(parentdir)
+      parent_buildfiles.update(BuildFile.get_project_tree_build_files_family(self.project_tree, parentdir))
     return parent_buildfiles
 
+  @deprecated('0.0.72')
   def siblings(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including
     this BUILD file itself"""
 
-    for build in self._get_all_build_files(self.parent_path):
-      if self.name != build:
-        siblingpath = os.path.join(os.path.dirname(self.relpath), build)
-        yield self.cached(self.project_tree, siblingpath)
+    for build in BuildFile.get_project_tree_build_files_family(self.project_tree,
+                                                               fast_relpath(self.parent_path, self.root_dir)):
+      if self != build:
+        yield build
 
+  @staticmethod
+  def get_project_tree_build_files_family(project_tree, dir_relpath):
+    """Returns all the BUILD files on a path"""
+    for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
+      if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
+        yield BuildFile.cached(project_tree, os.path.join(dir_relpath, build))
+
+  @deprecated('0.0.72', hint_message='Use get_project_tree_build_files_family instead.')
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
     BUILD file itself.  The family forms a single logical BUILD file composed of the canonical BUILD
     file if it exists and sibling build files each with their own extension, eg: BUILD.extras."""
-
-    yield self
-    for sibling in self.siblings():
-      yield sibling
+    return BuildFile.get_project_tree_build_files_family(self.project_tree, os.path.dirname(self.relpath))
 
   def source(self):
     """Returns the source code for this BUILD file."""
@@ -267,7 +253,7 @@ class BuildFile(AbstractClass):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return '{}({}, {})'.format(self.__class__.__name__, self.full_path, self.project_tree)
+    return '{}({}, {})'.format(self.__class__.__name__, self.relpath, self.project_tree)
 
 
 # Deprecated, will be removed after 0.0.72. Create BuildFile with IoFilesystem instead.

@@ -15,7 +15,6 @@ import six
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_file import BuildFile
-from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 
 
@@ -162,9 +161,7 @@ class CmdLineSpecParser(object):
     else:
       spec_parts = spec.rsplit(':', 1)
       spec_parts[0] = normalize_spec_path(spec_parts[0])
-      spec_path, target_name = parse_spec(':'.join(spec_parts))
       try:
-        self._address_mapper.get_build_file(spec_path)
-      except BuildFile.BuildFileError as e:
+        return {self._address_mapper.spec_to_address(':'.join(spec_parts))}
+      except AddressLookupError as e:
         raise self.BadSpecError(e)
-      return {Address(spec_path, target_name)}
