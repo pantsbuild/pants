@@ -6,9 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 import shutil
 from collections import defaultdict
 
+import requests
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -60,6 +62,61 @@ class GoFetch(GoTask):
   def _get_fetcher(self, import_path):
     return Fetchers.global_instance().get_fetcher(import_path)
 
+  def _check_for_meta_tag(self, import_path):
+    """Looks for go-import meta tags for the provided import_path
+
+    Returns three values. First is the import prefix which designates where the
+    root of the repo should be setup. Next is the version control system that
+    must be used to copy down the repository. Finally is the URL to access the
+    repository.
+
+    If the meta tag is not found in the page's source, None is returned for all
+    three values.
+
+    More info: https://golang.org/cmd/go/#hdr-Remote_import_paths
+    """
+    meta_import_regex = re.compile('^\s*<meta name="go-import" content="(?P<content>.*)">$')
+    head_close_regex = re.compile('^\s*</head>$')
+
+    session = requests.session()
+    # Override default http adapters with a retriable one.
+    retriable_http_adapter = requests.adapters.HTTPAdapter(max_retries=2)
+    session.mount("http://", retriable_http_adapter)
+    session.mount("https://", retriable_http_adapter)
+    try:
+      page_data = session.get('http://{import_path}?go-get=1'.format(import_path=import_path))
+    except requests.ConnectionError as e:
+      return None, None, None
+
+    for line in page_data.text.split('\n'):
+      if line == '\n':
+        continue
+
+      meta_import = meta_import_regex.match(line)
+      if meta_import:
+        content_parts = meta_import.group('content').split(' ')
+
+        # Check to make sure returned root is an exact match to the provided
+        # import path. If it is only a prefix match then we need to check to
+        # make sure that this returned root for this call matches another call
+        # for the meta tags. The second call must return an exact match if it
+        # is to be used.
+        if content_parts[0] == import_path:
+          return content_parts[0], content_parts[1], content_parts[2]
+        elif content_parts[0] in import_path:
+          root, vcs, url = self._check_for_meta_tag(content_parts[0])
+
+          if root and content_parts[0] == root:
+            return content_parts[0], content_parts[1], content_parts[2]
+        else:
+          continue
+
+      head_closed = head_close_regex.match(line)
+      if head_closed:
+        break
+
+    return None, None, None
+
   def _transitive_download_remote_libs(self, go_remote_libs, all_known_addresses=None):
     """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.
 
@@ -93,14 +150,21 @@ class GoFetch(GoTask):
         fetcher = self._get_fetcher(go_remote_lib.import_path)
 
         if not vt.valid:
-          root = fetcher.root(go_remote_lib.import_path)
+          meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(go_remote_lib.import_path)
+
+          if meta_root:
+            root = fetcher.root(meta_root)
+          else:
+            root = fetcher.root(go_remote_lib.import_path)
+
           fetch_dir = os.path.join(self.workdir, 'fetches')
           root_dir = os.path.join(fetch_dir, root)
 
           # Only fetch each remote root once.
           if not os.path.exists(root_dir):
             with temporary_dir() as tmp_fetch_root:
-              fetcher.fetch(go_remote_lib.import_path, dest=tmp_fetch_root, rev=go_remote_lib.rev)
+              fetcher.fetch(go_remote_lib.import_path, dest=tmp_fetch_root,
+                            rev=go_remote_lib.rev, meta_repo_url=meta_repo_url)
               safe_mkdir(root_dir)
               for path in os.listdir(tmp_fetch_root):
                 shutil.move(os.path.join(tmp_fetch_root, path), os.path.join(root_dir, path))
