@@ -164,7 +164,7 @@ class BuildFileAddressMapper(object):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()
 
-  @deprecated('0.0.72', hint_message='Use get_build_file instead.')
+  @deprecated('0.0.72')
   def from_cache(self, root_dir, relpath, must_exist=True):
     """Return a BuildFile instance.  Args as per BuildFile.from_cache
 
