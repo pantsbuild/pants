@@ -183,12 +183,13 @@ class BuildFileAddressMapper(object):
     :rtype: :class:`pants.build_graph.address.Address`
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
+    address = Address(spec_path, name)
     try:
-      BuildFile.cached(self._project_tree, spec_path, strict_mode=False)
-    except BuildFile.BuildFileError as e:
+      self.resolve(address)
+      return address
+    except AddressLookupError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
-    return Address(spec_path, name)
 
   @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
   def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):

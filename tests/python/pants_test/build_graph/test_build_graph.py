@@ -253,7 +253,7 @@ class BuildGraphTest(BaseTest):
                            '  dependencies=["non-existent-path:b"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
-                                 '^BUILD file does not exist at:.*/non-existent-path/BUILD'
+                                 '^.*/non-existent-path does not contains any BUILD files.'
                                  '\s+when translating spec non-existent-path:b'
                                  '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
@@ -268,7 +268,7 @@ class BuildGraphTest(BaseTest):
                            '  dependencies=["non-existent-path:c"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
-                                 '^BUILD file does not exist at: .*/non-existent-path/BUILD'
+                                 '^.*/non-existent-path does not contains any BUILD files.'
                                  '\s+when translating spec non-existent-path:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from //:a$'):
@@ -298,7 +298,7 @@ class BuildGraphTest(BaseTest):
                            '  dependencies=["non-existent-path:d"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
-                                 '^BUILD file does not exist at:.*/non-existent-path/BUILD'
+                                 '^.*/non-existent-path does not contains any BUILD files.'
                                  '\s+when translating spec non-existent-path:d'
                                  '\s+referenced from goodpath:c'
                                  '\s+referenced from goodpath:b'
