@@ -97,6 +97,23 @@ required a product type:
 
 !inc[start-at=products.isrequired(&end-before=def](../backend/jvm/tasks/jvmdoc_gen.py)
 
+Task Implementation Versioning
+------------------------------
+
+Tasks may optionally specify an implementation version.  This is useful to be sure that cached
+objects from previous runs of pants using an older version are not used.  If you change a task
+class in a way that will impact its outputs you should update the version.  Implementation 
+versions are set with the class method implementation_version.
+  
+    :::python
+    Class FooTask(Task):
+      @classmethod
+        def implementation_version(cls):
+          return super(FooTask, cls).implementation_version() + [('FooTask', 1)]
+            
+We store both a version number and the name of the class in order to disambiguate changes in 
+different classes that have the same implementation version set.
+
 Task Configuration
 ------------------
 
