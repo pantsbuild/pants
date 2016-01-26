@@ -139,9 +139,11 @@ class BuildFile(AbstractClass):
     """
 
     if not must_exist:
-      logger.warn('BuildFile\'s must_exist parameter must be True.')
+      logger.warn('BuildFile\'s must_exist parameter is deprecated and will be removed in 0.0.74 release.'
+                  'BuildFile should be created from existing file only.')
     if relpath is None:
-      logger.warn('BuildFile\'s relpath parameter must be not None.')
+      logger.warn('BuildFile\'s relpath parameter is deprecated and will be removed in 0.0.74 release.'
+                  'BuildFile should be created with not None relpath only.')
 
     self.project_tree = project_tree
     self.root_dir = project_tree.build_root
@@ -150,7 +152,8 @@ class BuildFile(AbstractClass):
     self._build_basename = self._BUILD_FILE_PREFIX
 
     if project_tree.isdir(fast_relpath(path, self.root_dir)):
-      logger.warn('BuildFile can be created only from path to file.')
+      logger.warn('BuildFile creation using folder path is deprecated and will be removed in 0.0.74 release.'
+                  'BuildFile should be created from path to file only.')
 
     if project_tree.isdir(fast_relpath(path, self.root_dir)):
       buildfile = os.path.join(path, self._build_basename)
@@ -159,7 +162,6 @@ class BuildFile(AbstractClass):
 
     # There is no BUILD file without a prefix so select any viable sibling
     buildfile_relpath = fast_relpath(buildfile, self.root_dir)
-
     if not project_tree.exists(buildfile_relpath) or project_tree.isdir(buildfile_relpath):
       relpath = os.path.dirname(buildfile_relpath)
       for build in self.project_tree.glob1(relpath, '{prefix}*'.format(prefix=self._BUILD_FILE_PREFIX)):

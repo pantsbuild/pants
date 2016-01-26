@@ -66,7 +66,7 @@ def linkify(buildroot, s, memoized_urls):
         build_files = list(BuildFile.get_project_tree_build_files_family(
           FileSystemProjectTree(buildroot),
           putative_dir))
-        if len(build_files) > 0:
+        if build_files:
           path = build_files[0].relpath
         else:
           return None

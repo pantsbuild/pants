@@ -206,7 +206,6 @@ class GoalRunnerFactory(object):
         logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
       except AddressLookupError:
-        # Goal name should not be possible to look up.
         pass
 
     if self._help_request:
