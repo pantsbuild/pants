@@ -99,7 +99,6 @@ class IvyTaskMixin(TaskBase):
     # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
     return IvySubsystem.global_instance().get_options().resolution_dir
 
-
   def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False):
     """Resolves external classpath products (typically jars) for the given targets.
@@ -298,15 +297,15 @@ class IvyTaskMixin(TaskBase):
         return stripped_classpath, symlink_map, resolve_hash_name
 
   def _exec_ivy(self,
-               target_workdir,
-               targets,
-               args,
-               executor=None,
-               confs=None,
-               ivy=None,
-               workunit_name='ivy',
-               use_soft_excludes=False,
-               resolve_hash_name=None):
+                target_workdir,
+                targets,
+                args,
+                executor=None,
+                confs=None,
+                ivy=None,
+                workunit_name='ivy',
+                use_soft_excludes=False,
+                resolve_hash_name=None):
     ivy_jvm_options = self.get_options().jvm_options[:]
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
