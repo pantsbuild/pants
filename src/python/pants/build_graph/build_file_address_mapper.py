@@ -74,19 +74,16 @@ class BuildFileAddressMapper(object):
 
     :raises: A helpful error message listing possible correct target addresses.
     """
-    build_file = BuildFile.cached(self._project_tree, spec_path, strict_mode=False)
+    was_not_found_message = '{target_name} was not found in BUILD files from {spec_path}'.format(
+      target_name=wrong_target_name, spec_path=os.path.join(self._project_tree.build_root, spec_path))
 
     if not targets:
-      # There were no targets in the BUILD file.
       raise self.EmptyBuildFileError(
-        ':{target_name} was not found in BUILD file {build_file}, because that '
-        'BUILD file contains no addressable entities.'.format(target_name=wrong_target_name,
-                                                              build_file=build_file))
+        '{was_not_found_message}, because that BUILD files contains no addressable entities.'.format(
+          was_not_found_message=was_not_found_message))
 
-    all_same = len(set([target.build_file for target in targets])) == 1
-
-    # Trim out BUILD extensions if there's only one anyway; no need to be redundant.
-    if all_same:
+    # Print BUILD extensions if there's more than one BUILD file with targets only.
+    if len(set([target.build_file for target in targets])) == 1:
       specs = [':{}'.format(target.target_name) for target in targets]
     else:
       specs = ['{}:{}'.format(os.path.basename(target.build_file.relpath), target.target_name) for target in targets]
@@ -97,9 +94,9 @@ class BuildFileAddressMapper(object):
     # Give different error messages depending on whether BUILD file was empty.
     one_of = ' one of' if len(specs) > 1 else ''  # Handle plurality, just for UX.
     raise self.AddressNotInBuildFile(
-      '{target_name} was not found in BUILD file {build_file}. Perhaps you '
-      'meant{one_of}: \n  {specs}'.format(target_name=wrong_target_name,
-                                          build_file=build_file,
+      '{was_not_found_message}. Perhaps you '
+      'meant{one_of}: \n  {specs}'.format(was_not_found_message=was_not_found_message,
+                                          spec_path=spec_path,
                                           one_of=one_of,
                                           specs='\n  '.join(specs)))
 

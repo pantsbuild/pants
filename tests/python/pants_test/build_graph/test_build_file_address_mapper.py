@@ -84,7 +84,7 @@ class BuildFileAddressMapperTest(BaseTest):
     # Create an address that doesn't exist in an existing BUILD file
     address = Address.parse(':bar')
     with self.assertRaisesRegexp(BuildFileAddressMapper.AddressNotInBuildFile,
-                                 '^bar was not found in BUILD file BuildFile\(BUILD, FileSystemProjectTree\(.*\)\). '
+                                 '^bar was not found in BUILD files from .*. '
                                  'Perhaps you meant:'
                                  '\s+:foo$'):
       self.address_mapper.resolve(address)
@@ -96,7 +96,7 @@ class BuildFileAddressMapperTest(BaseTest):
     # Create an address that doesn't exist in an existing BUILD file
     address = Address.parse(':bar')
     with self.assertRaisesRegexp(BuildFileAddressMapper.AddressNotInBuildFile,
-                                 '^bar was not found in BUILD file BuildFile\(BUILD.1, FileSystemProjectTree\(.*\)\). '
+                                 '^bar was not found in BUILD files from .*. '
                                  'Perhaps you meant one of:'
                                  '\s+BUILD.1:foo1'
                                  '\s+BUILD.2:foo2$'):
