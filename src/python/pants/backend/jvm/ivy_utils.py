@@ -235,7 +235,7 @@ class IvyUtils(object):
       return []
     else:
       with safe_open(path, 'r') as cp:
-        return [path.strip() for path in cp.read().split(os.pathsep) if path.strip()]
+        return filter(None, (path.strip() for path in cp.read().split(os.pathsep)))
 
   @classmethod
   def exec_ivy(cls, ivy, confs, ivyxml, args,
@@ -277,9 +277,9 @@ class IvyUtils(object):
     # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
     real_ivy_cache_dir = os.path.realpath(ivy_cache_dir)
     symlink_map = OrderedDict()
-    with safe_open(inpath, 'r') as infile:
-      inpaths = filter(None, infile.read().strip().split(os.pathsep))
-      paths = OrderedSet([os.path.realpath(path) for path in inpaths])
+
+    inpaths = cls.load_classpath_from_cachepath(inpath)
+    paths = OrderedSet([os.path.realpath(path) for path in inpaths])
 
     for path in paths:
       if path.startswith(real_ivy_cache_dir):
@@ -448,12 +448,12 @@ class IvyUtils(object):
   def calculate_classpath(cls, targets):
     """Creates a consistent classpath and list of excludes for the passed targets.
 
-    It also modifies the JarDependency objects excludes to include all the jars excluded by
+    It also modifies the JarDependency objects' excludes to contain all the jars excluded by
     provides.
 
     :param iterable targets: List of targets to collect JarDependencies and excludes from.
 
-    :returns: A tuple of a list of JarDependencies, and a set of excludes to apply globally
+    :returns: A pair of a list of JarDependencies, and a set of excludes to apply globally.
     """
     jars = OrderedDict()
     global_excludes = set()

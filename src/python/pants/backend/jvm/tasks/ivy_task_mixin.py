@@ -230,7 +230,7 @@ class IvyTaskMixin(TaskBase):
       raw_target_classpath_file = target_classpath_file + '.raw'
 
       # If a report file is not present, we need to exec ivy, even if all the individual
-      # targets up to date... See https://rbcommons.com/s/twitter/r/2015
+      # targets are up to date. See https://rbcommons.com/s/twitter/r/2015.
       # Note that it's possible for all targets to be valid but for no classpath file to exist at
       # target_classpath_file, e.g., if we previously built a superset of targets.
       any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
