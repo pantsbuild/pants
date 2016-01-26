@@ -184,9 +184,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the proper runtime based on scala version.
     :return iterator: list with single runtime.
     """
+
+    print('~~', self._get_label())
     # If the version is custom allow the user the option to set the spec.
     if self._get_label() == 'custom':
-      print([self.get_options().runtime_spec])
       return [self.get_options().runtime_spec]
     else:
       runtime_name = scala_build_info.get(self._get_label()).runtime_name
