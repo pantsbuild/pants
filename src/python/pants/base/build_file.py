@@ -74,7 +74,7 @@ class BuildFile(AbstractClass):
     return BuildFile._cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @staticmethod
-  def scan_build_files(project_tree, base_relpath, spec_excludes=None):
+  def scan_build_files(project_tree, base_relpath, spec_excludes=None, pants_build_ignore=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
@@ -233,7 +233,7 @@ class BuildFile(AbstractClass):
         yield build
 
   @staticmethod
-  def get_build_files_family(project_tree, dir_relpath):
+  def get_build_files_family(project_tree, dir_relpath, pants_build_ignore=None):
     """Returns all the BUILD files on a path"""
     for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
