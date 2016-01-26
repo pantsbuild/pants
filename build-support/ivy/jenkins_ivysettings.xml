@@ -34,10 +34,8 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
   <caches
     resolutionCacheDir="${env.WORKSPACE}/.ivy2_resolution"
-    repositoryCacheDir="${env.WORKSPACE}/.ivy2_repository"
     lockStrategy="artifact-lock-nio"
   />
-
 
   <resolvers>
 
