@@ -103,6 +103,8 @@ class Ivy(object):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))
 
+    print('-Divy.cache.repository.dir={}'.format(self._ivy_cache_dir))
+    print('-Divy.cache.resolution.dir={}'.format(self._ivy_resolution_dir))
     jvm_options += ['-Divy.cache.repository.dir={}'.format(self._ivy_cache_dir)]
     jvm_options += ['-Divy.cache.resolution.dir={}'.format(self._ivy_resolution_dir)]
 

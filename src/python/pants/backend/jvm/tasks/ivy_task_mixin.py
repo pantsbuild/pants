@@ -284,10 +284,14 @@ class IvyTaskMixin(TaskBase):
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
     with IvyTaskMixin.symlink_map_lock:
+      print('creating symlink_map')
+      print('self.ivy_cache_dir', self.ivy_cache_dir)
       symlink_map = IvyUtils.symlink_cachepath(self.ivy_cache_dir,
                                                raw_target_classpath_file,
                                                symlink_dir,
                                                target_classpath_file)
+      print('symlink_map', symlink_map)
+      # import pdb; pdb.set_trace()
 
       with IvyUtils.cachepath(target_classpath_file) as classpath:
         stripped_classpath = [path.strip() for path in classpath]
