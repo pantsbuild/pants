@@ -9,6 +9,7 @@ import os
 
 from six.moves import urllib
 
+from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.subsystem.subsystem import Subsystem
 
@@ -35,8 +36,12 @@ class IvySubsystem(Subsystem):
              help='Timeout the fetch if the connection is idle for longer than this value.')
     register('--ivy-profile', advanced=True, default=cls._DEFAULT_VERSION,
              help='The version of ivy to fetch.')
-    register('--cache-dir', advanced=True, default=os.path.expanduser('~/.ivy2/pants'),
-             help='Directory to store artifacts retrieved by Ivy.')
+    register(
+      '--cache-dir',
+      advanced=True,
+      default=os.path.join(get_buildroot(), '.ivy2_resolution'),
+      help='Directory to store artifacts retrieved by Ivy.',
+    ),
     register('--ivy-settings', advanced=True,
              help='Location of XML configuration file for Ivy settings.')
 

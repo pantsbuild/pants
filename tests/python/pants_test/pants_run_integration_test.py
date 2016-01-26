@@ -124,18 +124,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
         ini.add_section(section)
         for key, value in section_config.items():
           ini.set(section, key, value)
-      ini_file_names = [
-        os.path.join(workdir, 'pants.ini'),
-        os.path.join(workdir, 'pants.jenkins-ci.ini'),
-      ]
-      for ini_file_name in ini_file_names:
-        with safe_open(ini_file_name, mode='w') as fp:
-          ini.write(fp)
-      args.append(
-        '--config-override=[{}]'.format(
-          ','.join("'{}'".format(ini_file_name))
-          for ini_file_name in ini_file_names
-      ))
+      ini_file_name = os.path.join(workdir, 'pants.ini')
+      with safe_open(ini_file_name, mode='w') as fp:
+        ini.write(fp)
+      args.append('--config-override=' + ini_file_name)
 
     pants_script = os.path.join(get_buildroot(), self.PANTS_SCRIPT_NAME)
     pants_command = [pants_script] + args + command
