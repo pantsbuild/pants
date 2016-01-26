@@ -74,49 +74,34 @@ class BuildFileAddressMapper(object):
 
     :raises: A helpful error message listing possible correct target addresses.
     """
-    def path_parts(build):  # Gets a tuple of directory, filename.
-      build = str(build)
-      slash = build.rfind('/')
-      if slash < 0:
-        return '', build
-      return build[:slash], build[slash + 1:]
-
-    def are_siblings(a, b):  # Are the targets in the same directory?
-      return path_parts(a)[0] == path_parts(b)[0]
-
     build_file = BuildFile.cached(self._project_tree, spec_path, strict_mode=False)
 
-    valid_specs = []
-    all_same = True
-    # Iterate through all addresses, saving those which are similar to the wrong address.
-    for target in targets:
-      if are_siblings(target.build_file, build_file):
-        possibility = (path_parts(target.build_file)[1], target.spec[target.spec.rfind(':'):])
-        # Keep track of whether there are multiple BUILD files or just one.
-        if all_same and valid_specs and possibility[0] != valid_specs[0][0]:
-          all_same = False
-        valid_specs.append(possibility)
+    if not targets:
+      # There were no targets in the BUILD file.
+      raise self.EmptyBuildFileError(
+        ':{target_name} was not found in BUILD file {build_file}, because that '
+        'BUILD file contains no addressable entities.'.format(target_name=wrong_target_name,
+                                                              build_file=build_file))
+
+    all_same = len(set([target.build_file for target in targets])) == 1
 
     # Trim out BUILD extensions if there's only one anyway; no need to be redundant.
     if all_same:
-      valid_specs = [('', tail) for head, tail in valid_specs]
+      specs = [':{}'.format(target.target_name) for target in targets]
+    else:
+      specs = ['{}:{}'.format(os.path.basename(target.build_file.relpath), target.target_name) for target in targets]
+
     # Might be neat to sort by edit distance or something, but for now alphabetical is fine.
-    valid_specs = [''.join(pair) for pair in sorted(valid_specs)]
+    specs = [''.join(pair) for pair in sorted(specs)]
 
     # Give different error messages depending on whether BUILD file was empty.
-    if valid_specs:
-      one_of = ' one of' if len(valid_specs) > 1 else ''  # Handle plurality, just for UX.
-      raise self.AddressNotInBuildFile(
-        '{target_name} was not found in BUILD file {build_file}. Perhaps you '
-        'meant{one_of}: \n  {specs}'.format(target_name=wrong_target_name,
-                                             build_file=build_file,
-                                             one_of=one_of,
-                                             specs='\n  '.join(valid_specs)))
-    # There were no targets in the BUILD file.
-    raise self.EmptyBuildFileError(
-      ':{target_name} was not found in BUILD file {build_file}, because that '
-      'BUILD file contains no addressable entities.'.format(target_name=wrong_target_name,
-                                                             build_file=build_file))
+    one_of = ' one of' if len(specs) > 1 else ''  # Handle plurality, just for UX.
+    raise self.AddressNotInBuildFile(
+      '{target_name} was not found in BUILD file {build_file}. Perhaps you '
+      'meant{one_of}: \n  {specs}'.format(target_name=wrong_target_name,
+                                          build_file=build_file,
+                                          one_of=one_of,
+                                          specs='\n  '.join(specs)))
 
   def resolve(self, address):
     """Maps an address in the virtual address space to an object.
@@ -149,7 +134,7 @@ class BuildFileAddressMapper(object):
       try:
         build_files = list(BuildFile.get_project_tree_build_files_family(self._project_tree, spec_path))
         if not build_files:
-          raise self.BuildFileScanError("{spec_path} does not contains any BUILD files."
+          raise self.BuildFileScanError("{spec_path} does not contain any BUILD files."
                                         .format(spec_path=os.path.join(self.root_dir, spec_path)))
         mapping = self._build_file_parser.address_map_from_build_files(build_files)
       except BuildFileParser.BuildFileParserError as e:
