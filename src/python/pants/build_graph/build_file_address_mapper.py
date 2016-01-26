@@ -129,7 +129,7 @@ class BuildFileAddressMapper(object):
     """
     if spec_path not in self._spec_path_to_address_map_map:
       try:
-        build_files = list(BuildFile.get_project_tree_build_files_family(self._project_tree, spec_path))
+        build_files = list(BuildFile.get_build_files_family(self._project_tree, spec_path))
         if not build_files:
           raise self.BuildFileScanError("{spec_path} does not contain any BUILD files."
                                         .format(spec_path=os.path.join(self.root_dir, spec_path)))
@@ -173,16 +173,16 @@ class BuildFileAddressMapper(object):
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
 
-  @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
+  @deprecated('0.0.72', hint_message='Use scan_build_files instead.')
   def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
     """Looks for all BUILD files in root_dir or its descendant directories.
 
     :returns: an OrderedSet of BuildFile instances.
     """
-    return self.scan_project_tree_build_files(base_path, spec_excludes)
+    return self.scan_build_files(base_path, spec_excludes)
 
-  def scan_project_tree_build_files(self, base_path, spec_excludes):
-    return BuildFile.scan_project_tree_build_files(self._project_tree, base_path, spec_excludes)
+  def scan_build_files(self, base_path, spec_excludes):
+    return BuildFile.scan_build_files(self._project_tree, base_path, spec_excludes)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
@@ -211,9 +211,9 @@ class BuildFileAddressMapper(object):
 
     addresses = set()
     try:
-      for build_file in BuildFile.scan_project_tree_build_files(self._project_tree,
-                                                                base_relpath=base_path,
-                                                                spec_excludes=spec_excludes):
+      for build_file in BuildFile.scan_build_files(self._project_tree,
+                                                   base_relpath=base_path,
+                                                   spec_excludes=spec_excludes):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
     except BuildFile.BuildFileError as e:

@@ -62,11 +62,11 @@ class BuildFile(AbstractClass):
     raise NotImplementedError()
 
   @classmethod
-  @deprecated('0.0.72', hint_message='Use scan_project_tree_build_files instead.')
+  @deprecated('0.0.72', hint_message='Use scan_build_files instead.')
   def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
     if base_path and os.path.isabs(base_path):
       base_path = fast_relpath(base_path, root_dir)
-    return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir), base_path, spec_excludes)
+    return cls.scan_build_files(cls._get_project_tree(root_dir), base_path, spec_excludes)
 
   @classmethod
   @deprecated('0.0.72')
@@ -74,7 +74,7 @@ class BuildFile(AbstractClass):
     return BuildFile._cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @staticmethod
-  def scan_project_tree_build_files(project_tree, base_relpath, spec_excludes=None):
+  def scan_build_files(project_tree, base_relpath, spec_excludes=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
@@ -204,9 +204,9 @@ class BuildFile(AbstractClass):
   def descendants(self, spec_excludes=None):
     """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
 
-    descendants = BuildFile.scan_project_tree_build_files(self.project_tree,
-                                                          fast_relpath(self.parent_path, self.root_dir),
-                                                          spec_excludes=spec_excludes)
+    descendants = BuildFile.scan_build_files(self.project_tree,
+                                             fast_relpath(self.parent_path, self.root_dir),
+                                             spec_excludes=spec_excludes)
     for sibling in self.family():
       descendants.discard(sibling)
     return descendants
@@ -219,7 +219,7 @@ class BuildFile(AbstractClass):
     parentdir = fast_relpath(self.parent_path, self.root_dir)
     while parentdir != '':
       parentdir = os.path.dirname(parentdir)
-      parent_buildfiles.update(BuildFile.get_project_tree_build_files_family(self.project_tree, parentdir))
+      parent_buildfiles.update(BuildFile.get_build_files_family(self.project_tree, parentdir))
     return parent_buildfiles
 
   @deprecated('0.0.72')
@@ -227,24 +227,24 @@ class BuildFile(AbstractClass):
     """Returns an iterator over all the BUILD files co-located with this BUILD file not including
     this BUILD file itself"""
 
-    for build in BuildFile.get_project_tree_build_files_family(self.project_tree,
-                                                               fast_relpath(self.parent_path, self.root_dir)):
+    for build in BuildFile.get_build_files_family(self.project_tree,
+                                                  fast_relpath(self.parent_path, self.root_dir)):
       if self != build:
         yield build
 
   @staticmethod
-  def get_project_tree_build_files_family(project_tree, dir_relpath):
+  def get_build_files_family(project_tree, dir_relpath):
     """Returns all the BUILD files on a path"""
     for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
         yield BuildFile._cached(project_tree, os.path.join(dir_relpath, build))
 
-  @deprecated('0.0.72', hint_message='Use get_project_tree_build_files_family instead.')
+  @deprecated('0.0.72', hint_message='Use get_build_files_family instead.')
   def family(self):
     """Returns an iterator over all the BUILD files co-located with this BUILD file including this
     BUILD file itself.  The family forms a single logical BUILD file composed of the canonical BUILD
     file if it exists and sibling build files each with their own extension, eg: BUILD.extras."""
-    return BuildFile.get_project_tree_build_files_family(self.project_tree, os.path.dirname(self.relpath))
+    return BuildFile.get_build_files_family(self.project_tree, os.path.dirname(self.relpath))
 
   def source(self):
     """Returns the source code for this BUILD file."""
