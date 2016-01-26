@@ -21,11 +21,19 @@ class Ivy(object):
   class Error(Exception):
     """Indicates an error executing an ivy command."""
 
-  def __init__(self, classpath, ivy_settings=None, ivy_cache_dir=None, extra_jvm_options=None):
+  def __init__(
+    self,
+    classpath,
+    ivy_settings=None,
+    ivy_cache_dir=None,
+    ivy_resolution_dir=None,
+    extra_jvm_options=None,
+  ):
     """Configures an ivy wrapper for the ivy distribution at the given classpath.
 
     :param ivy_settings: path to find settings.xml file
     :param ivy_cache_dir: path to store downloaded ivy artifacts
+    :param ivy_resolution_dir: path Ivy will use as a resolution scratch space
     :param extra_jvm_options: list of strings to add to command line when invoking Ivy
     """
     self._classpath = maybe_list(classpath)
@@ -38,6 +46,11 @@ class Ivy(object):
     if self._ivy_cache_dir and not isinstance(self._ivy_cache_dir, string_types):
       raise ValueError('ivy_cache_dir must be a string, given {} of type {}'.format(
                          self._ivy_cache_dir, type(self._ivy_cache_dir)))
+
+    self._ivy_resolution_dir = ivy_resolution_dir
+    if self._ivy_resolution_dir and not isinstance(self._ivy_resolution_dir, string_types):
+      raise ValueError('ivy_resolution_dir must be a string, given {} of type {}'.format(
+                         self._ivy_resolution_dir, type(self._ivy_resolution_dir)))
 
     self._extra_jvm_options = extra_jvm_options or []
 
@@ -54,6 +67,11 @@ class Ivy(object):
   def ivy_cache_dir(self):
     """Returns the ivy cache dir used by this `Ivy` instance."""
     return self._ivy_cache_dir
+
+  @property
+  def ivy_resolution_dir(self):
+    """Returns the ivy resolution dir used by this `Ivy` instance."""
+    return self._ivy_resolution_dir
 
   def execute(self, jvm_options=None, args=None, executor=None,
               workunit_factory=None, workunit_name=None, workunit_labels=None):
@@ -85,12 +103,10 @@ class Ivy(object):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))
 
-    if self._ivy_cache_dir and '-cache' not in args:
-      # TODO(John Sirois): Currently this is a magic property to support hand-crafted <caches/> in
-      # ivysettings.xml.  Ideally we'd support either simple -caches or these hand-crafted cases
-      # instead of just hand-crafted.  Clean this up by taking over ivysettings.xml and generating
-      # it from BUILD constructs.
-      jvm_options += ['-Divy.cache.dir={}'.format(self._ivy_cache_dir)]
+    print('-Divy.cache.repository.dir={}'.format(self._ivy_cache_dir))
+    print('-Divy.cache.resolution.dir={}'.format(self._ivy_resolution_dir))
+    jvm_options += ['-Divy.cache.repository.dir={}'.format(self._ivy_cache_dir)]
+    jvm_options += ['-Divy.cache.resolution.dir={}'.format(self._ivy_resolution_dir)]
 
     if self._ivy_settings and '-settings' not in args:
       args = ['-settings', self._ivy_settings] + args

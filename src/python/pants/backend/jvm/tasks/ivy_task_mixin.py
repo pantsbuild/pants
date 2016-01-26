@@ -85,12 +85,21 @@ class IvyTaskMixin(TaskBase):
 
   @memoized_property
   def ivy_cache_dir(self):
-    """The path of the ivy cache dir used for resolves.
+    """The directory where Ivy stores fetched artifacts.
 
     :rtype: string
     """
     # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
     return IvySubsystem.global_instance().get_options().cache_dir
+
+  @memoized_property
+  def ivy_resolution_dir(self):
+    """The directory that Ivy uses for resolves.
+
+    :rtype: string
+    """
+    # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
+    return IvySubsystem.global_instance().get_options().resolution_dir
 
   def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False):
@@ -170,7 +179,7 @@ class IvyTaskMixin(TaskBase):
 
   # Extracted for testing.
   def _parse_report(self, resolve_hash_name, conf):
-    return IvyUtils.parse_xml_report(self.ivy_cache_dir, resolve_hash_name, conf)
+    return IvyUtils.parse_xml_report(self.ivy_resolution_dir, resolve_hash_name, conf)
 
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
@@ -229,7 +238,7 @@ class IvyTaskMixin(TaskBase):
       report_paths = []
       resolve_hash_name = global_vts.cache_key.hash
       for conf in report_confs:
-        report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+        report_path = IvyUtils.xml_report_path(self.ivy_resolution_dir, resolve_hash_name, conf)
         if not os.path.exists(report_path):
           report_missing = True
           break
@@ -278,25 +287,29 @@ class IvyTaskMixin(TaskBase):
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
     with IvyTaskMixin.symlink_map_lock:
+      print('creating symlink_map')
+      print('self.ivy_cache_dir', self.ivy_cache_dir)
       symlink_map = IvyUtils.symlink_cachepath(self.ivy_cache_dir,
                                                raw_target_classpath_file,
                                                symlink_dir,
                                                target_classpath_file)
+      print('symlink_map', symlink_map)
+      # import pdb; pdb.set_trace()
 
       with IvyUtils.cachepath(target_classpath_file) as classpath:
         stripped_classpath = [path.strip() for path in classpath]
         return stripped_classpath, symlink_map, resolve_hash_name
 
   def _exec_ivy(self,
-               target_workdir,
-               targets,
-               args,
-               executor=None,
-               confs=None,
-               ivy=None,
-               workunit_name='ivy',
-               use_soft_excludes=False,
-               resolve_hash_name=None):
+                target_workdir,
+                targets,
+                args,
+                executor=None,
+                confs=None,
+                ivy=None,
+                workunit_name='ivy',
+                use_soft_excludes=False,
+                resolve_hash_name=None):
     ivy_jvm_options = self.get_options().jvm_options[:]
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')

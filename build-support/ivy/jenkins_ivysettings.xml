@@ -44,7 +44,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   />
  -->
   <caches
-    defaultCacheDir="${ivy.cache.repository.dir}"
+    repositoryCacheDir="${ivy.cache.repository.dir}"
     resolutionCacheDir="${ivy.cache.resolution.dir}"
     lockStrategy="artifact-lock-nio"
   />
