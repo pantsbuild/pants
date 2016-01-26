@@ -75,7 +75,7 @@ class Pinger(object):
 
 
 class BestUrlSelector(object):
-  SUPPORTED_PROTOCOLS = ['http', 'https']
+  SUPPORTED_PROTOCOLS = ('http', 'https')
   MAX_FAILURES = 5
 
   def __init__(self, available_urls, max_failures=MAX_FAILURES):

@@ -35,7 +35,7 @@ class RESTfulArtifactCache(ArtifactCache):
 
   READ_SIZE_BYTES = 4 * 1024 * 1024
 
-  def __init__(self, artifact_root, bestUrlSelector, local):
+  def __init__(self, artifact_root, best_url_selector, local):
     """
     :param string artifact_root: The path under which cacheable products will be read/written.
     :param string url_base: The prefix for urls on some RESTful service. We must be able to PUT and
@@ -44,7 +44,7 @@ class RESTfulArtifactCache(ArtifactCache):
     """
     super(RESTfulArtifactCache, self).__init__(artifact_root)
 
-    self.bestUrlSelector = bestUrlSelector
+    self.best_url_selector = best_url_selector
     self._timeout_secs = 4.0
     self._localcache = local
 
@@ -87,8 +87,8 @@ class RESTfulArtifactCache(ArtifactCache):
 
     session = RequestsSession.instance()
     try:
-      with self.bestUrlSelector.select_best_url() as bestUrl:
-        url = self._url_for_key(bestUrl, cache_key)
+      with self.best_url_selector.select_best_url() as best_url:
+        url = self._url_for_key(best_url, cache_key)
         logger.debug('Sending {0} request to {1}'.format(method, url))
 
         if 'PUT' == method:

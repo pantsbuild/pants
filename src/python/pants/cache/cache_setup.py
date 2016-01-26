@@ -249,10 +249,10 @@ class CacheFactory(object):
       urls = self.get_available_urls(remote_spec.split('|'))
 
       if len(urls) > 0:
-        bestUrlSelector = BestUrlSelector(['{}/{}'.format(url.rstrip('/'), self._stable_name)
-                                           for url in urls])
+        best_url_selector = BestUrlSelector(['{}/{}'.format(url.rstrip('/'), self._stable_name)
+                                             for url in urls])
         local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
-        return RESTfulArtifactCache(artifact_root, bestUrlSelector, local_cache)
+        return RESTfulArtifactCache(artifact_root, best_url_selector, local_cache)
 
     local_cache = create_local_cache(spec.local) if spec.local else None
     remote_cache = create_remote_cache(spec.remote, local_cache) if spec.remote else None
