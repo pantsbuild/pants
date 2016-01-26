@@ -215,7 +215,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
     self.assertEqual(
       sorted([
-        '//:scala-library',
+        '//:scala_library_synthetic',
         'java/project_info:java_lib',
         'project_info:jar_lib'
       ]),
@@ -249,7 +249,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       'libraries': ['org.apache:apache-jar:12.12.2012', 'org.scala-lang:scala-library:2.10.5'],
       'id': 'project_info.jvm_target',
       'is_code_gen': False,
-      'targets': ['project_info:jar_lib', '//:scala-library'],
+      'targets': ['project_info:jar_lib', '//:scala_library_synthetic'],
       'roots': [
          {
            'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),
