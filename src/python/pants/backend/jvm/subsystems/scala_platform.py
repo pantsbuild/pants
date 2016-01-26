@@ -186,6 +186,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """
     # If the version is custom allow the user the option to set the spec.
     if self._get_label() == 'custom':
+      print([self.get_options().runtime_spec])
       return [self.get_options().runtime_spec]
     else:
       runtime_name = scala_build_info.get(self._get_label()).runtime_name
@@ -197,11 +198,12 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object
     :return pants.build_graph.address.Address:
     """
-    # If scala-library is already defined return it instead of synthetic target
+    # If a custom runtime is specified return it instead of synthetic target
     # This will pull in user defined scala-library defs
-    library_address = Address.parse('//:scala-library')
-    if buildgraph.contains_address(library_address):
-      return buildgraph.get_target(library_address)
+    custom_runtime_spec = ScalaPlatform.global_instance().runtime[0]
+
+    if ScalaPlatform.global_instance().version == 'custom':
+      return custom_runtime_spec
     else:
       # Create an address for the synthetic target if needed
       synth_library_address = Address.parse('//:scala_library_synthetic')
@@ -215,4 +217,4 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
           raise buildgraph.ManualSyntheticTargetError(
             'Synthetic targets can not be defined manually'
           )
-      return buildgraph.get_target(synth_library_address)
+      return buildgraph.get_target(synth_library_address).address.spec
