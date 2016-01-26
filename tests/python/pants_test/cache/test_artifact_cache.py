@@ -12,7 +12,8 @@ import unittest
 from contextlib import contextmanager
 from threading import Thread
 
-from pants.cache.artifact_cache import call_insert, call_use_cached_files
+from pants.cache.artifact_cache import (NonfatalArtifactCacheError, call_insert,
+                                        call_use_cached_files)
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
@@ -134,6 +135,23 @@ class TestArtifactCache(unittest.TestCase):
 
     with self.setup_rest_cache() as artifact_cache:
       self.do_test_artifact_cache(artifact_cache)
+
+  def test_restful_cache_failover(self):
+    bad_url = 'http://badhost:123'
+
+    with temporary_dir() as artifact_root:
+      local = TempLocalArtifactCache(artifact_root, 0)
+
+      # With fail-over, rest call second time will succeed
+      with self.setup_server() as good_url:
+        artifact_cache = RESTfulArtifactCache(artifact_root,
+                                              BestUrlSelector([bad_url, good_url], max_failures=0),
+                                              local)
+        with self.assertRaises(NonfatalArtifactCacheError) as ex:
+          self.do_test_artifact_cache(artifact_cache)
+        self.assertTrue('Connection aborted' in str(ex.exception))
+
+        self.do_test_artifact_cache(artifact_cache)
 
   def do_test_artifact_cache(self, artifact_cache):
     key = CacheKey('muppet_key', 'fake_hash', 42)

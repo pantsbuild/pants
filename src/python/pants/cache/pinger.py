@@ -76,7 +76,7 @@ class Pinger(object):
 
 class BestUrlSelector(object):
   SUPPORTED_PROTOCOLS = ('http', 'https')
-  MAX_FAILURES = 5
+  MAX_FAILURES = 3
 
   def __init__(self, available_urls, max_failures=MAX_FAILURES):
     """Save parsed input urls in order and perform basic validations.
@@ -116,9 +116,10 @@ class BestUrlSelector(object):
     except Exception as e:
       self.unsuccessful_calls[best_url] += 1
 
+      # Not thread-safe but pool used by cache is based on subprocesses, therefore no race.
       if self.unsuccessful_calls[best_url] > self.max_failures:
         self.parsed_urls.rotate(-1)
         self.unsuccessful_calls[best_url] = 0
-      raise e
+      raise
     else:
       self.unsuccessful_calls[best_url] = 0
