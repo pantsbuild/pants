@@ -217,9 +217,13 @@ class CacheFactory(object):
     pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
+
     sorted_pingtimes = sorted(pingtimes, key=lambda x: x[1])
-    return [netloc_to_url[netloc] for netloc, pingtime in sorted_pingtimes
-            if pingtime < Pinger.UNREACHABLE]
+    available_urls = [netloc_to_url[netloc] for netloc, pingtime in sorted_pingtimes
+                      if pingtime < Pinger.UNREACHABLE]
+    self._log.debug('Available cache servers: {0}'.format(available_urls))
+
+    return available_urls
 
   def _do_create_artifact_cache(self, spec, action):
     """Returns an artifact cache for the specified spec.

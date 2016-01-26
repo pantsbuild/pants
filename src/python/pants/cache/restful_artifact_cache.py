@@ -84,40 +84,38 @@ class RESTfulArtifactCache(ArtifactCache):
 
   # Returns a response if we get a 200, None if we get a 404 and raises an exception otherwise.
   def _request(self, method, cache_key, body=None):
-    url = self.url_for_key(cache_key)
-    logger.debug('Sending {0} request to {1}'.format(method, url))
 
     session = RequestsSession.instance()
-
     try:
-      if 'PUT' == method:
-        response = session.put(url, data=body, timeout=self._timeout_secs)
-      elif 'GET' == method:
-        response = session.get(url, timeout=self._timeout_secs, stream=True)
-      elif 'HEAD' == method:
-        response = session.head(url, timeout=self._timeout_secs)
-      elif 'DELETE' == method:
-        response = session.delete(url, timeout=self._timeout_secs)
-      else:
-        raise ValueError('Unknown request method {0}'.format(method))
+      with self.bestUrlSelector.select_best_url() as bestUrl:
+        url = self._url_for_key(bestUrl, cache_key)
+        logger.debug('Sending {0} request to {1}'.format(method, url))
 
-      # Allow all 2XX responses. E.g., nginx returns 201 on PUT. HEAD may return 204.
-      if int(response.status_code / 100) == 2:
-        return response
-      elif response.status_code == 404:
-        logger.debug('404 returned for {0} request to {1}'.format(method, url))
-        return None
-      else:
-        raise NonfatalArtifactCacheError('Failed to {0} {1}. Error: {2} {3}'.format(method,
-                                                                         url,
-                                                                         response.status_code,
-                                                                         response.reason))
+        if 'PUT' == method:
+          response = session.put(url, data=body, timeout=self._timeout_secs)
+        elif 'GET' == method:
+          response = session.get(url, timeout=self._timeout_secs, stream=True)
+        elif 'HEAD' == method:
+          response = session.head(url, timeout=self._timeout_secs)
+        elif 'DELETE' == method:
+          response = session.delete(url, timeout=self._timeout_secs)
+        else:
+          raise ValueError('Unknown request method {0}'.format(method))
+
+        # Allow all 2XX responses. E.g., nginx returns 201 on PUT. HEAD may return 204.
+        if int(response.status_code / 100) == 2:
+          return response
+        elif response.status_code == 404:
+          logger.debug('404 returned for {0} request to {1}'.format(method, url))
+          return None
+        else:
+          raise NonfatalArtifactCacheError('Failed to {0} {1}. Error: {2} {3}'
+                                           .format(method, url,
+                                                   response.status_code, response.reason))
     except RequestException as e:
       raise NonfatalArtifactCacheError(e)
 
-  def url_for_key(self, cache_key):
-    with self.bestUrlSelector.select_best_url() as bestUrl:
-      path_prefix = bestUrl.path.rstrip(b'/')
-      path = '{0}/{1}/{2}.tgz'.format(path_prefix, cache_key.id, cache_key.hash)
-
-      return '{0}://{1}{2}'.format(bestUrl.scheme, bestUrl.netloc, path)
+  def _url_for_key(self, url, cache_key):
+    path_prefix = url.path.rstrip(b'/')
+    path = '{0}/{1}/{2}.tgz'.format(path_prefix, cache_key.id, cache_key.hash)
+    return '{0}://{1}{2}'.format(url.scheme, url.netloc, path)
