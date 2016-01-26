@@ -74,7 +74,7 @@ class BuildFileAddressMapperTest(BaseTest):
   def test_raises_invalid_build_file_reference(self):
     # reference a BUILD file that doesn't exist
     with self.assertRaisesRegexp(BuildFileAddressMapper.InvalidBuildFileReference,
-                                 '^.*/non-existent-path does not contains any BUILD files.'
+                                 '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec //non-existent-path:a'):
       self.address_mapper.spec_to_address('//non-existent-path:a')
 
