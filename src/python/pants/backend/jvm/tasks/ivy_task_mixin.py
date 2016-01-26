@@ -83,12 +83,22 @@ class IvyTaskMixin(TaskBase):
 
   @memoized_property
   def ivy_cache_dir(self):
-    """The path of the ivy cache dir used for resolves.
+    """The directory where Ivy stores fetched artifacts.
 
     :rtype: string
     """
     # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
     return IvySubsystem.global_instance().get_options().cache_dir
+
+  @memoized_property
+  def ivy_resolution_dir(self):
+    """The directory that Ivy uses for resolves.
+
+    :rtype: string
+    """
+    # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
+    return IvySubsystem.global_instance().get_options().resolution_dir
+
 
   def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False):
@@ -168,7 +178,7 @@ class IvyTaskMixin(TaskBase):
 
   # Extracted for testing.
   def _parse_report(self, resolve_hash_name, conf):
-    return IvyUtils.parse_xml_report(self.ivy_cache_dir, resolve_hash_name, conf)
+    return IvyUtils.parse_xml_report(self.ivy_resolution_dir, resolve_hash_name, conf)
 
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
@@ -225,7 +235,7 @@ class IvyTaskMixin(TaskBase):
       report_paths = []
       resolve_hash_name = global_vts.cache_key.hash
       for conf in report_confs:
-        report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+        report_path = IvyUtils.xml_report_path(self.ivy_resolution_dir, resolve_hash_name, conf)
         if not os.path.exists(report_path):
           report_missing = True
           break

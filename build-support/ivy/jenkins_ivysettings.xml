@@ -32,8 +32,20 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="android.repo.dir" value="${ANDROID_HOME}/extras/android/m2repository"/>
   <property name="google.repo.dir" value="${ANDROID_HOME}/extras/google/m2repository"/>
 
+<!--   <property
+    name="cache.resolution.dir"
+    value="${user.home}/.ivy2"
+    unlessset="env.IVY_CACHE_RESOLUTION_DIR"
+  />
+  <property
+    name="cache.resolution.dir"
+    value="${env.IVY_CACHE_RESOLUTION_DIR}"
+    ifset="env.IVY_CACHE_RESOLUTION_DIR"
+  />
+ -->
   <caches
-    resolutionCacheDir="${env.WORKSPACE}/.ivy2_resolution"
+    repositoryCacheDir="${ivy.cache.repository.dir}"
+    resolutionCacheDir="${ivy.cache.resolution.dir}"
     lockStrategy="artifact-lock-nio"
   />
 
