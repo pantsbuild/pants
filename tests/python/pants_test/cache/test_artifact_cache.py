@@ -14,7 +14,8 @@ from threading import Thread
 
 from pants.cache.artifact_cache import call_insert, call_use_cached_files
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
-from pants.cache.restful_artifact_cache import InvalidRESTfulCacheProtoError, RESTfulArtifactCache
+from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError
+from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.invalidation.build_invalidator import CacheKey
 from pants.util.contextutil import pushd, temporary_dir, temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdir
@@ -112,7 +113,7 @@ class TestArtifactCache(unittest.TestCase):
     with temporary_dir() as artifact_root:
       local = local or TempLocalArtifactCache(artifact_root, 0)
       with self.setup_server(return_failed=return_failed) as base_url:
-        yield RESTfulArtifactCache(artifact_root, base_url, local)
+        yield RESTfulArtifactCache(artifact_root, BestUrlSelector([base_url]), local)
 
   @contextmanager
   def setup_test_file(self, parent):
@@ -129,7 +130,7 @@ class TestArtifactCache(unittest.TestCase):
 
   def test_restful_cache(self):
     with self.assertRaises(InvalidRESTfulCacheProtoError):
-      RESTfulArtifactCache('foo', 'ftp://localhost/bar', 'foo')
+      RESTfulArtifactCache('foo', BestUrlSelector(['ftp://localhost/bar']), 'foo')
 
     with self.setup_rest_cache() as artifact_cache:
       self.do_test_artifact_cache(artifact_cache)
@@ -164,8 +165,8 @@ class TestArtifactCache(unittest.TestCase):
     with self.setup_server() as url:
       with self.setup_local_cache() as local:
         tmp = TempLocalArtifactCache(local.artifact_root, 0)
-        remote = RESTfulArtifactCache(local.artifact_root, url, tmp)
-        combined = RESTfulArtifactCache(local.artifact_root, url, local)
+        remote = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), tmp)
+        combined = RESTfulArtifactCache(local.artifact_root, BestUrlSelector([url]), local)
 
         key = CacheKey('muppet_key', 'fake_hash', 42)
 

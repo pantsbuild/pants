@@ -14,7 +14,7 @@ from six.moves import range
 
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
-from pants.cache.pinger import Pinger
+from pants.cache.pinger import BestUrlSelector, Pinger
 from pants.cache.resolver import NoopResolver, Resolver, RESTfulResolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.option.custom_types import list_option
@@ -210,19 +210,16 @@ class CacheFactory(object):
     # both artifact cache and resolver use REST, add new protocols here once they are supported
     return string_spec.startswith('http://') or string_spec.startswith('https://')
 
-  def select_best_url(self, remote_spec):
-    urls = remote_spec.split('|')
+  def get_available_urls(self, urls):
+    """Return reachable urls sorted by their ping times."""
+
     netloc_to_url = {urlparse.urlparse(url).netloc: url for url in urls}
     pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).
     self._log.debug('Artifact cache server ping times: {}'
                     .format(', '.join(['{}: {:.6f} secs'.format(*p) for p in pingtimes])))
-    best_url, ping_time = min(pingtimes, key=lambda t: t[1])
-    if ping_time == Pinger.UNREACHABLE:
-      self._log.warn('No reachable artifact caches.')
-      return None
-
-    self._log.debug('Best artifact cache is {0}'.format(best_url))
-    return netloc_to_url[best_url]
+    sorted_pingtimes = sorted(pingtimes, key=lambda x: x[1])
+    return [netloc_to_url[netloc] for netloc, pingtime in sorted_pingtimes
+            if pingtime < Pinger.UNREACHABLE]
 
   def _do_create_artifact_cache(self, spec, action):
     """Returns an artifact cache for the specified spec.
@@ -244,23 +241,14 @@ class CacheFactory(object):
                       .format(self._stable_name, action, path))
       return LocalArtifactCache(artifact_root, path, compression, self._options.max_entries_per_target)
 
-    def create_remote_cache(urls, local_cache):
-      best_url = self.select_best_url(urls)
-      if best_url:
-        url = best_url.rstrip('/') + '/' + self._stable_name
-        self._log.debug('{0} {1} remote artifact cache at {2}'
-                        .format(self._stable_name, action, url))
+    def create_remote_cache(remote_spec, local_cache):
+      urls = self.get_available_urls(remote_spec.split('|'))
+
+      if len(urls) > 0:
+        bestUrlSelector = BestUrlSelector(['{}/{}'.format(url.rstrip('/'), self._stable_name)
+                                           for url in urls])
         local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
-        return RESTfulArtifactCache(artifact_root, url, local_cache)
-
-    def create_cache_from_string_spec(string_spec):
-      if self.is_remote(string_spec):
-        return create_remote_cache(string_spec, TempLocalArtifactCache(artifact_root, compression))
-      elif self.is_local(string_spec):
-        return create_local_cache(string_spec)
-      else:
-        raise CacheSpecFormatError('Invalid artifact cache spec: {0}'.format(string_spec))
-
+        return RESTfulArtifactCache(artifact_root, bestUrlSelector, local_cache)
 
     local_cache = create_local_cache(spec.local) if spec.local else None
     remote_cache = create_remote_cache(spec.remote, local_cache) if spec.remote else None
