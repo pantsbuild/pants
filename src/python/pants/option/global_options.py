@@ -137,6 +137,10 @@ class GlobalOptionsRegistrar(Optionable):
              default=[register.bootstrap.pants_workdir],
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
+    register('--pants-build-ignore', advanced=True, action='append',
+             default=[register.bootstrap.pants_workdir],
+             help='Ignore these paths when reading BUILD files. Useful to to avoid descending into '
+                  'unneeded directories. Syntax is similar to .gitignore.')
     register('--fail-fast', advanced=True, action='store_true', recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')

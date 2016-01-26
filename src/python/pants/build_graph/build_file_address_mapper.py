@@ -184,7 +184,8 @@ class BuildFileAddressMapper(object):
     return self.scan_build_files(base_path, spec_excludes)
 
   def scan_build_files(self, base_path, spec_excludes):
-    return BuildFile.scan_build_files(self._project_tree, base_path, spec_excludes)
+    return BuildFile.scan_build_files(self._project_tree, base_path, spec_excludes,
+                                      pants_build_ignore=self._pants_build_ignore)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
