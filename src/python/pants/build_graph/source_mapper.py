@@ -49,7 +49,6 @@ class SpecSourceMapper(SourceMapper):
       try:
         result.extend(self._find_targets_for_source(source, path))
       except AddressLookupError:
-        # Ignore address lookup errors.
         pass
       if self._stop_after_match and len(result) > 0:
         break
@@ -130,7 +129,6 @@ class LazySourceMapper(SourceMapper):
         try:
           self._map_sources_from_spec_path(path)
         except AddressLookupError:
-          # Ignore address lookup errors.
           pass
         self._mapped_paths.add(path)
       elif not self._stop_after_match:
