@@ -401,8 +401,10 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       'src::', 'tests::', 'examples::', 'testprojects::',
       # The android targets won't work if the Android ADK is not installed.
       '--exclude-target-regexp=.*android.*',
-      # Won't work until https://rbcommons.com/s/twitter/r/3367/ lands.
-      '--exclude-target-regexp=testprojects/3rdparty/managed.*',
+      # IdeaGen resolves source jars by default, which causes a collision with these targets because
+      # they explicitly include jersey.jersey's source jar.
+      '--exclude-target-regexp=testprojects/3rdparty/managed:jersey.jersey.sources',
+      '--exclude-target-regexp=testprojects/3rdparty/managed:example-dependee',
     ])
 
   def test_ivy_classifiers(self):

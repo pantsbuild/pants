@@ -23,6 +23,13 @@ jar_library(name='library-managed',
   managed_dependencies=':manager',
 )
 
+jar_library(name='library-managed2',
+  jars=[
+    jar(org='jersey', name='jersey'),
+  ],
+  managed_dependencies=':manager2',
+)
+
 jar_library(name='library-managed-forceful',
   jars=[
     jar(org='jersey', name='jersey', rev='0.5-ea', force=True),
@@ -65,6 +72,15 @@ jvm_binary(name='managed',
   platform='java7',
   dependencies=[
     ':library-managed',
+  ],
+)
+
+jvm_binary(name='managed2',
+  main='org.pantsbuild.testproject.depman.PrintClasspath',
+  source='PrintClasspath.java',
+  platform='java7',
+  dependencies=[
+    ':library-managed2',
   ],
 )
 
