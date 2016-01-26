@@ -131,3 +131,27 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
       self.set_managed: True,
       self.set_managed2: False,
     }, 'forceful', conflict_strategy='USE_MANAGED')
+
+  def test_managed_jar_libraries_targets(self):
+    expected_specs = [
+      'testprojects/3rdparty/managed:args4j.args4j',
+      'testprojects/3rdparty/managed:example-dependee',
+      'testprojects/3rdparty/managed:info.cukes.cucumber-core',
+      'testprojects/3rdparty/managed:jersey.jersey.sources',
+      'testprojects/3rdparty/managed:managed',
+      'testprojects/3rdparty/managed:org.eclipse.jetty.jetty-jsp',
+    ]
+    run = self.run_pants([
+      'filter',
+      'testprojects/3rdparty/managed::',
+    ])
+    self.assert_success(run)
+    for spec in expected_specs:
+      self.assertIn(spec, run.stdout_data)
+
+  def test_managed_jar_libraries_resolve(self):
+    run = self.run_pants([
+      'resolve',
+      'testprojects/3rdparty/managed::',
+    ])
+    self.assert_success(run)

@@ -347,7 +347,13 @@ class JarDependencyManagementSetup(Task):
 
   def execute(self):
     self._resolve_default_target()
-    targets = self.context.targets(predicate=lambda t: isinstance(t, ManagedJarDependencies))
+    targets = set(self.context.targets(predicate=lambda t: isinstance(t, ManagedJarDependencies)))
+    # NB(gmalmquist): We have to explicitly load in managed_jar_dependencies referenced by the
+    # `managed_dependencies` field of jar_library(). They aren't included as dependencies of
+    # jar_library targets to avoid created cycles.
+    for library in self.context.targets(predicate=lambda t: isinstance(t, JarLibrary)):
+      if library.managed_dependencies:
+        targets.add(library.managed_dependencies)
     self._compute_artifact_sets(targets)
     self._validate_managed_jar_dependencies_targets(targets)
 
