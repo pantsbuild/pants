@@ -161,6 +161,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':build_file',
+    ':hash_utils',
     'src/python/pants/build_graph',
   ],
 )

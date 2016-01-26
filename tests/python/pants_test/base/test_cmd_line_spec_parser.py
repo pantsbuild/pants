@@ -60,7 +60,7 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed(cmdline_spec='a/b:', expected=['a/b', 'a/b:c'])
     self.assert_parsed(cmdline_spec='//a/b:', expected=['a/b', 'a/b:c'])
 
-  def test_sibling_or_descendents(self):
+  def test_sibling_or_descendants(self):
     self.assert_parsed(cmdline_spec='::', expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
     self.assert_parsed(cmdline_spec='//::', expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
 
@@ -69,6 +69,21 @@ class CmdLineSpecParserTest(BaseTest):
 
     self.assert_parsed(cmdline_spec='a/b::', expected=['a/b', 'a/b:c'])
     self.assert_parsed(cmdline_spec='//a/b::', expected=['a/b', 'a/b:c'])
+
+  def test_sharded_descendants(self):
+    self.assert_parsed(cmdline_spec='::0/1', expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
+
+    self.assert_parsed(cmdline_spec='::0/2', expected=['a', 'a:b'])
+    self.assert_parsed(cmdline_spec='::1/2', expected=[':root', 'a/b', 'a/b:c'])
+
+    self.assert_parsed(cmdline_spec='::0/3', expected=[])
+    self.assert_parsed(cmdline_spec='::1/3', expected=[':root', 'a:b', 'a/b:c'])
+    self.assert_parsed(cmdline_spec='::2/3', expected=['a', 'a/b'])
+
+    self.assert_parsed(cmdline_spec='::0/4', expected=[])
+    self.assert_parsed(cmdline_spec='::1/4', expected=[':root', 'a/b:c'])
+    self.assert_parsed(cmdline_spec='::2/4', expected=['a', 'a:b'])
+    self.assert_parsed(cmdline_spec='::3/4', expected=['a/b'])
 
   def test_absolute(self):
     self.assert_parsed(cmdline_spec=os.path.join(self.build_root, 'a'), expected=['a'])
