@@ -18,7 +18,7 @@ from pants.engine.exp import parsers
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
-from pants.engine.exp.parsers import parse_json
+from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target
 from pants.util.contextutil import temporary_file
@@ -39,15 +39,22 @@ class Thing(object):
     return isinstance(other, Thing) and self._key() == other._key()
 
 
+class ThingTable(SymbolTable):
+  @classmethod
+  def table(cls):
+    return {'thing': Thing}
+
+
 class AddressMapTest(unittest.TestCase):
-  _parser = functools.partial(parsers.parse_json, symbol_table={'thing': Thing})
+  _parser_cls = JsonParser
+  _symbol_table_cls = ThingTable
 
   @contextmanager
   def parse_address_map(self, json):
     with temporary_file() as fp:
       fp.write(json)
       fp.close()
-      address_map = AddressMap.parse(fp.name, parser=self._parser)
+      address_map = AddressMap.parse(fp.name, self._symbol_table_cls, self._parser_cls)
       self.assertEqual(fp.name, address_map.path)
       yield address_map
 
@@ -122,6 +129,12 @@ class AddressFamilyTest(unittest.TestCase):
                                                     {'one': Thing(name='one', age=37)})])
 
 
+class TargetTable(SymbolTable):
+  @classmethod
+  def table(cls):
+    return {'struct': Struct, 'target': Target}
+
+
 class AddressMapperTest(unittest.TestCase):
   def setUp(self):
     self.work_dir = safe_mkdtemp()
@@ -130,10 +143,10 @@ class AddressMapperTest(unittest.TestCase):
     shutil.copytree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'),
                     self.build_root)
 
-    parser = partial(parse_json, symbol_table={'struct': Struct, 'target': Target})
     self.address_mapper = AddressMapper(build_root=self.build_root,
-                                        build_pattern=r'.+\.BUILD.json$',
-                                        parser=parser)
+                                        symbol_table_cls=TargetTable,
+                                        parser_cls=JsonParser,
+                                        build_pattern=r'.+\.BUILD.json$')
 
     self.a_b_target = Target(name='b',
                              dependencies=['//d:e'],
@@ -152,9 +165,6 @@ class AddressMapperTest(unittest.TestCase):
     address_family = self.address_mapper.family('a/c')
     self.assertEqual({}, address_family.addressables)
 
-    # But success is cached.
-    self.assertIs(address_family, self.address_mapper.family('a/c'))
-
   def test_no_address_no_family(self):
     with self.assertRaises(ResolveError):
       self.address_mapper.resolve(Address.parse('a/c'))
@@ -170,87 +180,9 @@ class AddressMapperTest(unittest.TestCase):
     resolved = self.address_mapper.resolve(Address.parse('a/c'))
     self.assertEqual(Struct(name='c'), resolved)
 
-    # But success is cached.
-    self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/c')))
-
   def test_resolve(self):
     resolved = self.address_mapper.resolve(Address.parse('a/b'))
     self.assertEqual(self.a_b_target, resolved)
-
-  def test_invalidate_build_file_added(self):
-    address_family = self.address_mapper.family('a/b')
-
-    self.assertEqual({Address.parse('a/b'): self.a_b_target},
-                     address_family.addressables)
-
-    with open(os.path.join(self.build_root, 'a/b/sibling.BUILD.json'), 'w') as fp:
-      fp.write('{"type_alias": "struct", "name": "c"}')
-
-    still_valid = self.address_mapper.family('a/b')
-    self.assertIs(address_family, still_valid)
-
-    self.address_mapper.invalidate_build_file('a/b/sibling.BUILD.json')
-    newly_formed = self.address_mapper.family('a/b')
-    self.assertIsNot(address_family, newly_formed)
-    self.assertEqual({Address.parse('a/b'): self.a_b_target,
-                      Address.parse('a/b:c'): Struct(name='c')},
-                     newly_formed.addressables)
-
-  def test_invalidate_build_file_changed(self):
-    with self.assertRaises(ResolveError):
-      self.address_mapper.resolve(Address.parse('a/b:c'))
-
-    build_file = os.path.join(self.build_root, 'a/b/b.BUILD.json')
-    with safe_open(build_file, 'w+') as fp:
-      fp.write('{"type_alias": "struct", "name": "c"}')
-
-    with self.assertRaises(ResolveError):
-      self.address_mapper.resolve(Address.parse('a/b:c'))
-
-    self.address_mapper.invalidate_build_file('a/b/b.BUILD.json')
-    resolved = self.address_mapper.resolve(Address.parse('a/b:c'))
-    self.assertEqual(Struct(name='c'), resolved)
-
-    # But success is cached.
-    self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b:c')))
-
-  def test_invalidate_build_file_removed(self):
-    resolved = self.address_mapper.resolve(Address.parse('a/b'))
-    self.assertEqual(self.a_b_target, resolved)
-
-    build_file = os.path.join(self.build_root, 'a/b/b.BUILD.json')
-    os.unlink(build_file)
-    self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b')))
-
-    self.address_mapper.invalidate_build_file(build_file)
-    with self.assertRaises(ResolveError):
-      self.address_mapper.resolve(Address.parse('a/b'))
-
-  def test_invalidation_un_normalized(self):
-    resolved = self.address_mapper.resolve(Address.parse('a/b'))
-    self.assertEqual(self.a_b_target, resolved)
-
-    os.unlink(os.path.join(self.build_root, 'a/b/b.BUILD.json'))
-    self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b')))
-
-    un_normalized_build_root = os.path.join(self.work_dir, 'build_root_linked')
-    os.symlink(self.build_root, un_normalized_build_root)
-    un_normalized_build_file = os.path.join(un_normalized_build_root, 'a/b/b.BUILD.json')
-    self.address_mapper.invalidate_build_file(un_normalized_build_file)
-    with self.assertRaises(ResolveError):
-      self.address_mapper.resolve(Address.parse('a/b'))
-
-  def test_invalidation_relative(self):
-    resolved = self.address_mapper.resolve(Address.parse('a/b'))
-    self.assertEqual(self.a_b_target, resolved)
-
-    build_file = os.path.join(self.build_root, 'a/b/b.BUILD.json')
-    os.unlink(build_file)
-    self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b')))
-
-    self.address_mapper.invalidate_build_file('a/b/b.BUILD.json')
-    with self.assertRaises(ResolveError):
-      self.address_mapper.resolve(Address.parse('a/b'))
 
   @staticmethod
   def addr(spec):

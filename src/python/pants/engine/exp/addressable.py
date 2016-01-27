@@ -217,7 +217,7 @@ class AddressableDescriptor(object):
 
   def _checked_value(self, instance, value):
     # We allow four forms of value:
-    # 1. An opaque (to us) string address pointing to a value that can be resolved by external
+    # 1. An opaque (to us) address pointing to a value that can be resolved by external
     #    means.
     # 2. A `Resolvable` value that we can lazily resolve and type-check in `__get__`.
     # 3. A concrete instance that meets our type constraint.
@@ -226,7 +226,7 @@ class AddressableDescriptor(object):
     if value is None:
       return None
 
-    if isinstance(value, (six.string_types, Resolvable)):
+    if isinstance(value, (six.string_types, Address, Resolvable)):
       return value
 
     # Support untyped dicts that we deserialize on-demand here into the required type.
@@ -389,20 +389,16 @@ def strip_variants(address):
 
   :rtype: :class:`pants.build_graph.address.Address`
   """
-  address, _ = _parse_config(address)
+  address, _ = parse_variants(address)
   return address
 
 
-def extract_variants(address):
-  """Return the variants (if any) stripped from the given address' name.
+def _extract_variants(variants_str):
+  """Return the variants (if any) represented by the given variants_str.
 
   :returns: The variants or else `None` if there are none.
   :rtype: tuple of tuples (key, value) strings
   """
-  _, variants_str = _parse_config(address)
-  if not variants_str:
-    return None
-
   def entries():
     for entry in variants_str.split(','):
       key, _, value = entry.partition('=')
@@ -412,8 +408,8 @@ def extract_variants(address):
   return tuple(entries())
 
 
-def _parse_config(address):
+def parse_variants(address):
   target_name, _, variants_str = address.target_name.partition('@')
-  variants_str = variants_str or None
+  variants = _extract_variants(variants_str) if variants_str else None
   normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
-  return normalized_address, variants_str
+  return normalized_address, variants

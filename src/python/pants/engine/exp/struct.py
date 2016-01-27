@@ -264,11 +264,13 @@ class Struct(Serializable, SerializableFactory, Validatable):
 class StructWithDeps(Struct):
   """A subclass of Struct with dependencies."""
 
-  def __init__(self, dependencies=None, **kwargs):
+  def __init__(self, dependencies=None, variants=None, **kwargs):
     """
     :param list dependencies: The direct dependencies of this struct.
+    :param dict variants: A dict of the default variant values for this target.
     """
-    super(StructWithDeps, self).__init__(**kwargs)
+    # TODO: enforce the type of variants using the Addressable framework.
+    super(StructWithDeps, self).__init__(variants=variants, **kwargs)
     self.dependencies = dependencies
 
   @addressable_list(SubclassesOf(Struct))

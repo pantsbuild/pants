@@ -7,14 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from functools import partial
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
 from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
                                     Resolver)
 from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.parsers import parse_json, python_assignments_parser, python_callbacks_parser
+from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
+                                      SymbolTable)
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
@@ -60,28 +60,31 @@ class PublishConfiguration(Struct):
     """"""
 
 
-class GraphTestBase(unittest.TestCase):
-  def setUp(self):
-    self.symbol_table = {'ApacheThriftConfig': ApacheThriftConfiguration,
-                         'Struct': Struct,
-                         'StructWithDeps': StructWithDeps,
-                         'PublishConfig': PublishConfiguration,
-                         'Target': Target}
+class TestTable(SymbolTable):
+  @classmethod
+  def table(cls):
+    return {'ApacheThriftConfig': ApacheThriftConfiguration,
+            'Struct': Struct,
+            'StructWithDeps': StructWithDeps,
+            'PublishConfig': PublishConfiguration,
+            'Target': Target}
 
-  def create_graph(self, build_pattern=None, parser=None, inline=False):
+
+class GraphTestBase(unittest.TestCase):
+  def create_graph(self, build_pattern=None, parser_cls=None, inline=False):
     mapper = AddressMapper(build_root=os.path.dirname(__file__),
+                           symbol_table_cls=TestTable,
                            build_pattern=build_pattern,
-                           parser=parser)
+                           parser_cls=parser_cls)
     return Graph(mapper, inline=inline)
 
   def create_json_graph(self):
-    return self.create_graph(build_pattern=r'.+\.BUILD.json$',
-                             parser=partial(parse_json, symbol_table=self.symbol_table))
+    return self.create_graph(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
 
 
 class InlinedGraphTest(GraphTestBase):
-  def create_graph(self, build_pattern=None, parser=None, inline=True):
-    return super(InlinedGraphTest, self).create_graph(build_pattern, parser, inline=inline)
+  def create_graph(self, build_pattern=None, parser_cls=None, inline=True):
+    return super(InlinedGraphTest, self).create_graph(build_pattern, parser_cls, inline=inline)
 
   def do_test_codegen_simple(self, graph):
     def address(name):
@@ -120,12 +123,12 @@ class InlinedGraphTest(GraphTestBase):
 
   def test_python(self):
     graph = self.create_graph(build_pattern=r'.+\.BUILD.python$',
-                              parser=python_assignments_parser(symbol_table=self.symbol_table))
+                              parser_cls=PythonAssignmentsParser)
     self.do_test_codegen_simple(graph)
 
   def test_python_classic(self):
     graph = self.create_graph(build_pattern=r'.+\.BUILD$',
-                              parser=python_callbacks_parser(symbol_table=self.symbol_table))
+                              parser_cls=PythonCallbacksParser)
     self.do_test_codegen_simple(graph)
 
   def test_resolve_cache(self):
@@ -264,10 +267,10 @@ class LazyResolvingGraphTest(GraphTestBase):
 
   def test_python(self):
     graph = self.create_graph(build_pattern=r'.+\.BUILD.python$',
-                              parser=python_assignments_parser(symbol_table=self.symbol_table))
+                              parser_cls=PythonAssignmentsParser)
     self.do_test_codegen_simple(graph)
 
   def test_python_classic(self):
     graph = self.create_graph(build_pattern=r'.+\.BUILD$',
-                              parser=python_callbacks_parser(symbol_table=self.symbol_table))
+                              parser_cls=PythonCallbacksParser)
     self.do_test_codegen_simple(graph)

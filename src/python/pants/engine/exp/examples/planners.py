@@ -5,18 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import collections
 import functools
 from abc import abstractmethod, abstractproperty
 
+import six
 from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import SubclassesOf, addressable_list
-from pants.engine.exp.graph import Graph
+from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.parsers import parse_json
-from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectAddress, SelectDependencies,
+from pants.engine.exp.objects import datatype
+from pants.engine.exp.parsers import JsonParser, SymbolTable
+from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
                                         SelectVariant)
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Sources, Target
@@ -228,31 +230,35 @@ def unpickleable_input(unpickleable):
   raise Exception('This function should never run, because its selected input is unpickleable.')
 
 
+class ExampleTable(SymbolTable):
+  @classmethod
+  def table(cls):
+    return {'apache_thrift_java_configuration': ApacheThriftJavaConfiguration,
+            'apache_thrift_python_configuration': ApacheThriftPythonConfiguration,
+            'jar': Jar,
+            'managed_jar': ManagedJar,
+            'managed_resolve': ManagedResolve,
+            'requirement': Requirement,
+            'scrooge_java_configuration': ScroogeJavaConfiguration,
+            'scrooge_scala_configuration': ScroogeScalaConfiguration,
+            'java': JavaSources,
+            'python': PythonSources,
+            'resources': ResourceSources,
+            'scala': ScalaSources,
+            'thrift': ThriftSources,
+            'target': Target,
+            'build_properties': BuildPropertiesConfiguration}
+
+
 def setup_json_scheduler(build_root):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype tuple of (:class:`pants.engine.exp.graph.Graph`,
-                   :class:`pants.engine.exp.scheduler.LocalScheduler`)
+  :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
   """
-  symbol_table = {'apache_thrift_java_configuration': ApacheThriftJavaConfiguration,
-                  'apache_thrift_python_configuration': ApacheThriftPythonConfiguration,
-                  'jar': Jar,
-                  'managed_jar': ManagedJar,
-                  'managed_resolve': ManagedResolve,
-                  'requirement': Requirement,
-                  'scrooge_java_configuration': ScroogeJavaConfiguration,
-                  'scrooge_scala_configuration': ScroogeScalaConfiguration,
-                  'java': JavaSources,
-                  'python': PythonSources,
-                  'resources': ResourceSources,
-                  'scala': ScalaSources,
-                  'thrift': ThriftSources,
-                  'target': Target,
-                  'build_properties': BuildPropertiesConfiguration}
-  json_parser = functools.partial(parse_json, symbol_table=symbol_table)
-  graph = Graph(AddressMapper(build_root=build_root,
-                              build_pattern=r'^BLD.json$',
-                              parser=json_parser))
+  address_mapper = AddressMapper(build_root=build_root,
+                                 symbol_table_cls=ExampleTable,
+                                 build_pattern=r'^BLD.json$',
+                                 parser_cls=JsonParser)
 
   # TODO(John Sirois): once the options system is plumbed, make the tool spec configurable.
   # It could also just be pointed at the scrooge jar at that point.
@@ -268,28 +274,28 @@ def setup_json_scheduler(build_root):
   tasks = [
       (JavaSources,
        [Select(ThriftSources),
-        SelectVariant('thrift', ApacheThriftJavaConfiguration)],
+        SelectVariant(ApacheThriftJavaConfiguration, 'thrift')],
        gen_apache_thrift),
       (PythonSources,
        [Select(ThriftSources),
-        SelectVariant('thrift', ApacheThriftPythonConfiguration)],
+        SelectVariant(ApacheThriftPythonConfiguration, 'thrift')],
        gen_apache_thrift),
       (ScalaSources,
        [Select(ThriftSources),
-        SelectVariant('thrift', ScroogeScalaConfiguration),
-        SelectAddress(scrooge_tool_address, Classpath)],
+        SelectVariant(ScroogeScalaConfiguration, 'thrift'),
+        SelectLiteral(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
       (JavaSources,
        [Select(ThriftSources),
-        SelectVariant('thrift', ScroogeJavaConfiguration),
-        SelectAddress(scrooge_tool_address, Classpath)],
+        SelectVariant(ScroogeJavaConfiguration, 'thrift'),
+        SelectLiteral(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
       (Classpath,
        [Select(Jar)],
        ivy_resolve),
       (Jar,
        [Select(ManagedJar),
-        SelectVariant('resolve', ManagedResolve)],
+        SelectVariant(ManagedResolve, 'resolve')],
        select_rev),
       (Classpath,
        [Select(ResourceSources)],
@@ -312,5 +318,5 @@ def setup_json_scheduler(build_root):
        [Select(UnpickleableOutput)],
        unpickleable_input),
     ]
-  scheduler = LocalScheduler(graph, products_by_goal, tasks)
-  return graph, scheduler
+  scheduler = LocalScheduler(products_by_goal, tasks + create_graph_tasks(address_mapper))
+  return scheduler
