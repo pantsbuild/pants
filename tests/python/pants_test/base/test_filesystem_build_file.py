@@ -90,11 +90,11 @@ class FilesystemBuildFileTest(BuildFileTestBase):
 
   def test_must_exist_true(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      self.create_buildfile("path-that-does-not-exist/BUILD", must_exist=True)
+      self.create_buildfile("path-that-does-not-exist/BUILD")
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      self.create_buildfile("path-that-does-exist/BUILD", must_exist=True)
+      self.create_buildfile("path-that-does-exist/BUILD")
     with self.assertRaises(BuildFile.MissingBuildFileError):
-      self.create_buildfile("path-that-does-exist/BUILD.invalid.suffix", must_exist=True)
+      self.create_buildfile("path-that-does-exist/BUILD.invalid.suffix")
 
   def test_suffix_only(self):
     self.makedirs('suffix-test')
@@ -110,18 +110,6 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         self.get_build_files_family('suffix-test'))
     self.assertEquals(OrderedSet([self.create_buildfile('suffix-test/child/BUILD.suffix3')]),
         self.scan_buildfiles('suffix-test/child'))
-
-  def test_buildfile_with_dir_must_exist_false(self):
-    # We should be able to create a BuildFile against a dir called BUILD if must_exist is false.
-    # This is used in what_changed for example.
-    buildfile = self.create_buildfile('grandparent/BUILD', must_exist=False)
-    self.assertFalse(buildfile.file_exists())
-
-  def test_buildfile_with_dir_must_exist_true(self):
-    # We should NOT be able to create a BuildFile instance against a dir called BUILD
-    # in the default case.
-    with self.assertRaises(BuildFile.MissingBuildFileError):
-      self.create_buildfile('grandparent/BUILD')
 
   def test_directory_called_build_skipped(self):
     # Ensure the buildfiles found do not include grandparent/BUILD since it is a dir.

@@ -46,7 +46,7 @@ class BuildFile(AbstractClass):
     BuildFile._cache = {}
 
   @staticmethod
-  def cached(project_tree, relpath, must_exist=True):
+  def _cached(project_tree, relpath, must_exist=True):
     cache_key = (project_tree, relpath, must_exist)
     if cache_key not in BuildFile._cache:
       BuildFile._cache[cache_key] = BuildFile(project_tree, relpath, must_exist)
@@ -69,9 +69,9 @@ class BuildFile(AbstractClass):
     return cls.scan_project_tree_build_files(cls._get_project_tree(root_dir), base_path, spec_excludes)
 
   @classmethod
-  @deprecated('0.0.72', 'Use cached method instead.')
+  @deprecated('0.0.72')
   def from_cache(cls, root_dir, relpath, must_exist=True):
-    return BuildFile.cached(cls._get_project_tree(root_dir), relpath, must_exist)
+    return BuildFile._cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @staticmethod
   def scan_project_tree_build_files(project_tree, base_relpath, spec_excludes=None):
@@ -122,7 +122,7 @@ class BuildFile(AbstractClass):
         dirs.remove(subdir)
       for filename in files:
         if BuildFile._is_buildfile_name(filename):
-          buildfiles.append(BuildFile.cached(project_tree, os.path.join(root, filename)))
+          buildfiles.append(BuildFile._cached(project_tree, os.path.join(root, filename)))
     return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
 
   def __init__(self, project_tree, relpath, must_exist=True):
@@ -137,11 +137,24 @@ class BuildFile(AbstractClass):
     :raises IOError: if the root_dir path is not absolute.
     :raises MissingBuildFileError: if the path does not house a BUILD file and must_exist is `True`.
     """
+
+    if not must_exist:
+      logger.warn('BuildFile\'s must_exist parameter is deprecated and will be removed in 0.0.74 release. '
+                  'BuildFile should be created from existing file only.')
+    if relpath is None:
+      logger.warn('BuildFile\'s relpath parameter is deprecated and will be removed in 0.0.74 release. '
+                  'BuildFile should be created with not None relpath only.')
+
     self.project_tree = project_tree
     self.root_dir = project_tree.build_root
 
     path = os.path.join(self.root_dir, relpath) if relpath else self.root_dir
     self._build_basename = self._BUILD_FILE_PREFIX
+
+    if project_tree.isdir(fast_relpath(path, self.root_dir)):
+      logger.warn('BuildFile creation using folder path is deprecated and will be removed in 0.0.74 release. '
+                  'BuildFile should be created from path to file only.')
+
     if project_tree.isdir(fast_relpath(path, self.root_dir)):
       buildfile = os.path.join(path, self._build_basename)
     else:
@@ -182,6 +195,7 @@ class BuildFile(AbstractClass):
     self.relpath = fast_relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
 
+  @deprecated('0.0.72')
   def file_exists(self):
     """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
     return self.project_tree.exists(self.relpath) and self.project_tree.isfile(self.relpath)
@@ -223,7 +237,7 @@ class BuildFile(AbstractClass):
     """Returns all the BUILD files on a path"""
     for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
-        yield BuildFile.cached(project_tree, os.path.join(dir_relpath, build))
+        yield BuildFile._cached(project_tree, os.path.join(dir_relpath, build))
 
   @deprecated('0.0.72', hint_message='Use get_project_tree_build_files_family instead.')
   def family(self):
