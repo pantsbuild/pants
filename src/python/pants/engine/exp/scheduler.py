@@ -599,15 +599,25 @@ class LocalScheduler(object):
     self._step_id = -1
 
   def _create_step(self, node):
-    """Creates a Step and Promise with the currently available dependencies of the given Node."""
+    """Creates a Step and Promise with the currently available dependencies of the given Node.
+
+    If a Node is already complete, or if any of its dependencies are not available, returns None.
+    """
     if not isinstance(node, Node):
       raise ValueError('Attempted to create step for {}'.format(node))
+
+    if self._product_graph.is_complete(node):
+      return None
+
+    # See whether all of the dependencies for the node are available.
+    deps = {dep: self._product_graph.state(dep)
+            for dep in self._product_graph.dependencies_of(node)}
+    if any(state is None for state in deps.values()):
+      return None
+
+    # Ready.
     self._step_id += 1
-    step = Step(self._step_id,
-                node,
-                {dep: self._product_graph.state(dep)
-                 for dep in self._product_graph.dependencies_of(node) if dep is not None},
-                self._node_builder)
+    step = Step(self._step_id, node, deps, self._node_builder)
     return (step, Promise())
 
   def _create_roots(self, build_request):
@@ -655,17 +665,16 @@ class LocalScheduler(object):
     # Yield nodes that are ready, and then compute new ones.
     scheduling_iterations = 0
     while True:
-      # Create Steps for candidates that are not already running.
+      # Create Steps for candidates that are ready to run, and not already running.
       ready = dict()
       for candidate_node in list(candidates):
         if candidate_node in outstanding:
           # Node is still a candidate, but is currently running.
           continue
-        if pg.is_complete(candidate_node):
-          # Previous Step for the Node caused it be completed.
-          candidates.discard(candidate_node)
-          continue
-        ready[candidate_node] = self._create_step(candidate_node)
+        candidate_step = self._create_step(candidate_node)
+        if candidate_step is not None:
+          ready[candidate_node] = candidate_step
+        candidates.discard(candidate_node)
 
       if not ready and not outstanding:
         # Finished.
@@ -689,7 +698,7 @@ class LocalScheduler(object):
           # Waiting on dependencies: mark them as candidates for Steps.
           candidates.update(d for d in pg.dependencies_of(step.node))
 
-      # TODO: Better loop detection.
+      # TODO: Better cycle detection.
       if scheduling_iterations % 10000 == 0:
         sum(1 for _ in pg.walk(self._roots, predicate=lambda _: True))
 
