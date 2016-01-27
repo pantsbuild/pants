@@ -127,3 +127,8 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+resources(
+  name='resources',
+  sources=globs('build-support/*.sh'),
+)
