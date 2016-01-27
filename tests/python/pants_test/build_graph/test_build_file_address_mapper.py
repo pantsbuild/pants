@@ -98,8 +98,8 @@ class BuildFileAddressMapperTest(BaseTest):
     with self.assertRaisesRegexp(BuildFileAddressMapper.AddressNotInBuildFile,
                                  '^bar was not found in BUILD files from .*. '
                                  'Perhaps you meant one of:'
-                                 '\s+BUILD.1:foo1'
-                                 '\s+BUILD.2:foo2$'):
+                                 '\s+:foo1 \(from BUILD.1\)'
+                                 '\s+:foo2 \(from BUILD.2\)$'):
       self.address_mapper.resolve(address)
 
   def test_raises_address_invalid_address_error(self):

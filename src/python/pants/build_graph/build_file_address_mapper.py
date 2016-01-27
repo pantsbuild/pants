@@ -79,14 +79,15 @@ class BuildFileAddressMapper(object):
 
     if not targets:
       raise self.EmptyBuildFileError(
-        '{was_not_found_message}, because that BUILD files contains no addressable entities.'.format(
-          was_not_found_message=was_not_found_message))
+        '{was_not_found_message}, because that directory contains no BUILD files defining addressable entities.'
+          .format(was_not_found_message=was_not_found_message))
 
-    # Print BUILD extensions if there's more than one BUILD file with targets only.
+    # Print BUILD file extensions if there's more than one BUILD file with targets only.
     if len(set([target.build_file for target in targets])) == 1:
       specs = [':{}'.format(target.target_name) for target in targets]
     else:
-      specs = ['{}:{}'.format(os.path.basename(target.build_file.relpath), target.target_name) for target in targets]
+      specs = [':{} (from {})'.format(target.target_name, os.path.basename(target.build_file.relpath))
+               for target in targets]
 
     # Might be neat to sort by edit distance or something, but for now alphabetical is fine.
     specs = [''.join(pair) for pair in sorted(specs)]
@@ -96,7 +97,6 @@ class BuildFileAddressMapper(object):
     raise self.AddressNotInBuildFile(
       '{was_not_found_message}. Perhaps you '
       'meant{one_of}: \n  {specs}'.format(was_not_found_message=was_not_found_message,
-                                          spec_path=spec_path,
                                           one_of=one_of,
                                           specs='\n  '.join(specs)))
 

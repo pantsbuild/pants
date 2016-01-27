@@ -139,10 +139,10 @@ class BuildFile(AbstractClass):
     """
 
     if not must_exist:
-      logger.warn('BuildFile\'s must_exist parameter is deprecated and will be removed in 0.0.74 release.'
+      logger.warn('BuildFile\'s must_exist parameter is deprecated and will be removed in 0.0.74 release. '
                   'BuildFile should be created from existing file only.')
     if relpath is None:
-      logger.warn('BuildFile\'s relpath parameter is deprecated and will be removed in 0.0.74 release.'
+      logger.warn('BuildFile\'s relpath parameter is deprecated and will be removed in 0.0.74 release. '
                   'BuildFile should be created with not None relpath only.')
 
     self.project_tree = project_tree
@@ -152,7 +152,7 @@ class BuildFile(AbstractClass):
     self._build_basename = self._BUILD_FILE_PREFIX
 
     if project_tree.isdir(fast_relpath(path, self.root_dir)):
-      logger.warn('BuildFile creation using folder path is deprecated and will be removed in 0.0.74 release.'
+      logger.warn('BuildFile creation using folder path is deprecated and will be removed in 0.0.74 release. '
                   'BuildFile should be created from path to file only.')
 
     if project_tree.isdir(fast_relpath(path, self.root_dir)):
