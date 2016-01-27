@@ -27,8 +27,8 @@ class BuildFileTestBase(unittest.TestCase):
   def scan_buildfiles(self, base_relpath, spec_excludes=None):
     return BuildFile.scan_project_tree_build_files(self._project_tree, base_relpath, spec_excludes)
 
-  def create_buildfile(self, relpath, must_exist=True):
-    return BuildFile(self._project_tree, relpath, must_exist=must_exist)
+  def create_buildfile(self, relpath):
+    return BuildFile(self._project_tree, relpath)
 
   def get_build_files_family(self, relpath):
     return BuildFile.get_project_tree_build_files_family(self._project_tree, relpath)

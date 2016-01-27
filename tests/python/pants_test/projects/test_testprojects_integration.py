@@ -50,6 +50,9 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/python/pants/dummies:failing_target',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
+      # These don't pass without special config.
+      'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
+      'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
     ]
 
     # May not succeed without java8 installed

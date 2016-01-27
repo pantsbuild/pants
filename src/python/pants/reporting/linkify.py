@@ -63,8 +63,14 @@ def linkify(buildroot, s, memoized_urls):
       else:
         putative_dir = path
       if os.path.isdir(os.path.join(buildroot, putative_dir)):
-        build_file = BuildFile.cached(FileSystemProjectTree(buildroot), putative_dir, must_exist=False)
-        path = build_file.relpath
+        build_files = list(BuildFile.get_project_tree_build_files_family(
+          FileSystemProjectTree(buildroot),
+          putative_dir))
+        if build_files:
+          path = build_files[0].relpath
+        else:
+          return None
+
     if os.path.exists(os.path.join(buildroot, path)):
       # The reporting server serves file content at /browse/<path_from_buildroot>.
       return '/browse/{}'.format(path)

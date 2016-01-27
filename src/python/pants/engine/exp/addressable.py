@@ -382,10 +382,10 @@ def addressable_dict(type_constraint):
   return _addressable_wrapper(AddressableDict, type_constraint)
 
 
-# TODO(John Sirois): Move config_selector into Address 1st class as part of merging the engine/exp
-# into the mainline if the config selectors survive.
-def strip_config_selector(address):
-  """Return a copy of the given address with the config selector (if any) stripped from the name.
+# TODO(John Sirois): Move variants into Address 1st class as part of merging the engine/exp
+# into the mainline (if they survive).
+def strip_variants(address):
+  """Return a copy of the given address with the variants (if any) stripped from the name.
 
   :rtype: :class:`pants.build_graph.address.Address`
   """
@@ -393,18 +393,27 @@ def strip_config_selector(address):
   return address
 
 
-def extract_config_selector(address):
-  """Return a the config selector (if any) stripped from the given address' name.
+def extract_variants(address):
+  """Return the variants (if any) stripped from the given address' name.
 
-  :returns: The config selector or else `None` if there is none.
-  :rtype: string
+  :returns: The variants or else `None` if there are none.
+  :rtype: tuple of tuples (key, value) strings
   """
-  _, config_specifier = _parse_config(address)
-  return config_specifier
+  _, variants_str = _parse_config(address)
+  if not variants_str:
+    return None
+
+  def entries():
+    for entry in variants_str.split(','):
+      key, _, value = entry.partition('=')
+      if not key or not value:
+        raise ValueError('Invalid variants after the @ in: {}'.format(address))
+      yield (key, value)
+  return tuple(entries())
 
 
 def _parse_config(address):
-  target_name, _, config_specifier = address.target_name.partition('@')
-  config_specifier = config_specifier or None
+  target_name, _, variants_str = address.target_name.partition('@')
+  variants_str = variants_str or None
   normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
-  return normalized_address, config_specifier
+  return normalized_address, variants_str
