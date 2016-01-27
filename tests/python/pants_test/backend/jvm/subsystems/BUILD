@@ -15,6 +15,20 @@ python_tests(
 )
 
 python_tests(
+  name='custom_scala',
+  sources=['test_custom_scala.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:scala',
+    'src/python/pants/backend/jvm/tasks:scalastyle',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/jvm:nailgun_task_test_base',
+  ]
+)
+
+python_tests(
   name='shader_integration',
   sources=['test_shader_integration.py'],
   dependencies=[
