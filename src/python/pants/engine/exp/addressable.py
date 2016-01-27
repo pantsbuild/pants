@@ -216,7 +216,8 @@ class AddressableDescriptor(object):
       return self._type_constraint
 
   def _checked_value(self, instance, value):
-    # We allow four forms of value:
+    # We allow five forms of value:
+    # 0. None.
     # 1. An opaque (to us) address pointing to a value that can be resolved by external
     #    means.
     # 2. A `Resolvable` value that we can lazily resolve and type-check in `__get__`.
@@ -394,7 +395,7 @@ def strip_variants(address):
   return address
 
 
-def _extract_variants(variants_str):
+def _extract_variants(address, variants_str):
   """Return the variants (if any) represented by the given variants_str.
 
   :returns: The variants or else `None` if there are none.
@@ -411,6 +412,6 @@ def _extract_variants(variants_str):
 
 def parse_variants(address):
   target_name, _, variants_str = address.target_name.partition('@')
-  variants = _extract_variants(variants_str) if variants_str else None
+  variants = _extract_variants(address, variants_str) if variants_str else None
   normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
   return normalized_address, variants

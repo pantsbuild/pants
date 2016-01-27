@@ -40,7 +40,7 @@ class Select(datatype('Subject', ['product']), Selector):
     return SelectNode(subject, self.product, variants, None)
 
 
-class SelectVariant(datatype('Subject', ['product', 'variant_key']), Selector):
+class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   """Selects the matching Product with the variant name for the Subject provided to the constructor.
 
   NB: variants only work for native Products currently. Products produced by tasks would
@@ -57,7 +57,11 @@ class SelectVariant(datatype('Subject', ['product', 'variant_key']), Selector):
 
 
 class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Selector):
-  """Selects the dependencies of a Product for the Subject provided to the constructor."""
+  """Selects the dependencies of a Product for the Subject provided to the constructor.
+
+  The dependencies declared on `deps_product` will be provided to the requesting task
+  in the order they were declared.
+  """
 
   def construct_node(self, subject, variants):
     return DependenciesNode(subject, self.product, variants, self.deps_product)
@@ -211,7 +215,11 @@ class Node(object):
 class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant']), Node):
   """A Node that selects a product for a subject.
 
-  A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR.
+  A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR. The
+  'variants' field represents variant configuration that is propagated to dependencies. When
+  a task needs to consume a product as configured by the variants map, it uses the SelectVariant
+  selector, which introduces the 'variant' value to restrict the names of values selected by a
+  SelectNode.
   """
 
   def _select_literal(self, candidate):
@@ -277,6 +285,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
 
   Begins by selecting the `dep_product` for the subject, and then selects a product for each
   of dep_products' dependencies.
+
+  The value produced by this Node guarantees that the order of the provided values matches the
+  order of declaration in the `dependencies` list of the `dep_product`.
   """
 
   def _dep_product_node(self):
@@ -365,7 +376,7 @@ class ProductGraph(object):
     self._node_results[node] = state
 
   @classmethod
-  def _validate_node(cls, node):
+  def validate_node(cls, node):
     if not isinstance(node, Node):
       raise ValueError('Value {} is not a Node.'.format(node))
 
@@ -420,7 +431,7 @@ class ProductGraph(object):
     a cycle, then the _source_ Node is marked as a Throw with an error indicating the
     cycle path, and the dependencies are not introduced.
     """
-    self._validate_node(node)
+    self.validate_node(node)
     if self.is_complete(node):
       raise ValueError('Node {} is already completed, and cannot be updated.'.format(node))
 
@@ -428,7 +439,7 @@ class ProductGraph(object):
     for dependency in dependencies:
       if dependency in self._dependencies[node]:
         continue
-      self._validate_node(dependency)
+      self.validate_node(dependency)
       cycle_path = self._detect_cycle(node, dependency)
       if cycle_path:
         # If a cycle is detected, don't introduce the dependencies, and instead fail the node.
@@ -635,8 +646,7 @@ class LocalScheduler(object):
 
     If the dependencies of a Node are not available, returns None.
     """
-    if not isinstance(node, Node):
-      raise ValueError('Attempted to create step for {}'.format(node))
+    ProductGraph.validate_node(node)
 
     # See whether all of the dependencies for the node are available.
     deps = {dep: self._product_graph.state(dep)

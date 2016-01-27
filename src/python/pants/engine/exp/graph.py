@@ -45,10 +45,12 @@ class Directory(datatype('Directory', ['path'])):
 
 
 class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'dependencies'])):
-  """A marker product type indicating that a Struct has not yet been hydrated.
+  """A product type that holds a Struct which has not yet been hydrated.
 
-  A Struct counts as "hydrated" when one level of its members have been resolved
-  from the graph.
+  A Struct counts as "hydrated" when all of its members (which are not themselves dependencies
+  lists) have been resolved from the graph. This means that hyrating a struct is eager in terms
+  of inline addressable fields, but lazy in terms of the complete graph walk represented by
+  the `dependencies` field of StructWithDeps.
   """
 
   def __eq__(self, other):
@@ -102,7 +104,11 @@ def resolve_unhydrated_struct(address_family, address):
 
 
 def hydrate_struct(unhydrated_struct, dependencies):
-  """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps."""
+  """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
+
+  Note that this relies on the guarantee that DependenciesNode provides dependencies in the
+  order they were requested.
+  """
   address = unhydrated_struct.address
   struct = unhydrated_struct.struct
 
@@ -119,6 +125,7 @@ def hydrate_struct(unhydrated_struct, dependencies):
     elif isinstance(value, Struct):
       value = consume_dependencies(value)
     return value
+  # NB: Some pythons throw an UnboundLocalError for `idx` if it is a simple local variable.
   maybe_consume.idx = 0
 
   # 'zip' the previously-requested dependencies back together as struct fields.

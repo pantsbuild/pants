@@ -33,18 +33,13 @@ class AddressMap(object):
   def parse(cls, path, symbol_table_cls, parser_cls):
     """Parses a source for addressable Serializable objects.
 
-    By default an enhanced JSON parser is used.  The parser admits extra blank lines, comment lines
-    and more than one top-level JSON object.  See :`pants.engine.exp.parsers.parse_json` for more
-    details on the modified JSON format and the schema for Serializable json objects.
-
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
     objects they point to in other namespaces or even in the same namespace but from a seperate
     source are left as unresolved pointers.
 
     :param string path: The path to the byte source containing serialized objects.
-    :param parser: The parser to use; by default a json parser.
-    :type parser: :class:`collection.Callable` that accepts a file path and returns a list of all
-                  addressable Serializable objects parsed from it.
+    :param parser_cls: The parser cls to use.
+    :type parser_cls: A :class:`pants.engine.exp.parser.Parser`
     """
     objects = parser_cls.parse(path, symbol_table_cls)
     objects_by_name = {}
@@ -177,7 +172,7 @@ class AddressFamily(object):
 
   def __repr__(self):
     return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(self._namespace,
-                                                                        len(self._objects_by_name))
+                                                                        self._objects_by_name.keys())
 
 
 class ResolveError(MappingError):
@@ -199,9 +194,8 @@ class AddressMapper(object):
                               directory.
     :param string build_pattern: A regular expression for identifying BUILD files used to resolve
                                  addresses; by default looks for `BUILD*` files.
-    :param parser: The BUILD file parser to use; by default a JSON BUILD file format parser.
-    :type parser: A :class:`collections.Callable` that takes a byte string and produces a list of
-                  parsed addressable Serializable objects found in the byte string.
+    :param parser_cls: The BUILD file parser cls to use.
+    :type parser_cls: A :class:`pants.engine.exp.parser.Parser`
     """
     self._build_root = os.path.realpath(build_root)
     self._symbol_table_cls = symbol_table_cls

@@ -68,7 +68,7 @@ class Parser(AbstractClass):
   @abstractmethod
   def parse(cls, path, symbol_table):
     """
-    :param dict symbol_table: An optional symbol table to expose to the python file being parsed.
+    :param dict symbol_table: A symbol table to expose to the python file being parsed.
     :returns: A callable that accepts a string path and returns a list of decoded addressable,
               Serializable objects.  The callable will raise :class:`ParseError` if there were any
               problems encountered parsing the python BUILD file at the given path.
