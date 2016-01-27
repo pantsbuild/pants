@@ -29,7 +29,7 @@ class Selector(object):
   def construct_node(self, subject, variants):
     """Constructs a Node for this Selector and the given Subject/Variants.
 
-    May return None if the Selector can be known statically to not be satisfiable.
+    May return None if the Selector can be known statically to not be satisfiable for the inputs.
     """
 
 
@@ -117,10 +117,6 @@ class Variants(object):
 
 class SchedulingError(Exception):
   """Indicates inability to make a scheduling promise."""
-
-
-class CycleError(SchedulingError):
-  """Indicates a cycle was detected during dependency resolution."""
 
 
 class NoProducersError(SchedulingError):
@@ -360,7 +356,7 @@ class ProductGraph(object):
     self._dependencies = defaultdict(set)
     self._dependents = defaultdict(set)
 
-  def complete(self, node, state):
+  def _set_state(self, node, state):
     existing_state = self._node_results.get(node, None)
     if existing_state is not None:
       raise ValueError('Node {} is already completed:\n  {}\n  {}'.format(node, existing_state, state))
@@ -379,12 +375,73 @@ class ProductGraph(object):
   def state(self, node):
     return self._node_results.get(node, None)
 
-  def add_edges(self, node, dependencies):
+  def update_state(self, node, state):
+    """Updates the Node with the given State."""
+    if type(state) in [Return, Throw]:
+      self._set_state(node, state)
+      return state
+    elif type(state) == Waiting:
+      self._add_dependencies(node, state.dependencies)
+      return self.state(node)
+    else:
+      raise State.raise_unrecognized(state)
+
+  def _detect_cycle(self, src, dest):
+    """Given a src and a dest, each of which _might_ already exist in the graph, detect cycles.
+
+    Return a path of Nodes that describe the cycle, or None.
+    """
+    path = OrderedSet()
+    walked = set()
+    def _walk(node):
+      if node in path:
+        return tuple(path) + (node,)
+      if node in walked:
+        return None
+      path.add(node)
+      walked.add(node)
+
+      for dep in self.dependencies_of(node):
+        found = _walk(dep)
+        if found is not None:
+          return found
+      path.discard(node)
+      return None
+
+    # Initialize the path with src (since the edge from src->dest may not actually exist), and
+    # then walk from the dest.
+    path.update([src])
+    return _walk(dest)
+
+  def _add_dependencies(self, node, dependencies):
+    """Adds dependency edges from the given src Node to the given dependency Nodes.
+
+    Executes cycle detection: if adding one of the given dependencies would create
+    a cycle, then the _source_ Node is marked as a Throw with an error indicating the
+    cycle path, and the dependencies are not introduced.
+    """
     self._validate_node(node)
+    if self.is_complete(node):
+      raise ValueError('Node {} is already completed, and cannot be updated.'.format(node))
+
+    # Validate that adding these deps would not cause a cycle.
+    for dependency in dependencies:
+      if dependency in self._dependencies[node]:
+        continue
+      self._validate_node(dependency)
+      cycle_path = self._detect_cycle(node, dependency)
+      if cycle_path:
+        # If a cycle is detected, don't introduce the dependencies, and instead fail the node.
+        entries = ' ->\n  '.join(str(p) for p in cycle_path)
+        self._set_state(node, Throw('Cycle detected in path:\n  {} !!'.format(entries)))
+        return
+
+    # Finally, add all deps.
     self._dependencies[node].update(dependencies)
     for dependency in dependencies:
-      self._validate_node(dependency)
       self._dependents[dependency].add(node)
+      # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
+      self._dependencies[dependency]
 
   def dependencies(self):
     return self._dependencies
@@ -408,23 +465,17 @@ class ProductGraph(object):
       return [entry for entry in all_entries if predicate(entry)]
 
     walked = set()
-    path = OrderedSet()
     def _walk(entries):
       for entry in entries:
         node, state = entry
-        if node in path:
-          entries = ' ->\n  '.join(str(p) for p in (list(path) + [node]))
-          raise CycleError('Cycle detected in path:\n  {} !!'.format(entries))
         if node in walked:
           continue
-        path.add(node)
         walked.add(node)
 
         dependencies = _filtered_entries(self.dependencies_of(node))
         yield (entry, dependencies)
         for e in _walk(dependencies):
           yield e
-        path.discard(node)
 
     for node in _walk(_filtered_entries(roots)):
       yield node
@@ -438,11 +489,7 @@ class NodeBuilder(object):
 
   @classmethod
   def create(cls, tasks):
-    """Indexes tasks by their output type, and simplifies their Select clauses.
-
-    This allows this object to carry the minimum of information when it is serialized... in
-    particular, it needn't carry along the entire graph!
-    """
+    """Indexes tasks by their output type."""
     serializable_tasks = defaultdict(set)
     for output_type, input_selects, task in tasks:
       simplified_input_selects = tuple(input_selects)
@@ -535,21 +582,6 @@ class Step(object):
   def node(self):
     return self._node
 
-  def finalize(self, promise, product_graph):
-    """Called by the Scheduler to collect the result of this Step. Not threadsafe.
-
-    If the step is not completed, returns False.
-    """
-    if not promise.is_complete():
-      return False
-
-    result = promise.get()
-    if type(result) == Waiting:
-      product_graph.add_edges(self._node, result.dependencies)
-    else:
-      product_graph.complete(self._node, result)
-    return True
-
   def __eq__(self, other):
     return type(self) == type(other) and self._step_id == other._step_id
 
@@ -601,13 +633,10 @@ class LocalScheduler(object):
   def _create_step(self, node):
     """Creates a Step and Promise with the currently available dependencies of the given Node.
 
-    If a Node is already complete, or if any of its dependencies are not available, returns None.
+    If the dependencies of a Node are not available, returns None.
     """
     if not isinstance(node, Node):
       raise ValueError('Attempted to create step for {}'.format(node))
-
-    if self._product_graph.is_complete(node):
-      return None
 
     # See whether all of the dependencies for the node are available.
     deps = {dep: self._product_graph.state(dep)
@@ -671,6 +700,12 @@ class LocalScheduler(object):
         if candidate_node in outstanding:
           # Node is still a candidate, but is currently running.
           continue
+        if self._product_graph.is_complete(candidate_node):
+          # Node has already completed.
+          candidates.discard(candidate_node)
+          continue
+        # Create a step if all dependencies are available; otherwise, can assume they are
+        # outstanding, and will cause this Node to become a candidate again later.
         candidate_step = self._create_step(candidate_node)
         if candidate_step is not None:
           ready[candidate_node] = candidate_step
@@ -686,25 +721,27 @@ class LocalScheduler(object):
       # Finalize completed Steps.
       for node, entry in outstanding.items()[:]:
         step, promise = entry
-        if not step.finalize(promise, pg):
-          # Still executing.
+        if not promise.is_complete():
           continue
-        # This step has completed; if the Node has completed, its dependents are candidates.
+        # The step has completed; see whether the Node is completed.
         outstanding.pop(node)
+        pg.update_state(step.node, promise.get())
         if pg.is_complete(step.node):
           # The Node is completed: mark any of its dependents as candidates for Steps.
           candidates.update(d for d in pg.dependents_of(step.node))
         else:
-          # Waiting on dependencies: mark them as candidates for Steps.
-          candidates.update(d for d in pg.dependencies_of(step.node))
-
-      # TODO: Better cycle detection.
-      if scheduling_iterations % 10000 == 0:
-        sum(1 for _ in pg.walk(self._roots, predicate=lambda _: True))
+          # Waiting on dependencies.
+          incomplete_deps = [d for d in pg.dependencies_of(step.node) if not pg.is_complete(d)]
+          if incomplete_deps:
+            # Mark incomplete deps as candidates for Steps.
+            candidates.update(incomplete_deps)
+          else:
+            # All deps are already completed: mark this Node as a candidate for another step.
+            candidates.add(step.node)
 
     print('created {} total nodes in {} scheduling iterations and {} steps, '
           'with {} nodes in the successful path.'.format(
+            len(pg.dependencies()),
             scheduling_iterations,
             self._step_id,
-            len(pg.dependencies()),
             sum(1 for _ in pg.walk(self._roots))))

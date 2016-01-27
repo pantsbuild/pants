@@ -384,6 +384,7 @@ def addressable_dict(type_constraint):
 
 # TODO(John Sirois): Move variants into Address 1st class as part of merging the engine/exp
 # into the mainline (if they survive).
+# TODO: Variants currently require an explict name (and thus `:`) in order to parse correctly.
 def strip_variants(address):
   """Return a copy of the given address with the variants (if any) stripped from the name.
 
