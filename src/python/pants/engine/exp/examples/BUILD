@@ -26,6 +26,7 @@ python_library(
     ':planners',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
+    'src/python/pants/engine/exp:engine',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/util:contextutil',
   ]
