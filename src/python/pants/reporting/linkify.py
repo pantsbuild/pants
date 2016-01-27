@@ -63,7 +63,7 @@ def linkify(buildroot, s, memoized_urls):
       else:
         putative_dir = path
       if os.path.isdir(os.path.join(buildroot, putative_dir)):
-        build_files = list(BuildFile.get_project_tree_build_files_family(
+        build_files = list(BuildFile.get_build_files_family(
           FileSystemProjectTree(buildroot),
           putative_dir))
         if build_files:
