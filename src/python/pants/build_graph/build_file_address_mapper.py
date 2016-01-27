@@ -155,20 +155,20 @@ class BuildFileAddressMapper(object):
     return BuildFile._cached(self._project_tree, relpath, must_exist)
 
   def spec_to_address(self, spec, relative_to=''):
-    """A helper method for mapping a spec to the correct address.
+    """A helper method for mapping a spec to the correct build file address.
 
     :param string spec: A spec to lookup in the map.
     :param string relative_to: Path the spec might be relative to
     :raises :class:`pants.build_graph.address_lookup_error.AddressLookupError`
             If the BUILD file cannot be found in the path specified by the spec.
     :returns: A new Address instance.
-    :rtype: :class:`pants.build_graph.address.Address`
+    :rtype: :class:`pants.build_graph.address.BuildFileAddress`
     """
     spec_path, name = parse_spec(spec, relative_to=relative_to)
     address = Address(spec_path, name)
     try:
-      self.resolve(address)
-      return address
+      build_file_address, _ = self.resolve(address)
+      return build_file_address
     except AddressLookupError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
