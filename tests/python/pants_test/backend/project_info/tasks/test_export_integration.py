@@ -216,9 +216,13 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
   def test_intellij_integration(self):
     with self.temporary_workdir() as workdir:
-      p = subprocess.Popen(['build-support/pants-intellij.sh'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      stdout, stderr = p.communicate()
-      json_data = json.loads(stdout)
+      exported_file = os.path.join(workdir, "export_file.json")
+      p = subprocess.Popen(['build-support/pants-intellij.sh', '--export-output-file='+exported_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      p.communicate()
+      self.assertEqual(p.returncode, 0)
+
+      with open(exported_file) as data_file:
+        json_data = json.load(data_file)
 
       python_setup = json_data['python_setup']
       self.assertIsNotNone(python_setup)
