@@ -81,14 +81,16 @@ class BuildFile(AbstractClass):
     :param base_relpath: Directory under root_dir to scan.
     :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
       or paths that are relative to the root_dir.
+    :param pants_build_ignore: List of paths to exclude from the scan.
+      Each path should be a relative to the build root.
     """
 
-    def relativize(paths, project_tree):
+    def relativize(paths, build_root):
       for path in paths:
         if os.path.isabs(path):
           realpath = os.path.realpath(path)
-          if realpath.startswith(project_tree.build_root):
-            yield fast_relpath(realpath, project_tree.build_root)
+          if realpath.startswith(build_root):
+            yield fast_relpath(realpath, build_root)
         else:
           yield path
 
@@ -102,20 +104,26 @@ class BuildFile(AbstractClass):
       return to_remove
 
     if base_relpath and os.path.isabs(base_relpath):
-      raise Exception('base_relpath parameter should be a relative path.')
-
+      raise Exception('base_relpath parameter ({}) should be a relative path.'.format(base_relpath))
     if base_relpath and not project_tree.isdir(base_relpath):
       raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir'
                                    .format(base_relpath))
+    if pants_build_ignore:
+      abs_ignore_paths = [path for path in pants_build_ignore if os.path.isabs(path)]
+      if any(abs_ignore_paths):
+        raise Exception('All pants_build_ignore paths passed to scan_build_files should be a relative. '
+                        'Absolute path {} was passed.'.format(abs_ignore_paths[0]))
+
+    ignore_patterns = set()
+    if spec_excludes:
+      ignore_patterns.update(relativize(spec_excludes, project_tree.build_root))
+    if pants_build_ignore:
+      ignore_patterns.update(pants_build_ignore)
 
     buildfiles = []
-    if spec_excludes:
-      exclude_roots = set(relativize(spec_excludes, project_tree))
-    else:
-      exclude_roots = set()
 
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
-      to_remove = find_excluded(root, dirs, exclude_roots)
+      to_remove = find_excluded(root, dirs, ignore_patterns)
       # For performance, ignore hidden dirs such as .git, .pants.d and .local_artifact_cache.
       to_remove.update(d for d in dirs if d.startswith('.'))
       for subdir in to_remove:
