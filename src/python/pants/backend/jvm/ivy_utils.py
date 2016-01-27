@@ -381,7 +381,8 @@ class IvyUtils(object):
     return ret
 
   @classmethod
-  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None):
+  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
+                   pinned_artifacts=None):
     if resolve_hash_name:
       org = IvyUtils.INTERNAL_ORG_NAME
       name = resolve_hash_name
@@ -396,7 +397,7 @@ class IvyUtils(object):
       jars.append(jar)
 
     manager = JarDependencyManagement.global_instance()
-    artifact_set = PinnedJarArtifactSet(manager.for_targets(targets))
+    artifact_set = PinnedJarArtifactSet(pinned_artifacts) # Copy, because we're modifying it.
     for jars in jars_by_key.values():
       for i, dep in enumerate(jars):
         direct_coord = M2Coordinate.create(dep)

@@ -156,6 +156,10 @@ def test_removal_version_too_small():
       pass
 
 
+def test_removal_version_too_small_expiration_unchecked():
+  check_deprecated_semver('0.0.27', check_expired=False)
+
+
 def test_bad_decorator_nesting():
   with pytest.raises(BadDecoratorNestingError):
     class Test(object):

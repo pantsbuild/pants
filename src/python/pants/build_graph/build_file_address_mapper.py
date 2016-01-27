@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.deprecated import deprecated
@@ -144,13 +146,11 @@ class BuildFileAddressMapper(object):
     """
     if spec_path not in self._spec_path_to_address_map_map:
       try:
-        try:
-          build_file = BuildFile.cached(self._project_tree, spec_path)
-        except BuildFile.BuildFileError as e:
-          raise self.BuildFileScanError("{message}\n searching {spec_path}"
-                                        .format(message=e,
-                                                spec_path=spec_path))
-        mapping = self._build_file_parser.address_map_from_build_file(build_file)
+        build_files = list(BuildFile.get_project_tree_build_files_family(self._project_tree, spec_path))
+        if not build_files:
+          raise self.BuildFileScanError("{spec_path} does not contains any BUILD files."
+                                        .format(spec_path=os.path.join(self.root_dir, spec_path)))
+        mapping = self._build_file_parser.address_map_from_build_files(build_files)
       except BuildFileParser.BuildFileParserError as e:
         raise AddressLookupError("{message}\n Loading addresses from '{spec_path}' failed."
                                  .format(message=e, spec_path=spec_path))

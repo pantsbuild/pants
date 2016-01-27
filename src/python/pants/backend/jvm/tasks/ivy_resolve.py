@@ -85,13 +85,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     targets = self.context.targets()
     compile_classpath = self.context.products.get_data('compile_classpath',
         init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
-    resolve_hash_name = self.resolve(executor=executor,
-                                     targets=targets,
-                                     classpath_products=compile_classpath,
-                                     confs=self.get_options().confs,
-                                     extra_args=self._args)
+    resolve_hash_names = self.resolve(executor=executor,
+                                      targets=targets,
+                                      classpath_products=compile_classpath,
+                                      confs=self.get_options().confs,
+                                      extra_args=self._args)
     if self._report:
-      self._generate_ivy_report(resolve_hash_name)
+      for resolve_hash_name in resolve_hash_names:
+        self._generate_ivy_report(resolve_hash_name)
 
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible

@@ -110,9 +110,21 @@ class IvyTaskMixin(TaskBase):
     :returns: The id of the reports associated with this resolve.
     :rtype: string
     """
+    targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
+    resolve_hash_names = []
+    for artifact_set, target_subset in targets_by_sets.items():
+      resolve_hash_names.append(self._resolve_subset(executor,
+                                                     target_subset,
+                                                     classpath_products,
+                                                     confs=confs,
+                                                     extra_args=extra_args,
+                                                     invalidate_dependents=invalidate_dependents,
+                                                     pinned_artifacts=artifact_set))
+    return resolve_hash_names
 
+  def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
+              invalidate_dependents=False, pinned_artifacts=None):
     classpath_products.add_excludes_for_targets(targets)
-
     confs = confs or ('default',)
 
     # After running ivy, we parse the resulting report, and record the dependencies for
@@ -124,6 +136,7 @@ class IvyTaskMixin(TaskBase):
       confs=confs,
       custom_args=extra_args,
       invalidate_dependents=invalidate_dependents,
+      pinned_artifacts=pinned_artifacts,
     )
 
     if not resolve_hash_name:
@@ -181,7 +194,8 @@ class IvyTaskMixin(TaskBase):
                   workunit_name=None,
                   confs=None,
                   custom_args=None,
-                  invalidate_dependents=False):
+                  invalidate_dependents=False,
+                  pinned_artifacts=None):
     """Resolves external dependencies for the given targets.
 
     If there are no targets suitable for jvm transitive dependency resolution, an empty result is
@@ -212,8 +226,6 @@ class IvyTaskMixin(TaskBase):
 
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
-    # TODO(gmalmquist): Targets should be partitioned and resolved in separate groups depending on
-    # what sets of pinned artifacts they depend on.
     with self.invalidated(targets,
                           invalidate_dependents=invalidate_dependents,
                           silent=silent,
@@ -249,7 +261,8 @@ class IvyTaskMixin(TaskBase):
             workunit_name=workunit_name,
             confs=confs,
             use_soft_excludes=self.get_options().soft_excludes,
-            resolve_hash_name=resolve_hash_name)
+            resolve_hash_name=resolve_hash_name,
+            pinned_artifacts=pinned_artifacts)
 
         if not os.path.exists(raw_target_classpath_file_tmp):
           raise self.Error('Ivy failed to create classpath file at {}'
@@ -300,7 +313,8 @@ class IvyTaskMixin(TaskBase):
                ivy=None,
                workunit_name='ivy',
                use_soft_excludes=False,
-               resolve_hash_name=None):
+               resolve_hash_name=None,
+               pinned_artifacts=None):
     # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
     # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
     # See: https://github.com/pantsbuild/pants/issues/2239
@@ -314,7 +328,7 @@ class IvyTaskMixin(TaskBase):
       ivyxml = os.path.join(target_workdir, 'ivy.xml')
       try:
         IvyUtils.generate_ivy(targets, jars, global_excludes, ivyxml, confs,
-                              resolve_hash_name)
+                              resolve_hash_name, pinned_artifacts)
       except IvyUtils.IvyError as e:
         raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
 
