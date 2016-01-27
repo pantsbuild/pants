@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import logging
 import os
 from collections import defaultdict
 
@@ -34,6 +35,9 @@ from pants.option.errors import OptionsError
 from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
+
+
+logger = logging.getLogger(__name__)
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
@@ -337,8 +341,9 @@ class ExportTask(IvyTaskMixin, PythonTask):
     if pants_target_type in self.target_aliases_map:
       return self.target_aliases_map.get(pants_target_type)
     else:
-      raise TaskError('Unregistered target type {target_type}'
+      logger.warn('Unregistered target type {target_type}'
                       .format(target_type=pants_target_type))
+      return "{}.{}".format(pants_target_type.__module__, pants_target_type.__name__)
 
   @staticmethod
   def _source_roots_for_target(target):
