@@ -68,19 +68,12 @@ python_tests(
 )
 
 python_tests(
-  name='planners',
-  sources=['test_planners.py'],
-  dependencies=[
-    'src/python/pants/engine/exp:scheduler',
-  ]
-)
-
-python_tests(
   name='scheduler',
   sources=['test_scheduler.py'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp/examples:planners',
+    'src/python/pants/engine/exp:engine',
+    'src/python/pants/engine/exp:scheduler',
   ]
 )

@@ -13,7 +13,7 @@
       "extends": ":sources",
       "dependencies": [
         "3rdparty/jvm:guava",
-        "src/thrift/codegen/selector:selector@scrooge_scala_config"
+        "src/thrift/codegen/selector:selector@thrift=scrooge_scala_config"
       ]
     }
   ]
@@ -43,7 +43,7 @@
       "extends": ":sources",
       "dependencies": [
         "3rdparty/jvm:guava",
-        "src/thrift/codegen/selector:selector@failing"
+        "src/thrift/codegen/selector:selector@thrift=failing"
       ]
     }
   ]
