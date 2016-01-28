@@ -88,6 +88,14 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       shared_artifacts('0.0.1-SNAPSHOT'),
                       ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],)
 
+  def test_java_publish_no_prompt(self):
+    """Test the --publish-jar-prompt option."""
+    self.publish_test('testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet',
+                      shared_artifacts('0.0.1-SNAPSHOT'),
+                      ['org.pantsbuild.testproject.publish/hello-greet/publish.properties'],
+                      extra_options=['--no-publish-jar-prompt'],
+                      expect_prompt=False)
+
   def test_protobuf_publish(self):
     unique_artifacts = {'org/pantsbuild/testproject/publish/protobuf/protobuf-java/0.0.1-SNAPSHOT':
                         ['ivy-0.0.1-SNAPSHOT.xml',
@@ -217,7 +225,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True,
-                   assert_publish_config_contents=False):
+                   assert_publish_config_contents=False, expect_prompt=True):
     """Tests that publishing the given target results in the expected output.
 
     :param target: Target to test.
@@ -230,6 +238,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     :param assert_publish_config_contents: Test the contents of the generated ivy and pom file.
            If set to True, compares the generated ivy.xml and pom files in
            tests/python/pants_test/tasks/jar_publish_resources/<package_name>/<artifact_name>/
+    :param expect_prompt: If true, feed 'y' to stdin.
     """
 
     with temporary_dir() as publish_dir:
@@ -239,7 +248,10 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       if extra_options:
         options.extend(extra_options)
 
-      yes = 'y' * expected_primary_artifact_count
+      if expect_prompt:
+        yes = 'y' * expected_primary_artifact_count
+      else:
+        yes = None
       pants_run = self.run_pants(['publish.jar'] + options + [target], config=extra_config,
                                  stdin_data=yes, extra_env=extra_env)
       if success_expected:
