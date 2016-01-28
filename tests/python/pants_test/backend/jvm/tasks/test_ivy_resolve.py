@@ -18,6 +18,7 @@ from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.tasks.task_test_base import ensure_cached
 
 
 class IvyResolveTest(JvmToolTaskTestBase):
@@ -43,6 +44,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   #
   # Test section
   #
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_specific(self):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
@@ -53,6 +55,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
 
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_conflicted(self):
     # Create jar_libraries with different versions of the same dep: this will cause
     # a pre-ivy "eviction" in IvyUtils.generate_ivy, but the same case can be triggered
@@ -131,6 +134,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
                                   (u'default', artifact_path(u'bogus1'))]),
                       winning_cp)
 
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_multiple_artifacts(self):
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
     classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
@@ -165,6 +169,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     self.assertIn(classifier.coordinate, {resolved_jar.coordinate
                                           for conf, resolved_jar in classifier_cp})
 
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
 
@@ -178,11 +183,13 @@ class IvyResolveTest(JvmToolTaskTestBase):
     self.assertEquals(0, len(junit_jar_cp))
     self.assertEquals(0, len(excluding_cp))
 
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
     target = self.make_target('//:a', JavaLibrary)
     self.assertTrue(self.resolve([target]))
 
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_symlinked_cache(self):
     """Test to make sure resolve works when --ivy-cache-dir is a symlinked path.
 
