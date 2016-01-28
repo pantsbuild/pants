@@ -9,8 +9,8 @@ import os
 import sqlite3
 from contextlib import contextmanager
 
-from pants.util.dirutil import safe_mkdir_for
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import safe_mkdir_for
 
 
 class StatsDBError(Exception): pass
