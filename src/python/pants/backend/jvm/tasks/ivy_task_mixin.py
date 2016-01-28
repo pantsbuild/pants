@@ -90,12 +90,21 @@ class IvyTaskMixin(TaskBase):
 
   @memoized_property
   def ivy_cache_dir(self):
-    """The path of the ivy cache dir used for resolves.
+    """The directory where Ivy stores fetched artifacts.
 
     :rtype: string
     """
     # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
     return IvySubsystem.global_instance().get_options().cache_dir
+
+  @memoized_property
+  def ivy_resolution_dir(self):
+    """The directory that Ivy uses for resolves.
+
+    :rtype: string
+    """
+    # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
+    return IvySubsystem.global_instance().resolution_dir
 
   def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False):
@@ -188,7 +197,7 @@ class IvyTaskMixin(TaskBase):
 
   # Extracted for testing.
   def _parse_report(self, resolve_hash_name, conf):
-    return IvyUtils.parse_xml_report(self.ivy_cache_dir, resolve_hash_name, conf)
+    return IvyUtils.parse_xml_report(self.ivy_resolution_dir, resolve_hash_name, conf)
 
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
@@ -302,7 +311,7 @@ class IvyTaskMixin(TaskBase):
     report_missing = False
     report_paths = []
     for conf in confs:
-      report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+      report_path = IvyUtils.xml_report_path(self.ivy_resolution_dir, resolve_hash_name, conf)
       if not os.path.exists(report_path):
         report_missing = True
         break
@@ -311,16 +320,16 @@ class IvyTaskMixin(TaskBase):
     return report_missing, report_paths
 
   def _exec_ivy(self,
-               target_workdir,
-               targets,
-               args,
-               confs,
-               executor=None,
-               ivy=None,
-               workunit_name='ivy',
-               use_soft_excludes=False,
-               resolve_hash_name=None,
-               pinned_artifacts=None):
+                target_workdir,
+                targets,
+                args,
+                confs,
+                executor=None,
+                ivy=None,
+                workunit_name='ivy',
+                use_soft_excludes=False,
+                resolve_hash_name=None,
+                pinned_artifacts=None):
     # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
     # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
     # See: https://github.com/pantsbuild/pants/issues/2239

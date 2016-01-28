@@ -87,6 +87,7 @@ class Bootstrapper(object):
     return Ivy(self._get_classpath(bootstrap_workunit_factory),
                ivy_settings=self._ivy_subsystem.get_options().ivy_settings,
                ivy_cache_dir=self._ivy_subsystem.get_options().cache_dir,
+               ivy_resolution_dir=self._ivy_subsystem.resolution_dir,
                extra_jvm_options=self._ivy_subsystem.extra_jvm_options())
 
   def _get_classpath(self, workunit_factory):
@@ -157,4 +158,5 @@ class Bootstrapper(object):
 
     return Ivy(bootstrap_jar_path,
                ivy_settings=self._ivy_subsystem.get_options().ivy_settings,
-               ivy_cache_dir=self._ivy_subsystem.get_options().cache_dir)
+               ivy_cache_dir=self._ivy_subsystem.get_options().cache_dir,
+               ivy_resolution_dir=self._ivy_subsystem.resolution_dir)

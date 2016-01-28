@@ -9,12 +9,17 @@ import os
 
 from six.moves import urllib
 
+from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.subsystem.subsystem import Subsystem
 
 
 class IvySubsystem(Subsystem):
   """Common configuration items for ivy tasks."""
+
+  class IvySubsystemError(Exception): pass
+  class CacheDirectoryConfigError(IvySubsystemError): pass
+
   options_scope = 'ivy'
 
   _DEFAULT_VERSION = '2.4.0'
@@ -35,10 +40,30 @@ class IvySubsystem(Subsystem):
              help='Timeout the fetch if the connection is idle for longer than this value.')
     register('--ivy-profile', advanced=True, default=cls._DEFAULT_VERSION,
              help='The version of ivy to fetch.')
+    # TODO(Patrick Lawson): It's more correct to default to
+    # `os.path.join(register.bootstrap.pants_workdir, '.ivy2')` here and have users
+    # configure a split cache/resolution strategy to avoid the performance hit of
+    # fetching artifacts to .pants.d where they will disappear after every clean.
+    # For now, in the interest of backwards compatibility, we leave it as it was
+    # but introduce a warning into the pants.ini migration script.
     register('--cache-dir', advanced=True, default=os.path.expanduser('~/.ivy2/pants'),
              help='Directory to store artifacts retrieved by Ivy.')
+    register('--resolution-dir', advanced=True,
+             help='Directory for ivy to create and retrieve resolution reports.')
     register('--ivy-settings', advanced=True,
              help='Location of XML configuration file for Ivy settings.')
+
+  @property
+  def resolution_dir(self):
+    if self.get_options().resolution_dir and not self.get_options().ivy_settings:
+      raise self.CacheDirectoryConfigError(
+        'An ivy resolution directory was provided, but a custom ivysettings.xml file was not.'
+        ' A custom ivysettings.xml file with <caches/> defined to consume'
+        ' `ivy.cache.resolution.dir` and `ivy.cache.repository.dir` is required'
+        ' when using --ivy-resolution-dir.  See build-support/ivy/ivysettings.xml in the'
+        ' pants repo for a simple example configuration.'
+      )
+    return self.get_options().resolution_dir or self.get_options().cache_dir
 
   @classmethod
   def subsystem_dependencies(cls):
