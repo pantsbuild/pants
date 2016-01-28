@@ -205,10 +205,13 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:ivy_resolve',
-    'src/python/pants/invalidation',
     'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/invalidation',
+    'src/python/pants/ivy',
+    'src/python/pants/java/distribution:distribution',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

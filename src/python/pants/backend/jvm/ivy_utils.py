@@ -347,7 +347,14 @@ class IvyUtils(object):
       return None
     path = cls.xml_report_path(cache_dir, resolve_hash_name, conf)
     if not os.path.exists(path):
-      raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
+      raise cls.IvyResolveReportError(
+        'Missing expected ivy output file {}.  This is generally the result of configuring'
+        ' ``--ivy-resolution-dir`` without properly consuming it in the <cache/> section'
+        ' of your custom ivysettings.xml, passed via --ivy-ivy-settings.  See'
+        ' build-support/ivy/ivysettings.xml in the pants repo for an example <cache/>'
+        ' configuration.'
+        .format(path)
+      )
 
     return cls._parse_xml_report(conf, path)
 

@@ -16,8 +16,12 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.ivy.ivy import Ivy
+from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ensure_cached
 
 
@@ -209,3 +213,24 @@ class IvyResolveTest(JvmToolTaskTestBase):
         # Confirm that the deps were added to the appropriate targets.
         compile_classpath = self.resolve([jar_lib])
         self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
+
+  def test_resolution_without_ivysettings_fails_subsystem(self):
+    self.set_options_for_scope('ivy', resolution_dir='fake', ivy_settings=None)
+    with self.assertRaises(IvySubsystem.CacheDirectoryConfigError):
+      dep = JarDependency('commons-lang', 'commons-lang', '2.5')
+      jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
+      # Confirm that the deps were added to the appropriate targets.
+      compile_classpath = self.resolve([jar_lib])
+
+  def test_resolution_without_ivysettings_fails_runner(self):
+    self.set_options_for_scope('ivy', ivy_settings=None)
+    with self.assertRaises(Ivy.Error):
+      bad_ivy = Ivy(
+        classpath=[],
+        ivy_settings=None,
+        ivy_cache_dir='fake',
+        ivy_resolution_dir='other_fake',
+        extra_jvm_options=[],
+      )
+      with subsystem_instance(DistributionLocator):
+        bad_ivy.runner()
