@@ -352,6 +352,8 @@ class JarPublish(ScmPublishMixin, JarTask):
     register('--changelog', default=True, action='store_true',
              help='A changelog.txt file will be created and printed to the console for each '
                   'artifact published')
+    register('--prompt', default=True, action='store_true',
+             help='Interactively prompt user before publishing each artifact.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -744,7 +746,8 @@ class JarPublish(ScmPublishMixin, JarTask):
               # tests), in which case we want to force encoding with a unicode-supporting codec.
               encoding = sys.stdout.encoding or 'utf-8'
               sys.stdout.write(message.encode(encoding))
-          if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
+          if self.get_options().prompt and not self.confirm_push(coordinate(jar.org, jar.name),
+                                                                 newentry.version()):
             raise TaskError('User aborted push')
 
         pushdb.set_entry(target, newentry)
