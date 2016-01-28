@@ -82,6 +82,9 @@ class ManagedResolve(Struct):
     """
     super(ManagedResolve, self).__init__(revs=revs, **kwargs)
 
+  def __repr__(self):
+    return "ManagedResolve({})".format(self.revs)
+
 
 class Jar(Struct):
   """A java jar."""
