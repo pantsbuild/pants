@@ -56,7 +56,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
   #
   # Note format changes in src/python/pants/docs/export.md and update the Changelog section.
   #
-  DEFAULT_EXPORT_VERSION = '1.0.5'
+  DEFAULT_EXPORT_VERSION = '1.0.6'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -189,7 +189,9 @@ class ExportTask(IvyTaskMixin, PythonTask):
         'roots': [],
         'id': current_target.id,
         'target_type': get_target_type(current_target),
+        # NB: is_code_gen should be removed when export format advances to 1.1.0 or higher
         'is_code_gen': current_target.is_codegen,
+        'is_synthetic': current_target.is_synthetic,
         'pants_target_type': self._get_pants_target_alias(type(current_target))
       }
 
