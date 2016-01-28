@@ -239,9 +239,8 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       if extra_options:
         options.extend(extra_options)
 
-      yes = 'y' * expected_primary_artifact_count
       pants_run = self.run_pants(['publish.jar'] + options + [target], config=extra_config,
-                                 stdin_data=yes, extra_env=extra_env)
+                                 extra_env=extra_env)
       if success_expected:
         self.assert_success(pants_run, "'pants goal publish' expected success, but failed instead.")
       else:
