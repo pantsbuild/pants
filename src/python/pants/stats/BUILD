@@ -6,5 +6,6 @@ python_library(
   sources = globs('*.py'),
   dependencies = [
     'src/python/pants/subsystem',
+    'src/python/pants/util:dirutil',
   ]
 )
