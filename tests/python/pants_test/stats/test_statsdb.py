@@ -18,7 +18,7 @@ def t(label, timing):
 
 class StatsDBTest(unittest.TestCase):
   def test_create_nonexisting_dir(self):
-    # This tests that we can create a database in a directory that does not exists.
+    # This tests that we can create a database in a directory that does not exist.
     with temporary_dir() as tmpdir:
       path = os.path.join(tmpdir, 'nonexistSubdir', 'statsdb.sqlite')
       statsdb = StatsDB(path)
