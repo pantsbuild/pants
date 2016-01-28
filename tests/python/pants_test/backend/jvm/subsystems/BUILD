@@ -19,12 +19,12 @@ python_tests(
   sources=['test_custom_scala.py'],
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:scala_platform',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',
-    'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
