@@ -22,6 +22,21 @@ class CustomScalaTest(NailgunTaskTestBase):
   def task_type(cls):
     return Scalastyle
 
+  def setUp(self):
+    super(CustomScalaTest, self).setUp()
+    self.context()  # We don't need the context, but this ensures subsystem option registration.
+
+    self.create_file(
+      relpath='a/scala/pass.scala',
+      contents=dedent("""
+        import java.util
+        object HelloWorld {
+           def main(args: Array[String]) {
+              println("Hello, world!")
+           }
+        }
+      """))
+
   def _create_context(self, scalastyle_config=None, excludes=None, target_roots=None):
     # If config is not specified, then we override pants.ini scalastyle such that
     # we have a default scalastyle config xml but with empty excludes.
@@ -74,21 +89,6 @@ class CustomScalaTest(NailgunTaskTestBase):
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.10.5')])
       yield
-
-  def setUp(self):
-    super(CustomScalaTest, self).setUp()
-    self.context()  # We don't need the context, but this ensures subsystem option registration.
-
-    self.create_file(
-      relpath='a/scala/pass.scala',
-      contents=dedent("""
-        import java.util
-        object HelloWorld {
-           def main(args: Array[String]) {
-              println("Hello, world!")
-           }
-        }
-      """))
 
   def test_custom_lib_spec(self):
     with self.scala_platform_setup():
