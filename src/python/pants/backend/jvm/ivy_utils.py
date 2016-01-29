@@ -556,11 +556,6 @@ class IvyUtils(object):
                           classifier=classifier)
       artifacts[(ext, url, classifier)] = artifact
 
-    if len(artifacts) == 1:
-      # If the only artifact has no attributes that we need a nested <artifact/> for, just emit
-      # a <dependency/>.
-      artifacts.pop((None, None, None), None)
-
     template = TemplateData(
         org=jar_attributes.org,
         module=jar_attributes.name,

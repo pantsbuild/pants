@@ -164,6 +164,10 @@ class BaseTest(unittest.TestCase):
       'pants_configdir': os.path.join(self.build_root, 'config'),
       'cache_key_gen_version': '0-test',
     }
+    self.options['cache'] = {
+      'read_from': [],
+      'write_to': [],
+    }
 
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)

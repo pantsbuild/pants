@@ -8,4 +8,5 @@
     --exclude-target-regexp='.*go/examples.*' \
     --exclude-target-regexp='.*scrooge/tests/thrift.*' \
     --exclude-target-regexp='.*spindle/tests/thrift.*' \
-    --exclude-target-regexp='.*spindle/tests/jvm.*'
+    --exclude-target-regexp='.*spindle/tests/jvm.*' \
+    "$@"

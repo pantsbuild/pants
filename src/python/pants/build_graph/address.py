@@ -172,7 +172,7 @@ class Address(object):
       return self._spec_path
 
   def __eq__(self, other):
-    if not isinstance(other, self.__class__):
+    if not isinstance(other, Address):
       return NotImplemented
     return (self._spec_path == other._spec_path and
             self._target_name == other._target_name)

@@ -59,7 +59,13 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
 
 class IvyTaskMixin(TaskBase):
-  """A mixin for Tasks that execute resolves via Ivy."""
+  """A mixin for Tasks that execute resolves via Ivy.
+
+  NB: Ivy reports are not relocatable in a cache, and a report must be present in order to
+  parse the graph structure of dependencies. Therefore, this mixin explicitly disables the
+  cache for its invalidation checks via the `use_cache=False` parameter. Tasks that extend
+  the mixin may safely enable task-level caching settings.
+  """
 
   class Error(TaskError):
     """Indicates an error performing an ivy resolve."""
@@ -226,10 +232,12 @@ class IvyTaskMixin(TaskBase):
 
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
+    # NB: See class pydoc regarding `use_cache=False`.
     with self.invalidated(targets,
                           invalidate_dependents=invalidate_dependents,
                           silent=silent,
-                          fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+                          fingerprint_strategy=fingerprint_strategy,
+                          use_cache=False) as invalidation_check:
       if not invalidation_check.all_vts:
         return [], {}, None
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
@@ -281,9 +289,6 @@ class IvyTaskMixin(TaskBase):
                            .format(raw_target_classpath_file_tmp))
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
         logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
-
-        if self.artifact_cache_writes_enabled():
-          self.update_artifact_cache([(global_vts, [raw_target_classpath_file])])
       else:
         logger.debug("Using previously resolved reports: {}".format(report_paths))
 

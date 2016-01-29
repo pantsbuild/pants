@@ -352,6 +352,8 @@ class JarPublish(ScmPublishMixin, JarTask):
     register('--changelog', default=True, action='store_true',
              help='A changelog.txt file will be created and printed to the console for each '
                   'artifact published')
+    register('--prompt', default=True, action='store_true',
+             help='Interactively prompt user before publishing each artifact.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -385,7 +387,7 @@ class JarPublish(ScmPublishMixin, JarTask):
         raise TaskError(
           "This repo is not configured to publish externally! Please configure per\n"
           "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
-          "or re-run with the '--publish-local' flag.")
+          "by setting --publish-jar-repos=<dict> or re-run with '--publish-jar-local=<dir>'.")
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
@@ -459,6 +461,8 @@ class JarPublish(ScmPublishMixin, JarTask):
   def confirm_push(self, coord, version):
     """Ask the user if a push should be done for a particular version of a
        particular coordinate.   Return True if the push should be done"""
+    if not self.get_options().prompt:
+      return True
     try:
       isatty = os.isatty(sys.stdin.fileno())
     except ValueError:

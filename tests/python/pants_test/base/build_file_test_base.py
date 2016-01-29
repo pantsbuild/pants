@@ -25,13 +25,13 @@ class BuildFileTestBase(unittest.TestCase):
     touch(self.fullpath(path))
 
   def scan_buildfiles(self, base_relpath, spec_excludes=None):
-    return BuildFile.scan_project_tree_build_files(self._project_tree, base_relpath, spec_excludes)
+    return BuildFile.scan_build_files(self._project_tree, base_relpath, spec_excludes)
 
   def create_buildfile(self, relpath):
     return BuildFile(self._project_tree, relpath)
 
   def get_build_files_family(self, relpath):
-    return BuildFile.get_project_tree_build_files_family(self._project_tree, relpath)
+    return BuildFile.get_build_files_family(self._project_tree, relpath)
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
