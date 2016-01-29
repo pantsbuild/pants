@@ -33,7 +33,7 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
 
         #Fetch the hash for task impl version.
         go_thrift_contents = os.listdir(os.path.join(workdir, 'gen', 'go-thrift'))
-        self.assertTrue(len(go_thrift_contents) == 1)
+        self.assertEqual(len(go_thrift_contents), 1)
 
         root = os.path.join(workdir, 'gen', 'go-thrift', go_thrift_contents[0])
         self.assertTrue(contains_exact_files(root, expected_files, ignore_links=True))
