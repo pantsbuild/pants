@@ -12,6 +12,7 @@ from collections import namedtuple
 
 from six.moves import range
 
+from pants.base.build_environment import get_buildroot
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import Pinger
@@ -48,6 +49,7 @@ class CacheSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(CacheSetup, cls).register_options(register)
+    default_cache = [os.path.join(get_buildroot(), '.cache')]
     register('--read', action='store_true', default=True,
              help='Read build artifacts from cache, if available.')
     register('--write', action='store_true', default=True,
@@ -60,19 +62,19 @@ class CacheSetup(Subsystem):
                   'artifact caches. none: use URIs from static config options, i.e. '
                   '--read-from, --write-to. rest: look up URIs by querying a RESTful '
                   'URL, which is a remote address from --read-from, --write-to.')
-    register('--read-from', advanced=True, type=list_option,
+    register('--read-from', advanced=True, type=list_option, default=default_cache,
              help='The URIs of artifact caches to read directly from. Each entry is a URL of '
                   'a RESTful cache, a path of a filesystem cache, or a pipe-separated list of '
                   'alternate caches to choose from. This list is also used as input to '
                   'the resolver. When resolver is \'none\' list is used as is.')
-    register('--write-to', advanced=True, type=list_option,
+    register('--write-to', advanced=True, type=list_option, default=default_cache,
              help='The URIs of artifact caches to write directly to. Each entry is a URL of'
                   'a RESTful cache, a path of a filesystem cache, or a pipe-separated list of '
                   'alternate caches to choose from. This list is also used as input to '
                   'the resolver. When resolver is \'none\' list is used as is.')
     register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
-    register('--max-entries-per-target', advanced=True, type=int, default=None,
+    register('--max-entries-per-target', advanced=True, type=int, default=8,
              help='Maximum number of old cache files to keep per task target pair')
     register('--pinger-timeout', advanced=True, type=float, default=0.5, help='number of seconds before pinger times out')
     register('--pinger-tries', advanced=True, type=float, default=2, help='number of times pinger tries a cache')

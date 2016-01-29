@@ -261,5 +261,4 @@ class SimpleCodegenTaskTest(TaskTestBase):
     targets = [self.target('fleem')]
     task = self._create_dummy_task(target_roots=targets, strategy='isolated')
     task.execute()
-    target = self.target('.pants.d/test_simple_codegen_task_DummyGen/fleem.fleem/fa3d8d4723f9:fleem.fleem')
-    self.assertEqual('copythis', target.copied)
+    self.assertEqual('copythis', task.codegen_targets()[0].copied)

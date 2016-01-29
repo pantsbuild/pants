@@ -50,7 +50,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
                                  'java6': {'source': '1.6', 'target': '1.6'}
                                })
 
-    with subsystem_instance(ScalaPlatform):
+    scala_options = {'scala-platform': {'version': 'custom'}}
+    with subsystem_instance(ScalaPlatform, **scala_options):
       self.make_target(':scala-library',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
@@ -315,10 +316,6 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.set_options(output_file=self.build_root)
     with self.assertRaises(TaskError):
       self.execute_export('project_info:target_type')
-
-  def test_unrecognized_target_type(self):
-    with self.assertRaises(TaskError):
-      self.execute_export('project_info:unrecognized_target_type')
 
   def test_source_exclude(self):
     self.set_options(globs=True)
