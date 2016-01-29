@@ -311,7 +311,7 @@ class ProcessManager(ProcessMetadataManager):
     """
     try:
       process = self._as_process()
-      if (
+      return not (
         # Can happen if we don't find our pid.
         (not process) or
         # Check for walkers.
@@ -320,12 +320,10 @@ class ProcessManager(ProcessMetadataManager):
         (self.process_name and self.process_name != process.name()) or
         # Extended checking.
         (extended_check and not extended_check(process))
-      ): return False
+      )
     except (psutil.NoSuchProcess, psutil.AccessDenied):
       # On some platforms, accessing attributes of a zombie'd Process results in NoSuchProcess.
       return False
-
-    return True
 
   def purge_metadata(self, force=False):
     """Instance-based version of ProcessMetadataManager.purge_metadata_by_name() that checks
