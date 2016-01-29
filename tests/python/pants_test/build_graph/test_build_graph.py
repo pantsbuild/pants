@@ -245,8 +245,7 @@ class BuildGraphTest(BaseTest):
     self.build_graph.inject_address_closure(Address.parse(spec))
 
   def test_invalid_address(self):
-    with self.assertRaisesRegexp(AddressLookupError,
-                                 '^BUILD file does not exist at:.*/BUILD'):
+    with self.assertRaisesRegexp(AddressLookupError, '^.* does not contain any BUILD files.$'):
       self.inject_address_closure('//:a')
 
     self.add_to_build_file('BUILD',
@@ -254,7 +253,7 @@ class BuildGraphTest(BaseTest):
                            '  dependencies=["non-existent-path:b"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
-                                 '^BUILD file does not exist at:.*/non-existent-path/BUILD'
+                                 '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec non-existent-path:b'
                                  '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
@@ -269,7 +268,7 @@ class BuildGraphTest(BaseTest):
                            '  dependencies=["non-existent-path:c"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
-                                 '^BUILD file does not exist at: .*/non-existent-path/BUILD'
+                                 '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec non-existent-path:c'
                                  '\s+referenced from goodpath:b'
                                  '\s+referenced from //:a$'):
@@ -299,7 +298,7 @@ class BuildGraphTest(BaseTest):
                            '  dependencies=["non-existent-path:d"],'
                            ')')
     with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
-                                 '^BUILD file does not exist at:.*/non-existent-path/BUILD'
+                                 '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec non-existent-path:d'
                                  '\s+referenced from goodpath:c'
                                  '\s+referenced from goodpath:b'

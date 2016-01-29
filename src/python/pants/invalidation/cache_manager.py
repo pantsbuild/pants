@@ -121,9 +121,16 @@ class VersionedTarget(VersionedTargetSet):
     to the new results dir. Otherwise, simply ensures that the results dir exists.
     """
     def dirname(key):
-      task_version = self._cache_manager.task_version
+      def version_to_string(task_ver):
+        return '.'.join(['_'.join(map(str, x)) for x in task_ver])
+      task_version = version_to_string(self._cache_manager.task_version)
       # TODO: Shorten cache_key hashes in general?
-      return os.path.join(root_dir, task_version, key.id, sha1(key.hash).hexdigest()[:12])
+      return os.path.join(
+          root_dir,
+          sha1(task_version).hexdigest()[:12],
+          key.id,
+          sha1(key.hash).hexdigest()[:12]
+      )
     new_dir = dirname(self.cache_key)
     self._results_dir = new_dir
     if self.valid:
@@ -256,10 +263,10 @@ class InvalidationCacheManager(object):
                fingerprint_strategy=None,
                invalidation_report=None,
                task_name=None,
-               task_version=None):
+               task_version=None,):
     self._cache_key_generator = cache_key_generator
     self._task_name = task_name or 'UNKNOWN'
-    self._task_version = task_version or '0'
+    self._task_version = task_version or 'Unknown_0'
     self._invalidate_dependents = invalidate_dependents
     self._invalidator = BuildInvalidator(build_invalidator_dir)
     self._fingerprint_strategy = fingerprint_strategy

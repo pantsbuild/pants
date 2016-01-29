@@ -24,7 +24,7 @@ public class PantsRunnerTest {
                "testproject-bundle/pants-runner-testproject.jar");
   static final File MAIN_JAR =
       new File("dist/testprojects.src.java.org.pantsbuild.testproject.runner.pants-runner-" +
-               "testproject-bundle/internal-libs/" +
+               "testproject-bundle/libs/" +
           "testprojects.src.java.org.pantsbuild.testproject.runner.main-class-0.jar");
   static final String MAIN_CLASS = "org.pantsbuild.testproject.runner.MainClass";
 

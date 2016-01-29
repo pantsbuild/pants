@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.source.payload_fields import SourcesField
+from pants.source.wrapped_globs import FilesetWithSpec
 from pants_test.base_test import BaseTest
 
 
@@ -69,3 +70,18 @@ class PayloadTest(BaseTest):
           ).fingerprint()
 
     self.assertNotEqual(fp1, fp2)
+
+  def test_fails_on_invalid_sources_kwarg(self):
+    with self.assertRaises(ValueError):
+      SourcesField(sources_rel_path='anything',
+                   sources='not-a-list')
+
+  def test_passes_fileset_with_spec_through(self):
+    self.create_file('foo/a.txt', 'a_contents')
+
+    fileset = FilesetWithSpec('foo', 'a.txt', lambda: ['a.txt'])
+    sf = SourcesField(sources_rel_path='foo',
+                      sources=fileset)
+
+    self.assertIs(fileset, sf.source_paths)
+    self.assertEqual(['a.txt'], list(sf.source_paths))

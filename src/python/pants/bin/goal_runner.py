@@ -11,14 +11,15 @@ import sys
 import pkg_resources
 
 from pants.base.build_environment import get_scm, pants_version
-from pants.base.build_file import FilesystemBuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
-from pants.base.scm_build_file import ScmBuildFile
+from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.scm_project_tree import ScmProjectTree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.extension_loader import load_plugins_and_backends
 from pants.bin.plugin_resolver import PluginResolver
 from pants.bin.repro import Reproducer
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.build_graph import BuildGraph
@@ -179,9 +180,9 @@ class GoalRunnerFactory(object):
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    self._build_file_type = self._get_buildfile_type(self._global_options.build_file_rev)
+    self._project_tree = self._get_project_tree(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._build_file_type)
+    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._project_tree)
     self._build_graph = BuildGraph(self._address_mapper)
     self._spec_parser = CmdLineSpecParser(
       self._root_dir,
@@ -190,21 +191,22 @@ class GoalRunnerFactory(object):
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
 
-  def _get_buildfile_type(self, build_file_rev):
-    """Selects the BuildFile type for use in a given pants run."""
+  def _get_project_tree(self, build_file_rev):
+    """Creates the project tree for build files for use in a given pants run."""
     if build_file_rev:
-      ScmBuildFile.set_rev(build_file_rev)
-      ScmBuildFile.set_scm(get_scm())
-      return ScmBuildFile
+      return ScmProjectTree(self._root_dir, get_scm(), build_file_rev)
     else:
-      return FilesystemBuildFile
+      return FileSystemProjectTree(self._root_dir)
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""
     for goal in goals:
-      if self._address_mapper.from_cache(self._root_dir, goal, must_exist=False).file_exists():
+      try:
+        self._address_mapper.resolve_spec(goal)
         logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
+      except AddressLookupError:
+        pass
 
     if self._help_request:
       help_printer = HelpPrinter(self._options)

@@ -15,11 +15,11 @@ from textwrap import dedent
 
 from pants.build_graph.address import Address
 from pants.engine.exp import parsers
-from pants.engine.exp.configuration import Configuration
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
 from pants.engine.exp.parsers import parse_json
+from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch
@@ -130,14 +130,14 @@ class AddressMapperTest(unittest.TestCase):
     shutil.copytree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'),
                     self.build_root)
 
-    parser = partial(parse_json, symbol_table={'configuration': Configuration, 'target': Target})
+    parser = partial(parse_json, symbol_table={'struct': Struct, 'target': Target})
     self.address_mapper = AddressMapper(build_root=self.build_root,
                                         build_pattern=r'.+\.BUILD.json$',
                                         parser=parser)
 
     self.a_b_target = Target(name='b',
                              dependencies=['//d:e'],
-                             configurations=['//a', Configuration(embedded='yes')])
+                             configurations=['//a', Struct(embedded='yes')])
 
   def test_no_family(self):
     with self.assertRaises(ResolveError):
@@ -165,10 +165,10 @@ class AddressMapperTest(unittest.TestCase):
 
     build_file = os.path.join(self.build_root, 'a/c/c.BUILD.json')
     with safe_open(build_file, 'w') as fp:
-      fp.write('{"type_alias": "configuration", "name": "c"}')
+      fp.write('{"type_alias": "struct", "name": "c"}')
 
     resolved = self.address_mapper.resolve(Address.parse('a/c'))
-    self.assertEqual(Configuration(name='c'), resolved)
+    self.assertEqual(Struct(name='c'), resolved)
 
     # But success is cached.
     self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/c')))
@@ -184,7 +184,7 @@ class AddressMapperTest(unittest.TestCase):
                      address_family.addressables)
 
     with open(os.path.join(self.build_root, 'a/b/sibling.BUILD.json'), 'w') as fp:
-      fp.write('{"type_alias": "configuration", "name": "c"}')
+      fp.write('{"type_alias": "struct", "name": "c"}')
 
     still_valid = self.address_mapper.family('a/b')
     self.assertIs(address_family, still_valid)
@@ -193,7 +193,7 @@ class AddressMapperTest(unittest.TestCase):
     newly_formed = self.address_mapper.family('a/b')
     self.assertIsNot(address_family, newly_formed)
     self.assertEqual({Address.parse('a/b'): self.a_b_target,
-                      Address.parse('a/b:c'): Configuration(name='c')},
+                      Address.parse('a/b:c'): Struct(name='c')},
                      newly_formed.addressables)
 
   def test_invalidate_build_file_changed(self):
@@ -202,14 +202,14 @@ class AddressMapperTest(unittest.TestCase):
 
     build_file = os.path.join(self.build_root, 'a/b/b.BUILD.json')
     with safe_open(build_file, 'w+') as fp:
-      fp.write('{"type_alias": "configuration", "name": "c"}')
+      fp.write('{"type_alias": "struct", "name": "c"}')
 
     with self.assertRaises(ResolveError):
       self.address_mapper.resolve(Address.parse('a/b:c'))
 
     self.address_mapper.invalidate_build_file('a/b/b.BUILD.json')
     resolved = self.address_mapper.resolve(Address.parse('a/b:c'))
-    self.assertEqual(Configuration(name='c'), resolved)
+    self.assertEqual(Struct(name='c'), resolved)
 
     # But success is cached.
     self.assertIs(resolved, self.address_mapper.resolve(Address.parse('a/b:c')))
@@ -257,20 +257,20 @@ class AddressMapperTest(unittest.TestCase):
     return Address.parse(spec)
 
   def test_walk_addressables(self):
-    self.assertEqual(sorted([(self.addr('//:root'), Configuration(name='root')),
+    self.assertEqual(sorted([(self.addr('//:root'), Struct(name='root')),
                              (self.addr('a/b:b'), self.a_b_target),
                              (self.addr('a/d:d'), Target(name='d')),
                              (self.addr('a/d/e:e'), Target(name='e')),
-                             (self.addr('a/d/e:e-prime'), Configuration(name='e-prime'))]),
+                             (self.addr('a/d/e:e-prime'), Struct(name='e-prime'))]),
                      sorted(self.address_mapper.walk_addressables()))
 
   def test_walk_addressables_rel_path(self):
     self.assertEqual(sorted([(self.addr('a/d:d'), Target(name='d')),
                              (self.addr('a/d/e:e'), Target(name='e')),
-                             (self.addr('a/d/e:e-prime'), Configuration(name='e-prime'))]),
+                             (self.addr('a/d/e:e-prime'), Struct(name='e-prime'))]),
                      sorted(self.address_mapper.walk_addressables(rel_path='a/d')))
 
   def test_walk_addressables_path_excludes(self):
-    self.assertEqual([(self.addr('//:root'), Configuration(name='root')),
+    self.assertEqual([(self.addr('//:root'), Struct(name='root')),
                       (self.addr('a/d:d'), Target(name='d'))],
                      list(self.address_mapper.walk_addressables(path_excludes=['a/b', 'a/d/e'])))

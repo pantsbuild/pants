@@ -27,3 +27,30 @@ python_tests(
   ],
   tags = {'integration'},
 )
+
+python_tests(
+  name='jar_dependency_management',
+  sources=['test_jar_dependency_management.py'],
+  dependencies=[
+    'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
+python_tests(
+  name='jar_dependency_management_integration',
+  sources=['test_jar_dependency_management_integration.py'],
+  dependencies=[
+    'src/python/pants/fs',
+    'src/python/pants/java/distribution',
+    'src/python/pants/java:executor',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)

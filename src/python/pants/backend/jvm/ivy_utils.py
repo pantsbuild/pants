@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
 import errno
 import logging
 import os
@@ -18,6 +19,8 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
+                                                                    PinnedJarArtifactSet)
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.generator import Generator, TemplateData
@@ -222,7 +225,7 @@ class IvyUtils(object):
 
   @staticmethod
   def _generate_override_template(jar):
-    return TemplateData(org=jar.org, module=jar.module, version=jar.version)
+    return TemplateData(org=jar.org, module=jar.name, version=jar.rev)
 
   @staticmethod
   @contextmanager
@@ -351,7 +354,8 @@ class IvyUtils(object):
     return ret
 
   @classmethod
-  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None):
+  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
+                   pinned_artifacts=None):
     if resolve_hash_name:
       org = IvyUtils.INTERNAL_ORG_NAME
       name = resolve_hash_name
@@ -365,6 +369,25 @@ class IvyUtils(object):
       jars = jars_by_key.setdefault((jar.org, jar.name), [])
       jars.append(jar)
 
+    manager = JarDependencyManagement.global_instance()
+    artifact_set = PinnedJarArtifactSet(pinned_artifacts) # Copy, because we're modifying it.
+    for jars in jars_by_key.values():
+      for i, dep in enumerate(jars):
+        direct_coord = M2Coordinate.create(dep)
+        managed_coord = artifact_set[direct_coord]
+        if direct_coord.rev != managed_coord.rev:
+          # It may be necessary to actually change the version number of the jar we want to resolve
+          # here, because overrides do not apply directly (they are exclusively transitive). This is
+          # actually a good thing, because it gives us more control over what happens.
+          coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
+          dep = copy.copy(dep)
+          dep.rev = coord.rev
+          jars[i] = dep
+        elif dep.force:
+          # If this dependency is marked as 'force' and there is no version conflict, use the normal
+          # pants behavior for 'force'.
+          artifact_set.put(direct_coord)
+
     dependencies = [cls._generate_jar_template(jars) for jars in jars_by_key.values()]
 
     # As it turns out force is not transitive - it only works for dependencies pants knows about
@@ -377,7 +400,7 @@ class IvyUtils(object):
     # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
     #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
     # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    overrides = [cls._generate_override_template(dep) for dep in dependencies if dep.force]
+    overrides = [cls._generate_override_template(coord) for coord in artifact_set]
 
     excludes = [cls._generate_exclude_template(exclude) for exclude in excludes]
 
@@ -460,6 +483,10 @@ class IvyUtils(object):
 
   @classmethod
   def _resolve_conflict(cls, existing, proposed):
+    if existing.rev is None:
+      return proposed
+    if proposed.rev is None:
+      return existing
     if proposed == existing:
       if proposed.force:
         return proposed
@@ -528,11 +555,6 @@ class IvyUtils(object):
                           url=url,
                           classifier=classifier)
       artifacts[(ext, url, classifier)] = artifact
-
-    if len(artifacts) == 1:
-      # If the only artifact has no attributes that we need a nested <artifact/> for, just emit
-      # a <dependency/>.
-      artifacts.pop((None, None, None), None)
 
     template = TemplateData(
         org=jar_attributes.org,

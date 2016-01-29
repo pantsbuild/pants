@@ -7,26 +7,25 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import MutableMapping, MutableSequence
 
-from pants.engine.exp.addressable import SuperclassesOf, addressable, addressable_list
+from pants.engine.exp.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
 from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable, ValidationError
 
 
-class Configuration(Serializable, SerializableFactory, Validatable):
-  """A serializable object describing some bit of build configuration.
+class Struct(Serializable, SerializableFactory, Validatable):
+  """A serializable object.
 
-  All build configuration data is composed of basic python builtin types and higher-level
-  configuration objects that aggregate configuration data.  Configuration objects can carry a name
-  in which case they become addressable and can be reused.
+  A Struct is composed of basic python builtin types and other high-level Structs.
+  Structs can carry a name in which case they become addressable and can be reused.
   """
 
   # Internal book-keeping fields to exclude from hash codes/equality checks.
   _SPECIAL_FIELDS = ('extends', 'merges', 'type_alias')
 
   def __init__(self, abstract=False, extends=None, merges=None, **kwargs):
-    """Creates a new configuration data blob.
+    """Creates a new struct data blob.
 
-    By default configurations are anonymous (un-named), concrete (not `abstract`), and they neither
-    inherit nor merge another configuration.
+    By default Structs are anonymous (un-named), concrete (not `abstract`), and they neither
+    inherit nor merge another Struct.
 
     Inheritance is allowed via the `extends` and `merges` channels.  An object inherits all
     attributes from the object it extends, overwriting any attributes in common with the extended
@@ -37,23 +36,23 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     over-written; again working from left to right with the main object's collection serving as the
     seed when present.
 
-    A configuration can be semantically abstract without setting `abstract=True`. The `abstract`
+    A Struct can be semantically abstract without setting `abstract=True`. The `abstract`
     value can serve as documentation, or, for subclasses that provide an implementation for
     `validate_concrete`, it allows skipping validation for abstract instances.
 
-    :param bool abstract: `True` to mark this configuration item as abstract, in which case no
+    :param bool abstract: `True` to mark this struct as abstract, in which case no
                           validation is performed (see `validate_concrete`); `False` by default.
-    :param extends: The configuration instance to inherit field values from.  Any shared fields are
+    :param extends: The struct instance to inherit field values from.  Any shared fields are
                     over-written with this instances values.
-    :type extends: An addressed or concrete configuration instance that is a type compatible with
-                   this configuration or this configurations superclasses.
-    :param merges: The configuration instances to merge this instances field values with.  Merging
+    :type extends: An addressed or concrete struct instance that is a type compatible with
+                   this struct or this structs superclasses.
+    :param merges: The struct instances to merge this instance's field values with.  Merging
                    is like extension except for containers, which are extended instead of replaced;
                    ie: any `dict` values are updated with this instances items and any `list` values
                    are extended with this instances items.
-    :type merges: An addressed or concrete configuration instance that is a type compatible with
-                  this configuration or this configurations superclasses.
-    :param **kwargs: The configuration parameters.
+    :type merges: An addressed or concrete struct instance that is a type compatible with
+                  this struct or this structs superclasses.
+    :param **kwargs: The struct parameters.
     """
     self._kwargs = kwargs
 
@@ -62,7 +61,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     self.extends = extends
     self.merges = merges
 
-    # Allow for configuration items that are directly constructed in memory.  These can have an
+    # Allow for structs that are directly constructed in memory.  These can have an
     # address directly assigned (vs. inferred from name + source file location) and we only require
     # that if they do, their name - if also assigned, matches the address.
     if self.address:
@@ -78,9 +77,9 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   def name(self):
     """Return the name of this object, if any.
 
-    In general configuration objects need not be named, in which case they are generally embedded
-    objects; ie: attributes values of enclosing named configuration objects.  Any top-level
-    configuration object, though, will carry a unique name (in the configuration object's enclosing
+    In general structs need not be named, in which case they are generally embedded
+    objects; ie: attributes values of enclosing named structs.  Any top-level
+    struct object, though, will carry a unique name (in the struct object's enclosing
     namespace) that can be used to address it.
 
     :rtype: string
@@ -91,9 +90,9 @@ class Configuration(Serializable, SerializableFactory, Validatable):
   def address(self):
     """Return the address of this object, if any.
 
-    In general configuration objects need not be identified by an address, in which case they are
-    generally embedded objects; ie: attributes values of enclosing named configuration objects.
-    Any top-level configuration object, though, will be identifiable via a unique address.
+    In general structs need not be identified by an address, in which case they are
+    generally embedded objects; ie: attributes values of enclosing named structs.
+    Any top-level struct, though, will be identifiable via a unique address.
 
     :rtype: :class:`pants.build_graph.address.Address`
     """
@@ -125,17 +124,17 @@ class Configuration(Serializable, SerializableFactory, Validatable):
 
   # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
   # our superclasses logically provide fields within this constrained set.
-  # NB: Since `Configuration` is at base an ~unconstrained struct, a superclass does allow for
+  # NB: Since `Struct` is at base an ~unconstrained struct, a superclass does allow for
   # arbitrary and thus more fields to be defined than a subclass might logically support.  We
-  # accept this hole in a trade for generally expected behavior when `Configuration` is subclassed
+  # accept this hole in a trade for generally expected behavior when `Struct` is subclassed
   # in the style of constructors with named parameters representing the full complete set of
   # expected parameters leaving **kwargs only for use by 'the system'; ie for `type_alias` and
   # `address` plumbing for example.
   #
   # Of note is the fact that we pass a constraint type and not a concrete constraint value.  This
-  # tells addressable to use `SuperclassesOf([Configuration instance's type])`, which is what we
-  # want.  Aka, for `ConfigurationSubclassA`, the constraint is
-  # `SuperclassesOf(ConfigurationSubclassA)`.
+  # tells addressable to use `SuperclassesOf([Struct instance's type])`, which is what we
+  # want.  Aka, for `StructSubclassA`, the constraint is
+  # `SuperclassesOf(StructSubclassA)`.
   #
   @addressable(SuperclassesOf)
   def extends(self):
@@ -195,8 +194,8 @@ class Configuration(Serializable, SerializableFactory, Validatable):
       for merged in self.merges:
         merge(self._extract_inheritable_attributes(merged))
 
-    configuration_type = type(self)
-    return configuration_type(**attributes)
+    struct_type = type(self)
+    return struct_type(**attributes)
 
   def validate(self):
     if not self.abstract:
@@ -214,7 +213,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     """Subclasses can override to implement validation logic.
 
     The object will be fully hydrated state and it's guaranteed the object will be concrete, aka.
-    not `abstract`.  If an error is found in the object's configuration, a validation error should
+    not `abstract`.  If an error is found in the struct's fields, a validation error should
     be raised by calling `report_validation_error`.
 
     :raises: :class:`pants.engine.exp.objects.ValidationError`
@@ -245,7 +244,7 @@ class Configuration(Serializable, SerializableFactory, Validatable):
     return hash(self._key())
 
   def __eq__(self, other):
-    return isinstance(other, Configuration) and self._key() == other._key()
+    return isinstance(other, Struct) and self._key() == other._key()
 
   def __ne__(self, other):
     return not (self == other)
@@ -260,3 +259,21 @@ class Configuration(Serializable, SerializableFactory, Validatable):
                                           args=', '.join(sorted('{}={!r}'.format(k, v)
                                                                 for k, v in self._kwargs.items()
                                                                 if v)))
+
+
+class StructWithDeps(Struct):
+  """A subclass of Struct with dependencies."""
+
+  def __init__(self, dependencies=None, **kwargs):
+    """
+    :param list dependencies: The direct dependencies of this struct.
+    """
+    super(StructWithDeps, self).__init__(**kwargs)
+    self.dependencies = dependencies
+
+  @addressable_list(SubclassesOf(Struct))
+  def dependencies(self):
+    """The direct dependencies of this target.
+
+    :rtype: list
+    """

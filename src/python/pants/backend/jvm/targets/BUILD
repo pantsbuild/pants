@@ -23,6 +23,7 @@ python_library(
     'jvm_binary.py',
     'jvm_prep_command.py',
     'jvm_target.py',
+    'managed_jar_dependencies.py',
     'unpacked_jars.py',
   ],
   dependencies = [

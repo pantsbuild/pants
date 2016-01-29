@@ -26,7 +26,7 @@ class SourcesField(PayloadField):
     :param filespec: glob and exclude data that generated this set of sources
     """
     self._rel_path = sources_rel_path
-    self._source_paths = assert_list(sources, key_arg='sources', allowable_add=(FilesetWithSpec,))
+    self._source_paths = self._validate_source_paths(sources)
     self._ref_address = ref_address
     self._filespec = filespec
 
@@ -87,6 +87,12 @@ class SourcesField(PayloadField):
         hasher.update(f.read())
     return hasher.hexdigest()
 
+  def _validate_source_paths(self, sources):
+    if isinstance(sources, FilesetWithSpec):
+      return sources
+    else:
+      return assert_list(sources, key_arg='sources')
+
 
 class DeferredSourcesField(SourcesField):
   """A SourcesField that isn't populated immediately when the graph is constructed.
@@ -125,7 +131,7 @@ class DeferredSourcesField(SourcesField):
       raise self.AlreadyPopulatedError("Called with rel_path={rel_path} sources={sources}"
       .format(rel_path=rel_path, sources=sources))
     self._rel_path = rel_path
-    self._source_paths = assert_list(sources, key_arg='sources', allowable_add=(FilesetWithSpec,))
+    self._source_paths = self._validate_source_paths(sources)
     self._populated = True
 
   def _validate_populated(self):

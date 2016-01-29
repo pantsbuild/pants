@@ -1,0 +1,112 @@
+# These targets don't currently work all together (without special setup), so this file is named
+# TEST_BUILD normally, and briefly renamed to BUILD during the integration tests for these targets.
+
+managed_jar_dependencies(name='manager',
+  artifacts=[
+    jar(org='jersey', name='jersey', rev='0.4-ea'),
+    jar(org='javax.ws.rs', name='jsr311-api', rev='0.7'),
+    jar(org='commons-io', name='commons-io', rev='2.3'),
+  ],
+)
+
+managed_jar_dependencies(name='manager2',
+  artifacts=[
+    jar(org='jersey', name='jersey', rev='0.2.1-ea'),
+    jar(org='javax.ws.rs', name='jsr311-api', rev='0.2'),
+  ],
+)
+
+jar_library(name='library-managed',
+  jars=[
+    jar(org='jersey', name='jersey', rev='0.5-ea'),
+  ],
+  managed_dependencies=':manager',
+)
+
+jar_library(name='library-managed2',
+  jars=[
+    jar(org='jersey', name='jersey'),
+  ],
+  managed_dependencies=':manager2',
+)
+
+jar_library(name='library-managed-forceful',
+  jars=[
+    jar(org='jersey', name='jersey', rev='0.5-ea', force=True),
+  ],
+  managed_dependencies=':manager',
+)
+
+jar_library(name='library-managed-redundant',
+  jars=[
+    jar(org='jersey', name='jersey', rev='0.4-ea'),
+  ],
+  managed_dependencies=':manager',
+)
+
+jar_library(name='library-unmanaged',
+  jars=[
+    jar(org='jersey', name='jersey', rev='0.5-ea'),
+  ],
+)
+
+jar_library(name='library-managed-auto',
+  jars=[
+    jar(org='jersey', name='jersey'),
+  ],
+  managed_dependencies=':manager',
+)
+
+jvm_binary(name='unmanaged',
+  main='org.pantsbuild.testproject.depman.PrintClasspath',
+  source='PrintClasspath.java',
+  platform='java7',
+  dependencies=[
+    ':library-unmanaged',
+  ],
+)
+
+jvm_binary(name='managed',
+  main='org.pantsbuild.testproject.depman.PrintClasspath',
+  source='PrintClasspath.java',
+  platform='java7',
+  dependencies=[
+    ':library-managed',
+  ],
+)
+
+jvm_binary(name='managed2',
+  main='org.pantsbuild.testproject.depman.PrintClasspath',
+  source='PrintClasspath.java',
+  platform='java7',
+  dependencies=[
+    ':library-managed2',
+  ],
+)
+
+jvm_binary(name='managed-auto',
+  main='org.pantsbuild.testproject.depman.PrintClasspath',
+  source='PrintClasspath.java',
+  platform='java7',
+  dependencies=[
+    ':library-managed-auto',
+  ],
+)
+
+jvm_binary(name='forceful',
+  main='org.pantsbuild.testproject.depman.PrintClasspath',
+  source='PrintClasspath.java',
+  platform='java7',
+  dependencies=[
+    ':library-managed-forceful',
+  ],
+)
+
+jvm_binary(name='redundant',
+  main='org.pantsbuild.testproject.depman.PrintClasspath',
+  source='PrintClasspath.java',
+  platform='java7',
+  dependencies=[
+    ':library-managed-redundant',
+  ],
+)

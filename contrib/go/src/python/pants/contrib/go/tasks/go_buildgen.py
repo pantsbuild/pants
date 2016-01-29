@@ -248,9 +248,8 @@ class GoBuildgen(GoTask):
 
     def gather_go_buildfiles(rel_path):
       address_mapper = self.context.address_mapper
-      for build_file in address_mapper.scan_buildfiles(root_dir=get_buildroot(),
-                                                       base_path=rel_path,
-                                                       spec_excludes=self.context.spec_excludes):
+      for build_file in address_mapper.scan_build_files(base_path=rel_path,
+                                                        spec_excludes=self.context.spec_excludes):
         existing_go_buildfiles.add(build_file.relpath)
 
     gather_go_buildfiles(generation_result.local_root)

@@ -18,6 +18,12 @@ from pants.util.dirutil import safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
+class JavaLibraryWithCopied(JavaLibrary):
+  def __init__(self, copied=None, *args, **kwargs):
+    self.copied = copied
+    super(JavaLibraryWithCopied, self).__init__(*args, **kwargs)
+
+
 class DummyLibrary(JvmTarget):
   """Library of .dummy files, which are just text files which generate empty java files.
 
@@ -35,6 +41,10 @@ class DummyLibrary(JvmTarget):
 
   Which would compile, but do nothing.
   """
+
+  def __init__(self, copied=None, *args, **kwargs):
+    self.copied = copied
+    super(DummyLibrary, self).__init__(*args, **kwargs)
 
 
 class DummyGen(SimpleCodegenTask):
@@ -92,7 +102,11 @@ class DummyGen(SimpleCodegenTask):
             yield os.path.join(target_workdir, os.path.join(*package_name.split('.')), class_name)
 
   def synthetic_target_type(self, target):
-    return JavaLibrary
+    return JavaLibraryWithCopied
+
+  @property
+  def _copy_target_attributes(self):
+    return ['copied']
 
 
 class SimpleCodegenTaskTest(TaskTestBase):
@@ -231,3 +245,20 @@ class SimpleCodegenTaskTest(TaskTestBase):
     targets = self._get_duplication_test_targets()[:-1]
     self._do_test_duplication(targets, allow_dups=False, should_fail=False)
     self._do_test_duplication(targets, allow_dups=True, should_fail=False)
+
+  def test_copy_target_attributes(self):
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+                     'org.pantsbuild.example Fleem')
+
+
+    self.add_to_build_file('fleem', dedent('''
+      dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+        copied='copythis'
+      )
+    '''))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets, strategy='isolated')
+    task.execute()
+    self.assertEqual('copythis', task.codegen_targets()[0].copied)

@@ -13,9 +13,9 @@ from hashlib import sha1
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.jar_dependency_utils import ResolvedJar
+from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -39,6 +39,9 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     hasher = sha1()
     for conf in self._confs:
       hasher.update(conf)
+    managed_jar_dependencies_artifacts = JarDependencyManagement.global_instance().for_target(target)
+    if managed_jar_dependencies_artifacts:
+      hasher.update(str(managed_jar_dependencies_artifacts.id))
     if isinstance(target, JarLibrary):
       hasher.update(target.payload.fingerprint())
       return hasher.hexdigest()
@@ -46,7 +49,6 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
       if target.payload.excludes:
         hasher.update(target.payload.fingerprint(field_keys=('excludes',)))
         return hasher.hexdigest()
-
     return None
 
   def __hash__(self):
@@ -57,7 +59,13 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
 
 class IvyTaskMixin(TaskBase):
-  """A mixin for Tasks that execute resolves via Ivy."""
+  """A mixin for Tasks that execute resolves via Ivy.
+
+  NB: Ivy reports are not relocatable in a cache, and a report must be present in order to
+  parse the graph structure of dependencies. Therefore, this mixin explicitly disables the
+  cache for its invalidation checks via the `use_cache=False` parameter. Tasks that extend
+  the mixin may safely enable task-level caching settings.
+  """
 
   class Error(TaskError):
     """Indicates an error performing an ivy resolve."""
@@ -67,7 +75,7 @@ class IvyTaskMixin(TaskBase):
 
   @classmethod
   def global_subsystems(cls):
-    return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, )
+    return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, JarDependencyManagement)
 
   @classmethod
   def register_options(cls, register):
@@ -109,9 +117,21 @@ class IvyTaskMixin(TaskBase):
     :returns: The id of the reports associated with this resolve.
     :rtype: string
     """
+    targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
+    resolve_hash_names = []
+    for artifact_set, target_subset in targets_by_sets.items():
+      resolve_hash_names.append(self._resolve_subset(executor,
+                                                     target_subset,
+                                                     classpath_products,
+                                                     confs=confs,
+                                                     extra_args=extra_args,
+                                                     invalidate_dependents=invalidate_dependents,
+                                                     pinned_artifacts=artifact_set))
+    return resolve_hash_names
 
+  def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
+              invalidate_dependents=False, pinned_artifacts=None):
     classpath_products.add_excludes_for_targets(targets)
-
     confs = confs or ('default',)
 
     # After running ivy, we parse the resulting report, and record the dependencies for
@@ -123,6 +143,7 @@ class IvyTaskMixin(TaskBase):
       confs=confs,
       custom_args=extra_args,
       invalidate_dependents=invalidate_dependents,
+      pinned_artifacts=pinned_artifacts,
     )
 
     if not resolve_hash_name:
@@ -180,7 +201,8 @@ class IvyTaskMixin(TaskBase):
                   workunit_name=None,
                   confs=None,
                   custom_args=None,
-                  invalidate_dependents=False):
+                  invalidate_dependents=False,
+                  pinned_artifacts=None):
     """Resolves external dependencies for the given targets.
 
     If there are no targets suitable for jvm transitive dependency resolution, an empty result is
@@ -210,10 +232,12 @@ class IvyTaskMixin(TaskBase):
 
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
+    # NB: See class pydoc regarding `use_cache=False`.
     with self.invalidated(targets,
                           invalidate_dependents=invalidate_dependents,
                           silent=silent,
-                          fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+                          fingerprint_strategy=fingerprint_strategy,
+                          use_cache=False) as invalidation_check:
       if not invalidation_check.all_vts:
         return [], {}, None
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
@@ -257,16 +281,14 @@ class IvyTaskMixin(TaskBase):
             workunit_name=workunit_name,
             confs=confs,
             use_soft_excludes=self.get_options().soft_excludes,
-            resolve_hash_name=resolve_hash_name)
+            resolve_hash_name=resolve_hash_name,
+            pinned_artifacts=pinned_artifacts)
 
         if not os.path.exists(raw_target_classpath_file_tmp):
           raise self.Error('Ivy failed to create classpath file at {}'
                            .format(raw_target_classpath_file_tmp))
         shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
         logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
-
-        if self.artifact_cache_writes_enabled():
-          self.update_artifact_cache([(global_vts, [raw_target_classpath_file])])
       else:
         logger.debug("Using previously resolved reports: {}".format(report_paths))
 
@@ -292,7 +314,8 @@ class IvyTaskMixin(TaskBase):
                ivy=None,
                workunit_name='ivy',
                use_soft_excludes=False,
-               resolve_hash_name=None):
+               resolve_hash_name=None,
+               pinned_artifacts=None):
     ivy_jvm_options = self.get_options().jvm_options[:]
     # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
     ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
@@ -313,7 +336,8 @@ class IvyTaskMixin(TaskBase):
     try:
       jars, excludes = IvyUtils.calculate_classpath(targets, gather_excludes=not use_soft_excludes)
       with IvyUtils.ivy_lock:
-        IvyUtils.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve, resolve_hash_name)
+        IvyUtils.generate_ivy(targets, jars, excludes, ivyxml, confs_to_resolve, resolve_hash_name,
+                              pinned_artifacts)
         runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
         try:
           result = execute_runner(runner, workunit_factory=self.context.new_workunit,

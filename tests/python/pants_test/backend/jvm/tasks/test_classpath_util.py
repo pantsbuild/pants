@@ -6,10 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import OrderedDict
 
+from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry, ClasspathProducts
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil, MissingClasspathEntryError
 from pants.goal.products import UnionProducts
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import relativize_paths
@@ -79,26 +82,66 @@ class ClasspathUtilTest(BaseTest):
 
     self.assertEqual(['/dev/null'], classpath)
 
-  def test_create_canonical_classpath(self):
-    a = self.make_target('a/b', JvmTarget)
+  def test_classpath_by_targets(self):
+    b = self.make_target('b', JvmTarget)
+    a = self.make_target('a', JvmTarget, dependencies=[b],
+                         excludes=[Exclude('com.example', 'lib')])
 
     classpath_products = ClasspathProducts(self.pants_workdir)
 
+    path1 = self._path('jar/path1')
+    path2 = self._path('jar/path2')
+    path3 = os.path.join(self.pants_workdir, 'jar/path3')
+    resolved_jar = ResolvedJar(M2Coordinate(org='com.example', name='lib', rev='1.0'),
+                               cache_path='somewhere',
+                               pants_path=path3)
+    classpath_products.add_for_target(a, [('default', path1)])
+    classpath_products.add_for_target(a, [('non-default', path2)])
+    classpath_products.add_for_target(b, [('default', path2)])
+    classpath_products.add_jars_for_targets([b], 'default', [resolved_jar])
+    classpath_products.add_excludes_for_targets([a])
+
+    # (a, path2) filtered because of conf
+    # (b, path3) filtered because of excludes
+    self.assertEquals(OrderedDict([(a, [ClasspathEntry(path1)]),
+                                   (b, [ClasspathEntry(path2)])]),
+                      ClasspathUtil.classpath_by_targets(a.closure(bfs=True),
+                                                         classpath_products))
+
+  def test_create_canonical_classpath(self):
+    a = self.make_target('a/b', JvmTarget)
+
+    jar_path = 'ivy/jars/org.x/lib/x-1.0.jar'
+    jar_path_excluded = 'ivy/jars/org.y/lib/y-1.0.jar'
+    classpath_products = ClasspathProducts(self.pants_workdir)
+
+    resolved_jar = ResolvedJar(M2Coordinate(org='org', name='x', rev='1.0'),
+                               cache_path='somewhere',
+                               pants_path=self._path(jar_path))
+    # org.y should be excluded from result canonical path
+    resolved_jar_to_exclude = ResolvedJar(M2Coordinate(org='org', name='y', rev='1.0'),
+                                          cache_path='somewhere',
+                                          pants_path=self._path(jar_path_excluded))
+
     classpath_products.add_for_target(a, [('default', self._path('a.jar')),
                                           ('default', self._path('resources'))])
+    classpath_products.add_jars_for_targets([a], 'default', [resolved_jar])
 
     with temporary_dir() as base_dir:
       self._test_canonical_classpath_helper(classpath_products, [a],
                                             base_dir, True,
                                             [
                                               'a.b.b-0.jar',
-                                              'a.b.b-1'
+                                              'a.b.b-1',
+                                              'a.b.b-2.jar',
                                             ],
                                             {
                                               'a.b.b-classpath.txt':
-                                              '{}/a.jar:{}/resources\n'.format(self.pants_workdir,
-                                                                               self.pants_workdir)
-                                            })
+                                              '{}/a.jar:{}/resources:{}/{}\n'
+                                               .format(self.pants_workdir, self.pants_workdir,
+                                                       self.pants_workdir, jar_path)
+                                            },
+                                            excludes=set([Exclude(org='org', name='y')]))
 
     # incrementally delete the resource dendendency
     classpath_products = ClasspathProducts(self.pants_workdir)
@@ -164,11 +207,31 @@ class ClasspathUtilTest(BaseTest):
                                                 '{}/c.jar\n'.format(self.pants_workdir),
                                             })
 
+  def test_create_canonical_classpath_with_broken_classpath(self):
+    """Test exception is thrown when the jar file is missing."""
+
+    a = self.make_target('a/b', JvmTarget)
+    classpath_products = ClasspathProducts(self.pants_workdir)
+    jar_path = 'ivy/jars/org.x/lib/x-1.0.jar'
+
+    # this sets the path for the artifact without actually materializing it.
+    resolved_jar = ResolvedJar(M2Coordinate(org='org', name='x', rev='1.0'),
+                               cache_path='somewhere',
+                               pants_path=os.path.join(self.pants_workdir, jar_path))
+    classpath_products.add_jars_for_targets([a], 'default', [resolved_jar])
+
+    with temporary_dir() as base_dir:
+      with self.assertRaises(MissingClasspathEntryError):
+        self._test_canonical_classpath_helper(classpath_products, [a],
+                                              base_dir, False,
+                                              [], {})
+
   def _test_canonical_classpath_helper(self, classpath_products, targets,
                                        libs_dir,
                                        use_target_id,
                                        expected_canonical_classpath,
-                                       expected_classspath_files):
+                                       expected_classspath_files,
+                                       excludes=set()):
     """
     Helper method to call `create_canonical_classpath` and verify generated canonical classpath.
 
@@ -183,7 +246,9 @@ class ClasspathUtilTest(BaseTest):
                                                                    targets,
                                                                    libs_dir,
                                                                    save_classpath_file=True,
-                                                                   use_target_id=use_target_id)
+                                                                   use_target_id=use_target_id,
+                                                                   internal_classpath_only=False,
+                                                                   excludes=excludes)
     # check canonical path returned
     self.assertEquals(expected_canonical_classpath,
                       relativize_paths(canonical_classpath, libs_dir))
@@ -199,4 +264,4 @@ class ClasspathUtilTest(BaseTest):
                                          expected_classspath_files[classpath_file]))
 
   def _path(self, p):
-    return os.path.join(self.pants_workdir, p)
+    return self.create_workdir_file(p)

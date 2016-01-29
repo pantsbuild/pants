@@ -84,11 +84,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
   def prune(self, root):
     """Prune stale cache files
 
-    If the user specifies the option --cache-target-max-entry then prune will remove all but n old
-    cache files for each target/task.
-
-    If the user has not specified the option --cache-target-max-entry then behavior is unchanged and
-    files will remain in cache indefinitely.
+    If the option --cache-target-max-entry is greater than zero, then prune will remove all but n
+    old cache files for each target/task.
 
     :param str root: The path under which cacheable artifacts will be cleaned
     """

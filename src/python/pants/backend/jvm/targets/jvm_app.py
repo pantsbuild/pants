@@ -17,6 +17,7 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
 from pants.build_graph.target import Target
+from pants.util.memo import memoized_property
 
 
 class RelativeToMapper(object):
@@ -61,7 +62,24 @@ class DirectoryReMapper(object):
     return 'DirectoryReMapper({0}, {1})'.format(self.base, self.dest)
 
 
-BundleProps = namedtuple('_BundleProps', ['rel_path', 'mapper', 'filemap', 'fileset'])
+class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset'])):
+  @memoized_property
+  def filemap(self):
+    filemap = {}
+    if self.fileset is not None:
+      paths = self.fileset() if isinstance(self.fileset, Fileset) \
+          else self.fileset if hasattr(self.fileset, '__iter__') \
+          else [self.fileset]
+      for path in paths:
+        abspath = path
+        if not os.path.isabs(abspath):
+          abspath = os.path.join(get_buildroot(), self.rel_path, path)
+        filemap[abspath] = self.mapper(abspath)
+    return filemap
+
+  def __hash__(self):
+    # Leave out fileset from hash calculation since it may not be hashable.
+    return hash((self.rel_path, self.mapper))
 
 
 class Bundle(object):
@@ -117,17 +135,7 @@ class Bundle(object):
     else:
       mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), rel_path))
 
-    if fileset is not None:
-      paths = fileset() if isinstance(fileset, Fileset) \
-        else fileset if hasattr(fileset, '__iter__') \
-        else [fileset]
-      for path in paths:
-        abspath = path
-        if not os.path.isabs(abspath):
-          abspath = os.path.join(get_buildroot(), rel_path, path)
-        filemap[abspath] = mapper(abspath)
-
-    return BundleProps(self._rel_path, mapper, filemap, fileset)
+    return BundleProps(self._rel_path, mapper, fileset)
 
 
 class BundleField(tuple, PayloadField):

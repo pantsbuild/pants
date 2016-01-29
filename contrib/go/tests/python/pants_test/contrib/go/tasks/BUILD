@@ -98,6 +98,19 @@ python_tests(
 )
 
 python_tests(
+  name='go_thrift_gen_integration',
+  sources=['test_go_thrift_gen_integration.py'],
+  dependencies=[
+    'contrib/go/src/python/pants/contrib/go/subsystems:go_distribution',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/testutils:file_test_util',
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+)
+
+python_tests(
   name='go_run_integration',
   sources=['test_go_run_integration.py'],
   dependencies=[

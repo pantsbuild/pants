@@ -1,6 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+page(
+  name='readme',
+  source='README.md',
+)
+
 python_library(
   name='addressable',
   sources=['addressable.py'],
@@ -12,8 +17,8 @@ python_library(
 )
 
 python_library(
-  name='configuration',
-  sources=['configuration.py'],
+  name='struct',
+  sources=['struct.py'],
   dependencies=[
     ':addressable',
     ':objects',
@@ -74,15 +79,6 @@ python_library(
 )
 
 python_library(
-  name='products',
-  sources=['products.py'],
-  dependencies=[
-    'src/python/pants/engine/exp:targets',
-    'src/python/pants/util:memo',
-  ],
-)
-
-python_library(
   name='scheduler',
   sources=['scheduler.py'],
   dependencies=[
@@ -91,7 +87,6 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:addressable',
     'src/python/pants/engine/exp:objects',
-    'src/python/pants/engine/exp:products',
     'src/python/pants/engine/exp:targets',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
@@ -103,7 +98,7 @@ python_library(
   sources=['targets.py'],
   dependencies=[
     ':addressable',
-    ':configuration',
+    ':struct',
     'src/python/pants/source',
   ]
 )
