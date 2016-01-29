@@ -50,7 +50,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
                                  'java6': {'source': '1.6', 'target': '1.6'}
                                })
 
-    with subsystem_instance(ScalaPlatform):
+    scala_options = {'scala-platform': {'version': 'custom'}}
+    with subsystem_instance(ScalaPlatform, **scala_options):
       self.make_target(':scala-library',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
