@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import os
 import re
+import subprocess
 
 from twitter.common.collections import maybe_list
 
@@ -215,14 +216,14 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
   def test_intellij_integration(self):
     with self.temporary_workdir() as workdir:
-      targets = ['src/python/::', 'tests/python/pants_test/base::', 'contrib/::']
-      excludes = [
-        '--exclude-target-regexp=.*go/examples.*',
-        '--exclude-target-regexp=.*scrooge/tests/thrift.*',
-        '--exclude-target-regexp=.*spindle/tests/thrift.*',
-        '--exclude-target-regexp=.*spindle/tests/jvm.*'
-      ]
-      json_data = self.run_export(targets, workdir, extra_args=excludes)
+      exported_file = os.path.join(workdir, "export_file.json")
+      p = subprocess.Popen(['build-support/pants-intellij.sh', '--export-output-file=' + exported_file],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+      p.communicate()
+      self.assertEqual(p.returncode, 0)
+
+      with open(exported_file) as data_file:
+        json_data = json.load(data_file)
 
       python_setup = json_data['python_setup']
       self.assertIsNotNone(python_setup)

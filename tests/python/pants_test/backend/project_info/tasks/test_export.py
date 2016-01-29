@@ -316,10 +316,6 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     with self.assertRaises(TaskError):
       self.execute_export('project_info:target_type')
 
-  def test_unrecognized_target_type(self):
-    with self.assertRaises(TaskError):
-      self.execute_export('project_info:unrecognized_target_type')
-
   def test_source_exclude(self):
     self.set_options(globs=True)
     result = self.execute_export_json('src/python/exclude')
