@@ -503,8 +503,7 @@ class NodeBuilder(object):
     """Indexes tasks by their output type."""
     serializable_tasks = defaultdict(set)
     for output_type, input_selects, task in tasks:
-      simplified_input_selects = tuple(input_selects)
-      serializable_tasks[output_type].add((task, simplified_input_selects))
+      serializable_tasks[output_type].add((task, tuple(input_selects)))
     return cls(serializable_tasks)
 
   def __init__(self, tasks):

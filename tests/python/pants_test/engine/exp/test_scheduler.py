@@ -28,6 +28,7 @@ class SchedulerTest(unittest.TestCase):
     self.guava = Address.parse('3rdparty/jvm:guava')
     self.thrift = Address.parse('src/thrift/codegen/simple')
     self.java = Address.parse('src/java/codegen/simple')
+    self.java_simple = Address.parse('src/java/simple')
     self.java_multi = Address.parse('src/java/multiple_classpath_entries')
     self.unconfigured_thrift = Address.parse('src/thrift/codegen/unconfigured')
     self.resources = Address.parse('src/resources/simple')
@@ -35,6 +36,7 @@ class SchedulerTest(unittest.TestCase):
     self.consumes_managed_thirdparty = Address.parse('src/java/managed_thirdparty')
     self.managed_guava = Address.parse('3rdparty/jvm/managed:guava')
     self.managed_hadoop = Address.parse('3rdparty/jvm/managed:hadoop-common')
+    self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
   def assert_select_for_subjects(self, walk, product, subjects, variants=None, variant=None):
     node_type = SelectNode
@@ -146,6 +148,20 @@ class SchedulerTest(unittest.TestCase):
                        Jar('com.google.guava', 'guava', '18.0')},
                       {ret.value for (node, ret), _ in walk
                        if node.product == Jar and isinstance(node, SelectNode)})
+
+  def test_dependency_inference(self):
+    """Scala dependency inference introduces dependencies that do not exist in BUILD files."""
+    build_request = BuildRequest(goals=['compile'],
+                                 addressable_roots=[self.inferred_deps])
+    walk = self.build_and_walk(build_request)
+
+    # Validate the root.
+    self.assertEqual((SelectNode(self.inferred_deps, Classpath, None, None),
+                      Return(Classpath(creator='scalac'))),
+                     walk[0][0])
+
+    # Confirm that we requested a classpath for the root and inferred targets.
+    self.assert_select_for_subjects(walk, Classpath, [self.inferred_deps, self.java_simple])
 
   @pytest.mark.xfail(raises=ConflictingProducersError)
   def test_multiple_classpath_entries(self):
