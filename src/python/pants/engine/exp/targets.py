@@ -18,7 +18,7 @@ class Sources(Struct):
   """Represents a collection of source files.
 
   Note that because this does not extend `StructWithDeps`, subclasses that would like to have
-  dependencies should mix-in SourcesWithDeps.
+  dependencies should mix-in StructWithDeps.
   """
 
   def __init__(self,

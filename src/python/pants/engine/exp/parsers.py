@@ -54,7 +54,7 @@ class SymbolTable(AbstractClass):
   """A one-classmethod interface exposing a symbol table dict.
 
   SymbolTables exist as named classes because it allows them to be loaded by name as a python
-  module, rather than being pickled when they cross between threads.
+  module, rather than being pickled when they cross between processes.
   """
 
   @classmethod

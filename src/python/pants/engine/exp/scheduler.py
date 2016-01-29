@@ -41,10 +41,11 @@ class Select(datatype('Subject', ['product']), Selector):
 
 
 class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
-  """Selects the matching Product with the variant name for the Subject provided to the constructor.
+  """Selects the matching Product and variant name for the Subject provided to the constructor.
 
-  NB: variants only work for native Products currently. Products produced by tasks would
-  likely not have a useful reason to be named.
+  For example: a SelectVariant with a variant_key of "thrift" and a product of type ApacheThrift
+  will only match when a consumer passes a variant value for "thrift" that matches the name of an
+  ApacheThrift value.
   """
 
   def construct_node(self, subject, variants):
@@ -193,6 +194,10 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
 
 
 class Node(object):
+  @abstractproperty
+  def subject(self):
+    """The subject for this Node."""
+
   @abstractproperty
   def product(self):
     """The output product for this Node."""
@@ -655,8 +660,7 @@ class LocalScheduler(object):
 
     # Ready.
     self._step_id += 1
-    step = Step(self._step_id, node, deps, self._node_builder)
-    return (step, Promise())
+    return (Step(self._step_id, node, deps, self._node_builder), Promise())
 
   def _create_roots(self, build_request):
     # Determine the root products and subjects based on the request.
@@ -709,7 +713,7 @@ class LocalScheduler(object):
         if candidate_node in outstanding:
           # Node is still a candidate, but is currently running.
           continue
-        if self._product_graph.is_complete(candidate_node):
+        if pg.is_complete(candidate_node):
           # Node has already completed.
           candidates.discard(candidate_node)
           continue
