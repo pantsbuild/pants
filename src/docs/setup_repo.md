@@ -237,6 +237,8 @@ In your `pants.ini` file, set up a `[publish.jar]` section. In that section,
 create a `dict` called `repos`. It should contain a section for each `Repository` object that you
 defined in your plugin:
 
+    :::ini
+    [publish.jar]
     repos: {
       'public': {  # must match the name of the `Repository` object that you defined in your plugin.
         'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
@@ -275,24 +277,33 @@ good place, and is used in the example above):
 Next, tell Ivy how to publish to your repository. Add a new `ivysettings.xml` file to your repo
 with the additional information needed to publish artifacts. Here is an example to get you started:
 
-   :::xml
+    :::xml
     <?xml version="1.0"?>
 
     <ivysettings>
       <settings defaultResolver="chain-repos"/>
+      <!-- The ${login} and ${password} values come from a credentials() object in a BUILD file,
+           which is fed by '~/.netrc'.  There must be a '~/.netrc' machine entry which matches
+           a resolver in the "repos" object in 'pants.ini', which also matches the 'host' in
+           this XML block.
 
+           machine <hostname>
+             login <login>
+             password <password>
+
+           The realm must match the kind of repository you are publishing to. For Sonotype Nexus, use:
+
+           realm="Sonatype Nexus Repository Manager"
+
+        -->
       <credentials host="artifactory.example.com"
                    realm="Artifactory Realm"
-                   <!-- These values come from a credentials() object, which is fed by '~/.netrc'.
-                        There must be a '~/.netrc' machine entry which matches a resolver in the
-                        "repos" object in 'pants.ini', which also matches the 'host' in this XML
-                        block. -->
                    username="${login}"
                    passwd="${password}"/>
 
       <resolvers>
         <chain name="chain-repos" returnFirst="true">
-           <ibiblio name="corp-maven"
+           <ibiblio name="artifactory.example.com"
                          m2compatible="true"
                          usepoms="true"
                          root="https://artifactory.example.com/content/groups/public/"/>
@@ -304,9 +315,11 @@ with the additional information needed to publish artifacts. Here is an example 
       </resolvers>
     </ivysettings>
 
-With this file in place, add a `[publish]` section to `pants.ini`, and tell pants to use
+With this file in place, add a `[publish.jar]` section to `pants.ini`, and tell pants to use
 the custom Ivy settings when publishing:
 
+    :::ini
+    [publish.jar]
     ivy_settings: %(pants_supportdir)s/ivy/ivysettings_for_publishing.xml
 
 <a pantsmark="setup_publish_restrict_branch"> </a>

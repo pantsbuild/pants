@@ -385,7 +385,7 @@ class JarPublish(ScmPublishMixin, JarTask):
         raise TaskError(
           "This repo is not configured to publish externally! Please configure per\n"
           "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
-          "or re-run with the '--publish-local' flag.")
+          "by setting --publish-jar-repos=<dict> or re-run with '--publish-jar-local=<dir>'.")
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
