@@ -140,14 +140,6 @@ class TestCacheSetup(BaseTest):
     self.assertEquals(self.CACHE_SPEC_LOCAL_RESOLVE,
                       self.cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
-  def test_select_best_url(self):
-    cache_factory = CacheFactory(options={}, log=self.log, stable_name='test',
-                                 pinger=self.pinger, resolver=self.resolver)
-    spec = '{0}|{1}/path/to|{2}/path/'.format(self.REMOTE_URI_1, self.REMOTE_URI_2,
-                                              self.REMOTE_URI_3)
-    best = cache_factory.select_best_url(spec)
-    self.assertEquals('{0}/path/to'.format(self.REMOTE_URI_2), best)
-
   def test_cache_spec_parsing(self):
     def mk_cache(spec, resolver=None):
       Subsystem.reset()
