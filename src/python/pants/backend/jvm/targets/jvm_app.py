@@ -9,6 +9,7 @@ import os
 from collections import namedtuple
 from hashlib import sha1
 
+import six
 from twitter.common.dirutil import Fileset
 
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
@@ -16,7 +17,10 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes
+from pants.base.validation import assert_list
 from pants.build_graph.target import Target
+from pants.source.wrapped_globs import FilesetWithSpec
+from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 
 
@@ -126,16 +130,24 @@ class Bundle(object):
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
-    rel_path = rel_path or self._rel_path
-    filemap = {}
+    if rel_path and isinstance(fileset, FilesetWithSpec):
+      raise ValueError("Must not use a glob for 'fileset' with 'rel_path'.")
+
+    # A fileset is either a string, a glob or a list of strings.
+    if isinstance(fileset, six.string_types) or isinstance(fileset, FilesetWithSpec):
+      pass
+    else:
+      fileset = assert_list(fileset, key_arg='fileset')
+
+    real_rel_path = rel_path or self._rel_path
 
     if relative_to:
-      base = os.path.join(get_buildroot(), rel_path, relative_to)
+      base = os.path.join(get_buildroot(), real_rel_path, relative_to)
       mapper = RelativeToMapper(base)
     else:
-      mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), rel_path))
+      mapper = mapper or RelativeToMapper(os.path.join(get_buildroot(), real_rel_path))
 
-    return BundleProps(self._rel_path, mapper, fileset)
+    return BundleProps(real_rel_path, mapper, fileset)
 
 
 class BundleField(tuple, PayloadField):
@@ -193,6 +205,7 @@ class JvmApp(Target):
       raise TargetDefinitionException(self, 'basename must not equal name.')
 
   def globs_relative_to_buildroot(self):
+    buildroot = get_buildroot()
     globs = []
     for bundle in self.bundles:
       fileset = bundle.fileset
@@ -201,7 +214,7 @@ class JvmApp(Target):
       elif hasattr(fileset, 'filespec'):
         globs += bundle.fileset.filespec['globs']
       else:
-        globs += bundle.fileset
+        globs += [fast_relpath(f, buildroot) for f in bundle.filemap.keys()]
     super_globs = super(JvmApp, self).globs_relative_to_buildroot()
     if super_globs:
       globs += super_globs['globs']
