@@ -131,7 +131,8 @@ class Bundle(object):
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
 
     if rel_path and isinstance(fileset, FilesetWithSpec):
-      raise ValueError("Must not use a glob for 'fileset' with 'rel_path'.")
+      raise ValueError("Must not use a glob for 'fileset' with 'rel_path'."
+                       " Globs are eagerly evaluated and ignore 'rel_path'.")
 
     # A fileset is either a string, a glob or a list of strings.
     if isinstance(fileset, six.string_types) or isinstance(fileset, FilesetWithSpec):
