@@ -133,7 +133,7 @@ def register_goals():
   task(name='zinc', action=ZincCompile).install('compile')
 
   # Dependency resolution.
-  task(name='ivy', action=IvyResolve).install('resolve')
+  task(name='ivy', action=IvyResolve).install('resolve', first=True)
   task(name='ivy-imports', action=IvyImports).install('imports')
   task(name='unpack-jars', action=UnpackJars).install()
 
