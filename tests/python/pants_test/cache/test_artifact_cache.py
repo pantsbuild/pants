@@ -149,7 +149,7 @@ class TestArtifactCache(unittest.TestCase):
                                               local)
         with self.assertRaises(NonfatalArtifactCacheError) as ex:
           self.do_test_artifact_cache(artifact_cache)
-        self.assertTrue('Connection aborted' in str(ex.exception))
+        self.assertIn('Connection aborted', str(ex.exception))
 
         self.do_test_artifact_cache(artifact_cache)
 
