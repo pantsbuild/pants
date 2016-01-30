@@ -748,7 +748,8 @@ class JarPublish(ScmPublishMixin, JarTask):
               # tests), in which case we want to force encoding with a unicode-supporting codec.
               encoding = sys.stdout.encoding or 'utf-8'
               sys.stdout.write(message.encode(encoding))
-          if not self.confirm_push(coordinate(jar.org, jar.name), newentry.version()):
+          if self.get_options().prompt and not self.confirm_push(coordinate(jar.org, jar.name),
+                                                                 newentry.version()):
             raise TaskError('User aborted push')
 
         pushdb.set_entry(target, newentry)
