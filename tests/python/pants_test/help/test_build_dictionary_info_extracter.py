@@ -53,12 +53,16 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
 
       :param a: Parameter a.
       :param  str  b: Parameter b.
-      :type c:  Parameter c.
+      :type c:  Type c.
+      Second line for Type c. 
       :param d:  Parameter d
       Second line Parameter d.
+      :param e:
+      Parameter e.
+      :returns: Return info.
       """
 
-    self.assertEqual({'a': 'Parameter a.', 'b': 'Parameter b.', 'd': 'Parameter d Second line Parameter d.'},
+    self.assertEqual({'a': 'Parameter a.', 'b': 'Parameter b.', 'd': 'Parameter d Second line Parameter d.', 'e': 'Parameter e.'},
                      BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func))
 
   def test_get_function_args(self):
