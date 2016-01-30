@@ -216,7 +216,15 @@ class LazyResolvingGraphTest(GraphTestBase):
     resolved_java1 = self.resolve(scheduler, java1_address)
 
     nonstrict_address = address('nonstrict')
+    expected_nonstrict = ApacheThriftConfiguration(address=nonstrict_address,
+                                                   version='0.9.2',
+                                                   strict=False,
+                                                   lang='java')
+
     public_address = address('public')
+    expected_public = Struct(address=public_address,
+                                    url='https://oss.sonatype.org/#stagingRepositories')
+
     thrift2_address = address('thrift2')
     expected_java1 = Target(address=java1_address,
                             sources={},
@@ -225,32 +233,26 @@ class LazyResolvingGraphTest(GraphTestBase):
                                 version='0.9.2',
                                 strict=True,
                                 lang='java',
-                                dependencies=[resolver(thrift2_address)]
+                                dependencies=[address(thrift2_address)]
                               ),
-                              resolver(nonstrict_address),
+                              expected_nonstrict,
                               PublishConfiguration(
-                                default_repo=resolver(public_address),
+                                default_repo=expected_public,
                                 repos={
                                   'jake':
                                     Struct(url='https://dl.bintray.com/pantsbuild/maven'),
-                                  'jane': resolver(public_address)
+                                  'jane': expected_public
                                 }
                               )
                             ])
 
     self.assertEqual(expected_java1, resolved_java1)
 
-    expected_nonstrict = ApacheThriftConfiguration(address=nonstrict_address,
-                                                   version='0.9.2',
-                                                   strict=False,
-                                                   lang='java')
     resolved_nonstrict = self.resolve(scheduler, nonstrict_address)
     self.assertEqual(expected_nonstrict, resolved_nonstrict)
     self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
     self.assertIs(expected_java1.configurations[1], resolved_nonstrict)
 
-    expected_public = Struct(address=public_address,
-                                    url='https://oss.sonatype.org/#stagingRepositories')
     resolved_public = self.resolve(scheduler, public_address)
     self.assertEqual(expected_public, resolved_public)
     self.assertEqual(expected_public, expected_java1.configurations[2].default_repo)
