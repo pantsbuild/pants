@@ -9,6 +9,7 @@ import os
 
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
@@ -51,10 +52,10 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
     # This is so that payload fingerprint can be computed.
     safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
+    self.java_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
     self.binary_target = self.make_target(spec='//foo:foo-binary',
                                           target_type=JvmBinary,
-                                          source='Foo.java',
-                                          dependencies=[self.jar_lib])
+                                          dependencies=[self.java_target, self.jar_lib])
     self.app_target = self.make_target(spec='//foo:foo-app',
                                         target_type=JvmApp,
                                         basename='FooApp',
@@ -62,6 +63,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
     self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
+    self.dist_root = os.path.join(self.build_root, 'dist')
 
   def _setup_classpath(self, task_context):
     """As a separate prep step because to test different option settings, this needs to rerun
@@ -88,10 +90,18 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     """Test override default setting outputs bundle products using basename."""
 
     self.set_options(use_basename_prefix=True)
-    self.task_context = self.context(target_roots=[self.app_target])
+    self.task_context = self.context(target_roots=[self.app_target, self.jar_lib])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
     self._check_bundle_products('FooApp')
+
+  def test_bundle_non_app_target(self):
+    """Test bundle does not apply to a non jvm_app/jvm_binary target."""
+    self.task_context = self.context(target_roots=[self.java_target])
+    self._setup_classpath(self.task_context)
+    self.execute(self.task_context)
+
+    self.assertFalse(os.path.exists(self.dist_root))
 
   def test_jvm_bundle_missing_product(self):
     """Test exception is thrown in case of a missing jar."""
@@ -123,11 +133,12 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     products = self.task_context.products.get('jvm_bundles')
     self.assertIsNotNone(products)
     product_data = products.get(self.app_target)
-    dist_root = os.path.join(self.build_root, 'dist')
-    self.assertEquals({dist_root: ['{basename}-bundle'.format(basename=bundle_basename)]},
+    self.assertEquals({self.dist_root: ['{basename}-bundle'.format(basename=bundle_basename)]},
                       product_data)
 
-    bundle_root = os.path.join(dist_root, '{basename}-bundle'.format(basename=bundle_basename))
+    self.assertTrue(os.path.exists(self.dist_root))
+    bundle_root = os.path.join(self.dist_root,
+                               '{basename}-bundle'.format(basename=bundle_basename))
     self.assertEqual(sorted(['foo-binary.jar',
                              'libs/foo.foo-binary-0.jar',
                              'libs/3rdparty.jvm.org.example.foo-0.jar',
