@@ -49,7 +49,7 @@ class BuildDictionaryInfoExtracter(object):
   @classmethod
   @memoized_method
   def _get_param_re(cls):
-    return re.compile(':param\s+(\w+\s+)?(\w+):\s+(.*)')
+    return re.compile(':(param|type)\s+(\w+\s+)?(\w+):\s+(.*)')
 
   @classmethod
   @memoized_method
@@ -58,21 +58,26 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def get_arg_descriptions_from_docstring(cls, obj):
-    """Returns an ordered map of arg name -> arg description found in :param: stanzas.
+    """Returns an ordered map of arg name -> arg description found in :param: stanzas."""
 
-    Note that this does not handle multiline descriptions.  Descriptions of target params
-    should be a single sentence on the first line, followed by more text, if any, on
-    subsequent lines.
-    """
     ret = OrderedDict()
+    name = ''
     doc = obj.__doc__ or ''
     lines = [s.strip() for s in doc.split('\n')]
     param_re = cls._get_param_re()
     for line in lines:
       m = param_re.match(line)
-      if m:
-        name, description = m.group(2, 3)
+      if m and m.group(1) == 'param':
+        # If first line of a parameter description, set name and description.
+        name, description = m.group(3, 4)
         ret[name] = description
+      elif m and m.group(1) != 'param':
+        # If first line of a description of something other than a parameter, clear name.   
+        name = ''
+      elif name and line:
+        # If subseqent line of parameter description, add to existing description for that parameter.
+        ret[name] += (' ' + line)
+      # Ignore subsquent lines of descriptions of items other than parameters.
     return ret
 
   @classmethod
