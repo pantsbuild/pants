@@ -263,6 +263,7 @@ class ClasspathUtil(object):
     canonical_classpath = []
     target_to_classpath = cls.classpath_by_targets(targets, classpath_products)
 
+    processed_entries = set()
     for target, classpath_entries_for_target in target_to_classpath.items():
       if internal_classpath_only:
         classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
@@ -278,6 +279,9 @@ class ClasspathUtil(object):
           if entry.is_excluded_by(excludes):
             continue
 
+          if entry in processed_entries:
+            continue
+
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
           _, ext = os.path.splitext(entry.path)
@@ -290,6 +294,8 @@ class ClasspathUtil(object):
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
           classpath.append(entry.path)
+
+          processed_entries.add(entry)
 
         if save_classpath_file:
           with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
