@@ -672,6 +672,10 @@ class LocalScheduler(object):
     # Roots are products that might be possible to produce for these subjects.
     return [SelectNode(s, p, v, None) for s, v in root_subjects for p in root_products]
 
+  @property
+  def product_graph(self):
+    return self._product_graph
+
   def walk_product_graph(self, predicate=None):
     """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
 

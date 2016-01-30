@@ -11,15 +11,11 @@ import six
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, TypeConstraintError, strip_variants
-from pants.engine.exp.mapper import AddressFamily, AddressMapper, MappingError
+from pants.engine.exp.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.exp.objects import (Resolvable, Serializable, SerializableFactory, Validatable,
                                       datatype)
 from pants.engine.exp.scheduler import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.exp.struct import Struct
-
-
-class ResolveError(Exception):
-  """Indicates an error resolving an address to an object."""
 
 
 class ResolvedTypeMismatchError(ResolveError):

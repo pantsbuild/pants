@@ -10,11 +10,12 @@ import unittest
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
-from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
-                                    Resolver)
-from pants.engine.exp.mapper import AddressMapper
+from pants.engine.exp.engine import LocalSerialEngine
+from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
+from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Return, SelectNode
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
@@ -71,26 +72,40 @@ class TestTable(SymbolTable):
 
 
 class GraphTestBase(unittest.TestCase):
-  def create_graph(self, build_pattern=None, parser_cls=None, inline=False):
+  _goal = 'parse'
+  _product = Struct
+
+  def _select(self, address):
+    return SelectNode(address, self._product, None, None)
+
+  def create(self, build_pattern=None, parser_cls=None, inline=False):
     mapper = AddressMapper(build_root=os.path.dirname(__file__),
                            symbol_table_cls=TestTable,
                            build_pattern=build_pattern,
                            parser_cls=parser_cls)
-    return Graph(mapper, inline=inline)
+    return LocalScheduler({self._goal: [self._product]}, create_graph_tasks(mapper))
 
-  def create_json_graph(self):
-    return self.create_graph(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
+  def create_json(self):
+    return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
+
+  def resolve(self, scheduler, address):
+    """Make a BuildRequest to parse the given Address into a Struct."""
+    request = BuildRequest(goals=[self._goal], addressable_roots=[address])
+    LocalSerialEngine(scheduler).reduce(request)
+    state = scheduler.product_graph.state(self._select(address))
+    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
+    return state.value
 
 
 class InlinedGraphTest(GraphTestBase):
-  def create_graph(self, build_pattern=None, parser_cls=None, inline=True):
-    return super(InlinedGraphTest, self).create_graph(build_pattern, parser_cls, inline=inline)
+  def create(self, build_pattern=None, parser_cls=None, inline=True):
+    return super(InlinedGraphTest, self).create(build_pattern, parser_cls, inline=inline)
 
-  def do_test_codegen_simple(self, graph):
+  def do_test_codegen_simple(self, scheduler):
     def address(name):
       return Address(spec_path='examples/graph_test', target_name=name)
 
-    resolved_java1 = graph.resolve(address('java1'))
+    resolved_java1 = self.resolve(scheduler, address('java1'))
 
     nonstrict = ApacheThriftConfiguration(address=address('nonstrict'),
                                           version='0.9.2',
@@ -118,57 +133,57 @@ class InlinedGraphTest(GraphTestBase):
     self.assertEqual(expected_java1, resolved_java1)
 
   def test_json(self):
-    graph = self.create_json_graph()
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create_json()
+    self.do_test_codegen_simple(scheduler)
 
   def test_python(self):
-    graph = self.create_graph(build_pattern=r'.+\.BUILD.python$',
-                              parser_cls=PythonAssignmentsParser)
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create(build_pattern=r'.+\.BUILD.python$',
+                            parser_cls=PythonAssignmentsParser)
+    self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
-    graph = self.create_graph(build_pattern=r'.+\.BUILD$',
-                              parser_cls=PythonCallbacksParser)
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create(build_pattern=r'.+\.BUILD$',
+                            parser_cls=PythonCallbacksParser)
+    self.do_test_codegen_simple(scheduler)
 
   def test_resolve_cache(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
 
     nonstrict_address = Address.parse('examples/graph_test:nonstrict')
-    nonstrict = graph.resolve(nonstrict_address)
-    self.assertIs(nonstrict, graph.resolve(nonstrict_address))
+    nonstrict = self.resolve(scheduler, nonstrict_address)
+    self.assertIs(nonstrict, self.resolve(scheduler, nonstrict_address))
 
     # The already resolved `nonstrict` interior node should be re-used by `java1`.
     java1_address = Address.parse('examples/graph_test:java1')
-    java1 = graph.resolve(java1_address)
+    java1 = self.resolve(scheduler, java1_address)
     self.assertIs(nonstrict, java1.configurations[1])
 
-    self.assertIs(java1, graph.resolve(java1_address))
+    self.assertIs(java1, self.resolve(scheduler, java1_address))
 
   def extract_path_tail(self, cycle_exception, line_count):
     return [l.lstrip() for l in str(cycle_exception).splitlines()[-line_count:]]
 
   def test_cycle_self(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(CycleError) as exc:
-      graph.resolve(Address.parse('examples/graph_test:self_cycle'))
+      self.resolve(scheduler, Address.parse('examples/graph_test:self_cycle'))
     self.assertEqual(['* examples/graph_test:self_cycle',
                       '* examples/graph_test:self_cycle'],
                      self.extract_path_tail(exc.exception, 2))
 
   def test_cycle_direct(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(CycleError) as exc:
-      graph.resolve(Address.parse('examples/graph_test:direct_cycle'))
+      self.resolve(scheduler, Address.parse('examples/graph_test:direct_cycle'))
     self.assertEqual(['* examples/graph_test:direct_cycle',
                       'examples/graph_test:direct_cycle_dep',
                       '* examples/graph_test:direct_cycle'],
                      self.extract_path_tail(exc.exception, 3))
 
   def test_cycle_indirect(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(CycleError) as exc:
-      graph.resolve(Address.parse('examples/graph_test:indirect_cycle'))
+      self.resolve(scheduler, Address.parse('examples/graph_test:indirect_cycle'))
     self.assertEqual(['examples/graph_test:indirect_cycle',
                       '* examples/graph_test:one',
                       'examples/graph_test:two',
@@ -177,31 +192,28 @@ class InlinedGraphTest(GraphTestBase):
                      self.extract_path_tail(exc.exception, 5))
 
   def test_type_mismatch_error(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(ResolvedTypeMismatchError):
-      graph.resolve(Address.parse('examples/graph_test:type_mismatch'))
+      self.resolve(scheduler, Address.parse('examples/graph_test:type_mismatch'))
 
   def test_not_found_but_family_exists(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(ResolveError):
-      graph.resolve(Address.parse('examples/graph_test:this_addressable_does_not_exist'))
+      self.resolve(scheduler, Address.parse('examples/graph_test:this_addressable_does_not_exist'))
 
   def test_not_found_and_family_does_not_exist(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(ResolveError):
-      graph.resolve(Address.parse('this/dir/does/not/exist'))
+      self.resolve(scheduler, Address.parse('this/dir/does/not/exist'))
 
 
 class LazyResolvingGraphTest(GraphTestBase):
-  def do_test_codegen_simple(self, graph):
+  def do_test_codegen_simple(self, scheduler):
     def address(name):
       return Address(spec_path='examples/graph_test', target_name=name)
 
-    def resolver(addr):
-      return Resolver(graph, addr)
-
     java1_address = address('java1')
-    resolved_java1 = graph.resolve(java1_address)
+    resolved_java1 = self.resolve(scheduler, java1_address)
 
     nonstrict_address = address('nonstrict')
     public_address = address('public')
@@ -232,14 +244,14 @@ class LazyResolvingGraphTest(GraphTestBase):
                                                    version='0.9.2',
                                                    strict=False,
                                                    lang='java')
-    resolved_nonstrict = graph.resolve(nonstrict_address)
+    resolved_nonstrict = self.resolve(scheduler, nonstrict_address)
     self.assertEqual(expected_nonstrict, resolved_nonstrict)
     self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
     self.assertIs(expected_java1.configurations[1], resolved_nonstrict)
 
     expected_public = Struct(address=public_address,
                                     url='https://oss.sonatype.org/#stagingRepositories')
-    resolved_public = graph.resolve(public_address)
+    resolved_public = self.resolve(scheduler, public_address)
     self.assertEqual(expected_public, resolved_public)
     self.assertEqual(expected_public, expected_java1.configurations[2].default_repo)
     self.assertEqual(expected_public, expected_java1.configurations[2].repos['jane'])
@@ -248,7 +260,7 @@ class LazyResolvingGraphTest(GraphTestBase):
 
     thrift1_address = address('thrift1')
     expected_thrift2 = Target(address=thrift2_address, dependencies=[resolver(thrift1_address)])
-    resolved_thrift2 = graph.resolve(thrift2_address)
+    resolved_thrift2 = self.resolve(scheduler, thrift2_address)
     self.assertEqual(expected_thrift2, resolved_thrift2)
     resolved_thrift_config = [config for config in resolved_java1.configurations
                               if isinstance(config, ApacheThriftConfiguration)]
@@ -256,21 +268,21 @@ class LazyResolvingGraphTest(GraphTestBase):
     self.assertIs(resolved_thrift_config[0].dependencies[0], resolved_thrift2)
 
     expected_thrift1 = Target(address=thrift1_address)
-    resolved_thrift1 = graph.resolve(thrift1_address)
+    resolved_thrift1 = self.resolve(scheduler, thrift1_address)
     self.assertEqual(expected_thrift1, resolved_thrift1)
     self.assertEqual(expected_thrift1, resolved_thrift2.dependencies[0])
     self.assertIs(resolved_thrift2.dependencies[0], resolved_thrift1)
 
   def test_json(self):
-    graph = self.create_json_graph()
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create_json()
+    self.do_test_codegen_simple(scheduler)
 
   def test_python(self):
-    graph = self.create_graph(build_pattern=r'.+\.BUILD.python$',
-                              parser_cls=PythonAssignmentsParser)
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create(build_pattern=r'.+\.BUILD.python$',
+                            parser_cls=PythonAssignmentsParser)
+    self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
-    graph = self.create_graph(build_pattern=r'.+\.BUILD$',
-                              parser_cls=PythonCallbacksParser)
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create(build_pattern=r'.+\.BUILD$',
+                            parser_cls=PythonCallbacksParser)
+    self.do_test_codegen_simple(scheduler)
