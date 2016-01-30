@@ -52,10 +52,10 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
     # This is so that payload fingerprint can be computed.
     safe_file_dump(os.path.join(self.build_root, 'foo/Foo.java'), '// dummy content')
-    self.java_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
+    self.java_lib_target = self.make_target('//foo:foo-library', JavaLibrary, sources=['Foo.java'])
     self.binary_target = self.make_target(spec='//foo:foo-binary',
                                           target_type=JvmBinary,
-                                          dependencies=[self.java_target, self.jar_lib])
+                                          dependencies=[self.java_lib_target, self.jar_lib])
     self.app_target = self.make_target(spec='//foo:foo-app',
                                         target_type=JvmApp,
                                         basename='FooApp',
@@ -90,17 +90,18 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
     """Test override default setting outputs bundle products using basename."""
 
     self.set_options(use_basename_prefix=True)
-    self.task_context = self.context(target_roots=[self.app_target, self.jar_lib])
+    self.task_context = self.context(target_roots=[self.app_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
     self._check_bundle_products('FooApp')
 
   def test_bundle_non_app_target(self):
     """Test bundle does not apply to a non jvm_app/jvm_binary target."""
-    self.task_context = self.context(target_roots=[self.java_target])
+    self.task_context = self.context(target_roots=[self.java_lib_target])
     self._setup_classpath(self.task_context)
     self.execute(self.task_context)
 
+    self.assertIsNone(self.task_context.products.get('jvm_bundles').get(self.java_lib_target))
     self.assertFalse(os.path.exists(self.dist_root))
 
   def test_jvm_bundle_missing_product(self):
