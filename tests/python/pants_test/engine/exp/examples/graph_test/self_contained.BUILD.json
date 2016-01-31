@@ -80,9 +80,9 @@
 
 # A single-hop direct cycle - though through different types of dependency edges.
 {
-  "type_alias": "StructWithDeps",
+  "type_alias": "Target",
   "name": "direct_cycle",
-  "dependencies": [
+  "configurations": [
     ":direct_cycle_dep"
   ]
 }
@@ -103,9 +103,9 @@
 }
 
 {
-  "type_alias": "StructWithDeps",
+  "type_alias": "Target",
   "name": "one",
-  "dependencies": [
+  "configurations": [
     ":two"
   ]
 }

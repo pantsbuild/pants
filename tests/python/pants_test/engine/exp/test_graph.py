@@ -15,7 +15,7 @@ from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Return, SelectNode
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Return, SelectNode, Throw
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
@@ -88,11 +88,20 @@ class GraphTestBase(unittest.TestCase):
   def create_json(self):
     return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
 
-  def resolve(self, scheduler, address):
+  def _populate(self, scheduler, address):
     """Make a BuildRequest to parse the given Address into a Struct."""
     request = BuildRequest(goals=[self._goal], addressable_roots=[address])
     LocalSerialEngine(scheduler).reduce(request)
-    state = scheduler.product_graph.state(self._select(address))
+    return self._select(address)
+
+  def walk(self, scheduler, address):
+    """Return a list of all (Node, State) tuples reachable from the given Address."""
+    root = self._populate(scheduler, address)
+    return list(e for e, _ in scheduler.product_graph.walk([root], predicate=lambda _: True))
+
+  def resolve(self, scheduler, address):
+    root = self._populate(scheduler, address)
+    state = scheduler.product_graph.state(root)
     self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
     return state.value
 
@@ -163,33 +172,22 @@ class InlinedGraphTest(GraphTestBase):
   def extract_path_tail(self, cycle_exception, line_count):
     return [l.lstrip() for l in str(cycle_exception).splitlines()[-line_count:]]
 
+  def do_test_cycle(self, scheduler, address_str):
+    walk = self.walk(scheduler, Address.parse(address_str))
+    # Confirm that the root failed, and that a cycle occurred deeper in the graph.
+    # TODO: in the case of a BUILD file cycle, it would be nice to fail synchronously, but
+    # tasks can cycle in normal cases currently (scrooge attempting to compile itself, etc).
+    self.assertEqual(type(walk[0][1]), Throw)
+    self.assertTrue(any('Cycle' in state.msg for _, state in walk if type(state) is Throw))
+
   def test_cycle_self(self):
-    scheduler = self.create_json()
-    with self.assertRaises(CycleError) as exc:
-      self.resolve(scheduler, Address.parse('examples/graph_test:self_cycle'))
-    self.assertEqual(['* examples/graph_test:self_cycle',
-                      '* examples/graph_test:self_cycle'],
-                     self.extract_path_tail(exc.exception, 2))
+    self.do_test_cycle(self.create_json(), 'examples/graph_test:self_cycle')
 
   def test_cycle_direct(self):
-    scheduler = self.create_json()
-    with self.assertRaises(CycleError) as exc:
-      self.resolve(scheduler, Address.parse('examples/graph_test:direct_cycle'))
-    self.assertEqual(['* examples/graph_test:direct_cycle',
-                      'examples/graph_test:direct_cycle_dep',
-                      '* examples/graph_test:direct_cycle'],
-                     self.extract_path_tail(exc.exception, 3))
+    self.do_test_cycle(self.create_json(), 'examples/graph_test:direct_cycle')
 
   def test_cycle_indirect(self):
-    scheduler = self.create_json()
-    with self.assertRaises(CycleError) as exc:
-      self.resolve(scheduler, Address.parse('examples/graph_test:indirect_cycle'))
-    self.assertEqual(['examples/graph_test:indirect_cycle',
-                      '* examples/graph_test:one',
-                      'examples/graph_test:two',
-                      'examples/graph_test:three',
-                      '* examples/graph_test:one'],
-                     self.extract_path_tail(exc.exception, 5))
+    self.do_test_cycle(self.create_json(), 'examples/graph_test:indirect_cycle')
 
   def test_type_mismatch_error(self):
     scheduler = self.create_json()
