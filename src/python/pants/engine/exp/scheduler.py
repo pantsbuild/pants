@@ -618,20 +618,6 @@ class LocalScheduler(object):
 
   # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
   # ng-killall, and buildgen.go.
-  #
-  # 1. If not subjects check for a special Planner subtype with a special subject-less
-  #    promise method.
-  # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
-  #    looks for Target or Jar or ... will naturally just skip it and no-op.
-  #
-  # Option 1 allows for failing the build if no such subtypes are amongst the goals;
-  # ie: `./pants compile` would fail since there are no inputs and all compile registered
-  # planners require subjects (don't implement the subtype).
-  # Seems promising - but what about mixed goals and no subjects?
-  #
-  # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
-  # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
-  # a TaskPlanner baseclass.
   """
 
   def __init__(self, products_by_goal, tasks):
