@@ -31,16 +31,6 @@ jvm_binary(
   dependencies=[
     ':junit',
   ],
-deploy_jar_rules = jar_rules(rules=[
-      Skip(r'^LICENSE$'),
-      Skip(r'^license'),
-      Skip(r'^META-INF/[^/]+\.SF$'),
-      Skip(r'^META-INF/[^/]+\.DSA$'),
-      Skip(r'^META-INF/[^/]+\.RSA$'),
-      Skip(r'^META-INF/INDEX.LIST$'),
-      Skip(r'^META-INF/LICENSE$'),
-      Duplicate(apply_pattern=r'^META-INF/services/', action= Duplicate.CONCAT_TEXT)
-  ]),
   description="""
 A replacement for org.junit.runner.JUnitCore.main that adds:
   + support for running individual test methods using [classname]#[methodname]

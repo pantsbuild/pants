@@ -88,3 +88,8 @@ class JaxbGen(SimpleCodegenTask, NailgunTask):
     if re.search(r'\.{2,}', package) is not None:
       raise ValueError('Package name cannot have consecutive periods! ({})'.format(package))
     return package
+
+  @property
+  def _copy_target_attributes(self):
+    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
+    return ['provides']
