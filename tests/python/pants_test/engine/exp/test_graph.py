@@ -229,13 +229,6 @@ class LazyResolvingGraphTest(GraphTestBase):
     expected_java1 = Target(address=java1_address,
                             sources={},
                             configurations=[
-                              ApacheThriftConfiguration(
-                                version='0.9.2',
-                                strict=True,
-                                lang='java',
-                                dependencies=[address(thrift2_address)]
-                              ),
-                              expected_nonstrict,
                               PublishConfiguration(
                                 default_repo=expected_public,
                                 repos={
@@ -243,7 +236,14 @@ class LazyResolvingGraphTest(GraphTestBase):
                                     Struct(url='https://dl.bintray.com/pantsbuild/maven'),
                                   'jane': expected_public
                                 }
-                              )
+                              ),
+                              expected_nonstrict,
+                              ApacheThriftConfiguration(
+                                version='0.9.2',
+                                strict=True,
+                                lang='java',
+                                dependencies=[address(thrift2_address)]
+                              ),
                             ])
 
     self.assertEqual(expected_java1, resolved_java1)
@@ -251,29 +251,24 @@ class LazyResolvingGraphTest(GraphTestBase):
     resolved_nonstrict = self.resolve(scheduler, nonstrict_address)
     self.assertEqual(expected_nonstrict, resolved_nonstrict)
     self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
-    self.assertIs(expected_java1.configurations[1], resolved_nonstrict)
+    self.assertIs(resolved_java1.configurations[1], resolved_nonstrict)
 
     resolved_public = self.resolve(scheduler, public_address)
     self.assertEqual(expected_public, resolved_public)
-    self.assertEqual(expected_public, expected_java1.configurations[2].default_repo)
-    self.assertEqual(expected_public, expected_java1.configurations[2].repos['jane'])
-    self.assertIs(expected_java1.configurations[2].default_repo, resolved_public)
-    self.assertIs(expected_java1.configurations[2].repos['jane'], resolved_public)
+    self.assertEqual(expected_public, expected_java1.configurations[0].default_repo)
+    self.assertEqual(expected_public, expected_java1.configurations[0].repos['jane'])
+    self.assertIs(resolved_java1.configurations[0].default_repo, resolved_public)
+    self.assertIs(resolved_java1.configurations[0].repos['jane'], resolved_public)
 
+    # NB: `dependencies` lists must be explicitly requested by tasks, so we expect an Address.
     thrift1_address = address('thrift1')
-    expected_thrift2 = Target(address=thrift2_address, dependencies=[resolver(thrift1_address)])
+    expected_thrift2 = Target(address=thrift2_address, dependencies=[thrift1_address])
     resolved_thrift2 = self.resolve(scheduler, thrift2_address)
     self.assertEqual(expected_thrift2, resolved_thrift2)
-    resolved_thrift_config = [config for config in resolved_java1.configurations
-                              if isinstance(config, ApacheThriftConfiguration)]
-    self.assertEqual(expected_thrift2, resolved_thrift_config[0].dependencies[0])
-    self.assertIs(resolved_thrift_config[0].dependencies[0], resolved_thrift2)
 
     expected_thrift1 = Target(address=thrift1_address)
     resolved_thrift1 = self.resolve(scheduler, thrift1_address)
     self.assertEqual(expected_thrift1, resolved_thrift1)
-    self.assertEqual(expected_thrift1, resolved_thrift2.dependencies[0])
-    self.assertIs(resolved_thrift2.dependencies[0], resolved_thrift1)
 
   def test_json(self):
     scheduler = self.create_json()

@@ -20,18 +20,6 @@
   "name": "java1",
   "sources": {},
   "configurations": [
-    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
-    # off / prove the capabilities of the new BUILD graph parser.
-    {
-      "type_alias": "ApacheThriftConfig",
-      "version": "0.9.2",
-      "strict": true,
-      "lang": "java",
-      "dependencies": [
-        ":thrift2"
-      ]
-    },
-    ":nonstrict",
     {
       "type_alias": "PublishConfig",
       "default_repo": ":public",
@@ -42,6 +30,18 @@
         },
         "jane": ":public"
       }
+    },
+    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
+    # off / prove the capabilities of the new BUILD graph parser.
+    ":nonstrict",
+    {
+      "type_alias": "ApacheThriftConfig",
+      "version": "0.9.2",
+      "strict": true,
+      "lang": "java",
+      "dependencies": [
+        ":thrift2"
+      ]
     }
   ]
 }
