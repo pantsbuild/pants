@@ -48,7 +48,7 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   @memoized_method
-  def _get_param_type_re(cls):
+  def _get_section_re(cls):
     return re.compile(':(\w+)\s*(\w+\s+)?(\w+):\s*(.*)')
 
   @classmethod
@@ -64,17 +64,18 @@ class BuildDictionaryInfoExtracter(object):
     name = ''
     doc = obj.__doc__ or ''
     lines = [s.strip() for s in doc.split('\n')]
-    param_type_re = cls._get_param_type_re()
+    section_re = cls._get_section_re()
     for line in lines:
-      m = param_type_re.match(line)
+      m = section_re.match(line)
       if m and m.group(1) == 'param':
         # If first line of a parameter description, set name and description.
         name, description = m.group(3, 4)
         ret[name] = description
       elif (m and m.group(1) != 'param'):
+        # If first line of a description of an item other than a parameter, clear name. 
         name = ''
       elif name and line:
-        # If subsequent line of parameter description, add to existing description (if any) for that parameter.
+        # If subsequent line of a parameter description, add to existing description (if any) for that parameter.
         ret[name] += (' ' + line) if ret[name] else line
       # Ignore subsequent lines of descriptions of items other than parameters.
     return ret
