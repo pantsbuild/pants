@@ -271,7 +271,6 @@ class ClasspathUtil(object):
       if len(classpath_entries_for_target) > 0:
         classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
-        classpath = []
         # Note: for internal targets pants has only one classpath entry, but user plugins
         # might generate additional entries, for example, build.properties for the target.
         # Also it's common to have multiple classpath entries associated with 3rdparty targets.
@@ -279,6 +278,7 @@ class ClasspathUtil(object):
           if entry.is_excluded_by(excludes):
             continue
 
+          # Avoid creating symlink on the same entry twice
           if entry in processed_entries:
             continue
 
@@ -293,11 +293,10 @@ class ClasspathUtil(object):
 
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
-          classpath.append(entry.path)
-
           processed_entries.add(entry)
 
         if save_classpath_file:
+          classpath = [entry.path for entry in classpath_entries_for_target]
           with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
             classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
             classpath_file.write('\n')
