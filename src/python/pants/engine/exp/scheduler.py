@@ -614,7 +614,7 @@ class Step(object):
 
 
 class LocalScheduler(object):
-  """A scheduler that expands a ProductGraph locally.
+  """A scheduler that expands a ProductGraph by executing user defined tasks.
 
   # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
   # ng-killall, and buildgen.go.
@@ -623,7 +623,8 @@ class LocalScheduler(object):
   def __init__(self, products_by_goal, tasks):
     """
     :param products_by_goal: The products that are required for each goal name.
-    :param tasks: 
+    :param tasks: A set of (output, input selection clause, task function) triples which
+           is used to compute values in the product graph.
     """
     self._products_by_goal = products_by_goal
     self._node_builder = NodeBuilder.create(tasks)
