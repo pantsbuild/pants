@@ -72,7 +72,7 @@ class BuildDictionaryInfoExtracter(object):
         name, description = m.group(3, 4)
         ret[name] = description
       elif (m and m.group(1) != 'param'):
-        # If first line of a description of an item other than a parameter, clear name. 
+        # If first line of a description of an item other than a parameter, clear name.
         name = ''
       elif name and line:
         # If subsequent line of a parameter description, add to existing description (if any) for that parameter.
