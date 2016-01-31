@@ -48,21 +48,39 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
                      BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func))
 
   def test_get_multiline_arg_descriptions_from_docstring(self):
-    def func(a, b, c, d):
+    # Test multiline parameter descriptions, including where all help is on subsequent line.
+    def func(a, b, c, d, e):
       """Foo function.
 
       :param a: Parameter a.
       :param  str  b: Parameter b.
-      :type c:  Type c.
-      Second line for Type c. 
-      :param d:  Parameter d
-      Second line Parameter d.
-      :param e:
-      Parameter e.
-      :returns: Return info.
+      :param c:  Parameter c
+      Second line Parameter c.
+      :param d:
+      Parameter d.
+      :param e:  Parameter e.
       """
 
-    self.assertEqual({'a': 'Parameter a.', 'b': 'Parameter b.', 'd': 'Parameter d Second line Parameter d.', 'e': 'Parameter e.'},
+    self.assertEqual({'a': 'Parameter a.', 'b': 'Parameter b.',
+                      'c': 'Parameter c Second line Parameter c.',
+                      'd': 'Parameter d.', 'e': 'Parameter e.'},
+                     BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func))
+
+  def test_get_arg_descriptions_with_nonparams_from_docstring(self):
+    # Test parameter help where other stanzas are present.
+    def func(a, b, c):
+      """Foo function.
+
+      :param a: Parameter a.
+      :type j:  Type j.
+      :type k:  Type k.
+      Second line Type k.
+      :param  str  b: Parameter b.
+      :param c:  Parameter c.
+      :returns:  Return.
+      """
+
+    self.assertEqual({'a': 'Parameter a.', 'b': 'Parameter b.', 'c': 'Parameter c.'},
                      BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func))
 
   def test_get_function_args(self):

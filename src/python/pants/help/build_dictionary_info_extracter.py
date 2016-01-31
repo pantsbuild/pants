@@ -49,12 +49,7 @@ class BuildDictionaryInfoExtracter(object):
   @classmethod
   @memoized_method
   def _get_param_type_re(cls):
-    return re.compile(':(param|type)\s+(\w+\s+)?(\w+):\s*(.*)')
-
-  @classmethod
-  @memoized_method
-  def _get_return_re(cls):
-    return re.compile(':r[\w]+:\s+(.*)')
+    return re.compile(':(\w+)\s*(\w+\s+)?(\w+):\s*(.*)')
 
   @classmethod
   @memoized_method
@@ -70,20 +65,18 @@ class BuildDictionaryInfoExtracter(object):
     doc = obj.__doc__ or ''
     lines = [s.strip() for s in doc.split('\n')]
     param_type_re = cls._get_param_type_re()
-    return_re = cls._get_return_re()
     for line in lines:
       m = param_type_re.match(line)
       if m and m.group(1) == 'param':
         # If first line of a parameter description, set name and description.
         name, description = m.group(3, 4)
         ret[name] = description
-      elif (m and m.group(1) != 'param') or return_re.match(line):
-        # If first line of a description of type, return value, or return type, clear name.   
+      elif (m and m.group(1) != 'param'):
         name = ''
       elif name and line:
-        # If subseqent line of parameter description, add to existing description (if any) for that parameter.
+        # If subsequent line of parameter description, add to existing description (if any) for that parameter.
         ret[name] += (' ' + line) if ret[name] else line
-      # Ignore subsquent lines of descriptions of items other than parameters.
+      # Ignore subsequent lines of descriptions of items other than parameters.
     return ret
 
   @classmethod
