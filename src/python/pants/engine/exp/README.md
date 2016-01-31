@@ -79,7 +79,7 @@ The core of the object model are
 objects.  These namedtuple-like objects that are amenable to serialization, including to and from
 json and via pickling.  This is a key requirement for both eventual RPC distribution of execution
 data as well as supporting a target graph daemon with out-of-process clients.  The engine experiment
-uses 
+uses
 [`Struct`](https://github.com/pantsbuild/pants/blob/0f8eb2c1a965dd55893a6220ca137a7d79cf50aa/src/python/pants/engine/exp/struct.py)
 as a convenient baseclass for most of its `Serializable` objects.
 
