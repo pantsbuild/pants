@@ -53,6 +53,8 @@ python_library(
     'src/python/pants/base:generator',
     'src/python/pants/base:revision',
     'src/python/pants/build_graph',
+    'src/python/pants/ivy',
+    'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
   ],
 )
