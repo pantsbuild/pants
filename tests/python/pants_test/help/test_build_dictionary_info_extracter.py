@@ -67,7 +67,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
                      BuildDictionaryInfoExtracter.get_arg_descriptions_from_docstring(func))
 
   def test_get_arg_descriptions_with_nonparams_from_docstring(self):
-    # Test parameter help where other stanzas are present.
+    # Test parameter help where help for items other than parameters present.
     def func(a, b, c):
       """Foo function.
 

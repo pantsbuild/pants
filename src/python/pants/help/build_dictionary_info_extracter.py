@@ -48,8 +48,15 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   @memoized_method
-  def _get_section_re(cls):
-    return re.compile(':(\w+)\s*(\w+\s+)?(\w+):\s*(.*)')
+  def _get_stanza_first_line_re(cls):
+    """Returns a regex that can be used to find the first line of a stanza in a docstring.
+
+    The returned regex can be used to find the first line where there is a not a data type
+    in the arg name (e.g., :param a:), where there is data type in the arg name
+    (e.g., :param str a:), where there is a single word between the colons (e.g., :returns:),
+    and where a newline immediately follows the second colon in the stanza.
+    """
+    return re.compile(':(\w+)\s*(\w+\s+)?(\w*):\s*(.*)')
 
   @classmethod
   @memoized_method
@@ -64,9 +71,9 @@ class BuildDictionaryInfoExtracter(object):
     name = ''
     doc = obj.__doc__ or ''
     lines = [s.strip() for s in doc.split('\n')]
-    section_re = cls._get_section_re()
+    stanza_first_line_re = cls._get_stanza_first_line_re()
     for line in lines:
-      m = section_re.match(line)
+      m = stanza_first_line_re.match(line)
       if m and m.group(1) == 'param':
         # If first line of a parameter description, set name and description.
         name, description = m.group(3, 4)
@@ -75,7 +82,8 @@ class BuildDictionaryInfoExtracter(object):
         # If first line of a description of an item other than a parameter, clear name.
         name = ''
       elif name and line:
-        # If subsequent line of a parameter description, add to existing description (if any) for that parameter.
+        # If subsequent line of a parameter description, add to existing description (if any) for
+        # that parameter.
         ret[name] += (' ' + line) if ret[name] else line
       # Ignore subsequent lines of descriptions of items other than parameters.
     return ret
