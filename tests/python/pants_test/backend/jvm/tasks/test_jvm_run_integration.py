@@ -38,7 +38,7 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
       expected = 'Hello world!: resource from example {name}\n'.format(name=name)
       self.assertIn(expected, stdout)
 
-  def test_run_cwd(self):
+  def test_no_run_cwd(self):
     """Tests the --cwd option that allows the working directory to change when running."""
 
     # Make sure the test fails if you don't specify a directory
@@ -47,13 +47,15 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
                                 '--interpreter=CPython>=2.6,<3',
                                 '--interpreter=CPython>=3.3'])
     self.assert_failure(pants_run)
-    self.assertIn('Neither ExampleCwd.java nor readme.txt found.', pants_run.stdout_data)
+    self.assertIn('Neither ExampleCwd.java nor readme.txt found.', pants_run.stderr_data)
 
+  def test_empty_run_cwd(self):
     # Implicit cwd based on target
     stdout_data = self._exec_run('testprojects/src/java/org/pantsbuild/testproject/cwdexample',
                                  '--run-jvm-cwd')
     self.assertIn('Found ExampleCwd.java', stdout_data)
 
+  def test_explicit_run_cwd(self):
     # Explicit cwd specified
     stdout_data = self._exec_run('testprojects/src/java/org/pantsbuild/testproject/cwdexample',
                                  '--run-jvm-cwd='

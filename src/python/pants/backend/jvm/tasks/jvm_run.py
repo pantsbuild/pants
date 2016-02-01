@@ -88,18 +88,16 @@ class JvmRun(JvmTask):
       jvm = DistributionLocator.cached()
       executor = CommandLineGrabber(jvm) if self.only_write_cmd_line else None
       self.context.release_lock()
-      result = jvm.execute_java(
-        classpath=self.classpath([target]),
-        main=self.get_options().main or binary.main,
-        executor=executor,
-        jvm_options=self.jvm_options,
-        args=self.args,
-        workunit_factory=self.context.new_workunit,
-        workunit_name='run',
-        workunit_labels=[WorkUnitLabel.RUN],
-        cwd=working_dir,
-        synthetic_jar_dir=self.workdir,
-      )
+      with self.context.new_workunit(name='run', labels=[WorkUnitLabel.RUN]):
+        result = jvm.execute_java(
+          classpath=self.classpath([target]),
+          main=self.get_options().main or binary.main,
+          executor=executor,
+          jvm_options=self.jvm_options,
+          args=self.args,
+          cwd=working_dir,
+          synthetic_jar_dir=self.workdir,
+        )
 
       if self.only_write_cmd_line:
         with safe_open(expand_path(self.only_write_cmd_line), 'w') as outfile:
