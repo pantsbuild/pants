@@ -476,12 +476,12 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
   # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
 
-  # 'E' is here as well to catch test errors, not just test failures.
-  RESULTLOG_FAILED_PATTERN = re.compile(r'^[EF] +(.+?)::(.+)$')
 
   # If a failure happens outside a function, then the resultlog will have a pattern like this:
   # F testprojects/tests/python/pants/constants_only/test_fail.py
-  RESULTLOG_FAILED_PATTERN_NO_DOUBLE_COLONS = re.compile(r'^[EF] +(.+)$')
+
+  # 'E' is here as well to catch test errors, not just test failures.
+  RESULTLOG_FAILED_PATTERN = re.compile(r'^[EF] +(?P<file>.+?)(::.+)?$')
 
   @classmethod
   def _get_failed_targets_from_resultlogs(cls, filename, targets):
@@ -489,9 +489,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       lines = fp.readlines()
 
     failed_files = {
-      m.groups()[0] for m in map(cls.RESULTLOG_FAILED_PATTERN.match, lines) if m and m.groups()
-    } | {
-       m.groups()[0] for m in map(cls.RESULTLOG_FAILED_PATTERN_NO_DOUBLE_COLONS.match, lines) if m and m.groups()
+      m.group('file') for m in map(cls.RESULTLOG_FAILED_PATTERN.match, lines) if m and m.groups()
     }
 
     failed_targets = set()
