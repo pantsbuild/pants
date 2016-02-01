@@ -440,13 +440,13 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_resultlog_regex(self):
     regex = PytestRun.RESULTLOG_FAILED_PATTERN
     for error_failure in ['E', 'F']:
-      self.assertEqual(regex.match("%s filename::class::method" % error_failure).group('file'), "filename")
-      self.assertEqual(regex.match("%s filename::method" % error_failure).group('file'), "filename")
-      self.assertEqual(regex.match("%s filename" % error_failure).group('file'), "filename")
-      self.assertIsNone(regex.match(" %s filename"))
-      self.assertIsNone(regex.match(" filename"))
-      self.assertIsNone(regex.match("filename"))
-      self.assertIsNone(regex.match("%sfilename"))
-      self.assertEqual(regex.match("%s   filename::class:method" % error_failure).group('file'), "filename")
-      self.assertEqual(regex.match("%s file/name.py::class:method" % error_failure).group('file'), "file/name.py")
-      self.assertEqual(regex.match("%s file:colons::class::method" % error_failure).group('file'), "file:colons")
+      self.assertEqual(regex.match('%s filename::class::method' % error_failure).group('file'), 'filename')
+      self.assertEqual(regex.match('%s filename::method' % error_failure).group('file'), 'filename')
+      self.assertEqual(regex.match('%s filename' % error_failure).group('file'), 'filename')
+      self.assertIsNone(regex.match(' %s filename'))
+      self.assertIsNone(regex.match(' filename'))
+      self.assertIsNone(regex.match('filename'))
+      self.assertIsNone(regex.match('%sfilename'))
+      self.assertEqual(regex.match('%s   filename::class:method' % error_failure).group('file'), 'filename')
+      self.assertEqual(regex.match('%s file/name.py::class:method' % error_failure).group('file'), 'file/name.py')
+      self.assertEqual(regex.match('%s file:colons::class::method' % error_failure).group('file'), 'file:colons')
