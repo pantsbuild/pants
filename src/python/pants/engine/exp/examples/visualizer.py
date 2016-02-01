@@ -34,8 +34,8 @@ def format_subject(node):
 
 
 def format_product(node):
-  if type(node) == SelectNode and node.variant:
-    return '{}@{}'.format(node.product.__name__, node.variant)
+  if type(node) == SelectNode and node.variant_key:
+    return '{}@{}'.format(node.product.__name__, node.variant_key)
   return node.product.__name__
 
 
@@ -61,7 +61,7 @@ def create_digraph(scheduler):
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state), dependency_entries) in scheduler.walk_product_graph():
+  for ((node, node_state), dependency_entries) in scheduler.walk_product_graph(predicate=lambda _: True):
     node_str = format_node(node, node_state)
 
     yield ('  node [style=filled, fillcolor={color}] "{node}";'
