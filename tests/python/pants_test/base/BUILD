@@ -158,8 +158,17 @@ python_tests(
 )
 
 python_tests(
-  name = 'test_spec_exclude_integration',
-  sources = [ 'test_spec_exclude_integration.py' ],
+  name = 'bundle_integration',
+  sources = [ 'test_bundle_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'pants_build_ignore_pants_ini_integration',
+  sources = [ 'test_pants_build_ignore_pants_ini_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
