@@ -51,12 +51,11 @@ class BuildFileAddressMapperTest(BaseTest):
                        BuildFileAddress(subdir_suffix_build_file, 'baz')},
                       self.address_mapper.scan_addresses())
 
-  def test_scan_addresses_with_excludes(self):
+  def test_scan_addresses_with_pants_build_ignore(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
     self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    spec_excludes = [os.path.join(self.build_root, 'subdir')]
-    self.assertEquals({BuildFileAddress(root_build_file, 'foo')},
-                      self.address_mapper.scan_addresses(spec_excludes=spec_excludes))
+    address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree, ['subdir'])
+    self.assertEquals({BuildFileAddress(root_build_file, 'foo')}, address_mapper_with_ignore.scan_addresses())
 
   def test_scan_addresses_with_root(self):
     self.add_to_build_file('BUILD', 'target(name="foo")')
