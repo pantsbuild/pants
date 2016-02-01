@@ -10,6 +10,7 @@ import re
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
+from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
@@ -129,7 +130,7 @@ class CmdLineSpecParserTest(BaseTest):
     self.assertEqual(sort(Address.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
 
-  def test_spec_excludes(self):
+  def test_pants_build_ignore(self):
     expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
 
     # This bogus BUILD file gets in the way of parsing.
@@ -137,15 +138,19 @@ class CmdLineSpecParserTest(BaseTest):
     with self.assertRaises(CmdLineSpecParser.BadSpecError):
       self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
-    # Test absolute path in spec_excludes.
-    self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper,
-                                         spec_excludes=[os.path.join(self.build_root, 'some')])
+    # Test relative path in pants_build_ignore.
+    address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
+                                                        pants_build_ignore=['some'])
+    self.spec_parser = CmdLineSpecParser(self.build_root, address_mapper_with_ignore)
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
-    # Test relative path in spec_excludes.
-    self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper,
-                                         spec_excludes=['some'])
-    self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
+    # Test absolute path in pants_build_ignore.
+    address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
+                                                        pants_build_ignore=[os.path.join(self.build_root, 'some')])
+    self.spec_parser = CmdLineSpecParser(self.build_root, address_mapper_with_ignore)
+    with self.assertRaisesRegexp(Exception, 'All pants_build_ignore paths passed to scan_build_files '
+                                            'should be relative.'):
+      self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
   def test_exclude_target_regexps(self):
     expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
