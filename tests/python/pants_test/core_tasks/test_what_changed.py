@@ -57,7 +57,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
     return WhatChanged
 
   def assert_console_output(self, *output, **kwargs):
-    options = {'spec_excludes': [], 'exclude_target_regexp': []}
+    options = {'pants_build_ignore': [], 'exclude_target_regexp': []}
     if 'options' in kwargs:
       options.update(kwargs['options'])
     kwargs['options'] = options
@@ -205,10 +205,10 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     """))
 
-  def test_spec_excludes(self):
+  def test_pants_build_ignore(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
-      options={'spec_excludes': 'root/src/py/1'},
+      options={'pants_build_ignore': 'root/src/py/1'},
       workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
     )
 
