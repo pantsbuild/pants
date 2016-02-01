@@ -73,7 +73,6 @@ Target(
   configurations=[
     # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
     # off / prove the capabilities of the new BUILD graph parser.
-    ':nonstrict',
     ApacheThriftConfig(
       version='0.9.2',
       strict=True,
@@ -82,5 +81,6 @@ Target(
         ':thrift2',
       ]
     ),
+    ':nonstrict'
   ]
 )

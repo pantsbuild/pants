@@ -14,47 +14,26 @@ from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, SelectNode, TaskNode, Throw
+from pants.engine.exp.scheduler import BuildRequest, TaskNode, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
-def format_type(node):
-  if type(node) == TaskNode:
-    return node.func.__name__
-  return type(node).__name__
-
-
-def format_subject(node):
-  subject = node.subject
-  if type(node.subject) == Address:
-    subject = 'Address({})'.format(node.subject)
-  if node.variants:
-    subject = '{}@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
-  return subject
-
-
-def format_product(node):
-  if type(node) == SelectNode and node.variant:
-    return '{}@{}'.format(node.product.__name__, node.variant)
-  return node.product.__name__
-
-
 def format_node(node, state):
-  return '{}:{}:{} == {}'.format(format_product(node),
-                                 format_subject(node),
-                                 format_type(node),
-                                 str(state).replace('"', '\\"'))
+  if type(node) == TaskNode:
+    name = node.func.__name__
+  else:
+    name = type(node).__name__
+  result = str(state).replace('"', '\\"')
+  return '{}:{}:{} == {}'.format(node.product.__name__, node.subject, name, result)
 
 
 def create_digraph(scheduler):
 
-  # NB: there are only 12 colors in `set312`.
   colorscheme = 'set312'
-  max_colors = 12
   colors = {}
 
   def color_index(key):
-    return colors.setdefault(key, (len(colors) % max_colors) + 1)
+    return colors.setdefault(key, len(colors) + 1)
 
   yield 'digraph plans {'
   yield '  node[colorscheme={}];'.format(colorscheme)
@@ -86,7 +65,7 @@ def visualize_execution_graph(scheduler):
 
 
 def visualize_build_request(build_root, build_request):
-  scheduler = setup_json_scheduler(build_root)
+  _, scheduler = setup_json_scheduler(build_root)
   LocalSerialEngine(scheduler).reduce(build_request)
   visualize_execution_graph(scheduler)
 

@@ -20,14 +20,17 @@ from pants.engine.exp.scheduler import BuildRequest, Return, SelectNode
 class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
-    self.scheduler = setup_json_scheduler(build_root)
+    self.graph, self.scheduler = setup_json_scheduler(build_root)
 
-    self.java = Address.parse('src/java/codegen/simple')
+    def resolve(spec):
+      return self.graph.resolve(Address.parse(spec))
+
+    self.java = resolve('src/java/codegen/simple')
 
   def assert_engine(self, engine):
-    build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java])
+    build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java.address])
     result = engine.execute(build_request)
-    self.assertEqual({SelectNode(self.java, Classpath, None, None): Return(Classpath(creator='javac'))},
+    self.assertEqual({SelectNode(self.java, Classpath, None): Return(Classpath(creator='javac'))},
                      result.root_products)
     self.assertIsNone(result.error)
 
@@ -50,7 +53,7 @@ class EngineTest(unittest.TestCase):
 
   def test_multiprocess_unpickleable(self):
     build_request = BuildRequest(goals=['unpickleable'],
-                                 addressable_roots=[self.java])
+                                 addressable_roots=[self.java.address])
 
     with self.multiprocessing_engine() as engine:
       with self.assertRaises(SerializationError):

@@ -14,12 +14,8 @@ from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 
 
-class Sources(Struct):
-  """Represents a collection of source files.
-
-  Note that because this does not extend `StructWithDeps`, subclasses that would like to have
-  dependencies should mix-in StructWithDeps.
-  """
+class Sources(StructWithDeps):
+  """Represents a collection of source files with the dependencies needed to build them."""
 
   def __init__(self,
                name=None,
@@ -45,16 +41,15 @@ class Sources(Struct):
                                   **kwargs)
     if files and self.extensions:
       for f in files:
-        if not self._accept_file(f):
+        accepted = False
+        for extension in self.extensions:
+          if f.endswith(extension):
+            accepted = True
+            break
+        if not accepted:
           # TODO: TargetDefinitionError or similar
-          raise ValueError('Path `{}` selected by {} is not a {} file.'.format(
-            f, self, self.extensions))
+          raise ValueError('Path `{}` selected by {} is not a {} file.'.format(f, self, self.extensions))
     self.excludes = excludes
-
-  def _accept_file(self, f):
-    """Returns true if the given file's extension matches this Sources type."""
-    _, ext = os.path.splitext(f)
-    return ext in self.extensions
 
   @abstractproperty
   def extensions(self):
@@ -70,7 +65,7 @@ class Sources(Struct):
     :rtype: :class:`Sources`
     """
 
-  def iter_paths(self, base_path=None):
+  def iter_paths(self, base_path=None, ext=None):
     """Return an iterator over this collection of sources file paths.
 
     If these sources are addressable, the paths returned will have a base path of the address
@@ -78,7 +73,8 @@ class Sources(Struct):
 
     :param string base_path: If this collection of sources is not addressed, the base path in the
                              repo the sources are relative to.
-    :returns: An iterator over the source paths that match the file extension and are
+    :param string ext: An optional file extension filter to restrict returned file paths with.
+    :returns: An iterator over the source paths that match the given file extension (if any) and are
               not excluded by `excludes`.  Paths are of the form
               `os.path.join(base_path, rel_path)`.
     :rtype: :class:`collections.Iterator` of string
@@ -86,6 +82,9 @@ class Sources(Struct):
     base_path = self.address.spec_path if self.address else base_path
     if not base_path:
       raise ValueError('A `base_path` must be supplied to iterate paths for {!r}'.format(self))
+
+    def select(file_name):
+      return file_name.endswith(ext) if ext else True
 
     excluded_files = frozenset(self.excludes.iter_paths(base_path)) if self.excludes else ()
 
@@ -100,7 +99,7 @@ class Sources(Struct):
           yield fileset
 
     for rel_path in itertools.chain.from_iterable(file_sources()):
-      if self._accept_file(rel_path):
+      if select(rel_path):
         file_path = os.path.join(base_path, rel_path)
         if file_path not in excluded_files:
           yield file_path
@@ -116,12 +115,14 @@ class Target(Struct):
   class ConfigurationNotFound(Exception):
     """Indicates a requested configuration of a target could not be found."""
 
-  def __init__(self, name=None, configurations=None, **kwargs):
+  def __init__(self, name=None, variants=None, configurations=None, **kwargs):
     """
     :param string name: The name of this target which forms its address in its namespace.
+    :param dict variants: A dict of the default variant values for this target.
     :param list configurations: The configurations that apply to this target in various contexts.
     """
-    super(Target, self).__init__(name=name, **kwargs)
+    # TODO: enforce the type of variants using the Addressable framework.
+    super(Target, self).__init__(name=name, variants=variants, **kwargs)
 
     self.configurations = configurations
 

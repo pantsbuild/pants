@@ -30,39 +30,20 @@ class Bob(object):
     return isinstance(other, Bob) and self._key() == other._key()
 
 
-class EmptyTable(parsers.SymbolTable):
-  @classmethod
-  def table(cls):
-    return {}
-
-
-class TestTable(parsers.SymbolTable):
-  @classmethod
-  def table(cls):
-    return {'bob': Bob}
-
-
-class TestTable2(parsers.SymbolTable):
-  @classmethod
-  def table(cls):
-    return {'nancy': Bob}
-
-
-def parse(parser, document, symbol_table_cls, **args):
+def parse(parser, document, **args):
   with temporary_file() as fp:
     fp.write(document)
     fp.close()
-    return parser.parse(fp.name, symbol_table_cls, **args)
+    return parser(fp.name, **args)
 
 
 class JsonParserTest(unittest.TestCase):
-  def parse(self, document, symbol_table_cls=None, **kwargs):
-    symbol_table_cls = symbol_table_cls or EmptyTable
-    return parse(parsers.JsonParser, document, symbol_table_cls, **kwargs)
+  def parse(self, document, **kwargs):
+    return parse(parsers.parse_json, document, **kwargs)
 
-  def round_trip(self, obj, symbol_table_cls=None):
+  def round_trip(self, obj, symbol_table=None):
     document = parsers.encode_json(obj, inline=True)
-    return self.parse(document, symbol_table_cls=symbol_table_cls)
+    return self.parse(document, symbol_table=symbol_table)
 
   def test_comments(self):
     document = dedent("""
@@ -90,6 +71,7 @@ class JsonParserTest(unittest.TestCase):
     self.assertEqual('pants_test.engine.exp.test_parsers.Bob', results[0]._asdict()['type_alias'])
 
   def test_symbol_table(self):
+    symbol_table = {'bob': Bob}
     document = dedent("""
     # An simple example with a single Bob.
     {
@@ -97,10 +79,10 @@ class JsonParserTest(unittest.TestCase):
       "hobbies": [1, 2, 3]
     }
     """)
-    results = self.parse(document, symbol_table_cls=TestTable)
+    results = self.parse(document, symbol_table=symbol_table)
     self.assertEqual(1, len(results))
     self.assertEqual([Bob(hobbies=[1, 2, 3])],
-                     self.round_trip(results[0], symbol_table_cls=TestTable))
+                     self.round_trip(results[0], symbol_table=symbol_table))
     self.assertEqual('bob', results[0]._asdict()['type_alias'])
 
   def test_nested_single(self):
@@ -235,7 +217,7 @@ class JsonParserTest(unittest.TestCase):
       fp.write(document)
       fp.close()
       with self.assertRaises(ParseError) as exc:
-        parsers.JsonParser.parse(path=fp.name, symbol_table_cls=EmptyTable)
+        parsers.parse_json(path=fp.name)
 
       # Strip trailing whitespace from the message since our expected literal below will have
       # trailing ws stripped via editors and code reviews calling for it.
@@ -333,31 +315,33 @@ class PythonAssignmentsParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser, document, symbol_table_cls=EmptyTable)
+    results = parse(parsers.python_assignments_parser(), document)
     self.assertEqual([Bob(name='nancy', hobbies=[1, 2, 3])], results)
 
     # No symbol table was used so no `type_alias` plumbing can be expected.
     self.assertNotIn('type_alias', results[0]._asdict())
 
   def test_symbol_table(self):
+    symbol_table = {'nancy': Bob}
     document = dedent("""
     bill = nancy(
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser, document, symbol_table_cls=TestTable2)
+    results = parse(parsers.python_assignments_parser(symbol_table), document)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
     self.assertEqual('nancy', results[0]._asdict()['type_alias'])
 
 
 class PythonCallbacksParserTest(unittest.TestCase):
   def test(self):
+    symbol_table = {'nancy': Bob}
     document = dedent("""
     nancy(
       name='bill',
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonCallbacksParser, document, symbol_table_cls=TestTable2)
+    results = parse(parsers.python_callbacks_parser(symbol_table), document)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
     self.assertEqual('nancy', results[0]._asdict()['type_alias'])

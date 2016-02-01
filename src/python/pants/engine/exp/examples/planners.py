@@ -5,22 +5,22 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
 import functools
-import os
-import re
 from abc import abstractmethod, abstractproperty
+
+from twitter.common.collections import OrderedSet
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
-from pants.engine.exp.graph import Directory, create_graph_tasks
-from pants.engine.exp.mapper import AddressFamily, AddressMapper
-from pants.engine.exp.objects import datatype
-from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
+from pants.engine.exp.addressable import SubclassesOf, addressable_list
+from pants.engine.exp.graph import Graph
+from pants.engine.exp.mapper import AddressMapper
+from pants.engine.exp.parsers import parse_json
+from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectAddress, SelectDependencies,
                                         SelectVariant)
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Sources, Target
+from pants.util.memo import memoized, memoized_property
 
 
 def printing_func(func):
@@ -33,92 +33,24 @@ def printing_func(func):
   return wrapper
 
 
-class JavaSources(Sources, StructWithDeps):
+class JavaSources(Sources):
   extensions = ('.java',)
 
 
-class ScalaSources(Sources, StructWithDeps):
+class ScalaSources(Sources):
   extensions = ('.scala',)
 
 
-class PythonSources(Sources, StructWithDeps):
+class PythonSources(Sources):
   extensions = ('.py',)
 
 
-class ThriftSources(Sources, StructWithDeps):
+class ThriftSources(Sources):
   extensions = ('.thrift',)
 
 
 class ResourceSources(Sources):
   extensions = tuple()
-
-
-class ScalaInferredDepsSources(Sources):
-  """A Sources subclass which can be converted to ScalaSources via dep inference."""
-  extensions = ('.scala',)
-
-
-class ImportedJVMPackages(datatype('ImportedJVMPackages', ['dependencies'])):
-  """Holds a list of 'JVMPackageName' dependencies."""
-  pass
-
-
-class JVMPackageName(datatype('JVMPackageName', ['name'])):
-  """A typedef to represent a fully qualified JVM package name."""
-  pass
-
-
-class SourceRoots(datatype('SourceRoots', ['buildroot', 'srcroots'])):
-  """Placeholder for the SourceRoot subsystem."""
-  pass
-
-
-class SearchPath(datatype('SearchPath', ['dependencies'])):
-  """A set of Directories to search."""
-  pass
-
-
-@printing_func
-def select_package_address(jvm_package_name, address_families):
-  """Return the Address from the given AddressFamilies which provides the given package."""
-  addresses = [address for address_family in address_families
-                       for address in address_family.addressables.keys()]
-  if len(addresses) == 0:
-    raise ValueError('No targets existed in {} to provide {}'.format(
-      address_families, jvm_package_name))
-  elif len(addresses) > 1:
-    raise ValueError('Multiple targets might be able to provide {}:\n  {}'.format(
-      jvm_package_name, '\n  '.join(str(a) for a in addresses)))
-  return addresses[0]
-
-
-@printing_func
-def calculate_package_search_path(jvm_package_name, source_roots):
-  """Return a SearchPath for all directories where the given JVMPackageName might exist."""
-  rel_package_dir = jvm_package_name.name.replace('.', os.sep)
-  return SearchPath([Directory(os.path.join(srcroot, rel_package_dir))
-                     for srcroot in source_roots.srcroots])
-
-
-@printing_func
-def extract_scala_imports(address, sources, source_roots):
-  """A toy example of dependency inference. Would usually be a compiler plugin."""
-  abs_base_path = os.path.join(source_roots.buildroot, address.spec_path)
-  packages = set()
-  import_re = re.compile(r'^import ([^;]*);?$')
-  for f in sources.iter_paths(base_path=abs_base_path):
-    with open(f) as source_file:
-      for line in source_file:
-        match = import_re.search(line)
-        if match:
-          packages.add(match.group(1).rsplit('.', 1)[0])
-  return ImportedJVMPackages([JVMPackageName(p) for p in packages])
-
-
-@printing_func
-def reify_scala_sources(address, sources, dependency_addresses):
-  return ScalaSources(files=list(sources.iter_paths(base_path=address.spec_path)),
-                      dependencies=list(set(dependency_addresses)))
 
 
 class Requirement(Struct):
@@ -147,9 +79,6 @@ class ManagedResolve(Struct):
     :param dict revs: A dict of artifact org#name to version.
     """
     super(ManagedResolve, self).__init__(revs=revs, **kwargs)
-
-  def __repr__(self):
-    return "ManagedResolve({})".format(self.revs)
 
 
 class Jar(Struct):
@@ -299,43 +228,35 @@ def unpickleable_input(unpickleable):
   raise Exception('This function should never run, because its selected input is unpickleable.')
 
 
-class ExampleTable(SymbolTable):
-  @classmethod
-  def table(cls):
-    return {'apache_thrift_java_configuration': ApacheThriftJavaConfiguration,
-            'apache_thrift_python_configuration': ApacheThriftPythonConfiguration,
-            'jar': Jar,
-            'managed_jar': ManagedJar,
-            'managed_resolve': ManagedResolve,
-            'requirement': Requirement,
-            'scrooge_java_configuration': ScroogeJavaConfiguration,
-            'scrooge_scala_configuration': ScroogeScalaConfiguration,
-            'java': JavaSources,
-            'python': PythonSources,
-            'resources': ResourceSources,
-            'scala': ScalaSources,
-            'thrift': ThriftSources,
-            'target': Target,
-            'build_properties': BuildPropertiesConfiguration,
-            'inferred_scala': ScalaInferredDepsSources}
-
-
 def setup_json_scheduler(build_root):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
-  :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
+  :rtype tuple of (:class:`pants.engine.exp.graph.Graph`,
+                   :class:`pants.engine.exp.scheduler.LocalScheduler`)
   """
-  address_mapper = AddressMapper(build_root=build_root,
-                                 symbol_table_cls=ExampleTable,
-                                 build_pattern=r'^BLD.json$',
-                                 parser_cls=JsonParser)
+  symbol_table = {'apache_thrift_java_configuration': ApacheThriftJavaConfiguration,
+                  'apache_thrift_python_configuration': ApacheThriftPythonConfiguration,
+                  'jar': Jar,
+                  'managed_jar': ManagedJar,
+                  'managed_resolve': ManagedResolve,
+                  'requirement': Requirement,
+                  'scrooge_java_configuration': ScroogeJavaConfiguration,
+                  'scrooge_scala_configuration': ScroogeScalaConfiguration,
+                  'java': JavaSources,
+                  'python': PythonSources,
+                  'resources': ResourceSources,
+                  'scala': ScalaSources,
+                  'thrift': ThriftSources,
+                  'target': Target,
+                  'build_properties': BuildPropertiesConfiguration}
+  json_parser = functools.partial(parse_json, symbol_table=symbol_table)
+  graph = Graph(AddressMapper(build_root=build_root,
+                              build_pattern=r'^BLD.json$',
+                              parser=json_parser))
 
   # TODO(John Sirois): once the options system is plumbed, make the tool spec configurable.
   # It could also just be pointed at the scrooge jar at that point.
   scrooge_tool_address = Address.parse('src/scala/scrooge')
-
-  # TODO: Placeholder for the SourceRoot subsystem.
-  source_roots = SourceRoots(build_root, ('src/java',))
 
   products_by_goal = {
       'compile': [Classpath],
@@ -345,59 +266,31 @@ def setup_json_scheduler(build_root):
       'unpickleable': [UnpickleableResult],
     }
   tasks = [
-      # Codegen
       (JavaSources,
        [Select(ThriftSources),
-        SelectVariant(ApacheThriftJavaConfiguration, 'thrift')],
+        SelectVariant('thrift', ApacheThriftJavaConfiguration)],
        gen_apache_thrift),
       (PythonSources,
        [Select(ThriftSources),
-        SelectVariant(ApacheThriftPythonConfiguration, 'thrift')],
+        SelectVariant('thrift', ApacheThriftPythonConfiguration)],
        gen_apache_thrift),
       (ScalaSources,
        [Select(ThriftSources),
-        SelectVariant(ScroogeScalaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address, Classpath)],
+        SelectVariant('thrift', ScroogeScalaConfiguration),
+        SelectAddress(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
       (JavaSources,
        [Select(ThriftSources),
-        SelectVariant(ScroogeJavaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address, Classpath)],
+        SelectVariant('thrift', ScroogeJavaConfiguration),
+        SelectAddress(scrooge_tool_address, Classpath)],
        gen_scrooge_thrift),
-    ] + [
-      # scala dependency inference
-      (ScalaSources,
-       [Select(Address),
-        Select(ScalaInferredDepsSources),
-        SelectDependencies(Address, ImportedJVMPackages)],
-       reify_scala_sources),
-      (ImportedJVMPackages,
-       [Select(Address),
-        Select(ScalaInferredDepsSources),
-        SelectLiteral(source_roots, SourceRoots)],
-       extract_scala_imports),
-      # TODO: The request for an AddressFamily for each member of a SearchPath will fail whenever
-      # a member of the path doesn't exist. Need to allow for optional products and to then
-      # request the AddressFamilies optionally here.
-      (Address,
-       [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, SearchPath)],
-       select_package_address),
-      (SearchPath,
-       [Select(JVMPackageName),
-        SelectLiteral(source_roots, SourceRoots)],
-       calculate_package_search_path),
-    ] + [
-      # Remote dependency resolution
       (Classpath,
        [Select(Jar)],
        ivy_resolve),
       (Jar,
        [Select(ManagedJar),
-        SelectVariant(ManagedResolve, 'resolve')],
+        SelectVariant('resolve', ManagedResolve)],
        select_rev),
-    ] + [
-      # Compilers
       (Classpath,
        [Select(ResourceSources)],
        isolate_resources),
@@ -412,17 +305,12 @@ def setup_json_scheduler(build_root):
        [Select(ScalaSources),
         SelectDependencies(Classpath, ScalaSources)],
        scalac),
-    ] + [
-      # TODO
       (UnpickleableOutput,
         [],
         unpickleable_output),
       (UnpickleableResult,
        [Select(UnpickleableOutput)],
        unpickleable_input),
-    ] + (
-      create_graph_tasks(address_mapper)
-    )
-
-  scheduler = LocalScheduler(products_by_goal, tasks)
-  return scheduler
+    ]
+  scheduler = LocalScheduler(graph, products_by_goal, tasks)
+  return graph, scheduler
