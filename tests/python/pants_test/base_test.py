@@ -143,6 +143,10 @@ class BaseTest(unittest.TestCase):
   def alias_groups(self):
     return BuildFileAliases(targets={'target': Target})
 
+  @property
+  def pants_build_ignore(self):
+    return None
+
   def setUp(self):
     super(BaseTest, self).setUp()
     Goal.clear()
@@ -178,7 +182,8 @@ class BaseTest(unittest.TestCase):
     self._build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
     self.project_tree = FileSystemProjectTree(self.build_root)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.project_tree)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
+                                                 pants_build_ignore=self.pants_build_ignore)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def buildroot_files(self, relpath=None):

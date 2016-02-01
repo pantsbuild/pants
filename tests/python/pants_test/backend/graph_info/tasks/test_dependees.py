@@ -21,28 +21,19 @@ from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
-class BaseReverseDepmapTest(ConsoleTaskTestBase):
-
+class ReverseDepmapEmptyTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
     return ReverseDepmap
-
-  def assert_console_output(self, *args, **kwargs):
-    # Ensure that the globally-registered spec_excludes option is set, as Dependees consults it.
-    options = {'spec_excludes': []}
-    if 'options' in kwargs:
-      options.update(kwargs['options'])
-    kwargs['options'] = options
-    return super(BaseReverseDepmapTest, self).assert_console_output(*args, **kwargs)
-
-
-class ReverseDepmapEmptyTest(BaseReverseDepmapTest):
 
   def test(self):
     self.assert_console_output(targets=[])
 
 
-class ReverseDepmapTest(BaseReverseDepmapTest):
+class BaseReverseDepmapTest(ConsoleTaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return ReverseDepmap
 
   @property
   def alias_groups(self):
@@ -63,7 +54,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
     )
 
   def setUp(self):
-    super(ReverseDepmapTest, self).setUp()
+    super(ConsoleTaskTestBase, self).setUp()
 
     def add_to_build_file(path, name, alias=False, deps=()):
       self.add_to_build_file(path, dedent("""
@@ -160,6 +151,8 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       )
       """))
 
+
+class ReverseDepmapTest(BaseReverseDepmapTest):
   def test_roots(self):
     self.assert_console_output(
       'overlaps:two',
@@ -238,7 +231,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
        targets=[self.target('resources/a:a_resources')]
     )
 
-  def test_with_spec_excludes(self):
+  def test_overlaps_without_pants_build_ignore(self):
     self.assert_console_output(
       'overlaps:one',
       'overlaps:two',
@@ -246,7 +239,14 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       targets=[self.target('common/a')]
     )
 
+
+class ReverseDepmapTestWithPantsBuildIgnore(BaseReverseDepmapTest):
+  @property
+  def pants_build_ignore(self):
+    return ['overlaps']
+
+  def test_overlaps_with_pants_build_ignore(self):
     self.assert_console_output(
       targets=[self.target('common/a')],
-      options={'spec_excludes': ['overlaps']}
+      options={'pants_build_ignore': ['overlaps']}
     )
