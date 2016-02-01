@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import namedtuple
+from collections import OrderedDict, namedtuple
 from hashlib import sha1
 
 import six
@@ -69,7 +69,7 @@ class DirectoryReMapper(object):
 class BundleProps(namedtuple('_BundleProps', ['rel_path', 'mapper', 'fileset'])):
   @memoized_property
   def filemap(self):
-    filemap = {}
+    filemap = OrderedDict()
     if self.fileset is not None:
       paths = self.fileset() if isinstance(self.fileset, Fileset) \
           else self.fileset if hasattr(self.fileset, '__iter__') \
@@ -134,9 +134,11 @@ class Bundle(object):
       raise ValueError("Must not use a glob for 'fileset' with 'rel_path'."
                        " Globs are eagerly evaluated and ignore 'rel_path'.")
 
-    # A fileset is either a string, a glob or a list of strings.
-    if isinstance(fileset, six.string_types) or isinstance(fileset, FilesetWithSpec):
+    # A fileset is either a glob, a string or a list of strings.
+    if isinstance(fileset, FilesetWithSpec):
       pass
+    elif isinstance(fileset, six.string_types):
+      fileset = [fileset]
     else:
       fileset = assert_list(fileset, key_arg='fileset')
 
@@ -215,6 +217,7 @@ class JvmApp(Target):
       elif hasattr(fileset, 'filespec'):
         globs += bundle.fileset.filespec['globs']
       else:
+        # NB(nh): filemap is an OrderedDict, so this ordering is stable.
         globs += [fast_relpath(f, buildroot) for f in bundle.filemap.keys()]
     super_globs = super(JvmApp, self).globs_relative_to_buildroot()
     if super_globs:
