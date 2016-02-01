@@ -74,7 +74,6 @@ class BundleCreate(JvmBinaryTask):
     archiver_type = self.get_options().archive
     archiver = archive.archiver(archiver_type) if archiver_type else None
 
-    targets_to_bundle = self.context.targets()
     if self.get_options().use_basename_prefix:
       # NB(peiyu) This special casing is confusing especially given we already fail
       # when duplicate basenames are detected. It's added because of the existing
@@ -84,6 +83,8 @@ class BundleCreate(JvmBinaryTask):
       # see their bundle command fail due to basename conflicts. We should eventually
       # get rid of this special case.
       targets_to_bundle = self.context.target_roots
+    else:
+      targets_to_bundle = self.context.targets()
     apps = [self.App(target, use_basename_prefix=self.get_options().use_basename_prefix)
             for target in targets_to_bundle if self.App.is_app(target)]
 
