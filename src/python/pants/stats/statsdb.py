@@ -10,6 +10,7 @@ import sqlite3
 from contextlib import contextmanager
 
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import safe_mkdir_for
 
 
 class StatsDBError(Exception): pass
@@ -135,6 +136,7 @@ class StatsDB(object):
 
   @contextmanager
   def _connection(self):
+    safe_mkdir_for(self._path)
     conn = sqlite3.connect(self._path)
     yield conn
     conn.commit()

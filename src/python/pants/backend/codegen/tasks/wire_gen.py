@@ -142,3 +142,8 @@ class WireGen(JvmToolTaskMixin, SimpleCodegenTask):
     collect_proto_paths(target)
     target.walk(collect_proto_paths)
     return proto_paths
+
+  @property
+  def _copy_target_attributes(self):
+    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
+    return ['provides']

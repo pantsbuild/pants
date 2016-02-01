@@ -117,7 +117,7 @@ class Executor(AbstractClass):
     """
     runner = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args,
                            cwd=cwd)
-    return runner.run(stdout=stdout, stderr=stderr, cwd=cwd)
+    return runner.run(stdout=stdout, stderr=stderr)
 
   @abstractmethod
   def _runner(self, classpath, main, jvm_options, args, cwd=None):
@@ -152,10 +152,10 @@ class CommandLineGrabber(Executor):
       def command(_):
         return list(self._command)
 
-      def run(_, stdout=None, stderr=None, cwd=None):
+      def run(_, stdout=None, stderr=None):
         return 0
 
-      def spawn(_, stdout=None, stderr=None, cwd=None):
+      def spawn(_, stdout=None, stderr=None):
         return None
 
     return Runner()
@@ -213,10 +213,10 @@ class SubprocessExecutor(Executor):
       def command(_):
         return list(command)
 
-      def spawn(_, stdout=None, stderr=None, cwd=None):
+      def spawn(_, stdout=None, stderr=None):
         return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd)
 
-      def run(_, stdout=None, stderr=None, cwd=None):
+      def run(_, stdout=None, stderr=None):
         return self._spawn(command, stdout=stdout, stderr=stderr, cwd=cwd).wait()
 
     return Runner()

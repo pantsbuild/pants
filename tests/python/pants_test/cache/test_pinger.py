@@ -5,7 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.cache.pinger import Pinger
+import urlparse
+
+from requests import RequestException
+
+from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger
 from pants_test.base_test import BaseTest
 from pants_test.cache.delay_server import setup_delayed_server
 
@@ -55,3 +59,42 @@ class TestPinger(BaseTest):
   def tearDown(self):
     for server in self.servers:
       server.shutdown()
+
+
+class TestBestUrlSelector(BaseTest):
+
+  def setUp(self):
+    self.url1 = 'http://host1:123'
+    self.url2 = 'https://host2:456'
+    self.unsupported_url = 'ftp://ftpserver'
+    self.best_url_selector = BestUrlSelector([self.url1, self.url2], max_failures=1)
+
+  def call_url(self, expected_url, with_error=False):
+    try:
+      with self.best_url_selector.select_best_url() as url:
+        self.assertEquals(urlparse.urlparse(expected_url), url)
+
+        if with_error:
+          raise RequestException('error connecting to {}'.format(url))
+    except RequestException as e:
+      pass
+
+  def test_unsupported_protocol(self):
+    with self.assertRaises(InvalidRESTfulCacheProtoError):
+      BestUrlSelector([self.unsupported_url])
+
+  def test_select_next_url_after_max_consecutive_failures(self):
+    self.call_url(self.url1, with_error=True)
+
+    # A success call will reset the counter.
+    self.call_url(self.url1)
+
+    # Too many failures for url1, switch to url2.
+    self.call_url(self.url1, with_error=True)
+    self.call_url(self.url1, with_error=True)
+    self.call_url(self.url2)
+
+    # Too many failures for url2, switch to url1.
+    self.call_url(self.url2, with_error=True)
+    self.call_url(self.url2, with_error=True)
+    self.call_url(self.url1)

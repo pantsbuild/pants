@@ -58,6 +58,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   _stable_name = None
 
   @classmethod
+  def implementation_version(cls):
+    return [('TaskBase', 1)]
+
+  @classmethod
   def stable_name(cls):
     """The stable name of this task type.
 
@@ -255,7 +259,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     invalidate_dependents,
                                     fingerprint_strategy=fingerprint_strategy,
                                     invalidation_report=self.context.invalidation_report,
-                                    task_name=type(self).__name__)
+                                    task_name=type(self).__name__,
+                                    task_version=self.implementation_version())
 
   @property
   def cache_target_dirs(self):
@@ -297,7 +302,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                   silent=False,
                   locally_changed_targets=None,
                   fingerprint_strategy=None,
-                  topological_order=False):
+                  topological_order=False,
+                  use_cache=True):
     """Checks targets for invalidation, first checking the artifact cache.
 
     Subclasses call this to figure out what to work on.
@@ -315,6 +321,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                   and over, and partitioning them separately is a performance win.
     :param fingerprint_strategy:   A FingerprintStrategy instance, which can do per task, finer grained
                                   fingerprinting of a given Target.
+    :param use_cache:             A boolean to indicate whether to read/write the cache within this
+                                  invalidate call. In order for the cache to be used, both the task
+                                  settings and this parameter must agree that they should be used.
 
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
@@ -346,7 +355,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     invalidation_check = cache_manager.check(targets, partition_size_hint, colors,
                                              topological_order=topological_order)
 
-    if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
+    if invalidation_check.invalid_vts and use_cache and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
         cached_vts, uncached_vts, uncached_causes = \
           self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
@@ -400,6 +409,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       vt.update()  # In case the caller doesn't update.
 
     write_to_cache = (self.cache_target_dirs
+                      and use_cache
                       and self.artifact_cache_writes_enabled()
                       and invalidation_check.invalid_vts)
     if write_to_cache:

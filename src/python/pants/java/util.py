@@ -73,7 +73,6 @@ def execute_java(classpath, main, jvm_options=None, args=None, executor=None,
                         workunit_factory=workunit_factory,
                         workunit_name=workunit_name,
                         workunit_labels=workunit_labels,
-                        cwd=cwd,
                         workunit_log_config=workunit_log_config)
 
 
@@ -114,12 +113,11 @@ def execute_java_async(classpath, main, jvm_options=None, args=None, executor=No
                               workunit_factory=workunit_factory,
                               workunit_name=workunit_name,
                               workunit_labels=workunit_labels,
-                              cwd=cwd,
                               workunit_log_config=workunit_log_config)
 
 
 def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
-                   cwd=None, workunit_log_config=None):
+                   workunit_log_config=None):
   """Executes the given java runner.
 
   If `workunit_factory` is supplied, does so in the context of a workunit.
@@ -128,7 +126,6 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
   :param workunit_factory: an optional callable that can produce a workunit context
   :param string workunit_name: an optional name for the work unit; defaults to the main
   :param list workunit_labels: an optional sequence of labels for the work unit
-  :param string cwd: optionally set the working directory
   :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
 
   Returns the exit code of the java runner.
@@ -148,13 +145,13 @@ def execute_runner(runner, workunit_factory=None, workunit_name=None, workunit_l
 
     with workunit_factory(name=workunit_name, labels=workunit_labels,
                           cmd=runner.cmd, log_config=workunit_log_config) as workunit:
-      ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
+      ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
       workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
       return ret
 
 
 def execute_runner_async(runner, workunit_factory=None, workunit_name=None, workunit_labels=None,
-                         cwd=None, workunit_log_config=None):
+                         workunit_log_config=None):
   """Executes the given java runner asynchronously.
 
   We can't use 'with' here because the workunit_generator's __exit__ function
@@ -171,7 +168,6 @@ def execute_runner_async(runner, workunit_factory=None, workunit_name=None, work
   :param workunit_factory: an optional callable that can produce a workunit context
   :param string workunit_name: an optional name for the work unit; defaults to the main
   :param list workunit_labels: an optional sequence of labels for the work unit
-  :param string cwd: optionally set the working directory
   :param WorkUnit.LogConfig workunit_log_config: an optional tuple of task options affecting reporting
 
   Returns a ProcessHandler to the java process that is spawned.
@@ -193,7 +189,7 @@ def execute_runner_async(runner, workunit_factory=None, workunit_name=None, work
     workunit_generator = workunit_factory(name=workunit_name, labels=workunit_labels,
                                 cmd=runner.cmd, log_config=workunit_log_config)
     workunit = workunit_generator.__enter__()
-    process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'), cwd=cwd)
+    process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
 
     class WorkUnitProcessHandler(ProcessHandler):
       def wait(_):

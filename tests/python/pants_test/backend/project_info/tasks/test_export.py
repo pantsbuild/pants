@@ -50,7 +50,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
                                  'java6': {'source': '1.6', 'target': '1.6'}
                                })
 
-    with subsystem_instance(ScalaPlatform):
+    scala_options = {'scala-platform': {'version': 'custom'}}
+    with subsystem_instance(ScalaPlatform, **scala_options):
       self.make_target(':scala-library',
                        JarLibrary,
                        jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
@@ -197,7 +198,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def test_version(self):
     result = self.execute_export_json('project_info:first')
-    self.assertEqual('1.0.5', result['version'])
+    self.assertEqual('1.0.6', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
@@ -250,6 +251,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       'id': 'project_info.jvm_target',
       'is_code_gen': False,
       'targets': ['project_info:jar_lib', '//:scala-library'],
+      'is_synthetic': False,
       'roots': [
          {
            'source_root': '{root}/project_info/this/is/a/source'.format(root=self.build_root),
@@ -315,10 +317,6 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     with self.assertRaises(TaskError):
       self.execute_export('project_info:target_type')
 
-  def test_unrecognized_target_type(self):
-    with self.assertRaises(TaskError):
-      self.execute_export('project_info:unrecognized_target_type')
-
   def test_source_exclude(self):
     self.set_options(globs=True)
     result = self.execute_export_json('src/python/exclude')
@@ -367,3 +365,15 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       {'globs': ['src/python/z/**/*.py']},
       result['targets']['src/python/z:z']['globs']
     )
+
+  def test_synthetic_target(self):
+    # Create a BUILD file then add itself as resources
+    self.add_to_build_file('src/python/alpha/BUILD', '''
+        python_library(name="alpha", sources=zglobs("**/*.py"), resources=["BUILD"])
+      '''.strip())
+
+    result = self.execute_export_json('src/python/alpha')
+    # The synthetic resource is synthetic
+    self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources']['is_synthetic'])
+    # But not the origin target
+    self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])

@@ -31,8 +31,12 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
           'contrib.go.testprojects.src.thrift.thrifttest.fleem/c4e43b3a84a8/src/go/thrifttest/duck/ttypes.go',
         ])
 
-        self.assertTrue(contains_exact_files(os.path.join(workdir, 'gen', 'go-thrift'),
-                                             expected_files, ignore_links=True))
+        #Fetch the hash for task impl version.
+        go_thrift_contents = os.listdir(os.path.join(workdir, 'gen', 'go-thrift'))
+        self.assertEqual(len(go_thrift_contents), 1)
+
+        root = os.path.join(workdir, 'gen', 'go-thrift', go_thrift_contents[0])
+        self.assertTrue(contains_exact_files(root, expected_files, ignore_links=True))
 
   def test_go_thrift_gen_and_compile(self):
     with self.temporary_workdir() as workdir:

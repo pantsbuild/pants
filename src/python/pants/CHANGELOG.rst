@@ -1,6 +1,100 @@
 RELEASE HISTORY
 ===============
 
+0.0.70 (01/29/2016)
+-------------------
+
+This release contains a few big steps towards 1.0.0! The last known issues with build
+caching are fixed, so this release enables using a local build cache by default. The
+release also includes 'task implementation versioning', so that cached artifacts will
+automatically be invalidated as the implementations of Tasks change between pants releases.
+
+API Changes
+~~~~~~~~~~~
+
+* Improve deprecated option handling to allow options hinting beyond deprecation version.
+  `RB #3369 <https://rbcommons.com/s/twitter/r/3369>`_
+
+* Remove the need to specify scalastyle in BUILD.tools
+  `RB #3355 <https://rbcommons.com/s/twitter/r/3355>`_
+
+* Bumping Node to 5.5.0
+  `RB #3366 <https://rbcommons.com/s/twitter/r/3366>`_
+
+Bugfixes
+~~~~~~~~
+
+* Don't error in export when a target does not have an alias
+  `RB #3379 <https://rbcommons.com/s/twitter/r/3379>`_
+  `RB #3383 <https://rbcommons.com/s/twitter/r/3383>`_
+
+* Permits creation of StatsDB in a directory that does not yet exist.
+  `RB #3384 <https://rbcommons.com/s/twitter/r/3384>`_
+
+* Don't skip writing <artifact>s to ivy.xml even if there's only one.
+  `RB #3388 <https://rbcommons.com/s/twitter/r/3388>`_
+
+* Add and use an invalidation-local use_cache setting in IvyTaskMixin
+  `RB #3386 <https://rbcommons.com/s/twitter/r/3386>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Enable releasing the scalajs plugin
+  `RB #3340 <https://rbcommons.com/s/twitter/r/3340>`_
+
+* Allow failover for remote cache
+  `RB #3374 <https://rbcommons.com/s/twitter/r/3374>`_
+
+* Enable local caching by default, but disable within pantsbuild/pants.
+  `RB #3391 <https://rbcommons.com/s/twitter/r/3391>`_
+
+* Improved task implementation version
+  `RB #3331 <https://rbcommons.com/s/twitter/r/3331>`_
+  `RB #3381 <https://rbcommons.com/s/twitter/r/3381>`_
+
+* Multiple dependency_managements with multiple ivy resolves.
+  `RB #3336 <https://rbcommons.com/s/twitter/r/3336>`_
+  `RB #3367 <https://rbcommons.com/s/twitter/r/3367>`_
+
+* A managed_jar_libraries factory to reduce 3rdparty duplication.
+  `RB #3372 <https://rbcommons.com/s/twitter/r/3372>`_
+
+* Add support for go_thrift_library().
+  `RB #3353 <https://rbcommons.com/s/twitter/r/3353>`_
+  `RB #3365 <https://rbcommons.com/s/twitter/r/3365>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add a command line option to turn off prompting before publishing
+  `RB #3387 <https://rbcommons.com/s/twitter/r/3387>`_
+
+* Update help message for failed publishing
+  `RB #3385 <https://rbcommons.com/s/twitter/r/3385>`_
+
+* Add is_synthetic in pants export
+  `RB #3239 <https://rbcommons.com/s/twitter/r/3239>`_
+
+* BuildFile refactoring: rename scan_project_tree_build_files to scan_build_files, get_project_tree_build_files_family to get_build_files_family
+  `RB #3382 <https://rbcommons.com/s/twitter/r/3382>`_
+
+* BuildFile refactoring: add more constraints to BuildFile constructor
+  `RB #3376 <https://rbcommons.com/s/twitter/r/3376>`_
+
+* BuildFile refactoring: remove usages and deprecate of BuildFile's family, ancestors, siblings and descendants methods
+  `RB #3368 <https://rbcommons.com/s/twitter/r/3368>`_
+
+* build_file_alias Perf Improvement: Move class declaration out of method target_macro
+  `RB #3361 <https://rbcommons.com/s/twitter/r/3361>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Eager execution and fully declarative dependencies
+  `RB #3339 <https://rbcommons.com/s/twitter/r/3339>`_
+
+
 0.0.69 (01/22/2016)
 -------------------
 
