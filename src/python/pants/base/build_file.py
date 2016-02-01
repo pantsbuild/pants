@@ -26,15 +26,15 @@ class BuildFile(AbstractClass):
 
   class BuildFileError(Exception):
     """Base class for all exceptions raised in BuildFile to make exception handling easier"""
-    pass
 
   class MissingBuildFileError(BuildFileError):
     """Raised when a BUILD file cannot be found at the path in the spec."""
-    pass
 
   class BadPathError(BuildFileError):
     """Raised when scan_buildfiles is called on a nonexistent directory."""
-    pass
+
+  class BadPantsBuildIgnore(Exception):
+    """Raised when pants_build_ignore is bad."""
 
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
@@ -74,6 +74,14 @@ class BuildFile(AbstractClass):
     return BuildFile._cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @staticmethod
+  def validate_pants_build_ignore(pants_build_ignore):
+    """Validate passed paths for being pants_build_ignore."""
+    abs_ignore_paths = [path for path in pants_build_ignore if os.path.isabs(path)]
+    if any(abs_ignore_paths):
+      raise BuildFile.BadPantsBuildIgnore('All pants_build_ignore paths should be relative. '
+                                          'Absolute path {} was passed.'.format(abs_ignore_paths[0]))
+
+  @staticmethod
   def scan_build_files(project_tree, base_relpath, spec_excludes=None, pants_build_ignore=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
@@ -84,7 +92,6 @@ class BuildFile(AbstractClass):
     :param pants_build_ignore: List of paths to exclude from the scan.
       Each path should be a relative to the build root.
     """
-
     def relativize(paths, build_root):
       for path in paths:
         if os.path.isabs(path):
@@ -104,15 +111,13 @@ class BuildFile(AbstractClass):
       return to_remove
 
     if base_relpath and os.path.isabs(base_relpath):
-      raise Exception('base_relpath parameter ({}) should be a relative path.'.format(base_relpath))
+      raise BuildFile.BadPathError('base_relpath parameter ({}) should be a relative path.'
+                                   .format(base_relpath))
     if base_relpath and not project_tree.isdir(base_relpath):
-      raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir'
+      raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir.'
                                    .format(base_relpath))
     if pants_build_ignore:
-      abs_ignore_paths = [path for path in pants_build_ignore if os.path.isabs(path)]
-      if any(abs_ignore_paths):
-        raise Exception('All pants_build_ignore paths passed to scan_build_files should be relative. '
-                        'Absolute path {} was passed.'.format(abs_ignore_paths[0]))
+      BuildFile.validate_pants_build_ignore(pants_build_ignore)
 
     ignore_patterns = set()
     if spec_excludes:

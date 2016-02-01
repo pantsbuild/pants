@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
+from pants.base.build_file import BuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -145,11 +146,10 @@ class CmdLineSpecParserTest(BaseTest):
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
     # Test absolute path in pants_build_ignore.
-    address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
-                                                        pants_build_ignore=[os.path.join(self.build_root, 'some')])
-    self.spec_parser = CmdLineSpecParser(self.build_root, address_mapper_with_ignore)
-    with self.assertRaisesRegexp(Exception, 'All pants_build_ignore paths passed to scan_build_files '
-                                            'should be relative.'):
+    with self.assertRaises(BuildFile.BadPantsBuildIgnore):
+      address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
+                                                          pants_build_ignore=[os.path.join(self.build_root, 'some')])
+      self.spec_parser = CmdLineSpecParser(self.build_root, address_mapper_with_ignore)
       self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
   def test_exclude_target_regexps(self):

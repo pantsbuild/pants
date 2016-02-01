@@ -75,8 +75,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       ]), buildfiles)
 
   def test_build_files_scan_with_abspath_ignore(self):
-    with self.assertRaisesRegexp(Exception, 'All pants_build_ignore paths passed to scan_build_files '
-                                            'should be relative.'):
+    with self.assertRaises(BuildFile.BadPantsBuildIgnore):
       self.scan_buildfiles('', pants_build_ignore=[
         os.path.join(self.root_dir, 'grandparent/parent/child1'),
         os.path.join(self.root_dir, 'grandparent/parent/child2')])

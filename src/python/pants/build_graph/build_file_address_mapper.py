@@ -63,6 +63,8 @@ class BuildFileAddressMapper(object):
       # If project_tree is BuildFile class actually.
       # TODO(tabishev): Remove after transition period.
       self._project_tree = project_tree._get_project_tree(self.root_dir)
+    if pants_build_ignore:
+      BuildFile.validate_pants_build_ignore(pants_build_ignore)
     self._pants_build_ignore = pants_build_ignore
 
   @property
