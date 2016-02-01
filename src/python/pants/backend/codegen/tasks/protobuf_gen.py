@@ -193,4 +193,5 @@ class ProtobufGen(SimpleCodegenTask):
 
   @property
   def _copy_target_attributes(self):
+    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
     return ['provides']

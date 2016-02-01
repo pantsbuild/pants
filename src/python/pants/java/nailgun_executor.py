@@ -38,7 +38,7 @@ class NailgunProcessGroup(ProcessGroup):
     def predicate(proc):
       if proc.name() == NailgunExecutor._PROCESS_NAME:
         if not everywhere:
-          return NailgunExecutor._PANTS_NG_ARG in proc.cmdline()
+          return NailgunExecutor._PANTS_NG_BUILDROOT_ARG in proc.cmdline()
         else:
           return any(arg.startswith(NailgunExecutor._PANTS_NG_ARG_PREFIX) for arg in proc.cmdline())
 
@@ -73,7 +73,7 @@ class NailgunExecutor(Executor, ProcessManager):
   _PANTS_NG_ARG_PREFIX = b'-Dpants.buildroot'
   _PANTS_FINGERPRINT_ARG_PREFIX = b'-Dpants.nailgun.fingerprint'
   _PANTS_OWNER_ARG_PREFIX = b'-Dpants.nailgun.owner'
-  _PANTS_NG_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
+  _PANTS_NG_BUILDROOT_ARG = '='.join((_PANTS_NG_ARG_PREFIX, get_buildroot()))
 
   _NAILGUN_SPAWN_LOCK = threading.Lock()
   _SELECT_WAIT = 1
@@ -231,7 +231,7 @@ class NailgunExecutor(Executor, ProcessManager):
     safe_file_dump(self._ng_stdout, '')
     safe_file_dump(self._ng_stderr, '')
 
-    jvm_options = jvm_options + [self._PANTS_NG_ARG,
+    jvm_options = jvm_options + [self._PANTS_NG_BUILDROOT_ARG,
                                  self._create_owner_arg(self._workdir),
                                  self._create_fingerprint_arg(fingerprint)]
 
@@ -257,6 +257,15 @@ class NailgunExecutor(Executor, ProcessManager):
     self.ensure_connectable(client)
 
     return client
+
+  def _check_process_buildroot(self, process):
+    """Matches only processes started from the current buildroot."""
+    return self._PANTS_NG_BUILDROOT_ARG in process.cmdline()
+
+  def is_alive(self):
+    """A ProcessManager.is_alive() override that ensures buildroot flags are present in the process
+    command line arguments."""
+    return super(NailgunExecutor, self).is_alive(self._check_process_buildroot)
 
   def post_fork_child(self, fingerprint, jvm_options, classpath, stdout, stderr):
     """Post-fork() child callback for ProcessManager.daemon_spawn()."""

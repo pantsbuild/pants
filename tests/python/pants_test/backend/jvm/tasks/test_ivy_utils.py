@@ -118,17 +118,9 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
       self.assertEqual(jar.excludes, (Exclude(self.b_org, self.b_name),))
     self.assertEqual(excludes, set())
 
-  def test_exclude_exported_disabled_when_no_excludes_gathered(self):
-    _, excludes = IvyUtils.calculate_classpath([self.b], gather_excludes=False)
-    self.assertSetEqual(excludes, set())
-
-  def test_excludes_generated_when_requested(self):
-    _, excludes = IvyUtils.calculate_classpath([self.e], gather_excludes=True)
+  def test_excludes_are_generated(self):
+    _, excludes = IvyUtils.calculate_classpath([self.e])
     self.assertSetEqual(excludes, {Exclude(org='commons-lang', name='commons-lang')})
-
-  def test_excludes_empty_when_not_requested(self):
-    _, excludes = IvyUtils.calculate_classpath([self.e], gather_excludes=False)
-    self.assertSetEqual(excludes, set())
 
   def test_classifiers(self):
     jars, _ = IvyUtils.calculate_classpath([self.c])

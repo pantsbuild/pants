@@ -225,7 +225,6 @@ class TestProcessManager(unittest.TestCase):
   def test_is_alive(self):
     with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
       mock_as_process.return_value = fake_process(name='test', pid=3, status=psutil.STATUS_IDLE)
-      self.pm._process = mock.Mock(status=psutil.STATUS_IDLE)
       self.assertTrue(self.pm.is_alive())
       mock_as_process.assert_called_with(self.pm)
 
@@ -246,6 +245,15 @@ class TestProcessManager(unittest.TestCase):
       mock_as_process.return_value = fake_process(name='not_test', pid=3, status=psutil.STATUS_IDLE)
       self.pm._process_name = 'test'
       self.assertFalse(self.pm.is_alive())
+      mock_as_process.assert_called_with(self.pm)
+
+  def test_is_alive_extra_check(self):
+    def extra_check(process):
+      return False
+
+    with mock.patch.object(ProcessManager, '_as_process', **PATCH_OPTS) as mock_as_process:
+      mock_as_process.return_value = fake_process(name='test', pid=3, status=psutil.STATUS_IDLE)
+      self.assertFalse(self.pm.is_alive(extra_check))
       mock_as_process.assert_called_with(self.pm)
 
   def test_purge_metadata_aborts(self):

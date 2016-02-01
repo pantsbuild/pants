@@ -1,4 +1,4 @@
-Created by running `./build-support/bin/contributors.sh`.
+Created by running `build-support/bin/contributors.sh`.
 
 + Alan Paulin
 + Alexander Johnson
@@ -24,6 +24,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Divij Rajkumar
 + Dominic Hamon
 + Dumitru Daniliuc
++ Emily Caveness
 + Eric Ayers
 + Eric Danielson
 + Eric Lindvall
