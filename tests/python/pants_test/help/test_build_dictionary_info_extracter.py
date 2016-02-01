@@ -55,7 +55,7 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
       :param a: Parameter a.
       :param  str  b: Parameter b.
       :param c:  Parameter c
-      Second line Parameter c.
+                 Second line Parameter c.
       :param d:
       Parameter d.
       :param e:  Parameter e.
