@@ -111,7 +111,7 @@ class BuildFile(AbstractClass):
     if pants_build_ignore:
       abs_ignore_paths = [path for path in pants_build_ignore if os.path.isabs(path)]
       if any(abs_ignore_paths):
-        raise Exception('All pants_build_ignore paths passed to scan_build_files should be a relative. '
+        raise Exception('All pants_build_ignore paths passed to scan_build_files should be relative. '
                         'Absolute path {} was passed.'.format(abs_ignore_paths[0]))
 
     ignore_patterns = set()

@@ -53,8 +53,8 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         self.create_buildfile('grandparent/parent/child5/BUILD'),
     ]), self.scan_buildfiles('grandparent/parent'))
 
-  def test_build_files_scan_with_relpath_excludes(self):
-    buildfiles = self.scan_buildfiles('', spec_excludes=[
+  def test_build_files_scan_with_relpath_ignore(self):
+    buildfiles = self.scan_buildfiles('', pants_build_ignore=[
         'grandparent/parent/child1',
         'grandparent/parent/child2'])
     self.assertEquals(OrderedSet([
@@ -66,7 +66,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         self.create_buildfile('issue_1742/BUILD.sibling'),
     ]), buildfiles)
 
-    buildfiles = self.scan_buildfiles('grandparent/parent', spec_excludes=['grandparent/parent/child1'])
+    buildfiles = self.scan_buildfiles('grandparent/parent', pants_build_ignore=['grandparent/parent/child1'])
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
@@ -74,19 +74,12 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         self.create_buildfile('grandparent/parent/child5/BUILD'),
       ]), buildfiles)
 
-  def test_build_files_scan_with_abspath_excludes(self):
-    buildfiles = self.scan_buildfiles('', spec_excludes=[
+  def test_build_files_scan_with_abspath_ignore(self):
+    with self.assertRaisesRegexp(Exception, 'All pants_build_ignore paths passed to scan_build_files '
+                                            'should be relative.'):
+      self.scan_buildfiles('', pants_build_ignore=[
         os.path.join(self.root_dir, 'grandparent/parent/child1'),
         os.path.join(self.root_dir, 'grandparent/parent/child2')])
-
-    self.assertEquals(OrderedSet([
-        self.create_buildfile('BUILD'),
-        self.create_buildfile('BUILD.twitter'),
-        self.create_buildfile('grandparent/parent/BUILD'),
-        self.create_buildfile('grandparent/parent/BUILD.twitter'),
-        self.create_buildfile('grandparent/parent/child5/BUILD'),
-        self.create_buildfile('issue_1742/BUILD.sibling'),
-    ]), buildfiles)
 
   def test_must_exist_true(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):
