@@ -162,7 +162,7 @@ class FileDepsTest(ConsoleTaskTestBase):
 
   def test_globs_app(self):
     self.assert_console_output(
-      'config/app.yaml',
+      'project/config/app.yaml',
       'project/BUILD',
       'src/java/bin/BUILD',
       'src/java/core/BUILD',
