@@ -225,8 +225,39 @@ class BundleTest(BaseTest):
                            JvmApp,
                            dependencies=[unused],
                            bundles=[
-                             _bundle(spec_path)(relative_to="config", fileset=globs("z/*")),
-                             _bundle(spec_path)(relative_to="config", fileset=['a/b'])
+                             _bundle(spec_path)(fileset=globs("z/*")),
+                             _bundle(spec_path)(fileset=['a/b'])
                            ])
 
-    self.assertEquals(['a/b', 'y/z/*'], sorted(app.globs_relative_to_buildroot()['globs']))
+    self.assertEquals(['y/a/b', 'y/z/*'], sorted(app.globs_relative_to_buildroot()['globs']))
+
+  def test_list_of_globs_fails(self):
+    # It's not allowed according to the docs, and will behave badly.
+
+    spec_path = 'y'
+    globs = _globs(spec_path)
+    with self.assertRaises(ValueError):
+      _bundle(spec_path)(fileset=[globs("z/*")])
+
+  def test_rel_path_with_glob_fails(self):
+    # Globs are treated as eager, so rel_path doesn't affect their meaning.
+    # The effect of this is likely to be confusing, so disallow it.
+
+    spec_path = 'y'
+    self.create_file(os.path.join(spec_path, 'z', 'somefile'))
+    globs = _globs(spec_path)
+    with self.assertRaises(ValueError):
+      _bundle(spec_path)(rel_path="config", fileset=globs('z/*'))
+
+  def test_rel_path_overrides_context_rel_path_for_explicit_path(self):
+    spec_path = 'y'
+    unused = self.make_target(spec_path, JvmBinary)
+
+    app = self.make_target('y:app',
+                           JvmApp,
+                           dependencies=[unused],
+                           bundles=[
+                             _bundle(spec_path)(rel_path="config", fileset=['a/b'])
+                           ])
+    self.assertEqual({os.path.join(self.build_root, 'config/a/b'): 'a/b'}, app.bundles[0].filemap)
+    self.assertEquals(['config/a/b'], sorted(app.globs_relative_to_buildroot()['globs']))

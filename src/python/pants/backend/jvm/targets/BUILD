@@ -39,6 +39,7 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/base:validation',
     'src/python/pants/build_graph',
+    'src/python/pants/source',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],

@@ -70,6 +70,11 @@ class RagelGen(SimpleCodegenTask):
         raise TaskError('{binary} ... exited non-zero ({result})'
                         .format(binary=self.ragel_binary, result=result))
 
+  @property
+  def _copy_target_attributes(self):
+    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
+    return ['provides']
+
 
 def calculate_class_and_package(path):
   package, classname = None, None

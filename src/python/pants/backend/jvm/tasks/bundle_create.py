@@ -71,21 +71,22 @@ class BundleCreate(JvmBinaryTask):
     return True
 
   def execute(self):
-    def get_bundle_apps():
-      if self.get_options().use_basename_prefix:
-        # NB(peiyu) This special casing is confusing especially given we fail when duplicate
-        # basenames are detected. It's added because a `jvm_app` that depends and another
-        # `jvm_binary` that has the same basename turns out to be fairly common. In this case,
-        # whoever in `self.context.targets()` that runs the second will destroy previously
-        # created bundle directory. Using `target_roots` instead of all transitive targets
-        # won't eliminate but would reduce such basename conflicts.
-        return [self.App(target, use_basename_prefix=True) for target in self.context.target_roots]
-      return [self.App(target) for target in self.context.targets(predicate=self.App.is_app)]
-
     archiver_type = self.get_options().archive
     archiver = archive.archiver(archiver_type) if archiver_type else None
 
-    apps = get_bundle_apps()
+    if self.get_options().use_basename_prefix:
+      # NB(peiyu) This special casing is confusing especially given we already fail
+      # when duplicate basenames are detected. It's added because of the existing
+      # user experience. Turns out a `jvm_app` that depends on another `jvm_binary`
+      # of the same basename is fairly common. In this case, using just
+      # `target_roots` instead of all transitive targets will reduce the chance users
+      # see their bundle command fail due to basename conflicts. We should eventually
+      # get rid of this special case.
+      targets_to_bundle = self.context.target_roots
+    else:
+      targets_to_bundle = self.context.targets()
+    apps = [self.App(target, use_basename_prefix=self.get_options().use_basename_prefix)
+            for target in targets_to_bundle if self.App.is_app(target)]
 
     if self.get_options().use_basename_prefix:
       self.check_basename_conflicts(apps)
