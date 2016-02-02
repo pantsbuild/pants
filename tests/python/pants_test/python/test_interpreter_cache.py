@@ -7,10 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
+from contextlib import contextmanager
 
 import mock
 from pex.package import EggPackage, Package, SourcePackage
-from pex.resolver import resolve
+from pex.resolver import Unsatisfiable, resolve
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
@@ -29,7 +30,8 @@ class TestInterpreterCache(unittest.TestCase):
   def setUp(self):
     self._interpreter = PythonInterpreter.get()
 
-  def _do_test(self, interpreter_requirement, filters, expected):
+  @contextmanager
+  def _setup_test(self, interpreter_requirement=None):
     mock_setup = mock.MagicMock().return_value
 
     # Explicitly set a repo-wide requirement that excludes our one interpreter.
@@ -45,7 +47,10 @@ class TestInterpreterCache(unittest.TestCase):
 
       cache._setup_cached = mock.Mock(side_effect=set_interpreters)
       cache._setup_paths = mock.Mock()
+      yield cache, path
 
+  def _do_test(self, interpreter_requirement, filters, expected):
+    with self._setup_test(interpreter_requirement) as (cache, _):
       self.assertEqual(cache.setup(filters=filters), expected)
 
   def test_cache_setup_with_no_filters_uses_repo_default_excluded(self):
@@ -105,3 +110,22 @@ class TestInterpreterCache(unittest.TestCase):
       for interpreter in interpereters:
         assert_egg_extra(interpreter, 'setuptools', setuptools_version)
         assert_egg_extra(interpreter, 'wheel', wheel_version)
+
+  def test_setup_resolve_failure_cleanup(self):
+    """Simulates a resolution failure during interpreter setup to avoid partial interpreter caching.
+
+    See https://github.com/pantsbuild/pants/issues/2038 for more info.
+    """
+    with mock.patch.object(PythonInterpreterCache, '_resolve') as mock_resolve, \
+         self._setup_test() as (cache, cache_path):
+      mock_resolve.side_effect = Unsatisfiable('nope')
+
+      with self.assertRaises(Unsatisfiable):
+        cache._setup_interpreter(self._interpreter, os.path.join(cache_path, 'CPython-2.7.11'))
+
+      # Before the bugfix, the above call would leave behind paths in the tmpdir that looked like:
+      #
+      #     /tmp/tmpUrCSzk/CPython-2.7.11.tmp.a167fc50834a4f00aa280780c3e1ba21
+      #
+      self.assertFalse('.tmp.' in ' '.join(os.listdir(cache_path)),
+                       'interpreter cache path contains tmp dirs!')
