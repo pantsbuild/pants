@@ -106,9 +106,10 @@ class BuildFile(AbstractClass):
 
     if spec_excludes:
       # Hack, will be removed after spec_excludes removal.
-      pants_build_ignore.patterns.append(pathspec.PathSpec.from_lines(
-        pathspec.GitIgnorePattern,
+      patterns = list(pants_build_ignore.patterns)
+      patterns.extend(pathspec.PathSpec.from_lines(pathspec.GitIgnorePattern,
         convert_to_gitignore_syntax(spec_excludes, project_tree.build_root)).patterns)
+      pants_build_ignore = pathspec.PathSpec(patterns)
 
     build_files = set()
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
