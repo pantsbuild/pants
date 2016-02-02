@@ -119,7 +119,14 @@ class BuildFile(AbstractClass):
         if BuildFile._is_buildfile_name(filename):
           build_files.add(os.path.join(root, filename))
 
-    build_files_without_ignores = build_files.difference(pants_build_ignore.match_files(build_files))
+    return BuildFile._build_files_from_paths(project_tree, build_files, pants_build_ignore)
+
+  @staticmethod
+  def _build_files_from_paths(project_tree, rel_paths, pants_build_ignore):
+    if pants_build_ignore:
+      build_files_without_ignores = rel_paths.difference(pants_build_ignore.match_files(rel_paths))
+    else:
+      build_files_without_ignores = rel_paths
     return OrderedSet(sorted([BuildFile(project_tree, relpath) for relpath in build_files_without_ignores],
                              key=lambda build_file: build_file.full_path))
 
@@ -233,9 +240,11 @@ class BuildFile(AbstractClass):
   @staticmethod
   def get_build_files_family(project_tree, dir_relpath, pants_build_ignore=None):
     """Returns all the BUILD files on a path"""
+    build_files = set()
     for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
-        yield BuildFile._cached(project_tree, os.path.join(dir_relpath, build))
+        build_files.add(os.path.join(dir_relpath, build))
+    return BuildFile._build_files_from_paths(project_tree, build_files, pants_build_ignore)
 
   @deprecated('0.0.72', hint_message='Use get_build_files_family instead.')
   def family(self):
