@@ -2,9 +2,6 @@
   "type_alias": "target",
   "merges": ["src/thrift:java_thrift_base"],
   "name": "simple",
-  "variants": {
-    "thrift": "apache_java"
-  },
   "configurations": [
     {
       "type_alias": "thrift",

@@ -116,14 +116,12 @@ class Target(Struct):
   class ConfigurationNotFound(Exception):
     """Indicates a requested configuration of a target could not be found."""
 
-  def __init__(self, name=None, variants=None, configurations=None, **kwargs):
+  def __init__(self, name=None, configurations=None, **kwargs):
     """
     :param string name: The name of this target which forms its address in its namespace.
-    :param dict variants: A dict of the default variant values for this target.
     :param list configurations: The configurations that apply to this target in various contexts.
     """
-    # TODO: enforce the type of variants using the Addressable framework.
-    super(Target, self).__init__(name=name, variants=variants, **kwargs)
+    super(Target, self).__init__(name=name, **kwargs)
 
     self.configurations = configurations
 

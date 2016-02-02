@@ -49,7 +49,12 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   """
 
   def construct_node(self, subject, variants):
-    return SelectNode(subject, self.product, variants, self.variant_key)
+    variant_values = [value for key, value in variants
+                      if key == self.variant_key] if variants else None
+    return SelectNode(subject,
+                      self.product,
+                      variants,
+                      variant_values[0] if variant_values else None)
 
 
 class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Selector):
@@ -212,7 +217,7 @@ class Node(object):
     """
 
 
-class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant_key']), Node):
+class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant']), Node):
   """A Node that selects a product for a subject.
 
   A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR. The
@@ -231,27 +236,12 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       # The subject is-a instance of the product.
       return candidate
     elif isinstance(candidate, Target):
-      # If we have a variant_key, calculate the variant_value to match.
-      variant_value = None
-      if self.variant_key:
-        # Allow Targets to include default variants.
-        variants = self.variants
-        if getattr(candidate, 'variants', None):
-          variants = Variants.merge(candidate.variants.items(), variants)
-        print('>>> variant_key {} with variants {} for {}'.format(self.variant_key, variants, candidate))
-        # Then compute a variant value
-        variant_values = [value for key, value in variants
-                          if key == self.variant_key] if variants else None
-        if not variant_values:
-          # This node has a configured variant key, but it was not specified.
-          return None
-        variant_value = variant_values[0]
       # TODO: returning only the first configuration of a given type/variant. Need to define
       # mergeability for products.
       for configuration in candidate.configurations:
         if type(configuration) != self.product:
           continue
-        if variant_value and not getattr(configuration, 'name', None) == variant_value:
+        if self.variant and not getattr(configuration, 'name', None) == self.variant:
           continue
         return configuration
     return None
@@ -308,8 +298,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
   def _dep_product_node(self):
     return SelectNode(self.subject, self.dep_product, self.variants, None)
 
-  def _dep_node(self, dependency):
-    variants = self.variants
+  def _dep_node(self, variants, dependency):
     if isinstance(dependency, Address):
       # If a subject has literal variants for particular dependencies, they win over all else.
       dependency, literal_variants = parse_variants(dependency)
@@ -328,7 +317,11 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
 
     # The product and its dependency list are available.
     dep_product = dep_product_state.value
-    dependencies = [self._dep_node(d) for d in dep_product.dependencies]
+    variants = self.variants
+    if getattr(dep_product, 'variants', None):
+      # A subject's variants are overridden by the dependent's requested variants.
+      variants = Variants.merge(dep_product.variants.items(), variants)
+    dependencies = [self._dep_node(variants, d) for d in dep_product.dependencies]
     for dependency in dependencies:
       dep_state = dependency_states.get(dependency, None)
       if dep_state is None or type(dep_state) == Waiting:
