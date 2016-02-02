@@ -75,10 +75,18 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       ]), buildfiles)
 
   def test_build_files_scan_with_abspath_ignore(self):
-    with self.assertRaises(BuildFile.BadPantsBuildIgnore):
-      self.scan_buildfiles('', pants_build_ignore=[
-        os.path.join(self.root_dir, 'grandparent/parent/child1'),
-        os.path.join(self.root_dir, 'grandparent/parent/child2')])
+    self.touch('parent/BUILD')
+    self.assertEquals(OrderedSet([
+      self.create_buildfile('BUILD'),
+      self.create_buildfile('BUILD.twitter'),
+      self.create_buildfile('grandparent/parent/BUILD'),
+      self.create_buildfile('grandparent/parent/BUILD.twitter'),
+      self.create_buildfile('grandparent/parent/child1/BUILD'),
+      self.create_buildfile('grandparent/parent/child1/BUILD.twitter'),
+      self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
+      self.create_buildfile('grandparent/parent/child5/BUILD'),
+      self.create_buildfile('issue_1742/BUILD.sibling'),
+    ]), self.scan_buildfiles('', pants_build_ignore=['/parent']))
 
   def test_build_files_scan_with_wildcard_ignore(self):
     self.assertEquals(OrderedSet([

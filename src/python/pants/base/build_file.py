@@ -34,9 +34,6 @@ class BuildFile(AbstractClass):
   class BadPathError(BuildFileError):
     """Raised when scan_buildfiles is called on a nonexistent directory."""
 
-  class BadPantsBuildIgnore(Exception):
-    """Raised when pants_build_ignore is bad."""
-
   _BUILD_FILE_PREFIX = 'BUILD'
   _PATTERN = re.compile('^{prefix}(\.[a-zA-Z0-9_-]+)?$'.format(prefix=_BUILD_FILE_PREFIX))
 
@@ -75,14 +72,6 @@ class BuildFile(AbstractClass):
     return BuildFile._cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @staticmethod
-  def validate_pants_build_ignore(pants_build_ignore):
-    """Validate passed paths for being pants_build_ignore."""
-    abs_ignore_paths = [path for path in pants_build_ignore if os.path.isabs(path)]
-    if any(abs_ignore_paths):
-      raise BuildFile.BadPantsBuildIgnore('All pants_build_ignore paths should be relative. '
-                                          'Absolute path {} was passed.'.format(abs_ignore_paths[0]))
-
-  @staticmethod
   def scan_build_files(project_tree, base_relpath, spec_excludes=None, pants_build_ignore=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
@@ -90,8 +79,7 @@ class BuildFile(AbstractClass):
     :param base_relpath: Directory under root_dir to scan.
     :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
       or paths that are relative to the root_dir.
-    :param pants_build_ignore: List of paths to exclude from the scan.
-      Each path should be a relative to the build root.
+    :param pants_build_ignore: .gitignore like patterns to exclude from BUILD files scan.
     """
     def convert_to_gitignore_syntax(spec_excludes, build_root):
       for path in spec_excludes:
@@ -108,8 +96,6 @@ class BuildFile(AbstractClass):
     if base_relpath and not project_tree.isdir(base_relpath):
       raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir.'
                                    .format(base_relpath))
-    if pants_build_ignore:
-      BuildFile.validate_pants_build_ignore(pants_build_ignore)
 
     ignore_patterns = set()
     if spec_excludes:

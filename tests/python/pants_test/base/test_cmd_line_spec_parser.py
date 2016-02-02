@@ -139,18 +139,10 @@ class CmdLineSpecParserTest(BaseTest):
     with self.assertRaises(CmdLineSpecParser.BadSpecError):
       self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
-    # Test relative path in pants_build_ignore.
     address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
                                                         pants_build_ignore=['some'])
     self.spec_parser = CmdLineSpecParser(self.build_root, address_mapper_with_ignore)
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
-
-    # Test absolute path in pants_build_ignore.
-    with self.assertRaises(BuildFile.BadPantsBuildIgnore):
-      address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
-                                                          pants_build_ignore=[os.path.join(self.build_root, 'some')])
-      self.spec_parser = CmdLineSpecParser(self.build_root, address_mapper_with_ignore)
-      self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
   def test_exclude_target_regexps(self):
     expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
