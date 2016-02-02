@@ -43,6 +43,11 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     buildfile = self.create_buildfile('grandparent/parent/child2/child3/BUILD')
     self.assertEquals(OrderedSet([buildfile]), self.get_build_files_family('grandparent/parent/child2/child3'))
 
+  def test_build_files_family_lookup_with_ignore(self):
+    self.assertEquals(OrderedSet([
+        self.create_buildfile('grandparent/parent/BUILD'),
+    ]), self.get_build_files_family('grandparent/parent', pants_build_ignore=['*.twitter']))
+
   def test_build_files_scan(self):
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
