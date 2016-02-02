@@ -308,7 +308,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     if type(bootstrap_nodes[variants_node]) == Return:
       # A subject's variants are overridden by the dependent's requested variants, so
       # we merge them left to right here.
-      variants = Variants.merge(bootstrap_nodes[variants_node].value.defaults, variants)
+      variants = Variants.merge(bootstrap_nodes[variants_node].value.default.items(), variants)
 
     # The product and its dependency list are available.
     dependencies = [self._dep_node(variants, d) for d in dep_product.dependencies]

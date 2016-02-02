@@ -96,12 +96,15 @@ class SchedulerTest(unittest.TestCase):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java])
     walk = self.build_and_walk(build_request)
 
-    subjects = [self.guava,
-                Jar(org='org.apache.thrift', name='libthrift', rev='0.9.2'),
-                Jar(org='commons-lang', name='commons-lang', rev='2.5'),
-                Address.parse('src/thrift:slf4j-api'),
-                self.java,
-                self.thrift]
+    # The subgraph below 'src/thrift/codegen/simple' will be affected by its default variants.
+    subjects = [
+        self.guava,
+        self.java,
+        self.thrift]
+    variant_subjects = [
+        Jar(org='org.apache.thrift', name='libthrift', rev='0.9.2'),
+        Jar(org='commons-lang', name='commons-lang', rev='2.5'),
+        Address.parse('src/thrift:slf4j-api')]
 
     # Root: expect compilation via javac.
     self.assertEqual((SelectNode(self.java, Classpath, None, None), Return(Classpath(creator='javac'))),
@@ -109,6 +112,8 @@ class SchedulerTest(unittest.TestCase):
 
     # Confirm that exactly the expected subjects got Classpaths.
     self.assert_select_for_subjects(walk, Classpath, subjects)
+    self.assert_select_for_subjects(walk, Classpath, variant_subjects,
+                                    variants={'thrift': 'apache_java'})
 
   def test_consumes_resources(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.consumes_resources])
