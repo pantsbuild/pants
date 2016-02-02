@@ -9,6 +9,7 @@ import logging
 import os
 import re
 
+import pathspec
 from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
@@ -92,23 +93,14 @@ class BuildFile(AbstractClass):
     :param pants_build_ignore: List of paths to exclude from the scan.
       Each path should be a relative to the build root.
     """
-    def relativize(paths, build_root):
-      for path in paths:
+    def convert_to_gitignore_syntax(spec_excludes, build_root):
+      for path in spec_excludes:
         if os.path.isabs(path):
           realpath = os.path.realpath(path)
           if realpath.startswith(build_root):
-            yield fast_relpath(realpath, build_root)
+            yield '/' + fast_relpath(realpath, build_root)
         else:
-          yield path
-
-    def find_excluded(root, dirnames, exclude_roots):
-      """Removes any of the directories specified in exclude_roots from dirs.
-      """
-      to_remove = set()
-      for dirname in dirnames:
-        if os.path.join(root, dirname) in exclude_roots or (root == '.' and (dirname in exclude_roots)):
-          to_remove.add(dirname)
-      return to_remove
+          yield '/' + path
 
     if base_relpath and os.path.isabs(base_relpath):
       raise BuildFile.BadPathError('base_relpath parameter ({}) should be a relative path.'
@@ -121,22 +113,23 @@ class BuildFile(AbstractClass):
 
     ignore_patterns = set()
     if spec_excludes:
-      ignore_patterns.update(relativize(spec_excludes, project_tree.build_root))
+      ignore_patterns.update(convert_to_gitignore_syntax(spec_excludes, project_tree.build_root))
     if pants_build_ignore:
       ignore_patterns.update(pants_build_ignore)
+    spec = pathspec.PathSpec.from_lines(pathspec.GitIgnorePattern, ignore_patterns)
 
-    buildfiles = []
-
+    build_files = set()
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
-      to_remove = find_excluded(root, dirs, ignore_patterns)
-      # For performance, ignore hidden dirs such as .git, .pants.d and .local_artifact_cache.
-      to_remove.update(d for d in dirs if d.startswith('.'))
-      for subdir in to_remove:
-        dirs.remove(subdir)
+      excluded_dirs = list(spec.match_files([os.path.join(root, dirname) + '/' for dirname in dirs]))
+      for subdir in excluded_dirs:
+        dirs.remove(fast_relpath(subdir, root)[:-1])
       for filename in files:
         if BuildFile._is_buildfile_name(filename):
-          buildfiles.append(BuildFile._cached(project_tree, os.path.join(root, filename)))
-    return OrderedSet(sorted(buildfiles, key=lambda buildfile: buildfile.full_path))
+          build_files.add(os.path.join(root, filename))
+
+    build_files_without_ignores = build_files.difference(spec.match_files(build_files))
+    return OrderedSet(sorted([BuildFile(project_tree, relpath) for relpath in build_files_without_ignores],
+                             key=lambda build_file: build_file.full_path))
 
   def __init__(self, project_tree, relpath, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
