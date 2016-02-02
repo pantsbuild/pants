@@ -10,6 +10,7 @@ import os
 import re
 
 import pathspec
+from pathspec.pathspec import PathSpec
 from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
@@ -80,6 +81,7 @@ class BuildFile(AbstractClass):
     :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
       or paths that are relative to the root_dir.
     :param pants_build_ignore: .gitignore like patterns to exclude from BUILD files scan.
+    :type pants_build_ignore: pathspec.pathspec.PathSpec
     """
     def convert_to_gitignore_syntax(spec_excludes, build_root):
       for path in spec_excludes:
@@ -96,24 +98,28 @@ class BuildFile(AbstractClass):
     if base_relpath and not project_tree.isdir(base_relpath):
       raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir.'
                                    .format(base_relpath))
+    if pants_build_ignore is None:
+      pants_build_ignore = pathspec.PathSpec.from_lines(pathspec.GitIgnorePattern, [])
+    if not isinstance(pants_build_ignore, PathSpec):
+      raise TypeError("pants_build_ignore should be pathspec.pathspec.PathSpec instance, "
+                      "instead {} was given.".format(type(pants_build_ignore)))
 
-    ignore_patterns = set()
     if spec_excludes:
-      ignore_patterns.update(convert_to_gitignore_syntax(spec_excludes, project_tree.build_root))
-    if pants_build_ignore:
-      ignore_patterns.update(pants_build_ignore)
-    spec = pathspec.PathSpec.from_lines(pathspec.GitIgnorePattern, ignore_patterns)
+      # Hack, will be removed after spec_excludes removal.
+      pants_build_ignore.patterns.append(pathspec.PathSpec.from_lines(
+        pathspec.GitIgnorePattern,
+        convert_to_gitignore_syntax(spec_excludes, project_tree.build_root)).patterns)
 
     build_files = set()
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
-      excluded_dirs = list(spec.match_files([os.path.join(root, dirname) + '/' for dirname in dirs]))
+      excluded_dirs = list(pants_build_ignore.match_files([os.path.join(root, dirname) + '/' for dirname in dirs]))
       for subdir in excluded_dirs:
         dirs.remove(fast_relpath(subdir, root)[:-1])
       for filename in files:
         if BuildFile._is_buildfile_name(filename):
           build_files.add(os.path.join(root, filename))
 
-    build_files_without_ignores = build_files.difference(spec.match_files(build_files))
+    build_files_without_ignores = build_files.difference(pants_build_ignore.match_files(build_files))
     return OrderedSet(sorted([BuildFile(project_tree, relpath) for relpath in build_files_without_ignores],
                              key=lambda build_file: build_file.full_path))
 

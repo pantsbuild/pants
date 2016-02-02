@@ -10,6 +10,9 @@ import shutil
 import tempfile
 import unittest
 
+import pathspec
+from pathspec.gitignore import GitIgnorePattern
+
 from pants.base.build_file import BuildFile
 from pants.util.dirutil import safe_mkdir, touch
 
@@ -25,8 +28,11 @@ class BuildFileTestBase(unittest.TestCase):
     touch(self.fullpath(path))
 
   def scan_buildfiles(self, base_relpath, pants_build_ignore=None):
-    return BuildFile.scan_build_files(self._project_tree, base_relpath,
-                                      pants_build_ignore=pants_build_ignore)
+    if pants_build_ignore is not None:
+      spec = pathspec.PathSpec.from_lines(GitIgnorePattern, pants_build_ignore)
+    else:
+      spec = pathspec.PathSpec.from_lines(GitIgnorePattern, [])
+    return BuildFile.scan_build_files(self._project_tree, base_relpath, pants_build_ignore=spec)
 
   def create_buildfile(self, relpath):
     return BuildFile(self._project_tree, relpath)
