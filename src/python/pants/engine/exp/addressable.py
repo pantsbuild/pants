@@ -13,8 +13,23 @@ from functools import update_wrapper
 import six
 
 from pants.build_graph.address import Address
-from pants.engine.exp.objects import Resolvable, Serializable
+from pants.engine.exp.objects import Resolvable, Serializable, datatype
 from pants.util.meta import AbstractClass
+
+
+class Directory(datatype('Directory', ['path'])):
+  pass
+
+
+class StructAddress(datatype('StructAddress', ['spec_path', 'name'])):
+  """This class helps avoid cycles in the "Address might be resolved via a Struct" special case.
+
+  TODO: scheduler.SelectNode defines a special case where it inserts an implicit task that
+  attempts to resolve any subclass of Struct for an Address by requesting the Struct superclass
+  as well. It wraps the subject in this class to avoid causing cycles on the special case.
+  Ideally we could kill that special case in favor of something more principaled.
+  """
+  pass
 
 
 class TypeConstraint(AbstractClass):

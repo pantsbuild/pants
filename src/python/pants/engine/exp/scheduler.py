@@ -16,7 +16,7 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import parse_variants
+from pants.engine.exp.addressable import StructAddress, parse_variants
 from pants.engine.exp.objects import Serializable, datatype
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target, Variants
@@ -231,8 +231,9 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     # TODO: This node defines a special case for Addresses and Structs by recognizing that they
     # might be-a Product after resolution, and so it begins by attempting to resolve a Struct for
     # a subject Address. This type of cast/conversion should likely be reified.
-    if isinstance(self.subject, Address) and self.product != Struct and issubclass(self.product, Struct):
-      yield SelectNode(self.subject, Struct, self.variants, None)
+    if isinstance(self.subject, Address) and issubclass(self.product, Struct):
+      struct_address = StructAddress(self.subject.spec_path, self.subject.target_name)
+      yield SelectNode(struct_address, Struct, self.variants, None)
 
   def step(self, dependency_states, node_builder):
     # If the Subject "is a" or "has a" Product, then we're done.
