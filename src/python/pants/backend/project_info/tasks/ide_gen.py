@@ -10,6 +10,8 @@ import os
 import shutil
 from collections import defaultdict
 
+import pathspec
+from pathspec.gitignore import GitIgnorePattern
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -184,6 +186,13 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                    isinstance(t, Resources)]
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
+
+    pants_build_ignore_paths = self.context.options.for_global_scope().pants_build_ignore
+    if pants_build_ignore_paths:
+      pants_build_ignore = pathspec.PathSpec.from_lines(GitIgnorePattern, pants_build_ignore_paths)
+    else:
+      pants_build_ignore = pathspec.PathSpec.from_lines(GitIgnorePattern, [])
+
     project = Project(self.project_name,
                       self.python,
                       self.skip_java,
@@ -195,7 +204,8 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                       jvm_targets,
                       not self.intransitive,
                       self.TargetUtil(self.context),
-                      self.context.options.for_global_scope().spec_excludes)
+                      self.context.options.for_global_scope().spec_excludes,
+                      pants_build_ignore)
 
     if self.python:
       python_source_paths = self.get_options().python_source_paths
@@ -451,7 +461,7 @@ class Project(object):
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               debug_port, context, targets, transitive, target_util, spec_excludes):
+               debug_port, context, targets, transitive, target_util, spec_excludes, pants_build_ignore):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
     self.context = context
@@ -478,6 +488,7 @@ class Project(object):
     self.internal_jars = OrderedSet()
     self.external_jars = OrderedSet()
     self.spec_excludes = spec_excludes
+    self.pants_build_ignore = pants_build_ignore
 
   def configure_python(self, source_paths, test_paths, lib_paths):
     self.py_sources.extend(SourceSet(get_buildroot(), root, None) for root in source_paths)
@@ -593,10 +604,12 @@ class Project(object):
         build_file = target.address.build_file
         dir_relpath = os.path.dirname(build_file.relpath)
         for descendant in BuildFile.scan_build_files(build_file.project_tree, dir_relpath,
-                                                     spec_excludes=self.spec_excludes):
+                                                     spec_excludes=self.spec_excludes,
+                                                     pants_build_ignore=self.pants_build_ignore):
           candidates.update(self.target_util.get_all_addresses(descendant))
         if not self._is_root_relpath(dir_relpath):
-          for ancestor in self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath)):
+          for ancestor in self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath),
+                                                             self.pants_build_ignore):
             candidates.update(self.target_util.get_all_addresses(ancestor))
 
         def is_sibling(target):
@@ -688,12 +701,12 @@ class Project(object):
     self.scala_compiler_classpath = scalac_classpath
 
   @classmethod
-  def _collect_ancestor_build_files(cls, project_tree, dir_relpath):
-    for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath):
+  def _collect_ancestor_build_files(cls, project_tree, dir_relpath, pants_build_ignore):
+    for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath, pants_build_ignore):
       yield build_file
     while not cls._is_root_relpath(dir_relpath):
       dir_relpath = os.path.dirname(dir_relpath)
-      for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath):
+      for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath, pants_build_ignore):
         yield build_file
 
   @classmethod
