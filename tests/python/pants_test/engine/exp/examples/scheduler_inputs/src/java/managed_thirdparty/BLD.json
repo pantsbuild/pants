@@ -9,7 +9,10 @@
         "3rdparty/jvm/managed:hadoop-common",
         "3rdparty/jvm/managed:guava"
       ],
-      "variants": {
+    },
+    {
+      "type_alias": "variants",
+      "default": {
         "resolve": "latest-hadoop"
       }
     }

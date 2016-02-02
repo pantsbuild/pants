@@ -20,7 +20,7 @@ from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
                                         SelectVariant)
 from pants.engine.exp.struct import Struct, StructWithDeps
-from pants.engine.exp.targets import Sources, Target
+from pants.engine.exp.targets import Sources, Target, Variants
 
 
 def printing_func(func):
@@ -316,6 +316,7 @@ class ExampleTable(SymbolTable):
             'scala': ScalaSources,
             'thrift': ThriftSources,
             'target': Target,
+            'variants': Variants,
             'build_properties': BuildPropertiesConfiguration,
             'inferred_scala': ScalaInferredDepsSources}
 

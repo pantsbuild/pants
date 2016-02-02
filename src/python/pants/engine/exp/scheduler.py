@@ -19,7 +19,7 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
 from pants.engine.exp.objects import Serializable, datatype
 from pants.engine.exp.struct import Struct
-from pants.engine.exp.targets import Target
+from pants.engine.exp.targets import Target, Variants
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -94,30 +94,6 @@ class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   def construct_node(self, subject, variants):
     # NB: Intentionally ignores subject parameter to provide a literal subject.
     return SelectNode(self.subject, self.product, variants, None)
-
-
-class Variants(object):
-  """Variants are key-value pairs representing uniquely identifying parameters for a Node.
-
-  They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
-  stored as sorted nested tuples of key-value strings.
-  """
-
-  @classmethod
-  def merge(cls, left, right):
-    """Merges right over left, ensuring that the return value is a tuple of tuples, or None."""
-    if not left:
-      if right:
-        return tuple(right)
-      else:
-        return None
-    if not right:
-      return tuple(left)
-    # Merge by key, and then return sorted by key.
-    merged = dict(left)
-    for key, value in right:
-      merged[key] = value
-    return tuple(sorted(merged.items(), key=lambda x: x[0]))
 
 
 class SchedulingError(Exception):
@@ -295,8 +271,10 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
   order of declaration in the `dependencies` list of the `dep_product`.
   """
 
-  def _dep_product_node(self):
-    return SelectNode(self.subject, self.dep_product, self.variants, None)
+  def _bootstrap_nodes(self):
+    """Returns a tuple of Selects for the dep_product, and for Variants for the subject."""
+    return (SelectNode(self.subject, self.dep_product, self.variants, None),
+            SelectNode(self.subject, Variants, self.variants, None))
 
   def _dep_node(self, variants, dependency):
     if isinstance(dependency, Address):
@@ -306,28 +284,39 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     return SelectNode(dependency, self.product, variants, None)
 
   def step(self, dependency_states, node_builder):
-    dep_product_state = dependency_states.get(self._dep_product_node(), None)
-    if dep_product_state is None or type(dep_product_state) == Waiting:
-      # Wait for the product which hosts the dependency list we need.
-      return Waiting([self._dep_product_node()])
-    elif type(dep_product_state) == Throw:
-      return Throw('Could not compute {} to determine dependencies.'.format(self._dep_product_node()))
-    elif type(dep_product_state) != Return:
-      State.raise_unrecognized(dep_product_state)
+    # Request the bootstrap products we need in order to request dependencies.
+    (dep_product_node, variants_node) = bootstrap_nodes = self._bootstrap_nodes()
+    bootstrap_nodes = {node: dependency_states.get(node, None) for node in bootstrap_nodes}
+    for node, state in bootstrap_nodes.items():
+      if state is None or type(state) == Waiting:
+        # Wait for the bootstrap nodes, which host the dependency list and variants.
+        return Waiting(bootstrap_nodes.keys())
+
+    # Both bootstrap nodes are ready: we need a return value for a dependencies list, but we
+    # can accept a failure for the variants.
+    # TODO: need to formalize optionality so that we don't treat exceptions as "normal" here.
+    if type(bootstrap_nodes[dep_product_node]) == Throw:
+      return Throw('Could not compute {} to determine dependencies.'.format(dep_product_node))
+    elif type(bootstrap_nodes[dep_product_node]) != Return:
+      State.raise_unrecognized(bootstrap_nodes[dep_product_node])
+    dep_product = bootstrap_nodes[dep_product_node].value
+    
+    # Merge the subject's default variants (if any).
+    variant_state = bootstrap_nodes[variants_node]
+    variants = self.variants
+    if type(bootstrap_nodes[variants_node]) == Return:
+      # A subject's variants are overridden by the dependent's requested variants, so
+      # we merge them left to right here.
+      variants = Variants.merge(bootstrap_nodes[variants_node].value.defaults, variants)
 
     # The product and its dependency list are available.
-    dep_product = dep_product_state.value
-    variants = self.variants
-    if getattr(dep_product, 'variants', None):
-      # A subject's variants are overridden by the dependent's requested variants.
-      variants = Variants.merge(dep_product.variants.items(), variants)
     dependencies = [self._dep_node(variants, d) for d in dep_product.dependencies]
     for dependency in dependencies:
       dep_state = dependency_states.get(dependency, None)
       if dep_state is None or type(dep_state) == Waiting:
         # One of the dependencies is not yet available. Indicate that we are waiting for all
         # of them.
-        return Waiting([self._dep_product_node()] + dependencies)
+        return Waiting(list(bootstrap_nodes.keys()) + dependencies)
       elif type(dep_state) == Throw:
         return Throw('Failed to compute dependency {}'.format(dependency))
       elif type(dep_state) != Return:
