@@ -34,8 +34,8 @@ def format_subject(node):
 
 
 def format_product(node):
-  if type(node) == SelectNode and node.variant:
-    return '{}@{}'.format(node.product.__name__, node.variant)
+  if type(node) == SelectNode and node.variant_key:
+    return '{}@{}'.format(node.product.__name__, node.variant_key)
   return node.product.__name__
 
 

@@ -38,10 +38,10 @@ class SchedulerTest(unittest.TestCase):
     self.managed_hadoop = Address.parse('3rdparty/jvm/managed:hadoop-common')
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
-  def assert_select_for_subjects(self, walk, product, subjects, variants=None, variant=None):
+  def assert_select_for_subjects(self, walk, product, subjects, variants=None, variant_key=None):
     node_type = SelectNode
     variants = tuple(variants.items()) if variants else None
-    self.assertEqual({node_type(subject, product, variants, variant) for subject in subjects},
+    self.assertEqual({node_type(subject, product, variants, variant_key) for subject in subjects},
                      {node for (node, _), _ in walk
                       if node.product == product and isinstance(node, node_type) and node.variants == variants})
 
@@ -89,8 +89,9 @@ class SchedulerTest(unittest.TestCase):
     self.assertEqual(SelectNode(self.thrift, JavaSources, None, None), root_entry[0])
     self.assertIsInstance(root_entry[1], Return)
 
-    # Expect an ApacheThriftJavaConfiguration to have been used.
-    self.assert_select_for_subjects(walk, ApacheThriftJavaConfiguration, [self.thrift])
+    # Expect an ApacheThriftJavaConfiguration to have been used via the default Variants.
+    self.assert_select_for_subjects(walk, ApacheThriftJavaConfiguration, [self.thrift],
+                                    variants={'thrift': 'apache_java'}, variant_key='thrift')
 
   def test_codegen_simple(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java])

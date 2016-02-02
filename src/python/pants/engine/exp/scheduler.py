@@ -49,12 +49,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   """
 
   def construct_node(self, subject, variants):
-    variant_values = [value for key, value in variants
-                      if key == self.variant_key] if variants else None
-    return SelectNode(subject,
-                      self.product,
-                      variants,
-                      variant_values[0] if variant_values else None)
+    return SelectNode(subject, self.product, variants, self.variant_key)
 
 
 class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Selector):
@@ -193,7 +188,7 @@ class Node(object):
     """
 
 
-class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant']), Node):
+class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant_key']), Node):
   """A Node that selects a product for a subject.
 
   A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR. The
@@ -203,29 +198,38 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
   SelectNode.
   """
 
-  def _select_literal(self, candidate):
+  def _variants_node(self):
+    if self.product != Variants:
+      return SelectNode(self.subject, Variants, self.variants, None)
+    return None
+
+  def _select_literal(self, candidate, variant_value):
     """Looks for has-a or is-a relationships between the given value and the requested product.
 
     Returns the resulting product value, or None if no match was made.
     """
-    if isinstance(candidate, self.product):
-      # The subject is-a instance of the product.
-      return candidate
-    elif isinstance(candidate, Target):
-      # TODO: returning only the first configuration of a given type/variant. Need to define
-      # mergeability for products.
-      for configuration in candidate.configurations:
-        if type(configuration) != self.product:
-          continue
-        if self.variant and not getattr(configuration, 'name', None) == self.variant:
-          continue
-        return configuration
+    def items():
+      # Check whether the subject is-a instance of the product.
+      yield candidate
+      # Else, check whether it has-a instance of the product.
+      if isinstance(candidate, Target):
+        for configuration in candidate.configurations:
+          yield configuration
+
+    # TODO: returning only the first configuration of a given type/variant. Need to define
+    # mergeability for products.
+    for item in items():
+      if not isinstance(item, self.product):
+        continue
+      if variant_value and not getattr(item, 'name', None) == variant_value:
+        continue
+      return item
     return None
 
-  def _task_sources(self, node_builder):
+  def _task_sources(self, node_builder, variants):
     """Returns a sequence of potential source Nodes for this Select."""
     # Tasks.
-    for task_node in node_builder.task_nodes(self.subject, self.product, self.variants):
+    for task_node in node_builder.task_nodes(self.subject, self.product, variants):
       yield task_node
     # An Address that can be resolved into a Struct.
     # TODO: This node defines a special case for Addresses and Structs by recognizing that they
@@ -233,17 +237,41 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     # a subject Address. This type of cast/conversion should likely be reified.
     if isinstance(self.subject, Address) and issubclass(self.product, Struct):
       struct_address = StructAddress(self.subject.spec_path, self.subject.target_name)
-      yield SelectNode(struct_address, Struct, self.variants, None)
+      yield SelectNode(struct_address, Struct, variants, None)
 
   def step(self, dependency_states, node_builder):
+    # Request default Variants for the subject, so that if there are any we can propagate
+    # them to task nodes.
+    variants = self.variants
+    variants_node = self._variants_node()
+    if variants_node:
+      dep_state = dependency_states.get(variants_node, None)
+      if dep_state is None or type(dep_state) == Waiting:
+        return Waiting([variants_node])
+      elif type(dep_state) == Return:
+        # A subject's variants are overridden by any dependent's requested variants, so
+        # we merge them left to right here.
+        variants = Variants.merge(dep_state.value.default.items(), variants)
+
+    # If there is a variant_key, see whether it has been configured.
+    variant_value = None
+    if self.variant_key:
+      variant_values = [value for key, value in variants
+                        if key == self.variant_key] if variants else None
+      if not variant_values:
+        # Select cannot be satisfied: no variant configured for this key.
+        return Throw('Variant key {} was not configured in variants {}'.format(
+          self.variant_key, variants))
+      variant_value = variant_values[0]
+
     # If the Subject "is a" or "has a" Product, then we're done.
-    literal_value = self._select_literal(self.subject)
+    literal_value = self._select_literal(self.subject, variant_value)
     if literal_value is not None:
       return Return(literal_value)
 
     # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
-    dependencies = list(self._task_sources(node_builder))
+    dependencies = list(self._task_sources(node_builder, variants))
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
       if dep_state is None or type(dep_state) == Waiting:
@@ -254,7 +282,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       elif type(dep_state) != Return:
         State.raise_unrecognized(dep_state)
       # We computed a value: see whether we can use it.
-      literal_value = self._select_literal(dep_state.value)
+      literal_value = self._select_literal(dep_state.value, variant_value)
       if literal_value is not None:
         return Return(literal_value)
     if has_waiting_dep:
@@ -272,12 +300,11 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
   order of declaration in the `dependencies` list of the `dep_product`.
   """
 
-  def _bootstrap_nodes(self):
-    """Returns a tuple of Selects for the dep_product, and for Variants for the subject."""
-    return (SelectNode(self.subject, self.dep_product, self.variants, None),
-            SelectNode(self.subject, Variants, self.variants, None))
+  def _dep_product_node(self):
+    return SelectNode(self.subject, self.dep_product, self.variants, None)
 
-  def _dep_node(self, variants, dependency):
+  def _dep_node(self, dependency):
+    variants = self.variants
     if isinstance(dependency, Address):
       # If a subject has literal variants for particular dependencies, they win over all else.
       dependency, literal_variants = parse_variants(dependency)
@@ -285,39 +312,25 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     return SelectNode(dependency, self.product, variants, None)
 
   def step(self, dependency_states, node_builder):
-    # Request the bootstrap products we need in order to request dependencies.
-    (dep_product_node, variants_node) = bootstrap_nodes = self._bootstrap_nodes()
-    bootstrap_nodes = {node: dependency_states.get(node, None) for node in bootstrap_nodes}
-    for node, state in bootstrap_nodes.items():
-      if state is None or type(state) == Waiting:
-        # Wait for the bootstrap nodes, which host the dependency list and variants.
-        return Waiting(bootstrap_nodes.keys())
-
-    # Both bootstrap nodes are ready: we need a return value for a dependencies list, but we
-    # can accept a failure for the variants.
-    # TODO: need to formalize optionality so that we don't treat exceptions as "normal" here.
-    if type(bootstrap_nodes[dep_product_node]) == Throw:
+    # Request the product we need in order to request dependencies.
+    dep_product_node = self._dep_product_node()
+    dep_product_state = dependency_states.get(dep_product_node, None)
+    if dep_product_state is None or type(dep_product_state) == Waiting:
+      return Waiting([dep_product_node])
+    elif type(dep_product_state) == Throw:
       return Throw('Could not compute {} to determine dependencies.'.format(dep_product_node))
-    elif type(bootstrap_nodes[dep_product_node]) != Return:
-      State.raise_unrecognized(bootstrap_nodes[dep_product_node])
-    dep_product = bootstrap_nodes[dep_product_node].value
-    
-    # Merge the subject's default variants (if any).
-    variant_state = bootstrap_nodes[variants_node]
-    variants = self.variants
-    if type(bootstrap_nodes[variants_node]) == Return:
-      # A subject's variants are overridden by the dependent's requested variants, so
-      # we merge them left to right here.
-      variants = Variants.merge(bootstrap_nodes[variants_node].value.default.items(), variants)
+    elif type(dep_product_state) != Return:
+      State.raise_unrecognized(dep_product_state)
 
     # The product and its dependency list are available.
-    dependencies = [self._dep_node(variants, d) for d in dep_product.dependencies]
+    dep_product = dep_product_state.value
+    dependencies = [self._dep_node(d) for d in dep_product.dependencies]
     for dependency in dependencies:
       dep_state = dependency_states.get(dependency, None)
       if dep_state is None or type(dep_state) == Waiting:
         # One of the dependencies is not yet available. Indicate that we are waiting for all
         # of them.
-        return Waiting(list(bootstrap_nodes.keys()) + dependencies)
+        return Waiting([dep_product_node] + dependencies)
       elif type(dep_state) == Throw:
         return Throw('Failed to compute dependency {}'.format(dependency))
       elif type(dep_state) != Return:
