@@ -278,7 +278,7 @@ class ClasspathUtil(object):
           if entry.is_excluded_by(excludes):
             continue
 
-          # Avoid creating symlink on the same entry twice
+          # Avoid creating symlink for the same entry twice
           if entry in processed_entries:
             continue
 
