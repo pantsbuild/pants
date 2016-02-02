@@ -5,6 +5,8 @@
 *.pyc
 *.hprof
 *.swp
+*.sublime-project
+*.sublime-workspace
 *~
 *#
 .#*
