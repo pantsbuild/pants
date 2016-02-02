@@ -237,7 +237,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     # a subject Address. This type of cast/conversion should likely be reified.
     if isinstance(self.subject, Address) and issubclass(self.product, Struct):
       struct_address = StructAddress(self.subject.spec_path, self.subject.target_name)
-      yield SelectNode(struct_address, Struct, variants, None)
+      yield SelectNode(struct_address, Struct, None, None)
 
   def step(self, dependency_states, node_builder):
     # Request default Variants for the subject, so that if there are any we can propagate
