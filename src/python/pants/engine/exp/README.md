@@ -153,10 +153,15 @@ might need to identify a globally consistent ivy resolve for a test target.  To 
 engine introduces the concept of `variants`, which are passed recursively from dependents to
 dependencies.
 
-If the configurations of a Target are ambiguous, consumers can use a `@[type]=[name]` address
-syntax extension to pass a variant that selects the appropriate configuration.  A dependency
+If a task indicates that a variant is required, consumers can use a `@[type]=[name]` address
+syntax extension to pass a variant that matches a particular configuration for a task. A dependency
 declared as `src/java/com/example/lib:lib` specifies no particular variant, but
 `src/java/com/example/lib:lib@java=java8` asks for the configured variant of the lib named "java8".
+
+Additionally, it is possible to specify the "default" variants for a Target by adding a
+`Variants(default=..)` configuration. Again, since the purpose of variants is to collect
+information from dependents, only default variant values which have not been set by a dependent
+will be used.
 
 #### Selectors
 
