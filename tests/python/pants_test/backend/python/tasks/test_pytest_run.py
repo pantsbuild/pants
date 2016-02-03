@@ -117,6 +117,16 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
           pass
       """)
     )
+    self.create_file(
+      'tests/test_failure_outside_function.py',
+      dedent("""
+      def null():
+        pass
+
+      assert(False)
+      """
+        )
+    )
     self.add_to_build_file(
         'tests',
         dedent("""
@@ -124,6 +134,13 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
             name='error',
             sources=[
               'test_error.py'
+            ],
+          )
+
+          python_tests(
+            name='failure_outside_function',
+            sources=[
+              'test_failure_outside_function.py',
             ],
           )
 
@@ -226,6 +243,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
     self.sleep_timeout = self.target('tests:sleep_timeout')
     self.error = self.target('tests:error')
+    self.failure_outside_function = self.target('tests:failure_outside_function')
 
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
@@ -234,6 +252,12 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     """Test that a test that errors rather than fails shows up in TestFailedTaskError."""
 
     self.run_failing_tests(targets=[self.red, self.green, self.error], failed_targets=[self.red, self.error])
+
+  def test_error_outside_function(self):
+    # If the test is outside a class or function, the failure line is in the following format:
+    # F testprojects/tests/python/pants/constants_only/test_fail.py
+    self.run_failing_tests(targets=[self.red, self.green, self.failure_outside_function],
+                           failed_targets=[self.red, self.failure_outside_function])
 
   def test_green(self):
     self.run_tests(targets=[self.green])
@@ -412,3 +436,17 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     with self.assertRaises(PytestRun.InvalidShardSpecification):
       self.run_tests(targets=[self.green], shard='1/a')
+
+  def test_resultlog_regex(self):
+    regex = PytestRun.RESULTLOG_FAILED_PATTERN
+    for error_failure in ['E', 'F']:
+      self.assertEqual(regex.match('%s filename::class::method' % error_failure).group('file'), 'filename')
+      self.assertEqual(regex.match('%s filename::method' % error_failure).group('file'), 'filename')
+      self.assertEqual(regex.match('%s filename' % error_failure).group('file'), 'filename')
+      self.assertIsNone(regex.match(' %s filename'))
+      self.assertIsNone(regex.match(' filename'))
+      self.assertIsNone(regex.match('filename'))
+      self.assertIsNone(regex.match('%sfilename'))
+      self.assertEqual(regex.match('%s   filename::class:method' % error_failure).group('file'), 'filename')
+      self.assertEqual(regex.match('%s file/name.py::class:method' % error_failure).group('file'), 'file/name.py')
+      self.assertEqual(regex.match('%s file:colons::class::method' % error_failure).group('file'), 'file:colons')
