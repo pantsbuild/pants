@@ -15,10 +15,18 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveResult
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
+
+
+def mock_ivy_resolve_returning(resolve_result):
+  def mock(*args, **kwargs):
+    return resolve_result
+
+  return mock
 
 
 class IvyResolveTest(JvmToolTaskTestBase):
@@ -70,23 +78,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
     def artifact_path(name):
       return os.path.join(self.pants_workdir, 'ivy_artifact', name)
 
-    symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
-                   artifact_path('bogus1'): artifact_path('bogus1'),
-                   artifact_path('unused'): artifact_path('unused')}
-    task = self.create_task(context, 'unused')
+    task = self.create_task(context, workdir='unused')
 
-    def mock_ivy_resolve(targets, *args, **kw):
-      if targets:
-        cache_manager = task.create_cache_manager(False)
-        vts = VersionedTargetSet(cache_manager, cache_manager.wrap_targets(targets))
-        cache_key = vts.cache_key.hash
-      else:
-        cache_key = None
-      return [], symlink_map, cache_key
-
-    task.ivy_resolve = mock_ivy_resolve
-
-    def mock_parse_report(resolve_hash_name_ignored, conf):
+    def mock_ivy_info_for(ivydir_ignored, conf):
       ivy_info = IvyInfo(conf)
 
       # Guava 16.0 would be evicted by Guava 16.0.1.  But in a real
@@ -96,7 +90,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       artifact_1 = artifact_path('bogus0')
       unused_artifact = artifact_path('unused')
 
-      # Because guava 16.0 was evicted, it has no artifacts
+      # Because guava 16.0 was evicted, it has no artifacts.
       guava_0 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0'),
                           None, [])
       guava_1 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0.1'),
@@ -116,7 +110,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       ivy_info.add_module(guava_dep_0)
       ivy_info.add_module(guava_dep_1)
 
-      # Add an unrelated module to ensure that it's not returned
+      # Add an unrelated module to ensure that it's not returned.
       unrelated_parent = IvyModuleRef('com.google.other', 'parent', '1.0')
       unrelated = IvyModule(IvyModuleRef('com.google.unrelated', 'unrelated', '1.0'),
                             unused_artifact, [unrelated_parent])
@@ -124,7 +118,14 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
       return ivy_info
 
-    task._parse_report = mock_parse_report
+    symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
+                   artifact_path('bogus1'): artifact_path('bogus1'),
+                   artifact_path('unused'): artifact_path('unused')}
+    result = IvyResolveResult([], symlink_map, 'some-key-for-a-and-b')
+    result.ivy_info_for= mock_ivy_info_for
+
+    task.ivy_resolve = mock_ivy_resolve_returning(result)
+
     task.execute()
     compile_classpath = context.products.get_data('compile_classpath', None)
     losing_cp = compile_classpath.get_for_target(losing_lib)

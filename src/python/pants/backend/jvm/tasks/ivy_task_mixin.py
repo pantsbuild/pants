@@ -22,10 +22,29 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.task.task import TaskBase
+from pants.util.dirutil import safe_concurrent_creation
 from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
+
+
+class IvyResolveResult(object):
+
+  def __init__(self, classpath, symlink_map, resolve_hash_name):
+    self.classpath = classpath
+    self.symlink_map = symlink_map
+    self.resolve_hash_name = resolve_hash_name
+
+  @property
+  def completed_resolve(self):
+    return self.resolve_hash_name is not None
+
+  def ivy_info_for(self, ivy_cache_dir, conf):
+    return IvyUtils.parse_xml_report(ivy_cache_dir, self.resolve_hash_name, conf)
+
+
+_NO_TARGETS_RESULT = IvyResolveResult([], {}, None)
 
 
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
@@ -131,11 +150,7 @@ class IvyTaskMixin(TaskBase):
 
   def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False, pinned_artifacts=None):
-    classpath_products.add_excludes_for_targets(targets)
-
-    # After running ivy, we parse the resulting report, and record the dependencies for
-    # all relevant targets (ie: those that have direct dependencies).
-    _, symlink_map, resolve_hash_name = self.ivy_resolve(
+    result = self.ivy_resolve(
       targets,
       executor=executor,
       workunit_name='ivy-resolve',
@@ -145,50 +160,57 @@ class IvyTaskMixin(TaskBase):
       pinned_artifacts=pinned_artifacts,
     )
 
-    if not resolve_hash_name:
-      # There was no resolve to do, so no 3rdparty deps to process below
+    if not result.completed_resolve:
+      # There was no resolve to do, so no 3rdparty deps to process below.
       return
 
+    jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
+
+    # After running ivy, we parse the resulting reports, and record the dependencies for
+    # all relevant targets (ie: those that have direct dependencies).
     # Record the ordered subset of jars that each jar_library/leaf depends on using
     # stable symlinks within the working copy.
+    classpath_products.add_excludes_for_targets(targets)
+    for conf in confs:
+      for target, resolved_jars in self._collect_resolved_jars_for_targets(result, conf,
+                                                                           jar_library_targets):
+        classpath_products.add_jars_for_targets([target], conf, resolved_jars)
 
-    def new_resolved_jar_with_symlink_path(tgt, cnf, resolved_jar_without_symlink):
-      # There is a focus on being lazy here to avoid `os.path.realpath` when we can.
+    return result.resolve_hash_name
+
+  def _collect_resolved_jars_for_targets(self, result, conf, jar_library_targets):
+    ivy_info = result.ivy_info_for(self.ivy_cache_dir, conf)
+    if not ivy_info:
+      return
+
+    def new_resolved_jar_with_symlink_path(tgt, resolved_jar_without_symlink):
       def candidate_cache_paths():
+        # There is a focus on being lazy here to avoid `os.path.realpath` when we can.
         yield resolved_jar_without_symlink.cache_path
         yield os.path.realpath(resolved_jar_without_symlink.cache_path)
 
-      try:
-        return next(ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
-                                pants_path=symlink_map[cache_path],
-                                cache_path=resolved_jar_without_symlink.cache_path)
-                    for cache_path in candidate_cache_paths() if cache_path in symlink_map)
-      except StopIteration:
+      for c in candidate_cache_paths():
+        pants_path = result.symlink_map.get(c)
+        if pants_path:
+          break
+      else:
         raise self.UnresolvedJarError('Jar {resolved_jar} in {spec} not resolved to the ivy '
                                       'symlink map in conf {conf}.'
                                       .format(spec=tgt.address.spec,
                                               resolved_jar=resolved_jar_without_symlink.cache_path,
-                                              conf=cnf))
+                                              conf=conf))
 
-    # Build the 3rdparty classpath product.
-    for conf in confs:
-      ivy_info = self._parse_report(resolve_hash_name, conf)
-      if not ivy_info:
-        continue
-      ivy_jar_memo = {}
-      jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
-      for target in jar_library_targets:
-        # Add the artifacts from each dependency module.
-        raw_resolved_jars = ivy_info.get_resolved_jars_for_jar_library(target, memo=ivy_jar_memo)
-        resolved_jars = [new_resolved_jar_with_symlink_path(target, conf, raw_resolved_jar)
-                         for raw_resolved_jar in raw_resolved_jars]
-        classpath_products.add_jars_for_targets([target], conf, resolved_jars)
+      return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
+                        pants_path=pants_path,
+                        cache_path=resolved_jar_without_symlink.cache_path)
 
-    return resolve_hash_name
-
-  # Extracted for testing.
-  def _parse_report(self, resolve_hash_name, conf):
-    return IvyUtils.parse_xml_report(self.ivy_cache_dir, resolve_hash_name, conf)
+    ivy_jar_memo = {}
+    for target in jar_library_targets:
+      # Add the artifacts from each dependency module.
+      raw_resolved_jars = ivy_info.get_resolved_jars_for_jar_library(target, memo=ivy_jar_memo)
+      resolved_jars = [new_resolved_jar_with_symlink_path(target, raw_resolved_jar)
+                       for raw_resolved_jar in raw_resolved_jars]
+      yield target, resolved_jars
 
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
@@ -220,10 +242,11 @@ class IvyTaskMixin(TaskBase):
                                         resolved.
     :returns: A tuple of the classpath, a mapping from ivy cache jars to their linked location
               under .pants.d, and the id of the reports associated with the resolve.
-    :rtype: tuple of (list, dict, string)
+    :rtype: IvyResolveResult
     """
+    # If there are no targets, we don't need to do a resolve.
     if not targets:
-      return [], {}, None
+      return _NO_TARGETS_RESULT
 
     confs = confs or ('default',)
     extra_args = extra_args or []
@@ -236,8 +259,10 @@ class IvyTaskMixin(TaskBase):
                           silent=silent,
                           fingerprint_strategy=fingerprint_strategy,
                           use_cache=False) as invalidation_check:
+      # In case all the targets were filtered out somehow in invalidation.
       if not invalidation_check.all_vts:
-        return [], {}, None
+        return _NO_TARGETS_RESULT
+
       global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
       resolve_hash_name = global_vts.cache_key.hash
@@ -258,25 +283,25 @@ class IvyTaskMixin(TaskBase):
           not os.path.exists(raw_target_classpath_file)):
 
         ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
-        raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
-        args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
+        with safe_concurrent_creation(raw_target_classpath_file) as raw_target_classpath_file_tmp:
+          args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
 
-        self._exec_ivy(
-            target_workdir=target_workdir,
-            targets=global_vts.targets,
-            args=args,
-            executor=executor,
-            ivy=ivy,
-            workunit_name=workunit_name,
-            confs=confs,
-            use_soft_excludes=self.get_options().soft_excludes,
-            resolve_hash_name=resolve_hash_name,
-            pinned_artifacts=pinned_artifacts)
+          self._exec_ivy(
+              target_workdir=target_workdir,
+              targets=global_vts.targets,
+              args=args,
+              executor=executor,
+              ivy=ivy,
+              workunit_name=workunit_name,
+              confs=confs,
+              use_soft_excludes=self.get_options().soft_excludes,
+              resolve_hash_name=resolve_hash_name,
+              pinned_artifacts=pinned_artifacts)
 
-        if not os.path.exists(raw_target_classpath_file_tmp):
-          raise self.Error('Ivy failed to create classpath file at {}'
-                           .format(raw_target_classpath_file_tmp))
-        shutil.move(raw_target_classpath_file_tmp, raw_target_classpath_file)
+          if not os.path.exists(raw_target_classpath_file_tmp):
+            raise self.Error('Ivy failed to create classpath file at {}'
+                             .format(raw_target_classpath_file_tmp))
+
         logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
       else:
         logger.debug("Using previously resolved reports: {}".format(existing_report_paths))
@@ -295,8 +320,9 @@ class IvyTaskMixin(TaskBase):
                                                symlink_dir,
                                                target_classpath_file)
 
+      # TODO does this need to be under the lock?
       classpath = IvyUtils.load_classpath_from_cachepath(target_classpath_file)
-      return classpath, symlink_map, resolve_hash_name
+    return IvyResolveResult(classpath, symlink_map, resolve_hash_name)
 
   def _collect_existing_reports(self, confs, resolve_hash_name):
     report_missing = False
