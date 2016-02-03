@@ -43,6 +43,41 @@ class IvyResolveResult(object):
   def ivy_info_for(self, ivy_cache_dir, conf):
     return IvyUtils.parse_xml_report(ivy_cache_dir, self.resolve_hash_name, conf)
 
+  def collect_resolved_jars(self, ivy_cache_dir, conf, targets):
+    ivy_info = self.ivy_info_for(ivy_cache_dir, conf)
+    if not ivy_info:
+      return
+
+    def new_resolved_jar_with_symlink_path(tgt, resolved_jar_without_symlink):
+      def candidate_cache_paths():
+        # There is a focus on being lazy here to avoid `os.path.realpath` when we can.
+        yield resolved_jar_without_symlink.cache_path
+        yield os.path.realpath(resolved_jar_without_symlink.cache_path)
+
+      for cache_path in candidate_cache_paths():
+        pants_path = self.symlink_map.get(cache_path)
+        if pants_path:
+          break
+      else:
+        raise IvyTaskMixin.UnresolvedJarError('Jar {resolved_jar} in {spec} not resolved to the ivy '
+                                      'symlink map in conf {conf}.'
+                                      .format(spec=tgt.address.spec,
+                                              resolved_jar=resolved_jar_without_symlink.cache_path,
+                                              conf=conf))
+
+      return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
+                        pants_path=pants_path,
+                        cache_path=resolved_jar_without_symlink.cache_path)
+
+    jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
+    ivy_jar_memo = {}
+    for target in jar_library_targets:
+      # Add the artifacts from each dependency module.
+      raw_resolved_jars = ivy_info.get_resolved_jars_for_jar_library(target, memo=ivy_jar_memo)
+      resolved_jars = [new_resolved_jar_with_symlink_path(target, raw_resolved_jar)
+                       for raw_resolved_jar in raw_resolved_jars]
+      yield target, resolved_jars
+
 
 _NO_TARGETS_RESULT = IvyResolveResult([], {}, None)
 
@@ -170,45 +205,11 @@ class IvyTaskMixin(TaskBase):
     # stable symlinks within the working copy.
     classpath_products.add_excludes_for_targets(targets)
     for conf in confs:
-      for target, resolved_jars in self._collect_resolved_jars_for_targets(result, conf, targets):
+      for target, resolved_jars in result.collect_resolved_jars(self.ivy_cache_dir,
+                                                                conf, targets):
         classpath_products.add_jars_for_targets([target], conf, resolved_jars)
 
     return result.resolve_hash_name
-
-  def _collect_resolved_jars_for_targets(self, result, conf, targets):
-    ivy_info = result.ivy_info_for(self.ivy_cache_dir, conf)
-    if not ivy_info:
-      return
-
-    def new_resolved_jar_with_symlink_path(tgt, resolved_jar_without_symlink):
-      def candidate_cache_paths():
-        # There is a focus on being lazy here to avoid `os.path.realpath` when we can.
-        yield resolved_jar_without_symlink.cache_path
-        yield os.path.realpath(resolved_jar_without_symlink.cache_path)
-
-      for c in candidate_cache_paths():
-        pants_path = result.symlink_map.get(c)
-        if pants_path:
-          break
-      else:
-        raise self.UnresolvedJarError('Jar {resolved_jar} in {spec} not resolved to the ivy '
-                                      'symlink map in conf {conf}.'
-                                      .format(spec=tgt.address.spec,
-                                              resolved_jar=resolved_jar_without_symlink.cache_path,
-                                              conf=conf))
-
-      return ResolvedJar(coordinate=resolved_jar_without_symlink.coordinate,
-                        pants_path=pants_path,
-                        cache_path=resolved_jar_without_symlink.cache_path)
-
-    jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
-    ivy_jar_memo = {}
-    for target in jar_library_targets:
-      # Add the artifacts from each dependency module.
-      raw_resolved_jars = ivy_info.get_resolved_jars_for_jar_library(target, memo=ivy_jar_memo)
-      resolved_jars = [new_resolved_jar_with_symlink_path(target, raw_resolved_jar)
-                       for raw_resolved_jar in raw_resolved_jars]
-      yield target, resolved_jars
 
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
