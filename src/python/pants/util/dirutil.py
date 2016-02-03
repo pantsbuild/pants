@@ -187,7 +187,7 @@ def safe_concurrent_creation(target_path):
   Useful when concurrent processes may attempt to create a file, and it doesn't matter who wins.
 
   :param target_path: The final target path to rename the temporary path to.
-  :yields: A temporary path containing the original path with a UUID suffix.
+  :yields: A temporary path containing the original path with a unique (uuid4) suffix.
   """
   safe_mkdir_for(target_path)
   tmp_path = '{}.tmp.{}'.format(target_path, uuid.uuid4().hex)
