@@ -12,7 +12,7 @@ from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
 
-from pants.util.dirutil import safe_concurrent_create, safe_mkdir
+from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
@@ -70,12 +70,11 @@ class PythonInterpreterCache(object):
       return self._resolve(interpreter)
     return None
 
-  def _setup_interpreter(self, interpreter, cache_path):
-    def resolve_interpreter(path):
-      os.mkdir(path)  # Parent will already have been created by safe_concurrent_create.
-      os.symlink(interpreter.binary, os.path.join(path, 'python'))
-      return self._resolve(interpreter, path)
-    return safe_concurrent_create(resolve_interpreter, cache_path)
+  def _setup_interpreter(self, interpreter, cache_target_path):
+    with safe_concurrent_creation(cache_target_path) as safe_path:
+      os.mkdir(safe_path)  # Parent will already have been created by safe_concurrent_creation.
+      os.symlink(interpreter.binary, os.path.join(safe_path, 'python'))
+      return self._resolve(interpreter, safe_path)
 
   def _setup_cached(self, filters):
     """Find all currently-cached interpreters."""
