@@ -113,8 +113,8 @@ class BuildFile(AbstractClass):
 
     build_files = set()
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
-      excluded_dirs = list(pants_build_ignore.match_files(('{}/'.format(os.path.join(root, dirname))
-                                                           for dirname in dirs)))
+      excluded_dirs = list(pants_build_ignore.match_files('{}/'.format(os.path.join(root, dirname))
+                                                          for dirname in dirs))
       for subdir in excluded_dirs:
         # Remove trailing '/' from paths which were added to indicate that paths are paths to directories.
         dirs.remove(fast_relpath(subdir, root)[:-1])
@@ -130,8 +130,8 @@ class BuildFile(AbstractClass):
       build_files_without_ignores = rel_paths.difference(pants_build_ignore.match_files(rel_paths))
     else:
       build_files_without_ignores = rel_paths
-    return OrderedSet(sorted((BuildFile._cached(project_tree, relpath) for relpath in build_files_without_ignores),
-                             key=lambda build_file: build_file.full_path))
+    return OrderedSet(sorted(BuildFile._cached(project_tree, relpath) for relpath in build_files_without_ignores),
+                             key=lambda build_file: build_file.full_path)
 
   def __init__(self, project_tree, relpath, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
