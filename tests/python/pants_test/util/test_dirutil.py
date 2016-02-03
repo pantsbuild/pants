@@ -230,4 +230,5 @@ class DirutilTest(unittest.TestCase):
           self.assertTrue(os.path.exists(safe_path))
           raise ZeroDivisionError('zomg')
 
+      self.assertFalse(os.path.exists(safe_path))
       self.assertTrue(os.path.exists(expected_file))
