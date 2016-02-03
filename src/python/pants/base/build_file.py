@@ -13,7 +13,7 @@ from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.util.dirutil import fast_relpath
 from pants.util.meta import AbstractClass
@@ -106,6 +106,10 @@ class BuildFile(AbstractClass):
     :param build_ignore_patterns: .gitignore like patterns to exclude from BUILD files scan.
     :type build_ignore_patterns: pathspec.pathspec.PathSpec
     """
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use build_ignore_patterns instead.')
+
     if base_relpath and os.path.isabs(base_relpath):
       raise BuildFile.BadPathError('base_relpath parameter ({}) should be a relative path.'
                                    .format(base_relpath))

@@ -21,6 +21,7 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
 from pants.build_graph.address import BuildFileAddress
@@ -457,9 +458,13 @@ class Project(object):
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               debug_port, context, targets, transitive, target_util, spec_excludes, build_ignore_patterns):
+               debug_port, context, targets, transitive, target_util, spec_excludes=None, build_ignore_patterns=None):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use build_ignore_patterns instead.')
+
     self.context = context
     self.target_util = target_util
     self.name = name

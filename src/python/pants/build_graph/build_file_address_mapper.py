@@ -12,7 +12,7 @@ from pathspec.gitignore import GitIgnorePattern
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.deprecated import deprecated
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.project_tree import ProjectTree
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -186,7 +186,10 @@ class BuildFileAddressMapper(object):
     """
     return self.scan_build_files(base_path, spec_excludes)
 
-  def scan_build_files(self, base_path, spec_excludes):
+  def scan_build_files(self, base_path, spec_excludes=None):
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use build_ignore_patterns consturctor parameter instead.')
     return BuildFile.scan_build_files(self._project_tree, base_path, spec_excludes,
                                       build_ignore_patterns=self._build_ignore_patterns)
 
@@ -206,6 +209,10 @@ class BuildFileAddressMapper(object):
     :rtype: set of :class:`pants.build_graph.address.Address`
     :raises AddressLookupError: if there is a problem parsing a BUILD file
     """
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use build_ignore_patterns constructor parameter instead.')
+
     root_dir = get_buildroot()
     base_path = None
 

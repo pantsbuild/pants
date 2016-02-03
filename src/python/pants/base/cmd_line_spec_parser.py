@@ -15,6 +15,7 @@ import six
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_file import BuildFile
+from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address_lookup_error import AddressLookupError
 
 
@@ -52,6 +53,10 @@ class CmdLineSpecParser(object):
     """Indicates an invalid command line address selector."""
 
   def __init__(self, root_dir, address_mapper, spec_excludes=None, exclude_target_regexps=None):
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use build_ignore_patterns in address_mapper instead.')
+
     self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
     self._spec_excludes = spec_excludes
