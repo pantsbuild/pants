@@ -134,6 +134,7 @@ class GlobalOptionsRegistrar(Optionable):
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
     register('--spec-excludes', advanced=True, action='append',
              default=[register.bootstrap.pants_workdir],
+             deprecated_hint='Use --build-file-ignore instead.', deprecated_version='0.0.75',
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
     register('--build-file-ignore', advanced=True, action='append',
