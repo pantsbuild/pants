@@ -143,8 +143,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
       self.resolve(executor=executor,
                    targets=targets,
                    classpath_products=compile_classpath,
-                   confs=confs,
-                   extra_args=())
+                   confs=confs)
     return compile_classpath
 
   def generate_targets_map(self, targets, classpath_products=None):

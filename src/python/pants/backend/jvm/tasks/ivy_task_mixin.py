@@ -116,6 +116,7 @@ class IvyTaskMixin(TaskBase):
     :returns: The id of the reports associated with this resolve.
     :rtype: string
     """
+    confs = confs or ('default',)
     targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
     resolve_hash_names = []
     for artifact_set, target_subset in targets_by_sets.items():
@@ -131,7 +132,6 @@ class IvyTaskMixin(TaskBase):
   def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False, pinned_artifacts=None):
     classpath_products.add_excludes_for_targets(targets)
-    confs = confs or ('default',)
 
     # After running ivy, we parse the resulting report, and record the dependencies for
     # all relevant targets (ie: those that have direct dependencies).
@@ -140,7 +140,7 @@ class IvyTaskMixin(TaskBase):
       executor=executor,
       workunit_name='ivy-resolve',
       confs=confs,
-      custom_args=extra_args,
+      extra_args=extra_args,
       invalidate_dependents=invalidate_dependents,
       pinned_artifacts=pinned_artifacts,
     )
@@ -199,7 +199,7 @@ class IvyTaskMixin(TaskBase):
                   silent=False,
                   workunit_name=None,
                   confs=None,
-                  custom_args=None,
+                  extra_args=None,
                   invalidate_dependents=False,
                   pinned_artifacts=None):
     """Resolves external dependencies for the given targets.
@@ -214,22 +214,18 @@ class IvyTaskMixin(TaskBase):
 
     :param confs: The ivy configurations to resolve; ('default',) by default.
     :type confs: :class:`collections.Iterable` of string
-    :param custom_args: Any extra command line arguments to pass to ivy.
-    :type custom_args: list of string
+    :param extra_args: Any extra command line arguments to pass to ivy.
+    :type extra_args: list of string
     :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
                                         resolved.
     :returns: A tuple of the classpath, a mapping from ivy cache jars to their linked location
               under .pants.d, and the id of the reports associated with the resolve.
     :rtype: tuple of (list, dict, string)
     """
-    confs = confs or ('default',)
     if not targets:
       return [], {}, None
 
-    ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
-
-    ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
-
+    confs = confs or ('default',)
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
     # NB: See class pydoc regarding `use_cache=False`.
@@ -244,6 +240,7 @@ class IvyTaskMixin(TaskBase):
 
       resolve_hash_name = global_vts.cache_key.hash
 
+      ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
       target_workdir = os.path.join(ivy_workdir, resolve_hash_name)
 
       target_classpath_file = os.path.join(target_workdir, 'classpath')
@@ -257,8 +254,10 @@ class IvyTaskMixin(TaskBase):
       if (invalidation_check.invalid_vts or
           any_report_missing or
           not os.path.exists(raw_target_classpath_file)):
+
+        ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
         raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
-        args = ['-cachepath', raw_target_classpath_file_tmp] + (custom_args if custom_args else [])
+        args = ['-cachepath', raw_target_classpath_file_tmp] + (extra_args if extra_args else [])
 
         self._exec_ivy(
             target_workdir=target_workdir,

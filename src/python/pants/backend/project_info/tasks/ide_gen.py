@@ -168,8 +168,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     self.resolve(executor=executor,
                  targets=targets,
                  classpath_products=compile_classpath,
-                 confs=confs,
-                 extra_args=())
+                 confs=confs)
     return compile_classpath
 
   def _prepare_project(self):
