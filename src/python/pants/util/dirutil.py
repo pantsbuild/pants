@@ -181,11 +181,13 @@ def safe_concurrent_rename(src, dst):
 
 @contextmanager
 def safe_concurrent_creation(target_path):
-  """A contextmanager that allows for safe concurrent file creation at a well-known path.
+  """A contextmanager that yields a temporary path and renames it to a final target path when the
+  contextmanager exits.
 
   Useful when concurrent processes may attempt to create a file, and it doesn't matter who wins.
 
   :param target_path: The final target path to rename the temporary path to.
+  :yields: A temporary path containing the original path with a UUID suffix.
   """
   safe_mkdir_for(target_path)
   tmp_path = '{}.tmp.{}'.format(target_path, uuid.uuid4().hex)
