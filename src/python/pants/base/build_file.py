@@ -73,6 +73,29 @@ class BuildFile(AbstractClass):
     return BuildFile._cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @staticmethod
+  def _add_spec_excludes_to_build_ignore_patterns(build_root, build_ignore_patterns=None, spec_excludes=None):
+    def convert_to_gitignore_syntax(spec_excludes, build_root):
+      for path in spec_excludes:
+        if os.path.isabs(path):
+          realpath = os.path.realpath(path)
+          if realpath.startswith(build_root):
+            yield '/{}'.format(fast_relpath(realpath, build_root))
+        else:
+          yield '/{}'.format(path)
+
+    if not build_ignore_patterns:
+      build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, [])
+
+    if spec_excludes:
+      # Hack, will be removed after spec_excludes removal.
+      patterns = list(build_ignore_patterns.patterns)
+      patterns.extend(PathSpec.from_lines(GitIgnorePattern,
+        convert_to_gitignore_syntax(spec_excludes, build_root)).patterns)
+      return PathSpec(patterns)
+    else:
+      return build_ignore_patterns
+
+  @staticmethod
   def scan_build_files(project_tree, base_relpath, spec_excludes=None, build_ignore_patterns=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
@@ -83,33 +106,19 @@ class BuildFile(AbstractClass):
     :param build_ignore_patterns: .gitignore like patterns to exclude from BUILD files scan.
     :type build_ignore_patterns: pathspec.pathspec.PathSpec
     """
-    def convert_to_gitignore_syntax(spec_excludes, build_root):
-      for path in spec_excludes:
-        if os.path.isabs(path):
-          realpath = os.path.realpath(path)
-          if realpath.startswith(build_root):
-            yield '/{}'.format(fast_relpath(realpath, build_root))
-        else:
-          yield '/{}'.format(path)
-
     if base_relpath and os.path.isabs(base_relpath):
       raise BuildFile.BadPathError('base_relpath parameter ({}) should be a relative path.'
                                    .format(base_relpath))
     if base_relpath and not project_tree.isdir(base_relpath):
       raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir.'
                                    .format(base_relpath))
-    if build_ignore_patterns is None:
-      build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, [])
-    if not isinstance(build_ignore_patterns, PathSpec):
+    if build_ignore_patterns and not isinstance(build_ignore_patterns, PathSpec):
       raise TypeError("build_ignore_patterns should be pathspec.pathspec.PathSpec instance, "
                       "instead {} was given.".format(type(build_ignore_patterns)))
 
-    if spec_excludes:
-      # Hack, will be removed after spec_excludes removal.
-      patterns = list(build_ignore_patterns.patterns)
-      patterns.extend(PathSpec.from_lines(GitIgnorePattern,
-        convert_to_gitignore_syntax(spec_excludes, project_tree.build_root)).patterns)
-      build_ignore_patterns = PathSpec(patterns)
+    build_ignore_patterns = BuildFile._add_spec_excludes_to_build_ignore_patterns(project_tree.build_root,
+                                                                                  build_ignore_patterns,
+                                                                                  spec_excludes)
 
     build_files = set()
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
