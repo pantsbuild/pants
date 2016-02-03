@@ -9,8 +9,8 @@ import logging
 import os
 import re
 
-import pathspec
-from pathspec.pathspec import PathSpec
+from pathspec import PathSpec
+from pathspec.gitignore import GitIgnorePattern
 from twitter.common.collections import OrderedSet
 
 from pants.base.deprecated import deprecated
@@ -99,7 +99,7 @@ class BuildFile(AbstractClass):
       raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir.'
                                    .format(base_relpath))
     if pants_build_ignore is None:
-      pants_build_ignore = pathspec.PathSpec.from_lines(pathspec.GitIgnorePattern, [])
+      pants_build_ignore = PathSpec.from_lines(GitIgnorePattern, [])
     if not isinstance(pants_build_ignore, PathSpec):
       raise TypeError("pants_build_ignore should be pathspec.pathspec.PathSpec instance, "
                       "instead {} was given.".format(type(pants_build_ignore)))
@@ -107,9 +107,9 @@ class BuildFile(AbstractClass):
     if spec_excludes:
       # Hack, will be removed after spec_excludes removal.
       patterns = list(pants_build_ignore.patterns)
-      patterns.extend(pathspec.PathSpec.from_lines(pathspec.GitIgnorePattern,
+      patterns.extend(PathSpec.from_lines(GitIgnorePattern,
         convert_to_gitignore_syntax(spec_excludes, project_tree.build_root)).patterns)
-      pants_build_ignore = pathspec.PathSpec(patterns)
+      pants_build_ignore = PathSpec(patterns)
 
     build_files = set()
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):

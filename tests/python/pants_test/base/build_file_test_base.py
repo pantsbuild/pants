@@ -10,7 +10,7 @@ import shutil
 import tempfile
 import unittest
 
-import pathspec
+from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
 
 from pants.base.build_file import BuildFile
@@ -28,7 +28,7 @@ class BuildFileTestBase(unittest.TestCase):
     touch(self.fullpath(path))
 
   def _create_ignore_spec(self, pants_build_ignore):
-    return pathspec.PathSpec.from_lines(GitIgnorePattern, pants_build_ignore or [])
+    return PathSpec.from_lines(GitIgnorePattern, pants_build_ignore or [])
 
   def scan_buildfiles(self, base_relpath, pants_build_ignore=None):
     return BuildFile.scan_build_files(self._project_tree, base_relpath,

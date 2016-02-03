@@ -10,7 +10,7 @@ import os
 import shutil
 from collections import defaultdict
 
-import pathspec
+from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
 from twitter.common.collections.orderedset import OrderedSet
 
@@ -188,7 +188,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
 
     pants_build_ignore_paths = self.context.options.for_global_scope().pants_build_ignore
-    pants_build_ignore = pathspec.PathSpec.from_lines(GitIgnorePattern, pants_build_ignore_paths or [])
+    pants_build_ignore = PathSpec.from_lines(GitIgnorePattern, pants_build_ignore_paths or [])
 
     project = Project(self.project_name,
                       self.python,

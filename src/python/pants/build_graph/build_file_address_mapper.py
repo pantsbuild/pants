@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-import pathspec
+from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
 
 from pants.base.build_environment import get_buildroot
@@ -66,7 +66,7 @@ class BuildFileAddressMapper(object):
       # If project_tree is BuildFile class actually.
       # TODO(tabishev): Remove after transition period.
       self._project_tree = project_tree._get_project_tree(self.root_dir)
-    self._pants_build_ignore = pathspec.PathSpec.from_lines(GitIgnorePattern, pants_build_ignore or [])
+    self._pants_build_ignore = PathSpec.from_lines(GitIgnorePattern, pants_build_ignore or [])
 
   @property
   def root_dir(self):
