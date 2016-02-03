@@ -605,8 +605,9 @@ class Project(object):
                                                      pants_build_ignore=self.pants_build_ignore):
           candidates.update(self.target_util.get_all_addresses(descendant))
         if not self._is_root_relpath(dir_relpath):
-          for ancestor in self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath),
-                                                             self.pants_build_ignore):
+          ancestors = self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath),
+                                                         self.pants_build_ignore)
+          for ancestor in ancestors:
             candidates.update(self.target_util.get_all_addresses(ancestor))
 
         def is_sibling(target):
