@@ -278,9 +278,10 @@ class ClasspathUtil(object):
           if entry.is_excluded_by(excludes):
             continue
 
-          # Avoid creating symlink for the same entry twice
+          # Avoid creating symlink for the same entry twice.
           if entry in processed_entries:
             continue
+          processed_entries.add(entry)
 
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
@@ -293,7 +294,6 @@ class ClasspathUtil(object):
 
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
-          processed_entries.add(entry)
 
         if save_classpath_file:
           classpath = [entry.path for entry in classpath_entries_for_target]
