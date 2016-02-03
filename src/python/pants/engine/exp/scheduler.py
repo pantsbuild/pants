@@ -191,7 +191,7 @@ class Node(object):
 class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant_key']), Node):
   """A Node that selects a product for a subject.
 
-  A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR. The
+  A Select can be satisfied by multiple sources, but fails if multiple sources produce a value. The
   'variants' field represents variant configuration that is propagated to dependencies. When
   a task needs to consume a product as configured by the variants map, it uses the SelectVariant
   selector, which introduces the 'variant' value to restrict the names of values selected by a
@@ -216,8 +216,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
         for configuration in candidate.configurations:
           yield configuration
 
-    # TODO: returning only the first configuration of a given type/variant. Need to define
-    # mergeability for products.
+    # TODO: returning only the first literal configuration of a given type/variant. Need to
+    # define mergeability for products.
     for item in items():
       if not isinstance(item, self.product):
         continue
@@ -272,6 +272,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
     dependencies = list(self._task_sources(node_builder, variants))
+    matches = {}
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
       if dep_state is None or type(dep_state) == Waiting:
@@ -284,10 +285,15 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       # We computed a value: see whether we can use it.
       literal_value = self._select_literal(dep_state.value, variant_value)
       if literal_value is not None:
-        return Return(literal_value)
+        matches[dep] = literal_value
     if has_waiting_dep:
       return Waiting(dependencies)
-    return Throw("No source of {}.".format(self))
+    elif len(matches) > 1:
+      msg = '\n  '.join('{}: {}'.format(k, v) for k, v in matches.items())
+      return Throw('More than one source of {}:\n  {}'.format(self, msg))
+    elif len(matches) == 1:
+      return Return(matches.values()[0])
+    return Throw('No source of {}.'.format(self))
 
 
 class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product']), Node):
