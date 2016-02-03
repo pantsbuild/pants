@@ -226,6 +226,8 @@ class IvyTaskMixin(TaskBase):
       return [], {}, None
 
     confs = confs or ('default',)
+    extra_args = extra_args or []
+
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
     # NB: See class pydoc regarding `use_cache=False`.
@@ -257,7 +259,7 @@ class IvyTaskMixin(TaskBase):
 
         ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
         raw_target_classpath_file_tmp = raw_target_classpath_file + '.tmp'
-        args = ['-cachepath', raw_target_classpath_file_tmp] + (extra_args if extra_args else [])
+        args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
 
         self._exec_ivy(
             target_workdir=target_workdir,
