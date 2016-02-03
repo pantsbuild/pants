@@ -46,22 +46,19 @@ class JvmBinaryTask(JarBuilderTask):
   def subsystem_dependencies(cls):
     return super(JvmBinaryTask, cls).subsystem_dependencies() + (Shader.Factory,)
 
-  def list_external_jar_dependencies(self, binary, confs=None):
+  def list_external_jar_dependencies(self, binary):
     """Returns the external jar dependencies of the given binary.
 
     :param binary: The jvm binary target to list transitive external dependencies for.
     :type binary: :class:`pants.backend.jvm.targets.jvm_binary.JvmBinary`
-    :param confs: The ivy configurations to include in the dependencies list, ('default',) by
-                  default.
-    :type confs: :class:`collections.Iterable` of string
     :returns: A list of (jar path, coordinate) tuples.
     :rtype: list of (string, :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`)
     """
     classpath_products = self.context.products.get_data('runtime_classpath')
     classpath_entries = classpath_products.get_artifact_classpath_entries_for_targets(
         binary.closure(bfs=True))
-    confs = confs or ('default',)
-    external_jars = OrderedSet(jar_entry for conf, jar_entry in classpath_entries if conf in confs)
+    external_jars = OrderedSet(jar_entry for conf, jar_entry in classpath_entries
+                               if conf == 'default')
     return [(entry.path, entry.coordinate) for entry in external_jars
             if not entry.is_excluded_by(binary.deploy_excludes)]
 
