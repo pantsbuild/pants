@@ -164,21 +164,18 @@ class IvyTaskMixin(TaskBase):
       # There was no resolve to do, so no 3rdparty deps to process below.
       return
 
-    jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
-
     # After running ivy, we parse the resulting reports, and record the dependencies for
     # all relevant targets (ie: those that have direct dependencies).
     # Record the ordered subset of jars that each jar_library/leaf depends on using
     # stable symlinks within the working copy.
     classpath_products.add_excludes_for_targets(targets)
     for conf in confs:
-      for target, resolved_jars in self._collect_resolved_jars_for_targets(result, conf,
-                                                                           jar_library_targets):
+      for target, resolved_jars in self._collect_resolved_jars_for_targets(result, conf, targets):
         classpath_products.add_jars_for_targets([target], conf, resolved_jars)
 
     return result.resolve_hash_name
 
-  def _collect_resolved_jars_for_targets(self, result, conf, jar_library_targets):
+  def _collect_resolved_jars_for_targets(self, result, conf, targets):
     ivy_info = result.ivy_info_for(self.ivy_cache_dir, conf)
     if not ivy_info:
       return
@@ -204,6 +201,7 @@ class IvyTaskMixin(TaskBase):
                         pants_path=pants_path,
                         cache_path=resolved_jar_without_symlink.cache_path)
 
+    jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
     ivy_jar_memo = {}
     for target in jar_library_targets:
       # Add the artifacts from each dependency module.
