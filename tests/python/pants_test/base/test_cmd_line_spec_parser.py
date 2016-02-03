@@ -131,7 +131,7 @@ class CmdLineSpecParserTest(BaseTest):
     self.assertEqual(sort(Address.parse(addr) for addr in expected),
                      sort(self.spec_parser.parse_addresses(cmdline_spec_list)))
 
-  def test_pants_build_ignore(self):
+  def test_build_ignore_patterns(self):
     expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
 
     # This bogus BUILD file gets in the way of parsing.
@@ -140,7 +140,7 @@ class CmdLineSpecParserTest(BaseTest):
       self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 
     address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
-                                                        pants_build_ignore=['some'])
+                                                        build_ignore_patterns=['some'])
     self.spec_parser = CmdLineSpecParser(self.build_root, address_mapper_with_ignore)
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
 

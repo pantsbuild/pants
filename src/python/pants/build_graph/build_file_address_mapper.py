@@ -52,7 +52,7 @@ class BuildFileAddressMapper(object):
   class InvalidRootError(BuildFileScanError):
     """Indicates an invalid scan root was supplied."""
 
-  def __init__(self, build_file_parser, project_tree, pants_build_ignore=None):
+  def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None):
     """Create a BuildFileAddressMapper.
 
     :param build_file_parser: An instance of BuildFileParser
@@ -66,7 +66,7 @@ class BuildFileAddressMapper(object):
       # If project_tree is BuildFile class actually.
       # TODO(tabishev): Remove after transition period.
       self._project_tree = project_tree._get_project_tree(self.root_dir)
-    self._pants_build_ignore = PathSpec.from_lines(GitIgnorePattern, pants_build_ignore or [])
+    self._build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
 
   @property
   def root_dir(self):
@@ -134,7 +134,7 @@ class BuildFileAddressMapper(object):
     if spec_path not in self._spec_path_to_address_map_map:
       try:
         build_files = list(BuildFile.get_build_files_family(self._project_tree, spec_path,
-                                                            self._pants_build_ignore))
+                                                            self._build_ignore_patterns))
         if not build_files:
           raise self.BuildFileScanError("{spec_path} does not contain any BUILD files."
                                         .format(spec_path=os.path.join(self.root_dir, spec_path)))
@@ -188,7 +188,7 @@ class BuildFileAddressMapper(object):
 
   def scan_build_files(self, base_path, spec_excludes):
     return BuildFile.scan_build_files(self._project_tree, base_path, spec_excludes,
-                                      pants_build_ignore=self._pants_build_ignore)
+                                      build_ignore_patterns=self._build_ignore_patterns)
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
@@ -220,7 +220,7 @@ class BuildFileAddressMapper(object):
       for build_file in BuildFile.scan_build_files(self._project_tree,
                                                    base_relpath=base_path,
                                                    spec_excludes=spec_excludes,
-                                                   pants_build_ignore=self._pants_build_ignore):
+                                                   build_ignore_patterns=self._build_ignore_patterns):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
     except BuildFile.BuildFileError as e:

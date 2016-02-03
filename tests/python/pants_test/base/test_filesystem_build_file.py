@@ -46,7 +46,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
   def test_build_files_family_lookup_with_ignore(self):
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
-    ]), self.get_build_files_family('grandparent/parent', pants_build_ignore=['*.twitter']))
+    ]), self.get_build_files_family('grandparent/parent', build_ignore_patterns=['*.twitter']))
 
   def test_build_files_scan(self):
     self.assertEquals(OrderedSet([
@@ -59,7 +59,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
     ]), self.scan_buildfiles('grandparent/parent'))
 
   def test_build_files_scan_with_relpath_ignore(self):
-    buildfiles = self.scan_buildfiles('', pants_build_ignore=[
+    buildfiles = self.scan_buildfiles('', build_ignore_patterns=[
         'grandparent/parent/child1',
         'grandparent/parent/child2'])
     self.assertEquals(OrderedSet([
@@ -71,7 +71,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
         self.create_buildfile('issue_1742/BUILD.sibling'),
     ]), buildfiles)
 
-    buildfiles = self.scan_buildfiles('grandparent/parent', pants_build_ignore=['grandparent/parent/child1'])
+    buildfiles = self.scan_buildfiles('grandparent/parent', build_ignore_patterns=['grandparent/parent/child1'])
     self.assertEquals(OrderedSet([
         self.create_buildfile('grandparent/parent/BUILD'),
         self.create_buildfile('grandparent/parent/BUILD.twitter'),
@@ -91,7 +91,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
       self.create_buildfile('grandparent/parent/child5/BUILD'),
       self.create_buildfile('issue_1742/BUILD.sibling'),
-    ]), self.scan_buildfiles('', pants_build_ignore=['/parent']))
+    ]), self.scan_buildfiles('', build_ignore_patterns=['/parent']))
 
   def test_build_files_scan_with_wildcard_ignore(self):
     self.assertEquals(OrderedSet([
@@ -100,7 +100,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.create_buildfile('grandparent/parent/BUILD'),
       self.create_buildfile('grandparent/parent/BUILD.twitter'),
       self.create_buildfile('issue_1742/BUILD.sibling'),
-    ]), self.scan_buildfiles('', pants_build_ignore=['**/child*']))
+    ]), self.scan_buildfiles('', build_ignore_patterns=['**/child*']))
 
   def test_build_files_scan_with_build_file_ignore(self):
     self.assertEquals(OrderedSet([
@@ -110,7 +110,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
       self.create_buildfile('grandparent/parent/child5/BUILD'),
       self.create_buildfile('issue_1742/BUILD.sibling'),
-    ]), self.scan_buildfiles('', pants_build_ignore=['BUILD.twitter']))
+    ]), self.scan_buildfiles('', build_ignore_patterns=['BUILD.twitter']))
 
   def test_subdir_ignore(self):
     self.touch('grandparent/child1/BUILD')
@@ -124,7 +124,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
       self.create_buildfile('grandparent/parent/child5/BUILD'),
       self.create_buildfile('issue_1742/BUILD.sibling'),
-    ]), self.scan_buildfiles('', pants_build_ignore=['**/parent/child1']))
+    ]), self.scan_buildfiles('', build_ignore_patterns=['**/parent/child1']))
 
   def test_subdir_file_pattern_ignore(self):
     self.assertEquals(OrderedSet([
@@ -133,7 +133,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.create_buildfile('grandparent/parent/child1/BUILD'),
       self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
       self.create_buildfile('grandparent/parent/child5/BUILD'),
-    ]), self.scan_buildfiles('', pants_build_ignore=['BUILD.*']))
+    ]), self.scan_buildfiles('', build_ignore_patterns=['BUILD.*']))
 
   def test_build_files_scan_with_non_default_relpath_ignore(self):
     self.assertEquals(OrderedSet([
@@ -141,7 +141,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.create_buildfile('grandparent/parent/BUILD.twitter'),
       self.create_buildfile('grandparent/parent/child2/child3/BUILD'),
       self.create_buildfile('grandparent/parent/child5/BUILD'),
-    ]), self.scan_buildfiles('grandparent/parent', pants_build_ignore=['**/parent/child1']))
+    ]), self.scan_buildfiles('grandparent/parent', build_ignore_patterns=['**/parent/child1']))
 
   def test_must_exist_true(self):
     with self.assertRaises(BuildFile.MissingBuildFileError):

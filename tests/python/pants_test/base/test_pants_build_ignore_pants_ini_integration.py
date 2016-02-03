@@ -12,9 +12,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class PantsBuildIgnorePantsIniIntegrationTest(PantsRunIntegrationTest):
-  """Tests the functionality of the pants_build_ignore option in pants.ini ."""
+  """Tests the functionality of the build_ignore_patterns option in pants.ini ."""
 
-  def test_pants_build_ignore_pants_ini(self):
+  def test_build_ignore_patterns_pants_ini(self):
     def output_to_list(output_filename):
       with open(output_filename, 'r') as results_file:
         return set([line.rstrip() for line in results_file.readlines()])

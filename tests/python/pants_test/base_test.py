@@ -144,7 +144,7 @@ class BaseTest(unittest.TestCase):
     return BuildFileAliases(targets={'target': Target})
 
   @property
-  def pants_build_ignore(self):
+  def build_ignore_patterns(self):
     return None
 
   def setUp(self):
@@ -183,7 +183,7 @@ class BaseTest(unittest.TestCase):
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
     self.project_tree = FileSystemProjectTree(self.build_root)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
-                                                 pants_build_ignore=self.pants_build_ignore)
+                                                 build_ignore_patterns=self.build_ignore_patterns)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def buildroot_files(self, relpath=None):

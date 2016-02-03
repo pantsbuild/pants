@@ -27,19 +27,19 @@ class BuildFileTestBase(unittest.TestCase):
   def touch(self, path):
     touch(self.fullpath(path))
 
-  def _create_ignore_spec(self, pants_build_ignore):
-    return PathSpec.from_lines(GitIgnorePattern, pants_build_ignore or [])
+  def _create_ignore_spec(self, build_ignore_patterns):
+    return PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
 
-  def scan_buildfiles(self, base_relpath, pants_build_ignore=None):
+  def scan_buildfiles(self, base_relpath, build_ignore_patterns=None):
     return BuildFile.scan_build_files(self._project_tree, base_relpath,
-                                      pants_build_ignore=self._create_ignore_spec(pants_build_ignore))
+                                      build_ignore_patterns=self._create_ignore_spec(build_ignore_patterns))
 
   def create_buildfile(self, relpath):
     return BuildFile(self._project_tree, relpath)
 
-  def get_build_files_family(self, relpath, pants_build_ignore=None):
+  def get_build_files_family(self, relpath, build_ignore_patterns=None):
     return BuildFile.get_build_files_family(self._project_tree, relpath,
-                                            pants_build_ignore=self._create_ignore_spec(pants_build_ignore))
+                                            build_ignore_patterns=self._create_ignore_spec(build_ignore_patterns))
 
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()

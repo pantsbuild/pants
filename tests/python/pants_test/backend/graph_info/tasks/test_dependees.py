@@ -231,7 +231,7 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
        targets=[self.target('resources/a:a_resources')]
     )
 
-  def test_overlaps_without_pants_build_ignore(self):
+  def test_overlaps_without_build_ignore_patterns(self):
     self.assert_console_output(
       'overlaps:one',
       'overlaps:two',
@@ -242,11 +242,11 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
 
 class ReverseDepmapTestWithPantsBuildIgnore(BaseReverseDepmapTest):
   @property
-  def pants_build_ignore(self):
+  def build_ignore_patterns(self):
     return ['overlaps']
 
-  def test_overlaps_with_pants_build_ignore(self):
+  def test_overlaps_with_build_ignore_patterns(self):
     self.assert_console_output(
       targets=[self.target('common/a')],
-      options={'pants_build_ignore': ['overlaps']}
+      options={'build_ignore_patterns': ['overlaps']}
     )

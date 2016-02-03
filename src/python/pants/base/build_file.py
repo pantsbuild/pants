@@ -73,15 +73,15 @@ class BuildFile(AbstractClass):
     return BuildFile._cached(cls._get_project_tree(root_dir), relpath, must_exist)
 
   @staticmethod
-  def scan_build_files(project_tree, base_relpath, spec_excludes=None, pants_build_ignore=None):
+  def scan_build_files(project_tree, base_relpath, spec_excludes=None, build_ignore_patterns=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
     :param base_relpath: Directory under root_dir to scan.
     :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
       or paths that are relative to the root_dir.
-    :param pants_build_ignore: .gitignore like patterns to exclude from BUILD files scan.
-    :type pants_build_ignore: pathspec.pathspec.PathSpec
+    :param build_ignore_patterns: .gitignore like patterns to exclude from BUILD files scan.
+    :type build_ignore_patterns: pathspec.pathspec.PathSpec
     """
     def convert_to_gitignore_syntax(spec_excludes, build_root):
       for path in spec_excludes:
@@ -98,22 +98,22 @@ class BuildFile(AbstractClass):
     if base_relpath and not project_tree.isdir(base_relpath):
       raise BuildFile.BadPathError('Can only scan directories and {0} is not a valid dir.'
                                    .format(base_relpath))
-    if pants_build_ignore is None:
-      pants_build_ignore = PathSpec.from_lines(GitIgnorePattern, [])
-    if not isinstance(pants_build_ignore, PathSpec):
-      raise TypeError("pants_build_ignore should be pathspec.pathspec.PathSpec instance, "
-                      "instead {} was given.".format(type(pants_build_ignore)))
+    if build_ignore_patterns is None:
+      build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, [])
+    if not isinstance(build_ignore_patterns, PathSpec):
+      raise TypeError("build_ignore_patterns should be pathspec.pathspec.PathSpec instance, "
+                      "instead {} was given.".format(type(build_ignore_patterns)))
 
     if spec_excludes:
       # Hack, will be removed after spec_excludes removal.
-      patterns = list(pants_build_ignore.patterns)
+      patterns = list(build_ignore_patterns.patterns)
       patterns.extend(PathSpec.from_lines(GitIgnorePattern,
         convert_to_gitignore_syntax(spec_excludes, project_tree.build_root)).patterns)
-      pants_build_ignore = PathSpec(patterns)
+      build_ignore_patterns = PathSpec(patterns)
 
     build_files = set()
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):
-      excluded_dirs = list(pants_build_ignore.match_files('{}/'.format(os.path.join(root, dirname))
+      excluded_dirs = list(build_ignore_patterns.match_files('{}/'.format(os.path.join(root, dirname))
                                                           for dirname in dirs))
       for subdir in excluded_dirs:
         # Remove trailing '/' from paths which were added to indicate that paths are paths to directories.
@@ -122,12 +122,12 @@ class BuildFile(AbstractClass):
         if BuildFile._is_buildfile_name(filename):
           build_files.add(os.path.join(root, filename))
 
-    return BuildFile._build_files_from_paths(project_tree, build_files, pants_build_ignore)
+    return BuildFile._build_files_from_paths(project_tree, build_files, build_ignore_patterns)
 
   @staticmethod
-  def _build_files_from_paths(project_tree, rel_paths, pants_build_ignore):
-    if pants_build_ignore:
-      build_files_without_ignores = rel_paths.difference(pants_build_ignore.match_files(rel_paths))
+  def _build_files_from_paths(project_tree, rel_paths, build_ignore_patterns):
+    if build_ignore_patterns:
+      build_files_without_ignores = rel_paths.difference(build_ignore_patterns.match_files(rel_paths))
     else:
       build_files_without_ignores = rel_paths
     return OrderedSet(sorted((BuildFile._cached(project_tree, relpath) for relpath in build_files_without_ignores),
@@ -241,13 +241,13 @@ class BuildFile(AbstractClass):
         yield build
 
   @staticmethod
-  def get_build_files_family(project_tree, dir_relpath, pants_build_ignore=None):
+  def get_build_files_family(project_tree, dir_relpath, build_ignore_patterns=None):
     """Returns all the BUILD files on a path"""
     build_files = set()
     for build in sorted(project_tree.glob1(dir_relpath, '{prefix}*'.format(prefix=BuildFile._BUILD_FILE_PREFIX))):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
         build_files.add(os.path.join(dir_relpath, build))
-    return BuildFile._build_files_from_paths(project_tree, build_files, pants_build_ignore)
+    return BuildFile._build_files_from_paths(project_tree, build_files, build_ignore_patterns)
 
   @deprecated('0.0.72', hint_message='Use get_build_files_family instead.')
   def family(self):
