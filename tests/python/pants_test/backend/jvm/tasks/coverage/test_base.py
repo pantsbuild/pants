@@ -34,7 +34,11 @@ class fake_log(object):
   """
   :API: public
   """
+
   def debug(self, string):
+    """
+    :API: public
+    """
     return
 
 
@@ -42,6 +46,7 @@ class TestCoverageEngine(Coverage):
   """
   :API: public
   """
+
   def __init__(self, settings):
     self.copy2_calls = defaultdict(list)
     self.copytree_calls = defaultdict(list)
