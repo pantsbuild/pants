@@ -140,7 +140,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-build-ignore', advanced=True, action='append',
              default=['.*'],
              help='Ignore these paths when reading BUILD files. Useful to to avoid descending into '
-                  'unneeded directories. Syntax is similar to .gitignore.')
+                  'unneeded directories. Syntax is the same as .gitignore.')
     register('--fail-fast', advanced=True, action='store_true', recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
