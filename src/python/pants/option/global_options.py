@@ -130,8 +130,7 @@ class GlobalOptionsRegistrar(Optionable):
                   "are used.  Multiple constraints may be added.  They will be ORed together.")
     register('--exclude-target-regexp', advanced=True, action='append', default=[],
              metavar='<regexp>',
-             help='Exclude targets that match these regexes. Useful with ::, to ignore broken '
-                  'BUILD files.',
+             help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
     register('--spec-excludes', advanced=True, action='append',
              default=[register.bootstrap.pants_workdir],
