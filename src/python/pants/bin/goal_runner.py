@@ -183,7 +183,7 @@ class GoalRunnerFactory(object):
     self._project_tree = self._get_project_tree(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
     self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._project_tree,
-                                                  self._global_options.pants_build_ignore)
+                                                  self._global_options.build_file_ignore)
     self._build_graph = BuildGraph(self._address_mapper)
     self._spec_parser = CmdLineSpecParser(
       self._root_dir,

@@ -44,7 +44,7 @@ class PantsBuildIgnorePantsIniIntegrationTest(PantsRunIntegrationTest):
                                  '--minimize-output-file={0}'.format(tmp_output)],
                                 config={
                                     'DEFAULT': {
-                                        'pants_build_ignore': [
+                                        'build_file_ignore': [
                                             'testprojects/src/java/org/pantsbuild/testproject/phrases'
                                         ]
                                     }

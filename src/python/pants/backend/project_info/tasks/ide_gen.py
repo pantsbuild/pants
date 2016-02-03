@@ -188,7 +188,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
 
     build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern,
-                                                self.context.options.for_global_scope().pants_build_ignore or [])
+                                                self.context.options.for_global_scope().build_file_ignore or [])
     project = Project(self.project_name,
                       self.python,
                       self.skip_java,
