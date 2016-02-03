@@ -10,6 +10,7 @@ import hashlib
 import itertools
 import os
 from collections import defaultdict
+from multiprocessing import cpu_count
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -128,9 +129,10 @@ class JvmCompile(NailgunTaskBase):
     register('--delete-scratch', advanced=True, default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
-    register('--worker-count', advanced=True, type=int, default=1,
+    register('--worker-count', advanced=True, type=int, default=cpu_count(),
              help='The number of concurrent workers to use when '
-                  'compiling with {task}.'.format(task=cls._name))
+                  'compiling with {task}. Defaults to the '
+                  'current machine\'s CPU count.'.format(task=cls._name))
 
     register('--size-estimator', advanced=True,
              choices=list(cls.size_estimators.keys()), default='filesize',
