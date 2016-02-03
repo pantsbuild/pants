@@ -130,8 +130,8 @@ class BuildFile(AbstractClass):
       build_files_without_ignores = rel_paths.difference(pants_build_ignore.match_files(rel_paths))
     else:
       build_files_without_ignores = rel_paths
-    return OrderedSet(sorted(BuildFile._cached(project_tree, relpath) for relpath in build_files_without_ignores),
-                             key=lambda build_file: build_file.full_path)
+    return OrderedSet(sorted((BuildFile._cached(project_tree, relpath) for relpath in build_files_without_ignores),
+                             key=lambda build_file: build_file.full_path))
 
   def __init__(self, project_tree, relpath, must_exist=True):
     """Creates a BuildFile object representing the BUILD file family at the specified path.
