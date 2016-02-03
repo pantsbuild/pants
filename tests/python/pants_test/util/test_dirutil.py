@@ -209,11 +209,13 @@ class DirutilTest(unittest.TestCase):
         self.assertFalse(os.path.exists(expected_file))
       self.assertTrue(os.path.exists(expected_file))
 
-  def test_safe_concurrent_creation_exception(self):
+  def test_safe_concurrent_creation_noop(self):
     with temporary_dir() as td:
-      expected_file = os.path.join(td, 'expected_file')
+      expected_file = os.path.join(td, 'parent_dir', 'expected_file')
 
       # Ensure safe_concurrent_creation() doesn't bomb if we don't write the expected files.
-      with self.assertRaises(ZeroDivisionError):
-        with safe_concurrent_creation(expected_file):
-          raise ZeroDivisionError('zomg')
+      with safe_concurrent_creation(expected_file):
+        pass
+
+      self.assertFalse(os.path.exists(expected_file))
+      self.assertTrue(os.path.exists(os.path.dirname(expected_file)))
