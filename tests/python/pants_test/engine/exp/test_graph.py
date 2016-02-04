@@ -7,14 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from functools import partial
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
-from pants.engine.exp.graph import (CycleError, Graph, ResolvedTypeMismatchError, ResolveError,
-                                    Resolver)
-from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.parsers import parse_json, python_assignments_parser, python_callbacks_parser
+from pants.engine.exp.engine import LocalSerialEngine
+from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
+from pants.engine.exp.mapper import AddressMapper, ResolveError
+from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
+                                      SymbolTable)
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Return, SelectNode, Throw
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
@@ -60,34 +61,60 @@ class PublishConfiguration(Struct):
     """"""
 
 
+class TestTable(SymbolTable):
+  @classmethod
+  def table(cls):
+    return {'ApacheThriftConfig': ApacheThriftConfiguration,
+            'Struct': Struct,
+            'StructWithDeps': StructWithDeps,
+            'PublishConfig': PublishConfiguration,
+            'Target': Target}
+
+
 class GraphTestBase(unittest.TestCase):
-  def setUp(self):
-    self.symbol_table = {'ApacheThriftConfig': ApacheThriftConfiguration,
-                         'Struct': Struct,
-                         'StructWithDeps': StructWithDeps,
-                         'PublishConfig': PublishConfiguration,
-                         'Target': Target}
+  _goal = 'parse'
+  _product = Struct
 
-  def create_graph(self, build_pattern=None, parser=None, inline=False):
+  def _select(self, address):
+    return SelectNode(address, self._product, None, None)
+
+  def create(self, build_pattern=None, parser_cls=None, inline=False):
     mapper = AddressMapper(build_root=os.path.dirname(__file__),
+                           symbol_table_cls=TestTable,
                            build_pattern=build_pattern,
-                           parser=parser)
-    return Graph(mapper, inline=inline)
+                           parser_cls=parser_cls)
+    return LocalScheduler({self._goal: [self._product]}, create_graph_tasks(mapper))
 
-  def create_json_graph(self):
-    return self.create_graph(build_pattern=r'.+\.BUILD.json$',
-                             parser=partial(parse_json, symbol_table=self.symbol_table))
+  def create_json(self):
+    return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
+
+  def _populate(self, scheduler, address):
+    """Make a BuildRequest to parse the given Address into a Struct."""
+    request = BuildRequest(goals=[self._goal], addressable_roots=[address])
+    LocalSerialEngine(scheduler).reduce(request)
+    return self._select(address)
+
+  def walk(self, scheduler, address):
+    """Return a list of all (Node, State) tuples reachable from the given Address."""
+    root = self._populate(scheduler, address)
+    return list(e for e, _ in scheduler.product_graph.walk([root], predicate=lambda _: True))
+
+  def resolve(self, scheduler, address):
+    root = self._populate(scheduler, address)
+    state = scheduler.product_graph.state(root)
+    self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
+    return state.value
 
 
 class InlinedGraphTest(GraphTestBase):
-  def create_graph(self, build_pattern=None, parser=None, inline=True):
-    return super(InlinedGraphTest, self).create_graph(build_pattern, parser, inline=inline)
+  def create(self, build_pattern=None, parser_cls=None, inline=True):
+    return super(InlinedGraphTest, self).create(build_pattern, parser_cls, inline=inline)
 
-  def do_test_codegen_simple(self, graph):
+  def do_test_codegen_simple(self, scheduler):
     def address(name):
       return Address(spec_path='examples/graph_test', target_name=name)
 
-    resolved_java1 = graph.resolve(address('java1'))
+    resolved_java1 = self.resolve(scheduler, address('java1'))
 
     nonstrict = ApacheThriftConfiguration(address=address('nonstrict'),
                                           version='0.9.2',
@@ -115,159 +142,142 @@ class InlinedGraphTest(GraphTestBase):
     self.assertEqual(expected_java1, resolved_java1)
 
   def test_json(self):
-    graph = self.create_json_graph()
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create_json()
+    self.do_test_codegen_simple(scheduler)
 
   def test_python(self):
-    graph = self.create_graph(build_pattern=r'.+\.BUILD.python$',
-                              parser=python_assignments_parser(symbol_table=self.symbol_table))
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create(build_pattern=r'.+\.BUILD.python$',
+                            parser_cls=PythonAssignmentsParser)
+    self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
-    graph = self.create_graph(build_pattern=r'.+\.BUILD$',
-                              parser=python_callbacks_parser(symbol_table=self.symbol_table))
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create(build_pattern=r'.+\.BUILD$',
+                            parser_cls=PythonCallbacksParser)
+    self.do_test_codegen_simple(scheduler)
 
   def test_resolve_cache(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
 
     nonstrict_address = Address.parse('examples/graph_test:nonstrict')
-    nonstrict = graph.resolve(nonstrict_address)
-    self.assertIs(nonstrict, graph.resolve(nonstrict_address))
+    nonstrict = self.resolve(scheduler, nonstrict_address)
+    self.assertIs(nonstrict, self.resolve(scheduler, nonstrict_address))
 
     # The already resolved `nonstrict` interior node should be re-used by `java1`.
     java1_address = Address.parse('examples/graph_test:java1')
-    java1 = graph.resolve(java1_address)
+    java1 = self.resolve(scheduler, java1_address)
     self.assertIs(nonstrict, java1.configurations[1])
 
-    self.assertIs(java1, graph.resolve(java1_address))
+    self.assertIs(java1, self.resolve(scheduler, java1_address))
 
   def extract_path_tail(self, cycle_exception, line_count):
     return [l.lstrip() for l in str(cycle_exception).splitlines()[-line_count:]]
 
+  def do_test_cycle(self, scheduler, address_str):
+    walk = self.walk(scheduler, Address.parse(address_str))
+    # Confirm that the root failed, and that a cycle occurred deeper in the graph.
+    # TODO: in the case of a BUILD file cycle, it would be nice to fail synchronously, but
+    # tasks can cycle in normal cases currently (scrooge attempting to compile itself, etc).
+    self.assertEqual(type(walk[0][1]), Throw)
+    self.assertTrue(any('Cycle' in state.msg for _, state in walk if type(state) is Throw))
+
   def test_cycle_self(self):
-    graph = self.create_json_graph()
-    with self.assertRaises(CycleError) as exc:
-      graph.resolve(Address.parse('examples/graph_test:self_cycle'))
-    self.assertEqual(['* examples/graph_test:self_cycle',
-                      '* examples/graph_test:self_cycle'],
-                     self.extract_path_tail(exc.exception, 2))
+    self.do_test_cycle(self.create_json(), 'examples/graph_test:self_cycle')
 
   def test_cycle_direct(self):
-    graph = self.create_json_graph()
-    with self.assertRaises(CycleError) as exc:
-      graph.resolve(Address.parse('examples/graph_test:direct_cycle'))
-    self.assertEqual(['* examples/graph_test:direct_cycle',
-                      'examples/graph_test:direct_cycle_dep',
-                      '* examples/graph_test:direct_cycle'],
-                     self.extract_path_tail(exc.exception, 3))
+    self.do_test_cycle(self.create_json(), 'examples/graph_test:direct_cycle')
 
   def test_cycle_indirect(self):
-    graph = self.create_json_graph()
-    with self.assertRaises(CycleError) as exc:
-      graph.resolve(Address.parse('examples/graph_test:indirect_cycle'))
-    self.assertEqual(['examples/graph_test:indirect_cycle',
-                      '* examples/graph_test:one',
-                      'examples/graph_test:two',
-                      'examples/graph_test:three',
-                      '* examples/graph_test:one'],
-                     self.extract_path_tail(exc.exception, 5))
+    self.do_test_cycle(self.create_json(), 'examples/graph_test:indirect_cycle')
 
   def test_type_mismatch_error(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(ResolvedTypeMismatchError):
-      graph.resolve(Address.parse('examples/graph_test:type_mismatch'))
+      self.resolve(scheduler, Address.parse('examples/graph_test:type_mismatch'))
 
   def test_not_found_but_family_exists(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(ResolveError):
-      graph.resolve(Address.parse('examples/graph_test:this_addressable_does_not_exist'))
+      self.resolve(scheduler, Address.parse('examples/graph_test:this_addressable_does_not_exist'))
 
   def test_not_found_and_family_does_not_exist(self):
-    graph = self.create_json_graph()
+    scheduler = self.create_json()
     with self.assertRaises(ResolveError):
-      graph.resolve(Address.parse('this/dir/does/not/exist'))
+      self.resolve(scheduler, Address.parse('this/dir/does/not/exist'))
 
 
 class LazyResolvingGraphTest(GraphTestBase):
-  def do_test_codegen_simple(self, graph):
+  def do_test_codegen_simple(self, scheduler):
     def address(name):
       return Address(spec_path='examples/graph_test', target_name=name)
 
-    def resolver(addr):
-      return Resolver(graph, addr)
-
     java1_address = address('java1')
-    resolved_java1 = graph.resolve(java1_address)
+    resolved_java1 = self.resolve(scheduler, java1_address)
 
     nonstrict_address = address('nonstrict')
-    public_address = address('public')
-    thrift2_address = address('thrift2')
-    expected_java1 = Target(address=java1_address,
-                            sources={},
-                            configurations=[
-                              ApacheThriftConfiguration(
-                                version='0.9.2',
-                                strict=True,
-                                lang='java',
-                                dependencies=[resolver(thrift2_address)]
-                              ),
-                              resolver(nonstrict_address),
-                              PublishConfiguration(
-                                default_repo=resolver(public_address),
-                                repos={
-                                  'jake':
-                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
-                                  'jane': resolver(public_address)
-                                }
-                              )
-                            ])
-
-    self.assertEqual(expected_java1, resolved_java1)
-
     expected_nonstrict = ApacheThriftConfiguration(address=nonstrict_address,
                                                    version='0.9.2',
                                                    strict=False,
                                                    lang='java')
-    resolved_nonstrict = graph.resolve(nonstrict_address)
-    self.assertEqual(expected_nonstrict, resolved_nonstrict)
-    self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
-    self.assertIs(expected_java1.configurations[1], resolved_nonstrict)
 
+    public_address = address('public')
     expected_public = Struct(address=public_address,
                                     url='https://oss.sonatype.org/#stagingRepositories')
-    resolved_public = graph.resolve(public_address)
-    self.assertEqual(expected_public, resolved_public)
-    self.assertEqual(expected_public, expected_java1.configurations[2].default_repo)
-    self.assertEqual(expected_public, expected_java1.configurations[2].repos['jane'])
-    self.assertIs(expected_java1.configurations[2].default_repo, resolved_public)
-    self.assertIs(expected_java1.configurations[2].repos['jane'], resolved_public)
 
+    thrift2_address = address('thrift2')
+    expected_java1 = Target(address=java1_address,
+                            sources={},
+                            configurations=[
+                              PublishConfiguration(
+                                default_repo=expected_public,
+                                repos={
+                                  'jake':
+                                    Struct(url='https://dl.bintray.com/pantsbuild/maven'),
+                                  'jane': expected_public
+                                }
+                              ),
+                              expected_nonstrict,
+                              ApacheThriftConfiguration(
+                                version='0.9.2',
+                                strict=True,
+                                lang='java',
+                                dependencies=[address(thrift2_address)]
+                              ),
+                            ])
+
+    self.assertEqual(expected_java1, resolved_java1)
+
+    resolved_nonstrict = self.resolve(scheduler, nonstrict_address)
+    self.assertEqual(expected_nonstrict, resolved_nonstrict)
+    self.assertEqual(expected_nonstrict, expected_java1.configurations[1])
+    self.assertIs(resolved_java1.configurations[1], resolved_nonstrict)
+
+    resolved_public = self.resolve(scheduler, public_address)
+    self.assertEqual(expected_public, resolved_public)
+    self.assertEqual(expected_public, expected_java1.configurations[0].default_repo)
+    self.assertEqual(expected_public, expected_java1.configurations[0].repos['jane'])
+    self.assertIs(resolved_java1.configurations[0].default_repo, resolved_public)
+    self.assertIs(resolved_java1.configurations[0].repos['jane'], resolved_public)
+
+    # NB: `dependencies` lists must be explicitly requested by tasks, so we expect an Address.
     thrift1_address = address('thrift1')
-    expected_thrift2 = Target(address=thrift2_address, dependencies=[resolver(thrift1_address)])
-    resolved_thrift2 = graph.resolve(thrift2_address)
+    expected_thrift2 = Target(address=thrift2_address, dependencies=[thrift1_address])
+    resolved_thrift2 = self.resolve(scheduler, thrift2_address)
     self.assertEqual(expected_thrift2, resolved_thrift2)
-    resolved_thrift_config = [config for config in resolved_java1.configurations
-                              if isinstance(config, ApacheThriftConfiguration)]
-    self.assertEqual(expected_thrift2, resolved_thrift_config[0].dependencies[0])
-    self.assertIs(resolved_thrift_config[0].dependencies[0], resolved_thrift2)
 
     expected_thrift1 = Target(address=thrift1_address)
-    resolved_thrift1 = graph.resolve(thrift1_address)
+    resolved_thrift1 = self.resolve(scheduler, thrift1_address)
     self.assertEqual(expected_thrift1, resolved_thrift1)
-    self.assertEqual(expected_thrift1, resolved_thrift2.dependencies[0])
-    self.assertIs(resolved_thrift2.dependencies[0], resolved_thrift1)
 
   def test_json(self):
-    graph = self.create_json_graph()
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create_json()
+    self.do_test_codegen_simple(scheduler)
 
   def test_python(self):
-    graph = self.create_graph(build_pattern=r'.+\.BUILD.python$',
-                              parser=python_assignments_parser(symbol_table=self.symbol_table))
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create(build_pattern=r'.+\.BUILD.python$',
+                            parser_cls=PythonAssignmentsParser)
+    self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
-    graph = self.create_graph(build_pattern=r'.+\.BUILD$',
-                              parser=python_callbacks_parser(symbol_table=self.symbol_table))
-    self.do_test_codegen_simple(graph)
+    scheduler = self.create(build_pattern=r'.+\.BUILD$',
+                            parser_cls=PythonCallbacksParser)
+    self.do_test_codegen_simple(scheduler)

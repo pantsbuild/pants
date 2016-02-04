@@ -6,6 +6,12 @@
     {
       "type_alias": "thrift",
       "files": ["simple.thrift"]
+    },
+    {
+      "type_alias": "variants",
+      "default": {
+        "thrift": "apache_java"
+      }
     }
   ]
 }
