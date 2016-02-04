@@ -200,7 +200,7 @@ class IvyTaskMixin(TaskBase):
 
   def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False, pinned_artifacts=None):
-    result = self.ivy_resolve(
+    result = self._ivy_resolve(
       targets,
       executor=executor,
       workunit_name='ivy-resolve',
@@ -231,13 +231,13 @@ class IvyTaskMixin(TaskBase):
     :param targets: A collection of targets to resolve a classpath for.
     :type targets: collection.Iterable
     """
-    result = self.ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
+    result = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
     return result.classpath
 
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
   # ivy cache dir.
-  def ivy_resolve(self,
+  def _ivy_resolve(self,
                   targets,
                   executor=None,
                   silent=False,
@@ -327,6 +327,15 @@ class IvyTaskMixin(TaskBase):
       else:
         logger.debug("Using previously resolved reports: {}".format(existing_report_paths))
 
+    symlink_map = self._symlink_from_cache_path(self.ivy_cache_dir, ivy_workdir,
+                                                raw_target_classpath_file,
+                                                target_classpath_file)
+
+    classpath = IvyUtils.load_classpath_from_cachepath(target_classpath_file)
+    return IvyResolveResult(classpath, symlink_map, resolve_hash_name)
+
+  def _symlink_from_cache_path(self, ivy_cache_dir, ivy_workdir, raw_target_classpath_file,
+                               target_classpath_file):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
@@ -336,14 +345,11 @@ class IvyTaskMixin(TaskBase):
       # Note that we have one global, well-known symlink dir, again so that paths are
       # consistent across builds.
       symlink_dir = os.path.join(ivy_workdir, 'jars')
-      symlink_map = IvyUtils.symlink_cachepath(self.ivy_cache_dir,
+      symlink_map = IvyUtils.symlink_cachepath(ivy_cache_dir,
                                                raw_target_classpath_file,
                                                symlink_dir,
                                                target_classpath_file)
-
-      # TODO does this need to be under the lock?
-      classpath = IvyUtils.load_classpath_from_cachepath(target_classpath_file)
-    return IvyResolveResult(classpath, symlink_map, resolve_hash_name)
+    return symlink_map
 
   def _collect_existing_reports(self, confs, resolve_hash_name):
     report_missing = False

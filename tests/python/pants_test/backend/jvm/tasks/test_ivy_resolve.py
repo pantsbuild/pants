@@ -123,7 +123,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     result = IvyResolveResult([], symlink_map, 'some-key-for-a-and-b')
     result.ivy_info_for= mock_ivy_info_for
 
-    task.ivy_resolve = mock_ivy_resolve_returning(result)
+    task._ivy_resolve = mock_ivy_resolve_returning(result)
 
     task.execute()
     compile_classpath = context.products.get_data('compile_classpath', None)
