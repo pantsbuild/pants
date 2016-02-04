@@ -41,6 +41,8 @@ class JvmRun(JvmTask):
              help='Set the working directory. If no argument is passed, use the target path.')
     register('--main', metavar='<main class>',
              help='Invoke this class (overrides "main"" attribute in jvm_binary targets)')
+    register('--synthetic-jar', advanced=True, action='store_true', default=True,
+             help="Use synthetic jar ability to handle long classpaths.")
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -97,6 +99,7 @@ class JvmRun(JvmTask):
           args=self.args,
           cwd=working_dir,
           synthetic_jar_dir=self.workdir,
+          create_synthetic_jar=self.get_options().synthetic_jar
         )
 
       if self.only_write_cmd_line:

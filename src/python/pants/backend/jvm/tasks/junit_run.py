@@ -98,6 +98,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     register('--allow-empty-sources', action='store_true', default=False, advanced=True,
              help='Allows a junit_tests() target to be defined with no sources.  Otherwise,'
                   'such a target will raise an error during the test run.')
+    register('--synthetic-jar', advanced=True, action='store_true', default=True,
+             help="Use synthetic jar ability to handle long classpaths.")
+
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
@@ -365,6 +368,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               workunit_labels=[WorkUnitLabel.TEST],
               cwd=workdir,
               synthetic_jar_dir=self.workdir,
+              create_synthetic_jar=self.get_options().synthetic_jar,
             ))
 
           if result != 0 and self._fail_fast:
