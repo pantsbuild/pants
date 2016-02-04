@@ -137,11 +137,11 @@ class GlobalOptionsRegistrar(Optionable):
              deprecated_hint='Use --build-file-ignore instead.', deprecated_version='0.0.75',
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
-    register('--build-file-ignore', advanced=True, action='append',
+    register('--build-file-ignore', advanced=True, action='append', fromfile=True,
              default=['.*'],
-             help='Ignore these paths when reading BUILD files. Useful to to avoid descending into '
-                  'unneeded directories. Default stands for all files and directories starting with a dot. '
-                  'Syntax is the same as .gitignore which can be checked at https://git-scm.com/docs/gitignore.')
+             help='Patterns for ignoring files when reading BUILD files. '
+                  'Use to ignore unneeded directories or BUILD files. '
+                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     register('--fail-fast', advanced=True, action='store_true', recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
