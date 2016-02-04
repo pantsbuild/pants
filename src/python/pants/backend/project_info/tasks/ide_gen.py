@@ -190,7 +190,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
 
     build_ignore_patterns = self.context.options.for_global_scope().build_file_ignore or []
     build_ignore_patterns.extend(BuildFile._spec_excludes_to_gitignore_syntax(
-      self._root_dir, self.context.options.for_global_scope().spec_excludes))
+      os.path.realpath(get_buildroot()), self.context.options.for_global_scope().spec_excludes))
 
     project = Project(self.project_name,
                       self.python,
