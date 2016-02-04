@@ -99,6 +99,7 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
                              workunit_factory=self.context.new_workunit,
                              workunit_name='caliper',
                              workunit_labels=[WorkUnitLabel.RUN],
-                             executor=java_executor)
+                             executor=java_executor,
+                             create_synthetic_jar=self.create_synthetic_jar)
     if exit_code != 0:
       raise TaskError('java {} ... exited non-zero ({})'.format(self._CALIPER_MAIN, exit_code))

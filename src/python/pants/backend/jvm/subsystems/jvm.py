@@ -38,6 +38,8 @@ class JVM(Subsystem):
              ],
              help='The JVM remote-debugging arguments. {debug_port} will be replaced with '
                   'the value of the --debug-port option.')
+    register('--synthetic-jar', advanced=True, action='store_true', default=True,
+             help="Use synthetic jar ability to handle long classpaths.")
 
   def get_jvm_options(self):
     """Return the options to run this JVM with.
