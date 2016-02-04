@@ -47,6 +47,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/thrift/org/pantsbuild/thrift_linter:',
       'testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target',
       'testprojects/tests/java/org/pantsbuild/testproject/empty:',
+      'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar',
       'testprojects/tests/python/pants/dummies:failing_target',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
