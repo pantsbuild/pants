@@ -85,10 +85,26 @@ def visualize_execution_graph(scheduler):
       binary_util.ui_open(image_file)
 
 
+def validate_graph(scheduler):
+  # Locate candidate Nodes: those with an Address Subject which failed.
+  candidate_roots = set()
+  for ((node, state), _) in scheduler.walk_product_graph(predicate=lambda _: True):
+    if not type(node) == SelectNode:
+      continue
+    if not isinstance(node.subject, Address):
+      continue
+    if not type(state) == Throw:
+      continue
+    # Found a candidate root.
+    print('>>> candidate: {}'.format(node))
+    candidate_roots.add(node)
+
+
 def visualize_build_request(build_root, build_request):
   scheduler = setup_json_scheduler(build_root)
   LocalSerialEngine(scheduler).reduce(build_request)
-  visualize_execution_graph(scheduler)
+  validate_graph(scheduler)
+  #visualize_execution_graph(scheduler)
 
 
 def main():

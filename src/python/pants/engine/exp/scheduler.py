@@ -240,6 +240,9 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       yield SelectNode(struct_address, Struct, None, None)
 
   def step(self, dependency_states, node_builder):
+    if isinstance(self.subject, Address):
+      print('>>> {} : {}'.format(self.subject, self.product.__name__))
+
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
     variants = self.variants
@@ -356,6 +359,15 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
       if dep is None:
         return Throw('Dependency {} is not satisfiable.'.format(select))
       dependencies.append(dep)
+
+    states = {dep_key: dependency_states.get(dep_key, None) for dep_key in dependencies}
+    successes = {dep_key: state.value for dep_key, state in states.items() if type(state) is Return}
+    failures = {dep_key: state.msg for dep_key, state in states.items() if type(state) is Throw}
+
+    #if successes and failures:
+    #  success_msg = '\n    '.join('{}: {}'.format(k, v) for k, v in successes.items())
+    #  failure_msg = '\n    '.join('{}: {}'.format(k, v) for k, v in failures.items())
+    #  print('>>> for {}:\n  successes:\n    {}\n  failures:\n    {}'.format(self, success_msg, failure_msg))
 
     # If all dependency Nodes are Return, execute the Node.
     for dep_key in dependencies:
