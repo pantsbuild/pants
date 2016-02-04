@@ -97,3 +97,14 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     test_spec = 'testprojects/tests/java/org/pantsbuild/testproject/cucumber'
     with self.pants_results(['clean-all', 'test.junit', '--per-test-timer', test_spec]) as results:
       self.assert_success(results)
+
+  def test_disable_synthetic_jar(self):
+    self.assert_failure(self.run_pants(
+      ['test.junit',
+       'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:test']))
+
+    self.assert_success(self.run_pants(
+      ['test.junit',
+       '--no-synthetic-jar',
+       'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:test',
+      ]))
