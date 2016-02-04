@@ -7,7 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
+from textwrap import dedent
 
+from pants.base.build_environment import get_buildroot
 from pants.fs.archive import ZIP
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import temporary_dir
@@ -97,3 +99,50 @@ class ShaderIntegrationTest(PantsRunIntegrationTest):
         bundle_options=['--deployjar'],
         expected_bundle_content=[
           'third.jar']).strip()))
+
+  def test_shading_does_not_influence_permissions(self):
+    with temporary_dir(root_dir=get_buildroot()) as tmpdir:
+      tmp_name = os.path.basename(tmpdir)
+      with open(os.path.join(tmpdir, 'Foo.java'), 'w+') as f:
+        f.write('public class Foo {}\n')
+      with open(os.path.join(tmpdir, 'BUILD.lib'), 'w+') as f:
+        f.write(dedent("""
+          java_library(name='lib',
+            sources=['Foo.java'],
+          )
+        """))
+      with open(os.path.join(tmpdir, 'BUILD'), 'w+') as f:
+        f.write(dedent("""
+          jvm_binary(name='{name}',
+            basename='{name}',
+            dependencies=[
+              ':lib',
+            ],
+          )
+        """).format(name=tmp_name))
+
+      jar_path = os.path.join('dist', '{}.jar'.format(tmp_name))
+
+      # Build a binary with no shading, and record the permissions.
+      self.run_pants(['clean-all'])
+      self.assert_success(self.run_pants(['binary', tmpdir]))
+      permissions = os.stat(jar_path).st_mode
+
+      with open(os.path.join(tmpdir, 'BUILD'), 'w') as f:
+        f.write(dedent("""
+          jvm_binary(name='{name}',
+            basename='{name}',
+            dependencies=[
+              ':lib',
+            ],
+            shading_rules=[
+              shading_relocate_package('org.foo.bar'),
+            ],
+          )
+        """).format(name=tmp_name))
+
+      # Build the binary again with shading; permissions shouldn't be different.
+      self.run_pants(['clean-all'])
+      os.remove(jar_path)
+      self.assert_success(self.run_pants(['binary', tmpdir]))
+      self.assertEquals(permissions, os.stat(jar_path).st_mode)

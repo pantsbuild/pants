@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import unittest
 
 from pants.util.contextutil import temporary_file, temporary_file_path
@@ -21,6 +22,7 @@ class FileutilTest(unittest.TestCase):
         dst.close()
         with open(dst.name) as new_dst:
           self.assertEquals(src.name, new_dst.read())
+        self.assertEqual(os.stat(src.name).st_mode, os.stat(dst.name).st_mode)
 
   def test_line_count_estimator(self):
     with temporary_file_path() as src:
