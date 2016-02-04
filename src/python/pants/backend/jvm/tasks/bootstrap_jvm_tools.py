@@ -204,8 +204,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
   def _bootstrap_classpath(self, jvm_tool, targets):
     workunit_name = 'bootstrap-{}'.format(jvm_tool.key)
-    result = self.ivy_resolve(targets, silent=True, workunit_name=workunit_name)
-    return result.classpath
+    return self.ivy_classpath(targets, silent=True, workunit_name=workunit_name)
 
   @memoized_property
   def shader(self):

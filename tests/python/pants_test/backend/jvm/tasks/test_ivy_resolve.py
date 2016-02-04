@@ -16,7 +16,6 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveResult
-from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
@@ -210,3 +209,14 @@ class IvyResolveTest(JvmToolTaskTestBase):
         # Confirm that the deps were added to the appropriate targets.
         compile_classpath = self.resolve([jar_lib])
         self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
+
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  def test_ivy_classpath(self):
+    # Testing the IvyTaskMixin entry point used by bootstrap for jvm tools.
+
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+
+    classpath = self.create_task(self.context()).ivy_classpath([junit_jar_lib])
+
+    self.assertEquals(2, len(classpath))

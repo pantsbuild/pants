@@ -30,11 +30,13 @@ logger = logging.getLogger(__name__)
 
 
 class IvyResolveResult(object):
+  """A class wrapping the classpath, a mapping from ivy cache jars to their linked location
+     under .pants.d, and the id of the reports associated with the resolve."""
 
   def __init__(self, classpath, symlink_map, resolve_hash_name):
     self.classpath = classpath
-    self.symlink_map = symlink_map
     self.resolve_hash_name = resolve_hash_name
+    self._symlink_map = symlink_map
 
   @property
   def completed_resolve(self):
@@ -44,6 +46,15 @@ class IvyResolveResult(object):
     return IvyUtils.parse_xml_report(ivy_cache_dir, self.resolve_hash_name, conf)
 
   def collect_resolved_jars(self, ivy_cache_dir, conf, targets):
+    """Finds the resolved jars for each jar_library target in targets and yields them with the
+    target.
+
+    :param ivy_cache_dir:
+    :param conf:
+    :param targets:
+    :yield: target, resolved_jars
+    :raises IvyTaskMixin.UnresolvedJarError
+    """
     ivy_info = self.ivy_info_for(ivy_cache_dir, conf)
     if not ivy_info:
       return
@@ -55,7 +66,7 @@ class IvyResolveResult(object):
         yield os.path.realpath(resolved_jar_without_symlink.cache_path)
 
       for cache_path in candidate_cache_paths():
-        pants_path = self.symlink_map.get(cache_path)
+        pants_path = self._symlink_map.get(cache_path)
         if pants_path:
           break
       else:
@@ -211,6 +222,14 @@ class IvyTaskMixin(TaskBase):
 
     return result.resolve_hash_name
 
+  def ivy_classpath(self, targets, silent=True, workunit_name=None):
+    """Create the classpath for the passed targets.
+    :param targets: A collection of targets to resolve a classpath for.
+    :type targets: collection.Iterable
+    """
+    result = self.ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
+    return result.classpath
+
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
   # ivy cache dir.
@@ -239,8 +258,7 @@ class IvyTaskMixin(TaskBase):
     :type extra_args: list of string
     :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
                                         resolved.
-    :returns: A tuple of the classpath, a mapping from ivy cache jars to their linked location
-              under .pants.d, and the id of the reports associated with the resolve.
+    :returns: The result of the resolve.
     :rtype: IvyResolveResult
     """
     # If there are no targets, we don't need to do a resolve.
@@ -258,7 +276,7 @@ class IvyTaskMixin(TaskBase):
                           silent=silent,
                           fingerprint_strategy=fingerprint_strategy,
                           use_cache=False) as invalidation_check:
-      # In case all the targets were filtered out somehow in invalidation.
+      # In case all the targets were filtered out because they didn't participate in fingerprinting.
       if not invalidation_check.all_vts:
         return _NO_TARGETS_RESULT
 
