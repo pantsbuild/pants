@@ -188,8 +188,10 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
 
-    build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern,
-                                                self.context.options.for_global_scope().build_file_ignore or [])
+    build_ignore_patterns = self.context.options.for_global_scope().build_file_ignore or []
+    build_ignore_patterns.extend(BuildFile._spec_excludes_to_gitignore_syntax(
+      self._root_dir, self.context.options.for_global_scope().spec_excludes))
+
     project = Project(self.project_name,
                       self.python,
                       self.skip_java,
@@ -201,8 +203,8 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                       jvm_targets,
                       not self.intransitive,
                       self.TargetUtil(self.context),
-                      self.context.options.for_global_scope().spec_excludes,
-                      build_ignore_patterns)
+                      None,
+                      PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns))
 
     if self.python:
       python_source_paths = self.get_options().python_source_paths
