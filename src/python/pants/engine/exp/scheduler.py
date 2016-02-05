@@ -514,8 +514,8 @@ class ProductGraph(object):
         for e in _walk(dependencies):
           yield e
 
-    for node in _walk(_filtered_entries(roots)):
-      yield node
+    for entry in _walk(_filtered_entries(roots)):
+      yield entry
 
 
 class NodeBuilder(object):
@@ -693,8 +693,8 @@ class LocalScheduler(object):
     The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
     that don't match it. The default predicate eliminates all `Throw` subgraphs.
     """
-    for node in self._product_graph.walk(self._roots, predicate=predicate):
-      yield node
+    for entry in self._product_graph.walk(self._roots, predicate=predicate):
+      yield entry
 
   def root_entries(self):
     """Returns the roots for this scheduler as a dict from Node to State."""
