@@ -69,6 +69,6 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
 
     self.assert_success(self.run_pants(
       ['run',
+       '--no-jvm-synthetic-classpath',
        'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:run',
-       '--no-run-jvm-synthetic-jar'
       ]))

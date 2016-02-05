@@ -33,7 +33,7 @@ class JvmTask(Task):
     self.jvm_options = self.jvm.get_jvm_options()
     self.args = self.jvm.get_program_args()
     self.confs = self.get_options().confs
-    self.create_synthetic_jar = self.jvm.get_options().synthetic_jar
+    self.synthetic_classpath = self.jvm.get_options().synthetic_classpath
 
   def classpath(self, targets, classpath_prefix=None, classpath_product=None):
     """Builds a transitive classpath for the given targets.

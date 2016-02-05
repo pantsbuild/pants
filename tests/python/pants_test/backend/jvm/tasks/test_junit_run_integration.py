@@ -105,6 +105,6 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
 
     self.assert_success(self.run_pants(
       ['test.junit',
-       '--no-synthetic-jar',
+       '--no-jvm-synthetic-classpath',
        'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:test',
       ]))

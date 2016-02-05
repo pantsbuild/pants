@@ -97,7 +97,7 @@ class JvmRun(JvmTask):
           args=self.args,
           cwd=working_dir,
           synthetic_jar_dir=self.workdir,
-          create_synthetic_jar=self.create_synthetic_jar
+          create_synthetic_jar=self.synthetic_classpath
         )
 
       if self.only_write_cmd_line:
