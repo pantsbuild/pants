@@ -4,83 +4,10 @@
 # cache configured below.
 sudo: false
 
-
-before_cache:
-  # Kill all python bytecode in our cached venvs.  Some files appear to
-  # get bytecode compiled in non-yet-understood circumstances leading to
-  # a full cache re-pack due to new bytecode files.
-  - find build-support -name "*.py[co]" -print -delete
-  # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
-  # effect on resolution time is in the noise, but they are
-  # re-timestamped in internal comments and fields on each run and this
-  # leads to travis-ci cache thrash.  Kill these files before the cache
-  # check to avoid un-needed cache re-packing and re-upload (a ~100s
-  # operation).
-  - find $HOME/.ivy2/pants -type f -name "ivydata-*.properties" -print -delete
-  - rm -fv $HOME/.ivy2/pants/*.{css,properties,xml,xsl}
-  # We have several tests that do local file:// url resolves for
-  # com.example artifacts, these disrupt the cache but are fast since
-  # they're resolved from local files when omitted from the cache.
-  - rm -rf $HOME/.ivy2/pants/com.example
-  # The stats cache contains timestamped reports unused by CI but that
-  # thrash the cache.  Skip caching these.
-  - rm -rf $HOME/.cache/pants/stats
-
-cache:
-  directories:
-    - $HOME/.cache/pants
-    - $HOME/.ivy2/pants
-    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
-    # using its own isolated cache:
-    #   https://github.com/pantsbuild/pants/issues/2485
-    - $HOME/.npm
-    - build-support/isort.venv
-    - build-support/pants_dev_deps.venv
-
 language: python
 
 python:
   - "2.7"
 
-install:
-  - pip --quiet install coveralls
-
-env:
-  global:
-    - CXX=g++
-    - PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']"
-    # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
-    # These are encrypted with a public key for our repo that only
-    # Travis-CI has the private key for.  We are trusting Travis-CI
-    # here but no-one else.
-    #
-    # See: http://docs.travis-ci.com/user/encryption-keys/
-    - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
-  matrix:
-    - CI_FLAGS="-cjlpn 'Various pants self checks'"  # (fkmsr)
-    - CI_FLAGS="-fkmsrcn -u 0/2 'Unit tests for pants and pants-plugins - shard 1'"  # (jlp)
-    - CI_FLAGS="-fkmsrcn -u 1/2 'Unit tests for pants and pants-plugins - shard 2'"
-    - CI_FLAGS="-fkmsrcjlp 'Python contrib tests'"  # (n)
-    - CI_FLAGS="-fkmsrjlpn -i 0/6 'Python integration tests for pants - shard 1'"  # (c)
-    - CI_FLAGS="-fkmsrjlpn -i 1/6 'Python integration tests for pants - shard 2'"
-    - CI_FLAGS="-fkmsrjlpn -i 2/6 'Python integration tests for pants - shard 3'"
-    - CI_FLAGS="-fkmsrjlpn -i 3/6 'Python integration tests for pants - shard 4'"
-    - CI_FLAGS="-fkmsrjlpn -i 4/6 'Python integration tests for pants - shard 5'"
-    - CI_FLAGS="-fkmsrjlpn -i 5/6 'Python integration tests for pants - shard 6'"
-
-before_script: |
-  ./build-support/bin/ci-sync.sh
-
-script: |
-  uname -a
-  java -version
-  ./build-support/bin/ci.sh -x ${CI_FLAGS}
-
-# We accept the default travis-ci email author+comitter notification
-# for now which is enabled even with no `notifications` config.
-# notifications:
-#   email: ...
-
-after_success:
-  coveralls
+script: python -c 'import multiprocessing; print("I see {} cores!".format(multiprocessing.cpu_count()))'
 
