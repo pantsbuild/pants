@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_graph import BuildGraph
@@ -61,6 +62,10 @@ class Context(object):
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, spec_excludes=None, invalidation_report=None):
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use address_mapper#build_ignore_patterns instead.')
+
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -127,6 +132,7 @@ class Context(object):
     return self._workspace
 
   @property
+  @deprecated('0.0.75')
   def spec_excludes(self):
     return self._spec_excludes
 

@@ -10,6 +10,8 @@ import os
 import shutil
 from collections import defaultdict
 
+from pathspec import PathSpec
+from pathspec.gitignore import GitIgnorePattern
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
@@ -19,6 +21,7 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
 from pants.build_graph.address import BuildFileAddress
@@ -183,6 +186,11 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                    isinstance(t, Resources)]
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
+
+    build_ignore_patterns = self.context.options.for_global_scope().ignore_patterns or []
+    build_ignore_patterns.extend(BuildFile._spec_excludes_to_gitignore_syntax(
+      os.path.realpath(get_buildroot()), self.context.options.for_global_scope().spec_excludes))
+
     project = Project(self.project_name,
                       self.python,
                       self.skip_java,
@@ -194,7 +202,8 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                       jvm_targets,
                       not self.intransitive,
                       self.TargetUtil(self.context),
-                      self.context.options.for_global_scope().spec_excludes)
+                      None,
+                      PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns))
 
     if self.python:
       python_source_paths = self.get_options().python_source_paths
@@ -450,9 +459,13 @@ class Project(object):
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               debug_port, context, targets, transitive, target_util, spec_excludes):
+               debug_port, context, targets, transitive, target_util, spec_excludes=None, build_ignore_patterns=None):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use build_ignore_patterns instead.')
+
     self.context = context
     self.target_util = target_util
     self.name = name
@@ -477,6 +490,7 @@ class Project(object):
     self.internal_jars = OrderedSet()
     self.external_jars = OrderedSet()
     self.spec_excludes = spec_excludes
+    self.build_ignore_patterns = build_ignore_patterns
 
   def configure_python(self, source_paths, test_paths, lib_paths):
     self.py_sources.extend(SourceSet(get_buildroot(), root, None) for root in source_paths)
@@ -592,10 +606,13 @@ class Project(object):
         build_file = target.address.build_file
         dir_relpath = os.path.dirname(build_file.relpath)
         for descendant in BuildFile.scan_build_files(build_file.project_tree, dir_relpath,
-                                                     spec_excludes=self.spec_excludes):
+                                                     spec_excludes=self.spec_excludes,
+                                                     build_ignore_patterns=self.build_ignore_patterns):
           candidates.update(self.target_util.get_all_addresses(descendant))
         if not self._is_root_relpath(dir_relpath):
-          for ancestor in self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath)):
+          ancestors = self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath),
+                                                         self.build_ignore_patterns)
+          for ancestor in ancestors:
             candidates.update(self.target_util.get_all_addresses(ancestor))
 
         def is_sibling(target):
@@ -687,12 +704,12 @@ class Project(object):
     self.scala_compiler_classpath = scalac_classpath
 
   @classmethod
-  def _collect_ancestor_build_files(cls, project_tree, dir_relpath):
-    for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath):
+  def _collect_ancestor_build_files(cls, project_tree, dir_relpath, build_ignore_patterns):
+    for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath, build_ignore_patterns):
       yield build_file
     while not cls._is_root_relpath(dir_relpath):
       dir_relpath = os.path.dirname(dir_relpath)
-      for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath):
+      for build_file in BuildFile.get_build_files_family(project_tree, dir_relpath, build_ignore_patterns):
         yield build_file
 
   @classmethod

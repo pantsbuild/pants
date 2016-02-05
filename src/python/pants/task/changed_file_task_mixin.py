@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 
 from pants.base.build_environment import get_scm
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.build_graph.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
@@ -27,6 +28,9 @@ class ChangeCalculator(object):
                diffspec=None,
                exclude_target_regexp=None,
                spec_excludes=None):
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use address_mapper#build_ignore_patterns instead.')
 
     self._scm = scm
     self._workspace = workspace
@@ -130,6 +134,10 @@ class ChangedFileTaskMixin(object):
 
   @classmethod
   def change_calculator(cls, options, address_mapper, build_graph, scm=None, workspace=None, spec_excludes=None):
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use address_mapper#build_ignore_patterns instead.')
+
     scm = scm or get_scm()
     if scm is None:
       raise TaskError('No SCM available.')
