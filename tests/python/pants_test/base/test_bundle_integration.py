@@ -47,7 +47,7 @@ class Bundles(object):
   all_bundles = [lesser_of_two, once_upon_a_time, ten_thousand, there_was_a_duck]
 
 
-class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
+class BundleIntegrationTest(PantsRunIntegrationTest):
   """Tests the functionality of the --spec-exclude flag in pants."""
 
   def _bundle_path(self, bundle):
@@ -139,53 +139,3 @@ class SpecExcludeIntegrationTest(PantsRunIntegrationTest):
         ],
         set(Bundles.all_bundles) - set([Bundles.there_was_a_duck, Bundles.once_upon_a_time]),
     )
-
-
-class SpecExcludePantsIniIntegrationTest(PantsRunIntegrationTest):
-  """Tests the functionality of the exclude_specs option in pants.ini ."""
-
-  def test_exclude_spec_pants_ini(self):
-    def output_to_list(output_filename):
-      with open(output_filename, 'r') as results_file:
-        return set([line.rstrip() for line in results_file.readlines()])
-
-    tempdir = tempfile.mkdtemp()
-    tmp_output = os.path.join(tempdir, 'minimize-output1.txt')
-    run_result = self.run_pants(['minimize',
-                                 'testprojects::',
-                                 '--quiet',
-                                 '--minimize-output-file={0}'.format(tmp_output)])
-    self.assert_success(run_result)
-    results = output_to_list(tmp_output)
-    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:ten-thousand',
-                  results)
-    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:once-upon-a-time',
-                  results)
-    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:lesser-of-two',
-                  results)
-    self.assertIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
-                  results)
-
-    tmp_output = os.path.join(tempdir, 'minimize-output2.txt')
-
-    run_result = self.run_pants(['minimize',
-                                 'testprojects::',
-                                 '--quiet',
-                                 '--minimize-output-file={0}'.format(tmp_output)],
-                                config={
-                                    'DEFAULT': {
-                                        'spec_excludes': [
-                                            'testprojects/src/java/org/pantsbuild/testproject/phrases'
-                                        ]
-                                    }
-                                })
-    self.assert_success(run_result)
-    results = output_to_list(tmp_output)
-    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:ten-thousand',
-                     results)
-    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:once-upon-a-time',
-                     results)
-    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:lesser-of-two',
-                     results)
-    self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
-                     results)

@@ -1,6 +1,6 @@
 # The Engine Experiment
 
-This directory tree and its test sibling in tests/python/pants_test/engine/exp serve as the base for
+This directory tree and its test sibling in `tests/python/pants_test/engine/exp` serve as the base for
 code implementing the new tuple-based engine envisioned some time as far back as 2013.
 
 The code is limited in scope to proving out capabilities of the new engine concept:
@@ -9,7 +9,7 @@ The code is limited in scope to proving out capabilities of the new engine conce
 + Can task writer accomplish their goals with the engine APIs reasonably?
 + Can a BUILD writer express BUILD rules reasonably.
 
-The code leaves out much that would be needed in a full execution model; notably option plumbing and
+The code leaves out much that would be needed in a full execution model; notably option plumbing
 and product caching.  The presumption is that the bits left out are straight-forward to plumb and do
 not provide insight into the questions above.
 
@@ -67,8 +67,8 @@ information down from dependents.
 
 The design goals led to 4 key components in the experiment:
 
-1. The target object model.
-2. The target graph parsing system.
+1. The struct object model.
+2. The product graph.
 3. The execution scheduler.
 4. The execution engines.
 
@@ -79,15 +79,15 @@ The core of the object model are
 objects.  These namedtuple-like objects that are amenable to serialization, including to and from
 json and via pickling.  This is a key requirement for both eventual RPC distribution of execution
 data as well as supporting a target graph daemon with out-of-process clients.  The engine experiment
-uses 
+uses
 [`Struct`](https://github.com/pantsbuild/pants/blob/0f8eb2c1a965dd55893a6220ca137a7d79cf50aa/src/python/pants/engine/exp/struct.py)
 as a convenient baseclass for most of its `Serializable` objects.
 
-### Target Graph
+### Product Graph
 
-The target
-[`Graph`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/graph.py#L57)
-is built around named `Serializable` objects as opposed to targets per-se.  Dependency edges are
+The
+[`ProductGraph`](https://github.com/pantsbuild/pants/blob/ef3f8d221a5afefb01d655448ce7e3f537399810/src/python/pants/engine/exp/scheduler.py#L321)
+is built around named `Struct` objects as opposed to targets per-se.  Dependency edges are
 modelled flexibly via an [`AddressableDescriptor`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/addressable.py#L113)
 that has associated decorators for one to one edges
 ([`@addressable`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/addressable.py#L299)),
@@ -153,18 +153,28 @@ might need to identify a globally consistent ivy resolve for a test target.  To 
 engine introduces the concept of `variants`, which are passed recursively from dependents to
 dependencies.
 
-If the configurations of a Target are ambiguous, consumers can use a `@[type]=[name]` address
-syntax extension to pass a variant that selects the appropriate configuration.  A dependency
+If a task indicates that a variant is required, consumers can use a `@[type]=[name]` address
+syntax extension to pass a variant that matches a particular configuration for a task. A dependency
 declared as `src/java/com/example/lib:lib` specifies no particular variant, but
 `src/java/com/example/lib:lib@java=java8` asks for the configured variant of the lib named "java8".
+
+Additionally, it is possible to specify the "default" variants for a Target by adding a
+`Variants(default=..)` configuration. Again, since the purpose of variants is to collect
+information from dependents, only default variant values which have not been set by a dependent
+will be used.
 
 #### Selectors
 
 The `Selector` classes selects function inputs in the context of a particular `Subject` (and its
 variants).  For example, it might select a Product for the given Subject (`Select` or
 `SelectVariant`), the dependencies of a Product for the Subject (`SelectDependencies`), or a
-Product for some other literal Subject (`SelectAddress` or `SelectLiteral`: usually because you
-need access to a tool that lives at a named address).
+Product for some other literal Subject (`SelectLiteral`: usually because you need access to a
+tool that lives at a named address).
+
+There is also a very useful but potentially confusing selector to 'project' fields of a Subject.
+SelectProjection allows for selecting only one field of a Subject, which normalizes the dependency
+graph and avoids unnecessary work. For example, if many unique Subjects have the same value in a
+'directory' field, projecting the directory will allow a task to execute only once per directory.
 
 ### Execution
 

@@ -130,13 +130,18 @@ class GlobalOptionsRegistrar(Optionable):
                   "are used.  Multiple constraints may be added.  They will be ORed together.")
     register('--exclude-target-regexp', advanced=True, action='append', default=[],
              metavar='<regexp>',
-             help='Exclude targets that match these regexes. Useful with ::, to ignore broken '
-                  'BUILD files.',
+             help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
     register('--spec-excludes', advanced=True, action='append',
              default=[register.bootstrap.pants_workdir],
+             deprecated_hint='Use --build-file-ignore instead.', deprecated_version='0.0.75',
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
+    register('--ignore-patterns', advanced=True, action='append', fromfile=True,
+             default=['.*'],
+             help='Patterns for ignoring files when reading BUILD files. '
+                  'Use to ignore unneeded directories or BUILD files. '
+                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     register('--fail-fast', advanced=True, action='store_true', recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')

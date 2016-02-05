@@ -286,7 +286,6 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         self.context.log.warn('Unknown target for test %{0}'.format(test))
 
       filename = get_test_filename(test)
-
       if os.path.exists(filename):
         try:
           xml = XmlParser.from_file(filename)
@@ -307,6 +306,12 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                 ))
         except (XmlParser.XmlError, ValueError) as e:
           self.context.log.error('Error parsing test result file {0}: {1}'.format(filename, e))
+      else:
+        # If the test file doesn't exist, then it must have failed before running the tests, so we should
+        # ensure this target is in failed_targets, but we don't have details about which testclass#testname
+        # failed. Instead we just use the 'test' up to the first '$'.
+        test_split = test.split('$')
+        failed_targets[target].add(test_split[0])
 
     return dict(failed_targets)
 

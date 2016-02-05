@@ -28,7 +28,8 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
 
     self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed
-    self._spec_excludes = self.get_options().spec_excludes
+    # Will be provided through context.address_mapper.build_ignore_patterns.
+    self._spec_excludes = None
 
   def console_output(self, _):
     address_mapper = self.context.address_mapper

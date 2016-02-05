@@ -12,6 +12,7 @@ from collections import namedtuple
 from pants.util.meta import AbstractClass
 
 
+# TODO: Likely no longer necessary, due to the laziness of the product graph.
 class Resolvable(AbstractClass):
   """Represents a resolvable object."""
 

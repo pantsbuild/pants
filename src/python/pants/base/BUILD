@@ -41,6 +41,7 @@ python_library(
   sources = ['build_file.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:pathspec',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     ':project_tree',

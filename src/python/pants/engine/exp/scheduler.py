@@ -16,93 +16,79 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import extract_variants
+from pants.engine.exp.addressable import StructAddress, parse_variants
 from pants.engine.exp.objects import Serializable, datatype
-from pants.engine.exp.struct import StructWithDeps
+from pants.engine.exp.struct import Struct
+from pants.engine.exp.targets import Target, Variants
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
 class Selector(object):
-  def simplify(self, build_graph):
-    """Simplifies this Select to a serializable version."""
-    return self
-
   @abstractmethod
   def construct_node(self, subject, variants):
-    """Constructs a Node for this Selector and the given Subject/Variants."""
+    """Constructs a Node for this Selector and the given Subject/Variants.
+
+    May return None if the Selector can be known statically to not be satisfiable for the inputs.
+    """
 
 
 class Select(datatype('Subject', ['product']), Selector):
   """Selects the given Product for the Subject provided to the constructor."""
 
   def construct_node(self, subject, variants):
-    return SelectNode(subject, self.product, variants)
+    return SelectNode(subject, self.product, variants, None)
 
 
-class SelectVariant(datatype('Subject', ['variant', 'product']), Selector):
-  """Selects the matching Product with the variant name for the Subject provided to the constructor.
+class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
+  """Selects the matching Product and variant name for the Subject provided to the constructor.
 
-  NB: variants only work for native Products currently. Products produced by tasks would
-  likely not have a useful reason to be named.
+  For example: a SelectVariant with a variant_key of "thrift" and a product of type ApacheThrift
+  will only match when a consumer passes a variant value for "thrift" that matches the name of an
+  ApacheThrift value.
   """
 
   def construct_node(self, subject, variants):
-    variant_values = [value for key, value in variants
-                      if key == self.variant] if variants else None
-    return NativeNode(subject,
-                      self.product,
-                      variant_values[0] if variant_values else None)
+    return SelectNode(subject, self.product, variants, self.variant_key)
 
 
 class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Selector):
-  """Selects the dependencies of a Product for the Subject provided to the constructor."""
+  """Selects the dependencies of a Product for the Subject provided to the constructor.
+
+  The dependencies declared on `deps_product` will be provided to the requesting task
+  in the order they were declared.
+  """
 
   def construct_node(self, subject, variants):
-    return SelectDependenciesNode(subject, self.product, variants, self.deps_product)
+    return DependenciesNode(subject, self.product, variants, self.deps_product)
 
 
-class SelectAddress(datatype('Address', ['address', 'product']), Selector):
-  """Selects the Subject represented by the given Address."""
+class SelectProjection(datatype('Projection', ['product', 'projected_product', 'field', 'input_product']), Selector):
+  """Selects a field of the given Subject to produce a Subject, Product dependency from.
 
-  def simplify(self, build_graph):
-    """Simplifies this Select to an executable version."""
-    return SelectLiteral(build_graph.resolve(self.address), self.product)
+  Projecting an input allows for deduplication in the graph, where multiple Subjects
+  resolve to a single backing Subject instead.
+  """
 
   def construct_node(self, subject, variants):
-    raise ValueError('{} must be resolved before it can be constructed.'.format(self))
+    # Input product type doesn't match: not satisfiable.
+    if not type(subject) == self.input_product:
+      return None
+
+    # Find the field of the Subject to project.
+    projected_field = getattr(subject, self.field, None)
+    if projected_field is None:
+      raise ValueError('Subject {} has no field {} to project.'.format(subject, self.field))
+    projected_subject = self.projected_product(projected_field)
+    return SelectNode(projected_subject, self.product, variants, None)
 
 
-class SelectLiteral(datatype('LiteralSubject', ['subject', 'product']), Selector):
+class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
 
   def construct_node(self, subject, variants):
     # NB: Intentionally ignores subject parameter to provide a literal subject.
-    return SelectNode(self.subject, self.product, variants)
-
-
-class Variants(object):
-  """Variants are key-value pairs representing uniquely identifying parameters for a Node.
-
-  They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
-  stored as sorted nested tuples of key-value strings.
-  """
-
-  @classmethod
-  def merge(cls, left, right):
-    """Merges right over left, ensuring that the return value is a tuple of tuples, or None."""
-    if not left:
-      if right:
-        return tuple(right)
-      else:
-        return None
-    if not right:
-      return tuple(left)
-    # Merge by key, and then return sorted by key.
-    merged = dict(left)
-    for key, value in right:
-      merged[key] = value
-    return tuple(sorted(merged.items(), key=lambda x: x[0]))
+    return SelectNode(self.subject, self.product, variants, None)
 
 
 class SchedulingError(Exception):
@@ -185,7 +171,11 @@ class Node(object):
 
   @abstractproperty
   def product(self):
-    """The product for this Node."""
+    """The output product for this Node."""
+
+  @abstractproperty
+  def variants(self):
+    """The variants for this Node."""
 
   @abstractmethod
   def step(self, dependency_states, node_builder):
@@ -198,91 +188,170 @@ class Node(object):
     """
 
 
-class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants']), Node):
+class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant_key']), Node):
   """A Node that selects a product for a subject.
 
-  A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR.
+  A Select can be satisfied by multiple sources, and (TODO: currently) acts like an OR. The
+  'variants' field represents variant configuration that is propagated to dependencies. When
+  a task needs to consume a product as configured by the variants map, it uses the SelectVariant
+  selector, which introduces the 'variant' value to restrict the names of values selected by a
+  SelectNode.
   """
 
-  def _dependencies(self, node_builder):
+  def _variants_node(self):
+    if self.product != Variants:
+      return SelectNode(self.subject, Variants, self.variants, None)
+    return None
+
+  def _select_literal(self, candidate, variant_value):
+    """Looks for has-a or is-a relationships between the given value and the requested product.
+
+    Returns the resulting product value, or None if no match was made.
+    """
+    def items():
+      # Check whether the subject is-a instance of the product.
+      yield candidate
+      # Else, check whether it has-a instance of the product.
+      if isinstance(candidate, Target):
+        for configuration in candidate.configurations:
+          yield configuration
+
+    # TODO: returning only the first configuration of a given type/variant. Need to define
+    # mergeability for products.
+    for item in items():
+      if not isinstance(item, self.product):
+        continue
+      if variant_value and not getattr(item, 'name', None) == variant_value:
+        continue
+      return item
+    return None
+
+  def _task_sources(self, node_builder, variants):
     """Returns a sequence of potential source Nodes for this Select."""
-    # Look for native sources.
-    yield NativeNode(self.subject, self.product, None)
-    # And for Tasks.
-    for task_node in node_builder.task_nodes(self.subject, self.product, self.variants):
+    # Tasks.
+    for task_node in node_builder.task_nodes(self.subject, self.product, variants):
       yield task_node
+    # An Address that can be resolved into a Struct.
+    # TODO: This node defines a special case for Addresses and Structs by recognizing that they
+    # might be-a Product after resolution, and so it begins by attempting to resolve a Struct for
+    # a subject Address. This type of cast/conversion should likely be reified.
+    if isinstance(self.subject, Address) and issubclass(self.product, Struct):
+      struct_address = StructAddress(self.subject.spec_path, self.subject.target_name)
+      yield SelectNode(struct_address, Struct, None, None)
 
   def step(self, dependency_states, node_builder):
-    # If there are any Return Nodes, return the first.
+    # Request default Variants for the subject, so that if there are any we can propagate
+    # them to task nodes.
+    variants = self.variants
+    variants_node = self._variants_node()
+    if variants_node:
+      dep_state = dependency_states.get(variants_node, None)
+      if dep_state is None or type(dep_state) == Waiting:
+        return Waiting([variants_node])
+      elif type(dep_state) == Return:
+        # A subject's variants are overridden by any dependent's requested variants, so
+        # we merge them left to right here.
+        variants = Variants.merge(dep_state.value.default.items(), variants)
+
+    # If there is a variant_key, see whether it has been configured.
+    variant_value = None
+    if self.variant_key:
+      variant_values = [value for key, value in variants
+                        if key == self.variant_key] if variants else None
+      if not variant_values:
+        # Select cannot be satisfied: no variant configured for this key.
+        return Throw('Variant key {} was not configured in variants {}'.format(
+          self.variant_key, variants))
+      variant_value = variant_values[0]
+
+    # If the Subject "is a" or "has a" Product, then we're done.
+    literal_value = self._select_literal(self.subject, variant_value)
+    if literal_value is not None:
+      return Return(literal_value)
+
+    # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
-    dependencies = list(self._dependencies(node_builder))
+    dependencies = list(self._task_sources(node_builder, variants))
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
       if dep_state is None or type(dep_state) == Waiting:
         has_waiting_dep = True
-      elif type(dep_state) == Return:
-        return dep_state
+        continue
+      elif type(dep_state) == Throw:
+        continue
+      elif type(dep_state) != Return:
+        State.raise_unrecognized(dep_state)
+      # We computed a value: see whether we can use it.
+      literal_value = self._select_literal(dep_state.value, variant_value)
+      if literal_value is not None:
+        return Return(literal_value)
     if has_waiting_dep:
       return Waiting(dependencies)
-    else:
-      return Throw('No source of {}, {}'.format(self.subject, self.product))
+    return Throw("No source of {}.".format(self))
 
 
-class SelectDependenciesNode(datatype('SelectDependenciesNode', ['subject', 'product', 'variants', 'dep_product']), Node):
-  """A Node that selects products for the dependencies of a product.
+class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product']), Node):
+  """A Node that selects the given Product for each of the dependencies of this subject.
 
   Begins by selecting the `dep_product` for the subject, and then selects a product for each
   of dep_products' dependencies.
+
+  The value produced by this Node guarantees that the order of the provided values matches the
+  order of declaration in the `dependencies` list of the `dep_product`.
   """
 
   def _dep_product_node(self):
-    return SelectNode(self.subject, self.dep_product, self.variants)
+    return SelectNode(self.subject, self.dep_product, self.variants, None)
 
-  def _product_node(self, dependency):
+  def _dep_node(self, dependency):
     variants = self.variants
-    if getattr(self.subject, 'variants', None):
-      # A subject's default variants are only used if a dependent has not overridden them.
-      variants = Variants.merge(self.subject.variants.items(), variants)
-    if dependency.address:
-      # If a subject has a literal variant for particular dependencies, it wins over all else.
-      variants = Variants.merge(variants, extract_variants(dependency.address))
-    return SelectNode(dependency, self.product, variants)
+    if isinstance(dependency, Address):
+      # If a subject has literal variants for particular dependencies, they win over all else.
+      dependency, literal_variants = parse_variants(dependency)
+      variants = Variants.merge(variants, literal_variants)
+    return SelectNode(dependency, self.product, variants, None)
 
   def step(self, dependency_states, node_builder):
-    dep_product_state = dependency_states.get(self._dep_product_node(), None)
+    # Request the product we need in order to request dependencies.
+    dep_product_node = self._dep_product_node()
+    dep_product_state = dependency_states.get(dep_product_node, None)
     if dep_product_state is None or type(dep_product_state) == Waiting:
-      # Wait for the product which hosts the dependency list we need.
-      return Waiting([self._dep_product_node()])
+      return Waiting([dep_product_node])
     elif type(dep_product_state) == Throw:
-      return Throw('Could not compute {} to determine dependencies.'.format(self._dep_product_node()))
-    elif type(dep_product_state) == Return:
-      # The product and its dependency list are available.
-      dependencies = [self._product_node(d) for d in dep_product_state.value.dependencies]
-      for dependency in dependencies:
-        dep_state = dependency_states.get(dependency, None)
-        if dep_state is None or type(dep_state) == Waiting:
-          # One of the dependencies is not yet available. Indicate that we are waiting for all
-          # of them.
-          return Waiting([self._dep_product_node()] + dependencies)
-        elif type(dep_state) == Throw:
-          return Throw('Failed to compute dependency {}'.format(dependency))
-        elif type(dep_state) != Return:
-          raise State.raise_unrecognized(dep_state)
-      # All dependencies are present! Set our value to a list of the resulting values.
-      return Return([dependency_states[d].value for d in dependencies])
-    else:
-      State.raise_unrecognized(dep_state)
+      return Throw('Could not compute {} to determine dependencies.'.format(dep_product_node))
+    elif type(dep_product_state) != Return:
+      State.raise_unrecognized(dep_product_state)
+
+    # The product and its dependency list are available.
+    dep_product = dep_product_state.value
+    dependencies = [self._dep_node(d) for d in dep_product.dependencies]
+    for dependency in dependencies:
+      dep_state = dependency_states.get(dependency, None)
+      if dep_state is None or type(dep_state) == Waiting:
+        # One of the dependencies is not yet available. Indicate that we are waiting for all
+        # of them.
+        return Waiting([dep_product_node] + dependencies)
+      elif type(dep_state) == Throw:
+        return Throw('Failed to compute dependency {}'.format(dependency))
+      elif type(dep_state) != Return:
+        raise State.raise_unrecognized(dep_state)
+    # All dependencies are present! Set our value to a list of the resulting values.
+    return Return([dependency_states[d].value for d in dependencies])
 
 
 class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', 'clause']), Node):
-  def _dependencies(self, node_builder):
-    for select in self.clause:
-      yield select.construct_node(self.subject, self.variants)
 
   def step(self, dependency_states, node_builder):
-    # If all dependency Nodes are Return, execute the Node.
+    # Compute dependencies.
     dep_values = []
-    dependencies = list(self._dependencies(node_builder))
+    dependencies = []
+    for select in self.clause:
+      dep = select.construct_node(self.subject, self.variants)
+      if dep is None:
+        return Throw('Dependency {} is not satisfiable.'.format(select))
+      dependencies.append(dep)
+
+    # If all dependency Nodes are Return, execute the Node.
     for dep_key in dependencies:
       dep_state = dependency_states.get(dep_key, None)
       if dep_state is None or type(dep_state) == Waiting:
@@ -296,28 +365,6 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     return Return(self.func(*dep_values))
 
 
-class NativeNode(datatype('NativeNode', ['subject', 'product', 'variant']), Node):
-  def step(self, dependency_states, node_builder):
-    def candidates():
-      yield self.subject
-      if getattr(self.subject, 'configurations', None):
-        for configuration in self.subject.configurations:
-          yield configuration
-
-    # TODO: returning only the last configuration of a given type. Need to define
-    # mergeability for products.
-    for candidate in candidates():
-      if type(candidate) != self.product:
-        continue
-      if self.variant and not getattr(candidate, 'name', None) == self.variant:
-        continue
-      return Return(candidate)
-    return Throw('No native source of {} for {}{}'.format(
-        self.product,
-        self.subject,
-        '(with variant {})'.format(self.variant) if self.variant else ''))
-
-
 class ProductGraph(object):
 
   def __init__(self):
@@ -328,7 +375,7 @@ class ProductGraph(object):
     self._dependencies = defaultdict(set)
     self._dependents = defaultdict(set)
 
-  def complete(self, node, state):
+  def _set_state(self, node, state):
     existing_state = self._node_results.get(node, None)
     if existing_state is not None:
       raise ValueError('Node {} is already completed:\n  {}\n  {}'.format(node, existing_state, state))
@@ -336,17 +383,84 @@ class ProductGraph(object):
       raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
     self._node_results[node] = state
 
+  @classmethod
+  def validate_node(cls, node):
+    if not isinstance(node, Node):
+      raise ValueError('Value {} is not a Node.'.format(node))
+
   def is_complete(self, node):
     return node in self._node_results
 
   def state(self, node):
     return self._node_results.get(node, None)
 
-  def add_edges(self, node, dependencies):
+  def update_state(self, node, state):
+    """Updates the Node with the given State."""
+    if type(state) in [Return, Throw]:
+      self._set_state(node, state)
+      return state
+    elif type(state) == Waiting:
+      self._add_dependencies(node, state.dependencies)
+      return self.state(node)
+    else:
+      raise State.raise_unrecognized(state)
+
+  def _detect_cycle(self, src, dest):
+    """Given a src and a dest, each of which _might_ already exist in the graph, detect cycles.
+
+    Return a path of Nodes that describe the cycle, or None.
+    """
+    path = OrderedSet()
+    walked = set()
+    def _walk(node):
+      if node in path:
+        return tuple(path) + (node,)
+      if node in walked:
+        return None
+      path.add(node)
+      walked.add(node)
+
+      for dep in self.dependencies_of(node):
+        found = _walk(dep)
+        if found is not None:
+          return found
+      path.discard(node)
+      return None
+
+    # Initialize the path with src (since the edge from src->dest may not actually exist), and
+    # then walk from the dest.
+    path.update([src])
+    return _walk(dest)
+
+  def _add_dependencies(self, node, dependencies):
+    """Adds dependency edges from the given src Node to the given dependency Nodes.
+
+    Executes cycle detection: if adding one of the given dependencies would create
+    a cycle, then the _source_ Node is marked as a Throw with an error indicating the
+    cycle path, and the dependencies are not introduced.
+    """
+    self.validate_node(node)
+    if self.is_complete(node):
+      raise ValueError('Node {} is already completed, and cannot be updated.'.format(node))
+
+    # Validate that adding these deps would not cause a cycle.
+    for dependency in dependencies:
+      if dependency in self._dependencies[node]:
+        continue
+      self.validate_node(dependency)
+      cycle_path = self._detect_cycle(node, dependency)
+      if cycle_path:
+        # If a cycle is detected, don't introduce the dependencies, and instead fail the node.
+        entries = ' ->\n  '.join(str(p) for p in cycle_path)
+        self._set_state(node, Throw('Cycle detected in path:\n  {} !!'.format(entries)))
+        return
+
+    # Finally, add all deps.
     self._dependencies[node].update(dependencies)
     for dependency in dependencies:
-      #self._dependencies[dependency].update([])
       self._dependents[dependency].add(node)
+      # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
+      self._dependencies[dependency]
 
   def dependencies(self):
     return self._dependencies
@@ -376,6 +490,7 @@ class ProductGraph(object):
         if node in walked:
           continue
         walked.add(node)
+
         dependencies = _filtered_entries(self.dependencies_of(node))
         yield (entry, dependencies)
         for e in _walk(dependencies):
@@ -388,20 +503,15 @@ class ProductGraph(object):
 class NodeBuilder(object):
   """Encapsulates the details of creating Nodes that involve user-defined functions/tasks.
 
-  This avoids giving Nodes direct access to the build graph, task list, or product graph.
+  This avoids giving Nodes direct access to the task list or product graph.
   """
 
   @classmethod
-  def create(cls, graph, tasks):
-    """Indexes tasks by their output type, and simplifies their Select clauses.
-
-    This allows this object to carry the minimum of information when it is serialized... in
-    particular, it needn't carry along the entire graph!
-    """
+  def create(cls, tasks):
+    """Indexes tasks by their output type."""
     serializable_tasks = defaultdict(set)
     for output_type, input_selects, task in tasks:
-      simplified_input_selects = tuple(select.simplify(graph) for select in input_selects)
-      serializable_tasks[output_type].add((task, simplified_input_selects))
+      serializable_tasks[output_type].add((task, tuple(input_selects)))
     return cls(serializable_tasks)
 
   def __init__(self, tasks):
@@ -490,21 +600,6 @@ class Step(object):
   def node(self):
     return self._node
 
-  def finalize(self, promise, product_graph):
-    """Called by the Scheduler to collect the result of this Step. Not threadsafe.
-
-    If the step is not completed, returns False.
-    """
-    if not promise.is_complete():
-      return False
-
-    result = promise.get()
-    if type(result) == Waiting:
-      product_graph.add_edges(self._node, result.dependencies)
-    else:
-      product_graph.complete(self._node, result)
-    return True
-
   def __eq__(self, other):
     return type(self) == type(other) and self._step_id == other._step_id
 
@@ -522,61 +617,54 @@ class Step(object):
 
 
 class LocalScheduler(object):
-  """A scheduler that expands a ProductGraph locally.
+  """A scheduler that expands a ProductGraph by executing user defined tasks.
 
   # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
   # ng-killall, and buildgen.go.
-  #
-  # 1. If not subjects check for a special Planner subtype with a special subject-less
-  #    promise method.
-  # 2. Use a sentinel NO_SUBJECT, planners that care test for this, other planners that
-  #    looks for Target or Jar or ... will naturally just skip it and no-op.
-  #
-  # Option 1 allows for failing the build if no such subtypes are amongst the goals;
-  # ie: `./pants compile` would fail since there are no inputs and all compile registered
-  # planners require subjects (don't implement the subtype).
-  # Seems promising - but what about mixed goals and no subjects?
-  #
-  # What about if subjects but the planner doesn't care about them?  Is using the IvyGlobal
-  # trick good enough here?  That pattern with fake Plans to aggregate could be packaged in
-  # a TaskPlanner baseclass.
   """
 
-  def __init__(self, graph, products_by_goal, tasks):
+  def __init__(self, products_by_goal, tasks):
     """
-    :param graph: The BUILD graph build requests will execute against.
-    :type graph: :class:`pants.engine.exp.graph.Graph`
     :param products_by_goal: The products that are required for each goal name.
-    :param tasks: 
+    :param tasks: A set of (output, input selection clause, task function) triples which
+           is used to compute values in the product graph.
     """
-    self._graph = graph
     self._products_by_goal = products_by_goal
-    self._node_builder = NodeBuilder.create(graph, tasks)
+    self._node_builder = NodeBuilder.create(tasks)
     self._product_graph = ProductGraph()
     self._roots = set()
     self._step_id = -1
 
   def _create_step(self, node):
-    """Creates a Step and Promise with the currently available dependencies of the given Node."""
+    """Creates a Step and Promise with the currently available dependencies of the given Node.
+
+    If the dependencies of a Node are not available, returns None.
+    """
+    ProductGraph.validate_node(node)
+
+    # See whether all of the dependencies for the node are available.
+    deps = {dep: self._product_graph.state(dep)
+            for dep in self._product_graph.dependencies_of(node)}
+    if any(state is None for state in deps.values()):
+      return None
+
+    # Ready.
     self._step_id += 1
-    step = Step(self._step_id,
-                node,
-                {dep: self._product_graph.state(dep)
-                 for dep in self._product_graph.dependencies_of(node) if dep is not None},
-                self._node_builder)
-    return (step, Promise())
+    return (Step(self._step_id, node, deps, self._node_builder), Promise())
 
   def _create_roots(self, build_request):
     # Determine the root products and subjects based on the request.
-    root_subjects = [(self._graph.resolve(a), extract_variants(a))
-                     for a in build_request.addressable_roots]
+    root_subjects = [parse_variants(a) for a in build_request.addressable_roots]
     root_products = OrderedSet()
     for goal in build_request.goals:
       root_products.update(self._products_by_goal[goal])
 
     # Roots are products that might be possible to produce for these subjects.
-    # TODO: allow specifying variants per Subject as part BuildRequest parsing.
-    return [SelectNode(s, p, v) for s, v in root_subjects for p in root_products]
+    return [SelectNode(s, p, v, None) for s, v in root_subjects for p in root_products]
+
+  @property
+  def product_graph(self):
+    return self._product_graph
 
   def walk_product_graph(self, predicate=None):
     """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
@@ -611,36 +699,56 @@ class LocalScheduler(object):
     candidates = set(root for root in self._roots)
 
     # Yield nodes that are ready, and then compute new ones.
+    scheduling_iterations = 0
     while True:
-      # Create Steps for candidates that are not already running.
+      # Create Steps for candidates that are ready to run, and not already running.
       ready = dict()
       for candidate_node in list(candidates):
         if candidate_node in outstanding:
           # Node is still a candidate, but is currently running.
           continue
         if pg.is_complete(candidate_node):
-          # Previous Step for the Node caused it be completed.
+          # Node has already completed.
           candidates.discard(candidate_node)
           continue
-        ready[candidate_node] = self._create_step(candidate_node)
+        # Create a step if all dependencies are available; otherwise, can assume they are
+        # outstanding, and will cause this Node to become a candidate again later.
+        candidate_step = self._create_step(candidate_node)
+        if candidate_step is not None:
+          ready[candidate_node] = candidate_step
+        candidates.discard(candidate_node)
 
       if not ready and not outstanding:
         # Finished.
         break
       yield ready.values()
+      scheduling_iterations += 1
       outstanding.update(ready)
 
       # Finalize completed Steps.
       for node, entry in outstanding.items()[:]:
         step, promise = entry
-        if not step.finalize(promise, pg):
-          # Still executing.
+        if not promise.is_complete():
           continue
-        # This step has completed; if the Node has completed, its dependents are candidates.
+        # The step has completed; see whether the Node is completed.
         outstanding.pop(node)
+        pg.update_state(step.node, promise.get())
         if pg.is_complete(step.node):
           # The Node is completed: mark any of its dependents as candidates for Steps.
           candidates.update(d for d in pg.dependents_of(step.node))
         else:
-          # Waiting on dependencies: mark them as candidates for Steps.
-          candidates.update(d for d in pg.dependencies_of(step.node))
+          # Waiting on dependencies.
+          incomplete_deps = [d for d in pg.dependencies_of(step.node) if not pg.is_complete(d)]
+          if incomplete_deps:
+            # Mark incomplete deps as candidates for Steps.
+            candidates.update(incomplete_deps)
+          else:
+            # All deps are already completed: mark this Node as a candidate for another step.
+            candidates.add(step.node)
+
+    print('created {} total nodes in {} scheduling iterations and {} steps, '
+          'with {} nodes in the successful path.'.format(
+            len(pg.dependencies()),
+            scheduling_iterations,
+            self._step_id,
+            sum(1 for _ in pg.walk(self._roots))))
