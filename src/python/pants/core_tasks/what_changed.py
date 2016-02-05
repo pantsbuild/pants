@@ -20,7 +20,8 @@ class WhatChanged(ChangedFileTaskMixin, ConsoleTask):
              help='Show changed files instead of the targets that own them.')
 
   def console_output(self, _):
-    spec_excludes = self.get_options().spec_excludes
+    # Will be provided through context.address_mapper.build_ignore_patterns.
+    spec_excludes = None
     change_calculator = self.change_calculator(self.get_options(),
                                                self.context.address_mapper,
                                                self.context.build_graph,

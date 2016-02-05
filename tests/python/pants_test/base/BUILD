@@ -27,7 +27,8 @@ python_library(
   name = 'build_file_test_base',
   sources = ['build_file_test_base.py'],
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:pathspec',
+    'src/python/pants/base:build_file',
     'src/python/pants/util:dirutil',
   ]
 )
@@ -158,8 +159,17 @@ python_tests(
 )
 
 python_tests(
-  name = 'test_spec_exclude_integration',
-  sources = [ 'test_spec_exclude_integration.py' ],
+  name = 'bundle_integration',
+  sources = [ 'test_bundle_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'ignore_patterns_pants_ini_integration',
+  sources = [ 'test_ignore_patterns_pants_ini_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
