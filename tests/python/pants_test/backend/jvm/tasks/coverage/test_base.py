@@ -19,7 +19,10 @@ from pants_test.base_test import BaseTest
 
 
 class attrdict(dict):
-  """Allows entries in the dictionary to be accessed like a property, in order to spoof options."""
+  """Allows entries in the dictionary to be accessed like a property, in order to spoof options.
+
+  :API: public
+  """
 
   def __getattr__(self, key):
     if self.has_key(key):
@@ -28,11 +31,21 @@ class attrdict(dict):
 
 
 class fake_log(object):
+  """
+  :API: public
+  """
+
   def debug(self, string):
+    """
+    :API: public
+    """
     return
 
 
 class TestCoverageEngine(Coverage):
+  """
+  :API: public
+  """
 
   def __init__(self, settings):
     self.copy2_calls = defaultdict(list)
@@ -47,6 +60,9 @@ class TestCoverageEngine(Coverage):
         safe_md=self.safe_md)
 
   def safe_md(self, dir, clean):
+    """
+    :API: public
+    """
     assert clean == True
     self.safe_makedir_calls += dir
 
@@ -67,8 +83,14 @@ class TestCoverageEngine(Coverage):
 
 
 class TestBase(BaseTest):
+  """
+  :API: public
+  """
 
   def setUp(self):
+    """
+    :API: public
+    """
     super(TestBase, self).setUp()
 
     self.pants_workdir = "workdir"
@@ -111,6 +133,9 @@ class TestBase(BaseTest):
     self._assert_calls(coverage.copytree_calls, frm, to)
 
   def test_skips_non_coverage_targets(self):
+    """
+    :API: public
+    """
     options = attrdict(coverage=True, coverage_jvm_options=[])
 
     settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
@@ -133,6 +158,9 @@ class TestBase(BaseTest):
                       "Should be no copytree calls when targets are not coverage targets.")
 
   def test_target_with_multiple_path_entries(self):
+    """
+    :API: public
+    """
     options = attrdict(coverage=True, coverage_jvm_options=[])
 
     settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
@@ -155,6 +183,9 @@ class TestBase(BaseTest):
                       "Should be no copytree calls when targets are not coverage targets.")
 
   def test_target_annotation_processor(self):
+    """
+    :API: public
+    """
     options = attrdict(coverage=True, coverage_jvm_options=[])
 
     settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
