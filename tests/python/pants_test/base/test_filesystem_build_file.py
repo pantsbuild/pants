@@ -102,7 +102,7 @@ class FilesystemBuildFileTest(BuildFileTestBase):
       self.create_buildfile('issue_1742/BUILD.sibling'),
     ]), self.scan_buildfiles('', build_ignore_patterns=['**/child*']))
 
-  def test_build_files_scan_with_build_file_ignore(self):
+  def test_build_files_scan_with_ignore_patterns(self):
     self.assertEquals(OrderedSet([
       self.create_buildfile('BUILD'),
       self.create_buildfile('grandparent/parent/BUILD'),

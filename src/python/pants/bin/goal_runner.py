@@ -184,7 +184,7 @@ class GoalRunnerFactory(object):
 
     self._project_tree = self._get_project_tree(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    build_ignore_patterns = self._global_options.build_file_ignore or []
+    build_ignore_patterns = self._global_options.ignore_patterns or []
     build_ignore_patterns.extend(BuildFile._spec_excludes_to_gitignore_syntax(self._root_dir,
                                                                               self._global_options.spec_excludes))
     self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._project_tree, build_ignore_patterns)

@@ -148,7 +148,7 @@ class CmdLineSpecParser(object):
             deprecated_conditional(lambda: True,
                                    '0.0.75',
                                    'Filtering broken BUILD files based on exclude_target_regexp is deprecated '
-                                   'and will be removed. Use build_file_ignore instead.')
+                                   'and will be removed. Use ignore_patterns instead.')
           else:
             if fail_fast:
               raise self.BadSpecError(e)
