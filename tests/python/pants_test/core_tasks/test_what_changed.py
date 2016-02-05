@@ -57,7 +57,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
     return WhatChanged
 
   def assert_console_output(self, *output, **kwargs):
-    options = {'build_ignore_patterns': [], 'exclude_target_regexp': []}
+    options = {'exclude_target_regexp': []}
     if 'options' in kwargs:
       options.update(kwargs['options'])
     kwargs['options'] = options
@@ -94,11 +94,8 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
       workspace=self.workspace(files=['a/b/c', 'd', 'e/f'])
     )
 
-
-class WhatChangedTest(BaseWhatChangedTest):
-
   def setUp(self):
-    super(WhatChangedTest, self).setUp()
+    super(WhatChangedTestBasic, self).setUp()
 
     self.add_to_build_file('root/src/py/a', dedent("""
       python_library(
@@ -205,13 +202,8 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     """))
 
-  def test_build_ignore_patterns(self):
-    self.assert_console_output(
-      'root/src/py/a:alpha',
-      options={'build_ignore_patterns': 'root/src/py/1'},
-      workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
-    )
 
+class WhatChangedTest(WhatChangedTestBasic):
   def test_owned(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
@@ -383,4 +375,16 @@ class WhatChangedTest(BaseWhatChangedTest):
     self.assert_console_output(
       '//:pants-config',
       workspace=self.workspace(files=['pants.ini'])
+    )
+
+
+class WhatChangedTestWithIgnorePatterns(WhatChangedTestBasic):
+  @property
+  def build_ignore_patterns(self):
+    return ['root/src/py/1']
+
+  def test_build_ignore_patterns(self):
+    self.assert_console_output(
+      'root/src/py/a:alpha',
+      workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
     )
