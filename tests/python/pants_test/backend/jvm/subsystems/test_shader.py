@@ -98,24 +98,9 @@ class ShaderTest(unittest.TestCase):
       self.assertEqual(input_jar, command.pop(0))
       self.assertEqual(self.output_jar, command.pop(0))
 
-  def test_sanitize_package_name(self):
-    def assert_sanitize(name, sanitized):
-      self.assertEqual(sanitized, Shading.Relocate._sanitize_package_name(name))
-
-    assert_sanitize('hello', 'hello')
-    assert_sanitize('hello.goodbye', 'hello.goodbye')
-    assert_sanitize('.hello.goodbye', 'hello.goodbye')
-    assert_sanitize('hello.goodbye.', 'hello.goodbye')
-    assert_sanitize('123', '_123')
-    assert_sanitize('123.456', '_123._456')
-    assert_sanitize('123.v2', '_123.v2')
-    assert_sanitize('hello-goodbye', 'hello_goodbye')
-    assert_sanitize('hello-/.goodbye.?', 'hello__.goodbye._')
-    assert_sanitize('one.two..three....four.', 'one.two.three.four')
-
   def test_infer_shaded_pattern(self):
     def assert_inference(from_pattern, prefix, to_pattern):
-      result = ''.join(Shading.Relocate._infer_shaded_pattern_iter(from_pattern, prefix))
+      result = ''.join(Shading.RelocateRule._infer_shaded_pattern_iter(from_pattern, prefix))
       self.assertEqual(to_pattern, result)
 
     assert_inference('com.foo.bar.Main', None, 'com.foo.bar.Main')
@@ -130,7 +115,7 @@ class ShaderTest(unittest.TestCase):
 
   def test_shading_exclude(self):
     def assert_exclude(from_pattern, to_pattern):
-      self.assertEqual((from_pattern, to_pattern), Shading.Exclude.new(from_pattern).rule())
+      self.assertEqual((from_pattern, to_pattern), Shading.create_exclude(from_pattern))
 
     assert_exclude('com.foo.bar.Main', 'com.foo.bar.Main')
     assert_exclude('com.foo.bar.**', 'com.foo.bar.@1')
@@ -138,27 +123,35 @@ class ShaderTest(unittest.TestCase):
 
   def test_shading_exclude_package(self):
     self.assertEqual(('com.foo.bar.**', 'com.foo.bar.@1'),
-                     Shading.ExcludePackage.new('com.foo.bar').rule())
+                     Shading.create_exclude_package('com.foo.bar'))
     self.assertEqual(('com.foo.bar.*', 'com.foo.bar.@1'),
-                     Shading.ExcludePackage.new('com.foo.bar', recursive=False).rule())
+                     Shading.create_exclude_package('com.foo.bar', recursive=False))
 
   def test_relocate(self):
     self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
-                     Shading.Relocate.new(from_pattern='com.foo.bar.**').rule())
+                     Shading.create_relocate(from_pattern='com.foo.bar.**'))
 
     self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format('__my_prefix__.')),
-                     Shading.Relocate.new(from_pattern='com.foo.bar.**',
-                                      shade_prefix='__my_prefix__.').rule())
+                     Shading.create_relocate(from_pattern='com.foo.bar.**',
+                                      shade_prefix='__my_prefix__.'))
 
     self.assertEqual(('com.foo.bar.**', 'org.biz.baz.@1'.format('__my_prefix__.')),
-                     Shading.Relocate.new(from_pattern='com.foo.bar.**',
+                     Shading.create_relocate(from_pattern='com.foo.bar.**',
                                       shade_prefix='__my_prefix__.',
-                                      shade_pattern='org.biz.baz.@1').rule())
+                                      shade_pattern='org.biz.baz.@1'))
 
   def test_relocate_package(self):
     self.assertEqual(('com.foo.bar.**', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
-                     Shading.RelocatePackage.new('com.foo.bar').rule())
+                     Shading.create_relocate_package('com.foo.bar'))
     self.assertEqual(('com.foo.bar.*', '{}com.foo.bar.@1'.format(Shading.SHADE_PREFIX)),
-                     Shading.RelocatePackage.new('com.foo.bar', recursive=False).rule())
+                     Shading.create_relocate_package('com.foo.bar', recursive=False))
     self.assertEqual(('com.foo.bar.**', '__p__.com.foo.bar.@1'),
-                     Shading.RelocatePackage.new('com.foo.bar', shade_prefix='__p__.').rule())
+                     Shading.create_relocate_package('com.foo.bar', shade_prefix='__p__.'))
+
+  def test_zap_package(self):
+    self.assertEqual(('zap', 'com.foo.bar.**'), Shading.create_zap_package('com.foo.bar', True))
+    self.assertEqual(('zap', 'com.foo.bar.*'), Shading.create_zap_package('com.foo.bar', False))
+
+  def test_keep_package(self):
+    self.assertEqual(('keep', 'com.foo.bar.**'), Shading.create_keep_package('com.foo.bar', True))
+    self.assertEqual(('keep', 'com.foo.bar.*'), Shading.create_keep_package('com.foo.bar', False))
