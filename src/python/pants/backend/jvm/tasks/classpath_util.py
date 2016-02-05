@@ -278,7 +278,10 @@ class ClasspathUtil(object):
           if entry.is_excluded_by(excludes):
             continue
 
-          # Avoid creating symlink for the same entry twice.
+          # Avoid creating symlink for the same entry twice, only the first entry on
+          # classpath will get a symlink. The resulted symlinks as a whole are still stable,
+          # but may have non-consecutive suffixes because the 'missing' ones are those
+          # have already been created symlinks by previous targets.
           if entry in processed_entries:
             continue
           processed_entries.add(entry)
