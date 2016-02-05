@@ -110,7 +110,7 @@ class NailgunTask(NailgunTaskBase, Task): pass
 
 
 class NailgunKillall(Task):
-  """A task to manually kill nailguns."""
+  """Kill running nailgun servers."""
 
   @classmethod
   def register_options(cls, register):

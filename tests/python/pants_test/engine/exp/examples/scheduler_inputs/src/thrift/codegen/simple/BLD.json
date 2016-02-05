@@ -1,8 +1,17 @@
 {
   "type_alias": "target",
-  "extends": "src/thrift:java_thrift_base",
+  "merges": ["src/thrift:java_thrift_base"],
   "name": "simple",
-  "sources": {
-    "files": ["simple.thrift"]
-  }
+  "configurations": [
+    {
+      "type_alias": "thrift",
+      "files": ["simple.thrift"]
+    },
+    {
+      "type_alias": "variants",
+      "default": {
+        "thrift": "apache_java"
+      }
+    }
+  ]
 }

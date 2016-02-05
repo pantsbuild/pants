@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_graph import BuildGraph
@@ -61,6 +62,10 @@ class Context(object):
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, spec_excludes=None, invalidation_report=None):
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use address_mapper#build_ignore_patterns instead.')
+
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -79,7 +84,6 @@ class Context(object):
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._spec_excludes = spec_excludes
     self._replace_targets(target_roots)
-    self._synthetic_targets = defaultdict(list)
     self._invalidation_report = invalidation_report
 
   @property
@@ -128,6 +132,7 @@ class Context(object):
     return self._workspace
 
   @property
+  @deprecated('0.0.75')
   def spec_excludes(self):
     return self._spec_excludes
 
@@ -246,9 +251,6 @@ class Context(object):
                                              **kwargs)
     new_target = self.build_graph.get_target(address)
 
-    if derived_from:
-      self._synthetic_targets[derived_from].append(new_target)
-
     return new_target
 
   def targets(self, predicate=None, postorder=False):
@@ -266,9 +268,9 @@ class Context(object):
     target_set = self._collect_targets(self.target_roots, postorder=postorder)
 
     synthetics = OrderedSet()
-    for derived_from, synthetic_targets in self._synthetic_targets.items():
-      if derived_from in target_set or derived_from in synthetics:
-        synthetics.update(synthetic_targets)
+    for synthetic_address in self.build_graph.synthetic_addresses:
+      if self.build_graph.get_concrete_derived_from(synthetic_address) in target_set:
+        synthetics.add(self.build_graph.get_target(synthetic_address))
 
     synthetic_set = self._collect_targets(synthetics, postorder=postorder)
 

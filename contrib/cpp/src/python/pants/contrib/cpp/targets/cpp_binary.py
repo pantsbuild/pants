@@ -12,7 +12,7 @@ from pants.contrib.cpp.targets.cpp_target import CppTarget
 
 
 class CppBinary(CppTarget):
-  """Produces a c++ binary."""
+  """A C++ binary."""
 
   def __init__(self,
                libraries=None,

@@ -12,10 +12,11 @@ from collections import defaultdict
 from tempfile import mkdtemp
 from textwrap import dedent
 
-from pants.base.build_file import FilesystemBuildFile
+from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
@@ -92,14 +93,14 @@ class BaseTest(unittest.TestCase):
     target:  A string containing the target definition as it would appear in a BUILD file.
     """
     self.create_file(self.build_path(relpath), target, mode='a')
-    cls = self.address_mapper._build_file_type
-    return cls(root_dir=self.build_root, relpath=self.build_path(relpath))
+    return BuildFile(self.address_mapper._project_tree, relpath=self.build_path(relpath))
 
   def make_target(self,
                   spec='',
                   target_type=Target,
                   dependencies=None,
                   derived_from=None,
+                  synthetic=False,
                   **kwargs):
     """Creates a target and injects it into the test's build graph.
 
@@ -118,7 +119,8 @@ class BaseTest(unittest.TestCase):
 
     self.build_graph.inject_target(target,
                                    dependencies=[dep.address for dep in dependencies],
-                                   derived_from=derived_from)
+                                   derived_from=derived_from,
+                                   synthetic=synthetic)
 
     # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
     # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
@@ -141,6 +143,10 @@ class BaseTest(unittest.TestCase):
   def alias_groups(self):
     return BuildFileAliases(targets={'target': Target})
 
+  @property
+  def build_ignore_patterns(self):
+    return None
+
   def setUp(self):
     super(BaseTest, self).setUp()
     Goal.clear()
@@ -162,6 +168,10 @@ class BaseTest(unittest.TestCase):
       'pants_configdir': os.path.join(self.build_root, 'config'),
       'cache_key_gen_version': '0-test',
     }
+    self.options['cache'] = {
+      'read_from': [],
+      'write_to': [],
+    }
 
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)
@@ -171,7 +181,9 @@ class BaseTest(unittest.TestCase):
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
+    self.project_tree = FileSystemProjectTree(self.build_root)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
+                                                 build_ignore_patterns=self.build_ignore_patterns)
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def buildroot_files(self, relpath=None):
@@ -189,7 +201,7 @@ class BaseTest(unittest.TestCase):
 
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
-    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FilesystemBuildFile)
+    self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree(self.build_root))
     self.build_graph = BuildGraph(address_mapper=self.address_mapper)
 
   def set_options_for_scope(self, scope, **kwargs):
@@ -243,7 +255,7 @@ class BaseTest(unittest.TestCase):
 
   def tearDown(self):
     super(BaseTest, self).tearDown()
-    FilesystemBuildFile.clear_cache()
+    BuildFile.clear_cache()
     Subsystem.reset()
 
   def target(self, spec):

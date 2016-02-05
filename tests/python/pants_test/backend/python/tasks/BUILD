@@ -1,17 +1,17 @@
-target(
-  name='tasks',
-  dependencies=[
-    ':pytest_run',
-    ':python_repl',
-    ':python_task',
-    ':setup_py',
-  ]
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+
+python_library(
+  name='interpreter_cache_test_mixin',
+  sources=['interpreter_cache_test_mixin.py'],
 )
 
 python_library(
   name='python_task_test_base',
   sources=['python_task_test_base.py'],
   dependencies=[
+    ':interpreter_cache_test_mixin',
     'src/python/pants/backend/python:plugin',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base'
@@ -62,6 +62,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -70,6 +71,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -80,7 +82,6 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:mock',
     ':python_task_test_base',
-    'src/python/pants/backend/core/targets:common',
 
     # TODO(John Sirois): XXX this dep needs to be fixed.  All pants/java utility code needs to live
     # in pants java since non-jvm backends depend on it to run things.

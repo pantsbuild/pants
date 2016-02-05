@@ -17,7 +17,6 @@ from copy import copy
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.tasks.scm_publish import Namedver, ScmPublishMixin, Semver
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -34,6 +33,7 @@ from pants.build_graph.build_graph import sort_targets
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
 from pants.option.custom_types import dict_option, list_option
+from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin, Semver
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants.util.strutil import ensure_text
 
@@ -352,6 +352,8 @@ class JarPublish(ScmPublishMixin, JarTask):
     register('--changelog', default=True, action='store_true',
              help='A changelog.txt file will be created and printed to the console for each '
                   'artifact published')
+    register('--prompt', default=True, action='store_true',
+             help='Interactively prompt user before publishing each artifact.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -385,7 +387,7 @@ class JarPublish(ScmPublishMixin, JarTask):
         raise TaskError(
           "This repo is not configured to publish externally! Please configure per\n"
           "http://pantsbuild.github.io/publish.html#authenticating-to-the-artifact-repository,\n"
-          "or re-run with the '--publish-local' flag.")
+          "by setting --publish-jar-repos=<dict> or re-run with '--publish-jar-local=<dir>'.")
       for repo, data in self.repos.items():
         auth = data.get('auth')
         if auth:
@@ -459,6 +461,8 @@ class JarPublish(ScmPublishMixin, JarTask):
   def confirm_push(self, coord, version):
     """Ask the user if a push should be done for a particular version of a
        particular coordinate.   Return True if the push should be done"""
+    if not self.get_options().prompt:
+      return True
     try:
       isatty = os.isatty(sys.stdin.fileno())
     except ValueError:

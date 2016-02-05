@@ -1,11 +1,14 @@
 {
   "type_alias": "target",
   "name": "simple",
-  "sources": {
-    "files": ["Simple.java"]
-  },
-  "dependencies": [
-    "3rdparty/jvm:guava",
-    "src/thrift/codegen/simple"
+  "configurations": [
+    {
+      "type_alias": "java",
+      "files": ["Simple.java"],
+      "dependencies": [
+        "3rdparty/jvm:guava",
+        "src/thrift/codegen/simple"
+      ]
+    }
   ]
 }

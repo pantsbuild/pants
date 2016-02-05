@@ -15,7 +15,7 @@ import six
 from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_file import BuildFile
-from pants.build_graph.address import Address, parse_spec
+from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address_lookup_error import AddressLookupError
 
 
@@ -53,6 +53,10 @@ class CmdLineSpecParser(object):
     """Indicates an invalid command line address selector."""
 
   def __init__(self, root_dir, address_mapper, spec_excludes=None, exclude_target_regexps=None):
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use build_ignore_patterns in address_mapper instead.')
+
     self._root_dir = os.path.realpath(root_dir)
     self._address_mapper = address_mapper
     self._spec_excludes = spec_excludes
@@ -130,22 +134,27 @@ class CmdLineSpecParser(object):
       spec_path = spec[:-len('::')]
       spec_dir = normalize_spec_path(spec_path)
       try:
-        build_files = self._address_mapper.scan_buildfiles(self._root_dir, spec_dir,
-                                                           spec_excludes=self._spec_excludes)
+        build_files = self._address_mapper.scan_build_files(base_path=spec_dir,
+                                                            spec_excludes=self._spec_excludes)
       except (BuildFile.BuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
 
       for build_file in build_files:
         try:
-          # This attempts to filter out broken BUILD files before we parse them.
-          if self._not_excluded_spec(build_file.spec_path):
-            addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
+          addresses.update(self._address_mapper.addresses_in_spec_path(build_file.spec_path))
         except (BuildFile.BuildFileError, AddressLookupError) as e:
-          if fail_fast:
-            raise self.BadSpecError(e)
-          errored_out.append('--------------------')
-          errored_out.append(traceback.format_exc())
-          errored_out.append('Exception message: {0}'.format(e))
+          # This attempts to filter out broken BUILD files before we parse them.
+          if not self._not_excluded_spec(build_file.spec_path):
+            deprecated_conditional(lambda: True,
+                                   '0.0.75',
+                                   'Filtering broken BUILD files based on exclude_target_regexp is deprecated '
+                                   'and will be removed. Use ignore_patterns instead.')
+          else:
+            if fail_fast:
+              raise self.BadSpecError(e)
+            errored_out.append('--------------------')
+            errored_out.append(traceback.format_exc())
+            errored_out.append('Exception message: {0}'.format(e))
 
       if errored_out:
         error_msg = '\n'.join(errored_out + ["Invalid BUILD files for [{0}]".format(spec)])
@@ -162,9 +171,7 @@ class CmdLineSpecParser(object):
     else:
       spec_parts = spec.rsplit(':', 1)
       spec_parts[0] = normalize_spec_path(spec_parts[0])
-      spec_path, target_name = parse_spec(':'.join(spec_parts))
       try:
-        self._address_mapper.from_cache(self._root_dir, spec_path)
-      except BuildFile.BuildFileError as e:
+        return {self._address_mapper.spec_to_address(':'.join(spec_parts))}
+      except AddressLookupError as e:
         raise self.BadSpecError(e)
-      return {Address(spec_path, target_name)}

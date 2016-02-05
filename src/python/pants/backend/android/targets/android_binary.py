@@ -11,7 +11,7 @@ from pants.util.memo import memoized_property
 
 
 class AndroidBinary(AndroidTarget):
-  """Produces an Android binary."""
+  """An Android binary."""
 
   def __init__(self, *args, **kwargs):
     super(AndroidBinary, self).__init__(*args, **kwargs)

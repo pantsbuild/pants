@@ -43,7 +43,7 @@ registers goals in its `register_goals` function. Here's an excerpt from
 [Pants' own Python
 backend](https://github.com/pantsbuild/pants/blob/master/src/python/pants/backend/python/register.py):
 
-!inc[start-at=def register_goals&end-at=Python projects from python_library](../backend/python/register.py)
+!inc[start-at=def register_goals](../backend/python/register.py)
 
 That `task(...)` is a name for
 `pants.goal.task_registrar.TaskRegistrar`. Calling its `install` method
@@ -96,6 +96,23 @@ do so if another task will use it. Use `self.context.products.isrequired` to fin
 required a product type:
 
 !inc[start-at=products.isrequired(&end-before=def](../backend/jvm/tasks/jvmdoc_gen.py)
+
+Task Implementation Versioning
+------------------------------
+
+Tasks may optionally specify an implementation version.  This is useful to be sure that cached
+objects from previous runs of pants using an older version are not used.  If you change a task
+class in a way that will impact its outputs you should update the version.  Implementation
+versions are set with the class method implementation_version.
+
+    :::python
+    Class FooTask(Task):
+      @classmethod
+      def implementation_version(cls):
+        return super(FooTask, cls).implementation_version() + [('FooTask', 1)]
+
+We store both a version number and the name of the class in order to disambiguate changes in
+different classes that have the same implementation version set.
 
 Task Configuration
 ------------------

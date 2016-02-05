@@ -15,6 +15,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
@@ -28,6 +29,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.option.custom_types import dict_option
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
+from pants.util.memo import memoized_property
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -38,19 +40,16 @@ _PLUGIN_INFO_FILE = 'scalac-plugin.xml'
 _PROCESSOR_INFO_FILE = 'META-INF/services/javax.annotation.processing.Processor'
 
 
-class ZincCompile(JvmCompile):
-  """Compile Scala and Java code using Zinc."""
+class BaseZincCompile(JvmCompile):
+  """An abstract base class for zinc compilation tasks."""
 
   _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
-
-  _name = 'zinc'
 
   _supports_concurrent_execution = True
 
   @staticmethod
   def write_plugin_info(resources_dir, target):
-    root = os.path.join(resources_dir, target.id)
-    plugin_info_file = os.path.join(root, _PLUGIN_INFO_FILE)
+    plugin_info_file = os.path.join(resources_dir, _PLUGIN_INFO_FILE)
     with safe_open(plugin_info_file, 'w') as f:
       f.write(textwrap.dedent("""
         <plugin>
@@ -58,7 +57,6 @@ class ZincCompile(JvmCompile):
           <classname>{}</classname>
         </plugin>
       """.format(target.plugin, target.classname)).strip())
-    return root, plugin_info_file
 
   @staticmethod
   def validate_arguments(log, whitelisted_args, args):
@@ -79,7 +77,7 @@ class ZincCompile(JvmCompile):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
+    return super(BaseZincCompile, cls).subsystem_dependencies() + (ScalaPlatform, DistributionLocator)
 
   @property
   def compiler_plugin_types(cls):
@@ -100,11 +98,7 @@ class ZincCompile(JvmCompile):
 
   @classmethod
   def register_options(cls, register):
-    super(ZincCompile, cls).register_options(register)
-    register('--scalac-plugins', advanced=True, action='append', fingerprint=True,
-             help='Use these scalac plugins.')
-    register('--scalac-plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
-             help='Map from plugin name to list of arguments for that plugin.')
+    super(BaseZincCompile, cls).register_options(register)
     # TODO: disable by default because it breaks dependency parsing:
     #   https://github.com/pantsbuild/pants/issues/2224
     # ...also, as of sbt 0.13.9, it is significantly slower for cold builds.
@@ -120,6 +114,12 @@ class ZincCompile(JvmCompile):
              help='A dict of option regexes that make up pants\' supported API for zinc. '
                   'Options not listed here are subject to change/removal. The value of the dict '
                   'indicates that an option accepts an argument.')
+
+    register('--incremental', advanced=True, action='store_true', default=True,
+             help='When set, zinc will use sub-target incremental compilation, which dramatically '
+                  'improves compile performance while changing large targets. When unset, '
+                  'changed targets will be compiled with an empty output directory, as if after '
+                  'running clean-all.')
 
     # TODO: Defaulting to false due to a few upstream issues for which we haven't pulled down fixes:
     #  https://github.com/sbt/sbt/pull/2085
@@ -166,13 +166,9 @@ class ZincCompile(JvmCompile):
                                     intransitive=True)
                           ])
 
-    # By default we expect no plugin-jars classpath_spec is filled in by the user, so we accept an
-    # empty classpath.
-    cls.register_jvm_tool(register, 'plugin-jars', classpath=[])
-
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ZincCompile, cls).prepare(options, round_manager)
+    super(BaseZincCompile, cls).prepare(options, round_manager)
     ScalaPlatform.prepare_tools(round_manager)
 
   @property
@@ -182,29 +178,30 @@ class ZincCompile(JvmCompile):
     Setting this property causes the task infrastructure to clone the previous
     results_dir for a target into the new results_dir for a target.
     """
-    return True
+    return self.get_options().incremental
 
   @property
   def cache_incremental(self):
     """Optionally write the results of incremental compiles to the cache."""
     return self.get_options().incremental_caching
 
-  def select(self, target):
-    return target.has_sources('.java') or target.has_sources('.scala')
-
-  def select_source(self, source_file_path):
-    return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
-
   def __init__(self, *args, **kwargs):
-    super(ZincCompile, self).__init__(*args, **kwargs)
-
-    self._lazy_plugin_args = None
+    super(BaseZincCompile, self).__init__(*args, **kwargs)
 
     # A directory to contain per-target subdirectories with apt processor info files.
     self._processor_info_dir = os.path.join(self.workdir, 'apt-processor-info')
 
     # Validate zinc options.
     ZincCompile.validate_arguments(self.context.log, self.get_options().whitelisted_args, self._args)
+    # A directory independent of any other classpath which can contain per-target
+    # plugin resource files.
+    self._plugin_info_dir = os.path.join(self.workdir, 'scalac-plugin-info')
+
+  def select(self, target):
+    raise NotImplementedError()
+
+  def select_source(self, source_file_path):
+    raise NotImplementedError()
 
   def create_analysis_tools(self):
     return AnalysisTools(DistributionLocator.cached().real_home, ZincAnalysisParser(), ZincAnalysis,
@@ -228,67 +225,21 @@ class ZincCompile(JvmCompile):
 
   def extra_compile_time_classpath_elements(self):
     # Classpath entries necessary for our compiler plugins.
-    return self.plugin_jars()
+    return self.plugin_jars
 
+  @property
   def plugin_jars(self):
     """The classpath entries for jars containing code for enabled plugins."""
-    if self.get_options().scalac_plugins:
-      return self.tool_classpath('plugin-jars')
-    else:
-      return []
+    raise NotImplementedError()
 
+  @property
   def plugin_args(self):
-    if self._lazy_plugin_args is None:
-      self._lazy_plugin_args = self._create_plugin_args()
-    return self._lazy_plugin_args
-
-  def _create_plugin_args(self):
-    if not self.get_options().scalac_plugins:
-      return []
-
-    plugin_args = self.get_options().scalac_plugin_args
-    active_plugins = self._find_plugins()
-    ret = []
-    for name, jar in active_plugins.items():
-      ret.append('-S-Xplugin:{}'.format(jar))
-      for arg in plugin_args.get(name, []):
-        ret.append('-S-P:{}:{}'.format(name, arg))
-    return ret
-
-  def _find_plugins(self):
-    """Returns a map from plugin name to plugin jar."""
-    # Allow multiple flags and also comma-separated values in a single flag.
-    plugin_names = set([p for val in self.get_options().scalac_plugins for p in val.split(',')])
-    plugins = {}
-    buildroot = get_buildroot()
-    for jar in self.plugin_jars():
-      with open_zip(jar, 'r') as jarfile:
-        try:
-          with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
-            plugin_info = ElementTree.parse(plugin_info_file).getroot()
-          if plugin_info.tag != 'plugin':
-            raise TaskError(
-              'File {} in {} is not a valid scalac plugin descriptor'.format(_PLUGIN_INFO_FILE,
-                                                                             jar))
-          name = plugin_info.find('name').text
-          if name in plugin_names:
-            if name in plugins:
-              raise TaskError('Plugin {} defined in {} and in {}'.format(name, plugins[name], jar))
-            # It's important to use relative paths, as the compiler flags get embedded in the zinc
-            # analysis file, and we port those between systems via the artifact cache.
-            plugins[name] = os.path.relpath(jar, buildroot)
-        except KeyError:
-          pass
-
-    unresolved_plugins = plugin_names - set(plugins.keys())
-    if unresolved_plugins:
-      raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
-    return plugins
+    raise NotImplementedError()
 
   def write_extra_resources(self, compile_context):
     """Override write_extra_resources to produce plugin and annotation processor files."""
     target = compile_context.target
-    if target.is_scalac_plugin and target.classname:
+    if isinstance(target, ScalacPlugin):
       self.write_plugin_info(compile_context.classes_dir, target)
     elif isinstance(target, AnnotationProcessor) and target.processors:
       processor_info_file = os.path.join(compile_context.classes_dir, _PROCESSOR_INFO_FILE)
@@ -332,7 +283,7 @@ class ZincCompile(JvmCompile):
     zinc_args.extend(['-sbt-interface', self.tool_jar('sbt-interface')])
     zinc_args.extend(['-scala-path', ':'.join(self.compiler_classpath())])
 
-    zinc_args += self.plugin_args()
+    zinc_args += self.plugin_args
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
@@ -379,3 +330,87 @@ class ZincCompile(JvmCompile):
                                    hash_file(analysis_file).upper()
                                    if os.path.exists(analysis_file)
                                    else 'nonexistent'))
+
+
+class ZincCompile(BaseZincCompile):
+  """Compile Scala and Java code using Zinc."""
+
+  _name = 'zinc'
+
+  @classmethod
+  def register_options(cls, register):
+    super(ZincCompile, cls).register_options(register)
+    register('--scalac-plugins', advanced=True, action='append', fingerprint=True,
+             help='Use these scalac plugins.')
+    register('--scalac-plugin-args', advanced=True, type=dict_option, default={}, fingerprint=True,
+             help='Map from plugin name to list of arguments for that plugin.')
+
+    # By default we expect no plugin-jars classpath_spec is filled in by the user, so we accept an
+    # empty classpath.
+    cls.register_jvm_tool(register, 'plugin-jars', classpath=[])
+
+  @classmethod
+  def product_types(cls):
+    return ['runtime_classpath', 'classes_by_source', 'product_deps_by_src']
+
+  def select(self, target):
+    # Require that targets are marked for JVM compilation, to differentiate from
+    # targets owned by the scalajs contrib module.
+    if not isinstance(target, JvmTarget):
+      return False
+    return target.has_sources('.java') or target.has_sources('.scala')
+
+  def select_source(self, source_file_path):
+    return source_file_path.endswith('.java') or source_file_path.endswith('.scala')
+
+  @memoized_property
+  def plugin_jars(self):
+    """The classpath entries for jars containing code for enabled plugins."""
+    if self.get_options().scalac_plugins:
+      return self.tool_classpath('plugin-jars')
+    else:
+      return []
+
+  @memoized_property
+  def plugin_args(self):
+    if not self.get_options().scalac_plugins:
+      return []
+
+    plugin_args = self.get_options().scalac_plugin_args
+    active_plugins = self._find_plugins()
+    ret = []
+    for name, jar in active_plugins.items():
+      ret.append('-S-Xplugin:{}'.format(jar))
+      for arg in plugin_args.get(name, []):
+        ret.append('-S-P:{}:{}'.format(name, arg))
+    return ret
+
+  def _find_plugins(self):
+    """Returns a map from plugin name to plugin jar."""
+    # Allow multiple flags and also comma-separated values in a single flag.
+    plugin_names = set([p for val in self.get_options().scalac_plugins for p in val.split(',')])
+    plugins = {}
+    buildroot = get_buildroot()
+    for jar in self.plugin_jars:
+      with open_zip(jar, 'r') as jarfile:
+        try:
+          with closing(jarfile.open(_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
+            plugin_info = ElementTree.parse(plugin_info_file).getroot()
+          if plugin_info.tag != 'plugin':
+            raise TaskError(
+              'File {} in {} is not a valid scalac plugin descriptor'.format(_PLUGIN_INFO_FILE,
+                                                                             jar))
+          name = plugin_info.find('name').text
+          if name in plugin_names:
+            if name in plugins:
+              raise TaskError('Plugin {} defined in {} and in {}'.format(name, plugins[name], jar))
+            # It's important to use relative paths, as the compiler flags get embedded in the zinc
+            # analysis file, and we port those between systems via the artifact cache.
+            plugins[name] = os.path.relpath(jar, buildroot)
+        except KeyError:
+          pass
+
+    unresolved_plugins = plugin_names - set(plugins.keys())
+    if unresolved_plugins:
+      raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
+    return plugins

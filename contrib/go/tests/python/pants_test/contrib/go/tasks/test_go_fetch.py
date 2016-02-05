@@ -44,47 +44,35 @@ class GoFetchTest(TaskTestBase):
                                                           gopath=self.build_root)
     self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
 
-  def test_get_remote_import_paths_relative_ignored(self):
-    go_fetch = self.create_task(self.context())
-    self.create_file('src/github.com/u/r/a/a_test.go', contents="""
-      package a
-
-      import (
-        "fmt"
-        "math"
-        "sync"
-
-        "bitbucket.org/u/b"
-        "github.com/u/c"
-        "./b"
-        "../c/d"
-      )
-    """)
-    remote_import_ids = go_fetch._get_remote_import_paths('github.com/u/r/a',
-                                                          gopath=self.build_root)
-    self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
-
   def test_resolve_and_inject_explicit(self):
     r1 = self.make_target(spec='3rdparty/go/r1', target_type=GoRemoteLibrary)
     r2 = self.make_target(spec='3rdparty/go/r2', target_type=GoRemoteLibrary)
 
     go_fetch = self.create_task(self.context())
-    resolved = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implict_ok=False)
+    resolved = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implicit_ok=False)
     self.assertEqual(r2, resolved)
 
   def test_resolve_and_inject_explicit_failure(self):
     r1 = self.make_target(spec='3rdparty/go/r1', target_type=GoRemoteLibrary)
     go_fetch = self.create_task(self.context())
     with self.assertRaises(go_fetch.UndeclaredRemoteLibError) as cm:
-      go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implict_ok=False)
+      go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implicit_ok=False)
     self.assertEqual(cm.exception.address, self.address('3rdparty/go/r2'))
 
   def test_resolve_and_inject_implicit(self):
     r1 = self.make_target(spec='3rdparty/go/r1', target_type=GoRemoteLibrary)
     go_fetch = self.create_task(self.context())
-    r2 = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implict_ok=True)
+    r2 = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implicit_ok=True)
     self.assertEqual(self.address('3rdparty/go/r2'), r2.address)
     self.assertIsInstance(r2, GoRemoteLibrary)
+
+  def test_resolve_and_inject_implicit_already_exists(self):
+    r1 = self.make_target(spec='3rdparty/go/r1', target_type=GoRemoteLibrary)
+    self.make_target(spec='3rdparty/go/r2', target_type=GoRemoteLibrary)
+    go_fetch = self.create_task(self.context())
+    r2_resolved = go_fetch._resolve(r1, self.address('3rdparty/go/r2'), 'r2', implicit_ok=True)
+    self.assertEqual(self.address('3rdparty/go/r2'), r2_resolved.address)
+    self.assertIsInstance(r2_resolved, GoRemoteLibrary)
 
   def _create_package(self, dirpath, name, deps):
     """Creates a Go package inside dirpath named 'name' importing deps."""

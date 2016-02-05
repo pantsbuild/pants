@@ -11,6 +11,7 @@ from itertools import chain
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_mkdir
 
+from pants.contrib.go.targets.go_target import GoTarget
 from pants.contrib.go.tasks.go_task import GoTask
 
 
@@ -43,6 +44,8 @@ class GoWorkspaceTask(GoTask):
       safe_mkdir(os.path.join(gopath, d))
     required_links = set()
     for dep in target.closure():
+      if not isinstance(dep, GoTarget):
+        continue
       if self.is_remote_lib(dep):
         self._symlink_remote_lib(gopath, dep, required_links)
       else:

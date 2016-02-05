@@ -12,12 +12,43 @@ python_library(
 )
 
 python_library(
+  name = 'project_tree',
+  sources = ['project_tree.py'],
+  dependencies = [
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
+  name = 'file_system_project_tree',
+  sources = ['file_system_project_tree.py'],
+  dependencies = [
+    ':project_tree',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
+python_library(
+  name = 'scm_project_tree',
+  sources = ['scm_project_tree.py'],
+  dependencies = [
+    ':project_tree',
+  ]
+)
+
+python_library(
   name = 'build_file',
   sources = ['build_file.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:pathspec',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
+    ':project_tree',
+    # TODO(tabishev): Remove this dependency after transition period.
+    # Currently needed because of FilesystemBuildFile declared in build_file.py.
+    ':file_system_project_tree',
+    ':deprecated',
   ]
 )
 
@@ -35,11 +66,6 @@ python_library(
   dependencies = [
     'src/python/pants/util:meta',
   ]
-)
-
-python_library(
-  name = 'build_manual',
-  sources = ['build_manual.py'],
 )
 
 python_library(
@@ -111,8 +137,6 @@ python_library(
   sources = ['payload_field.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':build_environment',
-    ':validation',
     'src/python/pants/util:meta',
   ]
 )
@@ -143,23 +167,6 @@ python_library(
 )
 
 python_library(
-  name = 'source_root',
-  sources = ['source_root.py'],
-  dependencies = [
-    ':build_environment',
-    ':build_file_target_factory',
-    ':build_manual',
-    ':deprecated',
-    ':exceptions',
-    ':parse_context',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    # TEMPORARY dep during migration to new source roots mechanism.
-    # I've verified that this does not introduce a circular dep.
-    'src/python/pants/source',
-  ],
-)
-
-python_library(
   name = 'worker_pool',
   sources = ['worker_pool.py'],
   dependencies = [
@@ -182,9 +189,8 @@ python_library(
   name='validation',
   sources=['validation.py'],
   dependencies=[
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    'src/python/pants/backend/core:wrapped_globs',
+    '3rdparty/python:six',
   ],
 )

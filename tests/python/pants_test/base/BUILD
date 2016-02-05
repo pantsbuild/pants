@@ -13,40 +13,6 @@ python_library(
   ]
 )
 
-target(
-  name = 'all',
-  dependencies = [
-    ':base',
-  ]
-)
-
-target(
-  name = 'integration',
-  dependencies = [
-    ':test_spec_exclude_integration',
-  ]
-)
-
-target(
-  name = 'base',
-  dependencies = [
-    ':build_environment',
-    ':build_root',
-    ':cmd_line_spec_parser',
-    ':deprecated',
-    ':filesystem_build_file',
-    ':fingerprint_strategy',
-    ':generator',
-    ':hash_utils',
-    ':payload',
-    ':payload_field',
-    ':revision',
-    ':run_info',
-    ':validation',
-    ':worker_pool',
-  ]
-)
-
 python_tests(
   name = 'build_environment',
   sources = ['test_build_environment.py'],
@@ -61,6 +27,8 @@ python_library(
   name = 'build_file_test_base',
   sources = ['build_file_test_base.py'],
   dependencies = [
+    '3rdparty/python:pathspec',
+    'src/python/pants/base:build_file',
     'src/python/pants/util:dirutil',
   ]
 )
@@ -141,7 +109,6 @@ python_tests(
   name = 'payload',
   sources = ['test_payload.py'],
   dependencies = [
-    'src/python/pants/backend/core',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
@@ -153,7 +120,6 @@ python_tests(
   name = 'payload_field',
   sources = ['test_payload_field.py'],
   dependencies = [
-    'src/python/pants/backend/core',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:payload_field',
@@ -186,18 +152,28 @@ python_tests(
   dependencies = [
     ':build_file_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/base:scm_build_file',
+    'src/python/pants/base:scm_project_tree',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
   ]
 )
 
 python_tests(
-  name = 'test_spec_exclude_integration',
-  sources = [ 'test_spec_exclude_integration.py' ],
+  name = 'bundle_integration',
+  sources = [ 'test_bundle_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'ignore_patterns_pants_ini_integration',
+  sources = [ 'test_ignore_patterns_pants_ini_integration.py' ],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

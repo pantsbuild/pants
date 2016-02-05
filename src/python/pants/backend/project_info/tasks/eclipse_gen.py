@@ -34,6 +34,7 @@ _SETTINGS = (
 
 
 class EclipseGen(IdeGen):
+  """Create an Eclipse project from the given targets."""
 
   @classmethod
   def register_options(cls, register):

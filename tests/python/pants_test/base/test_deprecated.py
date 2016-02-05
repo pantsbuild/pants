@@ -12,7 +12,8 @@ import pytest
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
                                    MissingRemovalVersionError, PastRemovalVersionError,
-                                   check_deprecated_semver, deprecated, deprecated_module)
+                                   check_deprecated_semver, deprecated, deprecated_conditional,
+                                   deprecated_module)
 from pants.version import VERSION
 
 
@@ -20,13 +21,16 @@ FUTURE_VERSION = '9999.9.9'
 
 
 @contextmanager
-def _test_deprecation():
+def _test_deprecation(deprecation_expected=True):
   with warnings.catch_warnings(record=True) as seen_warnings:
     def assert_deprecation_warning():
-      assert len(seen_warnings) == 1
-      warning = seen_warnings[0]
-      assert isinstance(warning.message, DeprecationWarning)
-      return warning.message
+      if deprecation_expected:
+        assert len(seen_warnings) == 1
+        warning = seen_warnings[0]
+        assert isinstance(warning.message, DeprecationWarning)
+        return warning.message
+      else:
+        assert len(seen_warnings) == 0
 
     warnings.simplefilter('always')
     assert len(seen_warnings) == 0
@@ -55,6 +59,18 @@ def test_deprecated_method():
 
   with _test_deprecation():
     assert expected_return == Test().deprecated_method()
+
+
+def test_deprecated_conditional_true():
+  predicate = lambda: True
+  with _test_deprecation():
+    deprecated_conditional(predicate, FUTURE_VERSION, "test hint message", stacklevel=0)
+
+
+def test_deprecated_conditional_false():
+  predicate = lambda: False
+  with _test_deprecation(deprecation_expected=False):
+    deprecated_conditional(predicate, FUTURE_VERSION, "test hint message", stacklevel=0)
 
 
 def test_deprecated_property():
@@ -138,6 +154,10 @@ def test_removal_version_too_small():
     @deprecated('0.0.27')
     def test_func():
       pass
+
+
+def test_removal_version_too_small_expiration_unchecked():
+  check_deprecated_semver('0.0.27', check_expired=False)
 
 
 def test_bad_decorator_nesting():

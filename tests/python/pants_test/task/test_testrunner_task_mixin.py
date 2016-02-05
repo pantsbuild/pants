@@ -5,11 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import collections
+
 from mock import patch
 
 from pants.base.exceptions import TestFailedTaskError
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util.process_handler import ProcessHandler
 from pants.util.timeout import TimeoutReached
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -18,9 +21,11 @@ class DummyTestTarget(object):
   def __init__(self, name, timeout=None):
     self.name = name
     self.timeout = timeout
+    self.address = collections.namedtuple('address', ['spec'])(name)
 
 targetA = DummyTestTarget('TargetA')
 targetB = DummyTestTarget('TargetB', timeout=1)
+targetC = DummyTestTarget('TargetC', timeout=10)
 
 
 class TestRunnerTaskMixinTest(TaskTestBase):
@@ -31,6 +36,23 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
       def _execute(self, all_targets):
         self.call_list.append(['_execute', all_targets])
+        self._spawn_and_wait()
+
+      def _spawn(self, *args, **kwargs):
+        self.call_list.append(['_spawn', args, kwargs])
+
+        class FakeProcessHandler(ProcessHandler):
+          def wait(_):
+            self.call_list.append(['process_handler.wait'])
+            return 0
+
+          def kill(_):
+            self.call_list.append(['process_handler.kill'])
+
+          def terminate(_):
+            self.call_list.append(['process_handler.terminate'])
+
+        return FakeProcessHandler()
 
       def _get_targets(self):
         return [targetA, targetB]
@@ -47,9 +69,6 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
       def _validate_target(self, target):
         self.call_list.append(['_validate_target', target])
-
-      def _timeout_abort_handler(self):
-        self.call_list.append(['_timeout_abort_handler'])
 
     return TestRunnerTaskMixinTask
 
@@ -89,13 +108,28 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
     self.assertIsNone(task._timeout_for_targets([targetA, targetB]))
 
-  def test_get_timeouts_w_default(self):
+  def test_get_timeouts_with_default(self):
     """If there is a default timeout, use that for targets which have no timeout set."""
 
     self.set_options(timeouts=True, timeout_default=2)
     task = self.create_task(self.context())
 
     self.assertEquals(task._timeout_for_targets([targetA, targetB]), 3)
+
+  def test_get_timeouts_with_maximum(self):
+    """If a timeout exceeds the maximum, set it to that."""
+
+    self.set_options(timeouts=True, timeout_maximum=1)
+    task = self.create_task(self.context())
+    self.assertEquals(task._timeout_for_targets([targetC]), 1)
+
+  def test_default_maximum_conflict(self):
+    """If the default exceeds the maximum, throw an error."""
+
+    self.set_options(timeouts=True, timeout_maximum=1, timeout_default=10)
+    task = self.create_task(self.context())
+    with self.assertRaises(TestFailedTaskError):
+      task.execute()
 
 
 class TestRunnerTaskMixinTimeoutTest(TaskTestBase):
@@ -106,6 +140,23 @@ class TestRunnerTaskMixinTimeoutTest(TaskTestBase):
 
       def _execute(self, all_targets):
         self.call_list.append(['_execute', all_targets])
+        self._spawn_and_wait()
+
+      def _spawn(self, *args, **kwargs):
+        self.call_list.append(['_spawn', args, kwargs])
+
+        class FakeProcessHandler(ProcessHandler):
+          def wait(_):
+            self.call_list.append(['process_handler.wait'])
+            return 0
+
+          def kill(_):
+            self.call_list.append(['process_handler.kill'])
+
+          def terminate(_):
+            self.call_list.append(['process_handler.terminate'])
+
+        return FakeProcessHandler()
 
       def _get_targets(self):
         return [targetB]

@@ -11,17 +11,19 @@ from textwrap import dedent
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.core.register import build_file_aliases as register_core
 from pants.backend.jvm.ivy_utils import (IvyInfo, IvyModule, IvyModuleRef, IvyResolveMappingError,
                                          IvyUtils)
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.base_test import BaseTest
+from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
 def coord(org, name, classifier=None, rev=None, ext=None):
@@ -116,17 +118,9 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
       self.assertEqual(jar.excludes, (Exclude(self.b_org, self.b_name),))
     self.assertEqual(excludes, set())
 
-  def test_exclude_exported_disabled_when_no_excludes_gathered(self):
-    _, excludes = IvyUtils.calculate_classpath([self.b], gather_excludes=False)
-    self.assertSetEqual(excludes, set())
-
-  def test_excludes_generated_when_requested(self):
-    _, excludes = IvyUtils.calculate_classpath([self.e], gather_excludes=True)
+  def test_excludes_are_generated(self):
+    _, excludes = IvyUtils.calculate_classpath([self.e])
     self.assertSetEqual(excludes, {Exclude(org='commons-lang', name='commons-lang')})
-
-  def test_excludes_empty_when_not_requested(self):
-    _, excludes = IvyUtils.calculate_classpath([self.e], gather_excludes=False)
-    self.assertSetEqual(excludes, set())
 
   def test_classifiers(self):
     jars, _ = IvyUtils.calculate_classpath([self.c])
@@ -142,7 +136,8 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_force_override(self):
     jars = list(self.a.payload.jars)
     with temporary_file_path() as ivyxml:
-      IvyUtils.generate_ivy([self.a], jars=jars, excludes=[], ivyxml=ivyxml, confs=['default'])
+      with subsystem_instance(JarDependencyManagement):
+        IvyUtils.generate_ivy([self.a], jars=jars, excludes=[], ivyxml=ivyxml, confs=['default'])
 
       doc = ET.parse(ivyxml).getroot()
 
@@ -164,6 +159,12 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
       override = self.find_single(doc, 'dependencies/override')
       self.assert_attributes(override, org='org2', module='name2', rev='rev2')
+
+  def test_resolve_conflict_missing_versions(self):
+    v1 = JarDependency('org.example', 'foo', None, force=False)
+    v2 = JarDependency('org.example', 'foo', '2', force=False)
+    self.assertIs(v2, IvyUtils._resolve_conflict(v1, v2))
+    self.assertIs(v2, IvyUtils._resolve_conflict(v2, v1))
 
   def test_resove_conflict_no_conflicts(self):
     v1 = JarDependency('org.example', 'foo', '1', force=False)

@@ -9,11 +9,13 @@ import os
 from collections import namedtuple
 from textwrap import dedent
 
-from pants.base.build_file import FilesystemBuildFile
+from pants.base.build_file import BuildFile
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
+from pants.util.strutil import ensure_binary
 from pants_test.base_test import BaseTest
 
 
@@ -27,15 +29,23 @@ class ErrorTarget(Target):
 
 class BuildFileParserBasicsTest(BaseTest):
 
+  @property
+  def alias_groups(self):
+    return BuildFileAliases(targets={'jvm_binary': ErrorTarget,
+                                     'java_library': ErrorTarget})
+
+  def create_buildfile(self, path):
+    return BuildFile(FileSystemProjectTree(self.build_root), path)
+
   def test_addressable_exceptions(self):
     self.add_to_build_file('a/BUILD', 'target()')
-    build_file_a = FilesystemBuildFile(self.build_root, 'a/BUILD')
+    build_file_a = self.create_buildfile('a/BUILD')
 
     with self.assertRaises(BuildFileParser.ExecuteError):
       self.build_file_parser.parse_build_file(build_file_a)
 
     self.add_to_build_file('b/BUILD', 'target(name="foo", "bad_arg")')
-    build_file_b = FilesystemBuildFile(self.build_root, 'b/BUILD')
+    build_file_b = self.create_buildfile('b/BUILD')
     with self.assertRaises(BuildFileParser.BuildFileParserError):
       self.build_file_parser.parse_build_file(build_file_b)
 
@@ -49,26 +59,55 @@ class BuildFileParserBasicsTest(BaseTest):
       )
       """
     ))
-    build_file_d = FilesystemBuildFile(self.build_root, 'd/BUILD')
+    build_file_d = self.create_buildfile('d/BUILD')
     with self.assertRaises(BuildFileParser.BuildFileParserError):
       self.build_file_parser.parse_build_file(build_file_d)
 
   def test_noop_parse(self):
     self.add_to_build_file('BUILD', '')
-    build_file = FilesystemBuildFile(self.build_root, '')
+    build_file = self.create_buildfile('BUILD')
     address_map = set(self.build_file_parser.parse_build_file(build_file))
     self.assertEqual(len(address_map), 0)
 
+  def test_invalid_unicode_in_build_file(self):
+    """Demonstrate that unicode characters causing parse errors raise real parse errors."""
+    self.add_to_build_file('BUILD', ensure_binary(dedent(
+      """
+      jvm_binary(name = ‘hello’,  # Parse error due to smart quotes (non ascii characters)
+        source = 'HelloWorld.java'
+        main = 'foo.HelloWorld',
+      )
+      """
+    )))
+    build_file = self.create_buildfile('BUILD')
+    with self.assertRaises(BuildFileParser.BuildFileParserError):
+      self.build_file_parser.parse_build_file(build_file)
+
+  def test_unicode_string_in_build_file(self):
+    """Demonstrates that a string containing unicode should work in a BUILD file."""
+    self.add_to_build_file('BUILD', ensure_binary(dedent(
+        """
+        java_library(
+          name='foo',
+          sources=['א.java']
+        )
+        """
+    )))
+    build_file = self.create_buildfile('BUILD')
+    self.build_file_parser.parse_build_file(build_file)
+
 
 class BuildFileParserTargetTest(BaseTest):
-
   @property
   def alias_groups(self):
     return BuildFileAliases(targets={'fake': ErrorTarget})
 
+  def create_buildfile(self, path):
+    return BuildFile(FileSystemProjectTree(self.build_root), path)
+
   def test_trivial_target(self):
     self.add_to_build_file('BUILD', 'fake(name="foozle")')
-    build_file = FilesystemBuildFile(self.build_root, 'BUILD')
+    build_file = self.create_buildfile('BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
 
     self.assertEqual(len(address_map), 1)
@@ -99,15 +138,16 @@ class BuildFileParserTargetTest(BaseTest):
       fake(name="bat")
       """))
 
-    bar_build_file = FilesystemBuildFile(self.build_root, 'BUILD.bar')
-    base_build_file = FilesystemBuildFile(self.build_root, 'BUILD')
-    foo_build_file = FilesystemBuildFile(self.build_root, 'BUILD.foo')
+    bar_build_file = self.create_buildfile('BUILD.bar')
+    base_build_file = self.create_buildfile('BUILD')
+    foo_build_file = self.create_buildfile('BUILD.foo')
 
-    address_map = self.build_file_parser.address_map_from_build_file(bar_build_file)
+    address_map = self.build_file_parser.address_map_from_build_files(
+      BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), "."))
     addresses = address_map.keys()
     self.assertEqual({bar_build_file, base_build_file, foo_build_file},
                      set([address.build_file for address in addresses]))
-    self.assertEqual({':base', ':foo', ':bat'},
+    self.assertEqual({'//:base', '//:foo', '//:bat'},
                      set([address.spec for address in addresses]))
 
   def test_build_file_duplicates(self):
@@ -116,7 +156,7 @@ class BuildFileParserTargetTest(BaseTest):
     self.add_to_build_file('BUILD', 'fake(name="foo")\n')
 
     with self.assertRaises(BuildFileParser.AddressableConflictException):
-      base_build_file = FilesystemBuildFile(self.build_root, 'BUILD')
+      base_build_file = self.create_buildfile('BUILD')
       self.build_file_parser.parse_build_file(base_build_file)
 
   def test_sibling_build_files_duplicates(self):
@@ -143,8 +183,8 @@ class BuildFileParserTargetTest(BaseTest):
       """))
 
     with self.assertRaises(BuildFileParser.SiblingConflictException):
-      base_build_file = FilesystemBuildFile(self.build_root, 'BUILD')
-      self.build_file_parser.address_map_from_build_file(base_build_file)
+      self.build_file_parser.address_map_from_build_files(
+        BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), '.'))
 
 
 class BuildFileParserExposedObjectTest(BaseTest):
@@ -155,7 +195,7 @@ class BuildFileParserExposedObjectTest(BaseTest):
 
   def test_exposed_object(self):
     self.add_to_build_file('BUILD', """fake_object""")
-    build_file = FilesystemBuildFile(self.build_root, 'BUILD')
+    build_file = BuildFile(FileSystemProjectTree(self.build_root), 'BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
     self.assertEqual(len(address_map), 0)
 
@@ -258,7 +298,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
                """)
     self.create_file('3rdparty/BUILD', contents)
 
-    build_file = FilesystemBuildFile(self.build_root, '3rdparty/BUILD')
+    build_file = BuildFile(FileSystemProjectTree(self.build_root), '3rdparty/BUILD')
     address_map = self.build_file_parser.parse_build_file(build_file)
     registered_proxies = set(address_map.values())
 
@@ -279,7 +319,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
 
   def test_raises_parse_error(self):
     self.add_to_build_file('BUILD', 'foo(name = = "baz")')
-    build_file = FilesystemBuildFile(self.build_root, 'BUILD')
+    build_file = BuildFile(FileSystemProjectTree(self.build_root), 'BUILD')
     with self.assertRaises(BuildFileParser.ParseError):
       self.build_file_parser.parse_build_file(build_file)
 
@@ -335,7 +375,7 @@ class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
 
   def test_raises_execute_error(self):
     self.add_to_build_file('BUILD', 'undefined_alias(name="baz")')
-    build_file = FilesystemBuildFile(self.build_root, 'BUILD')
+    build_file = BuildFile(FileSystemProjectTree(self.build_root), 'BUILD')
     with self.assertRaises(BuildFileParser.ExecuteError):
       self.build_file_parser.parse_build_file(build_file)
 

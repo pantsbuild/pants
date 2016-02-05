@@ -79,7 +79,7 @@ def temporary_dir(root_dir=None, cleanup=True, suffix=str()):
 
 
 @contextmanager
-def temporary_file_path(root_dir=None, cleanup=True):
+def temporary_file_path(root_dir=None, cleanup=True, suffix=''):
   """
     A with-context that creates a temporary file and returns its path.
 
@@ -87,7 +87,7 @@ def temporary_file_path(root_dir=None, cleanup=True):
     :param str root_dir: The parent directory to create the temporary file.
     :param bool cleanup: Whether or not to clean up the temporary file.
   """
-  with temporary_file(root_dir, cleanup) as fd:
+  with temporary_file(root_dir, cleanup=cleanup, suffix=suffix) as fd:
     fd.close()
     yield fd.name
 

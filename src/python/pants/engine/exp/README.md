@@ -1,6 +1,6 @@
 # The Engine Experiment
 
-This directory tree and its test sibling in tests/python/pants_test/engine/exp serve as the base for
+This directory tree and its test sibling in `tests/python/pants_test/engine/exp` serve as the base for
 code implementing the new tuple-based engine envisioned some time as far back as 2013.
 
 The code is limited in scope to proving out capabilities of the new engine concept:
@@ -9,7 +9,7 @@ The code is limited in scope to proving out capabilities of the new engine conce
 + Can task writer accomplish their goals with the engine APIs reasonably?
 + Can a BUILD writer express BUILD rules reasonably.
 
-The code leaves out much that would be needed in a full execution model; notably option plumbing and
+The code leaves out much that would be needed in a full execution model; notably option plumbing
 and product caching.  The presumption is that the bits left out are straight-forward to plumb and do
 not provide insight into the questions above.
 
@@ -43,31 +43,33 @@ here in light of the actual code to land in the `pants/engine/exp` package.
 
 4 primary concerns can be seen as driving much of the design, in no particular order:
 
-* It should be easy to write a maximally fine-grained task and have the engine handle scheduling;
-   it should still be possible to write a coarse-grained task.
-* It should be possible to determine the full execution plan while doing a minimum amount of work.
-  The plan should be fully determined from the list of goals, targets and options specified and
-  it should require minimal work to execute.
+* It should be easy to write a maximally fine-grained task and have the engine handle scheduling.
+* It should be possible for tasks to introduce new dependencies during execution, which may
+   cause further work to be scheduled.
 * It should be possible to distribute execution of independent units of work to exploit more cores
    and more disk IO bandwidth.
 * It should be easy for plugin authors to extend the operations available on a target without a
    brittle web of target subclassing across the core and plugins.
 
-There were other concerns, like bootstrapping in-repo tools from their sources, but the 3 above
-serve to explain almost all the features of the experiment.  Of note in the goals listed above is
-the requirement to still make it possible to schedule coarse-grained executions.  This requirement
-is driven in part by uncertainty of what model is most appropriate for the universe of tasks known
-and unknown and in part by currently global tasks, in particular `IvyResolve`, that will at least
-need a transition path to the new engine and may in fact best be modelled globally even after
-transition.
+There were other concerns, like bootstrapping in-repo tools from their sources, but the 4 above
+serve to explain almost all the features of the experiment.
+
+Notably _not_ in the list of goals listed above is any requirement to be able to schedule
+coarse-grained/"global" executions.  While originally present in the designs, it was removed in
+favor of the ability to introduce new dependencies during execution. Since it is impossible
+to know when "all" dependencies of a particular type have been introduced to the graph, no
+execution can be truly global.
+
+Instead, tasks like `IvyResolve` will be able to use the 'variants' feature to propagate global
+information down from dependents.
 
 ## Components
 
 The design goals led to 4 key components in the experiment:
 
-1. The target object model.
-2. The target graph parsing system.
-3. The execution planners and scheduler.
+1. The struct object model.
+2. The product graph.
+3. The execution scheduler.
 4. The execution engines.
 
 ### Object Model
@@ -78,14 +80,14 @@ objects.  These namedtuple-like objects that are amenable to serialization, incl
 json and via pickling.  This is a key requirement for both eventual RPC distribution of execution
 data as well as supporting a target graph daemon with out-of-process clients.  The engine experiment
 uses
-[`Configuration`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/configuration.py#L14)
+[`Struct`](https://github.com/pantsbuild/pants/blob/0f8eb2c1a965dd55893a6220ca137a7d79cf50aa/src/python/pants/engine/exp/struct.py)
 as a convenient baseclass for most of its `Serializable` objects.
 
-### Target Graph
+### Product Graph
 
-The target
-[`Graph`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/graph.py#L57)
-is built around named `Serializable` objects as opposed to targets per-se.  Dependency edges are
+The
+[`ProductGraph`](https://github.com/pantsbuild/pants/blob/ef3f8d221a5afefb01d655448ce7e3f537399810/src/python/pants/engine/exp/scheduler.py#L321)
+is built around named `Struct` objects as opposed to targets per-se.  Dependency edges are
 modelled flexibly via an [`AddressableDescriptor`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/addressable.py#L113)
 that has associated decorators for one to one edges
 ([`@addressable`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/addressable.py#L299)),
@@ -99,10 +101,10 @@ There are two important outgrowths from the flexible edge-schema model:
    themselves don't naturally admit (local) dependencies.  Both jars and python requirements are
    good examples of these.  For those that remember the old inline `jar(...)`s and un-wrapped
    (but still addressable) `python_requirement`s, this supports those in a disciplined way.
-2. A templating scheme becomes viable.  Since dependency edges are easy to define, `Configuration`
+2. A templating scheme becomes viable.  Since dependency edges are easy to define, `Struct`
    defines an optional `extends` one-to-one property and an optional `merges` one-to-many list
    property.  These combine with graph support for `Serializable` object factories to allow for
-   "target templating".  More accurately, a set of default properties for a `Configuration` (or
+   "target templating".  More accurately, a set of default properties for a `Struct` (or
    Target) can be written down in a BUILD file as an addressable object that is conceptually
    abstract.  Other targets can then inherit properties and configurations from these templates. 
    This allows normalization of BUILD configuration in general.
@@ -112,68 +114,79 @@ straight-forward introduction of BUILD file formats.  The experiment ships with 
 python style with name parameters, a modified python style that takes names from variable
 assignments, and a JSON format.
 
-### Planning and Scheduling
+### Scheduling
 
 In the current engine, work is scheduled and then later performed via the `Task` interface.  In the
-experimental engine these two roles are split apart.  A
-[`TaskPlanner`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/scheduler.py#L264)
-is responsible for scheduling and a Task - or just a plain function - is responsible for execution
-and product production.  The scheduling process is driven by
-[`Promise`s](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/scheduler.py#L435)
-to produce a given product type for a given
-[`Subject`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/scheduler.py#L26).
+experimental engine execution occurs via simple functions, with inputs selected via an input
+selection clause made up of `Selector` objects (described later).
 
-The initial promises are asked for by the
+The `Scheduler` builds a graph of `Node`s.  A Node represents a unique computation and the data for a
+Node implicitly acts as its own key/identity.
+
+To compute a value for a Node, the Scheduler uses the `Node.step` method on any Nodes that have
+not yet been computed.  The `step` method returns a State value which indicates whether the
+computation for a Node has completed with a value, failed, or needs additional inputs.  If a Node
+needs more inputs, they are provided to that Node during a future call to its `step` method.
+When a Node has all required inputs, it should execute and then `Return` its final value.
+
+The initial Nodes are created by the
 [scheduler](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/scheduler.py#L521),
-but then the rest of the scheduling is driven by `TaskPlanner`s in turn asking for promises for the
-products they need to
-create a [`Plan`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/scheduler.py#L95)
-for a piece of work.  Its this promise-driven scheduling that naturally allows for recursion and
-fine-grained planning following the the dependency edges of the subjects (generally but not always
-targets).
+but the rest of the scheduling is driven by Nodes returning the `Waiting` State to request
+dependencies.  It's this lazy scheduling that naturally allows for recursion and fine-grained
+planning.
 
-Since fine-grained planners will ask for promises for individual subjects, a coarse-grained planner
-has a challenge in aggregating plans.  Instead of forcing this style of planner to maintain awkward
-state, an optional
-[`finalize_plans`](https://github.com/pantsbuild/pants/blob/3bd6d75949c253e2e11dfece7e593a7e5fdf0908/src/python/pants/engine/exp/scheduler.py#L295)
-method can be implemented to aggregate any plans produced in a scheduling round into fewer plans
-across more subjects.  An example of this is provided with the
-[`GlobalIvyResolvePlanner`](https://github.com/pantsbuild/pants/blob/06e62bd1f00e130d76ada31b932062c5531cd717/src/python/pants/engine/exp/examples/planners.py#L75)
-Which implements complete aggregation of all jar resolve promises into one global resolution.
+#### Products and Subjects
 
-Planning execution requires that all inputs to a task be calculated ahead of time to both ensure
-complete invalidation data is at hand and that all execution data is available to ship to a worker
-for execution.  Certain planners will need specialized data to create plans for a given subject.
-For example, a javac planner might need to know the version of the java platform a given target's
-code should be compiled under (say Java 6).  As such, the concepts of target `configurations` and
-promise configuration are introduced.  The target `configurations` is just a list of `Configuration`
-objects that apply to the target in various situations.  Perhaps a `JvmConfiguration` for the case
-described above and a `JavadocConfiguration` for controlling aspects of javadoc gen for the target.
-Users can add configurations to a target to support new plugins without need to extend target types
-to add new task-specific parameters and task planners can export the configurations they require.
+A `Product` is a value of a particular type for a particular `Subject`.  The most common
+Subject type is `Target`: a named collection (usually parsed from a BUILD file) which holds
+concrete/native `Product` values in its `configurations` field.  Tasks can also request a Product
+for a non-Target subject, and the examples demonstrate this for named `Jar` objects. Products
+that are fetched directly from the build graph (rather than being computed) are referred to as
+'native' Products.
 
-In some cases configuration can be ambiguous.  A target may have 2 configurations that conceptually
-apply for a given planner.  In these cases the planner can chose to fail to plan based on the
-ambiguity.  If they do so, an affordance is made for users to resolve these ambiguities:
-"configuration selectors".  These are just an extension to the address syntax where a trailing
-`@[configuration name]` is allowed. So a dependency specified as `src/java/com/example/lib:lib`
-specifies no particular configuration, but `src/java/com/example/lib:lib@java8` ask for the lib
-compiled targeting java 8.
+#### Variants
+
+Certain tasks will also need parameters provided by the dependents of their Node in order to
+tailor their output Products to their consumers.  For example, a javac planner might need to know
+the version of the java platform for a given dependent binary target (say Java 6), or an ivy task
+might need to identify a globally consistent ivy resolve for a test target.  To allow for this the
+engine introduces the concept of `variants`, which are passed recursively from dependents to
+dependencies.
+
+If a task indicates that a variant is required, consumers can use a `@[type]=[name]` address
+syntax extension to pass a variant that matches a particular configuration for a task. A dependency
+declared as `src/java/com/example/lib:lib` specifies no particular variant, but
+`src/java/com/example/lib:lib@java=java8` asks for the configured variant of the lib named "java8".
+
+Additionally, it is possible to specify the "default" variants for a Target by adding a
+`Variants(default=..)` configuration. Again, since the purpose of variants is to collect
+information from dependents, only default variant values which have not been set by a dependent
+will be used.
+
+#### Selectors
+
+The `Selector` classes selects function inputs in the context of a particular `Subject` (and its
+variants).  For example, it might select a Product for the given Subject (`Select` or
+`SelectVariant`), the dependencies of a Product for the Subject (`SelectDependencies`), or a
+Product for some other literal Subject (`SelectLiteral`: usually because you need access to a
+tool that lives at a named address).
+
+There is also a very useful but potentially confusing selector to 'project' fields of a Subject.
+SelectProjection allows for selecting only one field of a Subject, which normalizes the dependency
+graph and avoids unnecessary work. For example, if many unique Subjects have the same value in a
+'directory' field, projecting the directory will allow a task to execute only once per directory.
 
 ### Execution
 
-The scheduling process emits an
-[`ExecutionGraph`](https://github.com/pantsbuild/pants/blob/06e62bd1f00e130d76ada31b932062c5531cd717/src/python/pants/engine/exp/scheduler.py#L446)
-of plans linked by promise edges to other plans.  This can be walked by engines to perform graph
-reduction and produce the final products requested by the user.  Two local implementations are
-provided, a simple
+The scheduling process emits opaque work units to be executed by the engine.  Two local engine
+implementations are provided, a simple
 [serial engine](https://github.com/pantsbuild/pants/blob/06e62bd1f00e130d76ada31b932062c5531cd717/src/python/pants/engine/exp/engine.py#L304)
 and a more sophisticated
 [multiprocess engine](https://github.com/pantsbuild/pants/blob/06e62bd1f00e130d76ada31b932062c5531cd717/src/python/pants/engine/exp/engine.py#L331)
 that can use all cores.
 
-To help visualize execution plans, a visualization tool is provided that, instead of executing the
-`ExecutionGraph`, draws it using graphviz.  If you have graphviz installed on your machin and its
+To help visualize executions, a visualization tool is provided that, after building/executing a
+`ProductGraph`, draws it using graphviz.  If you have graphviz installed on your machine and its
 binaries in your path, you can produce visualizations like so:
 
 ```console
@@ -183,8 +196,8 @@ $ ./pants run src/python/pants/engine/exp/examples:viz -- \
   src/java/codegen/selector:selected
 ```
 
-This particular example shows off target and configuration templating, configuration selectors, plan
-aggregation for ivy resolves and tool bootstrapping.
+This particular example shows off target and configuration templating, variants, and tool
+bootstrapping.
 
 ## Questions & Problems and TODO
 

@@ -1,14 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='subsystems',
-  dependencies=[
-    ':fetchers',
-    ':go_distribution',
-  ]
-)
-
 python_tests(
   name='fetchers',
   sources=['test_fetchers.py'],
@@ -18,6 +10,7 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go/subsystems:fetchers',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test:base_test',
   ]
 )
 

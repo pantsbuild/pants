@@ -18,8 +18,7 @@ class ThriftLintError(Exception):
 
 
 class ThriftLinter(NailgunTask):
-  """Print linter warnings for thrift files.
-  """
+  """Print linter warnings for thrift files."""
 
   _CONFIG_SECTION = 'thrift-linter'
 

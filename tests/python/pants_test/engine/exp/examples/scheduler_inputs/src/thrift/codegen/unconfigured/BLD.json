@@ -1,0 +1,14 @@
+{
+  "type_alias": "target",
+  "name": "unconfigured",
+  "configurations": [
+    {
+      "type_alias": "build_properties"
+    },
+    {
+      "type_alias": "thrift",
+      "files": ["unconfigured.thrift"]
+    }
+  ],
+  "description": "This target demonstrates a case where thrift configuration is missing, but where the BuildProperties planner will be able to provide a Classpath instead. This target should fail to build if there are any planners installed that can consume ThriftSources to produce a Classpath."
+}

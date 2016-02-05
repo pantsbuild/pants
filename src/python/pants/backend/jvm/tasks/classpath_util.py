@@ -5,12 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
+import re
+from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.tasks.classpath_products import ClasspathEntry
 from pants.util.contextutil import open_zip
-from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open, safe_rmtree, safe_walk
+from pants.util.dirutil import fast_relpath, safe_delete, safe_open, safe_walk
+
+
+class MissingClasspathEntryError(Exception):
+  """Indicates an unexpected problem finding a classpath entry."""
 
 
 class ClasspathUtil(object):
@@ -73,11 +81,41 @@ class ClasspathUtil(object):
     return [entry.path for entry in cls._entries_iter(filtered_tuples_iter)]
 
   @classmethod
+  def classpath_by_targets(cls, targets, classpath_products, confs=('default',)):
+    """Return classpath entries grouped by their targets for the given `targets`.
+
+    :param targets: The targets to lookup classpath products for.
+    :param ClasspathProducts classpath_products: Product containing classpath elements.
+    :param confs: The list of confs for use by this classpath.
+    :returns: The ordered (target, classpath) mappings.
+    :rtype: OrderedDict
+    """
+    classpath_target_tuples = classpath_products.get_product_target_mappings_for_targets(targets)
+    filtered_items_iter = itertools.ifilter(cls._accept_conf_filter(confs, lambda x: x[0][0]),
+                                            classpath_target_tuples)
+
+    # group (classpath_entry, target) tuples by targets
+    target_to_classpath = OrderedDict()
+    for classpath_entry, target in filtered_items_iter:
+      _, entry = classpath_entry
+      if not target in target_to_classpath:
+        target_to_classpath[target] = []
+      target_to_classpath[target].append(entry)
+    return target_to_classpath
+
+  @classmethod
+  def _accept_conf_filter(cls, confs, unpack_func=None):
+    def accept_conf_in_item(item):
+      conf = unpack_func(item)
+      return confs is None or conf in confs
+
+    unpack_func = unpack_func or (lambda x: x)
+    return accept_conf_in_item
+
+  @classmethod
   def _filtered_classpath_by_confs_iter(cls, classpath_tuples, confs):
-    accept = (lambda conf: conf in confs) if (confs is not None) else (lambda _: True)
-    for conf, entry in classpath_tuples:
-      if accept(conf):
-        yield conf, entry
+    filter_func = cls._accept_conf_filter(confs, unpack_func=lambda x: x[0])
+    return itertools.ifilter(filter_func, classpath_tuples)
 
   @classmethod
   def _entries_iter(cls, classpath):
@@ -149,50 +187,121 @@ class ClasspathUtil(object):
 
   @classmethod
   def create_canonical_classpath(cls, classpath_products, targets, basedir,
-                                 save_classpath_file=False):
+                                 save_classpath_file=False,
+                                 use_target_id=True,
+                                 internal_classpath_only=True,
+                                 excludes=None):
     """Create a stable classpath of symlinks with standardized names.
+
+    By default symlinks are created for each target under `basedir` based on its `target.id`.
+    Unique suffixes are added to further disambiguate classpath products from the same target.
+
+    It also optionally saves the classpath products to be used externally (by intellij plugin),
+    one output file for each target.
+
+    Note calling this function will refresh the symlinks and output files for the target under
+    `basedir` if they exist, but it will NOT delete/cleanup the contents for *other* targets.
+    Caller wants that behavior can make the similar calls for other targets or just remove
+    the `basedir` first.
 
     :param classpath_products: Classpath products.
     :param targets: Targets to create canonical classpath for.
     :param basedir: Directory to create symlinks.
     :param save_classpath_file: An optional file with original classpath entries that symlinks
       are created from.
+    :param use_target_id: Optionally switch to the subdirectory based symlinks naming.
+      This is added for backward compatibility. Remove once intellij plugin is ready to use
+      `target.id` based output files.  See `use_old_naming_style` option in :class:
+      `pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher.RuntimeClasspathPublisher`.
+    :param internal_classpath_only: whether to create symlinks just for internal classpath or
+       all classpath.
+    :param excludes: classpath entries should be excluded.
 
     :returns: Converted canonical classpath.
     :rtype: list of strings
     """
-    def _stable_output_folder(basedir, target):
-      address = target.address
-      return os.path.join(
-        basedir,
-        # target.address.spec is used in export goal to identify targets
-        address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
-      )
+    def delete_old_target_output_files(classpath_prefix):
+      """Delete existing output files or symlinks for target."""
+      directory, basename = os.path.split(classpath_prefix)
+      pattern = re.compile(r'^{basename}(([0-9]+)(\.jar)?|classpath\.txt)$'
+                           .format(basename=re.escape(basename)))
+      files = [filename for filename in os.listdir(directory) if pattern.match(filename)]
+      for rel_path in files:
+        path = os.path.join(directory, rel_path)
+        if os.path.islink(path) or os.path.isfile(path):
+          safe_delete(path)
 
+    def prepare_target_output_folder(basedir, target):
+      """Prepare directory that will contain canonical classpath for the target.
+
+      This includes creating directories if it does not already exist, cleaning up
+      previous classpath output related to the target.
+      """
+      if use_target_id:
+        output_dir = basedir
+        # TODO(peiyu) improve readability once we deprecate the old naming style.
+        # For example, `-` is commonly placed in string format as opposed to here.
+        classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
+                                                                      target_id=target.id)
+      else:
+        address = target.address
+        output_dir = os.path.join(
+          basedir,
+          # target.address.spec is used in export goal to identify targets
+          address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
+        )
+        # append / to the end as part of the prefix
+        classpath_prefix_for_target = os.path.join(output_dir, '')
+
+      if os.path.exists(output_dir):
+        delete_old_target_output_files(classpath_prefix_for_target)
+      else:
+        os.makedirs(output_dir)
+      return classpath_prefix_for_target
+
+    excludes = excludes or set()
     canonical_classpath = []
-    for target in targets:
-      folder_for_target_symlinks = _stable_output_folder(basedir, target)
-      safe_rmtree(folder_for_target_symlinks)
+    target_to_classpath = cls.classpath_by_targets(targets, classpath_products)
 
-      classpath_entries_for_target = classpath_products.get_internal_classpath_entries_for_targets(
-        [target])
-
+    processed_entries = set()
+    for target, classpath_entries_for_target in target_to_classpath.items():
+      if internal_classpath_only:
+        classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
+                                              classpath_entries_for_target)
       if len(classpath_entries_for_target) > 0:
-        safe_mkdir(folder_for_target_symlinks)
+        classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
-        classpath = []
-        for (index, (conf, entry)) in enumerate(classpath_entries_for_target):
-          classpath.append(entry.path)
+        # Note: for internal targets pants has only one classpath entry, but user plugins
+        # might generate additional entries, for example, build.properties for the target.
+        # Also it's common to have multiple classpath entries associated with 3rdparty targets.
+        for (index, entry) in enumerate(classpath_entries_for_target):
+          if entry.is_excluded_by(excludes):
+            continue
+
+          # Avoid creating symlink for the same entry twice, only the first entry on
+          # classpath will get a symlink. The resulted symlinks as a whole are still stable,
+          # but may have non-consecutive suffixes because the 'missing' ones are those
+          # have already been created symlinks by previous targets.
+          if entry in processed_entries:
+            continue
+          processed_entries.add(entry)
+
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
-          file_name = os.path.basename(entry.path)
-          symlink_path = os.path.join(folder_for_target_symlinks, '{}-{}'.format(index, file_name))
+          _, ext = os.path.splitext(entry.path)
+          symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
+          if not os.path.exists(entry.path):
+            raise MissingClasspathEntryError('Could not find {src} when attempting to link '
+                                             'it into the {dst}'
+                                             .format(src=entry.path, dst=symlink_path))
+
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
 
         if save_classpath_file:
-          with safe_open(os.path.join(folder_for_target_symlinks, 'classpath.txt'), 'w') as classpath_file:
-            classpath_file.write(os.pathsep.join(classpath))
+          classpath = [entry.path for entry in classpath_entries_for_target]
+          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
+            classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
             classpath_file.write('\n')
 
     return canonical_classpath

@@ -15,7 +15,7 @@ from pants.task.console_task import ConsoleTask
 
 
 class FileDeps(ConsoleTask):
-  """List all transitive file dependencies of the targets specified on the command line.
+  """List all source and BUILD files a target transitively depends on.
 
   Files are listed with absolute paths and any BUILD files implied in the transitive closure of
   targets are also included.
@@ -43,6 +43,9 @@ class FileDeps(ConsoleTask):
     buildroot = get_buildroot()
     files = set()
     output_globs = self.get_options().globs
+
+    # Filter out any synthetic targets, which will not have a build_file attr.
+    concrete_targets = set([target for target in concrete_targets if not target.is_synthetic])
     for target in concrete_targets:
       files.add(target.address.build_file.full_path)
       if output_globs or target.has_sources():

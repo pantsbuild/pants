@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import copy
 import errno
 import logging
 import os
@@ -18,11 +19,15 @@ import six
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
+                                                                    PinnedJarArtifactSet)
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.build_graph.target import Target
+from pants.ivy.bootstrapper import Bootstrapper
+from pants.java.util import execute_runner
 from pants.util.dirutil import safe_mkdir, safe_open
 
 
@@ -222,16 +227,41 @@ class IvyUtils(object):
 
   @staticmethod
   def _generate_override_template(jar):
-    return TemplateData(org=jar.org, module=jar.module, version=jar.version)
+    return TemplateData(org=jar.org, module=jar.name, version=jar.rev)
 
   @staticmethod
-  @contextmanager
-  def cachepath(path):
+  def load_classpath_from_cachepath(path):
     if not os.path.exists(path):
-      yield ()
+      return []
     else:
       with safe_open(path, 'r') as cp:
-        yield (path.strip() for path in cp.read().split(os.pathsep) if path.strip())
+        return filter(None, (path.strip() for path in cp.read().split(os.pathsep)))
+
+  @classmethod
+  def exec_ivy(cls, ivy, confs, ivyxml, args,
+               jvm_options,
+               executor,
+               workunit_name,
+               workunit_factory):
+    ivy = ivy or Bootstrapper.default_ivy()
+
+    ivy_args = ['-ivy', ivyxml]
+    ivy_args.append('-confs')
+    ivy_args.extend(confs)
+    ivy_args.extend(args)
+
+    ivy_jvm_options = list(jvm_options)
+    # Disable cache in File.getCanonicalPath(), makes Ivy work with -symlink option properly on ng.
+    ivy_jvm_options.append('-Dsun.io.useCanonCaches=false')
+
+    runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
+    try:
+      result = execute_runner(runner, workunit_factory=workunit_factory,
+                              workunit_name=workunit_name)
+      if result != 0:
+        raise IvyUtils.IvyError('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
+    except runner.executor.Error as e:
+      raise IvyUtils.IvyError(e)
 
   @classmethod
   def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
@@ -247,9 +277,9 @@ class IvyUtils(object):
     # this case, add both the symlink'ed path and the realpath to the jar to the symlink map.
     real_ivy_cache_dir = os.path.realpath(ivy_cache_dir)
     symlink_map = OrderedDict()
-    with safe_open(inpath, 'r') as infile:
-      inpaths = filter(None, infile.read().strip().split(os.pathsep))
-      paths = OrderedSet([os.path.realpath(path) for path in inpaths])
+
+    inpaths = cls.load_classpath_from_cachepath(inpath)
+    paths = OrderedSet([os.path.realpath(path) for path in inpaths])
 
     for path in paths:
       if path.startswith(real_ivy_cache_dir):
@@ -351,7 +381,8 @@ class IvyUtils(object):
     return ret
 
   @classmethod
-  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None):
+  def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
+                   pinned_artifacts=None):
     if resolve_hash_name:
       org = IvyUtils.INTERNAL_ORG_NAME
       name = resolve_hash_name
@@ -365,6 +396,25 @@ class IvyUtils(object):
       jars = jars_by_key.setdefault((jar.org, jar.name), [])
       jars.append(jar)
 
+    manager = JarDependencyManagement.global_instance()
+    artifact_set = PinnedJarArtifactSet(pinned_artifacts) # Copy, because we're modifying it.
+    for jars in jars_by_key.values():
+      for i, dep in enumerate(jars):
+        direct_coord = M2Coordinate.create(dep)
+        managed_coord = artifact_set[direct_coord]
+        if direct_coord.rev != managed_coord.rev:
+          # It may be necessary to actually change the version number of the jar we want to resolve
+          # here, because overrides do not apply directly (they are exclusively transitive). This is
+          # actually a good thing, because it gives us more control over what happens.
+          coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
+          dep = copy.copy(dep)
+          dep.rev = coord.rev
+          jars[i] = dep
+        elif dep.force:
+          # If this dependency is marked as 'force' and there is no version conflict, use the normal
+          # pants behavior for 'force'.
+          artifact_set.put(direct_coord)
+
     dependencies = [cls._generate_jar_template(jars) for jars in jars_by_key.values()]
 
     # As it turns out force is not transitive - it only works for dependencies pants knows about
@@ -377,7 +427,7 @@ class IvyUtils(object):
     # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
     #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
     # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    overrides = [cls._generate_override_template(dep) for dep in dependencies if dep.force]
+    overrides = [cls._generate_override_template(coord) for coord in artifact_set]
 
     excludes = [cls._generate_exclude_template(exclude) for exclude in excludes]
 
@@ -396,7 +446,16 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  def calculate_classpath(cls, targets, gather_excludes=True):
+  def calculate_classpath(cls, targets):
+    """Creates a consistent classpath and list of excludes for the passed targets.
+
+    It also modifies the JarDependency objects' excludes to contain all the jars excluded by
+    provides.
+
+    :param iterable targets: List of targets to collect JarDependencies and excludes from.
+
+    :returns: A pair of a list of JarDependencies, and a set of excludes to apply globally.
+    """
     jars = OrderedDict()
     global_excludes = set()
     provide_excludes = set()
@@ -443,8 +502,7 @@ class IvyUtils(object):
     def collect_elements(target):
       targets_processed.add(target)
       collect_jars(target)
-      if gather_excludes:
-        collect_excludes(target)
+      collect_excludes(target)
       collect_provide_excludes(target)
 
     for target in targets:
@@ -463,6 +521,10 @@ class IvyUtils(object):
 
   @classmethod
   def _resolve_conflict(cls, existing, proposed):
+    if existing.rev is None:
+      return proposed
+    if proposed.rev is None:
+      return existing
     if proposed == existing:
       if proposed.force:
         return proposed
@@ -531,11 +593,6 @@ class IvyUtils(object):
                           url=url,
                           classifier=classifier)
       artifacts[(ext, url, classifier)] = artifact
-
-    if len(artifacts) == 1:
-      # If the only artifact has no attributes that we need a nested <artifact/> for, just emit
-      # a <dependency/>.
-      artifacts.pop((None, None, None), None)
 
     template = TemplateData(
         org=jar_attributes.org,

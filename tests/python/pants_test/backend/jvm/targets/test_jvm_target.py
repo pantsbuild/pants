@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import pytest
 
-from pants.backend.core.targets.resources import Resources
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.resources import Resources
 from pants_test.base_test import BaseTest
 
 

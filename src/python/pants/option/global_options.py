@@ -46,9 +46,8 @@ class GlobalOptionsRegistrar(Optionable):
              help='Squelches most console output.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', '--color', action='store_true', default=True, recursive=True,
-             help='Set whether log messages are displayed in color. NB: The singular `color` form '
-                  'is deprecated until 0.0.63: prefer `colors`.')
+    register('--colors', action='store_true', default=True, recursive=True,
+             help='Set whether log messages are displayed in color.')
 
     # Pants code uses this only to verify that we are of the requested version. However
     # setup scripts, runner scripts, IDE plugins, etc., may grep this out of pants.ini
@@ -96,6 +95,12 @@ class GlobalOptionsRegistrar(Optionable):
     register('-d', '--logdir', advanced=True, metavar='<dir>',
              help='Write logs to files under this directory.')
 
+    # This facilitates bootstrap-time configuration of pantsd usage such that we can
+    # determine whether or not to use the Pailgun client to invoke a given pants run
+    # without resorting to heavier options parsing.
+    register('--enable-pantsd', advanced=True, action='store_true', default=False,
+             help='Enables use of the pants daemon. (Beta)')
+
   @classmethod
   def register_options(cls, register):
     """Register options not tied to any particular task or subsystem."""
@@ -125,13 +130,18 @@ class GlobalOptionsRegistrar(Optionable):
                   "are used.  Multiple constraints may be added.  They will be ORed together.")
     register('--exclude-target-regexp', advanced=True, action='append', default=[],
              metavar='<regexp>',
-             help='Exclude targets that match these regexes. Useful with ::, to ignore broken '
-                  'BUILD files.',
+             help='Exclude targets that match these regexes.',
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
     register('--spec-excludes', advanced=True, action='append',
              default=[register.bootstrap.pants_workdir],
+             deprecated_hint='Use --build-file-ignore instead.', deprecated_version='0.0.75',
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
+    register('--ignore-patterns', advanced=True, action='append', fromfile=True,
+             default=['.*'],
+             help='Patterns for ignoring files when reading BUILD files. '
+                  'Use to ignore unneeded directories or BUILD files. '
+                  'Entries use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
     register('--fail-fast', advanced=True, action='store_true', recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')

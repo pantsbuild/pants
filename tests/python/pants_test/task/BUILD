@@ -1,15 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='tasks',
-  dependencies=[
-    ':mutex_task_mixin',
-    ':task',
-    ':testrunner_task_mixin',
-  ],
-)
-
 python_tests(
   name = 'console_task',
   sources = ['test_console_task.py'],
@@ -27,6 +18,16 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name='scm_publish',
+  sources=['test_scm_publish_mixin.py'],
+  coverage=['pants.task.scm_publish_mixin'],
+  dependencies=[
+    '3rdparty/python:mock',
+    'src/python/pants/task',
   ]
 )
 

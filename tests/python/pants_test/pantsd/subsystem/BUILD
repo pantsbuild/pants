@@ -11,3 +11,14 @@ python_tests(
     'src/python/pants/pantsd/subsystem:watchman_launcher'
   ]
 )
+
+python_tests(
+  name = 'pants_daemon_launcher',
+  sources = ['test_pants_daemon_launcher.py'],
+  coverage = ['pants.pantsd.subsystem.pants_daemon_launcher'],
+  dependencies = [
+    'src/python/pants/pantsd/subsystem:pants_daemon_launcher',
+    'tests/python/pants_test/pantsd:test_deps',
+    'tests/python/pants_test/subsystem:subsystem_utils'
+  ]
+)

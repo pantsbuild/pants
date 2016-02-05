@@ -10,6 +10,8 @@ import warnings
 
 import six
 
+from pants.base.deprecated import deprecated
+
 
 logger = logging.getLogger(__name__)
 
@@ -62,16 +64,20 @@ class BuildFileParser(object):
     """Returns a copy of the registered build file aliases this build file parser uses."""
     return self._build_configuration.registered_aliases()
 
-  def address_map_from_build_file(self, build_file):
-    family_address_map_by_build_file = self.parse_build_file_family(build_file)
+  def address_map_from_build_files(self, build_files):
+    family_address_map_by_build_file = self.parse_build_files(build_files)
     address_map = {}
     for build_file, sibling_address_map in family_address_map_by_build_file.items():
       address_map.update(sibling_address_map)
     return address_map
 
-  def parse_build_file_family(self, build_file):
+  @deprecated('0.0.72', hint_message='Use address_map_from_build_files instead.')
+  def address_map_from_build_file(self, build_file):
+    return self.address_map_from_build_files(build_file.family())
+
+  def parse_build_files(self, build_files):
     family_address_map_by_build_file = {}  # {build_file: {address: addressable}}
-    for bf in build_file.family():
+    for bf in build_files:
       bf_address_map = self.parse_build_file(bf)
       for address, addressable in bf_address_map.items():
         for sibling_build_file, sibling_address_map in family_address_map_by_build_file.items():
@@ -85,6 +91,10 @@ class BuildFileParser(object):
       family_address_map_by_build_file[bf] = bf_address_map
     return family_address_map_by_build_file
 
+  @deprecated('0.0.72', hint_message='Use parse_build_files instead.')
+  def parse_build_file_family(self, build_file):
+    return self.parse_build_files(build_file.family())
+
   def parse_build_file(self, build_file):
     """Capture Addressable instances from parsing `build_file`.
     Prepare a context for parsing, read a BUILD file from the filesystem, and return the
@@ -93,10 +103,11 @@ class BuildFileParser(object):
 
     def _format_context_msg(lineno, offset, error_type, message):
       """Show the line of the BUILD file that has the error along with a few line of context"""
-      build_contents = build_file.source()
+      build_contents = build_file.source().decode('utf-8')
       context = "While parsing {build_file}:\n".format(build_file=build_file)
       curr_lineno = 0
       for line in build_contents.split('\n'):
+        line = line.encode('ascii', 'backslashreplace')
         curr_lineno += 1
         if curr_lineno == lineno:
           highlight = '*'

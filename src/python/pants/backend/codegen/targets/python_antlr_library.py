@@ -9,7 +9,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 
 
 class PythonAntlrLibrary(PythonTarget):
-  """Generates a stub Python library from Antlr grammar files."""
+  """A Python library generated from Antlr grammar files."""
 
   def __init__(self, module=None, antlr_version='3.1.3', *args, **kwargs):
     """

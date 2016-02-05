@@ -5,7 +5,7 @@ thrift1 = Target(
   sources=None,
 )
 
-thrift2 = Target(
+thrift2 = StructWithDeps(
   sources={},
   dependencies=[
     ':thrift1',
@@ -13,27 +13,27 @@ thrift2 = Target(
 )
 
 java1 = Target(
-  dependencies=[
-    ':thrift2',
-  ],
   configurations=[
-    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
-    # off / prove the capabilities of the new BUILD graph parser.
-    ApacheThriftConfig(
-      version='0.9.2',
-      strict=True,
-      lang='java',
-    ),
-    ':nonstrict',
     PublishConfig(
       default_repo=':public',
       repos={
-        'jake': Config(
+        'jake': Struct(
           url='https://dl.bintray.com/pantsbuild/maven'
         ),
         'jane': ':public'
       }
-    )
+    ),
+    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
+    # off / prove the capabilities of the new BUILD graph parser.
+    ':nonstrict',
+    ApacheThriftConfig(
+      version='0.9.2',
+      strict=True,
+      lang='java',
+      dependencies=[
+        ':thrift2',
+      ]
+    ),
   ]
 )
 
@@ -43,6 +43,6 @@ nonstrict = ApacheThriftConfig(
   lang='java'
 )
 
-public = Config(
+public = Struct(
   url='https://oss.sonatype.org/#stagingRepositories'
 )

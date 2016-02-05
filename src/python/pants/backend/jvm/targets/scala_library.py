@@ -12,7 +12,7 @@ from pants.build_graph.address import Address
 
 
 class ScalaLibrary(ExportableJvmLibrary):
-  """A collection of Scala code.
+  """A Scala library.
 
   Normally has conceptually-related sources; invoking the ``compile`` goal
   on this target compiles scala and generates classes. Invoking the ``bundle``
@@ -45,11 +45,7 @@ class ScalaLibrary(ExportableJvmLibrary):
   def traversable_dependency_specs(self):
     for spec in super(ScalaLibrary, self).traversable_dependency_specs:
       yield spec
-
-    # TODO(John Sirois): Targets should be able to set their scala platform version
-    # explicitly, and not have to conform to this global setting.
-    for library_spec in ScalaPlatform.global_instance().runtime:
-      yield library_spec
+    yield ScalaPlatform._synthetic_runtime_target(self._build_graph)
 
   @property
   def traversable_specs(self):

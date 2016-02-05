@@ -1,0 +1,21 @@
+{
+  "type_alias": "target",
+  "name": "managed_thirdparty",
+  "configurations": [
+    {
+      "type_alias": "java",
+      "files": ["UseHadoop.java"],
+      "dependencies": [
+        "3rdparty/jvm/managed:hadoop-common",
+        "3rdparty/jvm/managed:guava"
+      ]
+    },
+    {
+      "type_alias": "variants",
+      "default": {
+        "resolve": "latest-hadoop"
+      }
+    }
+  ],
+  "description": "Consumes a 'managed' resolve for Hadoop, where a dependent binary or test target would select a named `managed_resolve` target to use to fetch the versions for _all_ of its dependencies. The `variants` dict above specifies that this target prefers to use the `latest-hadoop` resolve variant."
+}

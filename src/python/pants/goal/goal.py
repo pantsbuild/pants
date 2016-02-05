@@ -19,6 +19,21 @@ class Goal(object):
     raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
 
   @classmethod
+  def register(cls, name, description):
+    """Register a goal description.
+
+    Otherwise the description must be set when registering some task on the goal,
+    which is clunky, and dependent on things like registration order of tasks in the goal.
+
+    A goal that isn't explicitly registered with a description will fall back to the description
+    of the task in that goal with the same name (if any).  So singleton goals (e.g., 'clean-all')
+    need not be registered explicitly.  This method is primarily useful for setting a
+    description on a generic goal like 'compile' or 'test', that multiple backends will
+    register tasks on.
+    """
+    cls.by_name(name)._description = description
+
+  @classmethod
   def by_name(cls, name):
     """Returns the unique object representing the goal of the specified name."""
     if name not in cls._goal_by_name:
@@ -29,7 +44,7 @@ class Goal(object):
   def clear(cls):
     """Remove all goals and tasks.
 
-    This method is EXCLUSIVELY for use in tests.
+    This method is EXCLUSIVELY for use in tests and during pantsd startup.
     """
     cls._goal_by_name.clear()
 
@@ -71,8 +86,11 @@ class _Goal(object):
     # Return the docstring for the Task registered under the same name as this goal, if any.
     # This is a very common case, and therefore a useful idiom.
     namesake_task = self._task_type_by_name.get(self.name)
-    if namesake_task:
-      return namesake_task.__doc__
+    if namesake_task and namesake_task.__doc__:
+      # First line of docstring.
+      # TODO: This is repetitive of Optionable.get_description(). We should probably just
+      # make Goal an Optionable, for uniformity.
+      return namesake_task.__doc__.partition('\n')[0].strip()
     return ''
 
   def register_options(self, options):
@@ -108,7 +126,9 @@ class _Goal(object):
                                       options_scope.replace('.', '_').replace('-', '_'))
     task_type = type(subclass_name, (superclass,), {
       '__doc__': superclass.__doc__,
-      'options_scope': options_scope
+      '__module__': superclass.__module__,
+      'options_scope': options_scope,
+      '_stable_name': superclass.stable_name()
     })
 
     otn = self._ordered_task_names
@@ -131,11 +151,6 @@ class _Goal(object):
     if task_registrar.serialize:
       self.serialize = True
 
-    return self
-
-  def with_description(self, description):
-    """Add a description to this goal."""
-    self._description = description
     return self
 
   def uninstall_task(self, name):

@@ -80,14 +80,20 @@ PKG_NODE=(
   "pkg_node_install_test"
 )
 function pkg_node_install_test() {
-  (cat << EOF
-var typ = require('typ');
-console.log("type of boolean is: " + typ.BOOLEAN);
-EOF
-  ) | \
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.node==$(local_version)']" \
-      repl.node contrib/node/examples::
+      test.node contrib/node/examples::
+}
+
+PKG_SCALAJS=(
+  "pantsbuild.pants.contrib.scalajs"
+  "//contrib/scalajs/src/python/pants/contrib/scalajs:plugin"
+  "pkg_scalajs_install_test"
+)
+function pkg_scalajs_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.scalajs==$(local_version)']" \
+      test contrib/scalajs::
 }
 
 PKG_PYTHON_CHECKS=(
@@ -113,4 +119,5 @@ CONTRIB_PACKAGES=(
   PKG_HASKELL
   PKG_NODE
   PKG_PYTHON_CHECKS
+  PKG_SCALAJS
 )

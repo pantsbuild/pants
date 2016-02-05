@@ -1,0 +1,136 @@
+<style>
+    {{> reference/reference.css}}
+</style>
+<script type="text/javascript">
+    {{> reference/reference.js}}
+</script>
+
+<h1>Pants Reference</h1>
+
+<div class="top-link-bar">
+  <a href="#available_goals">Available Goals</a>
+  <a href="#option_reference">Option Reference</a>
+</div>
+
+<p>
+  This page documents Pants goals, tasks, subsystems and options.
+</p>
+
+<h2>Goals</h2>
+<p>
+  A <em>goal</em> is an action that can be taken on build targets. It represents some
+  high-level goal that you wish to accomplish, such as compiling your code.
+  Goals are how you tell Pants what to do on the command line. E.g., this is how you
+  invoke the compile goal:
+</p>
+  <pre>
+  ./pants compile examples/src/java/org/pantsbuild/example/hello/main</pre>
+
+  Goals may depend on other goals, and Pants will invoke those dependencies before invoking
+  the goal you requested.  For example, the <code>run</code> goal depends on the <code>compile</code>
+  goal, so these commands are equivalent:
+  <pre>
+    ./pants compile run examples/src/java/org/pantsbuild/example/hello/main
+    ./pants run examples/src/java/org/pantsbuild/example/hello/main</pre>
+
+<h2>Tasks</h2>
+<p>
+  A goal is made up of one or more <em>tasks</em>. For example, the <code>compile.zinc</code> task
+  compiles JVM code using the Zinc compiler, and is installed in the <code>compile</code> goal.
+</p>
+<p>
+  Many goals are naturally 'singletons', i.e., they contain only one task.
+  For example the <code>clean-all</code> goal, which deletes all build byproducts. In these cases
+  we often casually elide the distinction between the goal and its task. E.g., we refer to the
+  <code>clean-all</code> task, not the <code>clean-all.clean-all</code> task.
+</p>
+
+<h2>Subsystems</h2>
+<p>
+  A <em>subsystem</em> is some configurable part of Pants that can be used across multiple
+  tasks and other parts of the system, including other subsystems. Examples include a JVM,
+  a remote code repository or a build cache.
+</p>
+<p>
+  There may be multiple instances of subsystem configuration. Tasks and other subsystems that
+  use a subsystem may either use its <em>global instance</em> or they may instantiate their own
+  instance, overriding its global config. For example, a task may use the global JVM configuration,
+  or it may use its own specialized JVM configuration.
+</p>
+
+<h2>Options and Scopes</h2>
+<p>
+  Tasks and subsystems can be configured using <em>options</em>. Option values may be specified
+  using command line flags, environment variables or the <code>pants.ini</code> config file.
+</p>
+<p>
+  Pants has many tasks and subsystems, and therefore it has many options. For organizational
+  purposes, the options are grouped into <em>scopes</em>:
+</p>
+<ul>
+  <li>
+    The options for task <code>foo</code> in goal <code>bar</code> belong to scope <code>bar.foo</code>.
+  </li>
+  <li>
+    If a task <code>foo</code> has the same name as its goal then it belongs to scope <code>foo</code>
+    (rather than <code>foo.foo</code>). This provides convenience and brevity in the case of 'singleton' goals.
+  </li>
+  <li>
+    The global instance of subsystem <code>foo</code> belongs to scope <code>foo</code>.
+  </li>
+  <li>
+    The specialized instance of subsystem <code>foo</code> used by scope <code>bar.baz</code>
+  belongs to scope <code>foo.bar.baz</code>.
+  </li>
+</ul>
+<p>
+  Scopes are used as qualifiers when specifying option values. For example, to set the value of option
+<code>foo</code> in scope <code>bar.baz</code>:
+</p>
+<ul>
+  <li>
+    Set the value of key <code>foo</code> in section <code>bar.baz</code> in pants.ini:
+    <pre>
+      [bar.baz]
+      foo = 42</pre>
+  </li>
+  <li>
+    Set the value of environment variable <code>PANTS_BAR_BAZ_FOO</code>:
+    <pre>
+      PANTS_BAR_BAZ_FOO=42 ./pants compile examples/src/java/org/pantsbuild/example/hello/main</pre>
+  </li>
+  <li>
+    Set the value of command line flag <code>--bar-baz-foo</code>:
+    <pre>
+      ./pants --bar-baz-foo=42 compile examples/src/java/org/pantsbuild/example/hello/main
+      ./pants compile --bar-baz-foo=42 examples/src/java/org/pantsbuild/example/hello/main</pre>
+  </li>
+</ul>
+<p>
+  For convenience, you can qualify a command-line goal with a task, followed by
+  the unqualified form of command line flags belonging to that task. E.g., this:
+</p>
+  <pre>
+      ./pants compile.zinc --foo --bar run.jvm --baz \
+        examples/src/java/org/pantsbuild/example/hello/main</pre>
+<p>
+  is equivalent to this:
+</p>
+<pre>
+      ./pants run --compile-zinc-foo --compile-zinc-bar --run-jvm-baz \
+        examples/src/java/org/pantsbuild/example/hello/main</pre>
+<p>
+  Pants also has a few global options, for basic systemwide configuration.
+</p>
+
+<hr>
+
+<a name="available_goals"></a>
+{{> reference/goal_reference.html}}
+
+<hr>
+
+<a name="option_reference"></a>
+{{> reference/option_reference.html}}
+
+<hr>

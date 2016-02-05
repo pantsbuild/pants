@@ -52,12 +52,50 @@ Configure Pants' own Runtime Dependencies
 -----------------------------------------
 
 Pants calls out to other tools. E.g., it optionally uses `scalastyle` to check scala source code.
-Most tools come pre-configured by Pants. A few do require more setup though and these rely on
-special targets in your workspace to specify versions of the tools to fetch. These targets all live
-in the `BUILD.tools` file by convention. For example, when Pants fetches `scalastyle`, it looks in
-`BUILD.tools` for that target:
+Most tools come pre-configured by Pants. If you use scala a few tools are configured based on the
+major scala version provided with the --version flag.  You can specify custom tool versions by
+passing "custom" to --scala-platform-version. If a custom version of scala is desired some of these
+tools require more setup though and these rely on special targets in your workspace to specify
+versions of the tools to fetch .These targets all live in the `BUILD.tools` file by convention.
 
-!inc[start-at=scalastyle&end-before=scrooge-gen](../../BUILD.tools)
+For example, the following targets are used to provide custom scala tools:
+
+`//:scalastyle`: Scala style checking.
+`//:scalac`: Scala compiler.
+`//:scala-repl`: Scala REPL environment.
+`//:scala-library`: Scala runtime environment.
+
+Pants looks in `BUILD.tools` for that target.  Below is an example of BUILD.tools that overrides
+the default minor version for 2.10.  For these changes to take effect you would need to set
+--scala-platform-version to 'custom'.
+
+    jar_library(name = 'scalac',
+                jars = [
+                  jar(org = 'org.scala-lang', name = 'scala-compiler', rev = 2.10.3),
+                ])
+
+    jar_library(name = 'scala-library',
+                jars = [
+                  jar(org = 'org.scala-lang', name = 'scala-library', rev = 2.10.3),
+                ])
+
+    jar_library(name = 'scala-repl',
+                jars = [
+                  jar(org = 'org.scala-lang', name = 'jline', rev = 2.10.3, intransitive = True),
+                ],
+                dependencies = [
+                  ':scala-compiler',
+                  ':scala-library',
+                ])
+
+    jar_library(name = 'scalastyle',
+                jars = [
+                  scala_jar(org='org.scalastyle', name='scalastyle', rev='0.3.2')
+                ])
+
+Additional tools can be defined as follows in BUILD.tools:
+
+!inc[start-at=scala-js-library&end-before=scrooge-gen](../../BUILD.tools)
 
 When setting up your Pants repo, you may want to copy this file over from a working Pants repo and
 perhaps change some version numbers to fit your situation.
@@ -199,6 +237,8 @@ In your `pants.ini` file, set up a `[publish.jar]` section. In that section,
 create a `dict` called `repos`. It should contain a section for each `Repository` object that you
 defined in your plugin:
 
+    :::ini
+    [publish.jar]
     repos: {
       'public': {  # must match the name of the `Repository` object that you defined in your plugin.
         'resolver': 'maven.example.com', # must match hostname in ~/.netrc and the <url> parameter
@@ -237,24 +277,33 @@ good place, and is used in the example above):
 Next, tell Ivy how to publish to your repository. Add a new `ivysettings.xml` file to your repo
 with the additional information needed to publish artifacts. Here is an example to get you started:
 
-   :::xml
+    :::xml
     <?xml version="1.0"?>
 
     <ivysettings>
       <settings defaultResolver="chain-repos"/>
+      <!-- The ${login} and ${password} values come from a credentials() object in a BUILD file,
+           which is fed by '~/.netrc'.  There must be a '~/.netrc' machine entry which matches
+           a resolver in the "repos" object in 'pants.ini', which also matches the 'host' in
+           this XML block.
 
+           machine <hostname>
+             login <login>
+             password <password>
+
+           The realm must match the kind of repository you are publishing to. For Sonotype Nexus, use:
+
+           realm="Sonatype Nexus Repository Manager"
+
+        -->
       <credentials host="artifactory.example.com"
                    realm="Artifactory Realm"
-                   <!-- These values come from a credentials() object, which is fed by '~/.netrc'.
-                        There must be a '~/.netrc' machine entry which matches a resolver in the
-                        "repos" object in 'pants.ini', which also matches the 'host' in this XML
-                        block. -->
                    username="${login}"
                    passwd="${password}"/>
 
       <resolvers>
         <chain name="chain-repos" returnFirst="true">
-           <ibiblio name="corp-maven"
+           <ibiblio name="artifactory.example.com"
                          m2compatible="true"
                          usepoms="true"
                          root="https://artifactory.example.com/content/groups/public/"/>
@@ -266,9 +315,11 @@ with the additional information needed to publish artifacts. Here is an example 
       </resolvers>
     </ivysettings>
 
-With this file in place, add a `[publish]` section to `pants.ini`, and tell pants to use
+With this file in place, add a `[publish.jar]` section to `pants.ini`, and tell pants to use
 the custom Ivy settings when publishing:
 
+    :::ini
+    [publish.jar]
     ivy_settings: %(pants_supportdir)s/ivy/ivysettings_for_publishing.xml
 
 <a pantsmark="setup_publish_restrict_branch"> </a>

@@ -124,11 +124,13 @@ contribute a change or merge it to master:
     :::bash
     $ ./build-support/bin/ci.sh
 
-To run just Pants' *unit* tests (skipping the can-be-slow integration tests), use the
-`tests/python/pants_test:all` target:
+To run just Pants' *unit* tests (skipping the can-be-slow integration tests), filter out
+the python tests tagged with 'integration':
 
     :::bash
-    $ ./pants test tests/python/pants_test:all
+    $ ./pants test tests/python/pants_test:: --tag=-integration
+
+For convenience, this is wrapped up in a script `build-support/bin/unit-test.sh`.
 
 If you only want to run tests for changed targets, then you can use the
 `test-changed` goal:
@@ -186,17 +188,17 @@ Debug quickly; that test target will time out in a couple of minutes,
 quitting you out.
 
 To start an interactive Python shell that can `import` Pants modules,
-use the usual `./pants py` on a `python_library` target that builds (or
+use the usual `./pants repl` on a `python_library` target that builds (or
 depends on) the modules you want:
 
     :::bash
-    $ ./pants py src/python/pants/backend/core/targets:common
-    /Users/lhosken/workspace/pants src/python/pants/backend/core/targets:common
+    $ ./pants repl src/python/pants/build_graph
+    /Users/lhosken/workspace/pants src/python/pants/build_graph
     Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
     [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
     Type "help", "copyright", "credits" or "license" for more information.
     (InteractiveConsole)
-    >>> from pants.backend.core.targets import repository
+    >>> from pants.build_graph.target import Target
     >>>
 
 Developing and Debugging a JVM Tool
@@ -212,10 +214,10 @@ in `BUILD.tools` to point Pants at a development version of your jar file.
 First, create a jar file for the tool with the `binary` goal.
 
     :::bash
-    $ ./pants binary src/scala/org/pantsbuild/zinc::
+    $ ./pants binary src/java/org/pantsbuild/tools/jar:main
 
-The above command will create `dist/main.jar` according to the _jvm_binary_
-target defined in `src/scala/org/pantsbuild/zinc/BUILD`
+The above command will create `dist/jar-tool.jar` according to the _jvm_binary_
+target defined in `src/java/org/pantsbuild/tools/jar/BUILD`
 
 
 You'll need to update the jar dependency that this tool uses for Pants to see the
@@ -225,10 +227,10 @@ which describes how to specify the `url` and `mutable` attributes of a `jar`
 dependency found on the local filesystem:
 
     :::python
-    jar_library(name='zinc',
+    jar_library(name='jar-tool',
         jars=[
-          jar(org='org.pantsbuild', name='zinc', rev='1.2.3-SNAPSHOT',
-              url='file:///Users/squarepants/Src/pants/dist/main.jar', mutable=True),
+          jar(org='org.pantsbuild', name='jar-tool', rev='1.2.3-SNAPSHOT',
+              url='file:///Users/squarepants/Src/pants/dist/jar-tool.jar', mutable=True),
       ],
     )
 
@@ -236,7 +238,7 @@ For debugging, append JVM args to turn on the debugger for the appropriate tool 
 `pants.ini`:
 
     :::ini
-    [compile.zinc-java]
+    [jar-tool]
     jvm_options: ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 
 Note that most tools run under nailgun by default. The easiest way to
@@ -260,7 +262,7 @@ cache a shaded version under `~/.cache/pants/artifact_cache/`.  Clear out the ca
 before testing a new version of the tool as follows:
 
     :::bash
-    $ rm -rf ~/.cache.pants/artifact_cache
+    $ rm -rf ~/.cache/pants/artifact_cache
 
 If you have trouble resolving the file with Ivy after making the
 above changes to `BUILD.tools`:

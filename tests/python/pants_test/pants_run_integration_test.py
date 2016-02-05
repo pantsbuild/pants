@@ -20,6 +20,7 @@ from pants.base.build_file import BuildFile
 from pants.fs.archive import ZIP
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
 PantsResult = namedtuple(
@@ -167,14 +168,17 @@ class PantsRunIntegrationTest(unittest.TestCase):
     with self.temporary_workdir() as workdir:
       yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
 
-  def bundle_and_run(self, target, bundle_name, bundle_options=None, args=None,
+  def bundle_and_run(self, target, bundle_name, bundle_jar_name=None, bundle_options=None,
+                     args=None,
                      expected_bundle_jar_content=None,
                      expected_bundle_content=None,
                      library_jars_are_symlinks=True):
     """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the bundle.
 
     :param target: target name to compile
-    :param bundle_name: resulting bundle filename (minus .jar extension)
+    :param bundle_name: resulting bundle filename (minus .zip extension)
+    :param bundle_jar_name: monolithic jar filename (minus .jar extension), if None will be the
+      same as bundle_name
     :param bundle_options: additional options for bundle
     :param args: optional arguments to pass to executable
     :param expected_bundle_content: verify the bundle zip content
@@ -184,13 +188,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
       dependencies, only exception is when shading is used.
     :return: stdout as a string on success, raises an Exception on error
     """
+    bundle_jar_name = bundle_jar_name or bundle_name
     bundle_options = bundle_options or []
     bundle_options = ['bundle.jvm'] + bundle_options + ['--archive=zip', target]
     pants_run = self.run_pants(bundle_options)
     self.assert_success(pants_run)
 
-    self.assert_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
-                         library_jars_are_symlinks)
+    self.assertTrue(check_symlinks('dist/{bundle_name}-bundle/libs'.format(bundle_name=bundle_name),
+                                   library_jars_are_symlinks))
     # TODO(John Sirois): We need a zip here to suck in external library classpath elements
     # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
     # contextmanager that yields its results while the tmpdir workdir is still active and change
@@ -198,21 +203,20 @@ class PantsRunIntegrationTest(unittest.TestCase):
     with temporary_dir() as workdir:
       ZIP.extract('dist/{bundle_name}.zip'.format(bundle_name=bundle_name), workdir)
       if expected_bundle_content:
-        self.assert_contains_exact_files(workdir, expected_bundle_content)
+        self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
       if expected_bundle_jar_content:
         with temporary_dir() as check_bundle_jar_dir:
-          bundle_jar = os.path.join(workdir, '{bundle_name}.jar')
-          ZIP.extract('{workdir}/{bundle_name}.jar'.format(workdir=workdir,
-                                                           bundle_name=bundle_name),
-                      check_bundle_jar_dir)
-          self.assert_contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content)
+          bundle_jar = os.path.join(workdir, '{bundle_jar_name}.jar'
+                                    .format(bundle_jar_name=bundle_jar_name))
+          ZIP.extract(bundle_jar, check_bundle_jar_dir)
+          self.assertTrue(contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content))
 
       optional_args = []
       if args:
         optional_args = args
       java_run = subprocess.Popen(['java',
                                    '-jar',
-                                   '{bundle_name}.jar'.format(bundle_name=bundle_name)]
+                                   '{bundle_jar_name}.jar'.format(bundle_jar_name=bundle_jar_name)]
                                   + optional_args,
                                   stdout=subprocess.PIPE,
                                   cwd=workdir)
@@ -247,36 +251,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
     error_msg = '\n'.join(details)
 
     assertion(value, pants_run.returncode, error_msg)
-
-  def assert_contains_exact_files(self, directory, expected_files, ignore_links=False):
-    """Asserts that the only files which directory contains are expected_files.
-
-    :param str directory: Path to directory to search.
-    :param set expected_files: Set of filepaths relative to directory to search for.
-    :param bool ignore_links: Indicates to ignore any file links.
-    """
-    found = []
-    for root, _, files in os.walk(directory):
-      for f in files:
-        p = os.path.join(root, f)
-        if ignore_links and os.path.islink(p):
-          continue
-        found.append(os.path.relpath(p, directory))
-
-    self.assertEqual(sorted(expected_files), sorted(found))
-
-  def assert_symlinks(self, directory, symlinks=True):
-    """Asserts files under directory are symlinks.
-
-    :param str directory: Path to directory to search.
-    :param bool symlinks: If true, verify files are symlinks, if false, verify files are actual files.
-    """
-    for root, _, files in os.walk(directory):
-      for f in files:
-        p = os.path.join(root, f)
-        if symlinks ^ os.path.islink(p):
-          return False
-    return True
 
   def normalize(self, s):
     """Removes escape sequences (e.g. colored output) and all whitespace from string s."""

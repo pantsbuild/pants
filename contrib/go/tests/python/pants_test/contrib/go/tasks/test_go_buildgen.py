@@ -369,3 +369,47 @@ class GoBuildgenTest(TaskTestBase):
     self.assertIsNotNone(jane)
     self.assertEqual([jane], fred.dependencies)
     self.assertEqual({jane, fred}, set(self.build_graph.targets()))
+
+  def test_issues_2787(self):
+    # Previously, `XTestImports` were not handled.  These imports are those of out-of-package black
+    # box tests.  We create one of these below in the `lib/` dir with `lib_test.go` in the
+    # `lib_test` package.
+
+    self.set_options(remote=False, materialize=False)
+
+    self.create_file(relpath='src/go/helper/helper.go', contents=dedent("""
+        package helper
+
+        const PublicConstant = 42
+      """))
+
+    self.create_file(relpath='src/go/lib/lib.go', contents=dedent("""
+        package lib
+
+        const privateConstant = 42
+      """))
+
+    self.create_file(relpath='src/go/lib/lib_test.go', contents=dedent("""
+        package lib_test
+
+        import (
+          "helper"
+          "testing"
+        )
+
+        func TestAdd(t *testing.T) {
+          if privateConstant != helper.PublicConstant {
+            t.Fatalf("got: %d, expected: %d", privateConstant, helper.PublicConstant)
+          }
+        }
+      """))
+
+    lib = self.make_target('src/go/lib', GoLibrary)
+    self.assertEqual([], lib.dependencies)
+
+    context = self.context(target_roots=[lib])
+    task = self.create_task(context)
+    task.execute()
+
+    helper = self.target('src/go/helper')
+    self.assertEqual([helper], lib.dependencies)

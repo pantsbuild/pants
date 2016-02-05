@@ -74,8 +74,8 @@ class SourceMapperTest(object):
     self.create_file('bar.py')
 
     self.owner(['text/common/helper:helper'], 'text/common/helper/trunc.py')
-    self.owner([':top', 'text/common/const:const'], 'text/common/const/emoji.py')
-    self.owner([':top'], 'foo.py')
+    self.owner(['//:top', 'text/common/const:const'], 'text/common/const/emoji.py')
+    self.owner(['//:top'], 'foo.py')
     self.owner([], 'bar.py')
 
   def test_fast_vs_correct(self):
@@ -84,16 +84,16 @@ class SourceMapperTest(object):
 
     # With fast=False, order doesn't matter.
     self.set_mapper(fast=False)
-    self.owner([':top', 'a/b:b'], 'a/b/bar.py')
-    self.owner([':top'], 'foo.py')
+    self.owner(['//:top', 'a/b:b'], 'a/b/bar.py')
+    self.owner(['//:top'], 'foo.py')
     self.set_mapper(fast=False)
-    self.owner([':top'], 'foo.py')
-    self.owner([':top', 'a/b:b'], 'a/b/bar.py')
+    self.owner(['//:top'], 'foo.py')
+    self.owner(['//:top', 'a/b:b'], 'a/b/bar.py')
 
     # With fast=False, loading a parent first vs after now affects results.
     self.set_mapper(fast=True)
     self.owner(['a/b:b'], 'a/b/bar.py')
-    self.owner([':top'], 'foo.py')
+    self.owner(['//:top'], 'foo.py')
 
 
 class LazySourceMapperTest(SourceMapperTest, BaseTest):

@@ -1,17 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'cache',
-  dependencies = [
-    ':artifact',
-    ':artifact_cache',
-    ':cache_setup',
-    ':pinger',
-    ':resolver',
-  ]
-)
-
 python_tests(
   name = 'artifact',
   sources = ['test_artifact.py'],
@@ -43,7 +32,29 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/task',
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test/testutils',
+    'tests/python/pants_test/testutils:mock_logger',
+  ]
+)
+
+python_tests(
+  name = 'caching',
+  sources = ['test_caching.py'],
+  dependencies = [
+    'src/python/pants/task:task',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:payload',
+    'src/python/pants/build_graph:build_graph',
+    'src/python/pants/cache:cache',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+python_library(
+  name = 'delay_server',
+  sources = ['delay_server.py'],
+  dependencies = [
+  '3rdparty/python:six',
   ]
 )
 
@@ -53,7 +64,7 @@ python_tests(
   dependencies = [
     'src/python/pants/cache',
     'tests/python/pants_test:base_test',
-    '3rdparty/python:six',
+    'tests/python/pants_test/cache:delay_server',
   ]
 )
 
@@ -65,4 +76,16 @@ python_tests(
     'src/python/pants/cache',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
+)
+
+python_tests(
+  name = 'cache_cleanup_integration',
+  sources = ['test_cache_cleanup_integration.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks/jvm_compile:zinc',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'}
 )

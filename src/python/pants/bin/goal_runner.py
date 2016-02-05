@@ -11,14 +11,16 @@ import sys
 import pkg_resources
 
 from pants.base.build_environment import get_scm, pants_version
-from pants.base.build_file import FilesystemBuildFile
+from pants.base.build_file import BuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
-from pants.base.scm_build_file import ScmBuildFile
+from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.scm_project_tree import ScmProjectTree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.extension_loader import load_plugins_and_backends
 from pants.bin.plugin_resolver import PluginResolver
 from pants.bin.repro import Reproducer
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.build_graph import BuildGraph
@@ -29,9 +31,9 @@ from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.logging.setup import setup_logging
-from pants.option.custom_types import list_option
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
 from pants.source.source_root import SourceRootConfig
@@ -61,10 +63,7 @@ class OptionsInitializer(object):
     """Sets global logging."""
     # N.B. quiet help says 'Squelches all console output apart from errors'.
     level = 'ERROR' if global_options.quiet else global_options.level.upper()
-    setup_logging(level, log_dir=global_options.logdir)
-
-    # This routes warnings through our loggers instead of straight to raw stderr.
-    logging.captureWarnings(True)
+    setup_logging(level, console_stream=sys.stderr, log_dir=global_options.logdir)
 
   def _register_options(self, subsystems, options):
     """Registers global options."""
@@ -178,13 +177,17 @@ class GoalRunnerFactory(object):
     self._global_options = options.for_global_scope()
     self._tag = self._global_options.tag
     self._fail_fast = self._global_options.fail_fast
-    self._spec_excludes = self._global_options.spec_excludes
+    # Will be provided through context.address_mapper.build_ignore_patterns.
+    self._spec_excludes = None
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
-    self._build_file_type = self._get_buildfile_type(self._global_options.build_file_rev)
+    self._project_tree = self._get_project_tree(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
-    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._build_file_type)
+    build_ignore_patterns = self._global_options.ignore_patterns or []
+    build_ignore_patterns.extend(BuildFile._spec_excludes_to_gitignore_syntax(self._root_dir,
+                                                                              self._global_options.spec_excludes))
+    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._project_tree, build_ignore_patterns)
     self._build_graph = BuildGraph(self._address_mapper)
     self._spec_parser = CmdLineSpecParser(
       self._root_dir,
@@ -193,21 +196,22 @@ class GoalRunnerFactory(object):
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
 
-  def _get_buildfile_type(self, build_file_rev):
-    """Selects the BuildFile type for use in a given pants run."""
+  def _get_project_tree(self, build_file_rev):
+    """Creates the project tree for build files for use in a given pants run."""
     if build_file_rev:
-      ScmBuildFile.set_rev(build_file_rev)
-      ScmBuildFile.set_scm(get_scm())
-      return ScmBuildFile
+      return ScmProjectTree(self._root_dir, get_scm(), build_file_rev)
     else:
-      return FilesystemBuildFile
+      return FileSystemProjectTree(self._root_dir)
 
   def _expand_goals(self, goals):
     """Check and populate the requested goals for a given run."""
     for goal in goals:
-      if self._address_mapper.from_cache(self._root_dir, goal, must_exist=False).file_exists():
+      try:
+        self._address_mapper.resolve_spec(goal)
         logger.warning("Command-line argument '{0}' is ambiguous and was assumed to be "
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
+      except AddressLookupError:
+        pass
 
     if self._help_request:
       help_printer = HelpPrinter(self._options)
@@ -231,10 +235,19 @@ class GoalRunnerFactory(object):
           if tag_filter(target):
             self._targets.append(target)
 
+  def _maybe_launch_pantsd(self):
+    """Launches pantsd if configured to do so."""
+    if self._global_options.enable_pantsd:
+      # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
+      with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
+        PantsDaemonLauncher.global_instance().maybe_launch()
+
   def _is_quiet(self):
     return any(goal.has_task_of_type(QuietTaskMixin) for goal in self._goals) or self._explain
 
   def _setup_context(self):
+    self._maybe_launch_pantsd()
+
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._expand_goals(self._requested_goals)
       self._expand_specs(self._target_specs, self._fail_fast)
@@ -294,7 +307,7 @@ class GoalRunner(object):
   @classmethod
   def subsystems(cls):
     # Subsystems used outside of any task.
-    return {SourceRootConfig, Reporting, Reproducer, RunTracker}
+    return {SourceRootConfig, Reporting, Reproducer, RunTracker, PantsDaemonLauncher}
 
   def _execute_engine(self):
     workdir = self._context.options.for_global_scope().pants_workdir

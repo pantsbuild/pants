@@ -51,12 +51,11 @@ class BuildFileAddressMapperTest(BaseTest):
                        BuildFileAddress(subdir_suffix_build_file, 'baz')},
                       self.address_mapper.scan_addresses())
 
-  def test_scan_addresses_with_excludes(self):
+  def test_scan_addresses_with_build_ignore_patterns(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
     self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    spec_excludes = [os.path.join(self.build_root, 'subdir')]
-    self.assertEquals({BuildFileAddress(root_build_file, 'foo')},
-                      self.address_mapper.scan_addresses(spec_excludes=spec_excludes))
+    address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree, ['subdir'])
+    self.assertEquals({BuildFileAddress(root_build_file, 'foo')}, address_mapper_with_ignore.scan_addresses())
 
   def test_scan_addresses_with_root(self):
     self.add_to_build_file('BUILD', 'target(name="foo")')
@@ -74,16 +73,32 @@ class BuildFileAddressMapperTest(BaseTest):
   def test_raises_invalid_build_file_reference(self):
     # reference a BUILD file that doesn't exist
     with self.assertRaisesRegexp(BuildFileAddressMapper.InvalidBuildFileReference,
-                                 '^BUILD file does not exist at: .*/non-existent-path'
+                                 '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec //non-existent-path:a'):
       self.address_mapper.spec_to_address('//non-existent-path:a')
 
-  def test_raises_address_not_in_build_file(self):
+  def test_raises_address_not_in_one_build_file(self):
     self.add_to_build_file('BUILD', 'target(name="foo")')
 
     # Create an address that doesn't exist in an existing BUILD file
     address = Address.parse(':bar')
-    with self.assertRaises(BuildFileAddressMapper.AddressNotInBuildFile):
+    with self.assertRaisesRegexp(BuildFileAddressMapper.AddressNotInBuildFile,
+                                 '^bar was not found in BUILD files from .*. '
+                                 'Perhaps you meant:'
+                                 '\s+:foo$'):
+      self.address_mapper.resolve(address)
+
+  def test_raises_address_not_in_two_build_files(self):
+    self.add_to_build_file('BUILD.1', 'target(name="foo1")')
+    self.add_to_build_file('BUILD.2', 'target(name="foo2")')
+
+    # Create an address that doesn't exist in an existing BUILD file
+    address = Address.parse(':bar')
+    with self.assertRaisesRegexp(BuildFileAddressMapper.AddressNotInBuildFile,
+                                 '^bar was not found in BUILD files from .*. '
+                                 'Perhaps you meant one of:'
+                                 '\s+:foo1 \(from BUILD.1\)'
+                                 '\s+:foo2 \(from BUILD.2\)$'):
       self.address_mapper.resolve(address)
 
   def test_raises_address_invalid_address_error(self):
@@ -95,7 +110,7 @@ class BuildFileAddressMapperTest(BaseTest):
     with self.assertRaises(BuildFileAddressMapper.EmptyBuildFileError):
       self.address_mapper.resolve_spec('//:foo')
 
-  def test_address_lookup_error_hierarcy(self):
+  def test_address_lookup_error_hierarchy(self):
     self.assertIsInstance(BuildFileAddressMapper.AddressNotInBuildFile(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.EmptyBuildFileError(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)

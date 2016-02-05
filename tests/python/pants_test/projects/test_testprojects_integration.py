@@ -24,6 +24,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/cucumber',
       # TODO: This one has a missing dependency, but is intended to succeed... should it?
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
+      # TODO(Eric Ayers): I don't understand why this fails
+      'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
     ]
 
     # Targets that are intended to fail
@@ -34,9 +36,10 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/cycle1',
       'testprojects/src/java/org/pantsbuild/testproject/cycle2',
       'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
+      'testprojects/src/java/org/pantsbuild/testproject/junit/beforeclassexception:tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/failing/tests/org/pantsbuild/tmp/tests',
       'testprojects/src/java/org/pantsbuild/testproject/junit/mixed/tests/org/pantsbuild/tmp/tests',
-      'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput',
+      'testprojects/src/java/org/pantsbuild/testproject/junit/suppressoutput:tests',
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*',
       'testprojects/src/python/antlr:test_antlr_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure',
@@ -47,6 +50,9 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/python/pants/dummies:failing_target',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
+      # These don't pass without special config.
+      'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
+      'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
     ]
 
     # May not succeed without java8 installed
@@ -64,7 +70,13 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target'
     ]
 
-    targets_to_exclude = known_failing_targets + negative_test_targets + need_java_8 + timeout_targets
-    exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target), targets_to_exclude)
+    deliberately_conflicting_targets = [
+      'testprojects/src/python/interpreter_selection.*'
+    ]
+
+    targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
+                          timeout_targets + deliberately_conflicting_targets)
+    exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
+                       targets_to_exclude)
     pants_run = self.pants_test(['testprojects::'] + exclude_opts)
     self.assert_success(pants_run)

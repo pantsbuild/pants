@@ -8,6 +8,7 @@ python_library(
     ':plugins',
     '3rdparty/python:ansicolors',
     '3rdparty/python:pex',
+    '3rdparty/python:setproctitle',
     '3rdparty/python:setuptools',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
@@ -16,9 +17,10 @@ python_library(
     'src/python/pants/base:build_file',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:scm_build_file',
+    'src/python/pants/base:scm_project_tree',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
+    'src/python/pants/core_tasks',
     'src/python/pants/engine',
     'src/python/pants/goal',
     'src/python/pants/goal:context',
@@ -26,6 +28,7 @@ python_library(
     'src/python/pants/help',
     'src/python/pants/logging',
     'src/python/pants/option',
+    'src/python/pants/pantsd/subsystem:pants_daemon_launcher',
     'src/python/pants/reporting',
     'src/python/pants/subsystem',
     'src/python/pants/task',
@@ -39,13 +42,12 @@ python_library(
 target(
   name = 'plugins',
   dependencies = [
-    'src/python/pants/backend/authentication',
     'src/python/pants/backend/codegen:plugin',
-    'src/python/pants/backend/core:plugin',
+    'src/python/pants/backend/docgen:plugin',
+    'src/python/pants/backend/graph_info:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info:plugin',
     'src/python/pants/backend/python:plugin',
-    'src/python/pants/core_tasks',
   ],
 )
 

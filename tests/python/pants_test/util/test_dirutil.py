@@ -17,8 +17,9 @@ import six
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir,
-                                relative_symlink, relativize_paths, rm_rf, safe_mkdir, touch)
+from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir, read_file,
+                                relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
+                                safe_file_dump, safe_mkdir, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -191,3 +192,43 @@ class DirutilTest(unittest.TestCase):
       mock_rmtree.side_effect = OSError(errno.ENOENT, os.strerror(errno.ENOENT))
       touch(file_name)
       rm_rf(file_name)
+
+  def test_readwrite_file(self):
+    with temporary_dir() as td:
+      test_filename = os.path.join(td, 'test.out')
+      test_content = '3333'
+      safe_file_dump(test_filename, test_content)
+      self.assertEqual(read_file(test_filename), test_content)
+
+  def test_safe_concurrent_creation(self):
+    with temporary_dir() as td:
+      expected_file = os.path.join(td, 'expected_file')
+      with safe_concurrent_creation(expected_file) as tmp_expected_file:
+        os.mkdir(tmp_expected_file)
+        self.assertTrue(os.path.exists(tmp_expected_file))
+        self.assertFalse(os.path.exists(expected_file))
+      self.assertTrue(os.path.exists(expected_file))
+
+  def test_safe_concurrent_creation_noop(self):
+    with temporary_dir() as td:
+      expected_file = os.path.join(td, 'parent_dir', 'expected_file')
+
+      # Ensure safe_concurrent_creation() doesn't bomb if we don't write the expected files.
+      with safe_concurrent_creation(expected_file):
+        pass
+
+      self.assertFalse(os.path.exists(expected_file))
+      self.assertTrue(os.path.exists(os.path.dirname(expected_file)))
+
+  def test_safe_concurrent_creation_exception_still_renames(self):
+    with temporary_dir() as td:
+      expected_file = os.path.join(td, 'expected_file')
+
+      with self.assertRaises(ZeroDivisionError):
+        with safe_concurrent_creation(expected_file) as safe_path:
+          os.mkdir(safe_path)
+          self.assertTrue(os.path.exists(safe_path))
+          raise ZeroDivisionError('zomg')
+
+      self.assertFalse(os.path.exists(safe_path))
+      self.assertTrue(os.path.exists(expected_file))

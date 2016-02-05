@@ -7,14 +7,55 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import os
+from abc import abstractproperty
 
-from pants.backend.core.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.engine.exp.addressable import Exactly, SubclassesOf, addressable, addressable_list
-from pants.engine.exp.configuration import Configuration
+from pants.engine.exp.struct import Struct, StructWithDeps
+from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 
 
-class Sources(Configuration):
-  """Represents a collection of source files."""
+class Variants(Struct):
+  """A struct that holds default variant values.
+
+  Variants are key-value pairs representing uniquely identifying parameters for a Node.
+
+  Default variants are usually configured on a Target to be used whenever they are
+  not specified by a caller.
+
+  They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
+  stored internally as sorted nested tuples of key-value strings.
+  """
+
+  @staticmethod
+  def merge(left, right):
+    """Merges right over left, ensuring that the return value is a tuple of tuples, or None."""
+    if not left:
+      if right:
+        return tuple(right)
+      else:
+        return None
+    if not right:
+      return tuple(left)
+    # Merge by key, and then return sorted by key.
+    merged = dict(left)
+    for key, value in right:
+      merged[key] = value
+    return tuple(sorted(merged.items(), key=lambda x: x[0]))
+
+  def __init__(self, default=None, **kwargs):
+    """
+    :param dict default: A dict of default variant values.
+    """
+    # TODO: enforce the type of variants using the Addressable framework.
+    super(Variants, self).__init__(default=default, **kwargs)
+
+
+class Sources(Struct):
+  """Represents a collection of source files.
+
+  Note that because this does not extend `StructWithDeps`, subclasses that would like to have
+  dependencies should mix-in StructWithDeps.
+  """
 
   def __init__(self,
                name=None,
@@ -38,7 +79,25 @@ class Sources(Configuration):
     """
     super(Sources, self).__init__(name=name, files=files, globs=globs, rglobs=rglobs, zglobs=zglobs,
                                   **kwargs)
+    if files and self.extensions:
+      for f in files:
+        if not self._accept_file(f):
+          # TODO: TargetDefinitionError or similar
+          raise ValueError('Path `{}` selected by {} is not a {} file.'.format(
+            f, self, self.extensions))
     self.excludes = excludes
+
+  def _accept_file(self, f):
+    """Returns true if the given file's extension matches this Sources type."""
+    _, ext = os.path.splitext(f)
+    return ext in self.extensions
+
+  @abstractproperty
+  def extensions(self):
+    """A collection of file extensions collected by this Sources instance.
+
+    An empty collection indicates that any extension will be accepted.
+    """
 
   @property
   def excludes(self):
@@ -47,7 +106,7 @@ class Sources(Configuration):
     :rtype: :class:`Sources`
     """
 
-  def iter_paths(self, base_path=None, ext=None):
+  def iter_paths(self, base_path=None):
     """Return an iterator over this collection of sources file paths.
 
     If these sources are addressable, the paths returned will have a base path of the address
@@ -55,8 +114,7 @@ class Sources(Configuration):
 
     :param string base_path: If this collection of sources is not addressed, the base path in the
                              repo the sources are relative to.
-    :param string ext: An optional file extension filter to restrict returned file paths with.
-    :returns: An iterator over the source paths that match the given file extension (if any) and are
+    :returns: An iterator over the source paths that match the file extension and are
               not excluded by `excludes`.  Paths are of the form
               `os.path.join(base_path, rel_path)`.
     :rtype: :class:`collections.Iterator` of string
@@ -64,9 +122,6 @@ class Sources(Configuration):
     base_path = self.address.spec_path if self.address else base_path
     if not base_path:
       raise ValueError('A `base_path` must be supplied to iterate paths for {!r}'.format(self))
-
-    def select(file_name):
-      return file_name.endswith(ext) if ext else True
 
     excluded_files = frozenset(self.excludes.iter_paths(base_path)) if self.excludes else ()
 
@@ -81,7 +136,7 @@ class Sources(Configuration):
           yield fileset
 
     for rel_path in itertools.chain.from_iterable(file_sources()):
-      if select(rel_path):
+      if self._accept_file(rel_path):
         file_path = os.path.join(base_path, rel_path)
         if file_path not in excluded_files:
           yield file_path
@@ -91,44 +146,26 @@ class Sources(Configuration):
 Sources.excludes = addressable(Exactly(Sources))(Sources.excludes)
 
 
-class Target(Configuration):
+class Target(Struct):
   """TODO(John Sirois): XXX DOCME"""
 
   class ConfigurationNotFound(Exception):
     """Indicates a requested configuration of a target could not be found."""
 
-  def __init__(self, name=None, sources=None, configurations=None, dependencies=None, **kwargs):
+  def __init__(self, name=None, configurations=None, **kwargs):
     """
     :param string name: The name of this target which forms its address in its namespace.
-    :param sources: The relative source file paths of sources this target owns.
-    :type sources: :class:`Sources`
     :param list configurations: The configurations that apply to this target in various contexts.
-    :param list dependencies: The direct dependencies of this target.
     """
     super(Target, self).__init__(name=name, **kwargs)
-    self.configurations = configurations
-    self.dependencies = dependencies
-    self.sources = sources
 
-  @addressable_list(SubclassesOf(Configuration))
+    self.configurations = configurations
+
+  @addressable_list(SubclassesOf(Struct))
   def configurations(self):
     """The configurations that apply to this target in various contexts.
 
-    :rtype list of :class:`pants.engine.exp.configuration.Configuration`
-    """
-
-  @addressable_list(SubclassesOf(Configuration))
-  def dependencies(self):
-    """The direct dependencies of this target.
-
-    :rtype: list
-    """
-
-  @addressable(Exactly(Sources))
-  def sources(self):
-    """Return the sources this target owns.
-
-    :rtype: :class:`Sources`
+    :rtype list of :class:`pants.engine.exp.configuration.Struct`
     """
 
   def select_configuration(self, name):
@@ -136,20 +173,31 @@ class Target(Configuration):
 
     :param string name: The name of the configuration to select.
     :returns: The configuration with the given name.
-    :rtype: :class:`pants.engine.exp.configuration.Configuration`
+    :rtype: :class:`pants.engine.exp.configuration.Struct`
     :raises: :class:`Target.ConfigurationNotFound` if the configuration was not found.
     """
     configs = tuple(config for config in self.configurations if config.name == name)
     if len(configs) != 1:
       configurations = ('{} -> {!r}'.format(repr(c.name) if c.name else '<anonymous>', c)
                         for c in configs)
-      raise self.ConfigurationNotFound('Failed to find a single configuration named {!r} these '
+      raise self.ConfigurationNotFound('Failed to find a single configuration named {!r} for these '
                                        'configurations in {!r}:\n\t{}'
                                        .format(name, self, '\n\t'.join(configurations)))
     return configs[0]
 
+  def select_configuration_type(self, tpe):
+    """Selects configurations of the given type on this target.
+
+    :param type tpe: The exact type of the configuration to select: subclasses will not match.
+    :returns: The configurations with the given type.
+    :rtype: :class:`pants.engine.exp.configuration.Configuration`
+    """
+    return tuple(config for config in self.configurations if type(config) == tpe)
+
   def walk_targets(self, postorder=True):
     """Performs a depth first walk of this target, visiting all reachable targets exactly once.
+
+    TODO: Walking a Target graph probably doesn't make sense; but walking an ExecutionGraph does.
 
     :param bool postorder: When ``True``, the traversal order is postorder (children before
                            parents), else it is preorder (parents before children).
@@ -161,10 +209,11 @@ class Target(Configuration):
         visited.add(target)
         if not postorder:
           yield target
-        for dep in self.dependencies:
-          if isinstance(dep, Target):
-            for t in walk(dep):
-              yield t
+        for configuration in self.configurations:
+          for dep in configuration.dependencies:
+            if isinstance(dep, Target):
+              for t in walk(dep):
+                yield t
         if postorder:
           yield target
 

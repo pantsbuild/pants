@@ -12,7 +12,5 @@ from pants.contrib.scrooge.tasks.thrift_linter import ThriftLinter
 
 
 def register_goals():
-  task(name='thrift-linter', action=ThriftLinter).install().with_description(
-      'Check thrift files for non-recommended usage patterns.')
-
+  task(name='thrift-linter', action=ThriftLinter).install()
   task(name='scrooge', action=ScroogeGen).install('gen')

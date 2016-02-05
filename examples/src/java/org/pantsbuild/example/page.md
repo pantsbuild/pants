@@ -167,7 +167,7 @@ have one. In the plugin, define a `Wiki` and register it:
     :::python
     import urllib
 
-    from pants.backend.core.targets.doc import Wiki
+    from pants.backend.docgen.targets.doc import Wiki
 
     def confluence_url_builder(page, config):
       title = config['title']
@@ -190,7 +190,7 @@ You need to install a goal to enable publishing a doc to confluence. To do this,
 plugin, install a goal that subclasses `ConfluencePublish`:
 
     :::python
-    from pants.backend.core.tasks.confluence_publish import ConfluencePublish
+    from pants.backend.docgen.tasks.confluence_publish import ConfluencePublish
 
     class ArchieConfluence(ConfluencePublish):
       def wiki(self):

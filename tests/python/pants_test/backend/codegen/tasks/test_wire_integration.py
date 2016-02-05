@@ -27,7 +27,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     expected_patterns = [
-      '/gen/wire/[^/]*/[^/]*/org/pantsbuild/example/temperature/Temperature.java',
+      '/gen/wire/[^/]*/[^/]*/[^/]*/org/pantsbuild/example/temperature/Temperature.java',
     ]
     expected_outputs = [
       'Compiling proto source file',
@@ -44,7 +44,9 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/wire/temperatureservice'])
     self.assert_success(pants_run)
-    out_path = os.path.join(get_buildroot(), 'dist', 'wire-temperature-example-bundle')
+    out_path = os.path.join(get_buildroot(), 'dist',
+                            ('examples.src.java.org.pantsbuild.example.wire.temperatureservice.'
+                            'temperatureservice-bundle'))
 
     args = ['java', '-cp', 'wire-temperature-example.jar',
             'org.pantsbuild.example.wire.temperatureservice.WireTemperatureExample']
@@ -59,7 +61,8 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                                 '--deployjar',
                                 'examples/src/java/org/pantsbuild/example/wire/element'])
     self.assert_success(pants_run)
-    out_path = os.path.join(get_buildroot(), 'dist', 'wire-element-example-bundle')
+    out_path = os.path.join(get_buildroot(), 'dist',
+                            'examples.src.java.org.pantsbuild.example.wire.element.element-bundle')
 
     java_run = subprocess.Popen(['java', '-cp', 'wire-element-example.jar',
                                  'org.pantsbuild.example.wire.element.WireElementExample'],

@@ -10,6 +10,10 @@ import shutil
 import tempfile
 import unittest
 
+from pathspec import PathSpec
+from pathspec.gitignore import GitIgnorePattern
+
+from pants.base.build_file import BuildFile
 from pants.util.dirutil import safe_mkdir, touch
 
 
@@ -23,8 +27,23 @@ class BuildFileTestBase(unittest.TestCase):
   def touch(self, path):
     touch(self.fullpath(path))
 
+  def _create_ignore_spec(self, build_ignore_patterns):
+    return PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
+
+  def scan_buildfiles(self, base_relpath, build_ignore_patterns=None):
+    return BuildFile.scan_build_files(self._project_tree, base_relpath,
+                                      build_ignore_patterns=self._create_ignore_spec(build_ignore_patterns))
+
+  def create_buildfile(self, relpath):
+    return BuildFile(self._project_tree, relpath)
+
+  def get_build_files_family(self, relpath, build_ignore_patterns=None):
+    return BuildFile.get_build_files_family(self._project_tree, relpath,
+                                            build_ignore_patterns=self._create_ignore_spec(build_ignore_patterns))
+
   def setUp(self):
     self.base_dir = tempfile.mkdtemp()
+    self._project_tree = None
 
     # Seed a BUILD outside the build root that should not be detected
     touch(os.path.join(self.base_dir, 'BUILD'))

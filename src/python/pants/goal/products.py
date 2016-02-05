@@ -67,6 +67,19 @@ class UnionProducts(object):
       products.update(self._products_by_target[target])
     return products
 
+  def get_product_target_mappings_for_targets(self, targets):
+    """Gets the product-target associations for the given targets, preserving the input order.
+
+    :param targets: The targets to lookup products for.
+    :returns: The ordered (product, target) tuples.
+    """
+    product_target_mappings = []
+    for target in targets:
+      for product in self._products_by_target[target]:
+        product_target_mappings.append((product, target))
+
+    return product_target_mappings
+
   def target_for_product(self, product):
     """Looks up the target key for a product.
 
@@ -286,7 +299,7 @@ class Products(object):
   def safe_create_data(self, typename, init_func):
     """Ensures that a data item is created if it doesn't already exist."""
     # Basically just an alias for readability.
-    self.get_data(typename, init_func)
+    return self.get_data(typename, init_func)
 
   def get_data(self, typename, init_func=None):
     """ Returns a data product.

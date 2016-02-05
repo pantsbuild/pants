@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from six import string_types
 
 from pants.base.revision import Revision
-from pants.java.util import execute_java
+from pants.java.util import execute_java, execute_java_async
 from pants.option.custom_types import dict_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
@@ -218,6 +218,9 @@ class Distribution(object):
   def execute_java(self, *args, **kwargs):
     return execute_java(*args, distribution=self, **kwargs)
 
+  def execute_java_async(self, *args, **kwargs):
+    return execute_java_async(*args, distribution=self, **kwargs)
+
   def _get_version(self, java):
     if not self._version:
       self._version = self._parse_java_version('java.version',
@@ -319,6 +322,8 @@ class DistributionLocator(Subsystem):
                   'everything else (before the JDK_HOME, JAVA_HOME, PATH environment variables) '
                   'when locating a jvm to use. The same OS can be specified via several different '
                   'aliases, according to this map: {}'.format(human_readable_os_aliases))
+    register('--minimum-version', advanced=True, help='Minimum version of the JVM pants will use')
+    register('--maximum-version', advanced=True, help='Maximum version of the JVM pants will use')
 
   @memoized_property
   def _normalized_jdk_paths(self):
@@ -365,36 +370,66 @@ class DistributionLocator(Subsystem):
       yield cls._Location.from_home(location)
 
   @classmethod
+  def _scan_constraint_match(cls, minimum_version, maximum_version, jdk):
+    """Finds a cached version matching the specified constraints
+
+    :param Revision minimum_version: minimum jvm version to look for (eg, 1.7).
+    :param Revision maximum_version: maximum jvm version to look for (eg, 1.7.9999).
+    :param bool jdk: whether the found java distribution is required to have a jdk.
+    :return: the Distribution, or None if no matching distribution is in the cache.
+    :rtype: :class:`pants.java.distribution.Distribution`
+    """
+
+    for dist in cls._CACHE.values():
+      if minimum_version and dist.version < minimum_version:
+        continue
+      if maximum_version and dist.version > maximum_version:
+        continue
+      if jdk and not dist.jdk:
+        continue
+      return dist
+
+  @classmethod
   def cached(cls, minimum_version=None, maximum_version=None, jdk=False):
     """Finds a java distribution that meets the given constraints and returns it.
 
     First looks for a cached version that was previously located, otherwise calls locate().
     :param minimum_version: minimum jvm version to look for (eg, 1.7).
+                            The stricter of this and get_options().minimum_version is used.
     :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
+                            The stricter of this and get_options().maximum_version is used.
     :param bool jdk: whether the found java distribution is required to have a jdk.
     :return: the Distribution.
     :rtype: :class:`pants.java.distribution.Distribution`
     """
-    def scan_constraint_match():
-      # Convert strings to Revision objects for apples-to-apples comparison.
-      max_version = Distribution._parse_java_version("maximum_version", maximum_version)
-      min_version = Distribution._parse_java_version("minimum_version", minimum_version)
 
-      for dist in cls._CACHE.values():
-        if min_version and dist.version < min_version:
-          continue
-        if max_version and dist.version > max_version:
-          continue
-        if jdk and not dist.jdk:
-          continue
-        return dist
+    def _get_stricter_version(a, b, name, stricter):
+      version_a = Distribution._parse_java_version(name, a)
+      version_b = Distribution._parse_java_version(name, b)
+      if version_a is None:
+        return version_b
+      if version_b is None:
+        return version_a
+      return stricter(version_a, version_b)
+
+    # take the tighter constraint of method args and subsystem options
+    minimum_version = _get_stricter_version(minimum_version,
+                                            cls.global_instance().get_options().minimum_version,
+                                            "minimum_version",
+                                            max)
+    maximum_version = _get_stricter_version(maximum_version,
+                                            cls.global_instance().get_options().maximum_version,
+                                            "maximum_version",
+                                            min)
 
     key = (minimum_version, maximum_version, jdk)
     dist = cls._CACHE.get(key)
     if not dist:
-      dist = scan_constraint_match()
+      dist = cls._scan_constraint_match(minimum_version, maximum_version, jdk)
       if not dist:
-        dist = cls.locate(minimum_version=minimum_version, maximum_version=maximum_version, jdk=jdk)
+        dist = cls.locate(minimum_version=minimum_version,
+                          maximum_version=maximum_version,
+                          jdk=jdk)
       cls._CACHE[key] = dist
     return dist
 
@@ -402,9 +437,15 @@ class DistributionLocator(Subsystem):
   def locate(cls, minimum_version=None, maximum_version=None, jdk=False):
     """Finds a java distribution that meets any given constraints and returns it.
 
-    First looks through the paths listed for this operating system in the --jvm-distributions-paths
-    map. Then looks in JDK_HOME and JAVA_HOME if defined, falling back to a search on the PATH.
-    Raises Distribution.Error if no suitable java distribution could be found.
+    Distributions are searched for in the following order:
+     * Paths listed for this operating system in the
+    --jvm-distributions-paths map
+     * JDK_HOME/JAVA_HOME
+     * PATH
+     * Likely locations on the file system such as /usr/lib/jvm
+
+    :raises: Distribution.Error if no suitable java distribution could
+    be found.
     :param minimum_version: minimum jvm version to look for (eg, 1.7).
     :param maximum_version: maximum jvm version to look for (eg, 1.7.9999).
     :param bool jdk: whether the found java distribution is required to have a jdk.
@@ -433,8 +474,12 @@ class DistributionLocator(Subsystem):
 
         pass
 
-    raise cls.Error('Failed to locate a {} distribution with minimum_version {}, maximum_version {}'
-                    .format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
+
+    if minimum_version is not None and maximum_version is not None and maximum_version < minimum_version:
+      error_format = 'Pants configuration/options led to impossible constraints for {} distribution: minimum_version {}, maximum_version {}'
+    else:
+      error_format = 'Failed to locate a {} distribution with minimum_version {}, maximum_version {}'
+    raise cls.Error(error_format.format('JDK' if jdk else 'JRE', minimum_version, maximum_version))
 
   @classmethod
   def _linux_java_homes(cls):
@@ -484,13 +529,13 @@ class DistributionLocator(Subsystem):
     yield env_home('JDK_HOME')
     yield env_home('JAVA_HOME')
 
+    search_path = os.environ.get('PATH')
+    if search_path:
+      for bin_path in search_path.strip().split(os.pathsep):
+        yield cls._Location.from_bin(bin_path)
+
     for location in cls._linux_java_homes():
       yield location
 
     for location in cls._osx_java_homes():
       yield location
-
-    search_path = os.environ.get('PATH')
-    if search_path:
-      for bin_path in search_path.strip().split(os.pathsep):
-        yield cls._Location.from_bin(bin_path)

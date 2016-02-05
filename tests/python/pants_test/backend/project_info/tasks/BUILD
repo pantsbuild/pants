@@ -2,17 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'all',
-  dependencies = [
-    ':dependencies',
-    ':depmap',
-    ':export',
-    ':filedeps',
-    ':ide_gen',
-  ],
-)
-
-python_library(
   name = 'resolve_jars_test_mixin',
   sources = ['resolve_jars_test_mixin.py'],
   dependencies = [
@@ -24,7 +13,6 @@ python_tests(
   name = 'dependencies',
   sources = ['test_dependencies.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/project_info/tasks:dependencies',
@@ -40,10 +28,10 @@ python_tests(
   sources = ['test_depmap.py'],
   coverage = ['pants.backend.project_info.tasks.depmap'],
   dependencies = [
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:depmap',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -55,6 +43,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -64,14 +53,13 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )
 
 python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
@@ -84,6 +72,7 @@ python_tests(
     'src/python/pants/build_graph',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test/backend/python/tasks:interpreter_cache_test_mixin',
   ]
 )
 
@@ -99,7 +88,8 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -107,10 +97,10 @@ python_tests(
   sources = ['test_filedeps.py'],
   dependencies = [
     'src/python/pants/backend/codegen:plugin',
-    'src/python/pants/backend/core:plugin',
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/project_info/tasks:filedeps',
+    'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )
@@ -135,4 +125,5 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
+  tags = {'integration'},
 )

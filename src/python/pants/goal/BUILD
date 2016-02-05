@@ -57,6 +57,7 @@ python_library(
   sources = ['goal.py'],
   dependencies = [
     ':error',
+    'src/python/pants/base:deprecated',
   ],
 )
 

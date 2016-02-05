@@ -10,9 +10,6 @@ from textwrap import dedent
 from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
-from pants.backend.core.from_target import FromTarget
-from pants.backend.core.targets.resources import Resources
-from pants.backend.core.wrapped_globs import Globs, RGlobs
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -20,8 +17,11 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.from_target import FromTarget
+from pants.build_graph.resources import Resources
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.workspace import Workspace
+from pants.source.wrapped_globs import Globs, RGlobs
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -30,6 +30,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
   @property
   def alias_groups(self):
     return BuildFileAliases(
+      # TODO: Use dummy target types here, instead of depending on other backends.
       targets={
         'java_library': JavaLibrary,
         'python_library': PythonLibrary,
@@ -41,8 +42,8 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
         'python_thrift_library': PythonThriftLibrary,
       },
       context_aware_object_factories={
-        'globs': Globs.factory,
-        'rglobs': RGlobs.factory,
+        'globs': Globs,
+        'rglobs': RGlobs,
         'from_target': FromTarget,
       },
       objects={
@@ -56,7 +57,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
     return WhatChanged
 
   def assert_console_output(self, *output, **kwargs):
-    options = {'spec_excludes': [], 'exclude_target_regexp': []}
+    options = {'exclude_target_regexp': []}
     if 'options' in kwargs:
       options.update(kwargs['options'])
     kwargs['options'] = options
@@ -93,11 +94,8 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
       workspace=self.workspace(files=['a/b/c', 'd', 'e/f'])
     )
 
-
-class WhatChangedTest(BaseWhatChangedTest):
-
   def setUp(self):
-    super(WhatChangedTest, self).setUp()
+    super(WhatChangedTestBasic, self).setUp()
 
     self.add_to_build_file('root/src/py/a', dedent("""
       python_library(
@@ -204,13 +202,8 @@ class WhatChangedTest(BaseWhatChangedTest):
       )
     """))
 
-  def test_spec_excludes(self):
-    self.assert_console_output(
-      'root/src/py/a:alpha',
-      options={'spec_excludes': 'root/src/py/1'},
-      workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
-    )
 
+class WhatChangedTest(WhatChangedTestBasic):
   def test_owned(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
@@ -380,6 +373,18 @@ class WhatChangedTest(BaseWhatChangedTest):
 
   def test_root_config(self):
     self.assert_console_output(
-      ':pants-config',
+      '//:pants-config',
       workspace=self.workspace(files=['pants.ini'])
+    )
+
+
+class WhatChangedTestWithIgnorePatterns(WhatChangedTestBasic):
+  @property
+  def build_ignore_patterns(self):
+    return ['root/src/py/1']
+
+  def test_build_ignore_patterns(self):
+    self.assert_console_output(
+      'root/src/py/a:alpha',
+      workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'])
     )

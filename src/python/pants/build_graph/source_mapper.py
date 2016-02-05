@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
-from pants.base.build_environment import get_buildroot
-from pants.base.payload_field import DeferredSourcesField
+from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.source.payload_fields import DeferredSourcesField
 
 
 class SourceMapper(object):
@@ -41,37 +41,36 @@ class SpecSourceMapper(SourceMapper):
   def target_addresses_for_source(self, source):
     result = []
 
-    root = get_buildroot()
     path = source
 
     # a top-level source has empty dirname, so do/while instead of straight while loop.
     while path:
       path = os.path.dirname(path)
-      candidate = self._address_mapper.from_cache(root_dir=root, relpath=path, must_exist=False)
-      if candidate.file_exists():
-        result.extend(list(self._find_targets_for_source(source, candidate.family())))
+      try:
+        result.extend(self._find_targets_for_source(source, path))
+      except AddressLookupError:
+        pass
       if self._stop_after_match and len(result) > 0:
         break
 
     return result
 
-  def _find_targets_for_source(self, source, build_files):
-    for build_file in build_files:
-      for address in self._address_mapper.addresses_in_spec_path(build_file.spec_path):
-        self._build_graph.inject_address_closure(address)
-        target = self._build_graph.get_target(address)
-        sources = target.payload.get_field('sources')
-        if sources and not isinstance(sources, DeferredSourcesField) and sources.matches(source):
-          yield address
-        if address.build_file.relpath == source:
-          yield address
-        if target.has_resources:
-          for resource in target.resources:
-            """
-            :type resource: pants.backend.core.targets.resources.Resources
-            """
-            if resource.payload.sources.matches(source):
-              yield address
+  def _find_targets_for_source(self, source, spec_path):
+    for address in self._address_mapper.addresses_in_spec_path(spec_path):
+      self._build_graph.inject_address_closure(address)
+      target = self._build_graph.get_target(address)
+      sources = target.payload.get_field('sources')
+      if sources and not isinstance(sources, DeferredSourcesField) and sources.matches(source):
+        yield address
+      if address.build_file.relpath == source:
+        yield address
+      if target.has_resources:
+        for resource in target.resources:
+          """
+          :type resource: pants.build_graph.resources.Resources
+          """
+          if resource.payload.sources.matches(source):
+            yield address
 
 
 class LazySourceMapper(SourceMapper):
@@ -120,7 +119,6 @@ class LazySourceMapper(SourceMapper):
       return
     self._searched_sources.add(source)
 
-    root = get_buildroot()
     path = os.path.dirname(source)
 
     # a top-level source has empty dirname, so do/while instead of straight while loop.
@@ -128,9 +126,10 @@ class LazySourceMapper(SourceMapper):
     while walking:
       # It is possible
       if path not in self._mapped_paths:
-        candidate = self._address_mapper.from_cache(root_dir=root, relpath=path, must_exist=False)
-        if candidate.file_exists():
-          self._map_sources_from_family(candidate.family())
+        try:
+          self._map_sources_from_spec_path(path)
+        except AddressLookupError:
+          pass
         self._mapped_paths.add(path)
       elif not self._stop_after_match:
         # If not in stop-after-match mode, once a path is seen visited, all parents can be assumed.
@@ -143,24 +142,23 @@ class LazySourceMapper(SourceMapper):
       walking = bool(path)
       path = os.path.dirname(path)
 
-  def _map_sources_from_family(self, build_files):
+  def _map_sources_from_spec_path(self, spec_path):
     """Populate mapping of source to owning addresses with targets from given BUILD files.
 
-    :param iterable<BuildFile> build_files: a family of BUILD files from which to map sources.
+    :param spec_path: a spec_path of targets from which to map sources.
     """
-    for build_file in build_files:
-      for address in self._address_mapper.addresses_in_spec_path(build_file.spec_path):
-        self._build_graph.inject_address_closure(address)
-        target = self._build_graph.get_target(address)
-        if target.has_resources:
-          for resource in target.resources:
-            for item in resource.sources_relative_to_buildroot():
-              self._source_to_address[item].add(target.address)
+    for address in self._address_mapper.addresses_in_spec_path(spec_path):
+      self._build_graph.inject_address_closure(address)
+      target = self._build_graph.get_target(address)
+      if target.has_resources:
+        for resource in target.resources:
+          for item in resource.sources_relative_to_buildroot():
+            self._source_to_address[item].add(target.address)
 
-        for target_source in target.sources_relative_to_buildroot():
-          self._source_to_address[target_source].add(target.address)
-        if not target.is_synthetic:
-          self._source_to_address[target.address.build_file.relpath].add(target.address)
+      for target_source in target.sources_relative_to_buildroot():
+        self._source_to_address[target_source].add(target.address)
+      if not target.is_synthetic:
+        self._source_to_address[target.address.build_file.relpath].add(target.address)
 
   def target_addresses_for_source(self, source):
     """Attempt to find targets which own a source by searching up directory structure to buildroot.

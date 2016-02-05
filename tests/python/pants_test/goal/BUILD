@@ -1,14 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'goal',
-  dependencies = [
-    ':artifact_cache_stats',
-    ':other',
-  ]
-)
-
 python_tests(
   name='artifact_cache_stats',
   sources= ['test_artifact_cache_stats.py'],
@@ -36,5 +28,16 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test:base_test',
+  ]
+)
+
+python_tests(
+  name='run_tracker_integration',
+  sources=[
+    'test_run_tracker_integration.py'
+  ],
+  dependencies=[
+    'src/python/pants/goal:run_tracker',
+    'tests/python/pants_test:int-test',
   ]
 )

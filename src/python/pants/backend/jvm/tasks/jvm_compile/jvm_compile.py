@@ -10,9 +10,8 @@ import hashlib
 import itertools
 import os
 from collections import defaultdict
+from multiprocessing import cpu_count
 
-from pants.backend.core.targets.resources import Resources
-from pants.backend.core.tasks.group_task import GroupMember
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -27,6 +26,7 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.goal.products import MultipleRootedProducts
 from pants.option.custom_types import list_option
@@ -68,7 +68,7 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
             super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__eq__(other))
 
 
-class JvmCompile(NailgunTaskBase, GroupMember):
+class JvmCompile(NailgunTaskBase):
   """A common framework for JVM compilation.
 
   To subclass for a specific JVM language, implement the static values and methods
@@ -129,9 +129,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--delete-scratch', advanced=True, default=True, action='store_true',
              help='Leave intermediate scratch files around, for debugging build problems.')
 
-    register('--worker-count', advanced=True, type=int, default=1,
+    register('--worker-count', advanced=True, type=int, default=cpu_count(),
              help='The number of concurrent workers to use when '
-                  'compiling with {task}.'.format(task=cls._name))
+                  'compiling with {task}. Defaults to the '
+                  'current machine\'s CPU count.'.format(task=cls._name))
 
     register('--size-estimator', advanced=True,
              choices=list(cls.size_estimators.keys()), default='filesize',
@@ -140,11 +141,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     register('--capture-log', advanced=True, action='store_true', default=False,
              fingerprint=True,
              help='Capture compilation output to per-target logs.')
-
-  @classmethod
-  def product_types(cls):
-    raise TaskError('Expected to be installed in GroupTask, which has its own '
-                    'product_types implementation.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -166,12 +162,11 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   # Subclasses must implement.
   # --------------------------
   _name = None
-  _file_suffix = None
   _supports_concurrent_execution = None
 
   @classmethod
-  def task_subsystems(cls):
-    return super(JvmCompile, cls).task_subsystems() + (Java, JvmPlatform, ScalaPlatform)
+  def subsystem_dependencies(cls):
+    return super(JvmCompile, cls).subsystem_dependencies() + (Java, JvmPlatform, ScalaPlatform)
 
   @classmethod
   def name(cls):
@@ -208,11 +203,10 @@ class JvmCompile(NailgunTaskBase, GroupMember):
     return True
 
   def select(self, target):
-    return target.has_sources(self._file_suffix)
+    raise NotImplementedError()
 
   def select_source(self, source_file_path):
-    """Source predicate for this task."""
-    return source_file_path.endswith(self._file_suffix)
+    raise NotImplementedError()
 
   def create_analysis_tools(self):
     """Returns an AnalysisTools implementation.
@@ -309,27 +303,6 @@ class JvmCompile(NailgunTaskBase, GroupMember):
   def _fingerprint_strategy(self, classpath_products):
     return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
 
-  def pre_execute(self):
-    # In case we have no relevant targets and return early create the requested product maps.
-    self._create_empty_products()
-
-  def prepare_execute(self, chunks):
-    relevant_targets = list(itertools.chain(*chunks))
-
-    # Clone the compile_classpath to the runtime_classpath.
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
-
-    # This ensures the workunit for the worker pool is set
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
-            as workunit:
-      # This uses workunit.parent as the WorkerPool's parent so that child workunits
-      # of different pools will show up in order in the html output. This way the current running
-      # workunit is on the bottom of the page rather than possibly in the middle.
-      self._worker_pool = WorkerPool(workunit.parent,
-                                     self.context.run_tracker,
-                                     self._worker_count)
-
   def _compile_context(self, target, target_workdir):
     analysis_file = JvmCompile._analysis_for_target(target_workdir, target)
     portable_analysis_file = JvmCompile._portable_analysis_for_target(target_workdir, target)
@@ -346,9 +319,30 @@ class JvmCompile(NailgunTaskBase, GroupMember):
                           self._compute_sources_for_target(target),
                           strict_deps)
 
-  def execute_chunk(self, relevant_targets):
+  def execute(self):
+    # In case we have no relevant targets and return early create the requested product maps.
+    self._create_empty_products()
+
+    relevant_targets = list(self.context.targets(predicate=self.select))
+
     if not relevant_targets:
       return
+
+    # Clone the compile_classpath to the runtime_classpath.
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+
+    # This ensures the workunit for the worker pool is set
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
+            as workunit:
+      # This uses workunit.parent as the WorkerPool's parent so that child workunits
+      # of different pools will show up in order in the html output. This way the current running
+      # workunit is on the bottom of the page rather than possibly in the middle.
+      self._worker_pool = WorkerPool(workunit.parent,
+                                     self.context.run_tracker,
+                                     self._worker_count)
+
+
 
     classpath_product = self.context.products.get_data('runtime_classpath')
     fingerprint_strategy = self._fingerprint_strategy(classpath_product)

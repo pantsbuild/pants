@@ -1,4 +1,4 @@
-Created by running `./build-support/bin/contributors.sh`.
+Created by running `build-support/bin/contributors.sh`.
 
 + Alan Paulin
 + Alexander Johnson
@@ -10,6 +10,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Brian Larson
 + Brian Wickman
 + Chris Aniszczyk
++ Chris Burroughs
 + Chris Chen
 + Chris Pesto
 + Cody Gibb
@@ -17,11 +18,13 @@ Created by running `./build-support/bin/contributors.sh`.
 + Dan Davydov
 + Dan Harrison
 + Daniel Anderson
++ Daniel Bentley
 + David Taylor
 + David Turner
 + Divij Rajkumar
 + Dominic Hamon
 + Dumitru Daniliuc
++ Emily Caveness
 + Eric Ayers
 + Eric Danielson
 + Eric Lindvall
@@ -80,6 +83,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Michael Doherty
 + Mike Lindsey
 + Misho Krastev
++ Moses Nakamura
 + Neil Sanchala
 + Nick Howard
 + Nik Shkrob
@@ -108,4 +112,5 @@ Created by running `./build-support/bin/contributors.sh`.
 + Tom Howland
 + Travis Crawford
 + Ugo Di Girolamo
++ Wei An
 + Yi Cheng

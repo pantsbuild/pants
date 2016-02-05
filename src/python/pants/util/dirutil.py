@@ -14,6 +14,7 @@ import tempfile
 import threading
 import uuid
 from collections import defaultdict
+from contextlib import contextmanager
 
 from pants.util.strutil import ensure_text
 
@@ -60,10 +61,25 @@ def safe_mkdir_for(path):
   safe_mkdir(os.path.dirname(path), clean=False)
 
 
-def safe_file_dump(path, content):
-  safe_mkdir_for(path)
-  with open(path, 'w') as outfile:
-    outfile.write(content)
+def safe_file_dump(filename, payload):
+  """Write a string to a file.
+
+  :param string filename: The filename of the file to write to.
+  :param string payload: The string to write to the file.
+  """
+  with safe_open(filename, 'wb') as f:
+    f.write(payload)
+
+
+def read_file(filename):
+  """Read and return the contents of a file in a single file.read().
+
+  :param string filename: The filename of the file to read.
+  :returns: The contents of the file.
+  :rtype: string
+  """
+  with open(filename, 'rb') as f:
+    return f.read()
 
 
 def safe_walk(path, **kwargs):
@@ -132,7 +148,7 @@ def safe_rmtree(directory):
 
 def safe_open(filename, *args, **kwargs):
   """Open a file safely, ensuring that its directory exists."""
-  safe_mkdir(os.path.dirname(filename))
+  safe_mkdir_for(filename)
   return open(filename, *args, **kwargs)
 
 
@@ -163,20 +179,23 @@ def safe_concurrent_rename(src, dst):
       raise
 
 
-def safe_concurrent_create(func, path):
-  """Safely execute code that creates a file at a well-known path.
+@contextmanager
+def safe_concurrent_creation(target_path):
+  """A contextmanager that yields a temporary path and renames it to a final target path when the
+  contextmanager exits.
 
   Useful when concurrent processes may attempt to create a file, and it doesn't matter who wins.
 
-  :param func: A callable that takes a single path argument and creates a file at that path.
-  :param path: The path to execute the callable on.
-  :return: func(path)'s return value.
+  :param target_path: The final target path to rename the temporary path to.
+  :yields: A temporary path containing the original path with a unique (uuid4) suffix.
   """
-  safe_mkdir_for(path)
-  tmp_path = '{0}.tmp.{1}'.format(path, uuid.uuid4().hex)
-  ret = func(tmp_path)
-  safe_concurrent_rename(tmp_path, path)
-  return ret
+  safe_mkdir_for(target_path)
+  tmp_path = '{}.tmp.{}'.format(target_path, uuid.uuid4().hex)
+  try:
+    yield tmp_path
+  finally:
+    if os.path.exists(tmp_path):
+      safe_concurrent_rename(tmp_path, target_path)
 
 
 def chmod_plus_x(path):

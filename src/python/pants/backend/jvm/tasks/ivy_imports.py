@@ -15,7 +15,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 class IvyImports(IvyTaskMixin, NailgunTask):
   """Resolves all jar files for the import_jar_libraries property on all `ImportJarsMixin` targets.
 
-  One use case is for  JavaProtobufLibrary, which includes imports for jars containing .proto files.
+  One use case is for JavaProtobufLibrary, which includes imports for jars containing .proto files.
   """
 
   # TODO https://github.com/pantsbuild/pants/issues/604 product_types start

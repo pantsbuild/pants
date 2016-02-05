@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 class AaptGen(AaptTask):
-  """
-  Handle the processing of resources for Android targets with the Android Asset Packaging Tool
-  (aapt). The aapt tool supports 6 major commands: [dump, list, add, remove, crunch, package]
+  """Process resources for Android targets with the Android Asset Packaging Tool (aapt).
+
+  The aapt tool supports 6 major commands: [dump, list, add, remove, crunch, package]
   For right now, pants supports 'package'.
 
   Commands and flags for aapt can be seen here:

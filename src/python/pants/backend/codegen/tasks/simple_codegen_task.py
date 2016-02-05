@@ -157,25 +157,33 @@ class SimpleCodegenTask(Task):
           # And inject a synthetic target to represent it.
           self._inject_synthetic_target(vt.target, vt.results_dir)
 
+  @property
+  def _copy_target_attributes(self):
+    """Return a list of attributes to be copied from the target to derived synthetic targets."""
+    return []
+
+  def synthetic_target_dir(self, target, target_workdir):
+    return target_workdir
+
   def _inject_synthetic_target(self, target, target_workdir):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
     :param target: The target to inject a synthetic target for.
     :param target_workdir: The work directory containing the generated code for the target.
     """
+    copied_attributes = {}
+    for attribute in self._copy_target_attributes:
+      copied_attributes[attribute] = getattr(target, attribute)
+
+    target_workdir = self.synthetic_target_dir(target, target_workdir)
+
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, target_workdir),
       target_type=self.synthetic_target_type(target),
       dependencies=self.synthetic_target_extra_dependencies(target, target_workdir),
       sources=list(self.find_sources(target, target_workdir)),
       derived_from=target,
-
-      # TODO(John Sirois): This assumes - currently, a JvmTarget or PythonTarget which both
-      # happen to have this attribute for carrying publish metadata but share no interface
-      # that defines this canonical property.  Lift up an interface and check for it or else
-      # add a way for SimpleCodeGen subclasses to specify extra attribute names that should be
-      # copied over from the target to its derived target.
-      provides=target.provides,
+      **copied_attributes
     )
 
     build_graph = self.context.build_graph

@@ -53,13 +53,20 @@ passed through to some tool that Pants invoke in turn. These are specified last 
 line after a double-hyphen like `-- foo bar` and are passed to the last goal specified. E.g., to
 pass `-k list` to `pytest` (to say "only run tests whose names contain `list`") you could invoke:
 
-    ./pants test.pytest tests/python/pants_test/tasks -- -k list
+    :::bash
+    $ ./pants test.pytest tests/python/pants_test/tasks -- -k list
 
 You could use `test` instead of `test.pytest` above; Pants then applies the
 passthrough args to tools called by all of `test`, not just `test.pytest`.
 This gets tricky. We happen to know we can pass `-k list` here, that `pytest` accepts passthrough
 args, and that this `test` invocation upon `tests/python/...` won't invoke any other tools
 (assuming nobody hid a `junit` test in the `python` directory).
+
+Append arguments that append to a list can be specified more than one time.  When specifying more
+than one test to run at a time, you could run:
+
+    :::bash
+    $ ./pants test.junit --test="com.twitter.MyMainTest" --test="com.twitter.MySideTest" ./beans::
 
 Setting Options Other Ways
 --------------------------

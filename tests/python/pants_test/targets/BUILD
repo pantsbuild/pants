@@ -8,33 +8,14 @@ python_library(
   ],
 )
 
-target(
-  name = 'targets',
-  dependencies = [
-    ':java_agent',
-    ':python_binary',
-    ':python_target',
-    ':scala_library',
-    ':sort_targets',
-    ':wiki_page'
-  ]
-)
-
-target(
-  name = 'integration',
-  dependencies = [
-    ':scala_library_integration',
-    ':unknown_arguments_integration',
-  ],
-)
-
 python_tests(
   name = 'unknown_arguments_integration',
   sources = ['test_unknown_arguments_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -42,7 +23,6 @@ python_tests(
   sources = ['test_sort_targets.py'],
   dependencies = [
     ':base',
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/build_graph',
   ]
 )
@@ -63,7 +43,8 @@ python_tests(
   sources = ['test_jvm_app_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
@@ -93,29 +74,20 @@ python_tests(
   sources = ['test_scala_library_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',
-  ]
+  ],
+  tags = {'integration'},
 )
 
 python_tests(
   name = 'python_target',
   sources = ['test_python_target.py'],
   dependencies = [
-    'src/python/pants/backend/core/targets:common',
     'src/python/pants/backend/jvm:artifact',
     'src/python/pants/backend/jvm:repository',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'tests/python/pants_test:base_test'
-  ]
-)
-
-python_tests(
-  name = 'wiki_page',
-  sources = ['test_wiki_page.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.confluence',
-    'src/python/pants/backend/core/targets:common',
-    'tests/python/pants_test:base_test',
   ]
 )

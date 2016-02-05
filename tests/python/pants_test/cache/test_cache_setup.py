@@ -55,6 +55,7 @@ class TestCacheSetup(BaseTest):
   REMOTE_URI_1 = 'http://host1'
   REMOTE_URI_2 = 'https://host2:666'
   REMOTE_URI_3 = 'http://host3'
+  EMPTY_URI = 'http://localhost:9999'
 
   CACHE_SPEC_LOCAL_ONLY = CacheSpec(local=LOCAL_URI, remote=None)
   CACHE_SPEC_REMOTE_ONLY = CacheSpec(local=None, remote=REMOTE_URI_1)
@@ -72,6 +73,9 @@ class TestCacheSetup(BaseTest):
     options = Mock()
     options.pinger_timeout = .5
     options.pinger_tries = 2
+    options.read_from = [self.EMPTY_URI]
+    options.write_to = [self.EMPTY_URI]
+    options.compression_level = 1
     self.cache_factory = CacheFactory(options=options, log=MockLogger(),
                                  stable_name='test', resolver=self.resolver)
 
@@ -136,14 +140,6 @@ class TestCacheSetup(BaseTest):
     self.assertEquals(self.CACHE_SPEC_LOCAL_RESOLVE,
                       self.cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
-  def test_select_best_url(self):
-    cache_factory = CacheFactory(options={}, log=self.log, stable_name='test',
-                                 pinger=self.pinger, resolver=self.resolver)
-    spec = '{0}|{1}/path/to|{2}/path/'.format(self.REMOTE_URI_1, self.REMOTE_URI_2,
-                                              self.REMOTE_URI_3)
-    best = cache_factory.select_best_url(spec)
-    self.assertEquals('{0}/path/to'.format(self.REMOTE_URI_2), best)
-
   def test_cache_spec_parsing(self):
     def mk_cache(spec, resolver=None):
       Subsystem.reset()
@@ -182,3 +178,9 @@ class TestCacheSetup(BaseTest):
 
       with self.assertRaises(TooManyCacheSpecsError):
         mk_cache([tmpdir, self.REMOTE_URI_1, self.REMOTE_URI_2])
+
+  def test_read_cache_available(self):
+    self.assertEquals(None, self.cache_factory.read_cache_available())
+
+  def test_write_cache_available(self):
+    self.assertEquals(None, self.cache_factory.write_cache_available())

@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 
 /**
  * Annotate that a test class can be run in parallel. See usage note in
- * {@link org.pantsbuild.tools.junit.impl.ConsoleRunnerImpl}. The {@link TestSerial} annotation
+ * {@code org.pantsbuild.tools.junit.impl.ConsoleRunnerImpl}. The {@link TestSerial} annotation
  * takes precedence over this annotation if a class has both (including via inheritance).
  */
 @Retention(RetentionPolicy.RUNTIME)
