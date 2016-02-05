@@ -386,5 +386,5 @@ class WhatChangedTestWithIgnorePatterns(WhatChangedTestBasic):
   def test_build_ignore_patterns(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
-      workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d'])
+      workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'])
     )
