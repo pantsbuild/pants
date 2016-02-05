@@ -13,8 +13,8 @@ from textwrap import dedent
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.examples.planners import setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, SelectNode, TaskNode, Throw
+from pants.engine.exp.examples.planners import setup_json_scheduler, ExampleTable
+from pants.engine.exp.scheduler import BuildRequest, Return, SelectNode, TaskNode, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
@@ -85,6 +85,43 @@ def visualize_execution_graph(scheduler):
       binary_util.ui_open(image_file)
 
 
+def validate_root(product_graph, root):
+  """Walks below the given root and collects cases where additional literal products could be used.
+  
+  In particular, looks (recursively) for cases where:
+    1) at least one literal subject existed.
+    2) some literal/named products were missing.
+
+  TODO: Implement simpler case first?: look for Tasks which given literal subjects
+  could have succeeded.
+  TODO: propagate SymbolTable more cleanly.
+  """
+  literal_types = set(ExampleTable.table().values())
+  missing = dict()
+  for ((node, state), dependencies) in product_graph.walk([root], predicate=lambda _: True):
+    # Look for failed TaskNodes with at least one satisfied Select dependency.
+    if type(node) != TaskNode:
+      continue
+    if type(state) != Throw:
+      continue
+    select_deps = {dep: state for dep, state in dependencies if type(dep) == SelectNode}
+    if not select_deps:
+      continue
+    if not any(type(state) == Return for state in select_deps.values()):
+      # No successful deps.
+      continue
+
+    # TODO: need to look recursively for a satisfied literal dep: currently too noisy, because
+    # we have some deps that are "implicitly" satisfied.
+
+    # If one product was satisfied, but all unattainable products were literal...
+    failed_products = {dep.product for dep, state in select_deps.items() if type(state) == Throw}
+    if all(product in literal_types for product in failed_products):
+      print('>>> all missing dependencies of {} were literal!:\n  {}'.format(node.func.__name__, list(p.__name__ for p in failed_products)))
+    else:
+      print('>>> some missing dependencies of {} were not literal.:\n  {}'.format(node, list(p.__name__ for p in failed_products)))
+
+
 def validate_graph(scheduler):
   # Locate candidate Nodes: those with an Address Subject which failed.
   candidate_roots = set()
@@ -96,8 +133,10 @@ def validate_graph(scheduler):
     if not type(state) == Throw:
       continue
     # Found a candidate root.
-    print('>>> candidate: {}'.format(node))
     candidate_roots.add(node)
+
+  for candidate in candidate_roots:
+    validate_root(scheduler.product_graph, candidate)
 
 
 def visualize_build_request(build_root, build_request):
