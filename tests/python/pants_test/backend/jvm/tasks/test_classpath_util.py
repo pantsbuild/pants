@@ -226,6 +226,34 @@ class ClasspathUtilTest(BaseTest):
                                               base_dir, False,
                                               [], {})
 
+  def test_create_canonical_classpath_no_duplicate_entry(self):
+    """Test no more than one symlink are created for the same classpath entry."""
+    jar_path = 'ivy/jars/org.x/lib/x-1.0.jar'
+    resolved_jar = ResolvedJar(M2Coordinate(org='org', name='x', rev='1.0'),
+                               cache_path='somewhere',
+                               pants_path=self._path(jar_path))
+    target_a = self.make_target('a', JvmTarget)
+    target_b = self.make_target('b', JvmTarget)
+
+    classpath_products = ClasspathProducts(self.pants_workdir)
+    # Both target a and target b depend on the same jar library
+    classpath_products.add_jars_for_targets([target_a], 'default', [resolved_jar])
+    classpath_products.add_jars_for_targets([target_b], 'default', [resolved_jar])
+
+    with temporary_dir() as base_dir:
+      # Only target a generates symlink to jar library, target b skips creating the
+      # symlink for the same jar library. Both targets' classpath.txt files should
+      # still contain the jar library.
+      self._test_canonical_classpath_helper(classpath_products, [target_a, target_b],
+                                            base_dir, True,
+                                            ['a.a-0.jar'],
+                                            {
+                                              'a.a-classpath.txt':
+                                                '{}/{}\n'.format(self.pants_workdir, jar_path),
+                                              'b.b-classpath.txt':
+                                                '{}/{}\n'.format(self.pants_workdir, jar_path),
+                                            })
+
   def _test_canonical_classpath_helper(self, classpath_products, targets,
                                        libs_dir,
                                        use_target_id,

@@ -263,6 +263,7 @@ class ClasspathUtil(object):
     canonical_classpath = []
     target_to_classpath = cls.classpath_by_targets(targets, classpath_products)
 
+    processed_entries = set()
     for target, classpath_entries_for_target in target_to_classpath.items():
       if internal_classpath_only:
         classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
@@ -270,13 +271,20 @@ class ClasspathUtil(object):
       if len(classpath_entries_for_target) > 0:
         classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
-        classpath = []
         # Note: for internal targets pants has only one classpath entry, but user plugins
         # might generate additional entries, for example, build.properties for the target.
         # Also it's common to have multiple classpath entries associated with 3rdparty targets.
         for (index, entry) in enumerate(classpath_entries_for_target):
           if entry.is_excluded_by(excludes):
             continue
+
+          # Avoid creating symlink for the same entry twice, only the first entry on
+          # classpath will get a symlink. The resulted symlinks as a whole are still stable,
+          # but may have non-consecutive suffixes because the 'missing' ones are those
+          # have already been created symlinks by previous targets.
+          if entry in processed_entries:
+            continue
+          processed_entries.add(entry)
 
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
@@ -289,9 +297,9 @@ class ClasspathUtil(object):
 
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
-          classpath.append(entry.path)
 
         if save_classpath_file:
+          classpath = [entry.path for entry in classpath_entries_for_target]
           with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
             classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
             classpath_file.write('\n')
