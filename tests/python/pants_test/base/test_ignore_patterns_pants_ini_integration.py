@@ -11,7 +11,7 @@ import tempfile
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class PantsBuildIgnorePantsIniIntegrationTest(PantsRunIntegrationTest):
+class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
   """Tests the functionality of the build_ignore_patterns option in pants.ini ."""
 
   def test_build_ignore_patterns_pants_ini(self):

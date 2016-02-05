@@ -167,8 +167,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'pants_build_ignore_pants_ini_integration',
-  sources = [ 'test_pants_build_ignore_pants_ini_integration.py' ],
+  name = 'ignore_patterns_pants_ini_integration',
+  sources = [ 'test_ignore_patterns_pants_ini_integration.py' ],
   dependencies = [
     'tests/python/pants_test:int-test',
   ],
