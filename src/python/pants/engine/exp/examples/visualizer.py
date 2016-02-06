@@ -13,8 +13,9 @@ from textwrap import dedent
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.examples.planners import setup_json_scheduler, ExampleTable
-from pants.engine.exp.scheduler import BuildRequest, Return, SelectNode, TaskNode, Throw
+from pants.engine.exp.examples.planners import ExampleTable, setup_json_scheduler
+from pants.engine.exp.scheduler import (BuildRequest, DependenciesNode, Return, SelectNode,
+                                        TaskNode, Throw)
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
@@ -85,6 +86,20 @@ def visualize_execution_graph(scheduler):
       binary_util.ui_open(image_file)
 
 
+def used_literal_dependency(product_graph, literal_types, root_subject, roots):
+  """Walks nodes for the given product and returns the first literal product used, or None.
+
+  Note that this will not walk into Nodes for other subjects.
+  """
+  def predicate(entry):
+    node, state = entry
+    return root_subject == node.subject and type(state) is not Throw
+  for ((node, _), _) in product_graph.walk(roots, predicate=predicate):
+    if node.product in literal_types:
+      return node.product
+  return None
+
+
 def validate_root(product_graph, root):
   """Walks below the given root and collects cases where additional literal products could be used.
   
@@ -107,19 +122,25 @@ def validate_root(product_graph, root):
     select_deps = {dep: state for dep, state in dependencies if type(dep) == SelectNode}
     if not select_deps:
       continue
-    if not any(type(state) == Return for state in select_deps.values()):
-      # No successful deps.
+    failed_products = {dep.product for dep, state in select_deps.items() if type(state) == Throw}
+    if not failed_products:
       continue
 
-    # TODO: need to look recursively for a satisfied literal dep: currently too noisy, because
-    # we have some deps that are "implicitly" satisfied.
+    # If all unattainable products were literal...
+    all_literal_failed_products = all(product in literal_types for product in failed_products)
+    if not all_literal_failed_products:
+      continue
 
-    # If one product was satisfied, but all unattainable products were literal...
-    failed_products = {dep.product for dep, state in select_deps.items() if type(state) == Throw}
-    if all(product in literal_types for product in failed_products):
-      print('>>> all missing dependencies of {} were literal!:\n  {}'.format(node.func.__name__, list(p.__name__ for p in failed_products)))
-    else:
-      print('>>> some missing dependencies of {} were not literal.:\n  {}'.format(node, list(p.__name__ for p in failed_products)))
+    # There was at least one dep successfully (recursively) satisfied via a literal.
+    used_literal_dep = used_literal_dependency(product_graph,
+                                               literal_types,
+                                               node.subject,
+                                               select_deps.keys())
+    if used_literal_dep is None:
+      continue
+
+    print('>>> {} was partially satisfied!\n  had:\n    {}\n  but not:\n    {}'.format(
+      node.func.__name__, used_literal_dep.__name__, [p.__name__ for p in failed_products]))
 
 
 def validate_graph(scheduler):
