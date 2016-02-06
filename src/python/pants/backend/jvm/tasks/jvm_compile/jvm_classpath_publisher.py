@@ -17,9 +17,8 @@ class RuntimeClasspathPublisher(Task):
   @classmethod
   def register_options(cls, register):
     super(Task, cls).register_options(register)
-    # NB: This is now unused in the code below and can be removed in 0.0.75 or later.
     register('--use-old-naming-style', advanced=True, default=True, action='store_true',
-             deprecated_version='0.0.71',
+             deprecated_version='0.0.71', removal_version='0.0.75',
              deprecated_hint='Switch to use the safe identifier to construct canonical classpath.',
              help='Use the old (unsafe) naming style construct canonical classpath.')
 
