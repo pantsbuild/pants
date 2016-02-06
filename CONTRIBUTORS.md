@@ -1,4 +1,4 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Alan Paulin
 + Alexander Johnson
@@ -16,6 +16,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Cody Gibb
 + Craig Schertz
 + Dan Davydov
++ Dan Fabulich
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
