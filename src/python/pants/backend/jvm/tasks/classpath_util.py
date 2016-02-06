@@ -188,7 +188,6 @@ class ClasspathUtil(object):
   @classmethod
   def create_canonical_classpath(cls, classpath_products, targets, basedir,
                                  save_classpath_file=False,
-                                 use_target_id=True,
                                  internal_classpath_only=True,
                                  excludes=None):
     """Create a stable classpath of symlinks with standardized names.
@@ -209,10 +208,6 @@ class ClasspathUtil(object):
     :param basedir: Directory to create symlinks.
     :param save_classpath_file: An optional file with original classpath entries that symlinks
       are created from.
-    :param use_target_id: Optionally switch to the subdirectory based symlinks naming.
-      This is added for backward compatibility. Remove once intellij plugin is ready to use
-      `target.id` based output files.  See `use_old_naming_style` option in :class:
-      `pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher.RuntimeClasspathPublisher`.
     :param internal_classpath_only: whether to create symlinks just for internal classpath or
        all classpath.
     :param excludes: classpath entries should be excluded.
@@ -237,21 +232,11 @@ class ClasspathUtil(object):
       This includes creating directories if it does not already exist, cleaning up
       previous classpath output related to the target.
       """
-      if use_target_id:
-        output_dir = basedir
-        # TODO(peiyu) improve readability once we deprecate the old naming style.
-        # For example, `-` is commonly placed in string format as opposed to here.
-        classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
-                                                                      target_id=target.id)
-      else:
-        address = target.address
-        output_dir = os.path.join(
-          basedir,
-          # target.address.spec is used in export goal to identify targets
-          address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
-        )
-        # append / to the end as part of the prefix
-        classpath_prefix_for_target = os.path.join(output_dir, '')
+      output_dir = basedir
+      # TODO(peiyu) improve readability once we deprecate the old naming style.
+      # For example, `-` is commonly placed in string format as opposed to here.
+      classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
+                                                                    target_id=target.id)
 
       if os.path.exists(output_dir):
         delete_old_target_output_files(classpath_prefix_for_target)
