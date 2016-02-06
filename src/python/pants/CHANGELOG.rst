@@ -61,6 +61,9 @@ Bugfixes
 New Features
 ~~~~~~~~~~~~
 
+* Cleaning up jarjar rules, and adding support for keep and zap.
+  `RB #3428 <https://rbcommons.com/s/twitter/r/3428>`_
+
 * Introduce ignore_patterns option
   `RB #3414 <https://rbcommons.com/s/twitter/r/3414>`_
 
