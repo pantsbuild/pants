@@ -120,8 +120,7 @@ class JvmBinaryTask(JarBuilderTask):
     self.context.log.debug('Shading {}.'.format(jar_path))
     with temporary_dir() as tempdir:
       output_jar = os.path.join(tempdir, os.path.basename(jar_path))
-      rules = [rule.rule() for rule in shading_rules]
-      with self.shader.binary_shader_for_rules(output_jar, jar_path, rules) as shade_runner:
+      with self.shader.binary_shader_for_rules(output_jar, jar_path, shading_rules) as shade_runner:
         result = execute_runner(shade_runner, workunit_factory=self.context.new_workunit,
                                 workunit_name='jarjar')
         if result != 0:
