@@ -8,11 +8,10 @@ import java.net.URLClassLoader;
 import java.util.Arrays;
 
 public class Util {
-  public static void failIfSyntheticJar() {
+  public static void detectSyntheticJar() {
     URL[] urls = ((URLClassLoader) Thread.currentThread().getContextClassLoader()).getURLs();
-    if (urls.length == 1) {
-      throw new IllegalStateException("Synthetic jar run is detected, classpath: " +
-          Arrays.toString(urls));
-    }
+    String detectStatus = urls.length == 1 ? "detected" : "not detected";
+    System.out.println("Synthetic jar run is " + detectStatus + ", classpath: " +
+      Arrays.toString(urls));
   }
 }

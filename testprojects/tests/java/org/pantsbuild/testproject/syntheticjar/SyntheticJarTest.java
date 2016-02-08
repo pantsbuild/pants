@@ -8,6 +8,6 @@ import org.junit.Test;
 public class SyntheticJarTest {
   @Test
   public void testSyntheticJar() {
-    org.pantsbuild.testproject.syntheticjar.util.Util.failIfSyntheticJar();
+    org.pantsbuild.testproject.syntheticjar.util.Util.detectSyntheticJar();
   }
 }

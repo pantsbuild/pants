@@ -5,6 +5,6 @@ package org.pantsbuild.testproject.syntheticjar.run;
 
 public class SyntheticJarRun {
   public static void main(String[] args) {
-    org.pantsbuild.testproject.syntheticjar.util.Util.failIfSyntheticJar();
+    org.pantsbuild.testproject.syntheticjar.util.Util.detectSyntheticJar();
   }
 }
