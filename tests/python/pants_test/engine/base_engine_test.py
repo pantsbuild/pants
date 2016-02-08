@@ -11,20 +11,31 @@ from pants_test.base_test import BaseTest
 
 
 class EngineTestBase(BaseTest):
+  """
+  :API: public
+  """
 
   @classmethod
   def as_goal(cls, goal_name):
-    """Returns a ``Goal`` object of the given name"""
+    """Returns a ``Goal`` object of the given name
+
+    :API: public
+    """
     return Goal.by_name(goal_name)
 
   @classmethod
   def as_goals(cls, *goal_names):
-    """Converts the given goal names to a list of ``Goal`` objects."""
+    """Converts the given goal names to a list of ``Goal`` objects.
+
+    :API: public
+    """
     return map(cls.as_goal, goal_names)
 
   @classmethod
   def install_task(cls, name, action=None, dependencies=None, goal=None):
     """Creates and installs a task with the given name.
+
+    :API: public
 
     :param string name: The task name.
     :param action: The task's action.
@@ -38,6 +49,9 @@ class EngineTestBase(BaseTest):
                          dependencies=dependencies or []).install(goal if goal is not None else None)
 
   def setUp(self):
+    """
+    :API: public
+    """
     super(EngineTestBase, self).setUp()
 
     # TODO(John Sirois): Now that the BuildFileParser controls goal registration by iterating
@@ -46,6 +60,9 @@ class EngineTestBase(BaseTest):
     Goal.clear()
 
   def tearDown(self):
+    """
+    :API: public
+    """
     Goal.clear()
 
     super(EngineTestBase, self).tearDown()
