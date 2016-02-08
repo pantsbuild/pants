@@ -100,20 +100,18 @@ def used_literal_dependency(product_graph, literal_types, root_subject, roots):
   return None
 
 
-def validate_root(product_graph, root):
-  """Walks below the given root and collects cases where additional literal products could be used.
+def validate_failed_roots(product_graph, failed_roots):
+  """Walks below failed nodes and collects cases where additional literal products could be used.
   
   In particular, looks (recursively) for cases where:
     1) at least one literal subject existed.
     2) some literal/named products were missing.
 
-  TODO: Implement simpler case first?: look for Tasks which given literal subjects
-  could have succeeded.
   TODO: propagate SymbolTable more cleanly.
   """
   literal_types = set(ExampleTable.table().values())
   missing = dict()
-  for ((node, state), dependencies) in product_graph.walk([root], predicate=lambda _: True):
+  for ((node, state), dependencies) in product_graph.walk(failed_roots, predicate=lambda _: True):
     # Look for failed TaskNodes with at least one satisfied Select dependency.
     if type(node) != TaskNode:
       continue
@@ -140,31 +138,34 @@ def validate_root(product_graph, root):
       continue
 
     print('>>> {} was partially satisfied!\n  had:\n    {}\n  but not:\n    {}'.format(
-      node.func.__name__, used_literal_dep.__name__, [p.__name__ for p in failed_products]))
+      node, used_literal_dep.__name__, [p.__name__ for p in failed_products]))
 
 
 def validate_graph(scheduler):
-  # Locate candidate Nodes: those with an Address Subject which failed.
+  """Finds failed roots and invokes subgraph validation on all of them."""
+
+  # Locate failed candidate Nodes: those with an Address Subject which failed.
+  # This is a filter rather than a walk, because the `validate_failed_roots` step executes
+  # a walk which will handle deduping visited subgraphs.
   candidate_roots = set()
-  for ((node, state), _) in scheduler.walk_product_graph(predicate=lambda _: True):
+  for node in scheduler.product_graph.dependencies().keys():
     if not type(node) == SelectNode:
       continue
     if not isinstance(node.subject, Address):
       continue
-    if not type(state) == Throw:
+    if not type(scheduler.product_graph.state(node)) == Throw:
       continue
     # Found a candidate root.
     candidate_roots.add(node)
 
-  for candidate in candidate_roots:
-    validate_root(scheduler.product_graph, candidate)
+  validate_failed_roots(scheduler.product_graph, candidate_roots)
 
 
 def visualize_build_request(build_root, build_request):
   scheduler = setup_json_scheduler(build_root)
   LocalSerialEngine(scheduler).reduce(build_request)
   validate_graph(scheduler)
-  #visualize_execution_graph(scheduler)
+  visualize_execution_graph(scheduler)
 
 
 def main():
