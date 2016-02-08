@@ -452,6 +452,42 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
+  def generate_fetch_ivy(cls, targets, ivyxml, confs, resolve_hash_name=None, resolve_stuffs=None):
+    """Generates an ivy xml with all jars marked as intransitive using the all conflict manager."""
+    if resolve_hash_name:
+      org = IvyUtils.INTERNAL_ORG_NAME
+      name = resolve_hash_name
+    else:
+      org, name = cls.identify(targets)
+
+    extra_configurations = [conf for conf in confs if conf and conf != 'default']
+
+    # so we have all the jars with their versions in resolve_stuffs, so we don't need to do anything
+    # maybe some validation though
+    # TODO validate stuff, and use more than just default.
+    jars = resolve_stuffs.get('default').all_resolved_coordinates
+
+    # use org name _and_ rev so that we can have dependencies with different versions!
+    jars_by_key = OrderedDict()
+    for jar in jars:
+      jars = jars_by_key.setdefault((jar.org, jar.name, jar.rev), [])
+      jars.append(jar)
+
+
+    dependencies = [cls._generate_fetch_jar_template(jars) for jars in jars_by_key.values()]
+
+    template_data = TemplateData(org=org,
+                                 module=name,
+                                 extra_configurations=extra_configurations,
+                                 dependencies=dependencies)
+
+    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy_fetch.mustache')
+    template_text = pkgutil.get_data(__name__, template_relpath)
+    generator = Generator(template_text, lib=template_data)
+    with safe_open(ivyxml, 'w') as output:
+      generator.write(output)
+
+  @classmethod
   def calculate_classpath(cls, targets):
     """Creates a consistent classpath and list of excludes for the passed targets.
 
@@ -604,5 +640,50 @@ class IvyUtils(object):
         artifacts=artifacts.values(),
         any_have_url=any_have_url,
         excludes=[cls._generate_exclude_template(exclude) for exclude in excludes])
+
+    return template
+
+  @classmethod
+  def _generate_fetch_jar_template(cls, jars):#
+    global_dep_attributes = set(Dependency(org=jar.org,
+                                           name=jar.name,
+                                           rev=jar.rev,
+                                           transitive=False
+        )
+                                for jar in jars)
+    if len(global_dep_attributes) != 1:
+      # If we batch fetches and assume conflict manager all, we could ignore these.
+      # Leaving this here for now.
+      conflicting_dependencies = sorted(str(g) for g in global_dep_attributes)
+      raise cls.IvyResolveConflictingDepsError('Found conflicting dependencies:\n\t{}'
+                                               .format('\n\t'.join(conflicting_dependencies)))
+    jar_attributes = global_dep_attributes.pop()
+
+    any_have_url = False
+
+    artifacts = OrderedDict()
+    for jar in jars:
+      ext = jar.ext
+      url = jar.url
+      if url:
+        any_have_url = True
+      classifier = jar.classifier
+      artifact = Artifact(name=jar.name,
+                          type_=ext or 'jar',
+                          ext=ext,
+                          url=url,
+                          classifier=classifier)
+      artifacts[(ext, url, classifier)] = artifact
+
+    template = TemplateData(
+        org=jar_attributes.org,
+        module=jar_attributes.name,
+        version=jar_attributes.rev,
+        mutable=jar_attributes.mutable,
+        force=jar_attributes.force,
+        transitive=jar_attributes.transitive,
+        artifacts=artifacts.values(),
+        any_have_url=any_have_url,
+        excludes=[])
 
     return template

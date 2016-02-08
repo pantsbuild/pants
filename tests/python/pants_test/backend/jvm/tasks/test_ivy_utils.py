@@ -456,3 +456,71 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     assert_order([module6, module4, module3, module1 ,module2, module5])
     assert_order([module4, module2, module1, module3, module6, module5])
     assert_order([module4, module2, module5, module6, module1, module3])
+
+# WIP maybe
+#  def test_collects_origin_url(self):
+#    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_origin_location.xml')
+#
+#    ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
+#
+#    def collector(r):
+#      x = ivy_info.modules_by_ref.get(r)
+#      if x:
+#        return {x}
+#      else:
+#  #      return set()
+#
+#    result = ivy_info.traverse_dependency_graph(ref, collector, dict())
+#    print(result)
+#    self.assertEqual(
+#          {
+#           IvyModule(ref=IvyModuleRef(org='org1',
+#                                      name='name1',
+#                                      rev='0.0.1',
+#                                      classifier=None,
+#                                      ext=u'jar'),
+#                     artifact='ivy2cache_path/org1/name1.jar',
+#                     #origin_location="http://example.com/example.jar",
+#                     # ^^ maybe
+#                     callers=(IvyModuleRef(org='toplevel', name='toplevelmodule', rev='latest', classifier=None, ext=u'jar'),))
+#          },
+#          result)
+
+  def test_collects_classifiers(self):
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_multiple_classifiers.xml')
+
+    ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
+
+    def collector(r):
+      x = ivy_info.modules_by_ref.get(r)
+      if x:
+        return {x}
+      else:
+        return set()
+
+    result = ivy_info.traverse_dependency_graph(ref, collector, dict())
+    print(result)
+    self.assertEqual(
+      {IvyModule(ref=IvyModuleRef(org='org1',
+                                  name='name1',
+                                  rev='0.0.1',
+                                  classifier=None,
+                                  ext=u'jar'),
+                 artifact='ivy2cache_path/org1/name1.jar',
+                 callers=(IvyModuleRef(org='toplevel',
+                                       name='toplevelmodule',
+                                       rev='latest',
+                                       classifier=None,
+                                       ext=u'jar'),)),
+       IvyModule(ref=IvyModuleRef(org='org1',
+                                  name='name1',
+                                  rev='0.0.1',
+                                  classifier='wut',
+                                  ext=u'jar'),
+                 artifact='ivy2cache_path/org1/name1-wut.jar',
+                 callers=(IvyModuleRef(org='toplevel',
+                                       name='toplevelmodule',
+                                       rev='latest',
+                                       classifier=None,
+                                       ext=u'jar'),))},
+      result)

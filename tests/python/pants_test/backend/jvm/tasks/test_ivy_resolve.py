@@ -215,3 +215,10 @@ class IvyResolveTest(JvmToolTaskTestBase):
     classpath = self.create_task(self.context()).ivy_classpath([junit_jar_lib])
 
     self.assertEquals(2, len(classpath))
+
+  def test_ivy_blah(self):
+    # TODO flesh it out
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+
+    result = self.create_task(self.context())._ivy_resolve([junit_jar_lib])

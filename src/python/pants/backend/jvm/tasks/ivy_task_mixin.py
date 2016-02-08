@@ -5,14 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import logging
 import os
-import shutil
 import threading
+from collections import OrderedDict, defaultdict
 from hashlib import sha1
 
+from twitter.common.collections import OrderedSet
+
 from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.jar_dependency_utils import ResolvedJar
+from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -27,6 +30,123 @@ from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
+      # Currently:
+      #  we don't parse the reports unless we're doing a proper resolve
+      #  Things that don't need a full resolve report don't need to read it right now
+      #  I think a naive impl would require that any ivy_resolve call will need to parse reports in
+      # the slow path
+      #
+      # check for cached resolve info
+      # if exists,
+      #   check for symlinks
+      #   if symlinks for everything, you're done
+      #   if missing,
+      #     do a dumb fetch using ivy
+      #     repopulate missing ones
+      #   create a result
+      # else if no cached resolve
+      #   do a resolve
+      #   dump results
+      #
+      # resolve:
+      #  3rdparty target -> list of jar coords that were resolved
+      #  jar coord -> remote url
+      #
+      #  maybe:
+      #  jar coord -> local cache url, but this would have to be invalidation only and not buildcached
+      #  -
+      #
+      # approach / pieces
+      # add a generate ivy for fetch rather than resolve
+      # create a data structure for a resolve and a serialization format
+      #
+      # tests
+      # search for resolve file
+      # assert that
+      #    run
+      #    invalidate
+      #    run 2 # loads from cache
+      # doesn't re-resolve-only fetches
+      # attempt a fetch
+      #resolve components
+      # - confs
+      # - report(s)
+      # - jar list in ivy cache
+      # - jar list to symlink tree
+
+
+class ExistingResolveSituation(object):
+  def __init__(self, ivy_workdir, resolve_workdir, resolve_hash_name, ivy_cache_dir, potential_resolve_stuffs, confs):
+    self.potential_resolve_stuffs = potential_resolve_stuffs
+    self.ivy_cache_dir = ivy_cache_dir
+    self.resolve_hash_name = resolve_hash_name
+    self.ivy_workdir = ivy_workdir
+    self.resolve_workdir = resolve_workdir
+    self.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm = os.path.join(resolve_workdir, 'classpath')
+    self.file_containing_full_list_of_resolved_jars_in_ivy_cache = self.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm + '.raw'
+    # If a report file is not present, we need to exec ivy, even if all the individual
+    # targets are up to date. See https://rbcommons.com/s/twitter/r/2015.
+    # Note that it's possible for all targets to be valid but for no classpath file to exist at
+    # target_classpath_file, e.g., if we previously built a superset of targets.
+    any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
+    self.any_report_missing = any_report_missing
+    self.existing_report_paths = existing_report_paths
+
+  def _collect_existing_reports(self, confs, resolve_hash_name):
+    report_missing = False
+    report_paths = []
+    for conf in confs:
+      report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+      if not os.path.exists(report_path):
+        report_missing = True
+        break
+      else:
+        report_paths.append(report_path)
+    return report_missing, report_paths
+
+  def has_file_containing_ivy_jar_locations(self):
+    return os.path.exists(
+      self.file_containing_full_list_of_resolved_jars_in_ivy_cache)
+
+  def requires_new_resolve(self):
+    return (self.any_report_missing or
+            not self.has_file_containing_ivy_jar_locations())
+
+
+class ResolveStuff(object):
+  def __init__(self):
+    self.target_to_resolved_coordinates = defaultdict(OrderedSet)
+    self.all_resolved_coordinates = OrderedSet()
+
+  def add_stuff(self, target, resolved_jars):
+    coords = [j.coordinate for j in resolved_jars]
+    self.add_stuff_coords(target, coords)
+
+  def add_stuff_coords(self, target, coords):
+    for c in coords:
+      self.target_to_resolved_coordinates[target].add(c)
+      self.all_resolved_coordinates.add(c)
+
+  def target_spec_to_coordinate_strings(self):
+    return {t.address.spec: [str(c) for c in coordinates] for t, coordinates in self.target_to_resolved_coordinates.items()}
+
+  def all_coordinate_strings(self):
+    return [str(c) for c in self.all_resolved_coordinates]
+
+  def __repr__(self):  #aeuo
+    return 'RS(\n  t_to_coord\n    {}\n  all\n    {}'.format(
+      '\n    '.join(':  '.join([t.address.spec, '\n      '.join(str(c) for c in cs)]) for t,cs in self.target_to_resolved_coordinates.items()),
+
+
+
+      '\n    '.join(str(c) for c in self.all_resolved_coordinates)
+    )
+
+  def __eq__(self, other):
+    return type(self) == type(other) and self.all_resolved_coordinates == other.all_resolved_coordinates and self.target_to_resolved_coordinates == other .target_to_resolved_coordinates
+
+  def __ne__(self, other):
+    return not self == other
 
 
 class IvyResolveResult(object):
@@ -289,50 +409,187 @@ class IvyTaskMixin(TaskBase):
       resolve_hash_name = global_vts.cache_key.hash
 
       ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
-      target_workdir = os.path.join(ivy_workdir, resolve_hash_name)
+      resolve_workdir = os.path.join(ivy_workdir, resolve_hash_name)
+      potential_resolve_stuffs = self.load_resolve_stuffs(resolve_workdir, targets)
 
-      target_classpath_file = os.path.join(target_workdir, 'classpath')
-      raw_target_classpath_file = target_classpath_file + '.raw'
+      situ = ExistingResolveSituation(ivy_workdir, resolve_workdir, resolve_hash_name,
+                                      self.ivy_cache_dir,
+                                      potential_resolve_stuffs,
+                                      confs)
 
-      # If a report file is not present, we need to exec ivy, even if all the individual
-      # targets are up to date. See https://rbcommons.com/s/twitter/r/2015.
-      # Note that it's possible for all targets to be valid but for no classpath file to exist at
-      # target_classpath_file, e.g., if we previously built a superset of targets.
-      any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
       if (invalidation_check.invalid_vts or
-          any_report_missing or
-          not os.path.exists(raw_target_classpath_file)):
-
-        ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
-        with safe_concurrent_creation(raw_target_classpath_file) as raw_target_classpath_file_tmp:
-          args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
-
-          self._exec_ivy(
-              target_workdir=target_workdir,
-              targets=global_vts.targets,
-              args=args,
-              executor=executor,
-              ivy=ivy,
-              workunit_name=workunit_name,
-              confs=confs,
-              use_soft_excludes=self.get_options().soft_excludes,
-              resolve_hash_name=resolve_hash_name,
-              pinned_artifacts=pinned_artifacts)
-
-          if not os.path.exists(raw_target_classpath_file_tmp):
-            raise self.Error('Ivy failed to create classpath file at {}'
-                             .format(raw_target_classpath_file_tmp))
-
-        logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
+            situ.requires_new_resolve()):
+        if situ.potential_resolve_stuffs:
+          self.do_a_just_fetch_resolve(confs,
+                                       executor,
+                                       extra_args,
+                                       global_vts,
+                                       pinned_artifacts,
+                                       situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                       situ.resolve_hash_name,
+                                       situ.resolve_workdir,
+                                       workunit_name,
+                                       situ.potential_resolve_stuffs)
+        else:
+          self.do_a_full_resolve_type_thing(confs,
+                                            executor,
+                                            extra_args,
+                                            global_vts,
+                                            pinned_artifacts,
+                                            situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                            situ.resolve_hash_name,
+                                            situ.resolve_workdir,
+                                            workunit_name)
       else:
-        logger.debug("Using previously resolved reports: {}".format(existing_report_paths))
+        logger.debug("Using previously resolved reports: {}".format(situ.existing_report_paths))
 
     symlink_map = self._symlink_from_cache_path(self.ivy_cache_dir, ivy_workdir,
-                                                raw_target_classpath_file,
-                                                target_classpath_file)
+                                                situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                                situ.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
 
-    classpath = IvyUtils.load_classpath_from_cachepath(target_classpath_file)
-    return IvyResolveResult(classpath, symlink_map, resolve_hash_name)
+    classpath = IvyUtils.load_classpath_from_cachepath(situ.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
+
+
+
+    result = IvyResolveResult(classpath, symlink_map, resolve_hash_name)
+    stuffs_by_conf = OrderedDict()
+    for conf in confs:
+      resolve_stuff = ResolveStuff()
+      for target, resolved_jars in result.collect_resolved_jars(self.ivy_cache_dir, conf, targets):
+        resolve_stuff.add_stuff(target, resolved_jars)
+      stuffs_by_conf[conf]=resolve_stuff
+      print('conf {}'.format(conf))
+      print('resolved stuff')
+      print('resolved stuff {}'.format(resolve_stuff))
+    if stuffs_by_conf != situ.potential_resolve_stuffs:
+      print('reconstructed stuff doesnt match potential stuff')
+      print('reconstructed stuff doesnt match potential stuff')
+      print('reconstructed stuff doesnt match potential stuff')
+      print('reconstructed stuff doesnt match potential stuff')
+      print('reconstructed stuff doesnt match potential stuff')
+      #self.all_resolved_coordinates == other.all_resolved_coordinates and self.target_to_resolved_coordinates == other .target_to_resolved_coordinates
+      if situ.potential_resolve_stuffs is None:
+        print('read is None')
+      else:
+        created_default = stuffs_by_conf.get('default')
+        potential_default = situ.potential_resolve_stuffs.get('default')
+        print('type(created_default.all_resolved_coordinates) == type(potential_default.all_resolved_coordinates)')
+        print(type(created_default.all_resolved_coordinates) == type(potential_default.all_resolved_coordinates))
+        print('created_default.all_resolved_coordinates == potential_default.all_resolved_coordinates')
+        print(created_default.all_resolved_coordinates == potential_default.all_resolved_coordinates)
+        print('created_default.all_resolved_coordinates')
+        print(created_default.all_resolved_coordinates)
+        print('potential_default.all_resolved_coordinates')
+        print(potential_default.all_resolved_coordinates)
+
+        print('created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates ')
+        print(created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates )
+    else:
+      print('yay they match')
+      print('yay they match')
+      print('yay they match')
+      print('yay they match')
+    self.dump_resolve_stuffs(resolve_workdir, stuffs_by_conf)
+
+    return result
+
+  def dump_resolve_stuffs(self, resolve_workdir, stuffs_by_conf):
+
+    res = {}
+    for conf, stuff in stuffs_by_conf.items():
+      res[conf] = OrderedDict([
+      ['target_to_coords',stuff.target_spec_to_coordinate_strings()],
+      ['coords', stuff.all_coordinate_strings()]
+      ])
+    filename = os.path.join(resolve_workdir, 'stuff.file.json')
+    with safe_concurrent_creation(filename) as tmp_filename:
+      with open(tmp_filename, 'wb') as f:
+        json.dump(res, f)
+
+  def load_resolve_stuffs(self, resolve_workdir, targets):
+    # returns a dict of conf -> ResolveStuff
+    filename = os.path.join(resolve_workdir, 'stuff.file.json')
+    if not os.path.exists(filename):
+      print('no resolve stuffs :(')
+      return None
+    with open(filename) as f:
+      from_file = json.load(f,object_pairs_hook=OrderedDict) # maybe the object_pairs_hook thing will work :/
+    print('yay')
+    print('yay')
+    print('yay')
+    print('result {}'.format(from_file))
+    result = {}
+    target_lookup = {t.address.spec: t for t in targets}
+    for conf, serialized_stuff in from_file.items():
+      stuff = ResolveStuff()
+      for spec, coord_strs in serialized_stuff['target_to_coords'].items():
+        t = target_lookup[spec] # TODO error handling
+        stuff.add_stuff_coords(t, [M2Coordinate.from_string(c) for c in coord_strs])
+      stuff.all_resolved_coordinates = OrderedSet(M2Coordinate.from_string(c) for c in serialized_stuff['coords'])
+      result[conf]= stuff
+    print('yay')
+    print('yay')
+    print('yay')
+    print('yay')
+    print('reified')
+    print(result)
+    return result
+
+  def do_a_full_resolve_type_thing(self, confs, executor, extra_args, global_vts, pinned_artifacts,
+                          raw_target_classpath_file, resolve_hash_name, target_workdir,
+                          workunit_name):
+    ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
+    with safe_concurrent_creation(raw_target_classpath_file) as raw_target_classpath_file_tmp:
+      args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
+
+      self._exec_ivy(
+        target_workdir=target_workdir,
+        targets=global_vts.targets,
+        args=args,
+        executor=executor,
+        ivy=ivy,
+        workunit_name=workunit_name,
+        confs=confs,
+        use_soft_excludes=self.get_options().soft_excludes,
+        resolve_hash_name=resolve_hash_name,
+        pinned_artifacts=pinned_artifacts)
+
+      if not os.path.exists(raw_target_classpath_file_tmp):
+        raise self.Error('Ivy failed to create classpath file at {}'
+                         .format(raw_target_classpath_file_tmp))
+    logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
+
+  def do_a_just_fetch_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
+                          raw_target_classpath_file, resolve_hash_name, resolve_workdir,
+                          workunit_name, resolve_stuffs):
+    # resolve stuffs has all the bits in it to do a boring fetch resolve.
+    # poc
+    #
+    ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
+    with safe_concurrent_creation(raw_target_classpath_file) as raw_target_classpath_file_tmp:
+      args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
+      targets=global_vts.targets,
+
+      with IvyUtils.ivy_lock:
+        ivyxml = os.path.join(resolve_workdir, 'ivy.xml')
+        try:
+          IvyUtils.generate_fetch_ivy(targets, ivyxml, confs, resolve_hash_name, resolve_stuffs)
+        except IvyUtils.IvyError as e:
+          raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
+
+        try:
+          IvyUtils.exec_ivy(ivy, confs, ivyxml, args,
+                            jvm_options=self.get_options().jvm_options,
+                            executor=executor,
+                            workunit_name=workunit_name,
+                            workunit_factory=self.context.new_workunit)
+        except IvyUtils.IvyError as e:
+          raise self.Error('Ivy resolve failed: {}'.format(e))
+
+      if not os.path.exists(raw_target_classpath_file_tmp):
+        raise self.Error('Ivy failed to create classpath file at {}'
+                         .format(raw_target_classpath_file_tmp))
+    logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
   def _symlink_from_cache_path(self, ivy_cache_dir, ivy_workdir, raw_target_classpath_file,
                                target_classpath_file):
@@ -350,18 +607,6 @@ class IvyTaskMixin(TaskBase):
                                                symlink_dir,
                                                target_classpath_file)
     return symlink_map
-
-  def _collect_existing_reports(self, confs, resolve_hash_name):
-    report_missing = False
-    report_paths = []
-    for conf in confs:
-      report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
-      if not os.path.exists(report_path):
-        report_missing = True
-        break
-      else:
-        report_paths.append(report_path)
-    return report_missing, report_paths
 
   def _exec_ivy(self,
                target_workdir,
