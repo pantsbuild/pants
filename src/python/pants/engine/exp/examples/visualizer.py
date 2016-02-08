@@ -8,14 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 import sys
+from collections import defaultdict
 from textwrap import dedent
 
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import ExampleTable, setup_json_scheduler
-from pants.engine.exp.scheduler import (BuildRequest, DependenciesNode, Return, SelectNode,
-                                        TaskNode, Throw)
+from pants.engine.exp.scheduler import (BuildRequest, DependenciesNode,
+                                        PartiallyConsumedInputsError, Return, SelectNode, TaskNode,
+                                        Throw)
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
@@ -100,18 +102,19 @@ def used_literal_dependency(product_graph, literal_types, root_subject, roots):
   return None
 
 
-def validate_failed_roots(product_graph, failed_roots):
-  """Walks below failed nodes and collects cases where additional literal products could be used.
+def validate_failed_root(product_graph, partially_consumed_inputs, failed_root):
+  """Walks below a failed node and collects cases where additional literal products could be used.
   
   In particular, looks (recursively) for cases where:
     1) at least one literal subject existed.
     2) some literal/named products were missing.
 
+  Returns dict(partially_consumed_input, dict(used_product, list(tasks_with_missing_products))).
+
   TODO: propagate SymbolTable more cleanly.
   """
   literal_types = set(ExampleTable.table().values())
-  missing = dict()
-  for ((node, state), dependencies) in product_graph.walk(failed_roots, predicate=lambda _: True):
+  for ((node, state), dependencies) in product_graph.walk([failed_root], predicate=lambda _: True):
     # Look for failed TaskNodes with at least one satisfied Select dependency.
     if type(node) != TaskNode:
       continue
@@ -124,41 +127,45 @@ def validate_failed_roots(product_graph, failed_roots):
     if not failed_products:
       continue
 
-    # If all unattainable products were literal...
+    # If all unattainable products could have been specified as literal...
     all_literal_failed_products = all(product in literal_types for product in failed_products)
     if not all_literal_failed_products:
       continue
 
-    # There was at least one dep successfully (recursively) satisfied via a literal.
+    # And there was at least one dep successfully (recursively) satisfied via a literal.
     used_literal_dep = used_literal_dependency(product_graph,
                                                literal_types,
                                                node.subject,
                                                select_deps.keys())
     if used_literal_dep is None:
       continue
-
-    print('>>> {} was partially satisfied!\n  had:\n    {}\n  but not:\n    {}'.format(
-      node, used_literal_dep.__name__, [p.__name__ for p in failed_products]))
+    partially_consumed_inputs[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
 
 
 def validate_graph(scheduler):
-  """Finds failed roots and invokes subgraph validation on all of them."""
+  """Finds failed roots and invokes subgraph validation on each of them."""
 
-  # Locate failed candidate Nodes: those with an Address Subject which failed.
-  # This is a filter rather than a walk, because the `validate_failed_roots` step executes
-  # a walk which will handle deduping visited subgraphs.
-  candidate_roots = set()
-  for node in scheduler.product_graph.dependencies().keys():
+  # Locate failed root Nodes: those with an Address Subject which failed, but which did
+  # not have any failed (direct) dependents.
+  failed_roots = set()
+  for node, dependents in scheduler.product_graph.dependents().items():
     if not type(node) == SelectNode:
       continue
     if not isinstance(node.subject, Address):
       continue
     if not type(scheduler.product_graph.state(node)) == Throw:
       continue
-    # Found a candidate root.
-    candidate_roots.add(node)
+    if any(type(scheduler.product_graph.state(d)) is Throw for d in dependents):
+      # Node had failed dependents: was not a failed root.
+      continue
+    failed_roots.add(node)
 
-  validate_failed_roots(scheduler.product_graph, candidate_roots)
+  # Raise if there were any partially consumed inputs.
+  partials = defaultdict(lambda: defaultdict(list))
+  for failed_root in failed_roots:
+    validate_failed_root(scheduler.product_graph, partials, failed_root)
+  if partials:
+    raise PartiallyConsumedInputsError(partials)
 
 
 def visualize_build_request(build_root, build_request):

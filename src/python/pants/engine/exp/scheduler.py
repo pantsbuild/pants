@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
 import inspect
 import itertools
 import threading
@@ -110,17 +109,18 @@ class PartiallyConsumedInputsError(SchedulingError):
   """No planner was able to produce a plan that consumed the given input products."""
 
   @staticmethod
-  def msg(output_product, subject, partially_consumed_products):
-    yield 'While attempting to produce {} for {}, some products could not be consumed:'.format(
-             output_product.__name__, subject)
-    for input_product, planners in partially_consumed_products.items():
-      yield '  To consume {}:'.format(input_product)
-      for planner, additional_inputs in planners.items():
-        inputs_str = ' OR '.join(str(i) for i in additional_inputs)
-        yield '    {} needed ({})'.format(type(planner).__name__, inputs_str)
+  def msg(partially_consumed_inputs):
+    for ((subject, output_product), tasks_and_inputs) in partially_consumed_inputs.items():
+      yield '\nWhile attempting to produce {} for {}, some products could not be consumed:'.format(
+              output_product.__name__, subject)
+      for input_product, tasks in tasks_and_inputs.items():
+        yield '  To consume {}:'.format(input_product.__name__)
+        for task, additional_inputs in tasks:
+          inputs_str = ' AND '.join(i.__name__ for i in additional_inputs)
+          yield '    {} also needed ({})'.format(task.__name__, inputs_str)
 
-  def __init__(self, output_product, subject, partially_consumed_products):
-    msg = '\n'.join(self.msg(output_product, subject, partially_consumed_products))
+  def __init__(self, partially_consumed_inputs):
+    msg = '\n'.join(self.msg(partially_consumed_inputs))
     super(PartiallyConsumedInputsError, self).__init__(msg)
 
 
@@ -467,6 +467,9 @@ class ProductGraph(object):
       self._dependents[dependency].add(node)
       # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
       self._dependencies[dependency]
+
+  def dependents(self):
+    return self._dependents
 
   def dependencies(self):
     return self._dependencies
