@@ -458,16 +458,9 @@ class IvyTaskMixin(TaskBase):
       for target, resolved_jars in result.collect_resolved_jars(self.ivy_cache_dir, conf, targets):
         resolve_stuff.add_stuff(target, resolved_jars)
       stuffs_by_conf[conf]=resolve_stuff
-      print('conf {}'.format(conf))
-      print('resolved stuff')
-      print('resolved stuff {}'.format(resolve_stuff))
-    if stuffs_by_conf != situ.potential_resolve_stuffs:
-      print('reconstructed stuff doesnt match potential stuff')
-      print('reconstructed stuff doesnt match potential stuff')
-      print('reconstructed stuff doesnt match potential stuff')
-      print('reconstructed stuff doesnt match potential stuff')
-      print('reconstructed stuff doesnt match potential stuff')
-      #self.all_resolved_coordinates == other.all_resolved_coordinates and self.target_to_resolved_coordinates == other .target_to_resolved_coordinates
+    if not situ.potential_resolve_stuffs:
+      self.dump_resolve_stuffs(resolve_workdir, stuffs_by_conf)
+    elif stuffs_by_conf != situ.potential_resolve_stuffs:
       if situ.potential_resolve_stuffs is None:
         print('read is None')
       else:
@@ -484,12 +477,9 @@ class IvyTaskMixin(TaskBase):
 
         print('created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates ')
         print(created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates )
+      self.dump_resolve_stuffs(resolve_workdir, stuffs_by_conf)
     else:
-      print('yay they match')
-      print('yay they match')
-      print('yay they match')
-      print('yay they match')
-    self.dump_resolve_stuffs(resolve_workdir, stuffs_by_conf)
+      pass
 
     return result
 
@@ -510,14 +500,10 @@ class IvyTaskMixin(TaskBase):
     # returns a dict of conf -> ResolveStuff
     filename = os.path.join(resolve_workdir, 'stuff.file.json')
     if not os.path.exists(filename):
-      print('no resolve stuffs :(')
       return None
+
     with open(filename) as f:
       from_file = json.load(f,object_pairs_hook=OrderedDict) # maybe the object_pairs_hook thing will work :/
-    print('yay')
-    print('yay')
-    print('yay')
-    print('result {}'.format(from_file))
     result = {}
     target_lookup = {t.address.spec: t for t in targets}
     for conf, serialized_stuff in from_file.items():
@@ -526,13 +512,7 @@ class IvyTaskMixin(TaskBase):
         t = target_lookup[spec] # TODO error handling
         stuff.add_stuff_coords(t, [M2Coordinate.from_string(c) for c in coord_strs])
       stuff.all_resolved_coordinates = OrderedSet(M2Coordinate.from_string(c) for c in serialized_stuff['coords'])
-      result[conf]= stuff
-    print('yay')
-    print('yay')
-    print('yay')
-    print('yay')
-    print('reified')
-    print(result)
+      result[conf] = stuff
     return result
 
   def do_a_full_resolve_type_thing(self, confs, executor, extra_args, global_vts, pinned_artifacts,
