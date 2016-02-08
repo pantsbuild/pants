@@ -10,6 +10,7 @@ import shutil
 from abc import ABCMeta, abstractmethod, abstractproperty
 
 from pants.util.dirutil import safe_mkdir
+from pants.util.meta import AbstractClass
 from pants.util.strutil import safe_shlex_split
 
 
@@ -41,9 +42,8 @@ class CoverageTaskSettings(object):
       log=task.context.log)
 
 
-class Coverage(object):
+class Coverage(AbstractClass):
   """Base class for coverage processors. Do not instantiate."""
-  __metaclass__ = ABCMeta
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):

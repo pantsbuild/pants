@@ -1,6 +1,104 @@
 RELEASE HISTORY
 ===============
 
+0.0.71 (02/05/2016)
+-------------------
+
+This release is primarily comprised of bugfixes, although there was also removal of support for the
+deprecated `--use-old-naming-style` flag for the `export-classpath` goal.
+
+If you use pants with custom plugins you've developed, you should be interested in the first
+appearance of a means of communicating the public APIs you can rely on.  You can read
+https://rbcommons.com/s/twitter/r/3417 to get a peek at what's to come.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove deprecated `--use-old-naming-style` flag.
+  `RB #3427 <https://rbcommons.com/s/twitter/r/3427>`_
+
+Bugfixes
+~~~~~~~~
+
+* bug fix: remove duplicate 3rdparty jars in the bundle
+  `RB #3329 <https://rbcommons.com/s/twitter/r/3329>`_
+  `RB #3412 <https://rbcommons.com/s/twitter/r/3412>`_
+
+* Fix __metaclass__ T605:WARNING.
+  `RB #3424 <https://rbcommons.com/s/twitter/r/3424>`_
+
+* Retain file permissions when shading monolithic jars.
+  `RB #3420 <https://rbcommons.com/s/twitter/r/3420>`_
+
+* Bump jarjar.  The new version is faster and fixes a bug.
+  `RB #3405 <https://rbcommons.com/s/twitter/r/3405>`_
+
+* If the junit output file doesn't exist, it should still count as an error on the target
+  `RB #3407 <https://rbcommons.com/s/twitter/r/3407>`_
+
+* When a python test fails outside of a function, the resultslog message is just [EF] file.py, without the double-colons
+  `RB #3397 <https://rbcommons.com/s/twitter/r/3397>`_
+
+* Fix "ValueError: too many values to unpack" when parsing interpreter versions.
+  `RB #3411 <https://rbcommons.com/s/twitter/r/3411>`_
+
+* Update how_to_develop.md's examples
+  `RB #3408 <https://rbcommons.com/s/twitter/r/3408>`_
+
+* bug fix: is_app filter not applied when using wildcard
+  `RB #3272 <https://rbcommons.com/s/twitter/r/3272>`_
+  `RB #3398 <https://rbcommons.com/s/twitter/r/3398>`_
+
+* Add validations to jvm_app bundles; Fix typo in BundleProps construction; fix relative globs
+  `RB #3396 <https://rbcommons.com/s/twitter/r/3396>`_
+
+* Add process-level buildroot validation to NailgunExecutor.
+  `RB #3393 <https://rbcommons.com/s/twitter/r/3393>`_
+
+* Adding support for multiline param help descriptions in Pants BUILD Dictionary
+  `RB #3399 <https://rbcommons.com/s/twitter/r/3399>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Cleaning up jarjar rules, and adding support for keep and zap.
+  `RB #3428 <https://rbcommons.com/s/twitter/r/3428>`_
+
+* Introduce ignore_patterns option
+  `RB #3414 <https://rbcommons.com/s/twitter/r/3414>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix bad test target deps.
+  `RB #3425 <https://rbcommons.com/s/twitter/r/3425>`_
+
+* add public api markers
+  `RB #3417 <https://rbcommons.com/s/twitter/r/3417>`_
+
+* Attempt a fix for flaky zinc compile failures under Travis-CI.
+  `RB #3413 <https://rbcommons.com/s/twitter/r/3413>`_
+  `RB #3426 <https://rbcommons.com/s/twitter/r/3426>`_
+
+* Cleanup: rename ivy_resolve kwarg custom_args to extra_args; move / rm unnecessary conf or defaults; rm unnecessary extra_args
+  `RB #3416 <https://rbcommons.com/s/twitter/r/3416>`_
+
+* Use one zinc worker per core by default.
+  `RB #3413 <https://rbcommons.com/s/twitter/r/3413>`_
+
+* Add sublime text project/workspace extensions to pants .gitignore.
+  `RB #3409 <https://rbcommons.com/s/twitter/r/3409>`_
+
+* Refactor IvyTaskMixin's ivy_resolve and functions it depends on
+  `RB #3371 <https://rbcommons.com/s/twitter/r/3371>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Implement BUILD file parsing inside the engine
+  `RB #3377 <https://rbcommons.com/s/twitter/r/3377>`_
+
+
 0.0.70 (01/29/2016)
 -------------------
 

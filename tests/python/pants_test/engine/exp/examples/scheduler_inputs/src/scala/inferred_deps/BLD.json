@@ -1,0 +1,10 @@
+{
+  "type_alias": "target",
+  "name": "inferred_deps",
+  "configurations": [
+    {
+      "type_alias": "inferred_scala",
+      "files": ["InferDeps.scala"]
+    }
+  ]
+}

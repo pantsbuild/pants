@@ -188,7 +188,6 @@ class ClasspathUtil(object):
   @classmethod
   def create_canonical_classpath(cls, classpath_products, targets, basedir,
                                  save_classpath_file=False,
-                                 use_target_id=True,
                                  internal_classpath_only=True,
                                  excludes=None):
     """Create a stable classpath of symlinks with standardized names.
@@ -209,10 +208,6 @@ class ClasspathUtil(object):
     :param basedir: Directory to create symlinks.
     :param save_classpath_file: An optional file with original classpath entries that symlinks
       are created from.
-    :param use_target_id: Optionally switch to the subdirectory based symlinks naming.
-      This is added for backward compatibility. Remove once intellij plugin is ready to use
-      `target.id` based output files.  See `use_old_naming_style` option in :class:
-      `pants.backend.jvm.tasks.jvm_compile.jvm_classpath_publisher.RuntimeClasspathPublisher`.
     :param internal_classpath_only: whether to create symlinks just for internal classpath or
        all classpath.
     :param excludes: classpath entries should be excluded.
@@ -237,21 +232,11 @@ class ClasspathUtil(object):
       This includes creating directories if it does not already exist, cleaning up
       previous classpath output related to the target.
       """
-      if use_target_id:
-        output_dir = basedir
-        # TODO(peiyu) improve readability once we deprecate the old naming style.
-        # For example, `-` is commonly placed in string format as opposed to here.
-        classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
-                                                                      target_id=target.id)
-      else:
-        address = target.address
-        output_dir = os.path.join(
-          basedir,
-          # target.address.spec is used in export goal to identify targets
-          address.spec.replace(':', os.sep) if address.spec_path else address.target_name,
-        )
-        # append / to the end as part of the prefix
-        classpath_prefix_for_target = os.path.join(output_dir, '')
+      output_dir = basedir
+      # TODO(peiyu) improve readability once we deprecate the old naming style.
+      # For example, `-` is commonly placed in string format as opposed to here.
+      classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
+                                                                    target_id=target.id)
 
       if os.path.exists(output_dir):
         delete_old_target_output_files(classpath_prefix_for_target)
@@ -263,6 +248,7 @@ class ClasspathUtil(object):
     canonical_classpath = []
     target_to_classpath = cls.classpath_by_targets(targets, classpath_products)
 
+    processed_entries = set()
     for target, classpath_entries_for_target in target_to_classpath.items():
       if internal_classpath_only:
         classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
@@ -270,13 +256,20 @@ class ClasspathUtil(object):
       if len(classpath_entries_for_target) > 0:
         classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
 
-        classpath = []
         # Note: for internal targets pants has only one classpath entry, but user plugins
         # might generate additional entries, for example, build.properties for the target.
         # Also it's common to have multiple classpath entries associated with 3rdparty targets.
         for (index, entry) in enumerate(classpath_entries_for_target):
           if entry.is_excluded_by(excludes):
             continue
+
+          # Avoid creating symlink for the same entry twice, only the first entry on
+          # classpath will get a symlink. The resulted symlinks as a whole are still stable,
+          # but may have non-consecutive suffixes because the 'missing' ones are those
+          # have already been created symlinks by previous targets.
+          if entry in processed_entries:
+            continue
+          processed_entries.add(entry)
 
           # Create a unique symlink path by prefixing the base file name with a monotonic
           # increasing `index` to avoid name collisions.
@@ -289,9 +282,9 @@ class ClasspathUtil(object):
 
           os.symlink(entry.path, symlink_path)
           canonical_classpath.append(symlink_path)
-          classpath.append(entry.path)
 
         if save_classpath_file:
+          classpath = [entry.path for entry in classpath_entries_for_target]
           with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
             classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
             classpath_file.write('\n')

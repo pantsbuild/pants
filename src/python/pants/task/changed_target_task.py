@@ -47,7 +47,8 @@ class ChangedTargetTask(ChangedFileTaskMixin, NoopExecTask):
       options,
       address_mapper,
       build_graph,
-      spec_excludes=options.spec_excludes,
+      # Will be provided through address_mapper.build_ignore_patterns.
+      spec_excludes=None,
     )
     changed_addresses = change_calculator.changed_target_addresses()
     readable = ''.join(sorted('\n\t* {}'.format(addr.reference()) for addr in changed_addresses))

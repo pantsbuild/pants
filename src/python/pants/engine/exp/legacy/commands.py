@@ -53,6 +53,7 @@ def list():
                                           per_path_symbol_factory=per_path_symbol_factory)
   mapper = AddressMapper(build_root, parser=parser)
 
-  spec_excludes = options.for_global_scope().spec_excludes
+  # Should use build_ignore_patterns instead.
+  spec_excludes = None
   for address, obj in mapper.walk_addressables(path_excludes=spec_excludes):
     print(address.spec)

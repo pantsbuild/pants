@@ -14,17 +14,6 @@ thrift2 = StructWithDeps(
 
 java1 = Target(
   configurations=[
-    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
-    # off / prove the capabilities of the new BUILD graph parser.
-    ApacheThriftConfig(
-      version='0.9.2',
-      strict=True,
-      lang='java',
-      dependencies=[
-        ':thrift2',
-      ]
-    ),
-    ':nonstrict',
     PublishConfig(
       default_repo=':public',
       repos={
@@ -33,7 +22,18 @@ java1 = Target(
         ),
         'jane': ':public'
       }
-    )
+    ),
+    # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
+    # off / prove the capabilities of the new BUILD graph parser.
+    ':nonstrict',
+    ApacheThriftConfig(
+      version='0.9.2',
+      strict=True,
+      lang='java',
+      dependencies=[
+        ':thrift2',
+      ]
+    ),
   ]
 )
 
