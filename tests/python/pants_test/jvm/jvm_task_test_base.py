@@ -13,11 +13,16 @@ from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class JvmTaskTestBase(TaskTestBase):
+  """
+  :API: public
+  """
 
   def populate_runtime_classpath(self, context, classpath=None):
     """
     Helps actual test cases to populate the 'runtime_classpath' products data mapping
     in the context, which holds the classpath value for targets.
+
+    :API: public
 
     :param context: The execution context where the products data mapping lives.
     :param classpath: a list of classpath strings. If not specified,
@@ -29,7 +34,10 @@ class JvmTaskTestBase(TaskTestBase):
                                       [('default', entry) for entry in classpath])
 
   def add_to_runtime_classpath(self, context, tgt, files_dict):
-    """Creates and adds the given files to the classpath for the given target under a temp path."""
+    """Creates and adds the given files to the classpath for the given target under a temp path.
+
+    :API: public
+    """
     runtime_classpath = self.get_runtime_classpath(context)
     # Create a temporary directory under the target id, then dump all files.
     target_dir = os.path.join(self.test_workdir, tgt.id)
@@ -41,4 +49,7 @@ class JvmTaskTestBase(TaskTestBase):
     runtime_classpath.add_for_target(tgt, [('default', classpath_dir)])
 
   def get_runtime_classpath(self, context):
+    """
+    :API: public
+    """
     return context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
