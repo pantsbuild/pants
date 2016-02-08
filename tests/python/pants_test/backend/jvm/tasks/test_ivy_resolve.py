@@ -136,6 +136,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_multiple_artifacts(self):
+    def coordinates_for(cp):
+      return {resolved_jar.coordinate for conf, resolved_jar in cp}
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
     classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
 
@@ -152,22 +154,15 @@ class IvyResolveTest(JvmToolTaskTestBase):
     classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
       classifier_and_no_classifier_lib.closure(bfs=True))
 
-    self.assertIn(no_classifier.coordinate,
-                  {resolved_jar.coordinate
-                   for conf, resolved_jar in classifier_and_no_classifier_cp})
-    self.assertIn(classifier.coordinate,
-                  {resolved_jar.coordinate
-                   for conf, resolved_jar in classifier_and_no_classifier_cp})
+    classifier_and_no_classifier_coords = coordinates_for(classifier_and_no_classifier_cp)
+    self.assertIn(no_classifier.coordinate, classifier_and_no_classifier_coords)
+    self.assertIn(classifier.coordinate, classifier_and_no_classifier_coords)
 
-    self.assertNotIn(classifier.coordinate, {resolved_jar.coordinate
-                                             for conf, resolved_jar in no_classifier_cp})
-    self.assertIn(no_classifier.coordinate, {resolved_jar.coordinate
-                                             for conf, resolved_jar in no_classifier_cp})
+    self.assertNotIn(classifier.coordinate, coordinates_for(no_classifier_cp))
+    self.assertIn(no_classifier.coordinate, coordinates_for(no_classifier_cp))
 
-    self.assertNotIn(no_classifier.coordinate, {resolved_jar.coordinate
-                                                for conf, resolved_jar in classifier_cp})
-    self.assertIn(classifier.coordinate, {resolved_jar.coordinate
-                                          for conf, resolved_jar in classifier_cp})
+    self.assertNotIn(no_classifier.coordinate, coordinates_for(classifier_cp))
+    self.assertIn(classifier.coordinate, coordinates_for(classifier_cp))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
