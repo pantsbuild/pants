@@ -296,6 +296,10 @@ class ArchiveFetcher(Fetcher, Subsystem):
       UrlInfo(url_format='https://github.com/golang/\g<repo>/archive/{rev}.tar.gz',
               default_rev='master',
               strip_level=1),
+    r'google\.golang\.org/.*':
+      UrlInfo(url_format='{meta_repo_url}/+archive/{rev}.tar.gz',
+              default_rev='master',
+              strip_level=0),
   }
 
   @classmethod
@@ -361,11 +365,13 @@ class ArchiveFetcher(Fetcher, Subsystem):
     match, _ = self._matcher(import_path)
     return match.string[:match.end()]
 
-  def fetch(self, import_path, dest, rev=None):
+  def fetch(self, import_path, dest, rev=None, url_info=None,
+            meta_repo_url=None):
     match, url_info = self._matcher(import_path)
     pkg = GoRemoteLibrary.remote_package_path(self.root(import_path), import_path)
     archive_url = match.expand(url_info.url_format).format(
-      rev=url_info.rev(rev), pkg=pkg, import_prefix=self.root(import_path))
+      rev=url_info.rev(rev), pkg=pkg, import_prefix=self.root(import_path),
+      meta_repo_url=meta_repo_url)
     try:
       archiver = archiver_for_path(archive_url)
     except ValueError:
@@ -452,7 +458,7 @@ class GopkgInFetcher(Fetcher, Subsystem):
   def _do_fetch(self, import_path, dest, rev=None):
     return self._fetcher.fetch(import_path, dest, rev=rev)
 
-  def fetch(self, import_path, dest, rev=None):
+  def fetch(self, import_path, dest, rev=None, meta_repo_url=None):
     github_root, github_rev = self._map_github_root_and_rev(import_path, rev)
     self._do_fetch(github_root, dest, rev=rev or github_rev)
 
@@ -603,3 +609,4 @@ Fetchers.advertise(ArchiveFetcher, namespace='')
 Fetchers._register_default(r'bitbucket\.org/.*', ArchiveFetcher)
 Fetchers._register_default(r'github\.com/.*', ArchiveFetcher)
 Fetchers._register_default(r'golang\.org/x/.*', ArchiveFetcher)
+Fetchers._register_default(r'google\.golang\.org/.*', ArchiveFetcher)
