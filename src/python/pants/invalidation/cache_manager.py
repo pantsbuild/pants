@@ -23,10 +23,15 @@ class VersionedTargetSet(object):
   When invalidating a single target, this can be used to represent that target as a singleton.
   When checking the artifact cache, this can also be used to represent a list of targets that are
   built together into a single artifact.
+
+  :API: public
   """
 
   @staticmethod
   def from_versioned_targets(versioned_targets):
+    """
+    :API: public
+    """
     first_target = versioned_targets[0]
     cache_manager = first_target._cache_manager
 
@@ -42,6 +47,9 @@ class VersionedTargetSet(object):
     return VersionedTargetSet(cache_manager, versioned_targets)
 
   def __init__(self, cache_manager, versioned_targets):
+    """
+    :API: public
+    """
     self._cache_manager = cache_manager
     self.versioned_targets = versioned_targets
     self.targets = [vt.target for vt in versioned_targets]
@@ -65,18 +73,30 @@ class VersionedTargetSet(object):
     self.is_incremental = False
 
   def update(self):
+    """
+    :API: public
+    """
     self._cache_manager.update(self)
 
   def force_invalidate(self):
+    """
+    :API: public
+    """
     self._cache_manager.force_invalidate(self)
 
   @property
   def has_results_dir(self):
+    """
+    :API: public
+    """
     return self._results_dir is not None
 
   @property
   def results_dir(self):
-    """The directory that stores results for this version of these targets."""
+    """The directory that stores results for this version of these targets.
+
+    :API: public
+    """
     if self._results_dir is None:
       raise ValueError('No results_dir was created for {}'.format(self))
     return self._results_dir
@@ -89,6 +109,8 @@ class VersionedTargetSet(object):
 
     TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
     mutate them.
+
+    :API: public
     """
     if self._previous_results_dir is None:
       raise ValueError('There is no previous_results_dir for: {}'.format(self))
@@ -102,9 +124,14 @@ class VersionedTargetSet(object):
 class VersionedTarget(VersionedTargetSet):
   """This class represents a singleton VersionedTargetSet, and has links to VersionedTargets that
   the wrapped target depends on (after having resolved through any "alias" targets.
+
+  :API: public
   """
 
   def __init__(self, cache_manager, target, cache_key):
+    """
+    :API: public
+    """
     if not isinstance(target, Target):
       raise ValueError("The target {} must be an instance of Target but is not.".format(target.id))
 
@@ -119,6 +146,8 @@ class VersionedTarget(VersionedTargetSet):
 
     If incremental=True, attempts to clone the results_dir for the previous version of this target
     to the new results dir. Otherwise, simply ensures that the results dir exists.
+
+    :API: public
     """
     def dirname(key):
       def version_to_string(task_ver):
@@ -157,6 +186,8 @@ class InvalidationCheck(object):
 
   Tasks may need to perform no, some or all operations on either of these, depending on how they
   are implemented.
+
+  :API: public
   """
 
   @classmethod
@@ -223,6 +254,9 @@ class InvalidationCheck(object):
     return res
 
   def __init__(self, all_vts, invalid_vts, partition_size_hint=None, target_colors=None):
+    """
+    :API: public
+    """
     # target_colors is specified by Target. We need it by VersionedTarget.
     vt_colors = {}
     if target_colors:
@@ -251,6 +285,8 @@ class InvalidationCacheManager(object):
   """Manages cache checks, updates and invalidation keeping track of basic change
   and invalidation statistics.
   Note that this is distinct from the ArtifactCache concept, and should probably be renamed.
+
+  :API: public
   """
 
   class CacheValidationError(Exception):
@@ -264,6 +300,9 @@ class InvalidationCacheManager(object):
                invalidation_report=None,
                task_name=None,
                task_version=None,):
+    """
+    :API: public
+    """
     self._cache_key_generator = cache_key_generator
     self._task_name = task_name or 'UNKNOWN'
     self._task_version = task_version or 'Unknown_0'
@@ -273,7 +312,10 @@ class InvalidationCacheManager(object):
     self.invalidation_report = invalidation_report
 
   def update(self, vts):
-    """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
+    """Mark a changed or invalidated VersionedTargetSet as successfully processed.
+
+    :API: public
+    """
     for vt in vts.versioned_targets:
       self._invalidator.update(vt.cache_key)
       vt.valid = True
@@ -281,7 +323,10 @@ class InvalidationCacheManager(object):
     vts.valid = True
 
   def force_invalidate(self, vts):
-    """Force invalidation of a VersionedTargetSet."""
+    """Force invalidation of a VersionedTargetSet.
+
+    :API: public
+    """
     for vt in vts.versioned_targets:
       self._invalidator.force_invalidate(vt.cache_key)
       vt.valid = False
@@ -304,6 +349,8 @@ class InvalidationCacheManager(object):
 
     If target_colors is specified, it must be a map from Target -> opaque 'color' values.
     Two Targets will be in the same partition only if they have the same color.
+
+    :API: public
     """
     all_vts = self.wrap_targets(targets, topological_order=topological_order)
     invalid_vts = filter(lambda vt: not vt.valid, all_vts)
@@ -311,10 +358,16 @@ class InvalidationCacheManager(object):
 
   @property
   def task_name(self):
+    """
+    :API: public
+    """
     return self._task_name
 
   @property
   def task_version(self):
+    """
+    :API: public
+    """
     return self._task_version
 
   def wrap_targets(self, targets, topological_order=False):
@@ -322,6 +375,8 @@ class InvalidationCacheManager(object):
 
     If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will not
     have an associated VersionedTarget returned.
+
+    :API: public
 
     Returns a list of VersionedTargets, each representing one input target.
     """
@@ -337,6 +392,9 @@ class InvalidationCacheManager(object):
     return list(vt_iter())
 
   def previous_key(self, cache_key):
+    """
+    :API: public
+    """
     return self._invalidator.previous_key(cache_key)
 
   def _key_for(self, target):

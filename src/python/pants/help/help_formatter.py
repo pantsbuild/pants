@@ -13,7 +13,14 @@ from pants.help.help_info_extracter import HelpInfoExtracter
 
 
 class HelpFormatter(object):
+  """
+  :API: public
+  """
+
   def __init__(self, scope, show_recursive, show_advanced, color):
+    """
+    :API: public
+    """
     self._scope = scope
     self._show_recursive = show_recursive
     self._show_advanced = show_advanced
@@ -36,6 +43,8 @@ class HelpFormatter(object):
 
   def format_options(self, scope, description, option_registrations_iter):
     """Return a help message for the specified options.
+
+    :API: public
 
     :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
                                       options registration.
@@ -64,6 +73,8 @@ class HelpFormatter(object):
 
   def format_option(self, ohi):
     """Format the help output for a single option.
+
+    :API: public
 
     :param OptionHelpInfo ohi: Extracted information for option to print
     :return: Formatted help text for this option

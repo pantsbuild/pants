@@ -17,18 +17,29 @@ from pants.engine.round_manager import RoundManager
 
 
 class GoalExecutor(object):
+  """
+  :API: public
+  """
 
   def __init__(self, context, goal, tasktypes_by_name):
+    """
+    :API: public
+    """
     self._context = context
     self._goal = goal
     self._tasktypes_by_name = tasktypes_by_name
 
   @property
   def goal(self):
+    """
+    :API: public
+    """
     return self._goal
 
   def attempt(self, explain):
     """Attempts to execute the goal's tasks in installed order.
+
+    :API: public
 
     :param bool explain: If ``True`` then the goal plan will be explained instead of being
                          executed.
@@ -54,6 +65,9 @@ class GoalExecutor(object):
 
 
 class RoundEngine(Engine):
+  """
+  :API: public
+  """
   class DependencyError(ValueError):
     """Indicates a Task has an unsatisfiable data dependency."""
 
@@ -199,6 +213,9 @@ class RoundEngine(Engine):
       yield GoalExecutor(context, goal_info.goal, goal_info.tasktypes_by_name)
 
   def attempt(self, context, goals):
+    """
+    :API: public
+    """
     goal_executors = list(self._prepare(context, goals))
     execution_goals = ' -> '.join(e.goal.name for e in goal_executors)
     context.log.info('Executing tasks in goals: {goals}'.format(goals=execution_goals))

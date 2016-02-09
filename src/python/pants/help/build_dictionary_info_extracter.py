@@ -25,7 +25,10 @@ class BuildSymbolInfo(namedtuple('_BuildSymbolInfo', ['symbol', 'description', '
 
 
 class BuildDictionaryInfoExtracter(object):
-  """Extracts help information about the symbols that may be used in BUILD files."""
+  """Extracts help information about the symbols that may be used in BUILD files.
+
+  :API: public
+  """
 
   ADD_DESCR = '<Add description>'
 
@@ -39,6 +42,9 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def get_description_from_docstring(cls, obj):
+    """
+    :API: public
+    """
     doc = obj.__doc__ or ''
     p = doc.find('\n')
     if p == -1:
@@ -65,7 +71,10 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def get_arg_descriptions_from_docstring(cls, obj):
-    """Returns an ordered map of arg name -> arg description found in :param: stanzas."""
+    """Returns an ordered map of arg name -> arg description found in :param: stanzas.
+
+    :API: public
+    """
 
     ret = OrderedDict()
     name = ''
@@ -90,6 +99,9 @@ class BuildDictionaryInfoExtracter(object):
 
   @classmethod
   def get_args_for_target_type(cls, target_type):
+    """
+    :API: public
+    """
     return list(cls._get_args_for_target_type(target_type))
 
   @classmethod
@@ -120,6 +132,8 @@ class BuildDictionaryInfoExtracter(object):
     """Returns pairs (arg, default) for each argument of func, in declaration order.
 
     Ignores *args, **kwargs. Ignores self for methods.
+
+    :API: public
     """
     return list(cls._get_function_args(func))
 
@@ -151,16 +165,25 @@ class BuildDictionaryInfoExtracter(object):
         yield FunctionArg(arg_name, descr_sans_default, True, default_value)
 
   def __init__(self, buildfile_aliases):
+    """
+    :API: public
+    """
     self._buildfile_aliases = buildfile_aliases
 
   def get_target_args(self, alias):
-    """Returns a list of FunctionArgs for the specified target_type."""
+    """Returns a list of FunctionArgs for the specified target_type.
+
+    :API: public
+    """
     target_types = list(self._buildfile_aliases.target_types_by_alias.get(alias))
     if not target_types:
       raise TaskError('No such target type: {}'.format(alias))
     return self.get_args_for_target_type(target_types[0])
 
   def get_object_args(self, alias):
+    """
+    :API: public
+    """
     obj_type = self._buildfile_aliases.objects.get(alias)
     if not obj_type:
       raise TaskError('No such object type: {}'.format(alias))
@@ -174,13 +197,19 @@ class BuildDictionaryInfoExtracter(object):
       return []
 
   def get_object_factory_args(self, alias):
+    """
+    :API: public
+    """
     obj_factory = self._buildfile_aliases.context_aware_object_factories.get(alias)
     if not obj_factory:
       raise TaskError('No such context aware object factory: {}'.format(alias))
     return self.get_function_args(obj_factory.__call__)
 
   def get_target_type_info(self):
-    """Returns a sorted list of BuildSymbolInfo for all known target types."""
+    """Returns a sorted list of BuildSymbolInfo for all known target types.
+
+    :API: public
+    """
     return sorted(self._get_target_type_info())
 
   def _get_target_type_info(self):
@@ -200,6 +229,9 @@ class BuildDictionaryInfoExtracter(object):
         yield BuildSymbolInfo(alias, self.ADD_DESCR, target_args)
 
   def get_object_info(self):
+    """
+    :API: public
+    """
     return sorted(self._get_object_info())
 
   def _get_object_info(self):
@@ -209,6 +241,9 @@ class BuildDictionaryInfoExtracter(object):
                             self.get_object_args(alias))
 
   def get_object_factory_info(self):
+    """
+    :API: public
+    """
     return sorted(self._get_object_factory_info())
 
   def _get_object_factory_info(self):
