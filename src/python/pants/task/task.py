@@ -424,8 +424,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def _cleanup_workdir_cache(self, invalid_vts):
     for vt in invalid_vts:
-      if vt.results_dir is not None:
+      try:
         root = os.path.dirname(vt.results_dir)
+      except ValueError:
+        continue
+      else:
         max_entries_per_target = 1
         if os.path.isdir(root) and max_entries_per_target is not None:
           found_files = []
