@@ -55,8 +55,11 @@ def linkify(buildroot, s, memoized_urls):
 
     if path.startswith('/'):
       path = os.path.relpath(path, buildroot)
+    elif path.startswith('..'):
+      # The path is not located inside the buildroot, so it's definitely not a BUILD file.
+      return None
     else:
-      # See if it's a reference to a target in a BUILD file.
+      # The path is located in the buildroot: see if it's a reference to a target in a BUILD file.
       parts = path.split(':')
       if len(parts) == 2:
         putative_dir = parts[0]
