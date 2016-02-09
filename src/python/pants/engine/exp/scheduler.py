@@ -632,20 +632,21 @@ class GraphValidator(object):
   def __init__(self, symbol_table_cls):
     self._literal_types = set(symbol_table_cls.table().values())
 
-  def _used_literal_dependency(self, product_graph, root_subject, roots):
-    """Walks nodes for the given product and returns the first literal product used, or None.
+  def _used_literal_dependencies(self, product_graph, root_subject, roots):
+    """Walks nodes for the given product and returns all literal products used.
 
     Note that this will not walk into Nodes for other subjects.
     """
+    used = set()
     def predicate(entry):
       node, state = entry
       return root_subject == node.subject and type(state) is not Throw
     for ((node, _), _) in product_graph.walk(roots, predicate=predicate):
       if node.product in self._literal_types:
-        return node.product
-    return None
+        used.add(node.product)
+    return used
 
-  def _validate_failed_root(self, product_graph, partially_consumed_inputs, failed_root):
+  def _validate_failed_root(self, product_graph, consumed_inputs, partially_consumed_inputs, failed_root):
     """Walks below a failed node and collects cases where additional literal products could be used.
 
     In particular, looks (recursively) for cases where:
@@ -673,12 +674,16 @@ class GraphValidator(object):
         continue
 
       # And there was at least one dep successfully (recursively) satisfied via a literal.
-      used_literal_dep = self._used_literal_dependency(product_graph,
-                                                       node.subject,
-                                                       select_deps.keys())
-      if used_literal_dep is None:
+      used_literal_deps = self._used_literal_dependencies(product_graph,
+                                                          node.subject,
+                                                          select_deps.keys())
+      if not used_literal_deps:
         continue
-      partially_consumed_inputs[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
+
+      # Found a partially consumed input.
+      consumed_inputs.update(used_literal_deps)
+      for used_literal_dep in used_literal_deps:
+        partially_consumed_inputs[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
 
   def validate(self, product_graph):
     """Finds failed roots in the product graph and invokes validation on each of them."""
@@ -699,11 +704,12 @@ class GraphValidator(object):
       failed_roots.add(node)
 
     # Raise if there were any partially consumed inputs.
-    partials = defaultdict(lambda: defaultdict(list))
     for failed_root in failed_roots:
-      self._validate_failed_root(product_graph, partials, failed_root)
-    if partials:
-      raise PartiallyConsumedInputsError(partials)
+      consumed = set()
+      partials = defaultdict(lambda: defaultdict(list))
+      self._validate_failed_root(product_graph, consumed, partials, failed_root)
+      if partials:
+        raise PartiallyConsumedInputsError(partials)
 
 
 class LocalScheduler(object):
