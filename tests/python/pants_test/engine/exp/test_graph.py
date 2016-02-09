@@ -15,8 +15,7 @@ from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
-from pants.engine.exp.scheduler import (BuildRequest, GraphValidator, LocalScheduler, Return,
-                                        SelectNode, Throw)
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Return, SelectNode, Throw
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
@@ -86,7 +85,7 @@ class GraphTestBase(unittest.TestCase):
                            build_pattern=build_pattern,
                            parser_cls=parser_cls)
     return LocalScheduler({self._goal: [self._product]},
-                          GraphValidator(symbol_table_cls),
+                          symbol_table_cls,
                           create_graph_tasks(mapper))
 
   def create_json(self):

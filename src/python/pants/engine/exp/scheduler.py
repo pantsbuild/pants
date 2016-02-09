@@ -226,19 +226,6 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       return item
     return None
 
-  def _task_sources(self, node_builder, variants):
-    """Returns a sequence of potential source Nodes for this Select."""
-    # Tasks.
-    for task_node in node_builder.task_nodes(self.subject, self.product, variants):
-      yield task_node
-    # An Address that can be resolved into a Struct.
-    # TODO: This node defines a special case for Addresses and Structs by recognizing that they
-    # might be-a Product after resolution, and so it begins by attempting to resolve a Struct for
-    # a subject Address. This type of cast/conversion should likely be reified.
-    if isinstance(self.subject, Address) and issubclass(self.product, Struct):
-      struct_address = StructAddress(self.subject.spec_path, self.subject.target_name)
-      yield SelectNode(struct_address, Struct, None, None)
-
   def step(self, dependency_states, node_builder):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
@@ -271,7 +258,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
 
     # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
-    dependencies = list(self._task_sources(node_builder, variants))
+    dependencies = list(node_builder.task_nodes(self.subject, self.product, variants))
     matches = {}
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
@@ -516,19 +503,29 @@ class NodeBuilder(object):
   """
 
   @classmethod
-  def create(cls, tasks):
+  def create(cls, tasks, symbol_table_cls):
     """Indexes tasks by their output type."""
     serializable_tasks = defaultdict(set)
     for output_type, input_selects, task in tasks:
       serializable_tasks[output_type].add((task, tuple(input_selects)))
-    return cls(serializable_tasks)
+    literal_products = set(symbol_table_cls.table().values())
+    return cls(serializable_tasks, literal_products)
 
-  def __init__(self, tasks):
+  def __init__(self, tasks, literal_products):
     self._tasks = tasks
+    self._literal_products = literal_products
 
   def task_nodes(self, subject, product, variants):
+    # Tasks.
     for task, anded_clause in self._tasks[product]:
       yield TaskNode(subject, product, variants, task, anded_clause)
+    # An Address that might be resolved as a literal value from a build file.
+    # TODO: This defines a special case for Addresses by recognizing that they might be-a literal
+    # Product after resolution, and so it begins by attempting to resolve a Struct for
+    # a subject Address. This type of cast/conversion should likely be reified.
+    if isinstance(subject, Address) and product in self._literal_products:
+      struct_address = StructAddress(subject.spec_path, subject.target_name)
+      yield SelectNode(struct_address, Struct, None, None)
 
 
 class BuildRequest(object):
@@ -716,15 +713,15 @@ class LocalScheduler(object):
   # ng-killall, and buildgen.go.
   """
 
-  def __init__(self, products_by_goal, graph_validator, tasks):
+  def __init__(self, products_by_goal, symbol_table_cls, tasks):
     """
     :param products_by_goal: The products that are required for each goal name.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
     """
     self._products_by_goal = products_by_goal
-    self._graph_validator = graph_validator
-    self._node_builder = NodeBuilder.create(tasks)
+    self._graph_validator = GraphValidator(symbol_table_cls)
+    self._node_builder = NodeBuilder.create(tasks, symbol_table_cls)
     self._product_graph = ProductGraph()
     self._roots = set()
     self._step_id = -1
