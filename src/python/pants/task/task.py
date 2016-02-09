@@ -429,7 +429,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       except ValueError:
         continue
       else:
-        max_entries_per_target = 1
+        max_entries_per_target = 4
         if os.path.isdir(root) and max_entries_per_target is not None:
           found_files = []
           for old_file in os.listdir(root):
