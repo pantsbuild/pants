@@ -61,3 +61,15 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
                                  '--run-jvm-cwd='
                                  'testprojects/src/java/org/pantsbuild/testproject/cwdexample/subdir')
     self.assertIn('Found readme.txt', stdout_data)
+
+  def test_disable_synthetic_jar(self):
+    output = self.run_pants(
+      ['run',
+       'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:run']).stdout_data
+    self.assertIn('Synthetic jar run is detected', output)
+
+    output = self.run_pants(
+      ['run',
+       '--no-jvm-synthetic-classpath',
+       'testprojects/tests/java/org/pantsbuild/testproject/syntheticjar:run']).stdout_data
+    self.assertIn('Synthetic jar run is not detected', output)
