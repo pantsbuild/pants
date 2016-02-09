@@ -9,8 +9,8 @@ import unittest
 import urlparse
 
 from requests import RequestException
+
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger
-from pants.cache.pinger import Pinger
 from pants_test.base_test import BaseTest
 from pants_test.cache.delay_server import setup_delayed_server
 
