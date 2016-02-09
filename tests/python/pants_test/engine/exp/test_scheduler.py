@@ -29,6 +29,7 @@ class SchedulerTest(unittest.TestCase):
     self.java = Address.parse('src/java/codegen/simple')
     self.java_simple = Address.parse('src/java/simple')
     self.java_multi = Address.parse('src/java/multiple_classpath_entries')
+    self.no_variant_thrift = Address.parse('src/java/codegen/selector:conflict')
     self.unconfigured_thrift = Address.parse('src/thrift/codegen/unconfigured')
     self.resources = Address.parse('src/resources/simple')
     self.consumes_resources = Address.parse('src/java/consumes_resources')
@@ -179,10 +180,21 @@ class SchedulerTest(unittest.TestCase):
     self.assertEqual(SelectNode(self.java_multi, Classpath, None, None), root_node)
     self.assertEqual(Throw, type(root_state))
 
-  @pytest.mark.xfail(reason='See #2869: should get an error here.')
-  def test_no_configured_thrift_planner(self):
-    """Even though the BuildPropertiesPlanner is able to produce a Classpath,
-    we still fail when a target with thrift sources doesn't have a thrift config.
+  def test_no_variant_thrift(self):
+    """No `thrift` variant is configured, and so no configuration is selected."""
+    build_request = BuildRequest(goals=['compile'],
+                                 addressable_roots=[self.no_variant_thrift])
+    walk = self.build_and_walk(build_request, failures=True)
+
+    # Validate that the root failed.
+    root_node, root_state = walk[0][0]
+    self.assertEqual(SelectNode(self.no_variant_thrift, Classpath, None, None), root_node)
+    self.assertEqual(Throw, type(root_state))
+
+  def test_unconfigured_thrift(self):
+    """The BuildPropertiesPlanner is able to produce a Classpath, but we should still fail.
+
+    A target with ThriftSources doesn't have a thrift config: that input is partially consumed.
     """
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.unconfigured_thrift])

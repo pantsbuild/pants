@@ -88,91 +88,11 @@ def visualize_execution_graph(scheduler):
       binary_util.ui_open(image_file)
 
 
-def used_literal_dependency(product_graph, literal_types, root_subject, roots):
-  """Walks nodes for the given product and returns the first literal product used, or None.
-
-  Note that this will not walk into Nodes for other subjects.
-  """
-  def predicate(entry):
-    node, state = entry
-    return root_subject == node.subject and type(state) is not Throw
-  for ((node, _), _) in product_graph.walk(roots, predicate=predicate):
-    if node.product in literal_types:
-      return node.product
-  return None
-
-
-def validate_failed_root(product_graph, partially_consumed_inputs, failed_root):
-  """Walks below a failed node and collects cases where additional literal products could be used.
-  
-  In particular, looks (recursively) for cases where:
-    1) at least one literal subject existed.
-    2) some literal/named products were missing.
-
-  Returns dict(partially_consumed_input, dict(used_product, list(tasks_with_missing_products))).
-
-  TODO: propagate SymbolTable more cleanly.
-  """
-  literal_types = set(ExampleTable.table().values())
-  for ((node, state), dependencies) in product_graph.walk([failed_root], predicate=lambda _: True):
-    # Look for failed TaskNodes with at least one satisfied Select dependency.
-    if type(node) != TaskNode:
-      continue
-    if type(state) != Throw:
-      continue
-    select_deps = {dep: state for dep, state in dependencies if type(dep) == SelectNode}
-    if not select_deps:
-      continue
-    failed_products = {dep.product for dep, state in select_deps.items() if type(state) == Throw}
-    if not failed_products:
-      continue
-
-    # If all unattainable products could have been specified as literal...
-    all_literal_failed_products = all(product in literal_types for product in failed_products)
-    if not all_literal_failed_products:
-      continue
-
-    # And there was at least one dep successfully (recursively) satisfied via a literal.
-    used_literal_dep = used_literal_dependency(product_graph,
-                                               literal_types,
-                                               node.subject,
-                                               select_deps.keys())
-    if used_literal_dep is None:
-      continue
-    partially_consumed_inputs[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
-
-
-def validate_graph(scheduler):
-  """Finds failed roots and invokes subgraph validation on each of them."""
-
-  # Locate failed root Nodes: those with an Address Subject which failed, but which did
-  # not have any failed (direct) dependents.
-  failed_roots = set()
-  for node, dependents in scheduler.product_graph.dependents().items():
-    if not type(node) == SelectNode:
-      continue
-    if not isinstance(node.subject, Address):
-      continue
-    if not type(scheduler.product_graph.state(node)) == Throw:
-      continue
-    if any(type(scheduler.product_graph.state(d)) is Throw for d in dependents):
-      # Node had failed dependents: was not a failed root.
-      continue
-    failed_roots.add(node)
-
-  # Raise if there were any partially consumed inputs.
-  partials = defaultdict(lambda: defaultdict(list))
-  for failed_root in failed_roots:
-    validate_failed_root(scheduler.product_graph, partials, failed_root)
-  if partials:
-    raise PartiallyConsumedInputsError(partials)
-
-
 def visualize_build_request(build_root, build_request):
   scheduler = setup_json_scheduler(build_root)
   LocalSerialEngine(scheduler).reduce(build_request)
-  validate_graph(scheduler)
   visualize_execution_graph(scheduler)
+  scheduler.validate()
 
 
 def main():

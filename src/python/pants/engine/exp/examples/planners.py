@@ -17,8 +17,8 @@ from pants.engine.exp.graph import Directory, create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.objects import datatype
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
-                                        SelectVariant)
+from pants.engine.exp.scheduler import (GraphValidator, LocalScheduler, Select, SelectDependencies,
+                                        SelectLiteral, SelectVariant)
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Sources, Target, Variants
 
@@ -425,5 +425,5 @@ def setup_json_scheduler(build_root):
       create_graph_tasks(address_mapper)
     )
 
-  scheduler = LocalScheduler(products_by_goal, tasks)
+  scheduler = LocalScheduler(products_by_goal, GraphValidator(ExampleTable), tasks)
   return scheduler

@@ -625,6 +625,90 @@ class Step(object):
     return 'Step({}, {})'.format(self._step_id, self._node)
 
 
+class GraphValidator(object):
+  """A concrete object that implements validation of a completed product graph.
+
+  If this abstraction seems useful, we should extract an interface and allow plugin
+  implementers to install their own.
+  """
+
+  def __init__(self, symbol_table_cls):
+    self._literal_types = set(symbol_table_cls.table().values())
+
+  def _used_literal_dependency(self, product_graph, root_subject, roots):
+    """Walks nodes for the given product and returns the first literal product used, or None.
+
+    Note that this will not walk into Nodes for other subjects.
+    """
+    def predicate(entry):
+      node, state = entry
+      return root_subject == node.subject and type(state) is not Throw
+    for ((node, _), _) in product_graph.walk(roots, predicate=predicate):
+      if node.product in self._literal_types:
+        return node.product
+    return None
+
+  def _validate_failed_root(self, product_graph, partially_consumed_inputs, failed_root):
+    """Walks below a failed node and collects cases where additional literal products could be used.
+
+    In particular, looks (recursively) for cases where:
+      1) at least one literal subject existed.
+      2) some literal/named products were missing.
+
+    Returns dict(partially_consumed_input, dict(used_product, list(tuple(task, missing_products)))).
+    """
+    for ((node, state), dependencies) in product_graph.walk([failed_root], predicate=lambda _: True):
+      # Look for failed TaskNodes with at least one satisfied Select dependency.
+      if type(node) != TaskNode:
+        continue
+      if type(state) != Throw:
+        continue
+      select_deps = {dep: state for dep, state in dependencies if type(dep) == SelectNode}
+      if not select_deps:
+        continue
+      failed_products = {dep.product for dep, state in select_deps.items() if type(state) == Throw}
+      if not failed_products:
+        continue
+
+      # If all unattainable products could have been specified as literal...
+      all_literal_failed_products = all(product in self._literal_types for product in failed_products)
+      if not all_literal_failed_products:
+        continue
+
+      # And there was at least one dep successfully (recursively) satisfied via a literal.
+      used_literal_dep = self._used_literal_dependency(product_graph,
+                                                       node.subject,
+                                                       select_deps.keys())
+      if used_literal_dep is None:
+        continue
+      partially_consumed_inputs[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
+
+  def validate(self, product_graph):
+    """Finds failed roots in the product graph and invokes validation on each of them."""
+
+    # Locate failed root Nodes: those with an Address Subject which failed, but which did
+    # not have any failed (direct) dependents.
+    failed_roots = set()
+    for node, dependents in product_graph.dependents().items():
+      if not type(node) == SelectNode:
+        continue
+      if not isinstance(node.subject, Address):
+        continue
+      if not type(product_graph.state(node)) == Throw:
+        continue
+      if any(type(product_graph.state(d)) is Throw for d in dependents):
+        # Node had failed dependents: was not a failed root.
+        continue
+      failed_roots.add(node)
+
+    # Raise if there were any partially consumed inputs.
+    partials = defaultdict(lambda: defaultdict(list))
+    for failed_root in failed_roots:
+      self._validate_failed_root(product_graph, partials, failed_root)
+    if partials:
+      raise PartiallyConsumedInputsError(partials)
+
+
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks.
 
@@ -632,13 +716,14 @@ class LocalScheduler(object):
   # ng-killall, and buildgen.go.
   """
 
-  def __init__(self, products_by_goal, tasks):
+  def __init__(self, products_by_goal, graph_validator, tasks):
     """
     :param products_by_goal: The products that are required for each goal name.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
     """
     self._products_by_goal = products_by_goal
+    self._graph_validator = graph_validator
     self._node_builder = NodeBuilder.create(tasks)
     self._product_graph = ProductGraph()
     self._roots = set()
@@ -761,3 +846,7 @@ class LocalScheduler(object):
             scheduling_iterations,
             self._step_id,
             sum(1 for _ in pg.walk(self._roots))))
+
+  def validate(self):
+    """Validates the generated product graph with the configured GraphValidator."""
+    self._graph_validator.validate(self._product_graph)
