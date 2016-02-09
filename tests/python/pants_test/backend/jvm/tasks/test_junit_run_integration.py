@@ -30,6 +30,11 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
     spec = 'testprojects/tests/java/org/pantsbuild/testproject/testjvms:{}'.format(spec_name)
     self.assert_success(self.run_pants(['clean-all', 'test.junit', '--strict-jvm-version', spec]))
 
+  # TODO(pl): This test is broken, and probably the underlying Distribution selection
+  # is also broken.  If a system has jdk8 installed but it is not the default jdk,
+  # this test will fail.
+  # See https://github.com/pantsbuild/pants/issues/2894
+  @expectedFailure
   @skipIf(missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_java_eight(self):
     self._testjvms('eight')

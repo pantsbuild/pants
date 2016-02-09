@@ -21,11 +21,19 @@ class Ivy(object):
   class Error(Exception):
     """Indicates an error executing an ivy command."""
 
-  def __init__(self, classpath, ivy_settings=None, ivy_cache_dir=None, extra_jvm_options=None):
+  def __init__(
+    self,
+    classpath,
+    ivy_settings=None,
+    ivy_cache_dir=None,
+    ivy_resolution_dir=None,
+    extra_jvm_options=None,
+  ):
     """Configures an ivy wrapper for the ivy distribution at the given classpath.
 
     :param ivy_settings: path to find settings.xml file
     :param ivy_cache_dir: path to store downloaded ivy artifacts
+    :param ivy_resolution_dir: path Ivy will use as a resolution scratch space
     :param extra_jvm_options: list of strings to add to command line when invoking Ivy
     """
     self._classpath = maybe_list(classpath)
@@ -38,6 +46,11 @@ class Ivy(object):
     if self._ivy_cache_dir and not isinstance(self._ivy_cache_dir, string_types):
       raise ValueError('ivy_cache_dir must be a string, given {} of type {}'.format(
                          self._ivy_cache_dir, type(self._ivy_cache_dir)))
+
+    self._ivy_resolution_dir = ivy_resolution_dir
+    if self._ivy_resolution_dir and not isinstance(self._ivy_resolution_dir, string_types):
+      raise ValueError('ivy_resolution_dir must be a string, given {} of type {}'.format(
+                         self._ivy_resolution_dir, type(self._ivy_resolution_dir)))
 
     self._extra_jvm_options = extra_jvm_options or []
 
@@ -54,6 +67,11 @@ class Ivy(object):
   def ivy_cache_dir(self):
     """Returns the ivy cache dir used by this `Ivy` instance."""
     return self._ivy_cache_dir
+
+  @property
+  def ivy_resolution_dir(self):
+    """Returns the ivy resolution dir used by this `Ivy` instance."""
+    return self._ivy_resolution_dir
 
   def execute(self, jvm_options=None, args=None, executor=None,
               workunit_factory=None, workunit_name=None, workunit_labels=None):
@@ -79,22 +97,45 @@ class Ivy(object):
   def runner(self, jvm_options=None, args=None, executor=None):
     """Creates an ivy commandline client runner for the given args."""
     args = args or []
+    jvm_args = []
     jvm_options = jvm_options or []
     executor = executor or SubprocessExecutor(DistributionLocator.cached())
     if not isinstance(executor, Executor):
       raise ValueError('The executor argument must be an Executor instance, given {} of type {}'.format(
                          executor, type(executor)))
 
-    if self._ivy_cache_dir and '-cache' not in args:
-      # TODO(John Sirois): Currently this is a magic property to support hand-crafted <caches/> in
-      # ivysettings.xml.  Ideally we'd support either simple -caches or these hand-crafted cases
-      # instead of just hand-crafted.  Clean this up by taking over ivysettings.xml and generating
-      # it from BUILD constructs.
-      jvm_options += ['-Divy.cache.dir={}'.format(self._ivy_cache_dir)]
-
-    if self._ivy_settings and '-settings' not in args:
-      args = ['-settings', self._ivy_settings] + args
+    # If '-cache' is in the provided args, it is assumed that the caller is taking full control
+    # over caching conventions, including passing the appropriate '-settings' and
+    # JVM properties for repository/resolution directories if custom ones are defined.
+    if '-cache' not in args:
+      # At the broadest scope, treat `--ivy-cache-dir` as the default global cache.
+      # This can be refined for narrower cache scopes, in particular for resolution.
+      jvm_args.extend(['-cache', self._ivy_cache_dir])
+      if self._ivy_resolution_dir != self._ivy_cache_dir:
+        if not self._ivy_settings:
+          raise self.Error(
+            '--ivy-resolution-dir is configured to be separate from --ivy-cache-dir,'
+            ' but a custom --ivy-ivy-settings pointing to an'
+            ' ivysettings.xml file was not provided.  In order for pants to discover the resolution'
+            ' reports that ivy generates, a custom ivysettings.xml defining <cache/> must be'
+            ' provided.  See build-support/ivy/ivysettings.xml in the pants repo for an example.'
+          )
+        jvm_args.extend(['-settings', self._ivy_settings])
+        # TODO(Patrick Lawson): In this case, the defaultCacheDir and resolutionCacheDir properties
+        #  _must_ be set to ${ivy.cache.repository.dir} and ${ivy.cache.resolution.dir} respectively
+        # in the <caches/> section of the passed ivy_settings XML file.
+        # Pants expects to rebase fetched artifacts from self._ivy_cache_dir,
+        # and it will look for generated resolution reports in self._ivy_resolution_dir.
+        jvm_options.extend([
+          '-Divy.cache.repository.dir={}'.format(self._ivy_cache_dir),
+          '-Divy.cache.resolution.dir={}'.format(self._ivy_resolution_dir),
+        ])
 
     jvm_options += self._extra_jvm_options
+    # NOTE(Patrick Lawson): It's important to prepend our arguments, since
+    # ivy can be used to invoke the JVM with the appropriate classpath
+    # after resolution, at which point it needs the trailing args in the right
+    # order.
+    jvm_args.extend(args)
     return executor.runner(classpath=self._classpath, main='org.apache.ivy.Main',
-                           jvm_options=jvm_options, args=args)
+                           jvm_options=jvm_options, args=jvm_args)
