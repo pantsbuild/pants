@@ -8,16 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import subprocess
 import sys
-from collections import defaultdict
 from textwrap import dedent
 
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.examples.planners import ExampleTable, setup_json_scheduler
-from pants.engine.exp.scheduler import (BuildRequest, DependenciesNode,
-                                        PartiallyConsumedInputsError, Return, SelectNode, TaskNode,
-                                        Throw)
+from pants.engine.exp.examples.planners import setup_json_scheduler
+from pants.engine.exp.scheduler import BuildRequest, SelectNode, TaskNode, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 

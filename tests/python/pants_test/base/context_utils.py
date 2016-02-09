@@ -20,6 +20,8 @@ from pants_test.option.util.fakes import create_options
 class TestContext(Context):
   """A Context to use during unittesting.
 
+  :API: public
+
   Stubs out various dependencies that we don't want to introduce in unit tests.
 
   TODO: Instead of extending the runtime Context class, create a Context interface and have
@@ -55,20 +57,32 @@ class TestContext(Context):
 
   @contextmanager
   def new_workunit(self, name, labels=None, cmd='', log_config=None):
+    """
+    :API: public
+    """
     sys.stderr.write('\nStarting workunit {}\n'.format(name))
     yield TestContext.DummyWorkUnit()
 
   @property
   def log(self):
+    """
+    :API: public
+    """
     return logging.getLogger('test')
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
+    """
+    :API: public
+    """
     # Just do the work synchronously, so we don't need a run tracker, background workers and so on.
     for work in work_chain:
       for args_tuple in work.args_tuples:
         work.func(*args_tuple)
 
   def subproc_map(self, f, items):
+    """
+    :API: public
+    """
     # Just execute in-process.
     return map(f, items)
 
@@ -78,6 +92,8 @@ def create_context(options=None, passthru_args=None, target_roots=None, build_gr
                    build_file_parser=None, address_mapper=None,
                    console_outstream=None, workspace=None):
   """Creates a ``Context`` with no options or targets by default.
+
+  :API: public
 
   :param options: A map of scope -> (map of key to value).
 

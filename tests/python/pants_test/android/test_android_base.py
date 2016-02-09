@@ -21,10 +21,16 @@ from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class TestAndroidBase(JvmToolTaskTestBase):
-  """Base class for Android tests that provides some mock structures useful for testing."""
+  """Base class for Android tests that provides some mock structures useful for testing.
+
+    :API: public
+  """
 
   @staticmethod
   def android_manifest(package_name=None, target_sdk=None):
+    """
+    :API: public
+    """
     package_name = package_name or 'org.pantsbuild.example.hello'
     sdk = target_sdk or 19
     manifest = textwrap.dedent(
@@ -41,7 +47,10 @@ class TestAndroidBase(JvmToolTaskTestBase):
   @contextmanager
   def android_target(self, target_name=None, package_name=None, target_sdk=None, dependencies=None,
                      target_type=AndroidTarget, **kwargs):
-    """Represent an Android target."""
+    """Represent an Android target.
+
+    :API: public
+    """
     with temporary_file() as manifest:
       manifest.write(self.android_manifest(package_name=package_name, target_sdk=target_sdk))
       manifest.close()
@@ -56,7 +65,10 @@ class TestAndroidBase(JvmToolTaskTestBase):
 
   @contextmanager
   def android_binary(self, target_name=None, dependencies=None, package_name=None, target_sdk=None):
-    """Represent an android_binary target."""
+    """Represent an android_binary target.
+
+    :API: public
+    """
     with self.android_target(target_name=target_name or 'binary',
                              dependencies=dependencies,
                              package_name=package_name,
@@ -66,7 +78,10 @@ class TestAndroidBase(JvmToolTaskTestBase):
 
   @contextmanager
   def android_resources(self, target_name=None, dependencies=None, package_name=None):
-    """Represent an android_resources target."""
+    """Represent an android_resources target.
+
+    :API: public
+    """
     with temporary_dir() as temp:
       with self.android_target(target_name=target_name or 'resources',
                                dependencies=dependencies,
@@ -78,7 +93,10 @@ class TestAndroidBase(JvmToolTaskTestBase):
   @contextmanager
   def android_library(self, target_name=None, libraries=None, include_patterns=None,
                       exclude_patterns=None, dependencies=None, package_name=None):
-    """Represent an android_library target."""
+    """Represent an android_library target.
+
+    :API: public
+    """
     with self.android_target(target_name=target_name or 'library',
                              libraries=libraries,
                              include_patterns=include_patterns,
@@ -95,6 +113,8 @@ def distribution(installed_sdks=('18', '19'),
                  files=('android.jar',),
                  executables=('aapt', 'zipalign')):
   """Mock Android SDK Distribution.
+
+  :API: public
 
   :param tuple[strings] installed_sdks: SDK versions of the files being mocked.
   :param tuple[strings] installed_build_tools: Build tools version of any tools.

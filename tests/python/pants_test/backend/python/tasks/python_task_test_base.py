@@ -15,13 +15,22 @@ from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
+  """
+  :API: public
+  """
 
   @property
   def alias_groups(self):
+    """
+    :API: public
+    """
     return register_python()
 
   def create_python_library(self, relpath, name, source_contents_map=None,
                             dependencies=(), provides=None):
+    """
+    :API: public
+    """
     sources = ['__init__.py'] + source_contents_map.keys() if source_contents_map else None
     sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""
@@ -45,6 +54,9 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     return self.target(Address(relpath, name).spec)
 
   def create_python_binary(self, relpath, name, entry_point, dependencies=(), provides=None):
+    """
+    :API: public
+    """
     self.create_file(relpath=self.build_path(relpath), contents=dedent("""
     python_binary(
       name='{name}',
@@ -59,6 +71,9 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     return self.target(Address(relpath, name).spec)
 
   def create_python_requirement_library(self, relpath, name, requirements):
+    """
+    :API: public
+    """
     def make_requirement(req):
       return 'python_requirement("{}")'.format(req)
 

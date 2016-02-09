@@ -17,6 +17,8 @@ from pants_test.option.util.fakes import (create_option_values_for_optionable,
 def create_subsystem(subsystem_type, scope='test-scope', **options):
   """Creates a Subsystem for test.
 
+  :API: public
+
   :param type subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
                               to create.
   :param string scope: The scope to create the subsystem in.
@@ -33,6 +35,8 @@ def create_subsystem(subsystem_type, scope='test-scope', **options):
 @contextmanager
 def subsystem_instance(subsystem_type, scope=None, **options):
   """Creates a Subsystem instance for test.
+
+  :API: public
 
   :param type subsystem_type: The subclass of :class:`pants.subsystem.subsystem.Subsystem`
                               to create.

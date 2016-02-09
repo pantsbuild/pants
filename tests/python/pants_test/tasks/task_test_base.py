@@ -28,6 +28,8 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
   the decorated test function, the cache for task_cls contains expected_num_artifacts.
   Clears the task's cache before running the test.
 
+  :API: public
+
   :param task_cls: Class of the task to check the artifact cache for. (e.g. JarCreate)
   :param expected_num_artifacts: Expected number of artifacts to be in the task's
                                  cache after running the test. If unspecified, will
@@ -60,16 +62,25 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
 
 
 class TaskTestBase(BaseTest):
-  """A baseclass useful for testing a single Task type."""
+  """A baseclass useful for testing a single Task type.
+
+  :API: public
+  """
 
   options_scope = 'test_scope'
 
   @classmethod
   def task_type(cls):
-    """Subclasses must return the type of the Task subclass under test."""
+    """Subclasses must return the type of the Task subclass under test.
+
+    :API: public
+    """
     raise NotImplementedError()
 
   def setUp(self):
+    """
+    :API: public
+    """
     super(TaskTestBase, self).setUp()
     self._testing_task_type = self.synthesize_task_subtype(self.task_type(), self.options_scope)
     # We locate the workdir below the pants_workdir, which BaseTest locates within the BuildRoot.
@@ -83,6 +94,9 @@ class TaskTestBase(BaseTest):
 
   @property
   def test_workdir(self):
+    """
+    :API: public
+    """
     return self._test_workdir
 
   def synthesize_task_subtype(self, task_type, options_scope):
@@ -95,6 +109,8 @@ class TaskTestBase(BaseTest):
 
     # TODO: Use the task type directly once we re-do the Task lifecycle.
 
+    :API: public
+
     :param task_type: The task type to subtype.
     :param options_scope: The scope to give options on the generated task type.
     :return: A pair (type, options_scope)
@@ -104,10 +120,16 @@ class TaskTestBase(BaseTest):
                                               'options_scope': options_scope})
 
   def set_options(self, **kwargs):
+    """
+    :API: public
+    """
     self.set_options_for_scope(self.options_scope, **kwargs)
 
   def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
               console_outstream=None, workspace=None, for_subsystems=None):
+    """
+    :API: public
+    """
     # Add in our task type.
     for_task_types = [self._testing_task_type] + (for_task_types or [])
     return super(TaskTestBase, self).context(for_task_types=for_task_types,
@@ -119,13 +141,22 @@ class TaskTestBase(BaseTest):
                                              for_subsystems=for_subsystems)
 
   def create_task(self, context, workdir=None):
+    """
+    :API: public
+    """
     return self._testing_task_type(context, workdir or self._test_workdir)
 
 
 class ConsoleTaskTestBase(TaskTestBase):
-  """A base class useful for testing ConsoleTasks."""
+  """A base class useful for testing ConsoleTasks.
+
+  :API: public
+  """
 
   def setUp(self):
+    """
+    :API: public
+    """
     Goal.clear()
     super(ConsoleTaskTestBase, self).setUp()
 
@@ -135,6 +166,8 @@ class ConsoleTaskTestBase(TaskTestBase):
 
   def execute_task(self, targets=None, options=None):
     """Creates a new task and executes it with the given config, command line args and targets.
+
+    :API: public
 
     :param targets: Optional list of Target objects passed on the command line.
     Returns the text output of the task.
@@ -150,6 +183,8 @@ class ConsoleTaskTestBase(TaskTestBase):
   def execute_console_task(self, targets=None, extra_targets=None, options=None,
                            passthru_args=None, workspace=None):
     """Creates a new task and executes it with the given config, command line args and targets.
+
+    :API: public
 
     :param options: option values.
     :param targets: optional list of Target objects passed on the command line.
@@ -168,6 +203,8 @@ class ConsoleTaskTestBase(TaskTestBase):
   def execute_console_task_given_context(self, context, extra_targets=None):
     """Creates a new task and executes it with the context and extra targets.
 
+    :API: public
+
     :param context: The pants run context to use.
     :param extra_targets: An optional list of extra targets in the context in addition to those
                           passed on the command line.
@@ -181,6 +218,8 @@ class ConsoleTaskTestBase(TaskTestBase):
     """Verifies the expected output text is flushed by the console task under test.
 
     NB: order of entries is not tested, just presence.
+
+    :API: public
 
     sep:      the expected output separator.
     *output:  the output entries expected between the separators
@@ -197,6 +236,8 @@ class ConsoleTaskTestBase(TaskTestBase):
 
     NB: order of entries is not tested, just presence.
 
+    :API: public
+
     *output:  the expected output entries
     **kwargs: additional kwargs passed to execute_console_task.
     """
@@ -204,6 +245,8 @@ class ConsoleTaskTestBase(TaskTestBase):
 
   def assert_console_output_contains(self, output, **kwargs):
     """Verifies the expected output string is emitted by the console task under test.
+
+    :API: public
 
     output:  the expected output entry(ies)
     **kwargs: additional kwargs passed to execute_console_task.
@@ -215,6 +258,8 @@ class ConsoleTaskTestBase(TaskTestBase):
 
     NB: order of entries is tested.
 
+    :API: public
+
     *output:  the expected output entries in expected order
     **kwargs: additional kwargs passed to execute_console_task.
     """
@@ -222,6 +267,8 @@ class ConsoleTaskTestBase(TaskTestBase):
 
   def assert_console_raises(self, exception, **kwargs):
     """Verifies the expected exception is raised by the console task under test.
+
+    :API: public
 
     **kwargs: additional kwargs are passed to execute_console_task.
     """
