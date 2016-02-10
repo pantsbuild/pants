@@ -87,8 +87,9 @@ def visualize_execution_graph(scheduler):
 
 def visualize_build_request(build_root, build_request):
   scheduler = setup_json_scheduler(build_root)
+  # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   LocalSerialEngine(scheduler).reduce(build_request)
-  #visualize_execution_graph(scheduler)
+  visualize_execution_graph(scheduler)
   scheduler.validate()
 
 

@@ -126,7 +126,14 @@ class NoProducersError(SchedulingError):
 
 
 class PartiallyConsumedInputsError(SchedulingError):
-  """No planner was able to produce a plan that consumed the given input products."""
+  """No task was able to consume a particular literal product for a subject, although some tried.
+
+  In particular, this error allows for safe composition of configuration on targets (ie,
+  ThriftSources AND ThriftConfig), because if a task requires multiple inputs for a subject
+  but cannot find them, a useful error is raised.
+
+  TODO: Improve the error message in the presence of failures due to mismatched variants.
+  """
 
   @staticmethod
   def msg(partially_consumed_inputs):

@@ -188,12 +188,9 @@ class SchedulerTest(unittest.TestCase):
     """No `thrift` variant is configured, and so no configuration is selected."""
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.no_variant_thrift])
-    walk = self.build_and_walk(build_request, failures=True)
 
-    # Validate that the root failed.
-    root_node, root_state = walk[0][0]
-    self.assertEqual(SelectNode(self.no_variant_thrift, Classpath, None, None), root_node)
-    self.assertEqual(Throw, type(root_state))
+    with self.assertRaises(PartiallyConsumedInputsError):
+      self.build_and_walk(build_request)
 
   def test_unconfigured_thrift(self):
     """The BuildPropertiesPlanner is able to produce a Classpath, but we should still fail.
@@ -204,4 +201,4 @@ class SchedulerTest(unittest.TestCase):
                                  addressable_roots=[self.unconfigured_thrift])
 
     with self.assertRaises(PartiallyConsumedInputsError):
-      self.build_and_walk(build_request, failures=True)
+      self.build_and_walk(build_request)

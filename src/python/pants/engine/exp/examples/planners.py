@@ -324,6 +324,21 @@ class Goal(AbstractClass):
   def products(cls):
     """Returns the products for this goal."""
 
+  def __eq__(self, other):
+    return type(self) == type(other)
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __hash__(self):
+    return hash(type(self))
+
+  def __str__(self):
+    return '{}()'.format(type(self).__name__)
+
+  def __repr__(self):
+    return str(self)
+
 
 class GenGoal(Goal):
   """A goal that requests all known types of sources."""

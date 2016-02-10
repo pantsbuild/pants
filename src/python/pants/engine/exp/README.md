@@ -205,9 +205,7 @@ bootstrapping.
    https://github.com/pantsbuild/pants/issues/2413
 2. Handle user-IO tasks appropriately with distributed executors in mind:
    https://github.com/pantsbuild/pants/issues/2417
-3. Validate configurations specified in the target graph, ie: a target with java sources should
-   probably not be allowed to list a python interpreter configuration.
-4. Allow for more than one fulfillment of a promise.  An example here is a java library target
+3. Allow for more than one fulfillment of a promise.  An example here is a java library target
    subject that a javac planner can promise a classpath product for (via compilation of java
    sources) and a service-info planner can offer a `META-INF/services/...` resource classpath
    product for. See: https://github.com/pantsbuild/pants/issues/2484
