@@ -23,8 +23,7 @@ class StackBuild(StackTask):
       extra_args = ['--file-watch']
     else:
       extra_args = []
-    for target in self.context.target_roots:
-      with self.invalidated(targets=target.closure()) as invalidated:
-        for vt in invalidated.invalid_vts:
-          if self.is_haskell_project(vt.target):
-            self.stack_task('build', vt, extra_args)
+    targets = self.context.targets(predicate=self.is_haskell_project)
+    with self.invalidated(targets=targets, invalidate_dependents=True) as invalidated:
+      for vt in invalidated.invalid_vts:
+        self.stack_task('build', vt, extra_args)
