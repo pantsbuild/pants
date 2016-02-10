@@ -30,54 +30,17 @@ from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
-      # Currently:
-      #  we don't parse the reports unless we're doing a proper resolve
-      #  Things that don't need a full resolve report don't need to read it right now
-      #  I think a naive impl would require that any ivy_resolve call will need to parse reports in
-      # the slow path
-      #
-      # check for cached resolve info
-      # if exists,
-      #   check for symlinks
-      #   if symlinks for everything, you're done
-      #   if missing,
-      #     do a dumb fetch using ivy
-      #     repopulate missing ones
-      #   create a result
-      # else if no cached resolve
-      #   do a resolve
-      #   dump results
-      #
-      # resolve:
-      #  3rdparty target -> list of jar coords that were resolved
-      #  jar coord -> remote url
-      #
-      #  maybe:
-      #  jar coord -> local cache url, but this would have to be invalidation only and not buildcached
-      #  -
-      #
-      # approach / pieces
-      # add a generate ivy for fetch rather than resolve
-      # create a data structure for a resolve and a serialization format
-      #
-      # tests
-      # search for resolve file
-      # assert that
-      #    run
-      #    invalidate
-      #    run 2 # loads from cache
-      # doesn't re-resolve-only fetches
-      # attempt a fetch
-      #resolve components
-      # - confs
-      # - report(s)
-      # - jar list in ivy cache
-      # - jar list to symlink tree
 
 
 class ExistingResolveSituation(object):
-  def __init__(self, ivy_workdir, resolve_workdir, resolve_hash_name, ivy_cache_dir, potential_resolve_stuffs, confs):
-    self.potential_resolve_stuffs = potential_resolve_stuffs
+  def __init__(self,
+               ivy_workdir,
+               resolve_workdir,
+               resolve_hash_name,
+               ivy_cache_dir,
+               potential_frozen_resolutions,
+               confs):
+    self.potential_frozen_resolution = potential_frozen_resolutions
     self.ivy_cache_dir = ivy_cache_dir
     self.resolve_hash_name = resolve_hash_name
     self.ivy_workdir = ivy_workdir
@@ -113,16 +76,16 @@ class ExistingResolveSituation(object):
             not self.has_file_containing_ivy_jar_locations())
 
 
-class ResolveStuff(object):
+class FrozenResolution(object):
   def __init__(self):
     self.target_to_resolved_coordinates = defaultdict(OrderedSet)
     self.all_resolved_coordinates = OrderedSet()
 
-  def add_stuff(self, target, resolved_jars):
+  def add_resolved_jars(self, target, resolved_jars):
     coords = [j.coordinate for j in resolved_jars]
-    self.add_stuff_coords(target, coords)
+    self.add_resolution_coords(target, coords)
 
-  def add_stuff_coords(self, target, coords):
+  def add_resolution_coords(self, target, coords):
     for c in coords:
       self.target_to_resolved_coordinates[target].add(c)
       self.all_resolved_coordinates.add(c)
@@ -133,7 +96,7 @@ class ResolveStuff(object):
   def all_coordinate_strings(self):
     return [str(c) for c in self.all_resolved_coordinates]
 
-  def __repr__(self):  #aeuo
+  def __repr__(self):
     return 'RS(\n  t_to_coord\n    {}\n  all\n    {}'.format(
       '\n    '.join(':  '.join([t.address.spec, '\n      '.join(str(c) for c in cs)]) for t,cs in self.target_to_resolved_coordinates.items()),
 
@@ -149,7 +112,7 @@ class ResolveStuff(object):
     return not self == other
 
 
-class IvyResolveResult(object):
+class IvyResolveResultClasspathEtc(object):
   """A class wrapping the classpath, a mapping from ivy cache jars to their linked location
      under .pants.d, and the id of the reports associated with the resolve."""
 
@@ -210,7 +173,7 @@ class IvyResolveResult(object):
       yield target, resolved_jars
 
 
-_NO_TARGETS_RESULT = IvyResolveResult([], {}, None)
+_NO_TARGETS_RESULT = IvyResolveResultClasspathEtc([], {}, None)
 
 
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
@@ -383,7 +346,7 @@ class IvyTaskMixin(TaskBase):
     :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
                                         resolved.
     :returns: The result of the resolve.
-    :rtype: IvyResolveResult
+    :rtype: IvyResolveResultClasspathEtc
     """
     # If there are no targets, we don't need to do a resolve.
     if not targets:
@@ -410,28 +373,29 @@ class IvyTaskMixin(TaskBase):
 
       ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
       resolve_workdir = os.path.join(ivy_workdir, resolve_hash_name)
-      potential_resolve_stuffs = self.load_resolve_stuffs(resolve_workdir, targets)
+      potential_frozen_resolutions = self.load_frozen_resolutions(resolve_workdir, targets)
 
-      situ = ExistingResolveSituation(ivy_workdir, resolve_workdir, resolve_hash_name,
+      situ = ExistingResolveSituation(ivy_workdir,
+                                      resolve_workdir,
+                                      resolve_hash_name,
                                       self.ivy_cache_dir,
-                                      potential_resolve_stuffs,
+                                      potential_frozen_resolutions,
                                       confs)
 
       if (invalidation_check.invalid_vts or
             situ.requires_new_resolve()):
-        if situ.potential_resolve_stuffs:
-          self.do_a_just_fetch_resolve(confs,
+        if situ.potential_frozen_resolution:
+          self._run_fetch_resolve(confs,
                                        executor,
                                        extra_args,
                                        global_vts,
-                                       pinned_artifacts,
                                        situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
                                        situ.resolve_hash_name,
                                        situ.resolve_workdir,
                                        workunit_name,
-                                       situ.potential_resolve_stuffs)
+                                       situ.potential_frozen_resolution)
         else:
-          self.do_a_full_resolve_type_thing(confs,
+          self._run_full_resolve(confs,
                                             executor,
                                             extra_args,
                                             global_vts,
@@ -451,21 +415,21 @@ class IvyTaskMixin(TaskBase):
 
 
 
-    result = IvyResolveResult(classpath, symlink_map, resolve_hash_name)
-    stuffs_by_conf = OrderedDict()
+    result = IvyResolveResultClasspathEtc(classpath, symlink_map, resolve_hash_name)
+    frozen_resolutions_by_conf = OrderedDict()
     for conf in confs:
-      resolve_stuff = ResolveStuff()
+      frozen_resolution = FrozenResolution()
       for target, resolved_jars in result.collect_resolved_jars(self.ivy_cache_dir, conf, targets):
-        resolve_stuff.add_stuff(target, resolved_jars)
-      stuffs_by_conf[conf]=resolve_stuff
-    if not situ.potential_resolve_stuffs:
-      self.dump_resolve_stuffs(resolve_workdir, stuffs_by_conf)
-    elif stuffs_by_conf != situ.potential_resolve_stuffs:
-      if situ.potential_resolve_stuffs is None:
-        print('read is None')
+        frozen_resolution.add_resolved_jars(target, resolved_jars)
+      frozen_resolutions_by_conf[conf] = frozen_resolution
+    if not situ.potential_frozen_resolution:
+      self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
+    elif frozen_resolutions_by_conf != situ.potential_frozen_resolution:
+      if situ.potential_frozen_resolution is None:
+        self.context.log.debug('No existing resolution.')
       else:
-        created_default = stuffs_by_conf.get('default')
-        potential_default = situ.potential_resolve_stuffs.get('default')
+        created_default = frozen_resolutions_by_conf.get('default')
+        potential_default = situ.potential_frozen_resolution.get('default')
         print('type(created_default.all_resolved_coordinates) == type(potential_default.all_resolved_coordinates)')
         print(type(created_default.all_resolved_coordinates) == type(potential_default.all_resolved_coordinates))
         print('created_default.all_resolved_coordinates == potential_default.all_resolved_coordinates')
@@ -477,28 +441,28 @@ class IvyTaskMixin(TaskBase):
 
         print('created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates ')
         print(created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates )
-      self.dump_resolve_stuffs(resolve_workdir, stuffs_by_conf)
+      self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
     else:
       pass
 
     return result
 
-  def dump_resolve_stuffs(self, resolve_workdir, stuffs_by_conf):
+  def dump_frozen_resolutions(self, resolve_workdir, resolutions_by_conf):
 
     res = {}
-    for conf, stuff in stuffs_by_conf.items():
+    for conf, resolution in resolutions_by_conf.items():
       res[conf] = OrderedDict([
-      ['target_to_coords',stuff.target_spec_to_coordinate_strings()],
-      ['coords', stuff.all_coordinate_strings()]
+      ['target_to_coords',resolution.target_spec_to_coordinate_strings()],
+      ['coords', resolution.all_coordinate_strings()]
       ])
-    filename = os.path.join(resolve_workdir, 'stuff.file.json')
+    filename = os.path.join(resolve_workdir, 'resolution.json')
     with safe_concurrent_creation(filename) as tmp_filename:
       with open(tmp_filename, 'wb') as f:
         json.dump(res, f)
 
-  def load_resolve_stuffs(self, resolve_workdir, targets):
-    # returns a dict of conf -> ResolveStuff
-    filename = os.path.join(resolve_workdir, 'stuff.file.json')
+  def load_frozen_resolutions(self, resolve_workdir, targets):
+    # returns a dict of conf -> FrozenResolution
+    filename = os.path.join(resolve_workdir, 'resolution.json')
     if not os.path.exists(filename):
       return None
 
@@ -506,16 +470,16 @@ class IvyTaskMixin(TaskBase):
       from_file = json.load(f,object_pairs_hook=OrderedDict) # maybe the object_pairs_hook thing will work :/
     result = {}
     target_lookup = {t.address.spec: t for t in targets}
-    for conf, serialized_stuff in from_file.items():
-      stuff = ResolveStuff()
-      for spec, coord_strs in serialized_stuff['target_to_coords'].items():
+    for conf, serialized_resolution in from_file.items():
+      resolution = FrozenResolution()
+      for spec, coord_strs in serialized_resolution['target_to_coords'].items():
         t = target_lookup[spec] # TODO error handling
-        stuff.add_stuff_coords(t, [M2Coordinate.from_string(c) for c in coord_strs])
-      stuff.all_resolved_coordinates = OrderedSet(M2Coordinate.from_string(c) for c in serialized_stuff['coords'])
-      result[conf] = stuff
+        resolution.add_resolution_coords(t, [M2Coordinate.from_string(c) for c in coord_strs])
+      resolution.all_resolved_coordinates = OrderedSet(M2Coordinate.from_string(c) for c in serialized_resolution['coords'])
+      result[conf] = resolution
     return result
 
-  def do_a_full_resolve_type_thing(self, confs, executor, extra_args, global_vts, pinned_artifacts,
+  def _run_full_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
                           raw_target_classpath_file, resolve_hash_name, target_workdir,
                           workunit_name):
     ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
@@ -539,10 +503,10 @@ class IvyTaskMixin(TaskBase):
                          .format(raw_target_classpath_file_tmp))
     logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
-  def do_a_just_fetch_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
+  def _run_fetch_resolve(self, confs, executor, extra_args, global_vts,
                           raw_target_classpath_file, resolve_hash_name, resolve_workdir,
-                          workunit_name, resolve_stuffs):
-    # resolve stuffs has all the bits in it to do a boring fetch resolve.
+                          workunit_name, frozen_resolutions):
+    # resolve resolutions has all the bits in it to do a boring fetch resolve.
     # poc
     #
     ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
@@ -553,7 +517,7 @@ class IvyTaskMixin(TaskBase):
       with IvyUtils.ivy_lock:
         ivyxml = os.path.join(resolve_workdir, 'ivy.xml')
         try:
-          IvyUtils.generate_fetch_ivy(targets, ivyxml, confs, resolve_hash_name, resolve_stuffs)
+          IvyUtils.generate_fetch_ivy(targets, ivyxml, confs, resolve_hash_name, frozen_resolutions)
         except IvyUtils.IvyError as e:
           raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
 

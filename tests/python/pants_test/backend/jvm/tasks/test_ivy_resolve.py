@@ -15,7 +15,7 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveResult
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveResultClasspathEtc
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
@@ -120,7 +120,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
                    artifact_path('bogus1'): artifact_path('bogus1'),
                    artifact_path('unused'): artifact_path('unused')}
-    result = IvyResolveResult([], symlink_map, 'some-key-for-a-and-b')
+    result = IvyResolveResultClasspathEtc([], symlink_map, 'some-key-for-a-and-b')
     result.ivy_info_for= mock_ivy_info_for
 
     task._ivy_resolve = mock_ivy_resolve_returning(result)
