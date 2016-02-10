@@ -427,7 +427,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       self.update_artifact_cache(pairs)
 
   def _cleanup_workdir_stale_builds(self, vts):
-    max_entries_per_target = self.context.options.for_global_scope().workdir_max_entries_per_target
+    max_entries_per_target = self.context.options.for_global_scope().workdir_max_build_entries
     if max_entries_per_target is None:
       return
     else:

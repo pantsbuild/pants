@@ -135,7 +135,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
                                                  'export-classpath',
                                                  'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                                  '--compile-zinc-debug-symbols',
-                                                 '--workdir-max-entries-per-target={}'.format(max_entries_per_target)
+                                                 '--workdir-max-build-entries={}'.format(max_entries_per_target)
                                                  ], workdir)
       self.assert_success(pants_run_2)
       item_num = len(os.listdir(target_dir_in_pantsd))
