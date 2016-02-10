@@ -428,7 +428,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return
     elif max_entries_per_target < 2:
       raise ValueError(
-        "--pants-workdir-max-entries-per-target cannot be less than 2, it may cause incremental compile error")
+        "--pants-workdir-max-entries-per-target cannot be less than 2. It may cause incremental compile error")
     else:
       for vt in invalid_vts:
         try:

@@ -118,7 +118,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/1a317a2504f6/z.jar'
       jar_path_in_pantsd = os.path.realpath(classpath)
 
-      # <workdir>/.pants.d/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
+      # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
       target_dir_in_pantsd = os.path.dirname(os.path.dirname(jar_path_in_pantsd))
 
       safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test1_dir'))
