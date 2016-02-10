@@ -667,24 +667,27 @@ class GraphValidator(object):
         continue
 
       # If all unattainable products could have been specified as literal...
-      all_literal_failed_products = all(product in self._literal_types for product in failed_products)
-      if not all_literal_failed_products:
+      if not all(product in self._literal_types for product in failed_products):
         continue
 
-      # And there was at least one dep successfully (recursively) satisfied via a literal.
-      # TODO: multiple walks here
+      # There was at least one dep successfully (recursively) satisfied via a literal.
+      # TODO: this does multiple walks.
       used_literal_deps = set()
       for dep, _ in dependencies:
-        for product in self._collect_consumed_inputs(product_graph, root):
+        for product in self._collect_consumed_inputs(product_graph, dep):
           if product in self._literal_types:
             used_literal_deps.add(product)
       if not used_literal_deps:
         continue
 
+      # The partially consumed products were not fully consumed elsewhere.
+      if not (used_literal_deps - consumed_inputs):
+        continue
+
       # Found a partially consumed input.
-      consumed_inputs.update(used_literal_deps)
       for used_literal_dep in used_literal_deps:
-        partially_consumed_inputs[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
+        partials[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
+    return partials
 
   def validate(self, product_graph):
     """Finds 'subject roots' in the product graph and invokes validation on each of them."""
@@ -700,7 +703,7 @@ class GraphValidator(object):
     # Raise if there were any partially consumed inputs.
     for root in roots:
       consumed = self._collect_consumed_inputs(product_graph, root)
-      partials = self._validate_failed_root(product_graph, consumed, root)
+      partials = self._collect_partially_consumed_inputs(product_graph, consumed, root)
       if partials:
         raise PartiallyConsumedInputsError(partials)
 
