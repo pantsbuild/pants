@@ -9,12 +9,11 @@ import os
 
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import touch
+from pants.util.dirutil import safe_mkdir, touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
-
   def create_platform_args(self, version):
     return [("""--jvm-platform-platforms={{'default': {{'target': '{version}'}}}}"""
              .format(version=version)),
@@ -25,7 +24,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
-          'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
+                                  'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
       touch(os.path.join(artifact_dir, 'old_cache_test1'))
       touch(os.path.join(artifact_dir, 'old_cache_test2'))
@@ -65,7 +64,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
-          'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
+                                  'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
       touch(os.path.join(artifact_dir, 'old_cache_test1'))
       touch(os.path.join(artifact_dir, 'old_cache_test2'))
@@ -96,3 +95,45 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
       # Cache cleanup disabled for 0
       self.assertEqual(len(os.listdir(artifact_dir)), 7)
+
+  def test_workdir_stale_cache_cleanup(self):
+    """Ensure that max-old of zero removes all files
+
+    This test should ensure that conditional doesn't change to the simpler test of if max_old since
+    we need to handle zero as well.
+    """
+
+    with temporary_dir() as tmp_dir:
+      workdir = os.path.join(tmp_dir, '.pants.d')
+      pants_run = self.run_pants_with_workdir(['compile',
+                                               'export-classpath',
+                                               'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
+                                               ], workdir)
+      self.assert_success(pants_run)
+
+      # Use the the static exported classpath symlink to the access the artifact in workdir
+      # to avoid the computation of hashed task verison used in workdir
+      classpath = 'dist/export-classpath/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main-0.jar'
+
+      # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/1a317a2504f6/z.jar'
+      jar_path_in_pantsd = os.path.realpath(classpath)
+
+      # <workdir>/.pants.d/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
+      target_dir_in_pantsd = os.path.dirname(os.path.dirname(jar_path_in_pantsd))
+
+      safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test1_dir'))
+      safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test2_dir'))
+      safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test3_dir'))
+      safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test4_dir'))
+      safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test5_dir'))
+
+      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 6)
+
+      # 2nd run with --compile-zinc-debug-symbols will invalidate the cache thus triggering the clean up
+      pants_run_2 = self.run_pants_with_workdir(['compile',
+                                                 'export-classpath',
+                                                 'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
+                                                 '--compile-zinc-debug-symbols',
+                                                 ], workdir)
+      self.assert_success(pants_run_2)
+      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 4)
