@@ -28,9 +28,15 @@ class Workspace(AbstractClass):
 
 
 class ScmWorkspace(Workspace):
-  """A workspace that uses an Scm to determine the touched files."""
+  """A workspace that uses an Scm to determine the touched files.
+
+  :API: public
+  """
 
   def __init__(self, scm):
+    """
+    :API: public
+    """
     super(ScmWorkspace, self).__init__()
 
     if scm is None:
@@ -39,6 +45,9 @@ class ScmWorkspace(Workspace):
     self._scm = scm
 
   def touched_files(self, parent):
+    """
+    :API: public
+    """
     try:
       return self._scm.changed_files(from_commit=parent,
                                      include_untracked=True,
@@ -47,6 +56,9 @@ class ScmWorkspace(Workspace):
       raise self.WorkspaceError("Problem detecting changed files.", e)
 
   def changes_in(self, rev_or_range):
+    """
+    :API: public
+    """
     try:
       return self._scm.changes_in(rev_or_range, relative_to=get_buildroot())
     except Scm.ScmException as e:
