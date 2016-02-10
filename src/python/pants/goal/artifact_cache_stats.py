@@ -19,9 +19,14 @@ CacheStat = namedtuple('CacheStat', ['hit_targets', 'miss_targets'])
 class ArtifactCacheStats(object):
   """Tracks the hits and misses in the artifact cache.
 
+  :API: public
+
   If dir is specified, writes the hits and misses to files in that dir."""
 
   def __init__(self, dir=None):
+    """
+    :API: public
+    """
     def init_stat():
       return CacheStat([], [])
     self.stats_per_cache = defaultdict(init_stat)
@@ -29,14 +34,23 @@ class ArtifactCacheStats(object):
     safe_mkdir(self._dir)
 
   def add_hits(self, cache_name, targets):
+    """
+    :API: public
+    """
     self._add_stat(0, cache_name, targets, None)
 
   # any cache misses, each target is paired with its cause for the miss.
   def add_misses(self, cache_name, targets, causes):
+    """
+    :API: public
+    """
     self._add_stat(1, cache_name, targets, causes)
 
   def get_all(self):
-    """Returns the cache stats as a list of dicts."""
+    """Returns the cache stats as a list of dicts.
+
+    :API: public
+    """
     ret = []
     for cache_name, stat in self.stats_per_cache.items():
       ret.append({
@@ -50,6 +64,9 @@ class ArtifactCacheStats(object):
 
   # hit_or_miss is the appropriate index in CacheStat, i.e., 0 for hit, 1 for miss.
   def _add_stat(self, hit_or_miss, cache_name, targets, causes):
+    """
+    :API: public
+    """
     def format_vts(tgt, cause):
       """Format into (target, cause) tuple."""
       target_address = tgt.address.reference()

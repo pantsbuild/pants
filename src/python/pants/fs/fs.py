@@ -26,6 +26,8 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
   Also raises ValueError when the name is simple but cannot be satisfactorily shortened with the
   given digest.
 
+  :API: public
+
   name:       the proposed filename without extension
   extension:  an optional extension to append to the filename
   digest:     the digest to fall back on for too-long name, extension concatenations - should
@@ -50,5 +52,8 @@ def safe_filename(name, extension=None, digest=None, max_length=_MAX_FILENAME_LE
 
 
 def expand_path(path):
-  """Returns ``path`` as an absolute path with ~user and env var expansion applied."""
+  """Returns ``path`` as an absolute path with ~user and env var expansion applied.
+
+  :API: public
+  """
   return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))

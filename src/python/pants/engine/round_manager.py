@@ -15,6 +15,9 @@ class ProducerInfo(namedtuple('ProducerInfo', ['product_type', 'task_type', 'goa
 
 
 class RoundManager(object):
+  """
+  :API: public
+  """
 
   class MissingProductError(KeyError):
     """Indicates a required product type is provided by non-one."""
@@ -30,22 +33,34 @@ class RoundManager(object):
     return producer_info_by_product_type
 
   def __init__(self, context):
+    """
+    :API: public
+    """
     self._dependencies = set()
     self._context = context
     self._producer_infos_by_product_type = None
 
   def require(self, product_type):
-    """Schedules the tasks that produce product_type to be executed before the requesting task."""
+    """Schedules the tasks that produce product_type to be executed before the requesting task.
+
+    :API: public
+    """
     self._dependencies.add(product_type)
     self._context.products.require(product_type)
 
   def require_data(self, product_type):
-    """Schedules the tasks that produce product_type to be executed before the requesting task."""
+    """Schedules the tasks that produce product_type to be executed before the requesting task.
+
+    :API: public
+    """
     self._dependencies.add(product_type)
     self._context.products.require_data(product_type)
 
   def get_dependencies(self):
-    """Returns the set of data dependencies as producer infos corresponding to data requirements."""
+    """Returns the set of data dependencies as producer infos corresponding to data requirements.
+
+    :API: public
+    """
     producer_infos = set()
     for product_type in self._dependencies:
       producer_infos.update(self._get_producer_infos_by_product_type(product_type))
