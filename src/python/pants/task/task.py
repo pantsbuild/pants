@@ -356,6 +356,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     invalidation_check = cache_manager.check(targets, partition_size_hint, colors,
                                              topological_order=topological_order)
 
+    self._cleanup_workdir_cache(invalidation_check.invalid_vts)
+
     if invalidation_check.invalid_vts and use_cache and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
         cached_vts, uncached_vts, uncached_causes = \
@@ -408,8 +410,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     phase='post-check')
     for vt in invalidation_check.invalid_vts:
       vt.update()  # In case the caller doesn't update.
-
-    self._cleanup_workdir_cache(invalidation_check.invalid_vts)
 
     write_to_cache = (self.cache_target_dirs
                       and use_cache
