@@ -111,8 +111,8 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
                                                ], workdir)
       self.assert_success(pants_run)
 
-      # Use the the static exported classpath symlink to the access the artifact in workdir
-      # to avoid the computation of hashed task verison used in workdir
+      # Use the static exported classpath symlink to access the artifact in workdir
+      # in order to avoid computing hashed task verison used in workdir
       classpath = 'dist/export-classpath/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main-0.jar'
 
       # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/1a317a2504f6/z.jar'
@@ -135,7 +135,11 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
                                                  'export-classpath',
                                                  'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                                  '--compile-zinc-debug-symbols',
-                                                 '--pants-workdir-max-entries-per-target={}'.format(max_entries_per_target)
+                                                 '--workdir-max-entries-per-target={}'.format(max_entries_per_target)
                                                  ], workdir)
       self.assert_success(pants_run_2)
-      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), max_entries_per_target)
+      item_num = len(os.listdir(target_dir_in_pantsd))
+
+      # Since pants.task.task.TaskBase#_cleanup_workdir_stale_cache runs in background, it is possible a new successful
+      # build writes into workdir after the clean up
+      self.asserTrue(max_entries_per_target <= item_num and item_num <= max_entries_per_target + 1)

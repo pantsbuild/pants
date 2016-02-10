@@ -24,7 +24,7 @@ from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.dirutil import safe_rmtree
+from pants.util.dirutil import safe_rm_oldest_items_in_dir, safe_rmtree
 from pants.util.meta import AbstractClass
 
 
@@ -409,7 +409,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     for vt in invalidation_check.invalid_vts:
       vt.update()  # In case the caller doesn't update.
 
-    self._cleanup_workdir_stale_cache(invalidation_check.invalid_vts)
+    # Background work to clean up previous builds
+    work = Work(self._cleanup_workdir_stale_cache, [(invalidation_check.invalid_vts,)], 'previous build cleanup')
+    self.context.submit_background_work_chain([work])
 
     write_to_cache = (self.cache_target_dirs
                       and use_cache
@@ -423,27 +425,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       self.update_artifact_cache(pairs)
 
   def _cleanup_workdir_stale_cache(self, invalid_vts):
-    max_entries_per_target = self.context.options.for_global_scope().pants_workdir_max_entries_per_target
+    max_entries_per_target = self.context.options.for_global_scope().workdir_max_entries_per_target
     if max_entries_per_target is None:
       return
-    elif max_entries_per_target < 2:
-      raise ValueError(
-        "--pants-workdir-max-entries-per-target cannot be less than 2. It may cause incremental compile error")
     else:
+      max_entries_per_target = max(max_entries_per_target, 2)
       for vt in invalid_vts:
         try:
-          root = os.path.dirname(vt.results_dir)
+          root_dir = os.path.dirname(vt.results_dir)
         except ValueError:
           continue
         else:
-          if os.path.isdir(root):
-            found_files = []
-            for old_file in os.listdir(root):
-              full_path = os.path.join(root, old_file)
-              found_files.append((full_path, os.path.getmtime(full_path)))
-            found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
-            for cur_file in found_files[max_entries_per_target:]:
-              safe_rmtree(cur_file[0])
+          safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target)
 
   def _should_cache(self, vt):
     """Return true if the given vt should be written to a cache (if configured)."""
