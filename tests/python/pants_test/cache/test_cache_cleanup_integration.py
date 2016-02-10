@@ -19,7 +19,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
              .format(version=version)),
             '--jvm-platform-default-platform=default']
 
-  def test_leave_one(self):
+  def test_buildcache_leave_one(self):
     """Ensure that max-old of 1 removes all but one files"""
 
     with temporary_dir() as cache_dir:
@@ -55,7 +55,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       # One artifact for java 7
       self.assertEqual(len(os.listdir(artifact_dir)), 1)
 
-  def test_leave_none(self):
+  def test_buildcache_leave_none(self):
     """Ensure that max-old of zero removes all files
 
     This test should ensure that conditional doesn't change to the simpler test of if max_old since
