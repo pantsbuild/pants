@@ -14,7 +14,7 @@ public class GreetingTest {
   @Test
   public void mentionGreetee() {
     String greetingForFoo = Greeting.greet("Foo");
-    assertTrue(greetingForFoo.contains("Fo122w3113"));
+    assertTrue(greetingForFoo.contains("Foo"));
   }
 
   @Test
