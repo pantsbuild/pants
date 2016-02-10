@@ -633,38 +633,48 @@ class GraphValidator(object):
     self._literal_types = set(symbol_table_cls.table().values())
 
   def _used_literal_dependencies(self, product_graph, root_subject, roots):
-    """Walks nodes for the given product and returns all literal products used.
+    """Walks nodes for the given subject and returns all literal products used.
 
     Note that this will not walk into Nodes for other subjects.
     """
     used = set()
     def predicate(entry):
       node, state = entry
-      return root_subject == node.subject and type(state) is not Throw
+      return root_subject == node.subject and type(state) is Return
     for ((node, _), _) in product_graph.walk(roots, predicate=predicate):
       if node.product in self._literal_types:
         used.add(node.product)
     return used
 
-  def _validate_failed_root(self, product_graph, consumed_inputs, partially_consumed_inputs, failed_root):
-    """Walks below a failed node and collects cases where additional literal products could be used.
+  def _collect_consumed_inputs(self, product_graph, root):
+    consumed_inputs = set()
+    # Walk into successful nodes for the same subject under this root.
+    def predicate(entry):
+      node, state = entry
+      return root.subject == node.subject and type(state) is Return
+    # If a product was successfully selected, record it.
+    for ((node, _), _) in product_graph.walk([root], predicate=predicate):
+      if type(node) is not SelectNode:
+        continue
+      consumed_inputs.add(node.product)
 
-    In particular, looks (recursively) for cases where:
-      1) at least one literal subject existed.
-      2) some literal/named products were missing.
+  def _collect_partially_consumed_inputs(self, product_graph, consumed_inputs, root):
+    """Walks below a failed node and collects cases where additional literal products could be used.
 
     Returns dict(partially_consumed_input, dict(used_product, list(tuple(task, missing_products)))).
     """
-    for ((node, state), dependencies) in product_graph.walk([failed_root], predicate=lambda _: True):
-      # Look for failed TaskNodes with at least one satisfied Select dependency.
+    partials = defaultdict(lambda: defaultdict(list))
+    # Walk all nodes for the same subject under this root.
+    def predicate(entry):
+      node, state = entry
+      return root.subject == node.subject
+    for ((node, state), dependencies) in product_graph.walk([root], predicate=predicate):
+      # Look for failed TaskNodes with at least one failed dependency.
       if type(node) != TaskNode:
         continue
       if type(state) != Throw:
         continue
-      select_deps = {dep: state for dep, state in dependencies if type(dep) == SelectNode}
-      if not select_deps:
-        continue
-      failed_products = {dep.product for dep, state in select_deps.items() if type(state) == Throw}
+      failed_products = {dep.product for dep, state in dependencies if type(state) == Throw}
       if not failed_products:
         continue
 
@@ -686,28 +696,20 @@ class GraphValidator(object):
         partially_consumed_inputs[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
 
   def validate(self, product_graph):
-    """Finds failed roots in the product graph and invokes validation on each of them."""
+    """Finds 'subject roots' in the product graph and invokes validation on each of them."""
 
-    # Locate failed root Nodes: those with an Address Subject which failed, but which did
-    # not have any failed (direct) dependents.
-    failed_roots = set()
+    # Locate roots: those who do not have any dependents for the same subject.
+    roots = set()
     for node, dependents in product_graph.dependents().items():
-      if not type(node) == SelectNode:
+      if any(d.subject == node.subject for d in dependents):
+        # Node had a dependent for its subject: was not a root.
         continue
-      if not isinstance(node.subject, Address):
-        continue
-      if not type(product_graph.state(node)) == Throw:
-        continue
-      if any(type(product_graph.state(d)) is Throw for d in dependents):
-        # Node had failed dependents: was not a failed root.
-        continue
-      failed_roots.add(node)
+      roots.add(node)
 
     # Raise if there were any partially consumed inputs.
-    for failed_root in failed_roots:
-      consumed = set()
-      partials = defaultdict(lambda: defaultdict(list))
-      self._validate_failed_root(product_graph, consumed, partials, failed_root)
+    for root in roots:
+      consumed = self._collect_consumed_inputs(product_graph, root)
+      partials = self._validate_failed_root(product_graph, consumed, root)
       if partials:
         raise PartiallyConsumedInputsError(partials)
 
