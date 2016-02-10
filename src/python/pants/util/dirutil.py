@@ -178,6 +178,7 @@ def safe_concurrent_rename(src, dst):
     if e.errno != errno.EEXIST:
       raise
 
+
 def safe_rm_oldest_items_in_dir(root_dir, num_of_items):
   if os.path.isdir(root_dir):
     found_files = []
@@ -188,6 +189,7 @@ def safe_rm_oldest_items_in_dir(root_dir, num_of_items):
     for cur_file in found_files[num_of_items:]:
       safe_rmtree(cur_file[0])
       safe_delete(cur_file[0])
+
 
 @contextmanager
 def safe_concurrent_creation(target_path):

@@ -410,8 +410,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       vt.update()  # In case the caller doesn't update.
 
     # Background work to clean up previous builds
-    work = Work(self._cleanup_workdir_stale_cache, [(invalidation_check.invalid_vts,)], 'previous build cleanup')
-    self.context.submit_background_work_chain([work])
+    workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
+                                     [(invalidation_check.invalid_vts,)],
+                                     'workdir_build_cleanup')
+    self.context.submit_background_work_chain([workdir_build_cleanup_job])
 
     write_to_cache = (self.cache_target_dirs
                       and use_cache
@@ -424,7 +426,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
           pairs.append((vt, [vt.results_dir]))
       self.update_artifact_cache(pairs)
 
-  def _cleanup_workdir_stale_cache(self, invalid_vts):
+  def _cleanup_workdir_stale_builds(self, invalid_vts):
     max_entries_per_target = self.context.options.for_global_scope().workdir_max_entries_per_target
     if max_entries_per_target is None:
       return
