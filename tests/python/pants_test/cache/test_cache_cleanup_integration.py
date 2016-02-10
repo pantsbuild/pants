@@ -129,11 +129,13 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
       self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 6)
 
+      max_entries_per_target = 4
       # 2nd run with --compile-zinc-debug-symbols will invalidate the cache thus triggering the clean up
       pants_run_2 = self.run_pants_with_workdir(['compile',
                                                  'export-classpath',
                                                  'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
                                                  '--compile-zinc-debug-symbols',
+                                                 '--pants-workdir-max-entries-per-target={}'.format(max_entries_per_target)
                                                  ], workdir)
       self.assert_success(pants_run_2)
-      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 4)
+      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), max_entries_per_target)
