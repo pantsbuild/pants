@@ -632,21 +632,8 @@ class GraphValidator(object):
   def __init__(self, symbol_table_cls):
     self._literal_types = set(symbol_table_cls.table().values())
 
-  def _used_literal_dependencies(self, product_graph, root_subject, roots):
-    """Walks nodes for the given subject and returns all literal products used.
-
-    Note that this will not walk into Nodes for other subjects.
-    """
-    used = set()
-    def predicate(entry):
-      node, state = entry
-      return root_subject == node.subject and type(state) is Return
-    for ((node, _), _) in product_graph.walk(roots, predicate=predicate):
-      if node.product in self._literal_types:
-        used.add(node.product)
-    return used
-
   def _collect_consumed_inputs(self, product_graph, root):
+    """Walks successful nodes under the root for its subject, and returns all products used."""
     consumed_inputs = set()
     # Walk into successful nodes for the same subject under this root.
     def predicate(entry):
@@ -657,6 +644,7 @@ class GraphValidator(object):
       if type(node) is not SelectNode:
         continue
       consumed_inputs.add(node.product)
+    return consumed_inputs
 
   def _collect_partially_consumed_inputs(self, product_graph, consumed_inputs, root):
     """Walks below a failed node and collects cases where additional literal products could be used.
@@ -684,9 +672,12 @@ class GraphValidator(object):
         continue
 
       # And there was at least one dep successfully (recursively) satisfied via a literal.
-      used_literal_deps = self._used_literal_dependencies(product_graph,
-                                                          node.subject,
-                                                          select_deps.keys())
+      # TODO: multiple walks here
+      used_literal_deps = set()
+      for dep, _ in dependencies:
+        for product in self._collect_consumed_inputs(product_graph, root):
+          if product in self._literal_types:
+            used_literal_deps.add(product)
       if not used_literal_deps:
         continue
 
