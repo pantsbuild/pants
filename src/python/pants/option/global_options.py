@@ -150,7 +150,8 @@ class GlobalOptionsRegistrar(Optionable):
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
     register('--pants-workdir-max-entries-per-target', advanced=True, type=int, default=None,
-             help='Maximum number of old cache files to keep per task target pair in pants workdir')
+             help='Maximum number of old cache files to keep per task target pair in pants workdir. '
+             'Requires minimum 2 if set')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking '
              'the command up into multiple invocations')
