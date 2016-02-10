@@ -24,7 +24,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
-                                  'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
+          'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
       touch(os.path.join(artifact_dir, 'old_cache_test1'))
       touch(os.path.join(artifact_dir, 'old_cache_test2'))
@@ -64,7 +64,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
     with temporary_dir() as cache_dir:
       artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
-                                  'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
+          'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
       touch(os.path.join(artifact_dir, 'old_cache_test1'))
       touch(os.path.join(artifact_dir, 'old_cache_test2'))
