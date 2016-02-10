@@ -84,7 +84,7 @@ class GraphTestBase(unittest.TestCase):
                            symbol_table_cls=symbol_table_cls,
                            build_pattern=build_pattern,
                            parser_cls=parser_cls)
-    return LocalScheduler({self._goal: [self._product]},
+    return LocalScheduler({self._goal: self._product},
                           symbol_table_cls,
                           create_graph_tasks(mapper))
 

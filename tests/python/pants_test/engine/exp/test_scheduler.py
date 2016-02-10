@@ -12,10 +12,11 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, Jar,
-                                                JavaSources, isolate_resources, ivy_resolve, javac,
-                                                setup_json_scheduler)
-from pants.engine.exp.scheduler import BuildRequest, Return, SelectNode, Throw
+from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
+                                                Jar, JavaSources, ThriftSources, isolate_resources,
+                                                ivy_resolve, javac, setup_json_scheduler)
+from pants.engine.exp.scheduler import (BuildRequest, PartiallyConsumedInputsError, Return,
+                                        SelectNode, Throw)
 
 
 class SchedulerTest(unittest.TestCase):
@@ -85,14 +86,17 @@ class SchedulerTest(unittest.TestCase):
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.thrift])
     walk = self.build_and_walk(build_request)
 
-    # Root: expect JavaSources.
+    # Root: expect the synthetic GenGoal product.
     root_entry = walk[0][0]
-    self.assertEqual(SelectNode(self.thrift, JavaSources, None, None), root_entry[0])
+    self.assertEqual(SelectNode(self.thrift, GenGoal, None, None), root_entry[0])
     self.assertIsInstance(root_entry[1], Return)
 
+    variants = {'thrift': 'apache_java'}
+    # Expect ThriftSources to have been selected.
+    self.assert_select_for_subjects(walk, ThriftSources, [self.thrift], variants=variants)
     # Expect an ApacheThriftJavaConfiguration to have been used via the default Variants.
     self.assert_select_for_subjects(walk, ApacheThriftJavaConfiguration, [self.thrift],
-                                    variants={'thrift': 'apache_java'}, variant_key='thrift')
+                                    variants=variants, variant_key='thrift')
 
   def test_codegen_simple(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java])
@@ -198,9 +202,6 @@ class SchedulerTest(unittest.TestCase):
     """
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.unconfigured_thrift])
-    walk = self.build_and_walk(build_request, failures=True)
 
-    # Validate that the root failed.
-    root_node, root_state = walk[0][0]
-    self.assertEqual(SelectNode(self.unconfigured_thrift, Classpath, None, None), root_node)
-    self.assertEqual(Throw, type(root_state))
+    with self.assertRaises(PartiallyConsumedInputsError):
+      self.build_and_walk(build_request, failures=True)

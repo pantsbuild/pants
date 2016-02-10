@@ -24,6 +24,10 @@ from pants.util.meta import AbstractClass
 
 
 class Selector(object):
+  @abstractproperty
+  def optional(self):
+    """Return true if this Selector is optional. It may result in a `None` match."""
+
   @abstractmethod
   def construct_node(self, subject, variants):
     """Constructs a Node for this Selector and the given Subject/Variants.
@@ -34,6 +38,18 @@ class Selector(object):
 
 class Select(datatype('Subject', ['product']), Selector):
   """Selects the given Product for the Subject provided to the constructor."""
+  optional = False
+
+  def construct_node(self, subject, variants):
+    return SelectNode(subject, self.product, variants, None)
+
+
+class SelectOptional(datatype('Optional', ['product']), Selector):
+  """Selects the given Product for the Subject as an optional value.
+
+  TODO: Unify hierarchy or constructors with non-optional Select.
+  """
+  optional = True
 
   def construct_node(self, subject, variants):
     return SelectNode(subject, self.product, variants, None)
@@ -46,6 +62,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   will only match when a consumer passes a variant value for "thrift" that matches the name of an
   ApacheThrift value.
   """
+  optional = False
 
   def construct_node(self, subject, variants):
     return SelectNode(subject, self.product, variants, self.variant_key)
@@ -57,6 +74,7 @@ class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), 
   The dependencies declared on `deps_product` will be provided to the requesting task
   in the order they were declared.
   """
+  optional = False
 
   def construct_node(self, subject, variants):
     return DependenciesNode(subject, self.product, variants, self.deps_product)
@@ -68,6 +86,7 @@ class SelectProjection(datatype('Projection', ['product', 'projected_product', '
   Projecting an input allows for deduplication in the graph, where multiple Subjects
   resolve to a single backing Subject instead.
   """
+  optional = False
 
   def construct_node(self, subject, variants):
     # Input product type doesn't match: not satisfiable.
@@ -84,6 +103,7 @@ class SelectProjection(datatype('Projection', ['product', 'projected_product', '
 
 class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
+  optional = False
 
   def construct_node(self, subject, variants):
     # NB: Intentionally ignores subject parameter to provide a literal subject.
@@ -345,14 +365,17 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
       dependencies.append(dep)
 
     # If all dependency Nodes are Return, execute the Node.
-    for dep_key in dependencies:
+    for dep_select, dep_key in zip(self.clause, dependencies):
       dep_state = dependency_states.get(dep_key, None)
       if dep_state is None or type(dep_state) == Waiting:
         return Waiting(dependencies)
       elif type(dep_state) == Return:
         dep_values.append(dep_state.value)
       elif type(dep_state) == Throw:
-        return Throw('Dependency {} failed.'.format(dep_key))
+        if dep_select.optional:
+          dep_values.append(None)
+        else:
+          return Throw('Dependency {} failed.'.format(dep_key))
       else:
         State.raise_unrecognized(dep_state)
     return Return(self.func(*dep_values))
@@ -709,19 +732,16 @@ class GraphValidator(object):
 
 
 class LocalScheduler(object):
-  """A scheduler that expands a ProductGraph by executing user defined tasks.
+  """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  # TODO(John Sirois): Allow for subject-less (target-less) goals.  Examples are clean-all,
-  # ng-killall, and buildgen.go.
-  """
-
-  def __init__(self, products_by_goal, symbol_table_cls, tasks):
+  def __init__(self, goals, symbol_table_cls, tasks):
     """
-    :param products_by_goal: The products that are required for each goal name.
+    :param goals: A dict from a goal name to a product type. A goal is just an alias for a
+           particular (possibly synthetic) product.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
     """
-    self._products_by_goal = products_by_goal
+    self._goals = goals
     self._graph_validator = GraphValidator(symbol_table_cls)
     self._node_builder = NodeBuilder.create(tasks, symbol_table_cls)
     self._product_graph = ProductGraph()
@@ -749,8 +769,8 @@ class LocalScheduler(object):
     # Determine the root products and subjects based on the request.
     root_subjects = [parse_variants(a) for a in build_request.addressable_roots]
     root_products = OrderedSet()
-    for goal in build_request.goals:
-      root_products.update(self._products_by_goal[goal])
+    for goal_name in build_request.goals:
+      root_products.add(self._goals[goal_name])
 
     # Roots are products that might be possible to produce for these subjects.
     return [SelectNode(s, p, v, None) for s, v in root_subjects for p in root_products]
