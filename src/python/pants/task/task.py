@@ -411,7 +411,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     # Background work to clean up previous builds
     workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
-                                     [(invalidation_check.invalid_vts,)],
+                                     [(invalidation_check.all_vts,)],
                                      'workdir_build_cleanup')
     self.context.submit_background_work_chain([workdir_build_cleanup_job])
 
@@ -426,13 +426,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
           pairs.append((vt, [vt.results_dir]))
       self.update_artifact_cache(pairs)
 
-  def _cleanup_workdir_stale_builds(self, invalid_vts):
+  def _cleanup_workdir_stale_builds(self, vts):
     max_entries_per_target = self.context.options.for_global_scope().workdir_max_entries_per_target
     if max_entries_per_target is None:
       return
     else:
       max_entries_per_target = max(max_entries_per_target, 2)
-      for vt in invalid_vts:
+      for vt in vts:
         try:
           root_dir = os.path.dirname(vt.results_dir)
         except ValueError:
