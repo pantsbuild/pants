@@ -35,20 +35,24 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     self._confs = sorted(confs or [])
 
   def compute_fingerprint(self, target):
+    if not isinstance(target, (JvmTarget, JarLibrary)):
+      # If it's not a valid target type, don't bother constructing the hasher.
+      return None
+
     hasher = sha1()
     for conf in self._confs:
       hasher.update(conf)
     managed_jar_dependencies_artifacts = JarDependencyManagement.global_instance().for_target(target)
     if managed_jar_dependencies_artifacts:
       hasher.update(str(managed_jar_dependencies_artifacts.id))
+
     if isinstance(target, JarLibrary):
       hasher.update(target.payload.fingerprint())
-      return hasher.hexdigest()
-    if isinstance(target, JvmTarget):
+    elif isinstance(target, JvmTarget):
       if target.payload.excludes:
         hasher.update(target.payload.fingerprint(field_keys=('excludes',)))
-        return hasher.hexdigest()
-    return None
+
+    return hasher.hexdigest()
 
   def __hash__(self):
     return hash((type(self), '-'.join(self._confs)))
