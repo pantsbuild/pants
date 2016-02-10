@@ -142,4 +142,4 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
       # Since pants.task.task.TaskBase#_cleanup_workdir_stale_cache runs in background, it is possible a new successful
       # build writes into workdir after the clean up
-      self.asserTrue(max_entries_per_target <= item_num and item_num <= max_entries_per_target + 1)
+      self.assertTrue(max_entries_per_target <= item_num and item_num <= max_entries_per_target + 1)
