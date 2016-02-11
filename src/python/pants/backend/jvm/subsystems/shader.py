@@ -28,7 +28,7 @@ class Shading(object):
     """Base class for shading keep and zap rules specifiable in BUILD files."""
 
     def render(self):
-      return '{name} {pattern}'.format(name=self.name, pattern=self.pattern)
+      return '{name} {pattern}\n'.format(name=self.name, pattern=self.pattern)
 
   class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
     """Base class for shading relocation rules specifiable in BUILD files."""
@@ -409,6 +409,14 @@ class Shader(object):
     return rules
 
   @contextmanager
+  def temporary_rules_file(self, rules):
+    with temporary_file() as fp:
+      for rule in rules:
+        fp.write(rule.render())
+      fp.close()
+      yield fp.name
+
+  @contextmanager
   def binary_shader_for_rules(self, output_jar, jar, rules, jvm_options=None):
     """Yields an `Executor.Runner` that will perform shading of the binary `jar` when `run()`.
 
@@ -422,15 +430,11 @@ class Shader(object):
     :returns: An `Executor.Runner` that can be `run()` to shade the given `jar`.
     :rtype: :class:`pants.java.executor.Executor.Runner`
     """
-    with temporary_file() as fp:
-      for rule in rules:
-        fp.write(rule.render())
-      fp.close()
-
+    with self.temporary_rules_file(rules) as rules_file:
       yield self._executor.runner(classpath=self._jarjar_classpath,
                                   main='org.pantsbuild.jarjar.Main',
                                   jvm_options=jvm_options,
-                                  args=['process', fp.name, jar, output_jar])
+                                  args=['process', rules_file, jar, output_jar])
 
   def binary_shader(self, output_jar, main, jar, custom_rules=None, jvm_options=None):
     """Yields an `Executor.Runner` that will perform shading of the binary `jar` when `run()`.
