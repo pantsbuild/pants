@@ -13,9 +13,15 @@ from pants.source.payload_fields import DeferredSourcesField
 
 
 class SourceMapper(object):
-  """A utility for making a mapping of source files to targets that own them."""
+  """A utility for making a mapping of source files to targets that own them.
+
+  :API: public
+  """
 
   def target_addresses_for_source(self, source):
+    """
+    :API: public
+    """
     raise NotImplementedError
 
 
@@ -24,10 +30,14 @@ class SpecSourceMapper(SourceMapper):
   Uses sources specs to identify an owner target of a source.
 
   Note: it doesn't check if a file exists.
+
+  :API: public
   """
 
   def __init__(self, address_mapper, build_graph, stop_after_match=False):
     """
+    :API: public
+
     :param AddressMapper address_mapper: An address mapper that can be used to populate the
       `build_graph` with targets source mappings are needed for.
     :param BuildGraph build_graph: The build graph to map sources from.
@@ -39,6 +49,9 @@ class SpecSourceMapper(SourceMapper):
     self._address_mapper = address_mapper
 
   def target_addresses_for_source(self, source):
+    """
+    :API: public
+    """
     result = []
 
     path = source
@@ -86,10 +99,14 @@ class LazySourceMapper(SourceMapper):
 
   A LazySourceMapper reuses computed mappings and only searches a given path once as
   populating the BuildGraph is expensive, so in general there should only be one instance of it.
+
+  :API: public
   """
 
   def __init__(self, address_mapper, build_graph, stop_after_match=False):
     """Initialize LazySourceMapper.
+
+    :API: public
 
     :param AddressMapper address_mapper: An address mapper that can be used to populate the
       `build_graph` with targets source mappings are needed for.
@@ -162,6 +179,8 @@ class LazySourceMapper(SourceMapper):
 
   def target_addresses_for_source(self, source):
     """Attempt to find targets which own a source by searching up directory structure to buildroot.
+
+    :API: public
 
     :param string source: The source to look up.
     """

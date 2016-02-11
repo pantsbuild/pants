@@ -32,28 +32,50 @@ from pants.util.dirutil import fast_relpath
 # Note: 'spec' should not be a user visible term, substitute 'address' instead.
 class BuildFileAddressMapper(object):
   """Maps addresses in the pants virtual address space to corresponding BUILD file declarations.
+
+  :API: public
   """
 
   class AddressNotInBuildFile(AddressLookupError):
-    """Indicates an address cannot be found in an existing BUILD file."""
+    """Indicates an address cannot be found in an existing BUILD file.
+
+    :API: public
+    """
 
   class EmptyBuildFileError(AddressLookupError):
-    """Indicates no addresses are defined in a BUILD file."""
+    """Indicates no addresses are defined in a BUILD file.
+
+    :API: public
+    """
 
   class InvalidBuildFileReference(AddressLookupError):
-    """Indicates no BUILD file exists at the address referenced."""
+    """Indicates no BUILD file exists at the address referenced.
+
+    :API: public
+    """
 
   class InvalidAddressError(AddressLookupError):
-    """Indicates an address cannot be parsed."""
+    """Indicates an address cannot be parsed.
+
+    :API: public
+    """
 
   class BuildFileScanError(AddressLookupError):
-    """Indicates a problem was encountered scanning a tree of BUILD files."""
+    """Indicates a problem was encountered scanning a tree of BUILD files.
+
+    :API: public
+    """
 
   class InvalidRootError(BuildFileScanError):
-    """Indicates an invalid scan root was supplied."""
+    """Indicates an invalid scan root was supplied.
+
+    :API: public
+    """
 
   def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None):
     """Create a BuildFileAddressMapper.
+
+    :API: public
 
     :param build_file_parser: An instance of BuildFileParser
     :param build_file_type: A subclass of BuildFile used to construct and cache BuildFile objects
@@ -70,6 +92,9 @@ class BuildFileAddressMapper(object):
 
   @property
   def root_dir(self):
+    """
+    :API: public
+    """
     return self._build_file_parser.root_dir
 
   def _raise_incorrect_address_error(self, spec_path, wrong_target_name, targets):
@@ -107,6 +132,8 @@ class BuildFileAddressMapper(object):
   def resolve(self, address):
     """Maps an address in the virtual address space to an object.
 
+    :API: public
+
     :param Address address: the address to lookup in a BUILD file
     :raises AddressLookupError: if the path to the address is not found.
     :returns: A tuple of the natively mapped BuildFileAddress and the Addressable it points to.
@@ -118,7 +145,10 @@ class BuildFileAddressMapper(object):
       return address_map[address]
 
   def resolve_spec(self, spec):
-    """Converts a spec to an address and maps it using `resolve`"""
+    """Converts a spec to an address and maps it using `resolve`
+
+    :API: public
+    """
     try:
       address = Address.parse(spec)
     except ValueError as e:
@@ -128,7 +158,6 @@ class BuildFileAddressMapper(object):
 
   def _address_map_from_spec_path(self, spec_path):
     """Returns a resolution map of all addresses in a "directory" in the virtual address space.
-
     :returns {Address: (Address, <resolved Object>)}:
     """
     if spec_path not in self._spec_path_to_address_map_map:
@@ -148,7 +177,10 @@ class BuildFileAddressMapper(object):
     return self._spec_path_to_address_map_map[spec_path]
 
   def addresses_in_spec_path(self, spec_path):
-    """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
+    """Returns only the addresses gathered by `address_map_from_spec_path`, with no values.
+
+    :API: public
+    """
     return self._address_map_from_spec_path(spec_path).keys()
 
   @deprecated('0.0.72')
@@ -161,6 +193,8 @@ class BuildFileAddressMapper(object):
 
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct build file address.
+
+    :API: public
 
     :param string spec: A spec to lookup in the map.
     :param string relative_to: Path the spec might be relative to
@@ -187,6 +221,9 @@ class BuildFileAddressMapper(object):
     return self.scan_build_files(base_path, spec_excludes)
 
   def scan_build_files(self, base_path, spec_excludes=None):
+    """
+    :API: public
+    """
     deprecated_conditional(lambda: spec_excludes is not None,
                            '0.0.75',
                            'Use build_ignore_patterns consturctor parameter instead.')
@@ -195,6 +232,9 @@ class BuildFileAddressMapper(object):
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
+
+    :API: public
+
     :param spec: iterable of Addresses.
     :raises AddressLookupError: if the BUILD file cannot be found in the path specified by the spec
     """
@@ -203,6 +243,8 @@ class BuildFileAddressMapper(object):
 
   def scan_addresses(self, root=None, spec_excludes=None):
     """Recursively gathers all addresses visible under `root` of the virtual address space.
+
+    :API: public
 
     :param string root: The absolute path of the root to scan; defaults to the root directory of the
                         pants project.

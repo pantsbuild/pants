@@ -20,9 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 class BaseLocalArtifactCache(ArtifactCache):
+  """
+  :API: public
+  """
 
   def __init__(self, artifact_root, compression):
     """
+    :API: public
+
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param int compression: The gzip compression level for created artifacts.
                             Valid values are 0-9.
@@ -42,13 +47,19 @@ class BaseLocalArtifactCache(ArtifactCache):
 
   @contextmanager
   def insert_paths(self, cache_key, paths):
-    """Gather paths into artifact, store it, and yield the path to stored artifact tarball."""
+    """Gather paths into artifact, store it, and yield the path to stored artifact tarball.
+
+    :API: public
+    """
     with self._tmpfile(cache_key, 'write') as tmp:
       self._artifact(tmp.name).collect(paths)
       yield self._store_tarball(cache_key, tmp.name)
 
   def store_and_use_artifact(self, cache_key, src, results_dir=None):
-    """Read the content of a tarball from an iterator and return an artifact stored in the cache."""
+    """Read the content of a tarball from an iterator and return an artifact stored in the cache.
+
+    :API: public
+    """
     with self._tmpfile(cache_key, 'read') as tmp:
       for chunk in src:
         tmp.write(chunk)
@@ -68,10 +79,15 @@ class BaseLocalArtifactCache(ArtifactCache):
 
 
 class LocalArtifactCache(BaseLocalArtifactCache):
-  """An artifact cache that stores the artifacts in local files."""
+  """An artifact cache that stores the artifacts in local files.
+
+  :API: public
+  """
 
   def __init__(self, artifact_root, cache_root, compression, max_entries_per_target=None):
     """
+    :API: public
+
     :param str artifact_root: The path under which cacheable products will be read/written.
     :param str cache_root: The locally cached files are stored under this directory.
     :param int compression: The gzip compression level for created artifacts (1-9 or false-y).
@@ -88,6 +104,8 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     If the option --cache-target-max-entry is greater than zero, then prune will remove all but n
     old cache files for each target/task.
 
+    :API: public
+
     :param str root: The path under which cacheable artifacts will be cleaned
     """
 
@@ -96,12 +114,18 @@ class LocalArtifactCache(BaseLocalArtifactCache):
       safe_rm_oldest_items_in_dir(root, max_entries_per_target)
 
   def has(self, cache_key):
+    """
+    :API: public
+    """
     return self._artifact_for(cache_key).exists()
 
   def _artifact_for(self, cache_key):
     return self._artifact(self._cache_file_for_key(cache_key))
 
   def use_cached_files(self, cache_key, results_dir=None):
+    """
+    :API: public
+    """
     tarfile = self._cache_file_for_key(cache_key)
     try:
       artifact = self._artifact_for(cache_key)
@@ -119,10 +143,16 @@ class LocalArtifactCache(BaseLocalArtifactCache):
     return False
 
   def try_insert(self, cache_key, paths):
+    """
+    :API: public
+    """
     with self.insert_paths(cache_key, paths) as tmp:
       pass
 
   def delete(self, cache_key):
+    """
+    :API: public
+    """
     safe_delete(self._cache_file_for_key(cache_key))
 
   def _store_tarball(self, cache_key, src):
@@ -143,10 +173,14 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
 
   This implementation does not have a backing _cache_root, and never
   actually stores files between calls, but is useful for handling file IO for a remote cache.
+
+  :API: public
   """
 
   def __init__(self, artifact_root, compression):
     """
+    :API: public
+
     :param str artifact_root: The path under which cacheable products will be read/written.
     """
     super(TempLocalArtifactCache, self).__init__(artifact_root, compression=compression)
@@ -155,10 +189,19 @@ class TempLocalArtifactCache(BaseLocalArtifactCache):
     return src
 
   def has(self, cache_key):
+    """
+    :API: public
+    """
     return False
 
   def use_cached_files(self, cache_key, results_dir=None):
+    """
+    :API: public
+    """
     return False
 
   def delete(self, cache_key):
+    """
+    :API: public
+    """
     pass

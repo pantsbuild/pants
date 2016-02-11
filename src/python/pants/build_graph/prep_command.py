@@ -18,10 +18,14 @@ class PrepCommand(Target):
 
   Pants will only execute the `prep_command()` under the test goal, when testing targets that
   depend on the `prep_command()` target.
+
+  :API: public
   """
 
   def __init__(self, prep_executable=None, prep_args=None, payload=None, prep_environ=False, **kwargs):
     """
+    :API: public
+
     :param prep_executable: The path to the executable that should be run.
     :param prep_args: A list of command-line args to the excutable.
     :param prep_environ: If True, the output of the command will be treated as

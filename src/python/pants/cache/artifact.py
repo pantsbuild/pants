@@ -15,13 +15,22 @@ from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
 
 
 class ArtifactError(Exception):
+  """
+  :API: public
+  """
   pass
 
 
 class Artifact(object):
-  """Represents a set of files in an artifact."""
+  """Represents a set of files in an artifact.
+
+  :API: public
+  """
 
   def __init__(self, artifact_root):
+    """
+    :API: public
+    """
     # All files must be under this root.
     self._artifact_root = artifact_root
 
@@ -29,36 +38,64 @@ class Artifact(object):
     self._relpaths = set()
 
   def exists(self):
-    """:returns True if the artifact is available for extraction."""
+    """
+    :API: public
+
+    :returns True if the artifact is available for extraction.
+    """
     raise NotImplementedError()
 
   def get_paths(self):
+    """
+    :API: public
+    """
     for relpath in self._relpaths:
       yield os.path.join(self._artifact_root, relpath)
 
   def override_paths(self, paths):  # Use with care.
+    """
+    :API: public
+    """
     self._relpaths = set([os.path.relpath(path, self._artifact_root) for path in paths])
 
   def collect(self, paths):
-    """Collect the paths (which must be under artifact root) into this artifact."""
+    """Collect the paths (which must be under artifact root) into this artifact.
+
+    :API: public
+    """
     raise NotImplementedError()
 
   def extract(self):
-    """Extract the files in this artifact to their locations under artifact root."""
+    """Extract the files in this artifact to their locations under artifact root.
+
+    :API: public
+    """
     raise NotImplementedError()
 
 
 class DirectoryArtifact(Artifact):
-  """An artifact stored as loose files under a directory."""
+  """An artifact stored as loose files under a directory.
+
+  :API: public
+  """
 
   def __init__(self, artifact_root, directory):
+    """
+    :API: public
+    """
     super(DirectoryArtifact, self).__init__(artifact_root)
     self._directory = directory
 
   def exists(self):
+    """
+    :API: public
+    """
     return os.path.exists(self._directory)
 
   def collect(self, paths):
+    """
+    :API: public
+    """
     for path in paths or ():
       relpath = os.path.relpath(path, self._artifact_root)
       dst = os.path.join(self._directory, relpath)
@@ -70,6 +107,9 @@ class DirectoryArtifact(Artifact):
       self._relpaths.add(relpath)
 
   def extract(self):
+    """
+    :API: public
+    """
     for dir_name, _, filenames in safe_walk(self._directory):
       for filename in filenames:
         filename = os.path.join(dir_name, filename)
@@ -81,17 +121,29 @@ class DirectoryArtifact(Artifact):
 
 
 class TarballArtifact(Artifact):
-  """An artifact stored in a tarball."""
+  """An artifact stored in a tarball.
+
+  :API: public
+  """
 
   def __init__(self, artifact_root, tarfile_, compression=9):
+    """
+    :API: public
+    """
     super(TarballArtifact, self).__init__(artifact_root)
     self._tarfile = tarfile_
     self._compression = compression
 
   def exists(self):
+    """
+    :API: public
+    """
     return os.path.isfile(self._tarfile)
 
   def collect(self, paths):
+    """
+    :API: public
+    """
     # In our tests, gzip is slightly less compressive than bzip2 on .class files,
     # but decompression times are much faster.
     mode = 'w:gz'
@@ -106,6 +158,9 @@ class TarballArtifact(Artifact):
         self._relpaths.add(relpath)
 
   def extract(self):
+    """
+    :API: public
+    """
     try:
       with open_tar(self._tarfile, 'r', errorlevel=2) as tarin:
         # Note: We create all needed paths proactively, even though extractall() can do this for us.

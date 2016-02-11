@@ -18,10 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class ArtifactCacheError(Exception):
+  """
+  :API: public
+  """
   pass
 
 
 class NonfatalArtifactCacheError(Exception):
+  """
+  :API: public
+  """
   pass
 
 
@@ -29,10 +35,14 @@ class UnreadableArtifact(object):
   """A False-y value to indicate a read-failure (vs a normal cache-miss)
 
   See docstring on `ArtifactCache.use_cached_files` for details.
+
+  :API: public
   """
 
   def __init__(self, key, err=None):
     """
+    :API: public
+
     :param CacheKey key: The key of the artifact that encountered an error
     :param err: Any additional information on the nature of the read error.
     """
@@ -58,12 +68,16 @@ class ArtifactCache(object):
   build the artifacts. Cache keys are typically obtained from a CacheKeyGenerator.
 
   Subclasses implement the methods below to provide this functionality.
+
+  :API: public
   """
 
   def __init__(self, artifact_root):
     """Create an ArtifactCache.
 
     All artifacts must be under artifact_root.
+
+    :API: public
     """
     self.artifact_root = artifact_root
 
@@ -71,6 +85,9 @@ class ArtifactCache(object):
     """Prune stale cache files
 
     Remove old unused cache files
+
+    :API: public
+
     :return:
     """
     pass
@@ -81,6 +98,8 @@ class ArtifactCache(object):
     By default, checks cache.has(key) first, only proceeding to create and insert an artifact
     if it is not already in the cache (though `overwrite` can be used to skip the check and
     unconditionally insert).
+
+    :API: public
 
     :param CacheKey cache_key: A CacheKey object.
     :param list<str> paths: List of absolute paths to generated dirs/files.
@@ -106,12 +125,17 @@ class ArtifactCache(object):
   def try_insert(self, cache_key, paths):
     """Attempt to cache the output of a build, without error-handling.
 
+    :API: public
+
     :param CacheKey cache_key: A CacheKey object.
     :param list<str> paths: List of absolute paths to generated dirs/files. These must be under the artifact_root.
     """
     pass
 
   def has(self, cache_key):
+    """
+    :API: public
+    """
     pass
 
   def use_cached_files(self, cache_key, results_dir=None):
@@ -131,6 +155,8 @@ class ArtifactCache(object):
     Callers may also choose to attempt to repair or report corrupted artifacts
     differently, as these are unexpected, unlike normal cache misses.
 
+    :API: public
+
     :param CacheKey cache_key: A CacheKey object.
     """
     pass
@@ -139,6 +165,9 @@ class ArtifactCache(object):
     """Delete the artifacts for the specified key.
 
     Deleting non-existent artifacts is a no-op.
+
+    :API: public
+
     :param CacheKey cache_key: A CacheKey object.
     """
     pass
@@ -150,6 +179,8 @@ def call_use_cached_files(tup):
   Multiprocessing map/apply/etc require functions which can be imported, not bound methods.
   To call a bound method, instead call a helper like this and pass tuple of the instance and args.
   The helper can then call the original method on the deserialized instance.
+
+  :API: public
 
   :param tup: A tuple of an ArtifactCache and args (eg CacheKey) for ArtifactCache.use_cached_files.
   """
@@ -171,6 +202,8 @@ def call_insert(tup):
   """Importable helper for multi-proc calling of ArtifactCache.insert on an ArtifactCache instance.
 
   See docstring on call_use_cached_files explaining why this is useful.
+
+  :API: public
 
   :param tup: A 4-tuple of an ArtifactCache and the 3 args passed to ArtifactCache.insert:
               eg (some_cache_instance, cache_key, [some_file, another_file], False)

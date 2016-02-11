@@ -13,15 +13,24 @@ from pants.util.meta import AbstractClass
 
 
 class AddressableCallProxy(BuildFileTargetFactory):
-  """A registration proxy for objects to be captured and addressed from BUILD files."""
+  """A registration proxy for objects to be captured and addressed from BUILD files.
+
+  :API: public
+  """
 
   def __init__(self, addressable_factory, build_file, registration_callback):
+    """
+    :API: public
+    """
     self._addressable_factory = addressable_factory
     self._build_file = build_file
     self._registration_callback = registration_callback
 
   @property
   def target_types(self):
+    """
+    :API: public
+    """
     return self._addressable_factory.target_types
 
   def __call__(self, *args, **kwargs):
@@ -38,14 +47,22 @@ class AddressableCallProxy(BuildFileTargetFactory):
 
 
 class Addressable(AbstractClass):
-  """An ABC for classes which would like instances to be named and exported from BUILD files."""
+  """An ABC for classes which would like instances to be named and exported from BUILD files.
+
+  :API: public
+  """
 
   class Factory(BuildFileTargetFactory):
-    """Captures addressable instances from BUILD file calls."""
+    """Captures addressable instances from BUILD file calls.
+
+    :API: public
+    """
 
     @abstractmethod
     def capture(self, *args, **kwargs):
       """Captures the arguments passed to an addressable alias in a BUILD file.
+
+      :API: public
 
       :returns: An addressable instance representing the call capture.
       :rtype: :class:`Addressable`
@@ -55,15 +72,23 @@ class Addressable(AbstractClass):
       return '{}(target_types={})'.format(type(self).__name__, self.target_types)
 
   class AddressableInitError(Exception):
-    """Indicates a problem capturing arguments to create a new :class:`Addressable`."""
+    """Indicates a problem capturing arguments to create a new :class:`Addressable`.
+
+    :API: public
+    """
 
   def __init__(self, addressed_alias, addressed_type):
+    """
+    :API: public
+    """
     self._addressed_alias = addressed_alias
     self._addressed_type = addressed_type
 
   @property
   def addressed_alias(self):
     """The alias via which this addressable was invoked.
+
+    :API: public
 
     :rtype: string
     """
@@ -72,6 +97,8 @@ class Addressable(AbstractClass):
   @property
   def addressed_type(self):
     """The type this addressable captures calls to and ultimately can `instantiate`.
+
+    :API: public
 
     :returns: The class of the addressed type this addressable proxies for.
     :rtype: type
@@ -82,6 +109,8 @@ class Addressable(AbstractClass):
   def addressed_name(self):
     """This property is inspected by AddressableCallProxy to automatically name Addressables.
 
+    :API: public
+
     Generally, a subclass will inspect its captured arguments and return, for example, the
       captured `name` parameter.  A value of `None` (the default) causes AddressableCallProxy
       to skip capturing and naming this instance.
@@ -90,6 +119,8 @@ class Addressable(AbstractClass):
 
   def instantiate(self, *args, **kwargs):
     """Realizes the captured addressable call as an instance of the aliased object type.
+
+    :API: public
 
     :returns: A fully hydrated addressable object.
     """

@@ -37,18 +37,26 @@ class AbstractTarget(object):
 
     Targets always use the global subsystem instance. They have no notion of any other scope.
 
+    :API: public
+
     :return: A tuple of subsystem types.
     """
     return tuple()
 
   @property
   def has_resources(self):
-    """Returns True if the target has an associated set of Resources."""
+    """Returns True if the target has an associated set of Resources.
+
+    :API: public
+    """
     return hasattr(self, 'resources') and self.resources
 
   @property
   def is_exported(self):
-    """Returns True if the target provides an artifact exportable from the repo."""
+    """Returns True if the target provides an artifact exportable from the repo.
+
+    :API: public
+    """
     # TODO(John Sirois): fixup predicate dipping down into details here.
     return self.has_label('exportable') and self.provides
 
@@ -56,7 +64,8 @@ class AbstractTarget(object):
   # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
   @property
   def is_thrift(self):
-    """Returns True if the target has thrift IDL sources."""
+    """Returns True if the target has thrift IDL sources.
+    """
     return False
 
   # DEPRECATED to be removed after 0.0.29
@@ -123,19 +132,33 @@ class Target(AbstractTarget):
 
   Handles registration of a target amongst all parsed targets as well as location of the target
   parse context.
+
+  :API: public
   """
 
   class WrongNumberOfAddresses(Exception):
-    """Internal error, too many elements in Addresses"""
+    """Internal error, too many elements in Addresses
+
+    :API: public
+    """
 
   class IllegalArgument(TargetDefinitionException):
-    """Argument that isn't allowed supplied to Target."""
+    """Argument that isn't allowed supplied to Target.
+
+    :API: public
+    """
 
   class UnknownArguments(Subsystem):
-    """Subsystem for validating unknown keyword arguments."""
+    """Subsystem for validating unknown keyword arguments.
+
+    :API: public
+    """
 
     class Error(TargetDefinitionException):
-      """Unknown keyword arguments supplied to Target."""
+      """Unknown keyword arguments supplied to Target.
+
+      :API: public
+      """
 
     options_scope = 'unknown-arguments'
 
@@ -148,9 +171,15 @@ class Target(AbstractTarget):
 
     @classmethod
     def check(cls, target, kwargs):
+      """
+      :API: public
+      """
       cls.global_instance().check_unknown(target, kwargs)
 
     def check_unknown(self, target, kwargs):
+      """
+      :API: public
+      """
       ignore_params = set((self.get_options().ignored or {}).get(target.type_alias, ()))
       unknown_args = {arg: value for arg, value in kwargs.items() if arg not in ignore_params}
       ignored_args = {arg: value for arg, value in kwargs.items() if arg in ignore_params}
@@ -172,6 +201,9 @@ class Target(AbstractTarget):
 
   @classmethod
   def get_addressable_type(target_cls):
+    """
+    :API: public
+    """
     class ConcreteTargetAddressable(TargetAddressable):
 
       @classmethod
@@ -181,7 +213,11 @@ class Target(AbstractTarget):
 
   @memoized_property
   def target_base(self):
-    """:returns: the source root path for this target."""
+    """
+    :API: public
+
+    :returns: the source root path for this target.
+    """
     source_root = self._sources_field.source_root
     if not source_root:
       raise TargetDefinitionException(self, 'Not under any configured source root.')
@@ -189,30 +225,44 @@ class Target(AbstractTarget):
 
   @classmethod
   def identify(cls, targets):
-    """Generates an id for a set of targets."""
+    """Generates an id for a set of targets.
+
+    :API: public
+    """
     return cls.combine_ids(target.id for target in targets)
 
   @classmethod
   def maybe_readable_identify(cls, targets):
     """Generates an id for a set of targets.
 
-    If the set is a single target, just use that target's id."""
+    If the set is a single target, just use that target's id.
+
+    :API: public
+    """
     return cls.maybe_readable_combine_ids([target.id for target in targets])
 
   @staticmethod
   def combine_ids(ids):
-    """Generates a combined id for a set of ids."""
+    """Generates a combined id for a set of ids.
+
+    :API: public
+    """
     return hash_all(sorted(ids))  # We sort so that the id isn't sensitive to order.
 
   @classmethod
   def maybe_readable_combine_ids(cls, ids):
-    """Generates combined id for a set of ids, but if the set is a single id, just use that."""
+    """Generates combined id for a set of ids, but if the set is a single id, just use that.
+
+    :API: public
+    """
     ids = list(ids)  # We can't len a generator.
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
   def __init__(self, name, address, build_graph, type_alias=None, payload=None, tags=None,
                description=None, no_cache=False, **kwargs):
     """
+    :API: public
+
     :param string name: The name of this target, which combined with this build file defines the
                         target address.
     :param dependencies: Target address specs of other targets that this target depends on.
@@ -264,24 +314,37 @@ class Target(AbstractTarget):
     The end result is that the type alias should be the most natural way to refer to this target's
     type to the author of the target instance.
 
+    :API: public
+
     :rtype: string
     """
     return self._type_alias or type(self).__name__
 
   @property
   def tags(self):
+    """
+    :API: public
+    """
     return self._tags
 
   @property
   def num_chunking_units(self):
+    """
+    :API: public
+    """
     return max(1, len(self.sources_relative_to_buildroot()))
 
   def assert_list(self, maybe_list, expected_type=string_types, key_arg=None):
+    """
+    :API: public
+    """
     return assert_list(maybe_list, expected_type, key_arg=key_arg,
                        raise_type=lambda msg: TargetDefinitionException(self, msg))
 
   def compute_invalidation_hash(self, fingerprint_strategy=None):
     """
+    :API: public
+
      :param FingerprintStrategy fingerprint_strategy: optional fingerprint strategy to use to compute
     the fingerprint of a target
     :return: a fingerprint representing this target (no dependencies)
@@ -291,18 +354,26 @@ class Target(AbstractTarget):
     return fingerprint_strategy.fingerprint_target(self)
 
   def invalidation_hash(self, fingerprint_strategy=None):
+    """
+    :API: public
+    """
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
     if fingerprint_strategy not in self._cached_fingerprint_map:
       self._cached_fingerprint_map[fingerprint_strategy] = self.compute_invalidation_hash(fingerprint_strategy)
     return self._cached_fingerprint_map[fingerprint_strategy]
 
   def mark_extra_invalidation_hash_dirty(self):
+    """
+    :API: public
+    """
     pass
 
   def mark_invalidation_hash_dirty(self):
     """Invalidates memoized fingerprints for this target, including those in payloads.
 
     Exposed for testing.
+
+    :API: public
     """
     self._cached_fingerprint_map = {}
     self._cached_transitive_fingerprint_map = {}
@@ -311,6 +382,8 @@ class Target(AbstractTarget):
 
   def transitive_invalidation_hash(self, fingerprint_strategy=None):
     """
+    :API: public
+
     :param FingerprintStrategy fingerprint_strategy: optional fingerprint strategy to use to compute
     the fingerprint of a target
     :return: A fingerprint representing this target and all of its dependencies.
@@ -340,13 +413,22 @@ class Target(AbstractTarget):
     return self._cached_transitive_fingerprint_map[fingerprint_strategy]
 
   def mark_transitive_invalidation_hash_dirty(self):
+    """
+    :API: public
+    """
     self._cached_transitive_fingerprint_map = {}
     self.mark_extra_transitive_invalidation_hash_dirty()
 
   def mark_extra_transitive_invalidation_hash_dirty(self):
+    """
+    :API: public
+    """
     pass
 
   def inject_dependency(self, dependency_address):
+    """
+    :API: public
+    """
     self._build_graph.inject_dependency(dependent=self.address, dependency=dependency_address)
 
     def invalidate_dependee(dependee):
@@ -355,11 +437,16 @@ class Target(AbstractTarget):
 
   @property
   def _sources_field(self):
+    """
+    :API: public
+    """
     sources_field = self.payload.get_field('sources')
     return sources_field if sources_field else SourcesField(self.address.spec_path, sources=())
 
   def has_sources(self, extension=''):
     """
+    :API: public
+
     :param string extension: suffix of filenames to test for
     :return: True if the target contains sources that match the optional extension suffix
     :rtype: bool
@@ -367,12 +454,18 @@ class Target(AbstractTarget):
     return self._sources_field.has_sources(extension)
 
   def sources_relative_to_buildroot(self):
+    """
+    :API: public
+    """
     if self.has_sources():
       return self.payload.sources.relative_to_buildroot()
     else:
       return []
 
   def sources_relative_to_source_root(self):
+    """
+    :API: public
+    """
     if self.has_sources():
       abs_source_root = os.path.join(get_buildroot(), self.target_base)
       for source in self.sources_relative_to_buildroot():
@@ -380,6 +473,9 @@ class Target(AbstractTarget):
         yield os.path.relpath(abs_source, abs_source_root)
 
   def globs_relative_to_buildroot(self):
+    """
+    :API: public
+    """
     return self._sources_field.filespec
 
   @property
@@ -387,6 +483,8 @@ class Target(AbstractTarget):
     """Returns the target this target was derived from.
 
     If this target was not derived from another, returns itself.
+
+    :API: public
     """
     return self._build_graph.get_derived_from(self.address)
 
@@ -395,6 +493,8 @@ class Target(AbstractTarget):
     """Returns all targets that this target was derived from.
 
     If this target was not derived from another, returns an empty sequence.
+
+    :API: public
     """
     cur = self
     while cur.derived_from is not cur:
@@ -407,12 +507,16 @@ class Target(AbstractTarget):
 
     The returned target is guaranteed to not have been derived from any other target, and is thus
     guaranteed to be a 'real' target from a BUILD file, not a programmatically injected target.
+
+    :API: public
     """
     return self._build_graph.get_concrete_derived_from(self.address)
 
   @property
   def traversable_specs(self):
     """
+    :API: public
+
     :return: specs referenced by this target to be injected into the build graph
     :rtype: list of strings
     """
@@ -421,6 +525,8 @@ class Target(AbstractTarget):
   @property
   def traversable_dependency_specs(self):
     """
+    :API: public
+
     :return: specs representing dependencies of this target that will be injected to the build
     graph and linked in the graph as dependencies of this target
     :rtype: list of strings
@@ -433,6 +539,8 @@ class Target(AbstractTarget):
   @property
   def dependencies(self):
     """
+    :API: public
+
     :return: targets that this target depends on
     :rtype: list of Target
     """
@@ -442,6 +550,8 @@ class Target(AbstractTarget):
   @property
   def dependents(self):
     """
+    :API: public
+
     :return: targets that depend on this target
     :rtype: list of Target
     """
@@ -451,13 +561,19 @@ class Target(AbstractTarget):
   @property
   def is_synthetic(self):
     """
+    :API: public
+
     :return: True if this target did not originate from a BUILD file.
     """
     return self.address in self._build_graph.synthetic_addresses
 
   @property
   def is_original(self):
-    """Returns ``True`` if this target is derived from no other."""
+    """
+    :API: public
+
+    Returns ``True`` if this target is derived from no other.
+    """
     return self.derived_from == self
 
   @memoized_property
@@ -465,6 +581,8 @@ class Target(AbstractTarget):
     """A unique and unix safe identifier for the Target.
     Since other classes use this id to generate new file names and unix system has 255 character
     limitation on a file name, 200-character limit is chosen as a safe measure.
+
+    :API: public
     """
     id_candidate = self.address.path_safe_spec
     if len(id_candidate) >= 200:
@@ -474,6 +592,9 @@ class Target(AbstractTarget):
 
   @property
   def identifier(self):
+    """
+    :API: public
+    """
     return self.id
 
   def walk(self, work, predicate=None):
@@ -483,6 +604,8 @@ class Target(AbstractTarget):
     If a predicate is supplied it will be used to test each target before handing the target to
     work and descending. Work can return targets in which case these will be added to the walk
     candidate set if not already walked.
+
+    :API: public
 
     :param work: Callable that takes a :py:class:`pants.build_graph.target.Target`
       as its single argument.
@@ -499,6 +622,8 @@ class Target(AbstractTarget):
     """Returns this target's transitive dependencies.
 
     The walk will be depth-first in preorder, or breadth first if bfs=True is specified.
+
+    :API: public
     """
     if bfs:
       return self._build_graph.transitive_subgraph_of_addresses_bfs([self.address])
@@ -538,6 +663,9 @@ class Target(AbstractTarget):
 
     Note that this method is called before the call to Target.__init__ so don't expect fields to
     be populated!
+
+    :API: public
+
     :return: a payload field object representing the sources parameter
     :rtype: SourcesField
     """

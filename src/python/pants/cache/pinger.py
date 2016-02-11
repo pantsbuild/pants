@@ -21,21 +21,32 @@ _global_pinger_memo = {}  # (netloc, timeout, tries) -> rt time in secs.
 
 
 class InvalidRESTfulCacheProtoError(ArtifactCacheError):
-  """Indicates an invalid protocol used in a remote spec."""
+  """Indicates an invalid protocol used in a remote spec.
+
+  :API: public
+  """
   pass
 
 
 class Pinger(object):
+  """
+  :API: public
+  """
   # Signifies that a netloc is unreachable.
   UNREACHABLE = 999999
 
   def __init__(self, timeout, tries):
-    """Try pinging the given number of times, each with the given timeout."""
+    """Try pinging the given number of times, each with the given timeout.
+
+    :API: public
+    """
     self._timeout = timeout
     self._tries = tries
 
   def ping(self, netloc):
     """Time a single roundtrip to the netloc.
+
+    :API: public
 
     :param netloc: string of "host:port"
     :returns: the fastest ping time for a given netloc and number of tries.
@@ -67,6 +78,9 @@ class Pinger(object):
     return rt_secs
 
   def pings(self, netlocs):
+    """
+    :API: public
+    """
     pool = ThreadPool(processes=len(netlocs))
     rt_secs = pool.map(self.ping, netlocs, chunksize=1)
     pool.close()
@@ -75,11 +89,16 @@ class Pinger(object):
 
 
 class BestUrlSelector(object):
+  """
+  :API: public
+  """
   SUPPORTED_PROTOCOLS = ('http', 'https')
   MAX_FAILURES = 3
 
   def __init__(self, available_urls, max_failures=MAX_FAILURES):
     """Save parsed input urls in order and perform basic validations.
+
+    :API: public
 
     :param available_urls: input urls pre-sorted by their ping times.
     """
@@ -108,6 +127,8 @@ class BestUrlSelector(object):
     allowed number of consecutive failures. In this case, we would return the next `best`
     url, and append the previous best one to the end of list (essentially rotate to the left
     by one element).
+
+    :API: public
     """
 
     best_url = self.parsed_urls[0]
