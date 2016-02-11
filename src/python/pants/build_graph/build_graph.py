@@ -579,4 +579,3 @@ def sort_targets(targets):
     topological_sort(root)
 
   return ordered
-   Å
