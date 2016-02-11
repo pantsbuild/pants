@@ -129,13 +129,17 @@ class IvyTaskMixin(TaskBase):
                                                      pinned_artifacts=artifact_set))
     return resolve_hash_names
 
+  def ivy_classpath(self, targets, silent=True, workunit_name=None):
+    classpath, _, _ = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
+    return classpath
+
   def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False, pinned_artifacts=None):
     classpath_products.add_excludes_for_targets(targets)
 
     # After running ivy, we parse the resulting report, and record the dependencies for
     # all relevant targets (ie: those that have direct dependencies).
-    _, symlink_map, resolve_hash_name = self.ivy_resolve(
+    _, symlink_map, resolve_hash_name = self._ivy_resolve(
       targets,
       executor=executor,
       workunit_name='ivy-resolve',
@@ -193,7 +197,7 @@ class IvyTaskMixin(TaskBase):
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the
   # ivy cache dir.
-  def ivy_resolve(self,
+  def _ivy_resolve(self,
                   targets,
                   executor=None,
                   silent=False,
