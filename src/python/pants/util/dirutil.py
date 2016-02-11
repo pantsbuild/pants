@@ -182,7 +182,7 @@ def safe_concurrent_rename(src, dst):
 def safe_rm_oldest_items_in_dir(root_dir, num_of_items):
   if os.path.isdir(root_dir):
     found_files = []
-    for old_file in os.listdir(root_dir):
+    for old_file, _ in os.listdir(root_dir):
       full_path = os.path.join(root_dir, old_file)
       found_files.append((full_path, os.path.getmtime(full_path)))
     found_files = sorted(found_files, key=lambda x: x[1], reverse=True)

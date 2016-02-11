@@ -409,7 +409,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     for vt in invalidation_check.invalid_vts:
       vt.update()  # In case the caller doesn't update.
 
-    # Background work to clean up previous builds
+    # Background work to clean up previous builds.
     workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
                                      [(invalidation_check.all_vts,)],
                                      'workdir_build_cleanup')
