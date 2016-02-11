@@ -97,7 +97,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       # Cache cleanup disabled for 0
       self.assertEqual(len(os.listdir(artifact_dir)), 7)
 
-  def test_workdir_stale_cache_cleanup(self):
+  def test_workdir_stale_builds_cleanup(self):
     """Ensure that max-old of zero removes all files
 
     This test should ensure that conditional doesn't change to the simpler test of if max_old since
