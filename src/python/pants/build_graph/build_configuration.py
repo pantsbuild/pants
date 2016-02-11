@@ -21,10 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class BuildConfiguration(object):
-  """Stores the types and helper functions exposed to BUILD files.
-
-  :API: public
-  """
+  """Stores the types and helper functions exposed to BUILD files."""
 
   ParseState = namedtuple('ParseState', ['registered_addressable_instances', 'parse_globals'])
 
@@ -33,9 +30,6 @@ class BuildConfiguration(object):
     return inspect.isclass(obj) and issubclass(obj, Subsystem)
 
   def __init__(self):
-    """
-    :API: public
-    """
     self._target_by_alias = {}
     self._target_macro_factory_by_alias = {}
     self._exposed_object_by_alias = {}
@@ -47,8 +41,6 @@ class BuildConfiguration(object):
 
     These returned aliases aren't so useful for actually parsing BUILD files.
     They are useful for generating things like http://pantsbuild.github.io/build_dictionary.html.
-
-    :API: public
 
     :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
               mappings.
@@ -63,8 +55,6 @@ class BuildConfiguration(object):
 
   def register_aliases(self, aliases):
     """Registers the given aliases to be exposed in parsed BUILD files.
-
-    :API: public
 
     :param aliases: The BuildFileAliases to register.
     :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
@@ -121,8 +111,6 @@ class BuildConfiguration(object):
   def register_subsystems(self, subsystems):
     """Registers the given subsystem types.
 
-    :API: public
-
     :param subsystems: The subsystem types to register.
     :type subsystems: :class:`collections.Iterable` containing
                       :class:`pants.subsystem.subsystem.Subsystem` subclasses.
@@ -139,8 +127,6 @@ class BuildConfiguration(object):
   def subsystems(self):
     """Returns the registered Subsystem types.
 
-    :API: public
-
     :rtype set
     """
     return self._subsystems
@@ -151,8 +137,6 @@ class BuildConfiguration(object):
 
   def initialize_parse_state(self, build_file):
     """Creates a fresh parse state for the given build file.
-
-    :API: public
 
     :param build_file: The BUILD file to set up a new ParseState for.
     :type build_file: :class:`pants.base.build_file.BuildFile`

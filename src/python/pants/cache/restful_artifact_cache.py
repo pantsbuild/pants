@@ -21,33 +21,22 @@ logging.getLogger('requests').setLevel(logging.WARNING)
 
 
 class RequestsSession(object):
-  """
-  :API: public
-  """
   _session = None
 
   @classmethod
   def instance(cls):
-    """
-    :API: public
-    """
     if cls._session is None:
       cls._session = requests.Session()
     return cls._session
 
 
 class RESTfulArtifactCache(ArtifactCache):
-  """An artifact cache that stores the artifacts on a RESTful service.
-
-  :API: public
-  """
+  """An artifact cache that stores the artifacts on a RESTful service."""
 
   READ_SIZE_BYTES = 4 * 1024 * 1024
 
   def __init__(self, artifact_root, best_url_selector, local):
     """
-    :API: public
-
     :param string artifact_root: The path under which cacheable products will be read/written.
     :param BestUrlSelector best_url_selector: Url selector that supports fail-over. Each returned
       url represents prefix for some RESTful service. We must be able to PUT and GET to any path
@@ -61,9 +50,6 @@ class RESTfulArtifactCache(ArtifactCache):
     self._localcache = local
 
   def try_insert(self, cache_key, paths):
-    """
-    :API: public
-    """
     # Delegate creation of artifact to local cache.
     with self._localcache.insert_paths(cache_key, paths) as tarfile:
       # Upload local artifact to remote cache.
@@ -72,17 +58,11 @@ class RESTfulArtifactCache(ArtifactCache):
           raise NonfatalArtifactCacheError('Failed to PUT {0}.'.format(cache_key))
 
   def has(self, cache_key):
-    """
-    :API: public
-    """
     if self._localcache.has(cache_key):
       return True
     return self._request('HEAD', cache_key) is not None
 
   def use_cached_files(self, cache_key, results_dir=None):
-    """
-    :API: public
-    """
     if self._localcache.has(cache_key):
       return self._localcache.use_cached_files(cache_key, results_dir)
 
@@ -100,9 +80,6 @@ class RESTfulArtifactCache(ArtifactCache):
     return False
 
   def delete(self, cache_key):
-    """
-    :API: public
-    """
     self._localcache.delete(cache_key)
     self._request('DELETE', cache_key)
 

@@ -64,8 +64,7 @@ class AbstractTarget(object):
   # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
   @property
   def is_thrift(self):
-    """Returns True if the target has thrift IDL sources.
-    """
+    """Returns True if the target has thrift IDL sources."""
     return False
 
   # DEPRECATED to be removed after 0.0.29
@@ -149,16 +148,10 @@ class Target(AbstractTarget):
     """
 
   class UnknownArguments(Subsystem):
-    """Subsystem for validating unknown keyword arguments.
-
-    :API: public
-    """
+    """Subsystem for validating unknown keyword arguments."""
 
     class Error(TargetDefinitionException):
-      """Unknown keyword arguments supplied to Target.
-
-      :API: public
-      """
+      """Unknown keyword arguments supplied to Target."""
 
     options_scope = 'unknown-arguments'
 
@@ -329,9 +322,6 @@ class Target(AbstractTarget):
 
   @property
   def num_chunking_units(self):
-    """
-    :API: public
-    """
     return max(1, len(self.sources_relative_to_buildroot()))
 
   def assert_list(self, maybe_list, expected_type=string_types, key_arg=None):
@@ -437,9 +427,6 @@ class Target(AbstractTarget):
 
   @property
   def _sources_field(self):
-    """
-    :API: public
-    """
     sources_field = self.payload.get_field('sources')
     return sources_field if sources_field else SourcesField(self.address.spec_path, sources=())
 

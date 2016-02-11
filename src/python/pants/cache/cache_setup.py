@@ -22,55 +22,28 @@ from pants.option.custom_types import list_option
 from pants.subsystem.subsystem import Subsystem
 
 
-class EmptyCacheSpecError(ArtifactCacheError):
-  """
-  :API: public
-  """
-  pass
+class EmptyCacheSpecError(ArtifactCacheError): pass
 
 
-class LocalCacheSpecRequiredError(ArtifactCacheError):
-  """
-  :API: public
-  """
-  pass
+class LocalCacheSpecRequiredError(ArtifactCacheError): pass
 
 
-class CacheSpecFormatError(ArtifactCacheError):
-  """
-  :API: public
-  """
-  pass
+class CacheSpecFormatError(ArtifactCacheError): pass
 
 
-class InvalidCacheSpecError(ArtifactCacheError):
-  """
-  :API: public
-  """
-  pass
+class InvalidCacheSpecError(ArtifactCacheError): pass
 
 
-class RemoteCacheSpecRequiredError(ArtifactCacheError):
-  """
-  :API: public
-  """
-  pass
+class RemoteCacheSpecRequiredError(ArtifactCacheError): pass
 
 
-class TooManyCacheSpecsError(ArtifactCacheError):
-  """
-  :API: public
-  """
-  pass
+class TooManyCacheSpecsError(ArtifactCacheError): pass
 
 
 CacheSpec = namedtuple('CacheSpec', ['local', 'remote'])
 
 
 class CacheSetup(Subsystem):
-  """
-  :API: public
-  """
   options_scope = 'cache'
 
   @classmethod
@@ -108,22 +81,14 @@ class CacheSetup(Subsystem):
 
   @classmethod
   def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
-    """
-    :API: public
-    """
     return CacheFactory(cls.scoped_instance(task).get_options(),
                         task.context.log, task.stable_name(), pinger=pinger, resolver=resolver)
 
 
 class CacheFactory(object):
-  """
-  :API: public
-  """
 
   def __init__(self, options, log, stable_name, pinger=None, resolver=None):
     """Create a cache factory from settings.
-
-    :API: public
 
     :param options: Task's scoped options.
     :param log: Task's context log.
@@ -155,27 +120,16 @@ class CacheFactory(object):
                       NoopResolver())
 
   def read_cache_available(self):
-    """
-    :API: public
-    """
     return self._options.read and bool(self._options.read_from) and self.get_read_cache()
 
   def write_cache_available(self):
-    """
-    :API: public
-    """
     return self._options.write and bool(self._options.write_to) and self.get_write_cache()
 
   def overwrite(self):
-    """
-    :API: public
-    """
     return self._options.overwrite
 
   def get_read_cache(self):
     """Returns the read cache for this setup, creating it if necessary.
-
-    :API: public
 
     Returns None if no read cache is configured.
     """
@@ -188,8 +142,6 @@ class CacheFactory(object):
 
   def get_write_cache(self):
     """Returns the write cache for this setup, creating it if necessary.
-
-    :API: public
 
     Returns None if no read cache is configured.
     """
@@ -253,24 +205,15 @@ class CacheFactory(object):
 
   @staticmethod
   def is_local(string_spec):
-    """
-    :API: public
-    """
     return string_spec.startswith('/') or string_spec.startswith('~')
 
   @staticmethod
   def is_remote(string_spec):
-    """
-    :API: public
-    """
     # both artifact cache and resolver use REST, add new protocols here once they are supported
     return string_spec.startswith('http://') or string_spec.startswith('https://')
 
   def get_available_urls(self, urls):
-    """Return reachable urls sorted by their ping times.
-
-    :API: public
-    """
+    """Return reachable urls sorted by their ping times."""
 
     netloc_to_url = {urlparse.urlparse(url).netloc: url for url in urls}
     pingtimes = self._pinger.pings(netloc_to_url.keys())  # List of pairs (host, time in ms).

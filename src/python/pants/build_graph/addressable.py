@@ -13,15 +13,9 @@ from pants.util.meta import AbstractClass
 
 
 class AddressableCallProxy(BuildFileTargetFactory):
-  """A registration proxy for objects to be captured and addressed from BUILD files.
-
-  :API: public
-  """
+  """A registration proxy for objects to be captured and addressed from BUILD files."""
 
   def __init__(self, addressable_factory, build_file, registration_callback):
-    """
-    :API: public
-    """
     self._addressable_factory = addressable_factory
     self._build_file = build_file
     self._registration_callback = registration_callback
@@ -47,10 +41,7 @@ class AddressableCallProxy(BuildFileTargetFactory):
 
 
 class Addressable(AbstractClass):
-  """An ABC for classes which would like instances to be named and exported from BUILD files.
-
-  :API: public
-  """
+  """An ABC for classes which would like instances to be named and exported from BUILD files."""
 
   class Factory(BuildFileTargetFactory):
     """Captures addressable instances from BUILD file calls.
@@ -72,15 +63,9 @@ class Addressable(AbstractClass):
       return '{}(target_types={})'.format(type(self).__name__, self.target_types)
 
   class AddressableInitError(Exception):
-    """Indicates a problem capturing arguments to create a new :class:`Addressable`.
-
-    :API: public
-    """
+    """Indicates a problem capturing arguments to create a new :class:`Addressable`."""
 
   def __init__(self, addressed_alias, addressed_type):
-    """
-    :API: public
-    """
     self._addressed_alias = addressed_alias
     self._addressed_type = addressed_type
 
