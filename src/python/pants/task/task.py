@@ -434,9 +434,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       max_entries_per_target = max(max_entries_per_target, 2)
       for vt in vts:
         if vt.has_results_dir:
-          excludes = [vt.results_dir]
           if vt.has_previous_results_dir:
-            excludes.append(vt.previous_results_dir)
+            excludes = [vt.results_dir, vt.previous_results_dir]
+          else:
+            excludes = [vt.results_dir]
           root_dir = os.path.dirname(vt.results_dir)
           safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes)
 
