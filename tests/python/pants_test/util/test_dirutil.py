@@ -269,3 +269,9 @@ class DirutilTest(unittest.TestCase):
       self.assertTrue(os.path.exists(os.path.join(td, 'file2')))
       self.assertFalse(os.path.exists(os.path.join(td, 'file3')))
       self.assertTrue(os.path.exists(os.path.join(td, 'file4')))
+
+  def test_safe_rm_oldest_items_in_dir_noop(self):
+    with temporary_dir() as td:
+      safe_rm_oldest_items_in_dir(td, 1)
+      touch(os.path.join(td, 'file1'))
+      self.assertEqual(len(os.listdir(td)), 1)
