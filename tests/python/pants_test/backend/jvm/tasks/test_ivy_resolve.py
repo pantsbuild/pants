@@ -15,7 +15,6 @@ from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
-from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
@@ -70,22 +69,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
     def artifact_path(name):
       return os.path.join(self.pants_workdir, 'ivy_artifact', name)
 
-    symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
-                   artifact_path('bogus1'): artifact_path('bogus1'),
-                   artifact_path('unused'): artifact_path('unused')}
-    task = self.create_task(context, 'unused')
-
-    def mock_ivy_resolve(targets, *args, **kw):
-      if targets:
-        cache_manager = task.create_cache_manager(False)
-        vts = VersionedTargetSet(cache_manager, cache_manager.wrap_targets(targets))
-        cache_key = vts.cache_key.hash
-      else:
-        cache_key = None
-      return [], symlink_map, cache_key
-
-    task.ivy_resolve = mock_ivy_resolve
-
     def mock_parse_report(resolve_hash_name_ignored, conf):
       ivy_info = IvyInfo(conf)
 
@@ -96,7 +79,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       artifact_1 = artifact_path('bogus0')
       unused_artifact = artifact_path('unused')
 
-      # Because guava 16.0 was evicted, it has no artifacts
+      # Because guava 16.0 was evicted, it has no artifacts.
       guava_0 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0'),
                           None, [])
       guava_1 = IvyModule(IvyModuleRef('com.google.guava', 'guava', '16.0.1'),
@@ -116,7 +99,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
       ivy_info.add_module(guava_dep_0)
       ivy_info.add_module(guava_dep_1)
 
-      # Add an unrelated module to ensure that it's not returned
+      # Add an unrelated module to ensure that it's not returned.
       unrelated_parent = IvyModuleRef('com.google.other', 'parent', '1.0')
       unrelated = IvyModule(IvyModuleRef('com.google.unrelated', 'unrelated', '1.0'),
                             unused_artifact, [unrelated_parent])
@@ -124,7 +107,18 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
       return ivy_info
 
+    def mock_ivy_resolve(*ignored_args, **ignored_kwargs):
+      symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
+                     artifact_path('bogus1'): artifact_path('bogus1'),
+                     artifact_path('unused'): artifact_path('unused')}
+
+      return [], symlink_map, 'some-key-for-a-and-b'
+
+
+    task = self.create_task(context, workdir='unused')
+    task._ivy_resolve = mock_ivy_resolve
     task._parse_report = mock_parse_report
+
     task.execute()
     compile_classpath = context.products.get_data('compile_classpath', None)
     losing_cp = compile_classpath.get_for_target(losing_lib)
@@ -136,6 +130,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_multiple_artifacts(self):
+    def coordinates_for(cp):
+      return {resolved_jar.coordinate for conf, resolved_jar in cp}
+
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
     classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
 
@@ -152,22 +149,15 @@ class IvyResolveTest(JvmToolTaskTestBase):
     classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
       classifier_and_no_classifier_lib.closure(bfs=True))
 
-    self.assertIn(no_classifier.coordinate,
-                  {resolved_jar.coordinate
-                   for conf, resolved_jar in classifier_and_no_classifier_cp})
-    self.assertIn(classifier.coordinate,
-                  {resolved_jar.coordinate
-                   for conf, resolved_jar in classifier_and_no_classifier_cp})
+    classifier_and_no_classifier_coords = coordinates_for(classifier_and_no_classifier_cp)
+    self.assertIn(no_classifier.coordinate, classifier_and_no_classifier_coords)
+    self.assertIn(classifier.coordinate, classifier_and_no_classifier_coords)
 
-    self.assertNotIn(classifier.coordinate, {resolved_jar.coordinate
-                                             for conf, resolved_jar in no_classifier_cp})
-    self.assertIn(no_classifier.coordinate, {resolved_jar.coordinate
-                                             for conf, resolved_jar in no_classifier_cp})
+    self.assertNotIn(classifier.coordinate, coordinates_for(no_classifier_cp))
+    self.assertIn(no_classifier.coordinate, coordinates_for(no_classifier_cp))
 
-    self.assertNotIn(no_classifier.coordinate, {resolved_jar.coordinate
-                                                for conf, resolved_jar in classifier_cp})
-    self.assertIn(classifier.coordinate, {resolved_jar.coordinate
-                                          for conf, resolved_jar in classifier_cp})
+    self.assertNotIn(no_classifier.coordinate, coordinates_for(classifier_cp))
+    self.assertIn(classifier.coordinate, coordinates_for(classifier_cp))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
@@ -209,3 +199,14 @@ class IvyResolveTest(JvmToolTaskTestBase):
         # Confirm that the deps were added to the appropriate targets.
         compile_classpath = self.resolve([jar_lib])
         self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
+
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  def test_ivy_classpath(self):
+    # Testing the IvyTaskMixin entry point used by bootstrap for jvm tools.
+
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+
+    classpath = self.create_task(self.context()).ivy_classpath([junit_jar_lib])
+
+    self.assertEquals(2, len(classpath))
