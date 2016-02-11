@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import time
 
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.util.contextutil import temporary_dir
@@ -125,12 +126,13 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test1_dir'))
       safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test2_dir'))
       safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test3_dir'))
+      time.sleep(1.1)
       safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test4_dir'))
       safe_mkdir(os.path.join(target_dir_in_pantsd, 'old_cache_test5_dir'))
 
       self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 6)
 
-      max_entries_per_target = 4
+      max_entries_per_target = 2
       # 2nd run with --compile-zinc-debug-symbols will invalidate previous build thus triggering the clean up.
       pants_run_2 = self.run_pants_with_workdir(['compile',
                                                  'export-classpath',
@@ -139,8 +141,11 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
                                                  '--workdir-max-build-entries={}'.format(max_entries_per_target)
                                                  ], workdir)
       self.assert_success(pants_run_2)
-      item_num = len(os.listdir(target_dir_in_pantsd))
+      # current and previous builds stay, and 2 newest dirs
+      self.assertEqual(len(os.listdir(target_dir_in_pantsd)), 4)
+      self.assertTrue(os.path.exists(os.path.join(target_dir_in_pantsd, 'old_cache_test4_dir')))
+      self.assertTrue(os.path.exists(os.path.join(target_dir_in_pantsd, 'old_cache_test5_dir')))
 
-      # Since pants.task.task.TaskBase#_cleanup_workdir_stale_builds runs in background, it is possible a new successful
-      # build writes into workdir after the clean up.
-      self.assertTrue(max_entries_per_target <= item_num and item_num <= max_entries_per_target + 1)
+      self.assertFalse(os.path.exists(os.path.join(target_dir_in_pantsd, 'old_cache_test1_dir')))
+      self.assertFalse(os.path.exists(os.path.join(target_dir_in_pantsd, 'old_cache_test2_dir')))
+      self.assertFalse(os.path.exists(os.path.join(target_dir_in_pantsd, 'old_cache_test3_dir')))
