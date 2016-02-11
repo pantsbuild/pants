@@ -135,20 +135,22 @@ class PartiallyConsumedInputsError(SchedulingError):
   TODO: Improve the error message in the presence of failures due to mismatched variants.
   """
 
-  @staticmethod
-  def msg(partially_consumed_inputs):
-    for ((subject, output_product), tasks_and_inputs) in partially_consumed_inputs.items():
-      yield '\nWhile attempting to produce {} for {}, some products could not be consumed:'.format(
-              output_product.__name__, subject)
-      for input_product, tasks in tasks_and_inputs.items():
-        yield '  To consume {}:'.format(input_product.__name__)
+  @classmethod
+  def _msg(cls, inverted_symbol_table, partially_consumed_inputs):
+    def name(product):
+      return inverted_symbol_table[product]
+    for subject, tasks_and_inputs in partially_consumed_inputs.items():
+      yield '\nSome products were partially specified for `{}`:'.format(subject)
+      for ((input_product, output_product), tasks) in tasks_and_inputs.items():
+        yield '  To consume `{}` and produce `{}`:'.format(name(input_product), name(output_product))
         for task, additional_inputs in tasks:
-          inputs_str = ' AND '.join(i.__name__ for i in additional_inputs)
+          inputs_str = ' AND '.join('`{}`'.format(name(i)) for i in additional_inputs)
           yield '    {} also needed ({})'.format(task.__name__, inputs_str)
 
-  def __init__(self, partially_consumed_inputs):
-    msg = '\n'.join(self.msg(partially_consumed_inputs))
-    super(PartiallyConsumedInputsError, self).__init__(msg)
+  @classmethod
+  def create(cls, inverted_symbol_table, partially_consumed_inputs):
+    msg = '\n'.join(cls._msg(inverted_symbol_table, partially_consumed_inputs))
+    return cls(msg)
 
 
 class ConflictingProducersError(SchedulingError):
@@ -660,7 +662,9 @@ class GraphValidator(object):
   """
 
   def __init__(self, symbol_table_cls):
-    self._literal_types = set(symbol_table_cls.table().values())
+    self._literal_types = dict()
+    for name, cls in symbol_table_cls.table().items():
+      self._literal_types[cls] = name
 
   def _collect_consumed_inputs(self, product_graph, root):
     """Walks successful nodes under the root for its subject, and returns all products used."""
@@ -679,7 +683,8 @@ class GraphValidator(object):
   def _collect_partially_consumed_inputs(self, product_graph, consumed_inputs, root):
     """Walks below a failed node and collects cases where additional literal products could be used.
 
-    Returns dict(partially_consumed_input, dict(used_product, list(tuple(task, missing_products)))).
+    Returns:
+      dict(subject, dict(tuple(input_product, output_product), list(tuple(task, missing_products))))
     """
     partials = defaultdict(lambda: defaultdict(list))
     # Walk all nodes for the same subject under this root.
@@ -716,7 +721,7 @@ class GraphValidator(object):
 
       # Found a partially consumed input.
       for used_literal_dep in used_literal_deps:
-        partials[(node.subject, node.product)][used_literal_dep].append((node.func, failed_products))
+        partials[node.subject][(used_literal_dep, node.product)].append((node.func, failed_products))
     return partials
 
   def validate(self, product_graph):
@@ -735,7 +740,7 @@ class GraphValidator(object):
       consumed = self._collect_consumed_inputs(product_graph, root)
       partials = self._collect_partially_consumed_inputs(product_graph, consumed, root)
       if partials:
-        raise PartiallyConsumedInputsError(partials)
+        raise PartiallyConsumedInputsError.create(self._literal_types, partials)
 
 
 class LocalScheduler(object):
