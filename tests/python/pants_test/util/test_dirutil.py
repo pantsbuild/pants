@@ -272,7 +272,6 @@ class DirutilTest(unittest.TestCase):
 
       self.assertFalse(os.path.exists(os.path.join(td, 'file3')))
 
-
   def test_safe_rm_oldest_items_in_dir_noop(self):
     with temporary_dir() as td:
       safe_rm_oldest_items_in_dir(td, 1)
