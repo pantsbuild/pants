@@ -13,7 +13,6 @@ import pkgutil
 import threading
 import xml.etree.ElementTree as ET
 from collections import OrderedDict, defaultdict, namedtuple
-from contextlib import contextmanager
 
 import six
 from twitter.common.collections import OrderedSet
@@ -32,6 +31,13 @@ from pants.util.dirutil import safe_mkdir, safe_open
 
 
 IvyModule = namedtuple('IvyModule', ['ref', 'artifact', 'callers'])
+
+
+Dependency = namedtuple('DependencyAttributes', ['org', 'name', 'rev', 'mutable', 'force',
+                                                     'transitive'])
+
+
+Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])
 
 
 logger = logging.getLogger(__name__)
@@ -551,8 +557,6 @@ class IvyUtils(object):
 
   @classmethod
   def _generate_jar_template(cls, jars):
-    Dependency = namedtuple('DependencyAttributes', ['org', 'name', 'rev', 'mutable', 'force',
-                                                     'transitive'])
     global_dep_attributes = set(Dependency(org=jar.org,
                                            name=jar.name,
                                            rev=jar.rev,
@@ -576,7 +580,6 @@ class IvyUtils(object):
 
     any_have_url = False
 
-    Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])
     artifacts = OrderedDict()
     for jar in jars:
       ext = jar.ext
