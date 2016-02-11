@@ -14,7 +14,7 @@ from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, SelectNode, TaskNode, Throw
+from pants.engine.exp.scheduler import BuildRequest, SelectNode, TaskNode
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
@@ -87,8 +87,10 @@ def visualize_execution_graph(scheduler):
 
 def visualize_build_request(build_root, build_request):
   scheduler = setup_json_scheduler(build_root)
+  # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   LocalSerialEngine(scheduler).reduce(build_request)
   visualize_execution_graph(scheduler)
+  scheduler.validate()
 
 
 def main():
