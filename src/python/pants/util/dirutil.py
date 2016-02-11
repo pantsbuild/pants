@@ -194,9 +194,8 @@ def safe_rm_oldest_items_in_dir(root_dir, num_of_items_to_keep, excludes=set()):
       if full_path not in excludes:
         found_files.append((full_path, os.path.getmtime(full_path)))
     found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
-    for cur_file in found_files[num_of_items_to_keep:]:
-      safe_rmtree(cur_file[0])
-      safe_delete(cur_file[0])
+    for cur_file, _ in found_files[num_of_items_to_keep:]:
+      rm_rf(cur_file)
 
 
 @contextmanager
