@@ -113,7 +113,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
 
       # Use the static exported classpath symlink to access the artifact in workdir
-      # in order to avoid computing hashed task verison used in workdir.
+      # in order to avoid computing hashed task version used in workdir.
       classpath = 'dist/export-classpath/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main-0.jar'
 
       # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/1a317a2504f6/z.jar'

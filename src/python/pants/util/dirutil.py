@@ -180,16 +180,23 @@ def safe_concurrent_rename(src, dst):
 
 
 def safe_rm_oldest_items_in_dir(root_dir, num_of_items_to_keep, excludes=set()):
+  """
+  Keep `num_of_items_to_keep` newly modified items besides `excludes` in `root_dir` then remove the rest.
+  :param root_dir: the folder to examine
+  :param num_of_items_to_keep: number of files/folders/symlinks to keep after the cleanup
+  :param excludes: paths excluded from removal
+  :return: none
+  """
   if os.path.isdir(root_dir):
     found_files = []
     for old_file in os.listdir(root_dir):
       full_path = os.path.join(root_dir, old_file)
-      found_files.append((full_path, os.path.getmtime(full_path)))
+      if full_path not in excludes:
+        found_files.append((full_path, os.path.getmtime(full_path)))
     found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
     for cur_file in found_files[num_of_items_to_keep:]:
-      if cur_file[0] not in excludes:
-        safe_rmtree(cur_file[0])
-        safe_delete(cur_file[0])
+      safe_rmtree(cur_file[0])
+      safe_delete(cur_file[0])
 
 
 @contextmanager
