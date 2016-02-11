@@ -18,7 +18,7 @@ from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.objects import datatype
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
-                                        SelectOptional, SelectVariant)
+                                        SelectVariant)
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Sources, Target, Variants
 from pants.util.meta import AbstractClass
@@ -317,7 +317,7 @@ class Goal(AbstractClass):
   @classmethod
   def signature(cls):
     """Returns a task triple for this Goal."""
-    return (cls, [SelectOptional(p) for p in cls.products()], cls)
+    return (cls, [Select(p, optional=True) for p in cls.products()], cls)
 
   @classmethod
   @abstractmethod

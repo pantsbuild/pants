@@ -36,20 +36,14 @@ class Selector(object):
     """
 
 
-class Select(datatype('Subject', ['product']), Selector):
-  """Selects the given Product for the Subject provided to the constructor."""
-  optional = False
+class Select(datatype('Subject', ['product', 'optional']), Selector):
+  """Selects the given Product for the Subject provided to the constructor.
 
-  def construct_node(self, subject, variants):
-    return SelectNode(subject, self.product, variants, None)
-
-
-class SelectOptional(datatype('Optional', ['product']), Selector):
-  """Selects the given Product for the Subject as an optional value.
-
-  TODO: Unify hierarchy or constructors with non-optional Select.
+  If optional=True and no matching product can be produced, will return None.
   """
-  optional = True
+
+  def __new__(self, product, optional=False):
+    return super(Select, self).__new__(self, product, optional)
 
   def construct_node(self, subject, variants):
     return SelectNode(subject, self.product, variants, None)
