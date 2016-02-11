@@ -9,6 +9,7 @@ import atexit
 import errno
 import os
 import tempfile
+import time
 import unittest
 
 import mock
@@ -19,7 +20,7 @@ from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, fast_relpath, get_basedir, read_file,
                                 relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
-                                safe_file_dump, safe_mkdir, touch)
+                                safe_file_dump, safe_mkdir, safe_rm_oldest_items_in_dir, touch)
 
 
 class DirutilTest(unittest.TestCase):
@@ -232,3 +233,39 @@ class DirutilTest(unittest.TestCase):
 
       self.assertFalse(os.path.exists(safe_path))
       self.assertTrue(os.path.exists(expected_file))
+
+  def test_safe_rm_oldest_items_in_dir(self):
+    with temporary_dir() as td:
+      touch(os.path.join(td, 'file1'))
+      safe_mkdir(os.path.join(td, 'file2'))
+      # time modified is only accurate to second
+      time.sleep(1.1)
+      touch(os.path.join(td, 'file3'))
+      touch(os.path.join(td, 'file4'))
+      safe_mkdir(os.path.join(td, 'file5'))
+
+      safe_rm_oldest_items_in_dir(td, 3)
+
+      self.assertFalse(os.path.exists(os.path.join(td, 'file1')))
+      self.assertFalse(os.path.exists(os.path.join(td, 'file2')))
+
+      self.assertTrue(os.path.exists(os.path.join(td, 'file3')))
+      self.assertTrue(os.path.exists(os.path.join(td, 'file4')))
+      self.assertTrue(os.path.exists(os.path.join(td, 'file5')))
+
+  def test_safe_rm_oldest_items_in_dir_with_excludes(self):
+    with temporary_dir() as td:
+      touch(os.path.join(td, 'file1'))
+      touch(os.path.join(td, 'file2'))
+      touch(os.path.join(td, 'file3'))
+      # time modified is only accurate to second
+      time.sleep(1.1)
+      touch(os.path.join(td, 'file4'))
+
+      excludes = [os.path.join(td, 'file1'), os.path.join(td, 'file2')]
+      safe_rm_oldest_items_in_dir(td, 1, excludes)
+
+      self.assertTrue(os.path.exists(os.path.join(td, 'file1')))
+      self.assertTrue(os.path.exists(os.path.join(td, 'file2')))
+      self.assertFalse(os.path.exists(os.path.join(td, 'file3')))
+      self.assertTrue(os.path.exists(os.path.join(td, 'file4')))

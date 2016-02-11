@@ -75,6 +75,10 @@ class VersionedTargetSet(object):
     return self._results_dir is not None
 
   @property
+  def has_previous_results_dir(self):
+    return self._previous_results_dir is not None
+
+  @property
   def results_dir(self):
     """The directory that stores results for this version of these targets."""
     if self._results_dir is None:

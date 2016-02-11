@@ -433,12 +433,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     else:
       max_entries_per_target = max(max_entries_per_target, 2)
       for vt in vts:
-        try:
+        if vt.has_results_dir:
+          excludes = [vt.results_dir]
+          if vt.has_previous_results_dir:
+            excludes.append(vt.previous_results_dir)
           root_dir = os.path.dirname(vt.results_dir)
-        except ValueError:
-          continue
-        else:
-          safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target)
+          safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes)
 
   def _should_cache(self, vt):
     """Return true if the given vt should be written to a cache (if configured)."""
