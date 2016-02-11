@@ -16,6 +16,7 @@ class TaskRegistrar(object):
   """
   :API: public
   """
+
   def __init__(self, name, action, dependencies=None, serialize=True):
     """
     :API: public

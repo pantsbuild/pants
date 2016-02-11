@@ -46,7 +46,7 @@ class FingerprintStrategy(AbstractClass):
     """Subclasses must implement a hash so computed fingerprints can be safely memoized."""
 
   @abstractmethod
-  def __eq__(self):
+  def __eq__(self, other):
     """Subclasses must implement an equality check so computed fingerprints can be safely memoized."""
 
 
