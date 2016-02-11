@@ -130,7 +130,7 @@ class IvyTaskMixin(TaskBase):
     return resolve_hash_names
 
   def ivy_classpath(self, targets, silent=True, workunit_name=None):
-    classpath, _, _ = self.ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
+    classpath, _, _ = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
     return classpath
 
   def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
