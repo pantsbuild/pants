@@ -299,6 +299,9 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     if has_waiting_dep:
       return Waiting(dependencies)
     elif len(matches) > 1:
+      # TODO: Multiple successful tasks are not currently supported. We should allow for this
+      # by adding support for "mergeable" products:
+      #  see https://github.com/pantsbuild/pants/issues/2526
       msg = '\n  '.join('{}: {}'.format(k, v) for k, v in matches.items())
       return Throw('More than one source of {}:\n  {}'.format(self, msg))
     elif len(matches) == 1:
@@ -651,8 +654,11 @@ class Step(object):
 class GraphValidator(object):
   """A concrete object that implements validation of a completed product graph.
 
-  If this abstraction seems useful, we should extract an interface and allow plugin
-  implementers to install their own.
+  TODO: If this abstraction seems useful, we should extract an interface and allow plugin
+  implementers to install their own. But currently the API isn't great: in particular, it
+  would be very, very helpful to be able to run validation _during_ graph execution as
+  subgraphs are completing. This would limit their performance impact, and allow for better
+  locality of errors.
   """
 
   def __init__(self, symbol_table_cls):
@@ -669,9 +675,8 @@ class GraphValidator(object):
       return root.subject == node.subject and type(state) is Return
     # If a product was successfully selected, record it.
     for ((node, _), _) in product_graph.walk([root], predicate=predicate):
-      if type(node) is not SelectNode:
-        continue
-      consumed_inputs.add(node.product)
+      if type(node) is SelectNode:
+        consumed_inputs.add(node.product)
     return consumed_inputs
 
   def _collect_partially_consumed_inputs(self, product_graph, consumed_inputs, root):
@@ -687,9 +692,9 @@ class GraphValidator(object):
       return root.subject == node.subject
     for ((node, state), dependencies) in product_graph.walk([root], predicate=predicate):
       # Look for failed TaskNodes with at least one failed dependency.
-      if type(node) != TaskNode:
+      if type(node) is not TaskNode:
         continue
-      if type(state) != Throw:
+      if type(state) is not Throw:
         continue
       failed_products = {dep.product for dep, state in dependencies if type(state) == Throw}
       if not failed_products:

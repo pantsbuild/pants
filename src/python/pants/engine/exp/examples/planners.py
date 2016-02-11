@@ -316,13 +316,17 @@ class Goal(AbstractClass):
 
   @classmethod
   def signature(cls):
-    """Returns a task triple for this Goal."""
+    """Returns a task triple for this Goal, used to install the Goal.
+
+    A Goal is it's own synthetic output product, and its constructor acts as its task function. It
+    selects each of its products as optional, but fails synchronously if none of them are available.
+    """
     return (cls, [Select(p, optional=True) for p in cls.products()], cls)
 
   @classmethod
   @abstractmethod
   def products(cls):
-    """Returns the products for this goal."""
+    """Returns the products that this Goal requests."""
 
   def __eq__(self, other):
     return type(self) == type(other)
