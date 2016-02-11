@@ -696,7 +696,7 @@ class GraphValidator(object):
         continue
 
       # If all unattainable products could have been specified as literal...
-      if not all(product in self._literal_types for product in failed_products):
+      if any(product not in self._literal_types for product in failed_products):
         continue
 
       # There was at least one dep successfully (recursively) satisfied via a literal.

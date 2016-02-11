@@ -304,7 +304,7 @@ class Goal(AbstractClass):
   """A synthetic aggregate product produced by a goal, which is its own task."""
 
   def __init__(self, *args):
-    if not any(arg is not None for arg in args):
+    if all(arg is None for arg in args):
       msg = '\n  '.join(p.__name__ for p in self.products())
       raise TaskError('Unable to produce any of the products for goal `{}`:\n  {}'.format(
         self.name(), msg))
