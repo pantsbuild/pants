@@ -113,15 +113,11 @@ class Address(object):
     )
 
   Where ``path/to/buildfile:targetname`` is the dependent target address.
-
-  :API: public
   """
 
   @classmethod
   def parse(cls, spec, relative_to=''):
     """Parses an address from its serialized form.
-
-    :API: public
 
     :param string spec: An address in string form <path>:<name>.
     :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
@@ -134,9 +130,6 @@ class Address(object):
 
   def __init__(self, spec_path, target_name):
     """
-
-    :API: public
-
     :param string spec_path: The path from the root of the repo to this Target.
     :param string target_name: The name of a target this Address refers to.
     """
