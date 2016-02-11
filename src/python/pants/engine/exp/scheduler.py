@@ -5,25 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import inspect
-import itertools
-import threading
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import StructAddress, parse_variants
-from pants.engine.exp.objects import Serializable, datatype
+from pants.engine.exp.objects import datatype
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target, Variants
-from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
-class Selector(object):
+class Selector(AbstractClass):
   @abstractproperty
   def optional(self):
     """Return true if this Selector is optional. It may result in a `None` match."""
@@ -108,17 +103,6 @@ class SchedulingError(Exception):
   """Indicates inability to make a scheduling promise."""
 
 
-class NoProducersError(SchedulingError):
-  """Indicates no planners were able to promise a product for a given subject."""
-
-  def __init__(self, product_type, subject=None, configuration=None):
-    msg = ('No plans to generate {!r}{} could be made.'
-            .format(product_type.__name__,
-                    ' for {!r}'.format(subject) if subject else '',
-                    ' (with config {!r})' if configuration else ''))
-    super(NoProducersError, self).__init__(msg)
-
-
 class PartiallyConsumedInputsError(SchedulingError):
   """No task was able to consume a particular literal product for a subject, although some tried.
 
@@ -148,17 +132,16 @@ class PartiallyConsumedInputsError(SchedulingError):
 
 
 class ConflictingProducersError(SchedulingError):
-  """Indicates more than one planner was able to promise a product for a given subject.
+  """Indicates that there was more than one source of a product for a given subject.
 
   TODO: This will need to be legal in order to support multiple Planners producing a
-  (mergeable) Classpath for one subject, for example.
+  (mergeable) Classpath for one subject, for example. see:
+    https://github.com/pantsbuild/pants/issues/2526
   """
 
-  def __init__(self, product_type, subject, plans):
-    msg = ('Collected the following plans for generating {!r} from {!r}:\n\t{}'
-            .format(product_type.__name__,
-                    subject,
-                    '\n\t'.join(str(p.func_or_task_type.value) for p in plans)))
+  def __init__(self, subject, product, matches):
+    msgs = '\n  '.join('{}: {}'.format(k, v) for k, v in matches.items())
+    msg = 'More than one source of {} for {}:\n  {}'.format(product.__name__, subject, msgs)
     super(ConflictingProducersError, self).__init__(msg)
 
 
@@ -168,12 +151,17 @@ class State(object):
     raise ValueError('Unrecognized Node State: {}'.format(state))
 
 
+class Noop(datatype('Noop', ['msg']), State):
+  """Indicates that a Node did not have the inputs which would be needed for it to execute."""
+  pass
+
+
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
   pass
 
 
-class Throw(datatype('Throw', ['msg']), State):
+class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
   pass
 
@@ -270,7 +258,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
                         if key == self.variant_key] if variants else None
       if not variant_values:
         # Select cannot be satisfied: no variant configured for this key.
-        return Throw('Variant key {} was not configured in variants {}'.format(
+        return Noop('Variant key {} was not configured in variants {}'.format(
           self.variant_key, variants))
       variant_value = variant_values[0]
 
@@ -289,6 +277,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
         has_waiting_dep = True
         continue
       elif type(dep_state) == Throw:
+        return dep_state
+      elif type(dep_state) == Noop:
         continue
       elif type(dep_state) != Return:
         State.raise_unrecognized(dep_state)
@@ -300,13 +290,12 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       return Waiting(dependencies)
     elif len(matches) > 1:
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
-      # by adding support for "mergeable" products:
-      #  see https://github.com/pantsbuild/pants/issues/2526
-      msg = '\n  '.join('{}: {}'.format(k, v) for k, v in matches.items())
-      return Throw('More than one source of {}:\n  {}'.format(self, msg))
+      # by adding support for "mergeable" products. see:
+      #   https://github.com/pantsbuild/pants/issues/2526
+      return Throw(ConflictingProducersError(self.subject, self.product, matches))
     elif len(matches) == 1:
       return Return(matches.values()[0])
-    return Throw('No source of {}.'.format(self))
+    return Noop('No source of {}.'.format(self))
 
 
 class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product']), Node):
@@ -337,7 +326,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     if dep_product_state is None or type(dep_product_state) == Waiting:
       return Waiting([dep_product_node])
     elif type(dep_product_state) == Throw:
-      return Throw('Could not compute {} to determine dependencies.'.format(dep_product_node))
+      return dep_product_state
+    elif type(dep_product_state) == Noop:
+      return Noop('Could not compute {} to determine dependencies.'.format(dep_product_node))
     elif type(dep_product_state) != Return:
       State.raise_unrecognized(dep_product_state)
 
@@ -351,7 +342,9 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
         # of them.
         return Waiting([dep_product_node] + dependencies)
       elif type(dep_state) == Throw:
-        return Throw('Failed to compute dependency {}'.format(dependency))
+        return dep_state
+      elif type(dep_state) == Noop:
+        return Throw(ValueError('No source of explicit dependency {}'.format(dependency)))
       elif type(dep_state) != Return:
         raise State.raise_unrecognized(dep_state)
     # All dependencies are present! Set our value to a list of the resulting values.
@@ -367,7 +360,7 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
     for select in self.clause:
       dep = select.construct_node(self.subject, self.variants)
       if dep is None:
-        return Throw('Dependency {} is not satisfiable.'.format(select))
+        return Noop('Dependency {} is not satisfiable.'.format(select))
       dependencies.append(dep)
 
     # If all dependency Nodes are Return, execute the Node.
@@ -377,14 +370,19 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
         return Waiting(dependencies)
       elif type(dep_state) == Return:
         dep_values.append(dep_state.value)
-      elif type(dep_state) == Throw:
+      elif type(dep_state) == Noop:
         if dep_select.optional:
           dep_values.append(None)
         else:
-          return Throw('Dependency {} failed.'.format(dep_key))
+          return Noop('Was missing (at least) input {}.'.format(dep_key))
+      elif type(dep_state) == Throw:
+        return dep_state
       else:
         State.raise_unrecognized(dep_state)
-    return Return(self.func(*dep_values))
+    try:
+      return Return(self.func(*dep_values))
+    except Exception as e:
+      return Throw(e)
 
 
 class ProductGraph(object):
@@ -393,7 +391,7 @@ class ProductGraph(object):
     # A dict from Node to its computed value: if a Node hasn't been computed yet, it will not
     # be present here.
     self._node_results = dict()
-    # A dict from Node to list of dependency Nodes.
+    # Dicts from Nodes to sets of dependency/dependent Nodes.
     self._dependencies = defaultdict(set)
     self._dependents = defaultdict(set)
 
@@ -401,7 +399,7 @@ class ProductGraph(object):
     existing_state = self._node_results.get(node, None)
     if existing_state is not None:
       raise ValueError('Node {} is already completed:\n  {}\n  {}'.format(node, existing_state, state))
-    elif type(state) not in [Return, Throw]:
+    elif type(state) not in [Return, Throw, Noop]:
       raise ValueError('Cannot complete Node {} with state {}'.format(node, state))
     self._node_results[node] = state
 
@@ -418,7 +416,7 @@ class ProductGraph(object):
 
   def update_state(self, node, state):
     """Updates the Node with the given State."""
-    if type(state) in [Return, Throw]:
+    if type(state) in [Return, Throw, Noop]:
       self._set_state(node, state)
       return state
     elif type(state) == Waiting:
@@ -458,7 +456,7 @@ class ProductGraph(object):
     """Adds dependency edges from the given src Node to the given dependency Nodes.
 
     Executes cycle detection: if adding one of the given dependencies would create
-    a cycle, then the _source_ Node is marked as a Throw with an error indicating the
+    a cycle, then the _source_ Node is marked as a Noop with an error indicating the
     cycle path, and the dependencies are not introduced.
     """
     self.validate_node(node)
@@ -474,7 +472,7 @@ class ProductGraph(object):
       if cycle_path:
         # If a cycle is detected, don't introduce the dependencies, and instead fail the node.
         entries = ' ->\n  '.join(str(p) for p in cycle_path)
-        self._set_state(node, Throw('Cycle detected in path:\n  {} !!'.format(entries)))
+        self._set_state(node, Noop('Cycle detected in path:\n  {} !!'.format(entries)))
         return
 
     # Finally, add all deps.
@@ -499,7 +497,8 @@ class ProductGraph(object):
   def walk(self, roots, predicate=None):
     def _default_walk_predicate(entry):
       node, state = entry
-      return type(state) != Throw
+      cls = type(state)
+      return cls is not Noop
     predicate = predicate or _default_walk_predicate
 
     def _filtered_entries(nodes):
@@ -691,17 +690,17 @@ class GraphValidator(object):
       node, state = entry
       return root.subject == node.subject
     for ((node, state), dependencies) in product_graph.walk([root], predicate=predicate):
-      # Look for failed TaskNodes with at least one failed dependency.
+      # Look for unsatisfied TaskNodes with at least one unsatisfied dependency.
       if type(node) is not TaskNode:
         continue
-      if type(state) is not Throw:
+      if type(state) is not Noop:
         continue
-      failed_products = {dep.product for dep, state in dependencies if type(state) == Throw}
-      if not failed_products:
+      missing_products = {dep.product for dep, state in dependencies if type(state) == Noop}
+      if not missing_products:
         continue
 
       # If all unattainable products could have been specified as literal...
-      if any(product not in self._literal_types for product in failed_products):
+      if any(product not in self._literal_types for product in missing_products):
         continue
 
       # There was at least one dep successfully (recursively) satisfied via a literal.
@@ -720,7 +719,7 @@ class GraphValidator(object):
 
       # Found a partially consumed input.
       for used_literal_dep in used_literal_deps:
-        partials[node.subject][(used_literal_dep, node.product)].append((node.func, failed_products))
+        partials[node.subject][(used_literal_dep, node.product)].append((node.func, missing_products))
     return partials
 
   def validate(self, product_graph):
@@ -797,7 +796,7 @@ class LocalScheduler(object):
     a tuple of (node_entry, dependency_node_entries).
 
     The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
-    that don't match it. The default predicate eliminates all `Throw` subgraphs.
+    that don't match it. The default predicate eliminates all `Noop` subgraphs.
     """
     for entry in self._product_graph.walk(self._roots, predicate=predicate):
       yield entry
@@ -871,7 +870,7 @@ class LocalScheduler(object):
             candidates.add(step.node)
 
     print('created {} total nodes in {} scheduling iterations and {} steps, '
-          'with {} nodes in the successful path.'.format(
+          'with {} nodes in the executed path.'.format(
             len(pg.dependencies()),
             scheduling_iterations,
             self._step_id,
