@@ -179,6 +179,25 @@ def safe_concurrent_rename(src, dst):
       raise
 
 
+def safe_rm_oldest_items_in_dir(root_dir, num_of_items_to_keep, excludes=frozenset()):
+  """
+  Keep `num_of_items_to_keep` newly modified items besides `excludes` in `root_dir` then remove the rest.
+  :param root_dir: the folder to examine
+  :param num_of_items_to_keep: number of files/folders/symlinks to keep after the cleanup
+  :param excludes: absolute paths excluded from removal (must be prefixed with `root_dir`)
+  :return: none
+  """
+  if os.path.isdir(root_dir):
+    found_files = []
+    for old_file in os.listdir(root_dir):
+      full_path = os.path.join(root_dir, old_file)
+      if full_path not in excludes:
+        found_files.append((full_path, os.path.getmtime(full_path)))
+    found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
+    for cur_file, _ in found_files[num_of_items_to_keep:]:
+      rm_rf(cur_file)
+
+
 @contextmanager
 def safe_concurrent_creation(target_path):
   """A contextmanager that yields a temporary path and renames it to a final target path when the

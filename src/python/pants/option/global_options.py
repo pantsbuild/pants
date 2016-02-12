@@ -149,9 +149,12 @@ class GlobalOptionsRegistrar(Optionable):
                   'to process the non-erroneous subset of the input.')
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
+    register('--workdir-max-build-entries', advanced=True, type=int, default=None,
+             help='Maximum number of previous builds to keep per task target pair in workdir. '
+             'If set, minimum 2 will always be kept to support incremental compilation.')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking '
-             'the command up into multiple invocations')
+             'the command up into multiple invocations.')
     register('--print-exception-stacktrace', advanced=True, action='store_true',
              help='Print to console the full exception stack trace if encountered.')
     register('--build-file-rev', advanced=True,

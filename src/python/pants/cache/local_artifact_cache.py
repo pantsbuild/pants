@@ -12,7 +12,8 @@ from contextlib import contextmanager
 from pants.cache.artifact import TarballArtifact
 from pants.cache.artifact_cache import ArtifactCache, UnreadableArtifact
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree
+from pants.util.dirutil import (safe_delete, safe_mkdir, safe_mkdir_for,
+                                safe_rm_oldest_items_in_dir, safe_rmtree)
 
 
 logger = logging.getLogger(__name__)
@@ -92,13 +93,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
 
     max_entries_per_target = self._max_entries_per_target
     if os.path.isdir(root) and max_entries_per_target:
-      found_files = []
-      for old_file in os.listdir(root):
-        full_path = os.path.join(root, old_file)
-        found_files.append((full_path, os.path.getmtime(full_path)))
-      found_files = sorted(found_files, key=lambda x: x[1], reverse=True)
-      for cur_file in found_files[self._max_entries_per_target:]:
-        safe_delete(cur_file[0])
+      safe_rm_oldest_items_in_dir(root, max_entries_per_target)
 
   def has(self, cache_key):
     return self._artifact_for(cache_key).exists()
