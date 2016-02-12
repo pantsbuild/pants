@@ -10,18 +10,17 @@ API Definition
 
 This policy applies to:
 
-- Modules under src/main/python/pants that do not start with an '_'.
-- Modules under src/test/python/pants_test that are marked `:API: public` in the docstring.
+- Modules and methods under src/python/pants marked `:API: public` in the docstring.
+- Modules and methods under tests/python/pants_test marked `:API: public` in the docstring.
 
 Excluding
 ---------
 
-- Modules under src/python/pants in directories named 'exp' or prefixed with '_'.
-- Modules under tests/python/pants_test not marked `:API: public` in the docstring.
-- Any module prefixed with '_'.
-- Any method prefixed with '_'.
-- Any method prefixed with 'private_'.
 - Modules under any other directory including contrib, examples, testprojects.
+- Modules under src/python/pants in directories named 'exp'.
+- Modules under tests/python/pants_test in directories named 'exp'.
+- Modules and methods under src/python/pants *not* marked `:API: public` in the docstring.
+- Modules and methods under tests/python/pants_test *not* marked `:API: public` in the docstring.
 
 Allowed API Changes
 -------------------
@@ -32,9 +31,8 @@ Allowed API Changes
 - Deprecate and warn about an API that has been refactored.
 - Deprecate and warn about an option that has been refactored.
 - Adding new named parameters to a public API method.
-- Adding/removing/renaming any module or method in a directory named 'exp' or starting with the prefix '_'.
-- Adding/removing/renaming any module prefixed with  '_'.
-- Adding/removing/renaming any method prefixed with '_' or 'private_'.
+- Adding/removing/renaming any module or method in a directory named 'exp'.
+- Adding/removing/renaming any module or method not marked `:API: public` in the docstring.
 - Fixing bugs.
   - Exceptions for severe or special case bugs may be considered on a case-by-case basis.
 
