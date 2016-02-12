@@ -431,7 +431,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       self.context.submit_background_work_chain([workdir_build_cleanup_job])
 
   def _cleanup_workdir_stale_builds(self, vts):
-    # workdir_max_build_entries has been assure of not None before launching this function
+    # workdir_max_build_entries has been assured of not None before invoking this method.
     max_entries_per_target = max(2, self.context.options.for_global_scope().workdir_max_build_entries)
     for vt in vts:
       if vt.has_results_dir:
