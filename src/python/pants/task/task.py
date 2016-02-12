@@ -425,10 +425,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       self.update_artifact_cache(pairs)
 
   def _launch_background_workdir_cleanup(self, vts):
-      workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
-                                       [(vts,)],
-                                       'workdir_build_cleanup')
-      self.context.submit_background_work_chain([workdir_build_cleanup_job])
+    workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds, [(vts,)], 'workdir_build_cleanup')
+    self.context.submit_background_work_chain([workdir_build_cleanup_job])
 
   def _cleanup_workdir_stale_builds(self, vts):
     # workdir_max_build_entries has been assured of not None before invoking this method.
