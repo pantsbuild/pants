@@ -34,5 +34,8 @@ class TestPathDeps(ConsoleTaskTestBase):
       os.path.join(self.build_root, 'second'),
       self.build_root
     ]
-    output = self.execute_console_task(targets=targets)
-    self.assertEqual(expected, output)
+    self.assert_console_output(
+        os.path.join(self.build_root, 'second'),
+        self.build_root,
+        targets=targets
+    )
