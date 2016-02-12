@@ -8,19 +8,39 @@ This assumes a rough timeline of 3 months lifetime per minor release.
 API Definition
 --------------
 
-This policy applies to:
+A module, variable, method, function or class is part of the public API if its definition's docstring is marked `:API: public`, and if its enclosing definition, if any, is part of the public API.
 
-- Modules and methods under src/python/pants marked `:API: public` in the docstring.
-- Modules and methods under tests/python/pants_test marked `:API: public` in the docstring.
+For example, a method `baz` of class `Bar` defined at the top level of module `foo` is part of the public API if and only if the docstrings of `foo`, `Bar` and `baz` are all marked `:API: public`. e.g.
 
-Excluding
----------
+    $ cat foo.py
 
-- Modules under any other directory including contrib, examples, testprojects.
-- Modules under src/python/pants in directories named 'exp'.
-- Modules under tests/python/pants_test in directories named 'exp'.
-- Modules and methods under src/python/pants *not* marked `:API: public` in the docstring.
-- Modules and methods under tests/python/pants_test *not* marked `:API: public` in the docstring.
+    """
+    An example public API module.
+
+    :API: public
+    """
+
+
+    class Bar(object):
+      """An example public API class.
+
+      :API: public
+      """
+
+      def baz(self):
+        """An example public API method.
+
+        :API: public
+        """
+
+
+    def qux(self):
+      """An example public API function.
+
+      :API: public
+      """
+
+The following rules apply to definitions in the public API. No rules apply to definitions outside the public API. Those may be changed in any way at any time.
 
 Allowed API Changes
 -------------------
