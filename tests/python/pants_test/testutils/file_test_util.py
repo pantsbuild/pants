@@ -14,6 +14,8 @@ from pants.util.contextutil import temporary_dir
 def contains_exact_files(directory, expected_files, ignore_links=False):
   """Check if the only files which directory contains are expected_files.
 
+  :API: public
+
   :param str directory: Path to directory to search.
   :param set expected_files: Set of filepaths relative to directory to search for.
   :param bool ignore_links: Indicates to ignore any file links.
@@ -32,6 +34,8 @@ def contains_exact_files(directory, expected_files, ignore_links=False):
 def check_file_content(path, expected_content):
   """Check file has expected content.
 
+  :API: public
+
   :param str path: Path to file.
   :param str expected_content: Expected file content.
   """
@@ -41,6 +45,8 @@ def check_file_content(path, expected_content):
 
 def check_symlinks(directory, symlinks=True):
   """Check files under directory are symlinks.
+
+  :API: public
 
   :param str directory: Path to directory to search.
   :param bool symlinks: If true, verify files are symlinks, if false, verify files are actual files.
@@ -55,6 +61,8 @@ def check_symlinks(directory, symlinks=True):
 
 def check_zip_file_content(zip_file, expected_files):
   """Check zip file contains expected files as well as verify their contents are as expected.
+
+  :API: public
 
   :param zip_file: Path to the zip file.
   :param expected_files: A map from file path included in the zip to its content. Set content

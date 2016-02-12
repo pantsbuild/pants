@@ -281,6 +281,14 @@ class IvyTaskMixin(TaskBase):
                                                      pinned_artifacts=artifact_set))
     return resolve_hash_names
 
+  def ivy_classpath(self, targets, silent=True, workunit_name=None):
+    """Create the classpath for the passed targets.
+    :param targets: A collection of targets to resolve a classpath for.
+    :type targets: collection.Iterable
+    """
+    result = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
+    return result.classpath
+
   def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False, pinned_artifacts=None):
     result = self._ivy_resolve(
@@ -308,14 +316,6 @@ class IvyTaskMixin(TaskBase):
         classpath_products.add_jars_for_targets([target], conf, resolved_jars)
 
     return result.resolve_hash_name
-
-  def ivy_classpath(self, targets, silent=True, workunit_name=None):
-    """Create the classpath for the passed targets.
-    :param targets: A collection of targets to resolve a classpath for.
-    :type targets: collection.Iterable
-    """
-    result = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
-    return result.classpath
 
   # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
   # and return that path instead of having everyone know that these reports live under the

@@ -51,12 +51,6 @@ class BuildFileAddressMapperTest(BaseTest):
                        BuildFileAddress(subdir_suffix_build_file, 'baz')},
                       self.address_mapper.scan_addresses())
 
-  def test_scan_addresses_with_build_ignore_patterns(self):
-    root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
-    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser, self.project_tree, ['subdir'])
-    self.assertEquals({BuildFileAddress(root_build_file, 'foo')}, address_mapper_with_ignore.scan_addresses())
-
   def test_scan_addresses_with_root(self):
     self.add_to_build_file('BUILD', 'target(name="foo")')
     subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
@@ -110,9 +104,35 @@ class BuildFileAddressMapperTest(BaseTest):
     with self.assertRaises(BuildFileAddressMapper.EmptyBuildFileError):
       self.address_mapper.resolve_spec('//:foo')
 
+  def test_context_scan_with_deprecated_spec_excludes(self):
+    # Can be removed while `spec_excludes` removal.
+    self.add_to_build_file('BUILD', 'target(name="foo")')
+    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
+    context = self.context()
+    context._spec_excludes = ['subdir']
+    graph = context.scan()
+    self.assertEquals([target.address.spec for target in graph.targets()], ['//:foo'])
+
   def test_address_lookup_error_hierarchy(self):
     self.assertIsInstance(BuildFileAddressMapper.AddressNotInBuildFile(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.EmptyBuildFileError(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.InvalidAddressError(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.BuildFileScanError(), AddressLookupError)
+
+
+class BuildFileAddressMapperWithIgnoreTest(BaseTest):
+  @property
+  def build_ignore_patterns(self):
+    return ['subdir']
+
+  def test_scan_from_address_mapper(self):
+    root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
+    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
+    self.assertEquals({BuildFileAddress(root_build_file, 'foo')}, self.address_mapper.scan_addresses())
+
+  def test_scan_from_context(self):
+    self.add_to_build_file('BUILD', 'target(name="foo")')
+    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
+    graph = self.context().scan()
+    self.assertEquals([target.address.spec for target in graph.targets()], ['//:foo'])

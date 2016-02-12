@@ -77,8 +77,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
     def artifact_path(name):
       return os.path.join(self.pants_workdir, 'ivy_artifact', name)
 
-    task = self.create_task(context, workdir='unused')
-
     def mock_ivy_info_for(ivydir_ignored, conf):
       ivy_info = IvyInfo(conf)
 
@@ -123,6 +121,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     result = IvyResolveResultClasspathEtc([], symlink_map, 'some-key-for-a-and-b')
     result.ivy_info_for= mock_ivy_info_for
 
+    task = self.create_task(context, workdir='unused')
     task._ivy_resolve = mock_ivy_resolve_returning(result)
 
     task.execute()
@@ -138,6 +137,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   def test_resolve_multiple_artifacts(self):
     def coordinates_for(cp):
       return {resolved_jar.coordinate for conf, resolved_jar in cp}
+
     no_classifier = JarDependency('junit', 'junit', rev='4.12')
     classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
 

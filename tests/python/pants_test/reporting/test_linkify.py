@@ -55,6 +55,9 @@ class LinkifyTest(unittest.TestCase):
     ensure_file_exists(path)
     self._do_test_linkify('/browse/{}'.format(relpath), relpath)
 
+  def test_linkify_relative_path_outside_buildroot(self):
+    self._do_test_not_linkified('../definitely/outside/baz')
+
   def test_linkify_non_existent_relative_paths(self):
     relpath = 'underscore_and.dot/and-dash/baz'
 

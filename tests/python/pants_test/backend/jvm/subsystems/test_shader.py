@@ -155,3 +155,27 @@ class ShaderTest(unittest.TestCase):
   def test_keep_package(self):
     self.assertEqual(('keep', 'com.foo.bar.**'), Shading.create_keep_package('com.foo.bar', True))
     self.assertEqual(('keep', 'com.foo.bar.*'), Shading.create_keep_package('com.foo.bar', False))
+
+  def test_rules_file(self):
+    expected = [
+      'rule a.b.c.** d.e.f.@1\n',
+      'rule a.*.b shaded.a.@1.b\n',
+      'rule x.y.z.** shaded.x.y.z.@1\n',
+      'zap com.foo.bar.Main\n',
+      'zap com.baz.*\n',
+      'keep org.foobar.vegetable.Potato\n',
+      'keep org.foobar.fruit.**\n',
+    ]
+    rules = [
+      Shading.create_relocate('a.b.c.**', 'd.e.f.@1'),
+      Shading.create_relocate('a.*.b', shade_prefix='shaded.'),
+      Shading.create_relocate_package('x.y.z', shade_prefix='shaded.'),
+      Shading.create_zap('com.foo.bar.Main'),
+      Shading.create_zap_package('com.baz', recursive=False),
+      Shading.create_keep('org.foobar.vegetable.Potato'),
+      Shading.create_keep_package('org.foobar.fruit'),
+    ]
+    with self.shader.temporary_rules_file(rules) as fname:
+      with open(fname, 'r') as f:
+        received = f.readlines()
+        self.assertEqual(received, expected)

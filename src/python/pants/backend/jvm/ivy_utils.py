@@ -33,8 +33,8 @@ from pants.util.dirutil import safe_mkdir, safe_open
 IvyModule = namedtuple('IvyModule', ['ref', 'artifact', 'callers'])
 
 
-Dependency = namedtuple('DependencyAttributes', ['org', 'name', 'rev', 'mutable', 'force',
-                                                     'transitive'])
+Dependency = namedtuple('DependencyAttributes',
+                        ['org', 'name', 'rev', 'mutable', 'force', 'transitive'])
 
 
 Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])

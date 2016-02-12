@@ -13,9 +13,14 @@ from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
 class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
+  """
+  :API: public
+  """
 
   def create_artifact(self, org, name, rev, classifier=None, ext=None, materialize=True):
     """
+    :API: public
+
     :param string org: The maven dependency `groupId`.
     :param string name: The maven dependency `artifactId`.
     :param string rev: The maven dependency `version`.
@@ -39,6 +44,8 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
   def iter_files(self, dir_path):
     """Returns an iterator over the files found under the given `dir_path`.
 
+    :API: public
+
     :param string dir_path: The path of the directory tree to scan for files.
     :returns: An iterator of the relative paths of files found under `dir_path`.
     :rtype: :class:`collections.Iterator` of string
@@ -49,6 +56,8 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
 
   def ensure_classpath_products(self, context):
     """Gets or creates the classpath products expected by `JvmBinaryTask`.
+
+    :API: public
 
     :param context: The pants run context to get/create/associate classpath products with.
     :type context: :class:`pants.goal.context.Context`

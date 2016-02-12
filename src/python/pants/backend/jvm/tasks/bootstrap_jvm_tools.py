@@ -183,7 +183,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                                                             init_func=lambda: defaultdict(dict))
       # We leave a callback in the products map because we want these Ivy calls
       # to be done lazily (they might never actually get executed) and we want
-      # to hit Task.invalidated (called in Task.ivy_resolve) on the instance of
+      # to hit Task.invalidated (called in Task._ivy_resolve) on the instance of
       # BootstrapJvmTools rather than the instance of whatever class requires
       # the bootstrap tools.  It would be awkward and possibly incorrect to call
       # self.invalidated twice on a Task that does meaningful invalidation on its

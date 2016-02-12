@@ -35,19 +35,31 @@ class Archiver(AbstractClass):
 
 
 class TarArchiver(Archiver):
-  """An archiver that stores files in a tar file with optional compression."""
+  """An archiver that stores files in a tar file with optional compression.
+
+  :API: public
+  """
 
   @classmethod
   def extract(cls, path, outdir):
+    """
+    :API: public
+    """
     with open_tar(path, errorlevel=1) as tar:
       tar.extractall(outdir)
 
   def __init__(self, mode, extension):
+    """
+    :API: public
+    """
     super(TarArchiver, self).__init__()
     self.mode = mode
     self.extension = extension
 
   def create(self, basedir, outdir, name, prefix=None):
+    """
+    :API: public
+    """
     basedir = ensure_text(basedir)
     tarpath = os.path.join(outdir, '{}.{}'.format(ensure_text(name), self.extension))
     with open_tar(tarpath, self.mode, dereference=True, errorlevel=1) as tar:
@@ -56,11 +68,16 @@ class TarArchiver(Archiver):
 
 
 class ZipArchiver(Archiver):
-  """An archiver that stores files in a zip file with optional compression."""
+  """An archiver that stores files in a zip file with optional compression.
+
+  :API: public
+  """
 
   @classmethod
   def extract(cls, path, outdir, filter_func=None):
     """Extract from a zip file, with an optional filter
+
+    :API: public
 
     :param string path: path to the zipfile to extract from
     :param string outdir: directory to extract files into
@@ -81,11 +98,17 @@ class ZipArchiver(Archiver):
             archive_file.extract(name, outdir)
 
   def __init__(self, compression, extension):
+    """
+    :API: public
+    """
     super(ZipArchiver, self).__init__()
     self.compression = compression
     self.extension = extension
 
   def create(self, basedir, outdir, name, prefix=None):
+    """
+    :API: public
+    """
     zippath = os.path.join(outdir, '{}.{}'.format(name, self.extension))
     with open_zip(zippath, 'w', compression=self.compression) as zip:
       # For symlinks, we want to archive the actual content of linked files but
@@ -116,6 +139,8 @@ TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
 def archiver(typename):
   """Returns Archivers in common configurations.
 
+  :API: public
+
   The typename must correspond to one of the following:
   'tar'   Returns a tar archiver that applies no compression and emits .tar files.
   'tgz'   Returns a tar archiver that applies gzip compression and emits .tar.gz files.
@@ -135,6 +160,8 @@ def archiver(typename):
 
 def archiver_for_path(path_name):
   """Returns an Archiver for the given path name.
+
+  :API: public
 
   :param string path_name: The path name of the archive - need not exist.
   :raises: :class:`ValueError` If the path name does not uniquely identify a supported archive type.

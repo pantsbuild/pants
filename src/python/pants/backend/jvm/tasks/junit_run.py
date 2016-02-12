@@ -365,6 +365,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               workunit_labels=[WorkUnitLabel.TEST],
               cwd=workdir,
               synthetic_jar_dir=self.workdir,
+              create_synthetic_jar=self.synthetic_classpath,
             ))
 
           if result != 0 and self._fail_fast:
