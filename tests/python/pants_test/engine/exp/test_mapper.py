@@ -5,16 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 import os
 import shutil
 import unittest
 from contextlib import contextmanager
-from functools import partial
 from textwrap import dedent
 
 from pants.build_graph.address import Address
-from pants.engine.exp import parsers
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)

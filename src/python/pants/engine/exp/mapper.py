@@ -9,9 +9,8 @@ import os
 import re
 
 from pants.build_graph.address import Address
-from pants.engine.exp import parsers
 from pants.engine.exp.objects import Serializable
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_property
 
 
 class MappingError(Exception):

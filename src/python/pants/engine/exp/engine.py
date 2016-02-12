@@ -15,7 +15,6 @@ from Queue import Queue
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
-from pants.engine.exp.scheduler import Promise
 from pants.util.meta import AbstractClass
 
 
