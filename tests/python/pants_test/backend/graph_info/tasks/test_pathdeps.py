@@ -30,10 +30,6 @@ class TestPathDeps(ConsoleTaskTestBase):
     c = self.make_target('c', synthetic=True)
     targets = [a, b, c]
 
-    expected = [
-      os.path.join(self.build_root, 'second'),
-      self.build_root
-    ]
     self.assert_console_output(
         os.path.join(self.build_root, 'second'),
         self.build_root,
