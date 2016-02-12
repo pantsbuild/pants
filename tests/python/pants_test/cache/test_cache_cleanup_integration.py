@@ -99,8 +99,8 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       self.assertEqual(len(os.listdir(artifact_dir)), 7)
 
   def test_workdir_stale_builds_cleanup(self):
-    """Ensure that current and previous build result_dirs and the newest `--workdir-max-build-entries` dirs will be
-     kept, and the rest will be purged.
+    """Ensure that current and previous build result_dirs and the newest `--workdir-max-build-entries` number of dirs
+    will be kept, and the rest will be purged.
     """
 
     with temporary_dir() as tmp_dir:
