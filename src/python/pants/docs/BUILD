@@ -14,6 +14,7 @@ page(
     ':internals',
     ':release',
     ':release_jvm',
+    ':styleguide',
   ]
 )
 
@@ -59,6 +60,7 @@ page(
     ':howto_ask',
     ':howto_develop',
     ':internals',
+    ':styleguide',
   ]
 )
 
@@ -113,3 +115,5 @@ page(
   ]
 )
 
+page(name='styleguide',
+     source='styleguide.md')
