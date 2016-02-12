@@ -23,7 +23,8 @@ class SpecSourceMapper(SourceMapper):
   """
   Uses sources specs to identify an owner target of a source.
 
-  Note: it doesn't check if a file exists."""
+  Note: it doesn't check if a file exists.
+  """
 
   def __init__(self, address_mapper, build_graph, stop_after_match=False):
     """

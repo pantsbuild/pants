@@ -44,16 +44,11 @@ class Addressable(AbstractClass):
   """An ABC for classes which would like instances to be named and exported from BUILD files."""
 
   class Factory(BuildFileTargetFactory):
-    """Captures addressable instances from BUILD file calls.
-
-    :API: public
-    """
+    """Captures addressable instances from BUILD file calls."""
 
     @abstractmethod
     def capture(self, *args, **kwargs):
       """Captures the arguments passed to an addressable alias in a BUILD file.
-
-      :API: public
 
       :returns: An addressable instance representing the call capture.
       :rtype: :class:`Addressable`
@@ -73,8 +68,6 @@ class Addressable(AbstractClass):
   def addressed_alias(self):
     """The alias via which this addressable was invoked.
 
-    :API: public
-
     :rtype: string
     """
     return self._addressed_alias
@@ -82,8 +75,6 @@ class Addressable(AbstractClass):
   @property
   def addressed_type(self):
     """The type this addressable captures calls to and ultimately can `instantiate`.
-
-    :API: public
 
     :returns: The class of the addressed type this addressable proxies for.
     :rtype: type
@@ -94,8 +85,6 @@ class Addressable(AbstractClass):
   def addressed_name(self):
     """This property is inspected by AddressableCallProxy to automatically name Addressables.
 
-    :API: public
-
     Generally, a subclass will inspect its captured arguments and return, for example, the
       captured `name` parameter.  A value of `None` (the default) causes AddressableCallProxy
       to skip capturing and naming this instance.
@@ -104,8 +93,6 @@ class Addressable(AbstractClass):
 
   def instantiate(self, *args, **kwargs):
     """Realizes the captured addressable call as an instance of the aliased object type.
-
-    :API: public
 
     :returns: A fully hydrated addressable object.
     """

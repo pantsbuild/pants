@@ -60,9 +60,6 @@ class BuildGraph(object):
     return transitive_subgraph_fn(t.address for t in targets)
 
   def __init__(self, address_mapper):
-    """
-    :API: public
-    """
     self._address_mapper = address_mapper
     self.reset()
 
