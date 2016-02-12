@@ -91,22 +91,24 @@ class FrozenResolution(object):
       self.all_resolved_coordinates.add(c)
 
   def target_spec_to_coordinate_strings(self):
-    return {t.address.spec: [str(c) for c in coordinates] for t, coordinates in self.target_to_resolved_coordinates.items()}
+    return {t.address.spec: [str(c) for c in coordinates]
+            for t, coordinates in self.target_to_resolved_coordinates.items()}
 
   def all_coordinate_strings(self):
     return [str(c) for c in self.all_resolved_coordinates]
 
   def __repr__(self):
     return 'RS(\n  t_to_coord\n    {}\n  all\n    {}'.format(
-      '\n    '.join(':  '.join([t.address.spec, '\n      '.join(str(c) for c in cs)]) for t,cs in self.target_to_resolved_coordinates.items()),
-
-
-
+      '\n    '.join(':  '.join([t.address.spec,
+                                '\n      '.join(str(c) for c in cs)])
+                    for t,cs in self.target_to_resolved_coordinates.items()),
       '\n    '.join(str(c) for c in self.all_resolved_coordinates)
     )
 
   def __eq__(self, other):
-    return type(self) == type(other) and self.all_resolved_coordinates == other.all_resolved_coordinates and self.target_to_resolved_coordinates == other .target_to_resolved_coordinates
+    return (type(self) == type(other) and
+            self.all_resolved_coordinates == other.all_resolved_coordinates and
+            self.target_to_resolved_coordinates == other.target_to_resolved_coordinates)
 
   def __ne__(self, other):
     return not self == other
@@ -317,9 +319,6 @@ class IvyTaskMixin(TaskBase):
 
     return result.resolve_hash_name
 
-  # TODO(Eric Ayers): Change this method to relocate the resolution reports to under workdir
-  # and return that path instead of having everyone know that these reports live under the
-  # ivy cache dir.
   def _ivy_resolve(self,
                   targets,
                   executor=None,
