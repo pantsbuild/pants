@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.graph_info.tasks.pathdeps import PathDeps
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
@@ -17,16 +19,20 @@ class TestPathDeps(ConsoleTaskTestBase):
   def test_filter_targets(self):
     self.add_to_build_file(
         'BUILD',
-         'target(name="a")\n'
+         'target(name="a")'
     )
     self.add_to_build_file(
         'second/BUILD',
-         'target(name="b")\n'
+         'target(name="b")'
     )
     a = self.target('//:a')
     b = self.target('//second:b')
     c = self.make_target('c', synthetic=True)
     targets = [a, b, c]
 
+    expected = [
+      os.path.join(self.build_root, 'second'),
+      self.build_root
+    ]
     output = self.execute_console_task(targets=targets)
-    self.assertEqual(2, len(output))
+    self.assertEqual(expected, output)
