@@ -179,12 +179,12 @@ def safe_concurrent_rename(src, dst):
       raise
 
 
-def safe_rm_oldest_items_in_dir(root_dir, num_of_items_to_keep, excludes=set()):
+def safe_rm_oldest_items_in_dir(root_dir, num_of_items_to_keep, excludes=frozenset()):
   """
   Keep `num_of_items_to_keep` newly modified items besides `excludes` in `root_dir` then remove the rest.
   :param root_dir: the folder to examine
   :param num_of_items_to_keep: number of files/folders/symlinks to keep after the cleanup
-  :param excludes: paths excluded from removal
+  :param excludes: absolute paths excluded from removal (must be prefixed with `root_dir`)
   :return: none
   """
   if os.path.isdir(root_dir):

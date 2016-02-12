@@ -238,7 +238,7 @@ class DirutilTest(unittest.TestCase):
     with temporary_dir() as td:
       touch(os.path.join(td, 'file1'))
       safe_mkdir(os.path.join(td, 'file2'))
-      # time modified is only accurate to second
+      # Time modified is only accurate to second.
       time.sleep(1.1)
       touch(os.path.join(td, 'file3'))
       touch(os.path.join(td, 'file4'))
@@ -258,7 +258,7 @@ class DirutilTest(unittest.TestCase):
       touch(os.path.join(td, 'file1'))
       touch(os.path.join(td, 'file2'))
       touch(os.path.join(td, 'file3'))
-      # time modified is only accurate to second
+      # Time modified is only accurate to second.
       time.sleep(1.1)
       touch(os.path.join(td, 'file4'))
 

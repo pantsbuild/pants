@@ -410,10 +410,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       vt.update()  # In case the caller doesn't update.
 
     # Background work to clean up previous builds.
-    workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
-                                     [(invalidation_check.all_vts,)],
-                                     'workdir_build_cleanup')
-    self.context.submit_background_work_chain([workdir_build_cleanup_job])
+    if self.context.options.for_global_scope().workdir_max_build_entries is not None:
+      self._launch_background_workdir_cleanup(invalidation_check.all_vts)
 
     write_to_cache = (self.cache_target_dirs
                       and use_cache
@@ -426,20 +424,23 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
           pairs.append((vt, [vt.results_dir]))
       self.update_artifact_cache(pairs)
 
+  def _launch_background_workdir_cleanup(self, vts):
+      workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
+                                       [(vts,)],
+                                       'workdir_build_cleanup')
+      self.context.submit_background_work_chain([workdir_build_cleanup_job])
+
   def _cleanup_workdir_stale_builds(self, vts):
-    max_entries_per_target = self.context.options.for_global_scope().workdir_max_build_entries
-    if max_entries_per_target is None:
-      return
-    else:
-      max_entries_per_target = max(max_entries_per_target, 2)
-      for vt in vts:
-        if vt.has_results_dir:
-          if vt.has_previous_results_dir:
-            excludes = [vt.results_dir, vt.previous_results_dir]
-          else:
-            excludes = [vt.results_dir]
-          root_dir = os.path.dirname(vt.results_dir)
-          safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes)
+    # workdir_max_build_entries has been assure of not None before launching this function
+    max_entries_per_target = max(2, self.context.options.for_global_scope().workdir_max_build_entries)
+    for vt in vts:
+      if vt.has_results_dir:
+        if vt.has_previous_results_dir:
+          excludes = [vt.results_dir, vt.previous_results_dir]
+        else:
+          excludes = [vt.results_dir]
+        root_dir = os.path.dirname(vt.results_dir)
+        safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes)
 
   def _should_cache(self, vt):
     """Return true if the given vt should be written to a cache (if configured)."""
