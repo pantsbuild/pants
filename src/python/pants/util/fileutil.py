@@ -24,7 +24,7 @@ def create_size_estimators():
   """Create a dict of name to a function that returns an estimated size for a given target.
 
   If a random build order is needed, use random.
-  :returns: Dict of a name to a function that returns an estimated size.  
+  :returns: Dict of a name to a function that returns an estimated size.
   """
   def line_count(filename):
     with open(filename, 'rb') as fh:
