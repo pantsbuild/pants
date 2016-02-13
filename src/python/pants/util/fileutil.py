@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import random
 import shutil
 
 from pants.util.contextutil import temporary_file
@@ -20,6 +21,11 @@ def atomic_copy(src, dst):
 
 
 def create_size_estimators():
+  """Create a dict of name to a function that returns an estimated size for a given target.
+
+  If a random build order is needed, use random.
+  :returns: Dict of a name to a function that returns an estimated size.  
+  """
   def line_count(filename):
     with open(filename, 'rb') as fh:
       return sum(1 for line in fh)
@@ -28,4 +34,5 @@ def create_size_estimators():
     'filecount': lambda srcs: len(srcs),
     'filesize': lambda srcs: sum(os.path.getsize(src) for src in srcs),
     'nosize': lambda srcs: 0,
+    'random': lambda srcs: random.random(),
   }

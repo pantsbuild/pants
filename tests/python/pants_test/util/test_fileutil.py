@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import random
 import unittest
 
 from pants.util.contextutil import temporary_file, temporary_file_path
@@ -27,3 +28,13 @@ class FileutilTest(unittest.TestCase):
   def test_line_count_estimator(self):
     with temporary_file_path() as src:
       self.assertEqual(create_size_estimators()['linecount']([src]), 0)
+
+  def test_random_estimator(self):
+    seedValue = 5
+    # The number chosen for seedValue doesn't matter, so long as it is the same for the call to
+    # generate a random test number and the call to create_size_estimators.   
+    random.seed(seedValue) 
+    rand = random.random()
+    random.seed(seedValue) 
+    with temporary_file_path() as src:
+      self.assertEqual(create_size_estimators()['random']([src]), rand)
