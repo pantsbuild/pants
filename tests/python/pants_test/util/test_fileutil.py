@@ -34,7 +34,7 @@ class FileutilTest(unittest.TestCase):
     # The number chosen for seedValue doesn't matter, so long as it is the same for the call to
     # generate a random test number and the call to create_size_estimators.
     random.seed(seedValue)
-    rand = random.random()
+    rand = random.randint(0, 10000)
     random.seed(seedValue)
     with temporary_file_path() as src:
       self.assertEqual(create_size_estimators()['random']([src]), rand)

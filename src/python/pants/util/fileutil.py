@@ -34,5 +34,5 @@ def create_size_estimators():
     'filecount': lambda srcs: len(srcs),
     'filesize': lambda srcs: sum(os.path.getsize(src) for src in srcs),
     'nosize': lambda srcs: 0,
-    'random': lambda srcs: random.random(),
+    'random': lambda srcs: random.randint(0, 10000),
   }
