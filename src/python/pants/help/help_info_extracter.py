@@ -10,7 +10,7 @@ from collections import namedtuple
 from pants.base.revision import Revision
 from pants.option.custom_types import dict_option, list_option
 from pants.option.option_util import is_boolean_flag
-from pants.version import VERSION
+from pants.version import PANTS_SEMVER
 
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
@@ -155,7 +155,7 @@ class HelpInfoExtracter(object):
   def _get_deprecated_tense(self, deprecated_version, future_tense='Will be', past_tense='Was'):
     """Provides the grammatical tense for a given deprecated version vs the current version."""
     return future_tense if (
-      Revision.semver(deprecated_version) >= Revision.semver(VERSION)
+      Revision.semver(deprecated_version) >= PANTS_SEMVER
     ) else past_tense
 
   def get_option_help_info(self, args, kwargs):
