@@ -37,6 +37,11 @@ page(
 )
 
 page(
+  name='deprecation_policy',
+  source='deprecation_policy.md',
+)
+
+page(
   name='docs',
   source='docs.md',
 )

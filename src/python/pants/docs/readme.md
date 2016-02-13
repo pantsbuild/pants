@@ -10,6 +10,7 @@ test pants, and how to get your change committed.
 + [[How to Contribute|pants('src/python/pants/docs:howto_contribute')]]
 + [[How to Ask|pants('src/python/pants/docs:howto_ask')]]
 + [[Pants Developers Guide|pants('src/python/pants/docs:howto_develop')]]
++ [[Pants Deprecation Policy|pants('src/python/pants/docs:deprecation_policy')]]
 + [[Developing a Task|pants('src/python/pants/docs:dev_tasks')]]
 + [[Developing a Plugin|pants('src/python/pants/docs:howto_plugin')]]
 + [[Pants Development with IntelliJ IDEA|pants('src/python/pants/docs:intellij')]]
