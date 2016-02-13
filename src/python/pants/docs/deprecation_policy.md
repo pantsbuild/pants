@@ -50,7 +50,7 @@ Allowed API Changes
 - Adding new features to existing modules.
 - Deprecate and warn about an API that has been refactored.
 - Deprecate and warn about an option that has been refactored.
-- Adding new named parameters to a public API method.
+- Adding new named/defaulted parameters to a public API method.
 - Adding/removing/renaming any module or method in a directory named 'exp'.
 - Adding/removing/renaming any module or method not marked `:API: public` in the docstring.
 - Fixing bugs.
