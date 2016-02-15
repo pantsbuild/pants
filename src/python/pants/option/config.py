@@ -15,7 +15,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.eval import parse_expression
-from pants.util.strutil import is_text_or_binary
 
 
 class Config(object):
@@ -29,20 +28,26 @@ class Config(object):
   class ConfigError(Exception):
     pass
 
+  @staticmethod
+  def empty():
+    return _EmptyConfig()
+
   @classmethod
-  def load(cls, configpaths=None, seed_values=None):
+  def load(cls, configpaths, seed_values=None):
     """Loads config from the given paths.
 
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
     section, and be available for use in substitutions.  The caller may override some of these
     seed values.
 
-    :param configpaths: Load from these paths. Later instances take precedence over earlier ones.
-                        If unspecified, loads from pants.ini in the current build root directory.
+    :param list configpaths: Load from these paths. Later instances take precedence over earlier ones.
+                             If empty, returns an empty config.
     :param seed_values: A dict with optional override seed values for buildroot, pants_workdir,
                         pants_supportdir and pants_distdir.
     """
-    configpaths = cls._munge_configpaths_arg(configpaths)
+    if not configpaths:
+      return cls.empty()
+
     single_file_configs = []
     for configpath in configpaths:
       parser = cls._create_parser(seed_values)
@@ -50,16 +55,6 @@ class Config(object):
         parser.readfp(ini)
       single_file_configs.append(_SingleFileConfig(configpath, parser))
     return _ChainedConfig(single_file_configs)
-
-  @classmethod
-  def _munge_configpaths_arg(cls, configpaths):
-    """Converts a string or iterable-of-strings argument into a tuple of strings.
-
-    Result is hashable, so may be used as a cache key.
-    """
-    if is_text_or_binary(configpaths):
-      return (configpaths,)
-    return tuple(configpaths) if configpaths else (os.path.join(get_buildroot(), 'pants.ini'),)
 
   @classmethod
   def _create_parser(cls, seed_values=None):
@@ -145,6 +140,28 @@ class Config(object):
     :rtype: string
     """
     raise NotImplementedError
+
+
+class _EmptyConfig(Config):
+  """A dummy config with no data at all."""
+
+  def sources(self):
+    return []
+
+  def sections(self):
+    return []
+
+  def has_section(self, section):
+    return False
+
+  def has_option(self, section, option):
+    return False
+
+  def get_value(self, section, option):
+    return None
+
+  def get_source_for_option(self, section, option):
+    return None
 
 
 class _SingleFileConfig(Config):
