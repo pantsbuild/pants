@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from collections import namedtuple
+
 
 def datatype(*args, **kwargs):
   """A wrapper for `namedtuple` that accounts for the type of the object in equality."""

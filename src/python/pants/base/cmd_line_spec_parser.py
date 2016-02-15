@@ -16,22 +16,21 @@ from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_file import BuildFile
 from pants.base.deprecated import deprecated_conditional
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
 
 
-# Note: In general, 'spec' should not be a user visible term, it is usually appropriate to
-# substitute 'address' for a spec resolved to an address, or 'address selector' if you are
-# referring to an unresolved spec string.
 class CmdLineSpecParser(object):
   """Parses address selectors as passed from the command line.
 
-  Supports simple target addresses as well as sibling (:) and descendant (::) selector forms.
-  Also supports some flexibility in the path portion of the spec to allow for more natural command
-  line use cases like tab completion leaving a trailing / for directories and relative paths, ie both
-  of these::
+  See the `specs` package for more information on the types of objects returned.
+  This class supports some flexibility in the path portion of the spec to allow for more natural
+  command line use cases like tab completion leaving a trailing / for directories and relative
+  paths, ie both of these::
 
     ./src/::
     /absolute/path/to/project/src/::
@@ -41,22 +40,13 @@ class CmdLineSpecParser(object):
 
     src::
 
-  The above expression would choose every target under src except for src/broken:test
+  The above expression would choose every target under src.
   """
 
   # Target specs are mapped to the patterns which match them, if any. This variable is a key for
   # specs which don't match any exclusion regexps. We know it won't already be in the list of
   # patterns, because the asterisks in its name make it an invalid regexp.
   _UNMATCHED_KEY = '** unmatched **'
-
-  class SingleAddress(object):
-    pass
-
-  class SiblingAddresses(object):
-    pass
-
-  class DescendantAddresses(object):
-    pass
 
   class BadSpecError(Exception):
     """Indicates an invalid command line address selector."""
@@ -119,6 +109,8 @@ class CmdLineSpecParser(object):
     return results
 
   def _parse_spec(self, spec, fail_fast=False):
+    """Given a spec string, parses it into a normalized specs.Spec object."""
+
     def normalize_spec_path(path):
       is_abs = not path.startswith('//') and os.path.isabs(path)
       if is_abs:
@@ -141,9 +133,9 @@ class CmdLineSpecParser(object):
     if spec.endswith('::'):
       addresses = set()
       spec_path = spec[:-len('::')]
-      spec_dir = normalize_spec_path(spec_path)
+      spec_dir = DescendantAddresses(normalize_spec_path(spec_path))
       try:
-        build_files = self._address_mapper.scan_build_files(base_path=spec_dir,
+        build_files = self._address_mapper.scan_build_files(base_path=spec_dir.directory,
                                                             spec_excludes=self._spec_excludes)
       except (BuildFile.BuildFileError, AddressLookupError) as e:
         raise self.BadSpecError(e)
@@ -172,14 +164,15 @@ class CmdLineSpecParser(object):
 
     elif spec.endswith(':'):
       spec_path = spec[:-len(':')]
-      spec_dir = normalize_spec_path(spec_path)
+      spec_dir = SiblingAddresses(normalize_spec_path(spec_path))
       try:
-        return set(self._address_mapper.addresses_in_spec_path(spec_dir))
+        return set(self._address_mapper.addresses_in_spec_path(spec_dir.directory))
       except AddressLookupError as e:
         raise self.BadSpecError(e)
     else:
       spec_parts = spec.rsplit(':', 1)
-      spec_parts[0] = normalize_spec_path(spec_parts[0])
+      single_spec = SingleAddress(normalize_spec_path(spec_parts[0]),
+                                  spec_parts[1] if len(spec_parts) > 1 else None)
       try:
         return {self._address_mapper.spec_to_address(':'.join(spec_parts))}
       except AddressLookupError as e:
