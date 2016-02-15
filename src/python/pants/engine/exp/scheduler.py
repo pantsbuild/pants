@@ -12,9 +12,9 @@ from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import StructAddress, parse_variants
-from pants.engine.exp.objects import datatype
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target, Variants
+from pants.util.objects import datatype
 
 
 class Selector(object):

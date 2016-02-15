@@ -13,8 +13,9 @@ from functools import update_wrapper
 import six
 
 from pants.build_graph.address import Address
-from pants.engine.exp.objects import Resolvable, Serializable, datatype
+from pants.engine.exp.objects import Resolvable, Serializable
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 class Directory(datatype('Directory', ['path'])):

@@ -49,6 +49,15 @@ class CmdLineSpecParser(object):
   # patterns, because the asterisks in its name make it an invalid regexp.
   _UNMATCHED_KEY = '** unmatched **'
 
+  class SingleAddress(object):
+    pass
+
+  class SiblingAddresses(object):
+    pass
+
+  class DescendantAddresses(object):
+    pass
+
   class BadSpecError(Exception):
     """Indicates an invalid command line address selector."""
 

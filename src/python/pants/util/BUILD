@@ -56,6 +56,11 @@ python_library(
 )
 
 python_library(
+  name = 'objects',
+  sources = ['objects.py'],
+)
+
+python_library(
   name = 'osutil',
   sources = ['osutil.py'],
 )
