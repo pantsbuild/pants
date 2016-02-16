@@ -6,7 +6,6 @@ package org.pantsbuild.tools.jar;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.String;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -450,6 +449,26 @@ public class JarBuilderTest {
           assertStoredContents(jar, "used/to/be", "1/137");
           assertStoredContents(jar, "meaning/of/life/is", "42");
           assertStoredContents(jar, "meaning/of/life/used/to/be", "1/137");
+        }
+      });
+    }
+
+    @Test
+    public void testAddDirectoryManifestIgnored() throws IOException {
+      File dir = newFolder();
+      File manifestFile = new File(dir, JarFile.MANIFEST_NAME);
+      write(manifestFile, String.format("%s: %s", Name.MAIN_CLASS, "some.main.class"));
+
+      // Manifest entry should be filtered for "/path/to/META-INF/=META-INF/".
+      File destinationJar = jarBuilder()
+          .addDirectory(manifestFile.getParentFile(), Optional.of("META-INF"))
+          .write();
+
+      doWithJar(destinationJar, new ExceptionalClosure<JarFile, IOException>() {
+        @Override
+        public void execute(JarFile jar) throws IOException {
+          // Default manifest is still generated.
+          assertListingUnordered(jar);
         }
       });
 
