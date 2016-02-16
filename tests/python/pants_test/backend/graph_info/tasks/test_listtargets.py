@@ -13,6 +13,7 @@ from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
@@ -41,6 +42,7 @@ class ListTargetsTest(BaseListTargetsTest):
       targets={
         'target': Target,
         'java_library': JavaLibrary,
+        'python_library': PythonLibrary,
       },
       objects={
         'pants': lambda x: x,
@@ -187,3 +189,14 @@ class ListTargetsTest(BaseListTargetsTest):
       """).strip(),
       options={'documented': True}
     )
+
+  def test_no_synthetic_resources_in_output(self):
+    self.add_to_build_file('BUILD', dedent("""
+    python_library(
+      name = 'lib',
+      resources = ['BUILD'],
+    )
+    """))
+    output = self.execute_console_task()
+    self.assertIn('//:lib', output)
+    self.assertTrue(all('synthetic' not in line for line in output))
