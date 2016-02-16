@@ -27,6 +27,8 @@ class Exiter(object):
    2) Call Exiter.apply_options() to set traceback printing behavior via an Options object.
    3) Perform other operations as normal.
    4) Call Exiter.exit(), Exiter.exit_and_fail() or exiter_inst() when you wish to exit the runtime.
+
+  :API: public
   """
 
   def __init__(self, exiter=sys.exit, formatter=traceback.format_tb, print_backtraces=True):
@@ -61,6 +63,8 @@ class Exiter(object):
   def exit(self, result=0, msg=None, out=None):
     """Exits the runtime.
 
+    :API: public
+
     :param result: The exit status. Typically a 0 indicating success or a 1 indicating failure, but
                    can be a string as well. (Optional)
     :param msg: A string message to print to stderr or another custom file desciptor before exiting.
@@ -73,6 +77,8 @@ class Exiter(object):
 
   def exit_and_fail(self, msg=None):
     """Exits the runtime with an exit code of 1, indicating failure.
+
+    :API: public
 
     :param str msg: A string message to print to stderr before exiting. (Optional)
     """

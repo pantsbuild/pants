@@ -19,6 +19,9 @@ from pants.util.rwbuf import FileBackedRWBuf
 
 
 class WorkUnitLabel(object):
+  """
+  :API: public
+  """
   # Labels describing a workunit.  Reporting code can use this to decide how to display
   # information about this workunit.
   #
@@ -44,6 +47,9 @@ class WorkUnitLabel(object):
   @classmethod
   @memoized_method
   def keys(cls):
+    """
+    :API: public
+    """
     return [key for key in dir(cls) if not key.startswith('_') and key.isupper()]
 
 
@@ -56,6 +62,8 @@ class WorkUnit(object):
   and that can be subdivided into WorkUnits for each goal. Each of those can be subdivided into
   WorkUnits for each task, and a task can subdivide that into further work units, if finer-grained
   timing and reporting is needed.
+
+  :API: public
   """
 
   # The outcome of a workunit.
@@ -73,7 +81,10 @@ class WorkUnit(object):
 
   @staticmethod
   def outcome_string(outcome):
-    """Returns a human-readable string describing the outcome."""
+    """Returns a human-readable string describing the outcome.
+
+    :API: public
+    """
     return ['ABORTED', 'FAILURE', 'WARNING', 'SUCCESS', 'UNKNOWN'][outcome]
 
   def __init__(self, run_info_dir, parent, name, labels=None, cmd='', log_config=None):
@@ -119,21 +130,33 @@ class WorkUnit(object):
       self.parent.children.append(self)
 
   def has_label(self, label):
+    """
+    :API: public
+    """
     return label in self.labels
 
   def start(self):
-    """Mark the time at which this workunit started."""
+    """Mark the time at which this workunit started.
+
+    :API: public
+    """
     self.start_time = time.time()
 
   def end(self):
-    """Mark the time at which this workunit ended."""
+    """Mark the time at which this workunit ended.
+
+    :API: public
+    """
     self.end_time = time.time()
     for output in self._outputs.values():
       output.close()
     return self.path(), self.duration(), self._self_time(), self.has_label(WorkUnitLabel.TOOL)
 
   def outcome(self):
-    """Returns the outcome of this workunit."""
+    """Returns the outcome of this workunit.
+
+    :API: public
+    """
     return self._outcome
 
   def set_outcome(self, outcome):
@@ -141,7 +164,10 @@ class WorkUnit(object):
 
     We can set the outcome on a work unit directly, but that outcome will also be affected by
     those of its subunits. The right thing happens: The outcome of a work unit is the
-    worst outcome of any of its subunits and any outcome set on it directly."""
+    worst outcome of any of its subunits and any outcome set on it directly.
+
+    :API: public
+    """
     if outcome not in range(0, 5):
       raise Exception('Invalid outcome: {}'.format(outcome))
 
@@ -152,7 +178,11 @@ class WorkUnit(object):
   _valid_name_re = re.compile(r'\w+')
 
   def output(self, name):
-    """Returns the output buffer for the specified output name (e.g., 'stdout'), creating it if necessary."""
+    """Returns the output buffer for the specified output name (e.g., 'stdout'), creating it if
+    necessary.
+
+    :API: public
+    """
     m = WorkUnit._valid_name_re.match(name)
     if not m or m.group(0) != name:
       raise Exception('Invalid output name: {}'.format(name))
@@ -169,36 +199,57 @@ class WorkUnit(object):
     return self._outputs[name]
 
   def outputs(self):
-    """Returns the map of output name -> output buffer."""
+    """Returns the map of output name -> output buffer.
+
+    :API: public
+    """
     return self._outputs
 
   def output_paths(self):
-    """Returns the map of output name -> path of the output file."""
+    """Returns the map of output name -> path of the output file.
+
+    :API: public
+    """
     return self._output_paths
 
   def duration(self):
-    """Returns the time (in fractional seconds) spent in this workunit and its children."""
+    """Returns the time (in fractional seconds) spent in this workunit and its children.
+
+    :API: public
+    """
     return (self.end_time or time.time()) - self.start_time
 
   @property
   def start_time_string(self):
-    """A convenient string representation of start_time."""
+    """A convenient string representation of start_time.
+
+    :API: public
+    """
     return time.strftime('%H:%M:%S', time.localtime(self.start_time))
 
   @property
   def start_delta_string(self):
-    """A convenient string representation of how long after the run started we started."""
+    """A convenient string representation of how long after the run started we started.
+
+    :API: public
+    """
     delta = int(self.start_time) - int(self.root().start_time)
     return '{:02}:{:02}'.format(int(delta / 60), delta % 60)
 
   def root(self):
+    """
+    :API: public
+    """
     ret = self
     while ret.parent is not None:
       ret = ret.parent
     return ret
 
   def ancestors(self):
-    """Returns a list consisting of this workunit and those enclosing it, up to the root."""
+    """Returns a list consisting of this workunit and those enclosing it, up to the root.
+
+    :API: public
+    """
     ret = []
     workunit = self
     while workunit is not None:
@@ -207,7 +258,10 @@ class WorkUnit(object):
     return ret
 
   def path(self):
-    """Returns a path string for this workunit, E.g., 'all:compile:jvm:scalac'."""
+    """Returns a path string for this workunit, E.g., 'all:compile:jvm:scalac'.
+
+    :API: public
+    """
     return ':'.join(reversed([w.name for w in self.ancestors()]))
 
   def unaccounted_time(self):
@@ -215,11 +269,16 @@ class WorkUnit(object):
 
     This assumes that all major work should be done in leaves.
     TODO: Is this assumption valid?
+
+    :API: public
     """
     return 0 if len(self.children) == 0 else self._self_time()
 
   def to_dict(self):
-    """Useful for providing arguments to templates."""
+    """Useful for providing arguments to templates.
+
+    :API: public
+    """
     ret = {}
     for key in ['name', 'cmd', 'id', 'start_time', 'end_time',
                 'outcome', 'start_time_string', 'start_delta_string']:

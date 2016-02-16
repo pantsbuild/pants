@@ -12,6 +12,8 @@ from itertools import izip_longest
 class Revision(object):
   """Represents a software revision that is comparable to another revision describing the same
   software.
+
+  :API: public
   """
   class BadRevision(Exception):
     """Indicates a problem parsing a revision."""
@@ -28,6 +30,8 @@ class Revision(object):
     """Attempts to parse a Revision from a semantic version.
 
     See http://semver.org/ for the full specification.
+
+    :API: public
     """
     def parse_extra(delimiter, value):
       if not value:
@@ -65,6 +69,8 @@ class Revision(object):
   def lenient(cls, rev):
     """A lenient revision parser that tries to split the version into logical components with
     heuristics inspired by PHP's version_compare.
+
+    :API: public
     """
     rev = re.sub(r'(\d)([a-zA-Z])', r'\1.\2', rev)
     rev = re.sub(r'([a-zA-Z])(\d)', r'\1.\2', rev)
@@ -75,7 +81,10 @@ class Revision(object):
 
   @property
   def components(self):
-    """Returns a list of this revision's components from most major to most minor."""
+    """Returns a list of this revision's components from most major to most minor.
+
+    :API: public
+    """
     return list(self._components)
 
   def __cmp__(self, other):
