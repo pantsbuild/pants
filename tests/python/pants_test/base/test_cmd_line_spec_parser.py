@@ -1,19 +1,13 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
 import os
-import re
 
-from pants.base.build_file import BuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.build_graph.address import Address
-from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
-from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
 
@@ -155,37 +149,3 @@ class CmdLineSpecParserTest(BaseTest):
     self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper,
                                          exclude_target_regexps=[r'.*some/dir.*'])
     self.assert_parsed_list(cmdline_spec_list=['::'], expected=expected_specs)
-
-
-class CmdLineSpecParserBadBuildTest(BaseTest):
-
-  def setUp(self):
-    super(CmdLineSpecParserBadBuildTest, self).setUp()
-
-    self.add_to_build_file('bad/a', 'a_is_bad')
-    self.add_to_build_file('bad/b', 'b_is_bad')
-
-    self.spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper)
-
-    self.NO_FAIL_FAST_RE = re.compile(r"""^--------------------
-.*
-Exception message: name 'a_is_bad' is not defined
- while executing BUILD file BuildFile\(bad/a/BUILD, FileSystemProjectTree\(.*\)\)
- Loading addresses from 'bad/a' failed\.
-.*
-Exception message: name 'b_is_bad' is not defined
- while executing BUILD file BuildFile\(bad/b/BUILD, FileSystemProjectTree\(.*\)\)
- Loading addresses from 'bad/b' failed\.
-Invalid BUILD files for \[::\]$""", re.DOTALL)
-
-    self.FAIL_FAST_RE = """^name 'a_is_bad' is not defined
- while executing BUILD file BuildFile\(bad/a/BUILD\, FileSystemProjectTree\(.*\)\)
- Loading addresses from 'bad/a' failed.$"""
-
-  def test_bad_build_files(self):
-    with self.assertRaisesRegexp(self.spec_parser.BadSpecError, self.NO_FAIL_FAST_RE):
-      list(self.spec_parser.parse_addresses('::'))
-
-  def test_bad_build_files_fail_fast(self):
-    with self.assertRaisesRegexp(self.spec_parser.BadSpecError, self.FAIL_FAST_RE):
-      list(self.spec_parser.parse_addresses('::', True))

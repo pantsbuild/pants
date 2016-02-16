@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import re
+import traceback
 from collections import defaultdict
 
 from pathspec import PathSpec
@@ -272,6 +273,7 @@ class BuildFileAddressMapper(object):
 
     addresses = OrderedSet()
     for spec in specs:
+      print('>>> scanning spec {}'.format(spec))
       for address in self._scan_spec(spec, fail_fast, spec_excludes, exclude_spec):
         if not exclude_address(address):
           addresses.add(address)
@@ -304,8 +306,8 @@ class BuildFileAddressMapper(object):
       try:
         build_files = self.scan_build_files(base_path=spec.directory,
                                             spec_excludes=spec_excludes)
-      except (BuildFile.BuildFileError, AddressLookupError) as e:
-        raise self.BadSpecError(e)
+      except BuildFile.BuildFileError as e:
+        raise AddressLookupError(e)
 
       for build_file in build_files:
         try:
@@ -319,14 +321,14 @@ class BuildFileAddressMapper(object):
                                    'and will be removed. Use ignore_patterns instead.')
           else:
             if fail_fast:
-              raise self.BadSpecError(e)
+              raise AddressLookupError(e)
             errored_out.append('--------------------')
             errored_out.append(traceback.format_exc())
             errored_out.append('Exception message: {0}'.format(e))
 
       if errored_out:
-        error_msg = '\n'.join(errored_out + ["Invalid BUILD files for [{0}]".format(spec)])
-        raise self.BadSpecError(error_msg)
+        error_msg = '\n'.join(errored_out + ["Invalid BUILD files for [{0}]".format(spec.to_spec_string())])
+        raise AddressLookupError(error_msg)
       return addresses
     elif type(spec) is SiblingAddresses:
       return set(self.addresses_in_spec_path(spec.directory))

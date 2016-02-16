@@ -1,16 +1,20 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
 import os
+import re
 from textwrap import dedent
 
+from pants.base.build_file import BuildFile
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
@@ -18,6 +22,21 @@ from pants_test.base_test import BaseTest
 # TODO(Eric Ayers) There are methods in BuildFileAddressMapper that are missing
 # explicit unit tests: addresses_in_spec_path, spec_to_address, spec_to_addresses
 class BuildFileAddressMapperTest(BaseTest):
+
+  NO_FAIL_FAST_RE = re.compile(r"""^--------------------
+.*
+Exception message: name 'a_is_bad' is not defined
+ while executing BUILD file BuildFile\(bad/a/BUILD, FileSystemProjectTree\(.*\)\)
+ Loading addresses from 'bad/a' failed\.
+.*
+Exception message: name 'b_is_bad' is not defined
+ while executing BUILD file BuildFile\(bad/b/BUILD, FileSystemProjectTree\(.*\)\)
+ Loading addresses from 'bad/b' failed\.
+Invalid BUILD files for \[::\]$""", re.DOTALL)
+
+  FAIL_FAST_RE = """^name 'a_is_bad' is not defined
+ while executing BUILD file BuildFile\(bad/a/BUILD\, FileSystemProjectTree\(.*\)\)
+ Loading addresses from 'bad/a' failed.$"""
 
   def test_resolve(self):
     build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
@@ -119,6 +138,20 @@ class BuildFileAddressMapperTest(BaseTest):
     self.assertIsInstance(BuildFileAddressMapper.InvalidBuildFileReference(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.InvalidAddressError(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.BuildFileScanError(), AddressLookupError)
+
+  def test_bad_build_files(self):
+    self.add_to_build_file('bad/a', 'a_is_bad')
+    self.add_to_build_file('bad/b', 'b_is_bad')
+
+    with self.assertRaisesRegexp(AddressLookupError, self.NO_FAIL_FAST_RE):
+      list(self.address_mapper.scan_specs([DescendantAddresses('')], fail_fast=False))
+
+  def test_bad_build_files_fail_fast(self):
+    self.add_to_build_file('bad/a', 'a_is_bad')
+    self.add_to_build_file('bad/b', 'b_is_bad')
+
+    with self.assertRaisesRegexp(AddressLookupError, self.FAIL_FAST_RE):
+      list(self.address_mapper.scan_specs([DescendantAddresses('')], fail_fast=True))
 
 
 class BuildFileAddressMapperWithIgnoreTest(BaseTest):

@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from abc import abstractmethod
+
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -18,7 +20,10 @@ class Spec(AbstractClass):
   substitute 'address' for a spec resolved to an address, or 'address selector' if you are
   referring to an unresolved spec string.
   """
-  pass
+
+  @abstractmethod
+  def to_spec_string(self):
+    """Returns the normalized string representation of this spec."""
 
 
 class SingleAddress(datatype('SingleAddress', ['directory', 'name']), Spec):
@@ -37,9 +42,13 @@ class SingleAddress(datatype('SingleAddress', ['directory', 'name']), Spec):
 
 class SiblingAddresses(datatype('SiblingAddresses', ['directory']), Spec):
   """A Spec representing all addresses located directly within the given directory."""
-  pass
+
+  def to_spec_string(self):
+    return '{}:'.format(self.directory)
 
 
 class DescendantAddresses(datatype('DescendantAddresses', ['directory']), Spec):
   """A Spec representing all addresses located recursively under the given directory."""
-  pass
+
+  def to_spec_string(self):
+    return '{}::'.format(self.directory)
