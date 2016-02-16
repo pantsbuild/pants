@@ -273,7 +273,6 @@ class BuildFileAddressMapper(object):
 
     addresses = OrderedSet()
     for spec in specs:
-      print('>>> scanning spec {}'.format(spec))
       for address in self._scan_spec(spec, fail_fast, spec_excludes, exclude_spec):
         if not exclude_address(address):
           addresses.add(address)
