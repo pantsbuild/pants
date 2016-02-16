@@ -13,8 +13,7 @@ import pytest
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, Jar,
-                                                JavaSources, isolate_resources, ivy_resolve, javac,
-                                                setup_json_scheduler)
+                                                JavaSources, setup_json_scheduler)
 from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError,
                                         PartiallyConsumedInputsError, Return, SelectNode)
 

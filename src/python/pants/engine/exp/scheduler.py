@@ -5,23 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
-import inspect
-import itertools
-import threading
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
 
-import six
 from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import StructAddress, parse_variants
-from pants.engine.exp.objects import Serializable, datatype
+from pants.engine.exp.objects import datatype
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target, Variants
-from pants.util.memo import memoized_property
-from pants.util.meta import AbstractClass
 
 
 class Selector(object):

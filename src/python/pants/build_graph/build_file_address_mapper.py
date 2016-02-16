@@ -31,8 +31,7 @@ from pants.util.dirutil import fast_relpath
 #
 # Note: 'spec' should not be a user visible term, substitute 'address' instead.
 class BuildFileAddressMapper(object):
-  """Maps addresses in the pants virtual address space to corresponding BUILD file declarations.
-  """
+  """Maps addresses in the pants virtual address space to corresponding BUILD file declarations."""
 
   class AddressNotInBuildFile(AddressLookupError):
     """Indicates an address cannot be found in an existing BUILD file."""
@@ -128,7 +127,6 @@ class BuildFileAddressMapper(object):
 
   def _address_map_from_spec_path(self, spec_path):
     """Returns a resolution map of all addresses in a "directory" in the virtual address space.
-
     :returns {Address: (Address, <resolved Object>)}:
     """
     if spec_path not in self._spec_path_to_address_map_map:
@@ -195,6 +193,7 @@ class BuildFileAddressMapper(object):
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
+
     :param spec: iterable of Addresses.
     :raises AddressLookupError: if the BUILD file cannot be found in the path specified by the spec
     """

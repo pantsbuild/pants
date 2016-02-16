@@ -89,6 +89,8 @@ class BuildFileAliases(object):
 
   There are three types of symbols that can be directly exposed:
 
+  :API: public
+
   - targets: These are Target subclasses or TargetMacro.Factory instances.
   - objects: These are any python object, from constants to types.
   - context_aware_object_factories: These are object factories that are passed a ParseContext and
@@ -171,6 +173,8 @@ class BuildFileAliases(object):
 
   def __init__(self, targets=None, objects=None, context_aware_object_factories=None):
     """
+    :API: public
+
     :param dict targets: A mapping from string aliases to Target subclasses or TargetMacro.Factory
                          instances
     :param dict objects: A mapping from string aliases to arbitrary objects.
@@ -186,6 +190,8 @@ class BuildFileAliases(object):
   def target_types(self):
     """Returns a mapping from string aliases to Target subclasses.
 
+    :API: public
+
     :rtype: dict
     """
     return self._target_types
@@ -193,6 +199,8 @@ class BuildFileAliases(object):
   @property
   def target_macro_factories(self):
     """Returns a mapping from string aliases to TargetMacro.Factory instances.
+
+    :API: public
 
     :rtype: dict
     """
@@ -202,6 +210,8 @@ class BuildFileAliases(object):
   def objects(self):
     """Returns a mapping from string aliases to arbitrary objects.
 
+    :API: public
+
     :rtype: dict
     """
     return self._objects
@@ -209,6 +219,8 @@ class BuildFileAliases(object):
   @property
   def context_aware_object_factories(self):
     """Returns a mapping from string aliases to context aware object factory callables.
+
+    :API: public
 
     :rtype: dict
     """
@@ -220,6 +232,8 @@ class BuildFileAliases(object):
 
     Normally there is 1 target type per alias, but macros can expand a single alias to several
     target types.
+
+    :API: public
 
     :rtype: dict
     """
@@ -234,6 +248,8 @@ class BuildFileAliases(object):
     """Merges a set of build file aliases and returns a new set of aliases containing both.
 
     Any duplicate aliases from `other` will trump.
+
+    :API: public
 
     :param other: The BuildFileAliases to merge in.
     :type other: :class:`BuildFileAliases`

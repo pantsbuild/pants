@@ -17,7 +17,7 @@ import six
 
 from pants.build_graph.address import Address
 from pants.engine.exp.objects import Resolvable, Serializable
-from pants.util.memo import memoized, memoized_method, memoized_property
+from pants.util.memo import memoized, memoized_method
 from pants.util.meta import AbstractClass
 
 

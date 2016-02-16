@@ -50,8 +50,8 @@ class StructTest(unittest.TestCase):
 
     # Merging is lazy, so we don't pick up the other field yet.
     self.assertNotEqual(Struct(age=32,
-                               items=[1, 2, 3],
-                               knobs={'a': True, 'b': False},
+                               items=[3, 1, 2],
+                               knobs={'a': True, 'b': True},
                                other=True),
                         merges)
 

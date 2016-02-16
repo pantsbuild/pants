@@ -12,10 +12,7 @@ from functools import wraps
 import six
 
 from pants.base.revision import Revision
-from pants.version import VERSION
-
-
-_PANTS_SEMVER = Revision.semver(VERSION)
+from pants.version import PANTS_SEMVER, VERSION
 
 
 class DeprecationApplicationError(Exception):
@@ -57,7 +54,7 @@ def check_deprecated_semver(removal_version, check_expired=True):
     raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
                                  '{}'.format(removal_version, e))
 
-  if check_expired and removal_semver <= _PANTS_SEMVER:
+  if check_expired and removal_semver <= PANTS_SEMVER:
     raise PastRemovalVersionError('The removal version must be greater than the current pants '
                                   'version of {} - given {}'.format(VERSION, removal_version))
 
