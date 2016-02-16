@@ -35,7 +35,7 @@ class BuildFileParser(object):
     pass
 
   class BuildFileScanError(BuildFileParserError):
-    """Raised if there was a problem when gathering all addresses in a BUILD file """
+    """Raised if there was a problem when gathering all addresses in a BUILD file"""
     pass
 
   class AddressableConflictException(BuildFileParserError):
