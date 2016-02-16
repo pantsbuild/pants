@@ -149,14 +149,6 @@ class BuildFileAddressMapper(object):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()
 
-  @deprecated('0.0.72')
-  def from_cache(self, root_dir, relpath, must_exist=True):
-    """Return a BuildFile instance.  Args as per BuildFile.from_cache
-
-    :returns: a BuildFile
-    """
-    return BuildFile._cached(self._project_tree, relpath, must_exist)
-
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct build file address.
 
@@ -175,14 +167,6 @@ class BuildFileAddressMapper(object):
     except AddressLookupError as e:
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
-
-  @deprecated('0.0.72', hint_message='Use scan_build_files instead.')
-  def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
-    """Looks for all BUILD files in root_dir or its descendant directories.
-
-    :returns: an OrderedSet of BuildFile instances.
-    """
-    return self.scan_build_files(base_path, spec_excludes)
 
   def scan_build_files(self, base_path, spec_excludes=None):
     deprecated_conditional(lambda: spec_excludes is not None,

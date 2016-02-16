@@ -53,14 +53,6 @@ python_library(
 )
 
 python_library(
-  name = 'scm_build_file',
-  sources = ['scm_build_file.py'],
-  dependencies = [
-    ':build_file',
-  ]
-)
-
-python_library(
   name = 'build_file_target_factory',
   sources = ['build_file_target_factory.py'],
   dependencies = [
