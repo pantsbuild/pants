@@ -11,7 +11,7 @@ from pants.util.objects import datatype
 
 class Spec(AbstractClass):
   """Represents address selectors as passed from the command line.
-  
+
   Supports `Single` target addresses as well as `Sibling` (:) and `Descendant` (::) selector forms.
 
   Note: In general, 'spec' should not be a user visible term, it is usually appropriate to
@@ -27,7 +27,12 @@ class SingleAddress(datatype('SingleAddress', ['directory', 'name']), Spec):
   If the address name is None, then the default address for the directory is assumed...
   ie, the address with the same name as the directory.
   """
-  pass
+
+  def to_spec_string(self):
+    if self.name:
+      return '{}:{}'.format(self.directory, self.name)
+    else:
+      return self.directory
 
 
 class SiblingAddresses(datatype('SiblingAddresses', ['directory']), Spec):

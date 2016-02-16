@@ -5,19 +5,27 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
+import re
+from collections import defaultdict
 
 from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
+from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.project_tree import ProjectTree
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.util.dirutil import fast_relpath
+
+
+logger = logging.getLogger(__name__)
 
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
@@ -52,7 +60,12 @@ class BuildFileAddressMapper(object):
   class InvalidRootError(BuildFileScanError):
     """Indicates an invalid scan root was supplied."""
 
-  def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None):
+  # Target specs are mapped to the patterns which match them, if any. This variable is a key for
+  # specs which don't match any exclusion regexps. We know it won't already be in the list of
+  # patterns, because the asterisks in its name make it an invalid regexp.
+  _UNMATCHED_KEY = '** unmatched **'
+
+  def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None, exclude_target_regexps=None):
     """Create a BuildFileAddressMapper.
 
     :param build_file_parser: An instance of BuildFileParser
@@ -67,6 +80,9 @@ class BuildFileAddressMapper(object):
       # TODO(tabishev): Remove after transition period.
       self._project_tree = project_tree._get_project_tree(self.root_dir)
     self._build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
+
+    self._exclude_target_regexps = exclude_target_regexps or []
+    self._exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
 
   @property
   def root_dir(self):
@@ -235,3 +251,86 @@ class BuildFileAddressMapper(object):
       raise self.BuildFileScanError("{message}\n while scanning BUILD files in '{root}'."
                                     .format(message=e, root=root))
     return addresses
+
+  def scan_specs(self, specs, fail_fast=True, spec_excludes=None):
+    """Execute a collection of `specs.Spec` objects and return an ordered set of Addresses."""
+    excluded_target_map = defaultdict(set)  # pattern -> targets (for debugging)
+    deprecated_conditional(lambda: spec_excludes is not None,
+                           '0.0.75',
+                           'Use build_ignore_patterns in address_mapper instead.')
+
+    def exclude_spec(spec):
+      for pattern in self._exclude_patterns:
+        if pattern.search(spec) is not None:
+          excluded_target_map[pattern.pattern].add(spec)
+          return True
+      excluded_target_map[self._UNMATCHED_KEY].add(spec)
+      return False
+
+    def exclude_address(address):
+      return exclude_spec(address.spec)
+
+    addresses = OrderedSet()
+    for spec in specs:
+      for address in self._scan_spec(spec, fail_fast, spec_excludes, exclude_spec):
+        if not exclude_address(address):
+          addresses.add(address)
+
+    # Print debug information about the excluded targets
+    if logger.getEffectiveLevel() <= logging.DEBUG and excluded_target_map:
+      logger.debug('excludes:\n  {excludes}'
+                   .format(excludes='\n  '.join(self._exclude_target_regexps)))
+      targets = ', '.join(excluded_target_map[self._UNMATCHED_KEY])
+      logger.debug('Targets after excludes: {targets}'.format(targets=targets))
+      excluded_count = 0
+      for pattern, targets in six.iteritems(excluded_target_map):
+        if pattern != self._UNMATCHED_KEY:
+          logger.debug('Targets excluded by pattern {pattern}\n  {targets}'
+                       .format(pattern=pattern,
+                               targets='\n  '.join(targets)))
+          excluded_count += len(targets)
+      logger.debug('Excluded {count} target{plural}.'
+                   .format(count=excluded_count,
+                           plural=('s' if excluded_count != 1 else '')))
+    return addresses
+
+  def _scan_spec(self, spec, fail_fast, spec_excludes, exclude_spec):
+    """Scans the given address spec."""
+
+    errored_out = []
+
+    if type(spec) is DescendantAddresses:
+      addresses = set()
+      try:
+        build_files = self.scan_build_files(base_path=spec.directory,
+                                            spec_excludes=spec_excludes)
+      except (BuildFile.BuildFileError, AddressLookupError) as e:
+        raise self.BadSpecError(e)
+
+      for build_file in build_files:
+        try:
+          addresses.update(self.addresses_in_spec_path(build_file.spec_path))
+        except (BuildFile.BuildFileError, AddressLookupError) as e:
+          # This attempts to filter out broken BUILD files before we parse them.
+          if exclude_spec(build_file.spec_path):
+            deprecated_conditional(lambda: True,
+                                   '0.0.75',
+                                   'Filtering broken BUILD files based on exclude_target_regexp is deprecated '
+                                   'and will be removed. Use ignore_patterns instead.')
+          else:
+            if fail_fast:
+              raise self.BadSpecError(e)
+            errored_out.append('--------------------')
+            errored_out.append(traceback.format_exc())
+            errored_out.append('Exception message: {0}'.format(e))
+
+      if errored_out:
+        error_msg = '\n'.join(errored_out + ["Invalid BUILD files for [{0}]".format(spec)])
+        raise self.BadSpecError(error_msg)
+      return addresses
+    elif type(spec) is SiblingAddresses:
+      return set(self.addresses_in_spec_path(spec.directory))
+    elif type(spec) is SingleAddress:
+      return {self.spec_to_address(spec.to_spec_string())}
+    else:
+      raise ValueError('Unsupported Spec type: {}'.format(spec))
