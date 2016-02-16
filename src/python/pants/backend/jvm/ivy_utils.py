@@ -644,11 +644,13 @@ class IvyUtils(object):
     return template
 
   @classmethod
-  def _generate_fetch_jar_template(cls, jars):#
+  def _generate_fetch_jar_template(cls, jars):
     global_dep_attributes = set(Dependency(org=jar.org,
                                            name=jar.name,
                                            rev=jar.rev,
-                                           transitive=False
+                                           transitive=False,
+                                           mutable=False,
+                                           force=False
         )
                                 for jar in jars)
     if len(global_dep_attributes) != 1:
@@ -664,9 +666,11 @@ class IvyUtils(object):
     artifacts = OrderedDict()
     for jar in jars:
       ext = jar.ext
-      url = jar.url
-      if url:
-        any_have_url = True
+      # TODO something with URLs
+      #url = jar.url
+      #if url:
+      #  any_have_url = True
+      url=None
       classifier = jar.classifier
       artifact = Artifact(name=jar.name,
                           type_=ext or 'jar',

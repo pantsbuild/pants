@@ -63,14 +63,6 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     ])
     self.assert_success(pants_run)
 
-  def test_ivy_confs_failure(self):
-    pants_run = self.run_pants([
-        'resolve',
-        '--resolve-ivy-confs=parampampam',
-        '3rdparty:junit'
-    ])
-    self.assert_failure(pants_run)
-
   def test_ivy_confs_ini_failure(self):
     pants_ini_config = {'resolve.ivy': {'confs': 'parampampam'}}
     pants_run = self.run_pants([
@@ -78,3 +70,34 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
         '3rdparty:junit'
     ], config=pants_ini_config)
     self.assert_failure(pants_run)
+
+  def test_ivy_confs_loads_those_configs(self):
+    with self.temporary_workdir() as workdir:
+      self.run_pants_with_workdir([
+        'resolve',
+        '--resolve-ivy-confs=default',
+        '--resolve-ivy-confs=sources',
+        '--resolve-ivy-confs=javadoc',
+        '3rdparty:junit'
+    ])
+
+
+    # TODO rm confs as a thing, instead explicitly request sources / javadoc. Then we can special
+    # case gathering them in a way that will work more correctly using ivys implicit optional conf.
+
+
+    #TODO look up files for sources and javadoc
+    # Test for bimodal resolve is
+    # 1 - do a resolve
+    # 2 - run clean-all
+    # 3 - do resolve
+    # assert that the second resolve ran fetch flow and not default flow
+  def test_ivy_bimodal_resolve(self):
+    with self.temporary_workdir() as workdir:
+      self.run_pants_with_workdir(['resolve', '3rdparty:junit'], workdir)
+      self.run_pants_with_workdir(['clean-all'], workdir)
+      self.run_pants_with_workdir(['resolve', '3rdparty:junit'], workdir)
+
+  # sub component test
+  # run resolve
+  # make assertions about the file to cache

@@ -216,6 +216,14 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     self.assertEquals(2, len(classpath))
 
+  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+    excluding_target = self.make_target('//:b', JavaLibrary, excludes=[Exclude('junit', 'junit')])
+    compile_classpath = self.resolve([junit_jar_lib, excluding_target])
+
   def test_ivy_blah(self):
     # TODO flesh it out
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
