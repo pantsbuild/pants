@@ -11,6 +11,7 @@ import re
 import traceback
 from collections import defaultdict
 
+import six
 from pathspec import PathSpec
 from pathspec.gitignore import GitIgnorePattern
 from twitter.common.collections import OrderedSet
