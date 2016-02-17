@@ -46,19 +46,20 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
     super(Filter, self).__init__(*args, **kwargs)
     self._filters = []
 
-    def _get_targets(spec):
+    def _get_targets(spec_str):
+      spec_parser = CmdLineSpecParser(get_buildroot())
       try:
-        spec_parser = CmdLineSpecParser(get_buildroot(), self.context.address_mapper)
-        addresses = spec_parser.parse_addresses(spec)
+        spec = spec_parser.parse_spec(spec_str)
+        addresses = self.context.address_mapper.scan_specs([spec])
       except AddressLookupError as e:
-        raise TaskError('Failed to parse address selector: {spec}\n {message}'.format(spec=spec, message=e))
+        raise TaskError('Failed to parse address selector: {spec_str}\n {message}'.format(spec_str=spec_str, message=e))
       # filter specs may not have been parsed as part of the context: force parsing
       matches = set()
       for address in addresses:
         self.context.build_graph.inject_address_closure(address)
         matches.add(self.context.build_graph.get_target(address))
       if not matches:
-        raise TaskError('No matches for address selector: {spec}'.format(spec=spec))
+        raise TaskError('No matches for address selector: {spec_str}'.format(spec_str=spec_str))
       return matches
 
     def filter_for_address(spec):

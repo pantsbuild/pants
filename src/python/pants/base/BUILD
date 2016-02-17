@@ -53,14 +53,6 @@ python_library(
 )
 
 python_library(
-  name = 'scm_build_file',
-  sources = ['scm_build_file.py'],
-  dependencies = [
-    ':build_file',
-  ]
-)
-
-python_library(
   name = 'build_file_target_factory',
   sources = ['build_file_target_factory.py'],
   dependencies = [
@@ -142,6 +134,15 @@ python_library(
 )
 
 python_library(
+  name = 'specs',
+  sources = ['specs.py'],
+  dependencies = [
+    'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
+  ],
+)
+
+python_library(
   name = 'revision',
   sources = ['revision.py'],
 )
@@ -162,6 +163,7 @@ python_library(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':build_file',
+    ':specs',
     'src/python/pants/build_graph',
   ],
 )

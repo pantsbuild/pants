@@ -15,12 +15,13 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.engine.exp.graph import Directory, create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
-from pants.engine.exp.objects import datatype
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
                                         SelectVariant)
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Sources, Target, Variants
+from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 def printing_func(func):
@@ -299,6 +300,62 @@ def unpickleable_input(unpickleable):
   raise Exception('This function should never run, because its selected input is unpickleable.')
 
 
+class Goal(AbstractClass):
+  """A synthetic aggregate product produced by a goal, which is its own task."""
+
+  def __init__(self, *args):
+    if all(arg is None for arg in args):
+      msg = '\n  '.join(p.__name__ for p in self.products())
+      raise TaskError('Unable to produce any of the products for goal `{}`:\n  {}'.format(
+        self.name(), msg))
+
+  @classmethod
+  @abstractmethod
+  def name(cls):
+    """Returns the name of the Goal."""
+
+  @classmethod
+  def signature(cls):
+    """Returns a task triple for this Goal, used to install the Goal.
+
+    A Goal is it's own synthetic output product, and its constructor acts as its task function. It
+    selects each of its products as optional, but fails synchronously if none of them are available.
+    """
+    return (cls, [Select(p, optional=True) for p in cls.products()], cls)
+
+  @classmethod
+  @abstractmethod
+  def products(cls):
+    """Returns the products that this Goal requests."""
+
+  def __eq__(self, other):
+    return type(self) == type(other)
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __hash__(self):
+    return hash(type(self))
+
+  def __str__(self):
+    return '{}()'.format(type(self).__name__)
+
+  def __repr__(self):
+    return str(self)
+
+
+class GenGoal(Goal):
+  """A goal that requests all known types of sources."""
+
+  @classmethod
+  def name(cls):
+    return 'gen'
+
+  @classmethod
+  def products(cls):
+    return [JavaSources, PythonSources, ResourceSources, ScalaSources]
+
+
 class ExampleTable(SymbolTable):
   @classmethod
   def table(cls):
@@ -338,15 +395,16 @@ def setup_json_scheduler(build_root):
   # TODO: Placeholder for the SourceRoot subsystem.
   source_roots = SourceRoots(build_root, ('src/java',))
 
-  products_by_goal = {
-      'compile': [Classpath],
+  goals = {
+      'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
-      'resolve': [Classpath],
-      'gen': [JavaSources, PythonSources, ResourceSources, ScalaSources],
-      'unpickleable': [UnpickleableResult],
+      'resolve': Classpath,
+      GenGoal.name(): GenGoal,
+      'unpickleable': UnpickleableResult,
     }
   tasks = [
       # Codegen
+      GenGoal.signature(),
       (JavaSources,
        [Select(ThriftSources),
         SelectVariant(ApacheThriftJavaConfiguration, 'thrift')],
@@ -425,5 +483,5 @@ def setup_json_scheduler(build_root):
       create_graph_tasks(address_mapper)
     )
 
-  scheduler = LocalScheduler(products_by_goal, tasks)
+  scheduler = LocalScheduler(goals, ExampleTable, tasks)
   return scheduler

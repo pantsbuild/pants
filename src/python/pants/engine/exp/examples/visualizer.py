@@ -53,7 +53,10 @@ def create_digraph(scheduler):
   max_colors = 12
   colors = {}
 
-  def color_index(key):
+  def format_color(node, node_state):
+    if type(node_state) is Throw:
+      return 'tomato'
+    key = node.product
     return colors.setdefault(key, (len(colors) % max_colors) + 1)
 
   yield 'digraph plans {'
@@ -64,8 +67,8 @@ def create_digraph(scheduler):
   for ((node, node_state), dependency_entries) in scheduler.walk_product_graph():
     node_str = format_node(node, node_state)
 
-    yield ('  node [style=filled, fillcolor={color}] "{node}";'
-            .format(color=color_index(node.product),
+    yield (' "{node}" [style=filled, fillcolor={color}];'
+            .format(color=format_color(node, node_state),
                     node=node_str))
 
     for (dep, dep_state) in dependency_entries:
@@ -87,8 +90,10 @@ def visualize_execution_graph(scheduler):
 
 def visualize_build_request(build_root, build_request):
   scheduler = setup_json_scheduler(build_root)
+  # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   LocalSerialEngine(scheduler).reduce(build_request)
   visualize_execution_graph(scheduler)
+  scheduler.validate()
 
 
 def main():

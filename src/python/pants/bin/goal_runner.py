@@ -9,6 +9,7 @@ import logging
 import sys
 
 import pkg_resources
+from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_scm, pants_version
 from pants.base.build_file import BuildFile
@@ -187,14 +188,13 @@ class GoalRunnerFactory(object):
     build_ignore_patterns = self._global_options.ignore_patterns or []
     build_ignore_patterns.extend(BuildFile._spec_excludes_to_gitignore_syntax(self._root_dir,
                                                                               self._global_options.spec_excludes))
-    self._address_mapper = BuildFileAddressMapper(self._build_file_parser, self._project_tree, build_ignore_patterns)
-    self._build_graph = BuildGraph(self._address_mapper)
-    self._spec_parser = CmdLineSpecParser(
-      self._root_dir,
-      self._address_mapper,
-      spec_excludes=self._spec_excludes,
+    self._address_mapper = BuildFileAddressMapper(
+      self._build_file_parser,
+      self._project_tree,
+      build_ignore_patterns,
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
+    self._build_graph = BuildGraph(self._address_mapper)
 
   def _get_project_tree(self, build_file_rev):
     """Creates the project tree for build files for use in a given pants run."""
@@ -220,7 +220,7 @@ class GoalRunnerFactory(object):
 
     self._goals.extend([Goal.by_name(goal) for goal in goals])
 
-  def _expand_specs(self, specs, fail_fast):
+  def _expand_specs(self, spec_strs, fail_fast):
     """Populate the BuildGraph and target list from a set of input specs."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
       def filter_for_tag(tag):
@@ -228,12 +228,18 @@ class GoalRunnerFactory(object):
 
       tag_filter = wrap_filters(create_filters(self._tag, filter_for_tag))
 
-      for spec in specs:
-        for address in self._spec_parser.parse_addresses(spec, fail_fast):
-          self._build_graph.inject_address_closure(address)
-          target = self._build_graph.get_target(address)
-          if tag_filter(target):
-            self._targets.append(target)
+      # Parse all specs into unique Spec objects.
+      spec_parser = CmdLineSpecParser(self._root_dir)
+      specs = OrderedSet()
+      for spec_str in spec_strs:
+        specs.add(spec_parser.parse_spec(spec_str))
+
+      # Then scan them to generate unique Addresses.
+      for address in self._address_mapper.scan_specs(specs, fail_fast, self._spec_excludes):
+        self._build_graph.inject_address_closure(address)
+        target = self._build_graph.get_target(address)
+        if tag_filter(target):
+          self._targets.append(target)
 
   def _maybe_launch_pantsd(self):
     """Launches pantsd if configured to do so."""

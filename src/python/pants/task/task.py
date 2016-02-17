@@ -301,7 +301,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                   invalidate_dependents=False,
                   partition_size_hint=sys.maxint,
                   silent=False,
-                  locally_changed_targets=None,
                   fingerprint_strategy=None,
                   topological_order=False,
                   use_cache=True):
@@ -316,10 +315,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                   sys.maxint for a single VersionedTargetSet. Set to 0 for one
                                   VersionedTargetSet per target. It is up to the caller to do the right
                                   thing with whatever partitioning it asks for.
-    :param locally_changed_targets: Targets that we've edited locally. If specified, and there aren't too
-                                  many of them, we keep these in separate partitions from other targets,
-                                  as these are more likely to have build errors, and so to be rebuilt over
-                                  and over, and partitioning them separately is a performance win.
     :param fingerprint_strategy:   A FingerprintStrategy instance, which can do per task, finer grained
                                   fingerprinting of a given Target.
     :param use_cache:             A boolean to indicate whether to read/write the cache within this
@@ -333,27 +328,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :rtype: InvalidationCheck
     """
 
-    # TODO(benjy): Compute locally_changed_targets here instead of passing it in? We currently pass
-    # it in because JvmCompile already has the source->target mapping for other reasons, and also
-    # to selectively enable this feature.
     fingerprint_strategy = fingerprint_strategy or TaskIdentityFingerprintStrategy(self)
     cache_manager = self.create_cache_manager(invalidate_dependents,
                                               fingerprint_strategy=fingerprint_strategy)
-    # We separate locally-modified targets from others by coloring them differently.
-    # This can be a performance win, because these targets are more likely to be iterated
-    # over, and this preserves "chunk stability" for them.
-    colors = {}
 
-    # But we only do so if there aren't too many, or this optimization will backfire.
-    locally_changed_target_limit = 10
-
-    if locally_changed_targets and len(locally_changed_targets) < locally_changed_target_limit:
-      for t in targets:
-        if t in locally_changed_targets:
-          colors[t] = 'locally_changed'
-        else:
-          colors[t] = 'not_locally_changed'
-    invalidation_check = cache_manager.check(targets, partition_size_hint, colors,
+    invalidation_check = cache_manager.check(targets, partition_size_hint,
                                              topological_order=topological_order)
 
     if invalidation_check.invalid_vts and use_cache and self.artifact_cache_reads_enabled():
@@ -375,7 +354,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
           self._report_targets('No cached artifacts for ', uncached_targets, '.')
       # Now that we've checked the cache, re-partition whatever is still invalid.
       invalidation_check = \
-        InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint, colors)
+        InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint)
 
     self._maybe_create_results_dirs(invalidation_check.all_vts)
 

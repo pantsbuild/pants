@@ -15,7 +15,7 @@ from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Return, SelectNode, Throw
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Noop, Return, SelectNode, Throw
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
@@ -79,11 +79,14 @@ class GraphTestBase(unittest.TestCase):
     return SelectNode(address, self._product, None, None)
 
   def create(self, build_pattern=None, parser_cls=None, inline=False):
+    symbol_table_cls = TestTable
     mapper = AddressMapper(build_root=os.path.dirname(__file__),
-                           symbol_table_cls=TestTable,
+                           symbol_table_cls=symbol_table_cls,
                            build_pattern=build_pattern,
                            parser_cls=parser_cls)
-    return LocalScheduler({self._goal: [self._product]}, create_graph_tasks(mapper))
+    return LocalScheduler({self._goal: self._product},
+                          symbol_table_cls,
+                          create_graph_tasks(mapper))
 
   def create_json(self):
     return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
@@ -98,6 +101,12 @@ class GraphTestBase(unittest.TestCase):
     """Return a list of all (Node, State) tuples reachable from the given Address."""
     root = self._populate(scheduler, address)
     return list(e for e, _ in scheduler.product_graph.walk([root], predicate=lambda _: True))
+
+  def resolve_failure(self, scheduler, address):
+    root = self._populate(scheduler, address)
+    state = scheduler.product_graph.state(root)
+    self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
+    return state.exc
 
   def resolve(self, scheduler, address):
     root = self._populate(scheduler, address)
@@ -172,16 +181,17 @@ class InlinedGraphTest(GraphTestBase):
   def extract_path_tail(self, cycle_exception, line_count):
     return [l.lstrip() for l in str(cycle_exception).splitlines()[-line_count:]]
 
-  def do_test_cycle(self, scheduler, address_str):
+  def do_test_cycle(self, scheduler, address_str, root_type=Throw):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    # TODO: in the case of a BUILD file cycle, it would be nice to fail synchronously, but
-    # tasks can cycle in normal cases currently (scrooge attempting to compile itself, etc).
-    self.assertEqual(type(walk[0][1]), Throw)
-    self.assertTrue(any('Cycle' in state.msg for _, state in walk if type(state) is Throw))
+    self.assertEqual(type(walk[0][1]), root_type)
+    self.assertTrue(any('Cycle' in state.msg for _, state in walk if type(state) is Noop))
 
   def test_cycle_self(self):
-    self.do_test_cycle(self.create_json(), 'examples/graph_test:self_cycle')
+    # A self-cycle is treated as a Noop, whereas a cycle between different objects is treated
+    # as a Throw via DependenciesNode failing to resolve an explicitly specified value.
+    # TODO: This should be sufficient validation in practice, but might be worth revisiting.
+    self.do_test_cycle(self.create_json(), 'examples/graph_test:self_cycle', root_type=Noop)
 
   def test_cycle_direct(self):
     self.do_test_cycle(self.create_json(), 'examples/graph_test:direct_cycle')
@@ -191,18 +201,18 @@ class InlinedGraphTest(GraphTestBase):
 
   def test_type_mismatch_error(self):
     scheduler = self.create_json()
-    with self.assertRaises(ResolvedTypeMismatchError):
-      self.resolve(scheduler, Address.parse('examples/graph_test:type_mismatch'))
+    mismatch = Address.parse('examples/graph_test:type_mismatch')
+    self.assertEquals(type(self.resolve_failure(scheduler, mismatch)), ResolvedTypeMismatchError)
 
   def test_not_found_but_family_exists(self):
     scheduler = self.create_json()
-    with self.assertRaises(ResolveError):
-      self.resolve(scheduler, Address.parse('examples/graph_test:this_addressable_does_not_exist'))
+    dne = Address.parse('examples/graph_test:this_addressable_does_not_exist')
+    self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
 
   def test_not_found_and_family_does_not_exist(self):
     scheduler = self.create_json()
-    with self.assertRaises(ResolveError):
-      self.resolve(scheduler, Address.parse('this/dir/does/not/exist'))
+    dne = Address.parse('this/dir/does/not/exist')
+    self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
 
 
 class LazyResolvingGraphTest(GraphTestBase):
