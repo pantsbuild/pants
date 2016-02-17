@@ -10,13 +10,20 @@ import os
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
+from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
+                                                                    PinnedJarArtifactSet)
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
 from pants.util.contextutil import temporary_dir
+from pants_test.base_test import BaseTest
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
+from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ensure_cached
 
 
@@ -210,3 +217,93 @@ class IvyResolveTest(JvmToolTaskTestBase):
     classpath = self.create_task(self.context()).ivy_classpath([junit_jar_lib])
 
     self.assertEquals(2, len(classpath))
+
+
+class IvyResolveFingerprintStrategyTest(BaseTest):
+
+  def setUp(self):
+    super(IvyResolveFingerprintStrategyTest, self).setUp()
+    self._subsystem_scope = subsystem_instance(JarDependencyManagement)
+    self._subsystem_scope.__enter__()
+
+  def tearDown(self):
+    self._subsystem_scope.__exit__(None, None, None)
+    super(IvyResolveFingerprintStrategyTest, self).tearDown()
+
+  def set_artifact_set_for(self, managed_jar_target, artifact_set):
+    JarDependencyManagement.global_instance()._artifact_set_map[
+      managed_jar_target.id] = artifact_set
+
+  def test_target_target_is_none(self):
+    confs = ()
+    strategy = IvyResolveFingerprintStrategy(confs)
+
+    target = self.make_target(':just-target')
+
+    self.assertIsNone(strategy.compute_fingerprint(target))
+
+  def test_jvm_target_without_excludes_is_none(self):
+    confs = ()
+    strategy = IvyResolveFingerprintStrategy(confs)
+
+    target_without_excludes = self.make_target(':jvm-target', target_type=JvmTarget)
+
+    self.assertIsNone(strategy.compute_fingerprint(target_without_excludes))
+
+  def test_jvm_target_with_excludes_is_hashed(self):
+    confs = ()
+    strategy = IvyResolveFingerprintStrategy(confs)
+
+    target_with_excludes = self.make_target(':jvm-target', target_type=JvmTarget,
+                                               excludes=[Exclude('org.some')])
+
+    self.assertIsNotNone(strategy.compute_fingerprint(target_with_excludes))
+
+  def test_jar_library_with_one_jar_is_hashed(self):
+    confs = ()
+    strategy = IvyResolveFingerprintStrategy(confs)
+
+    jar_library = self.make_target(':jar-library', target_type=JarLibrary,
+                                   jars=[JarDependency('org.some', 'name')])
+
+    self.assertIsNotNone(strategy.compute_fingerprint(jar_library))
+
+  def test_identical_jar_libraries_with_same_jar_dep_management_artifacts_match(self):
+    confs = ()
+    strategy = IvyResolveFingerprintStrategy(confs)
+
+    managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
+                               artifacts=[JarDependency('org.some', 'name')])
+    self.set_artifact_set_for(managed_jar_deps, PinnedJarArtifactSet())
+
+    jar_lib_1 = self.make_target(':jar-lib-1', target_type=JarLibrary,
+                                   jars=[JarDependency('org.some', 'name')],
+                                   managed_dependencies=':managed')
+
+
+    jar_lib_2 = self.make_target(':jar-lib-2', target_type=JarLibrary,
+                              jars=[JarDependency('org.some', 'name')],
+                              managed_dependencies=':managed')
+
+    self.assertEqual(strategy.compute_fingerprint(jar_lib_1),
+                     strategy.compute_fingerprint(jar_lib_2))
+
+  def test_identical_jar_libraries_with_differing_managed_deps_differ(self):
+    confs = ()
+    strategy = IvyResolveFingerprintStrategy(confs)
+
+    managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
+                               artifacts=[JarDependency('org.some', 'name')])
+    self.set_artifact_set_for(managed_jar_deps, PinnedJarArtifactSet())
+
+    jar_lib_with_managed_deps = self.make_target(':jar-lib-1', target_type=JarLibrary,
+                                   jars=[JarDependency('org.some', 'name')],
+                                   managed_dependencies=':managed')
+
+
+    jar_lib_without_managed_deps = self.make_target(':jar-lib-no-managed-dep',
+                                                    target_type=JarLibrary,
+                                                    jars=[JarDependency('org.some', 'name')])
+
+    self.assertNotEqual(strategy.compute_fingerprint(jar_lib_with_managed_deps),
+                        strategy.compute_fingerprint(jar_lib_without_managed_deps))

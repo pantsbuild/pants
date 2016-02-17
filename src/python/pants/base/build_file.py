@@ -60,18 +60,6 @@ class BuildFile(AbstractClass):
   def _get_project_tree(cls, root_dir):
     raise NotImplementedError()
 
-  @classmethod
-  @deprecated('0.0.72', hint_message='Use scan_build_files instead.')
-  def scan_buildfiles(cls, root_dir, base_path=None, spec_excludes=None):
-    if base_path and os.path.isabs(base_path):
-      base_path = fast_relpath(base_path, root_dir)
-    return cls.scan_build_files(cls._get_project_tree(root_dir), base_path, spec_excludes)
-
-  @classmethod
-  @deprecated('0.0.72')
-  def from_cache(cls, root_dir, relpath, must_exist=True):
-    return BuildFile._cached(cls._get_project_tree(root_dir), relpath, must_exist)
-
   @staticmethod
   def _spec_excludes_to_gitignore_syntax(build_root, spec_excludes=None):
     if spec_excludes:
@@ -216,43 +204,6 @@ class BuildFile(AbstractClass):
     self.relpath = fast_relpath(self.full_path, self.root_dir)
     self.spec_path = os.path.dirname(self.relpath)
 
-  @deprecated('0.0.72')
-  def file_exists(self):
-    """Returns True if this BuildFile corresponds to a real BUILD file on disk."""
-    return self.project_tree.exists(self.relpath) and self.project_tree.isfile(self.relpath)
-
-  @deprecated('0.0.72')
-  def descendants(self, spec_excludes=None):
-    """Returns all BUILD files in descendant directories of this BUILD file's parent directory."""
-
-    descendants = BuildFile.scan_build_files(self.project_tree,
-                                             fast_relpath(self.parent_path, self.root_dir),
-                                             spec_excludes=spec_excludes)
-    for sibling in self.family():
-      descendants.discard(sibling)
-    return descendants
-
-  @deprecated('0.0.72')
-  def ancestors(self):
-    """Returns all BUILD files in ancestor directories of this BUILD file's parent directory."""
-
-    parent_buildfiles = OrderedSet()
-    parentdir = fast_relpath(self.parent_path, self.root_dir)
-    while parentdir != '':
-      parentdir = os.path.dirname(parentdir)
-      parent_buildfiles.update(BuildFile.get_build_files_family(self.project_tree, parentdir))
-    return parent_buildfiles
-
-  @deprecated('0.0.72')
-  def siblings(self):
-    """Returns an iterator over all the BUILD files co-located with this BUILD file not including
-    this BUILD file itself"""
-
-    for build in BuildFile.get_build_files_family(self.project_tree,
-                                                  fast_relpath(self.parent_path, self.root_dir)):
-      if self != build:
-        yield build
-
   @staticmethod
   def get_build_files_family(project_tree, dir_relpath, build_ignore_patterns=None):
     """Returns all the BUILD files on a path"""
@@ -261,13 +212,6 @@ class BuildFile(AbstractClass):
       if BuildFile._is_buildfile_name(build) and project_tree.isfile(os.path.join(dir_relpath, build)):
         build_files.add(os.path.join(dir_relpath, build))
     return BuildFile._build_files_from_paths(project_tree, build_files, build_ignore_patterns)
-
-  @deprecated('0.0.72', hint_message='Use get_build_files_family instead.')
-  def family(self):
-    """Returns an iterator over all the BUILD files co-located with this BUILD file including this
-    BUILD file itself.  The family forms a single logical BUILD file composed of the canonical BUILD
-    file if it exists and sibling build files each with their own extension, eg: BUILD.extras."""
-    return BuildFile.get_build_files_family(self.project_tree, os.path.dirname(self.relpath))
 
   def source(self):
     """Returns the source code for this BUILD file."""
@@ -291,14 +235,3 @@ class BuildFile(AbstractClass):
 
   def __repr__(self):
     return '{}({}, {})'.format(self.__class__.__name__, self.relpath, self.project_tree)
-
-
-# Deprecated, will be removed after 0.0.72. Create BuildFile with IoFilesystem instead.
-class FilesystemBuildFile(BuildFile):
-  def __init__(self, root_dir, relpath=None, must_exist=True):
-    super(FilesystemBuildFile, self).__init__(FilesystemBuildFile._get_project_tree(root_dir),
-                                              relpath=relpath, must_exist=must_exist)
-
-  @classmethod
-  def _get_project_tree(cls, root_dir):
-    return FileSystemProjectTree(root_dir)

@@ -12,10 +12,11 @@ import pytest
 
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, Jar,
-                                                JavaSources, setup_json_scheduler)
-from pants.engine.exp.scheduler import (BuildRequest, ConflictingProducersError,
-                                        PartiallyConsumedInputsError, Return, SelectNode)
+from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
+                                                Jar, JavaSources, ThriftSources,
+                                                setup_json_scheduler)
+from pants.engine.exp.scheduler import (BuildRequest, PartiallyConsumedInputsError, Return,
+                                        SelectNode, Throw)
 
 
 class SchedulerTest(unittest.TestCase):
@@ -29,6 +30,7 @@ class SchedulerTest(unittest.TestCase):
     self.java = Address.parse('src/java/codegen/simple')
     self.java_simple = Address.parse('src/java/simple')
     self.java_multi = Address.parse('src/java/multiple_classpath_entries')
+    self.no_variant_thrift = Address.parse('src/java/codegen/selector:conflict')
     self.unconfigured_thrift = Address.parse('src/thrift/codegen/unconfigured')
     self.resources = Address.parse('src/resources/simple')
     self.consumes_resources = Address.parse('src/java/consumes_resources')
@@ -44,11 +46,12 @@ class SchedulerTest(unittest.TestCase):
                      {node for (node, _), _ in walk
                       if node.product == product and isinstance(node, node_type) and node.variants == variants})
 
-  def build_and_walk(self, build_request):
+  def build_and_walk(self, build_request, failures=False):
     """Build and then walk the given build_request, returning the walked graph as a list."""
+    predicate = (lambda _: True) if failures else None
     result = self.engine.execute(build_request)
     self.assertIsNone(result.error)
-    return list(self.scheduler.walk_product_graph())
+    return list(self.scheduler.walk_product_graph(predicate=predicate))
 
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = BuildRequest(goals=goals,
@@ -83,14 +86,17 @@ class SchedulerTest(unittest.TestCase):
     build_request = BuildRequest(goals=['gen'], addressable_roots=[self.thrift])
     walk = self.build_and_walk(build_request)
 
-    # Root: expect JavaSources.
+    # Root: expect the synthetic GenGoal product.
     root_entry = walk[0][0]
-    self.assertEqual(SelectNode(self.thrift, JavaSources, None, None), root_entry[0])
+    self.assertEqual(SelectNode(self.thrift, GenGoal, None, None), root_entry[0])
     self.assertIsInstance(root_entry[1], Return)
 
+    variants = {'thrift': 'apache_java'}
+    # Expect ThriftSources to have been selected.
+    self.assert_select_for_subjects(walk, ThriftSources, [self.thrift], variants=variants)
     # Expect an ApacheThriftJavaConfiguration to have been used via the default Variants.
     self.assert_select_for_subjects(walk, ApacheThriftJavaConfiguration, [self.thrift],
-                                    variants={'thrift': 'apache_java'}, variant_key='thrift')
+                                    variants=variants, variant_key='thrift')
 
   def test_codegen_simple(self):
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java])
@@ -168,17 +174,31 @@ class SchedulerTest(unittest.TestCase):
     # Confirm that we requested a classpath for the root and inferred targets.
     self.assert_select_for_subjects(walk, Classpath, [self.inferred_deps, self.java_simple])
 
-  @pytest.mark.xfail(raises=ConflictingProducersError)
   def test_multiple_classpath_entries(self):
     """Multiple Classpath products for a single subject currently cause a failure."""
     build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java_multi])
-    walk = self.build_and_walk(build_request)
+    walk = self.build_and_walk(build_request, failures=True)
 
-  @pytest.mark.xfail(raises=PartiallyConsumedInputsError)
-  def test_no_configured_thrift_planner(self):
-    """Even though the BuildPropertiesPlanner is able to produce a Classpath,
-    we still fail when a target with thrift sources doesn't have a thrift config.
+    # Validate that the root failed.
+    root_node, root_state = walk[0][0]
+    self.assertEqual(SelectNode(self.java_multi, Classpath, None, None), root_node)
+    self.assertEqual(Throw, type(root_state))
+
+  def test_no_variant_thrift(self):
+    """No `thrift` variant is configured, and so no configuration is selected."""
+    build_request = BuildRequest(goals=['compile'],
+                                 addressable_roots=[self.no_variant_thrift])
+
+    with self.assertRaises(PartiallyConsumedInputsError):
+      self.build_and_walk(build_request)
+
+  def test_unconfigured_thrift(self):
+    """The BuildPropertiesPlanner is able to produce a Classpath, but we should still fail.
+
+    A target with ThriftSources doesn't have a thrift config: that input is partially consumed.
     """
     build_request = BuildRequest(goals=['compile'],
                                  addressable_roots=[self.unconfigured_thrift])
-    walk = self.build_and_walk(build_request)
+
+    with self.assertRaises(PartiallyConsumedInputsError):
+      self.build_and_walk(build_request)

@@ -41,8 +41,7 @@ logger = logging.getLogger(__name__)
 #
 # Note: 'spec' should not be a user visible term, substitute 'address' instead.
 class BuildFileAddressMapper(object):
-  """Maps addresses in the pants virtual address space to corresponding BUILD file declarations.
-  """
+  """Maps addresses in the pants virtual address space to corresponding BUILD file declarations."""
 
   class AddressNotInBuildFile(AddressLookupError):
     """Indicates an address cannot be found in an existing BUILD file."""
@@ -146,7 +145,6 @@ class BuildFileAddressMapper(object):
 
   def _address_map_from_spec_path(self, spec_path):
     """Returns a resolution map of all addresses in a "directory" in the virtual address space.
-
     :returns {Address: (Address, <resolved Object>)}:
     """
     if spec_path not in self._spec_path_to_address_map_map:
@@ -169,14 +167,6 @@ class BuildFileAddressMapper(object):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()
 
-  @deprecated('0.0.72')
-  def from_cache(self, root_dir, relpath, must_exist=True):
-    """Return a BuildFile instance.  Args as per BuildFile.from_cache
-
-    :returns: a BuildFile
-    """
-    return BuildFile._cached(self._project_tree, relpath, must_exist)
-
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct build file address.
 
@@ -196,14 +186,6 @@ class BuildFileAddressMapper(object):
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
 
-  @deprecated('0.0.72', hint_message='Use scan_build_files instead.')
-  def scan_buildfiles(self, root_dir, base_path=None, spec_excludes=None):
-    """Looks for all BUILD files in root_dir or its descendant directories.
-
-    :returns: an OrderedSet of BuildFile instances.
-    """
-    return self.scan_build_files(base_path, spec_excludes)
-
   def scan_build_files(self, base_path, spec_excludes=None):
     deprecated_conditional(lambda: spec_excludes is not None,
                            '0.0.75',
@@ -213,6 +195,7 @@ class BuildFileAddressMapper(object):
 
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
+
     :param spec: iterable of Addresses.
     :raises AddressLookupError: if the BUILD file cannot be found in the path specified by the spec
     """

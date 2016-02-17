@@ -79,4 +79,4 @@ class ListTargets(ConsoleTask):
     if self.context.target_roots:
       return self.context.target_roots
     else:
-      return self.context.scan().targets()
+      return self.context.scan().targets(predicate=lambda target: not target.is_synthetic)

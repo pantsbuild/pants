@@ -72,6 +72,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
+    'src/python/pants/backend/python/targets:python',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

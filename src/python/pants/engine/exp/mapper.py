@@ -285,7 +285,7 @@ class AddressMapper(object):
             other._build_pattern == self._build_pattern and
             other._parser_cls == self._parser_cls)
 
-  def __ne__(self):
+  def __ne__(self, other):
     return not (self == other)
 
   def __hash__(self):

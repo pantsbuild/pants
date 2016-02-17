@@ -202,13 +202,17 @@ python_tests(
   sources = ['test_ivy_resolve.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:ivy_resolve',
+    'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/invalidation',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

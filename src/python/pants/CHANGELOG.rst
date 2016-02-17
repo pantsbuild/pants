@@ -1,6 +1,115 @@
 RELEASE HISTORY
 ===============
 
+0.0.72 (02/16/2016)
+-------------------
+This release concludes the deprecation cycle for the old API for
+scanning BUILD files.
+
+The following classes were removed:
+
+* ``FilesystemBuildFile`` (Create ``BuildFile`` with ``IoFilesystem`` instead.)
+* ``ScmBuildFile`` (Create ``BuildFile`` with ``ScmFilesystem`` instead.)
+
+The following methods were removed:
+
+* ``BuildFile.scan_buildfiles`` (Use ``BuildFile.scan_build_files`` instead.)
+* ``BuildFile.from_cache``
+* ``BuildFile.file_exists``
+* ``BuildFile.descendants``
+* ``BuildFile.ancestors``
+* ``BuildFile.siblings``
+* ``BuildFile.family`` (Use ``get_build_files_family`` instead.)
+* ``BuildFileAddressMapper.from_cache``
+* ``BuildFileAddressMapper.scan_buildfiles``
+* ``BuildFileAddressMapper.address_map_from_build_file`` (Use ``address_map_from_build_files`` instead.)
+* ``BuildFileAddressMapper.parse_build_file_family`` (Use ``parse_build_files`` instead.)
+
+This release features formal public API docstrings for many modules
+and classes.  It also includes many bugfixes and minor improvements.
+
+API Changes
+~~~~~~~~~~~
+
+* Add public api markers to the following:
+  `RB #3453 <https://rbcommons.com/s/twitter/r/3453>`_
+
+* add public api markers to several modules
+  `RB #3442 <https://rbcommons.com/s/twitter/r/3442>`_
+
+* add public api markers
+  `RB #3440 <https://rbcommons.com/s/twitter/r/3440>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `./pants list` without arguments output
+  `RB #3464 <https://rbcommons.com/s/twitter/r/3464>`_
+
+* jar-tool properly skipping Manifest file using entry's jarPath
+  `RB #3437 <https://rbcommons.com/s/twitter/r/3437>`_
+
+* fix pathdeps for synthetic targets.
+  `RB #3454 <https://rbcommons.com/s/twitter/r/3454>`_
+
+* Add param to fingerprint_strategy __eq__
+  `RB #3446 <https://rbcommons.com/s/twitter/r/3446>`_
+
+* Increase resolution from .1 second to 1 second
+  `RB #3311 <https://rbcommons.com/s/twitter/r/3311>`_
+
+* Fix build break due to missing whitespace
+
+* Fix linkify for relative paths pointing outside the buildroot
+  `RB #3441 <https://rbcommons.com/s/twitter/r/3441>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Options goal to show only functioning options instead of all.
+  `RB #3455 <https://rbcommons.com/s/twitter/r/3455>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Skip hashing in ivy fingerprint strategy if target doesn't need fingerprinting
+  `RB #3447 <https://rbcommons.com/s/twitter/r/3447>`_
+
+* Add 'Deprecation Policy' docs for 1.0.0.
+  `RB #3457 <https://rbcommons.com/s/twitter/r/3457>`_
+
+* Remove dead code
+  `RB #3454 <https://rbcommons.com/s/twitter/r/3454>`_
+  `RB #3461 <https://rbcommons.com/s/twitter/r/3461>`_
+
+* Clean up stale builds in .pants.d
+  `RB #2506 <https://rbcommons.com/s/twitter/r/2506>`_
+  `RB #3444 <https://rbcommons.com/s/twitter/r/3444>`_
+
+* Adding a newline symbol for unary shading rules.
+  `RB #3452 <https://rbcommons.com/s/twitter/r/3452>`_
+
+* Make IvyTaskMixin.ivy_resolve private, introduce ivy_classpath; clean up some ivy resolve tests
+  `RB #3450 <https://rbcommons.com/s/twitter/r/3450>`_
+
+* Move namedtuple declarations out of IvyUtils._generate_jar_template
+  `RB #3451 <https://rbcommons.com/s/twitter/r/3451>`_
+
+* Adjust type comment for targets param in JarDependencyManagement.targets_by_artifact_set
+  `RB #3449 <https://rbcommons.com/s/twitter/r/3449>`_
+
+* Only invalidate haskell-project targets.
+  `RB #3445 <https://rbcommons.com/s/twitter/r/3445>`_
+
+* Polishing --ignore-patterns change
+  `RB #3438 <https://rbcommons.com/s/twitter/r/3438>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Minor import cleanups
+  `RB #3458 <https://rbcommons.com/s/twitter/r/3458>`_
+
 0.0.71 (02/05/2016)
 -------------------
 
