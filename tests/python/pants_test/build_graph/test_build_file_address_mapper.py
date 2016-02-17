@@ -6,11 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 from textwrap import dedent
 
+from pants.base.build_file import BuildFile
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
 
@@ -136,3 +141,147 @@ class BuildFileAddressMapperWithIgnoreTest(BaseTest):
     self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
     graph = self.context().scan()
     self.assertEquals([target.address.spec for target in graph.targets()], ['//:foo'])
+
+
+class BuildFileAddressMapperScanTest(BaseTest):
+
+  NO_FAIL_FAST_RE = re.compile(r"""^--------------------
+.*
+Exception message: name 'a_is_bad' is not defined
+ while executing BUILD file BuildFile\(bad/a/BUILD, FileSystemProjectTree\(.*\)\)
+ Loading addresses from 'bad/a' failed\.
+.*
+Exception message: name 'b_is_bad' is not defined
+ while executing BUILD file BuildFile\(bad/b/BUILD, FileSystemProjectTree\(.*\)\)
+ Loading addresses from 'bad/b' failed\.
+Invalid BUILD files for \[::\]$""", re.DOTALL)
+
+  FAIL_FAST_RE = """^name 'a_is_bad' is not defined
+ while executing BUILD file BuildFile\(bad/a/BUILD\, FileSystemProjectTree\(.*\)\)
+ Loading addresses from 'bad/a' failed.$"""
+
+  def setUp(self):
+    super(BuildFileAddressMapperScanTest, self).setUp()
+
+    def add_target(path, name):
+      self.add_to_build_file(path, 'target(name="{name}")\n'.format(name=name))
+
+    add_target('BUILD', 'root')
+    add_target('a', 'a')
+    add_target('a', 'b')
+    add_target('a/b', 'b')
+    add_target('a/b', 'c')
+
+    self._spec_parser = CmdLineSpecParser(self.build_root)
+
+  def test_bad_build_files(self):
+    self.add_to_build_file('bad/a', 'a_is_bad')
+    self.add_to_build_file('bad/b', 'b_is_bad')
+
+    with self.assertRaisesRegexp(AddressLookupError, self.NO_FAIL_FAST_RE):
+      list(self.address_mapper.scan_specs([DescendantAddresses('')], fail_fast=False))
+
+  def test_bad_build_files_fail_fast(self):
+    self.add_to_build_file('bad/a', 'a_is_bad')
+    self.add_to_build_file('bad/b', 'b_is_bad')
+
+    with self.assertRaisesRegexp(AddressLookupError, self.FAIL_FAST_RE):
+      list(self.address_mapper.scan_specs([DescendantAddresses('')], fail_fast=True))
+
+  def test_normal(self):
+    self.assert_scanned([':root'], expected=[':root'])
+    self.assert_scanned(['//:root'], expected=[':root'])
+
+    self.assert_scanned(['a'], expected=['a'])
+    self.assert_scanned(['a:a'], expected=['a'])
+
+    self.assert_scanned(['a/b'], expected=['a/b'])
+    self.assert_scanned(['a/b:b'], expected=['a/b'])
+    self.assert_scanned(['a/b:c'], expected=['a/b:c'])
+
+  def test_sibling(self):
+    self.assert_scanned([':'], expected=[':root'])
+    self.assert_scanned(['//:'], expected=[':root'])
+
+    self.assert_scanned(['a:'], expected=['a', 'a:b'])
+    self.assert_scanned(['//a:'], expected=['a', 'a:b'])
+
+    self.assert_scanned(['a/b:'], expected=['a/b', 'a/b:c'])
+    self.assert_scanned(['//a/b:'], expected=['a/b', 'a/b:c'])
+
+  def test_sibling_or_descendents(self):
+    self.assert_scanned(['::'], expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
+    self.assert_scanned(['//::'], expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
+
+    self.assert_scanned(['a::'], expected=['a', 'a:b', 'a/b', 'a/b:c'])
+    self.assert_scanned(['//a::'], expected=['a', 'a:b', 'a/b', 'a/b:c'])
+
+    self.assert_scanned(['a/b::'], expected=['a/b', 'a/b:c'])
+    self.assert_scanned(['//a/b::'], expected=['a/b', 'a/b:c'])
+
+  def test_cmd_line_affordances(self):
+    self.assert_scanned(['./:root'], expected=[':root'])
+    self.assert_scanned(['//./:root'], expected=[':root'])
+    self.assert_scanned(['//./a/../:root'], expected=[':root'])
+    self.assert_scanned([os.path.join(self.build_root, './a/../:root')],
+                       expected=[':root'])
+
+    self.assert_scanned(['a/'], expected=['a'])
+    self.assert_scanned(['./a/'], expected=['a'])
+    self.assert_scanned([os.path.join(self.build_root, './a/')], expected=['a'])
+
+    self.assert_scanned(['a/b/:b'], expected=['a/b'])
+    self.assert_scanned(['./a/b/:b'], expected=['a/b'])
+    self.assert_scanned([os.path.join(self.build_root, './a/b/:b')], expected=['a/b'])
+
+  def test_cmd_line_spec_list(self):
+    self.assert_scanned(['a', 'a/b'], expected=['a', 'a/b'])
+    self.assert_scanned(['::'], expected=[':root', 'a', 'a:b', 'a/b', 'a/b:c'])
+
+  def test_does_not_exist(self):
+    with self.assertRaises(AddressLookupError):
+      self.assert_scanned(['c'], expected=[])
+
+    with self.assertRaises(AddressLookupError):
+      self.assert_scanned(['c:'], expected=[])
+
+    with self.assertRaises(AddressLookupError):
+      self.assert_scanned(['c::'], expected=[])
+
+  def test_build_ignore_patterns(self):
+    expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
+
+    # This bogus BUILD file gets in the way of parsing.
+    self.add_to_build_file('some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
+    with self.assertRaises(AddressLookupError):
+      self.assert_scanned(['::'], expected=expected_specs)
+
+    address_mapper_with_ignore = BuildFileAddressMapper(self.build_file_parser,
+                                                        self.project_tree,
+                                                        build_ignore_patterns=['some'])
+    self.assert_scanned(['::'], expected=expected_specs, address_mapper=address_mapper_with_ignore)
+
+  def test_exclude_target_regexps(self):
+    expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
+
+    # This bogus BUILD file gets in the way of parsing.
+    self.add_to_build_file('some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
+    with self.assertRaises(AddressLookupError):
+      self.assert_scanned(['::'], expected=expected_specs)
+
+    address_mapper_with_exclude = BuildFileAddressMapper(self.build_file_parser,
+                                                         self.project_tree,
+                                                         exclude_target_regexps=[r'.*some/dir.*'])
+    self.assert_scanned(['::'], expected=expected_specs, address_mapper=address_mapper_with_exclude)
+
+  def assert_scanned(self, specs_strings, expected, address_mapper=None):
+    """Parse and scan the given specs."""
+    address_mapper = address_mapper or self.address_mapper
+
+    def sort(addresses):
+      return sorted(addresses, key=lambda address: address.spec)
+
+    specs = [self._spec_parser.parse_spec(s) for s in specs_strings]
+
+    self.assertEqual(sort(Address.parse(addr) for addr in expected),
+                     sort(address_mapper.scan_specs(specs)))

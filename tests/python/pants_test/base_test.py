@@ -317,8 +317,8 @@ class BaseTest(unittest.TestCase):
     Returns the set of all Targets found.
     """
 
-    spec_parser = CmdLineSpecParser(self.build_root, self.address_mapper)
-    addresses = list(spec_parser.parse_addresses(spec))
+    spec = CmdLineSpecParser(self.build_root).parse_spec(spec)
+    addresses = list(self.address_mapper.scan_specs([spec]))
     for address in addresses:
       self.build_graph.inject_address_closure(address)
     targets = [self.build_graph.get_target(address) for address in addresses]

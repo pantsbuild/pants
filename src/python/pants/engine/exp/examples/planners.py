@@ -15,13 +15,13 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.engine.exp.graph import Directory, create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
-from pants.engine.exp.objects import datatype
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
                                         SelectVariant)
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Sources, Target, Variants
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 def printing_func(func):
