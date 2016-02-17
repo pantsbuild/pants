@@ -96,34 +96,3 @@ class InvalidationCacheManagerTest(BaseTest):
     self.assertEquals(2, len(partitioned))
     self.assertEquals(4, len(partitioned[0].targets))
     self.assertEquals(1, len(partitioned[1].targets))
-
-    # Test partition with colors.
-    red = 'red'
-    blue = 'blue'
-
-    colors = {
-      a: blue,
-      b: red,
-      c: red,
-      d: red,
-      e: blue
-    }
-
-    # As a reference, we partition without colors.
-    ic = InvalidationCheck(all_vts, [], 2)
-    partitioned = ic.all_vts_partitioned
-    print_partitions(partitioned)
-
-    self.assertEquals(2, len(partitioned))
-    self.assertEquals(3, len(partitioned[0].targets))
-    self.assertEquals(2, len(partitioned[1].targets))
-
-    # Now apply color restrictions.
-    ic = InvalidationCheck(all_vts, [], 2, target_colors=colors)
-    partitioned = ic.all_vts_partitioned
-    print_partitions(partitioned)
-
-    self.assertEquals(3, len(partitioned))
-    self.assertEquals(1, len(partitioned[0].targets))
-    self.assertEquals(3, len(partitioned[1].targets))
-    self.assertEquals(1, len(partitioned[2].targets))
