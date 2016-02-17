@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eo pipefail
+
 # Usage:
 #
 #   in practice, you probably want
@@ -38,5 +40,5 @@ git clone $repo_url
 cd `ls`
 mkdir -p ./$path_within_url && cp -R $root/../../../../dist/docsite/* ./$path_within_url
 git add .
-git commit -am"publish by $USER"
+git commit -am "publish by $USER"
 git push origin master
