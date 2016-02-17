@@ -60,8 +60,6 @@ class DaemonPantsRunner(ProcessManager):
   """A daemonizing PantsRunner that speaks the nailgun protocol to a remote client.
 
   N.B. this class is primarily used by the PailgunService in pantsd.
-
-  :API: public
   """
 
   def __init__(self, socket, exiter, args, env):
@@ -110,17 +108,11 @@ class DaemonPantsRunner(ProcessManager):
     signal.signal(signal.SIGINT, handle_control_c)
 
   def run(self):
-    """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager).
-
-    :API: public
-    """
+    """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
     self.daemonize(write_pid=False)
 
   def post_fork_child(self):
-    """Post-fork child process callback executed via ProcessManager.daemonize().
-
-    :API: public
-    """
+    """Post-fork child process callback executed via ProcessManager.daemonize()."""
     # Set the Exiter exception hook post-fork so as not to affect the pantsd processes exception
     # hook with socket-specific behavior.
     self._exiter.set_except_hook()
