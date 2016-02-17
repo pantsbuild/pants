@@ -392,24 +392,24 @@ class IvyTaskMixin(TaskBase):
             situ.requires_new_resolve()):
         if situ.potential_frozen_resolution:
           self._run_fetch_resolve(confs,
-                                       executor,
-                                       extra_args,
-                                       global_vts,
-                                       situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
-                                       situ.resolve_hash_name,
-                                       situ.resolve_workdir,
-                                       workunit_name,
-                                       situ.potential_frozen_resolution)
+                                  executor,
+                                  extra_args,
+                                  global_vts,
+                                  situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                  situ.resolve_hash_name,
+                                  situ.resolve_workdir,
+                                  workunit_name,
+                                  situ.potential_frozen_resolution)
         else:
           self._run_full_resolve(confs,
-                                            executor,
-                                            extra_args,
-                                            global_vts,
-                                            pinned_artifacts,
-                                            situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
-                                            situ.resolve_hash_name,
-                                            situ.resolve_workdir,
-                                            workunit_name)
+                                 executor,
+                                 extra_args,
+                                 global_vts,
+                                 pinned_artifacts,
+                                 situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                 situ.resolve_hash_name,
+                                 situ.resolve_workdir,
+                                 workunit_name)
       else:
         logger.debug("Using previously resolved reports: {}".format(situ.existing_report_paths))
 
@@ -419,39 +419,47 @@ class IvyTaskMixin(TaskBase):
 
     classpath = IvyUtils.load_classpath_from_cachepath(situ.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
 
-
-
     result = IvyResolveResultClasspathEtc(classpath, symlink_map, resolve_hash_name)
-    frozen_resolutions_by_conf = OrderedDict()
-    for conf in confs:
-      frozen_resolution = FrozenResolution()
-      for target, resolved_jars in result.collect_resolved_jars(self.ivy_cache_dir, conf, targets):
-        frozen_resolution.add_resolved_jars(target, resolved_jars)
-      frozen_resolutions_by_conf[conf] = frozen_resolution
+    frozen_resolutions_by_conf = self.construct_frozen_resolutions_by_conf(confs, result, targets)
     if not situ.potential_frozen_resolution:
       self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
     elif frozen_resolutions_by_conf != situ.potential_frozen_resolution:
       if situ.potential_frozen_resolution is None:
         self.context.log.debug('No existing resolution.')
       else:
-        created_default = frozen_resolutions_by_conf.get('default')
-        potential_default = situ.potential_frozen_resolution.get('default')
-        print('type(created_default.all_resolved_coordinates) == type(potential_default.all_resolved_coordinates)')
-        print(type(created_default.all_resolved_coordinates) == type(potential_default.all_resolved_coordinates))
-        print('created_default.all_resolved_coordinates == potential_default.all_resolved_coordinates')
-        print(created_default.all_resolved_coordinates == potential_default.all_resolved_coordinates)
-        print('created_default.all_resolved_coordinates')
-        print(created_default.all_resolved_coordinates)
-        print('potential_default.all_resolved_coordinates')
-        print(potential_default.all_resolved_coordinates)
-
-        print('created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates ')
-        print(created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates )
+        self._stupid_debug_prints(frozen_resolutions_by_conf, situ)
       self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
     else:
       pass
 
     return result
+
+  def construct_frozen_resolutions_by_conf(self, confs, result, targets):
+    frozen_resolutions_by_conf = OrderedDict()
+    for conf in confs:
+      frozen_resolution = FrozenResolution()
+      for target, resolved_jars in result.collect_resolved_jars(self.ivy_cache_dir, conf, targets):
+        frozen_resolution.add_resolved_jars(target, resolved_jars)
+      frozen_resolutions_by_conf[conf] = frozen_resolution
+    return frozen_resolutions_by_conf
+
+  def _stupid_debug_prints(self, frozen_resolutions_by_conf, situ):
+    created_default = frozen_resolutions_by_conf.get('default')
+    potential_default = situ.potential_frozen_resolution.get('default')
+    print(
+      'type(created_default.all_resolved_coordinates) == type(potential_default.all_resolved_coordinates)')
+    print(type(created_default.all_resolved_coordinates) == type(
+      potential_default.all_resolved_coordinates))
+    print('created_default.all_resolved_coordinates == potential_default.all_resolved_coordinates')
+    print(created_default.all_resolved_coordinates == potential_default.all_resolved_coordinates)
+    print('created_default.all_resolved_coordinates')
+    print(created_default.all_resolved_coordinates)
+    print('potential_default.all_resolved_coordinates')
+    print(potential_default.all_resolved_coordinates)
+    print(
+      'created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates ')
+    print(
+      created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates)
 
   def dump_frozen_resolutions(self, resolve_workdir, resolutions_by_conf):
 
@@ -486,28 +494,47 @@ class IvyTaskMixin(TaskBase):
     return result
 
   def _run_full_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
-                          raw_target_classpath_file, resolve_hash_name, target_workdir,
+                          raw_target_classpath_file, resolve_hash_name, resolve_workdir,
                           workunit_name):
     ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
     with safe_concurrent_creation(raw_target_classpath_file) as raw_target_classpath_file_tmp:
       args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
 
-      self._exec_ivy(
-        target_workdir=target_workdir,
-        targets=global_vts.targets,
-        args=args,
-        executor=executor,
-        ivy=ivy,
-        workunit_name=workunit_name,
-        confs=confs,
-        use_soft_excludes=self.get_options().soft_excludes,
-        resolve_hash_name=resolve_hash_name,
-        pinned_artifacts=pinned_artifacts)
+      targets=global_vts.targets,
+      use_soft_excludes=self.get_options().soft_excludes,
+      # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
+      # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
+      # See: https://github.com/pantsbuild/pants/issues/2239
+      jars, global_excludes = IvyUtils.calculate_classpath(targets)
 
-      if not os.path.exists(raw_target_classpath_file_tmp):
-        raise self.Error('Ivy failed to create classpath file at {}'
-                         .format(raw_target_classpath_file_tmp))
+      # Don't pass global excludes to ivy when using soft excludes.
+      if use_soft_excludes:
+        global_excludes = []
+
+      ivyxml = os.path.join(resolve_workdir, 'ivy.xml')
+      with IvyUtils.ivy_lock:
+        try:
+          IvyUtils.generate_ivy(targets, jars, global_excludes, ivyxml, confs,
+                                resolve_hash_name, pinned_artifacts)
+        except IvyUtils.IvyError as e:
+          raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
+
+        try:
+          IvyUtils.exec_ivy(ivy, confs, ivyxml, args,
+                            jvm_options=self.get_options().jvm_options,
+                            executor=executor,
+                            workunit_name=workunit_name,
+                            workunit_factory=self.context.new_workunit)
+        except IvyUtils.IvyError as e:
+          raise self.Error('Ivy resolve failed: {}'.format(e))
+
+      self.validate_classpath_file_creation(raw_target_classpath_file_tmp)
     logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
+
+  def validate_classpath_file_creation(self, raw_target_classpath_file_tmp):
+    if not os.path.exists(raw_target_classpath_file_tmp):
+      raise self.Error('Ivy failed to create classpath file at {}'
+                       .format(raw_target_classpath_file_tmp))
 
   def _run_fetch_resolve(self, confs, executor, extra_args, global_vts,
                           raw_target_classpath_file, resolve_hash_name, resolve_workdir,
@@ -536,9 +563,7 @@ class IvyTaskMixin(TaskBase):
         except IvyUtils.IvyError as e:
           raise self.Error('Ivy resolve failed: {}'.format(e))
 
-      if not os.path.exists(raw_target_classpath_file_tmp):
-        raise self.Error('Ivy failed to create classpath file at {}'
-                         .format(raw_target_classpath_file_tmp))
+      self.validate_classpath_file_creation(raw_target_classpath_file_tmp)
     logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
   def _symlink_from_cache_path(self, ivy_cache_dir, ivy_workdir, raw_target_classpath_file,
@@ -557,40 +582,3 @@ class IvyTaskMixin(TaskBase):
                                                symlink_dir,
                                                target_classpath_file)
     return symlink_map
-
-  def _exec_ivy(self,
-               target_workdir,
-               targets,
-               args,
-               confs,
-               executor=None,
-               ivy=None,
-               workunit_name='ivy',
-               use_soft_excludes=False,
-               resolve_hash_name=None,
-               pinned_artifacts=None):
-    # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
-    # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
-    # See: https://github.com/pantsbuild/pants/issues/2239
-    jars, global_excludes = IvyUtils.calculate_classpath(targets)
-
-    # Don't pass global excludes to ivy when using soft excludes.
-    if use_soft_excludes:
-      global_excludes = []
-
-    with IvyUtils.ivy_lock:
-      ivyxml = os.path.join(target_workdir, 'ivy.xml')
-      try:
-        IvyUtils.generate_ivy(targets, jars, global_excludes, ivyxml, confs,
-                              resolve_hash_name, pinned_artifacts)
-      except IvyUtils.IvyError as e:
-        raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
-
-      try:
-        IvyUtils.exec_ivy(ivy, confs, ivyxml, args,
-                          jvm_options=self.get_options().jvm_options,
-                          executor=executor,
-                          workunit_name=workunit_name,
-                          workunit_factory=self.context.new_workunit)
-      except IvyUtils.IvyError as e:
-        raise self.Error('Ivy resolve failed: {}'.format(e))
