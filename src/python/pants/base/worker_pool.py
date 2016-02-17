@@ -16,10 +16,7 @@ from pants.reporting.report import Report
 
 
 class Work(object):
-  """Represents multiple concurrent calls to the same callable.
-
-  :API: public
-  """
+  """Represents multiple concurrent calls to the same callable."""
 
   def __init__(self, func, args_tuples, workunit_name=None):
     # A callable.
@@ -38,8 +35,6 @@ class WorkerPool(object):
 
   Workers are threads, and so are subject to GIL constraints. Submitting CPU-bound work
   may not be effective. Use this class primarily for IO-bound work.
-
-  :API: public
   """
 
   def __init__(self, parent_workunit, run_tracker, num_workers):
@@ -58,15 +53,10 @@ class WorkerPool(object):
     self.num_workers = num_workers
 
   def add_shutdown_hook(self, hook):
-    """
-    :API: public
-    """
     self._shutdown_hooks.append(hook)
 
   def submit_async_work(self, work, workunit_parent=None, on_success=None, on_failure=None):
     """Submit work to be executed in the background.
-
-    :API: public
 
     - work: The work to execute.
     - workunit_parent: If specified, work is accounted for under this workunit.
@@ -90,8 +80,6 @@ class WorkerPool(object):
 
   def submit_async_work_chain(self, work_chain, workunit_parent, done_hook=None):
     """Submit work to be executed in the background.
-
-    :API: public
 
     - work_chain: An iterable of Work instances. Will be invoked serially. Each instance may
                   have a different cardinality. There is no output-input chaining: the argument
@@ -134,8 +122,6 @@ class WorkerPool(object):
   def submit_work_and_wait(self, work, workunit_parent=None):
     """Submit work to be executed on this pool, but wait for it to complete.
 
-    :API: public
-
     - work: The work to execute.
     - workunit_parent: If specified, work is accounted for under this workunit.
 
@@ -171,9 +157,6 @@ class WorkerPool(object):
       raise
 
   def shutdown(self):
-    """
-    :API: public
-    """
     with self._pending_workchains_cond:
       while self._pending_workchains > 0:
         self._pending_workchains_cond.wait()
@@ -201,8 +184,6 @@ class SubprocPool(object):
   lead to os.fork failing once too many processes are spawned.
 
   To avoid this, the pools themselves are kept in this singleton and new RunTrackers re-use them.
-
-  :API: public
   """
   _pool = None
   _lock = threading.Lock()
@@ -210,24 +191,15 @@ class SubprocPool(object):
 
   @staticmethod
   def worker_init():
-    """
-    :API: public
-    """
     # Exit quietly on sigint, otherwise we get {num_procs} keyboardinterrupt stacktraces spewn
     signal.signal(signal.SIGINT, lambda *args: sys.exit())
 
   @classmethod
   def set_num_processes(cls, num_processes):
-    """
-    :API: public
-    """
     cls._num_processes = num_processes
 
   @classmethod
   def foreground(cls):
-    """
-    :API: public
-    """
     with cls._lock:
       if cls._pool is None:
         cls._pool = multiprocessing.Pool(processes=cls._num_processes,
@@ -236,9 +208,6 @@ class SubprocPool(object):
 
   @classmethod
   def shutdown(cls, force):
-    """
-    :API: public
-    """
     with cls._lock:
       old = cls._pool
       cls._pool = None

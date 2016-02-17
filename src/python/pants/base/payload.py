@@ -98,8 +98,6 @@ class Payload(object):
     If no fields were hashed (or all fields opted out of being hashed by returning `None`), then
     `fingerprint()` also returns `None`.
 
-    :API: public
-
     :param iterable<string> field_keys: A subset of fields to use for the fingerprint.  Defaults
                                         to all fields.
     """

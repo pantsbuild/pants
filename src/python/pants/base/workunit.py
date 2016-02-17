@@ -136,17 +136,11 @@ class WorkUnit(object):
     return label in self.labels
 
   def start(self):
-    """Mark the time at which this workunit started.
-
-    :API: public
-    """
+    """Mark the time at which this workunit started."""
     self.start_time = time.time()
 
   def end(self):
-    """Mark the time at which this workunit ended.
-
-    :API: public
-    """
+    """Mark the time at which this workunit ended."""
     self.end_time = time.time()
     for output in self._outputs.values():
       output.close()
@@ -164,10 +158,7 @@ class WorkUnit(object):
 
     We can set the outcome on a work unit directly, but that outcome will also be affected by
     those of its subunits. The right thing happens: The outcome of a work unit is the
-    worst outcome of any of its subunits and any outcome set on it directly.
-
-    :API: public
-    """
+    worst outcome of any of its subunits and any outcome set on it directly."""
     if outcome not in range(0, 5):
       raise Exception('Invalid outcome: {}'.format(outcome))
 
