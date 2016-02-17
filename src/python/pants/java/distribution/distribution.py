@@ -308,8 +308,8 @@ class DistributionLocator(Subsystem):
   options_scope = 'jvm-distributions'
   _CACHE = {}
   # The `/usr/lib/jvm` dir is a common target of packages built for redhat and debian as well as
-  # other more exotic distributions.
-  _JAVA_DIST_DIR = '/usr/lib/jvm'
+  # other more exotic distributions.  SUSE uses lib64
+  _JAVA_DIST_DIRS = ['/usr/lib/jvm', '/usr/lib64/jvm']
   _OSX_JAVA_HOME_EXE = '/usr/libexec/java_home'
 
   @classmethod
@@ -483,11 +483,12 @@ class DistributionLocator(Subsystem):
 
   @classmethod
   def _linux_java_homes(cls):
-    if os.path.isdir(cls._JAVA_DIST_DIR):
-      for path in os.listdir(cls._JAVA_DIST_DIR):
-        home = os.path.join(cls._JAVA_DIST_DIR, path)
-        if os.path.isdir(home):
-          yield cls._Location.from_home(home)
+    for java_dist_dir in cls._JAVA_DIST_DIRS:
+      if os.path.isdir(java_dist_dir):
+        for path in os.listdir(java_dist_dir):
+          home = os.path.join(java_dist_dir, path)
+          if os.path.isdir(home):
+            yield cls._Location.from_home(home)
 
   @classmethod
   def _osx_java_homes(cls):
