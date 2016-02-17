@@ -153,12 +153,12 @@ class BaseDistributionLocationTest(unittest.TestCase):
     self.addCleanup(safe_rmtree, tmpdir)
     return tmpdir
 
-  def set_up_no_linux_discovery(self):
-    orig_java_dist_dir = DistributionLocator._JAVA_DIST_DIR
+  def set_up_no_linux_discovery(self, index=0):
+    orig_java_dist_dir = DistributionLocator._JAVA_DIST_DIRS[index]
 
     def restore_java_dist_dir():
-      DistributionLocator._JAVA_DIST_DIR = orig_java_dist_dir
-    DistributionLocator._JAVA_DIST_DIR = self.make_tmp_dir()
+      DistributionLocator._JAVA_DIST_DIRS[index] = orig_java_dist_dir
+    DistributionLocator._JAVA_DIST_DIRS[index] = self.make_tmp_dir()
     self.addCleanup(restore_java_dist_dir)
 
   def set_up_no_osx_discovery(self):
@@ -275,12 +275,12 @@ class DistributionLinuxLocationTest(BaseDistributionLocationTest):
           os.symlink(jdk1_home, jdk1_home_link)
           os.symlink(jdk2_home, jdk2_home_link)
 
-          original_java_dist_dir = DistributionLocator._JAVA_DIST_DIR
-          DistributionLocator._JAVA_DIST_DIR = java_dist_dir
+          original_java_dist_dir = DistributionLocator._JAVA_DIST_DIRS[0]
+          DistributionLocator._JAVA_DIST_DIRS[0] = java_dist_dir
           try:
             yield jdk1_home_link, jdk2_home_link
           finally:
-            DistributionLocator._JAVA_DIST_DIR = original_java_dist_dir
+            DistributionLocator._JAVA_DIST_DIRS[0] = original_java_dist_dir
 
   def test_locate_jdk1(self):
     with env():
@@ -324,6 +324,12 @@ class DistributionLinuxLocationTest(BaseDistributionLocationTest):
           self.assertEqual(jdk1_home, dist.home)
           dist = DistributionLocator.locate(minimum_version='1.1', maximum_version='2')
           self.assertEqual(jdk2_home, dist.home)
+
+
+class DistributionLinuxAltLocationTest(DistributionLinuxLocationTest):
+  def setUp(self):
+    self.set_up_no_linux_discovery(index=1)
+    self.set_up_no_osx_discovery()
 
 
 class DistributionOSXLocationTest(BaseDistributionLocationTest):
