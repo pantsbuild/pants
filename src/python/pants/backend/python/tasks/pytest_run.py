@@ -71,6 +71,9 @@ class PythonTestResult(object):
 
 
 class PytestRun(TestRunnerTaskMixin, PythonTask):
+  """
+  :API: public
+  """
   _TESTING_TARGETS = [
     # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
     # to avoid confusion when debugging pants tests.
@@ -148,6 +151,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
           self.run_tests(test_targets, workunit)
 
   def run_tests(self, targets, workunit):
+    """
+    :API: public
+    """
     if self.get_options().fast:
       result = self._do_run_tests(targets, workunit)
       if not result.success:
