@@ -318,7 +318,7 @@ class BaseTest(unittest.TestCase):
     """
 
     spec = CmdLineSpecParser(self.build_root).parse_spec(spec)
-    addresses = list(spec_parser.scan_specs([spec]))
+    addresses = list(self.address_mapper.scan_specs([spec]))
     for address in addresses:
       self.build_graph.inject_address_closure(address)
     targets = [self.build_graph.get_target(address) for address in addresses]
