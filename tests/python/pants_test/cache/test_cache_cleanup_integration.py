@@ -25,6 +25,8 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
     """Ensure that max-old of 1 removes all but one files"""
 
     with temporary_dir() as cache_dir:
+      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
+
       artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
           'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
 
@@ -33,8 +35,6 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       touch(os.path.join(artifact_dir, 'old_cache_test3'))
       touch(os.path.join(artifact_dir, 'old_cache_test4'))
       touch(os.path.join(artifact_dir, 'old_cache_test5'))
-
-      config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
       pants_run = self.run_pants(self.create_platform_args(6) +
                                  ['compile.zinc',

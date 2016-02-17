@@ -238,6 +238,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     result = self.create_task(self.context())._ivy_resolve([junit_jar_lib])
 
+
 class IvyResolveFingerprintStrategyTest(BaseTest):
 
   def setUp(self):

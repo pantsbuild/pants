@@ -25,7 +25,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.task.task import TaskBase
-from pants.util.dirutil import safe_concurrent_creation
+from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
 
 
@@ -363,19 +363,17 @@ class IvyTaskMixin(TaskBase):
 
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
-    # NB: See class pydoc regarding `use_cache=False`.
     with self.invalidated(targets,
                           invalidate_dependents=invalidate_dependents,
                           silent=silent,
-                          fingerprint_strategy=fingerprint_strategy,
-                          use_cache=False) as invalidation_check:
+                          fingerprint_strategy=fingerprint_strategy) as invalidation_check:
       # In case all the targets were filtered out because they didn't participate in fingerprinting.
       if not invalidation_check.all_vts:
         return _NO_TARGETS_RESULT
 
-      global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+      resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
-      resolve_hash_name = global_vts.cache_key.hash
+      resolve_hash_name = resolve_vts.cache_key.hash
 
       ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
       resolve_workdir = os.path.join(ivy_workdir, resolve_hash_name)
@@ -387,51 +385,52 @@ class IvyTaskMixin(TaskBase):
                                       self.ivy_cache_dir,
                                       potential_frozen_resolutions,
                                       confs)
-
+      safe_mkdir(resolve_workdir)
       if (invalidation_check.invalid_vts or
             situ.requires_new_resolve()):
         if situ.potential_frozen_resolution:
           self._run_fetch_resolve(confs,
                                   executor,
                                   extra_args,
-                                  global_vts,
+                                  resolve_vts,
                                   situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
                                   situ.resolve_hash_name,
                                   situ.resolve_workdir,
                                   workunit_name,
                                   situ.potential_frozen_resolution)
+          result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, situ)
+          return result
         else:
           self._run_full_resolve(confs,
                                  executor,
                                  extra_args,
-                                 global_vts,
+                                 resolve_vts,
                                  pinned_artifacts,
                                  situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
                                  situ.resolve_hash_name,
                                  situ.resolve_workdir,
                                  workunit_name)
+          result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, situ)
+
+          frozen_resolutions_by_conf = self.construct_frozen_resolutions_by_conf(confs, result, targets)
+          self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
+
+          if self.artifact_cache_writes_enabled():
+            self.update_artifact_cache([(resolve_vts, [self._frozen_resolve_file(resolve_workdir)])])
+          return result
+
       else:
         logger.debug("Using previously resolved reports: {}".format(situ.existing_report_paths))
+        result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, situ)
+        return result
 
+  def _symlink_stuff_and_construct_resolve_result(self, ivy_workdir, resolve_hash_name, situ):
     symlink_map = self._symlink_from_cache_path(self.ivy_cache_dir, ivy_workdir,
                                                 situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
                                                 situ.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
-
-    classpath = IvyUtils.load_classpath_from_cachepath(situ.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
-
+    classpath = IvyUtils.load_classpath_from_cachepath(
+      situ.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
     result = IvyResolveResultClasspathEtc(classpath, symlink_map, resolve_hash_name)
-    frozen_resolutions_by_conf = self.construct_frozen_resolutions_by_conf(confs, result, targets)
-    if not situ.potential_frozen_resolution:
-      self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
-    elif frozen_resolutions_by_conf != situ.potential_frozen_resolution:
-      if situ.potential_frozen_resolution is None:
-        self.context.log.debug('No existing resolution.')
-      else:
-        self._stupid_debug_prints(frozen_resolutions_by_conf, situ)
-      self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
-    else:
-      pass
-
     return result
 
   def construct_frozen_resolutions_by_conf(self, confs, result, targets):
@@ -462,21 +461,23 @@ class IvyTaskMixin(TaskBase):
       created_default.target_to_resolved_coordinates == potential_default.target_to_resolved_coordinates)
 
   def dump_frozen_resolutions(self, resolve_workdir, resolutions_by_conf):
-
     res = {}
     for conf, resolution in resolutions_by_conf.items():
       res[conf] = OrderedDict([
       ['target_to_coords',resolution.target_spec_to_coordinate_strings()],
       ['coords', resolution.all_coordinate_strings()]
       ])
-    filename = os.path.join(resolve_workdir, 'resolution.json')
+    filename = self._frozen_resolve_file(resolve_workdir)
     with safe_concurrent_creation(filename) as tmp_filename:
       with open(tmp_filename, 'wb') as f:
         json.dump(res, f)
 
+  def _frozen_resolve_file(self, resolve_workdir):
+    return os.path.join(resolve_workdir, 'resolution.json')
+
   def load_frozen_resolutions(self, resolve_workdir, targets):
     # returns a dict of conf -> FrozenResolution
-    filename = os.path.join(resolve_workdir, 'resolution.json')
+    filename = self._frozen_resolve_file(resolve_workdir)
     if not os.path.exists(filename):
       return None
 
@@ -500,8 +501,8 @@ class IvyTaskMixin(TaskBase):
     with safe_concurrent_creation(raw_target_classpath_file) as raw_target_classpath_file_tmp:
       args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
 
-      targets=global_vts.targets,
-      use_soft_excludes=self.get_options().soft_excludes,
+      targets=global_vts.targets
+      use_soft_excludes=self.get_options().soft_excludes
       # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
       # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
       # See: https://github.com/pantsbuild/pants/issues/2239
@@ -547,8 +548,8 @@ class IvyTaskMixin(TaskBase):
       args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
       targets=global_vts.targets,
 
+      ivyxml = os.path.join(resolve_workdir, 'fetch-ivy.xml')
       with IvyUtils.ivy_lock:
-        ivyxml = os.path.join(resolve_workdir, 'ivy.xml')
         try:
           IvyUtils.generate_fetch_ivy(targets, ivyxml, confs, resolve_hash_name, frozen_resolutions)
         except IvyUtils.IvyError as e:

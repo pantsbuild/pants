@@ -485,7 +485,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 #                     callers=(IvyModuleRef(org='toplevel', name='toplevelmodule', rev='latest', classifier=None, ext=u'jar'),))
 #          },
 #          result)
-
   def test_collects_classifiers(self):
     ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_multiple_classifiers.xml')
 
