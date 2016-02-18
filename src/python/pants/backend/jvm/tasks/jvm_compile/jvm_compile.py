@@ -350,7 +350,6 @@ class JvmCompile(NailgunTaskBase):
     # invalid targets to become valid.
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
-                          partition_size_hint=0,
                           fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
 
@@ -407,7 +406,7 @@ class JvmCompile(NailgunTaskBase):
                                      compile_contexts,
                                      extra_compile_time_classpath,
                                      invalid_targets,
-                                     invalidation_check.invalid_vts_partitioned)
+                                     invalidation_check.invalid_vts)
 
     exec_graph = ExecutionGraph(jobs)
     try:
@@ -590,7 +589,7 @@ class JvmCompile(NailgunTaskBase):
     return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, classpath_products, compile_contexts, extra_compile_time_classpath,
-                           invalid_targets, invalid_vts_partitioned):
+                           invalid_targets, invalid_vts):
     class Counter(object):
       def __init__(self, size, initial=0):
         self.size = size
@@ -602,7 +601,7 @@ class JvmCompile(NailgunTaskBase):
 
       def format_length(self):
         return len(str(self.size))
-    counter = Counter(len(invalid_vts_partitioned))
+    counter = Counter(len(invalid_vts))
 
     def check_cache(vts):
       """Manually checks the artifact cache (usually immediately before compilation.)
@@ -689,9 +688,7 @@ class JvmCompile(NailgunTaskBase):
 
     jobs = []
     invalid_target_set = set(invalid_targets)
-    for vts in invalid_vts_partitioned:
-      assert len(vts.targets) == 1, ("Requested one target per partition, got {}".format(vts))
-
+    for vts in invalid_vts:
       # Invalidated targets are a subset of relevant targets: get the context for this one.
       compile_target = vts.targets[0]
       compile_context = compile_contexts[compile_target]

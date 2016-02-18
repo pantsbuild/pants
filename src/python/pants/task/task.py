@@ -299,7 +299,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def invalidated(self,
                   targets,
                   invalidate_dependents=False,
-                  partition_size_hint=sys.maxint,
                   silent=False,
                   fingerprint_strategy=None,
                   topological_order=False,
@@ -310,11 +309,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :param targets:               The targets to check for changes.
     :param invalidate_dependents: If True then any targets depending on changed targets are invalidated.
-    :param partition_size_hint:   Each VersionedTargetSet in the yielded list will represent targets
-                                  containing roughly this number of source files, if possible. Set to
-                                  sys.maxint for a single VersionedTargetSet. Set to 0 for one
-                                  VersionedTargetSet per target. It is up to the caller to do the right
-                                  thing with whatever partitioning it asks for.
     :param fingerprint_strategy:   A FingerprintStrategy instance, which can do per task, finer grained
                                   fingerprinting of a given Target.
     :param use_cache:             A boolean to indicate whether to read/write the cache within this
@@ -324,7 +318,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
 
-    :returns: Yields an InvalidationCheck object reflecting the (partitioned) targets.
+    :returns: Yields an InvalidationCheck object reflecting the targets.
     :rtype: InvalidationCheck
     """
 
@@ -332,8 +326,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     cache_manager = self.create_cache_manager(invalidate_dependents,
                                               fingerprint_strategy=fingerprint_strategy)
 
-    invalidation_check = cache_manager.check(targets, partition_size_hint,
-                                             topological_order=topological_order)
+    invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 
     if invalidation_check.invalid_vts and use_cache and self.artifact_cache_reads_enabled():
       with self.context.new_workunit('cache'):
@@ -354,21 +347,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
           self._report_targets('No cached artifacts for ', uncached_targets, '.')
       # Now that we've checked the cache, re-partition whatever is still invalid.
       invalidation_check = \
-        InvalidationCheck(invalidation_check.all_vts, uncached_vts, partition_size_hint)
+        InvalidationCheck(invalidation_check.all_vts, uncached_vts)
 
     self._maybe_create_results_dirs(invalidation_check.all_vts)
 
     if not silent:
       targets = []
-      num_invalid_partitions = len(invalidation_check.invalid_vts_partitioned)
-      for vt in invalidation_check.invalid_vts_partitioned:
+      for vt in invalidation_check.invalid_vts:
         targets.extend(vt.targets)
 
       if len(targets):
         msg_elements = ['Invalidated ',
                         items_to_report_element([t.address.reference() for t in targets], 'target')]
-        if num_invalid_partitions > 1:
-          msg_elements.append(' in {} target partitions'.format(num_invalid_partitions))
         msg_elements.append('.')
         self.context.log.info(*msg_elements)
 

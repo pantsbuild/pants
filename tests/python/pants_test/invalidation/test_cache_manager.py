@@ -60,9 +60,7 @@ class InvalidationCacheManagerTest(BaseTest):
   def make_vts(self, target):
     return VersionedTarget(self.cache_manager, target, target.id)
 
-  def test_partition(self):
-    # The default EmptyPayload chunking unit happens to be 1, so each of these Targets
-    # has a chunking unit contribution of 1
+  def test_check_marks_all_as_invalid_by_default(self):
     a = self.make_target(':a', dependencies=[])
     b = self.make_target(':b', dependencies=[a])
     c = self.make_target(':c', dependencies=[b])
@@ -71,28 +69,12 @@ class InvalidationCacheManagerTest(BaseTest):
 
     targets = [a, b, c, d, e]
 
-    def print_partitions(partitions):
-      strs = []
-      for partition in partitions:
-        strs.append('(%s)' % ', '.join([t.id for t in partition.targets]))
-      print('[%s]' % ' '.join(strs))
+    ic = self.cache_manager.check(targets)
 
-    # Verify basic data structure soundness.
-    all_vts = self.cache_manager.wrap_targets(targets)
-    invalid_vts = filter(lambda vt: not vt.valid, all_vts)
+    all_vts = ic.all_vts
+    invalid_vts = ic.invalid_vts
+
     self.assertEquals(5, len(invalid_vts))
     self.assertEquals(5, len(all_vts))
     vts_targets = [vt.targets[0] for vt in all_vts]
     self.assertEquals(set(targets), set(vts_targets))
-
-    # Test a simple partition.
-    ic = InvalidationCheck(all_vts, [], 3)
-    partitioned = ic.all_vts_partitioned
-    print_partitions(partitioned)
-
-    # Several correct partitionings are possible, but in all cases 4 1-source targets will be
-    # added to the first partition before it exceeds the limit of 3, and the final target will
-    # be in a partition by itself.
-    self.assertEquals(2, len(partitioned))
-    self.assertEquals(4, len(partitioned[0].targets))
-    self.assertEquals(1, len(partitioned[1].targets))
