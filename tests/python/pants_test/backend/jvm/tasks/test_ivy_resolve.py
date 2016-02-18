@@ -58,7 +58,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   #
   # Test section
   #
-  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_resolve_specific(self):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
@@ -140,7 +140,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
                                   (u'default', artifact_path(u'bogus1'))]),
                       winning_cp)
 
-  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_resolve_multiple_artifacts(self):
     def coordinates_for(cp):
       return {resolved_jar.coordinate for conf, resolved_jar in cp}
@@ -191,7 +191,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     target = self.make_target('//:a', JavaLibrary)
     self.assertTrue(self.resolve([target]))
 
-  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_resolve_symlinked_cache(self):
     """Test to make sure resolve works when --ivy-cache-dir is a symlinked path.
 
@@ -212,7 +212,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
         compile_classpath = self.resolve([jar_lib])
         self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
 
-  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_ivy_classpath(self):
     # Testing the IvyTaskMixin entry point used by bootstrap for jvm tools.
 
@@ -223,7 +223,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     self.assertEquals(2, len(classpath))
 
-  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
 
