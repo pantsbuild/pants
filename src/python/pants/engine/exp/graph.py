@@ -10,8 +10,7 @@ import collections
 import six
 
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import (AddressableDescriptor, Directory,
-                                          TypeConstraintError)
+from pants.engine.exp.addressable import AddressableDescriptor, Directory, TypeConstraintError
 from pants.engine.exp.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.exp.objects import SerializableFactory, Validatable
 from pants.engine.exp.scheduler import Select, SelectDependencies, SelectLiteral, SelectProjection
