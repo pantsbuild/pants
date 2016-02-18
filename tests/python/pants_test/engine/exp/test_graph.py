@@ -181,17 +181,14 @@ class InlinedGraphTest(GraphTestBase):
   def extract_path_tail(self, cycle_exception, line_count):
     return [l.lstrip() for l in str(cycle_exception).splitlines()[-line_count:]]
 
-  def do_test_cycle(self, scheduler, address_str, root_type=Throw):
+  def do_test_cycle(self, scheduler, address_str):
     walk = self.walk(scheduler, Address.parse(address_str))
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    self.assertEqual(type(walk[0][1]), root_type)
-    self.assertTrue(any('Cycle' in state.msg for _, state in walk if type(state) is Noop))
+    self.assertEqual(type(walk[0][1]), Throw)
+    self.assertTrue(any('cycle' in state.msg for _, state in walk if type(state) is Noop))
 
   def test_cycle_self(self):
-    # A self-cycle is treated as a Noop, whereas a cycle between different objects is treated
-    # as a Throw via DependenciesNode failing to resolve an explicitly specified value.
-    # TODO: This should be sufficient validation in practice, but might be worth revisiting.
-    self.do_test_cycle(self.create_json(), 'examples/graph_test:self_cycle', root_type=Noop)
+    self.do_test_cycle(self.create_json(), 'examples/graph_test:self_cycle')
 
   def test_cycle_direct(self):
     self.do_test_cycle(self.create_json(), 'examples/graph_test:direct_cycle')
