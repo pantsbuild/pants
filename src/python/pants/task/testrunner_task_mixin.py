@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import threading
+import time
 from abc import abstractmethod
-from textwrap import dedent
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout, TimeoutReached
 
@@ -71,13 +71,28 @@ class TestRunnerTaskMixin(object):
 
     process_handler = self._spawn(*args, **kwargs)
 
-    # TODO(sbrenn): We use process_handler.kill here because we want to aggressively terminate the
-    # process. It may make sense in the future to do a multi-stage approach
-    # where first we do process_handler.terminate to let it die gracefully, and
-    # then do process_handler.kill if that doesn't work. It will probably require
-    # adding poll() support to ProcessHandler.
+    def _graceful_terminate(handler, wait_time):
+      """
+      Returns a function which attempts to terminate the process gracefully.
+
+      If terminate doesn't work after wait_time seconds, do a kill.
+      """
+
+
+      def terminator():
+        handler.terminate()
+        def kill():
+          if handler.poll() is None:
+            self.context.log.warn("Warning: Timed out test did not terminate gracefully after %s seconds, killing..." % wait_time)
+            handler.kill()
+
+        timer = threading.Timer(wait_time, kill)
+        timer.start()
+
+      return terminator
+
     try:
-      with Timeout(timeout, abort_handler=process_handler.kill):
+      with Timeout(timeout, abort_handler=_graceful_terminate(process_handler, 10)):
         return process_handler.wait()
     except TimeoutReached as e:
       raise TestFailedTaskError(str(e), failed_targets=test_targets)

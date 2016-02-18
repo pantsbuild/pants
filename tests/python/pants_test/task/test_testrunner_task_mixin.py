@@ -52,6 +52,9 @@ class TestRunnerTaskMixinTest(TaskTestBase):
           def terminate(_):
             self.call_list.append(['process_handler.terminate'])
 
+          def poll(_):
+            self.call_list.append(['process_handler.poll'])
+
         return FakeProcessHandler()
 
       def _get_targets(self):
@@ -155,6 +158,10 @@ class TestRunnerTaskMixinTimeoutTest(TaskTestBase):
 
           def terminate(_):
             self.call_list.append(['process_handler.terminate'])
+
+          def poll(_):
+            self.call_list.append(['process_handler.poll'])
+            return 0
 
         return FakeProcessHandler()
 
