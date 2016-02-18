@@ -151,9 +151,6 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
           self.run_tests(test_targets, workunit)
 
   def run_tests(self, targets, workunit):
-    """
-    :API: public
-    """
     if self.get_options().fast:
       result = self._do_run_tests(targets, workunit)
       if not result.success:
