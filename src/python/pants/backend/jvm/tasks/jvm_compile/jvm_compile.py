@@ -136,8 +136,10 @@ class JvmCompile(NailgunTaskBase):
 
     register('--size-estimator', advanced=True,
              choices=list(cls.size_estimators.keys()), default='filesize',
-             help='The method of target size estimation.  Choose '
-                  'random when a random build order is needed.')
+             help='The method of target size estimation. The size estimator estimates the size '
+                  'of targets in order to build the largest targets first (subject to dependency '
+                  'constraints). Choose \'random\' to choose random sizes for each target, which '
+                  'may be useful for distributed builds.')
 
     register('--capture-log', advanced=True, action='store_true', default=False,
              fingerprint=True,

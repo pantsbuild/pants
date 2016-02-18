@@ -23,7 +23,9 @@ def atomic_copy(src, dst):
 def create_size_estimators():
   """Create a dict of name to a function that returns an estimated size for a given target.
 
-  If a random build order is needed, use random.
+  The estimated size is used to build the largest targets first (subject to dependency constraints).
+  Choose \'random\' to choose random sizes for each target, which may be useful for distributed
+  builds.
   :returns: Dict of a name to a function that returns an estimated size.
   """
   def line_count(filename):
