@@ -14,7 +14,7 @@ from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, SelectNode, TaskNode, Throw
+from pants.engine.exp.scheduler import BuildRequest, Noop, SelectNode, TaskNode, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
@@ -56,6 +56,8 @@ def create_digraph(scheduler):
   def format_color(node, node_state):
     if type(node_state) is Throw:
       return 'tomato'
+    elif type(node_state) is Noop:
+      return 'white'
     key = node.product
     return colors.setdefault(key, (len(colors) % max_colors) + 1)
 
