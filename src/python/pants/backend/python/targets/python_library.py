@@ -9,5 +9,8 @@ from pants.backend.python.targets.python_target import PythonTarget
 
 
 class PythonLibrary(PythonTarget):
-  """A Python library."""
+  """A Python library.
+
+  :API: public
+  """
   pass
