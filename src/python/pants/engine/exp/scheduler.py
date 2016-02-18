@@ -11,7 +11,7 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import StructAddress, parse_variants
+from pants.engine.exp.addressable import parse_variants
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target, Variants
 from pants.util.meta import AbstractClass
@@ -556,8 +556,7 @@ class NodeBuilder(object):
     # Product after resolution, and so it begins by attempting to resolve a Struct for
     # a subject Address. This type of cast/conversion should likely be reified.
     if isinstance(subject, Address) and product in self._literal_products:
-      struct_address = StructAddress(subject.spec_path, subject.target_name)
-      yield SelectNode(struct_address, Struct, None, None)
+      yield SelectNode(subject, Struct, None, None)
 
 
 class BuildRequest(object):

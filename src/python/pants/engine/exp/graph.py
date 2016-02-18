@@ -10,7 +10,7 @@ import collections
 import six
 
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import (AddressableDescriptor, Directory, StructAddress,
+from pants.engine.exp.addressable import (AddressableDescriptor, Directory,
                                           TypeConstraintError)
 from pants.engine.exp.mapper import AddressFamily, AddressMapper, ResolveError
 from pants.engine.exp.objects import SerializableFactory, Validatable
@@ -58,14 +58,13 @@ class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'depen
     return hash(self.struct)
 
 
-def resolve_unhydrated_struct(address_family, struct_address):
-  """Given a StructAddress and its AddressFamily, resolve an UnhydratedStruct.
+def resolve_unhydrated_struct(address_family, address):
+  """Given an Address and its AddressFamily, resolve an UnhydratedStruct.
 
   Recursively collects any embedded addressables within the Struct, but will not walk into a
   dependencies field, since those are requested explicitly by tasks using SelectDependencies.
   """
 
-  address = Address(struct_address.spec_path, struct_address.name)
   struct = address_family.addressables.get(address)
   if not struct:
     possibilities = '\n  '.join(str(a) for a in address_family.addressables)
@@ -76,8 +75,7 @@ def resolve_unhydrated_struct(address_family, struct_address):
   def maybe_append(outer_key, value):
     if isinstance(value, six.string_types):
       if outer_key != 'dependencies':
-        dep_address = Address.parse(value, relative_to=address.spec_path)
-        dependencies.append(StructAddress(dep_address.spec_path, dep_address.target_name))
+        dependencies.append(Address.parse(value, relative_to=address.spec_path))
     elif isinstance(value, Struct):
       collect_dependencies(value)
 
@@ -170,8 +168,8 @@ def create_graph_tasks(address_mapper):
        SelectDependencies(Struct, UnhydratedStruct)],
       hydrate_struct),
     (UnhydratedStruct,
-      [SelectProjection(AddressFamily, Directory, 'spec_path', StructAddress),
-       Select(StructAddress)],
+      [SelectProjection(AddressFamily, Directory, 'spec_path', Address),
+       Select(Address)],
       resolve_unhydrated_struct),
     (AddressFamily,
       [SelectLiteral(address_mapper, AddressMapper),
