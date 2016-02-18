@@ -126,8 +126,9 @@ the `pantsbuild/pants` repo's master branch, use these commands:
 ### Making the Change
 
 You might want to familiarize yourself with the
-[[Pants Internals|pants('src/python/pants/docs:internals')]] or
-[[Pants Developers Guide|pants('src/python/pants/docs:howto_develop')]].
+[[Pants Internals|pants('src/python/pants/docs:internals')]],
+[[Pants Developers Guide|pants('src/python/pants/docs:howto_develop')]], and the
+[[Pants Style Guide|pants('src/python/pants/docs:styleguide')]].
 
 Create a new branch off master and make changes.
 
