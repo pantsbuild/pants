@@ -5,13 +5,13 @@ import signal
 import time
 
 
-def test_sleep_long():
+def test_ignore_terminate():
   def signal_term_handler(signal, frame):
-    # Ignore SIGTERM
+    # Ignore SIGTERM.
     pass
 
   signal.signal(signal.SIGTERM, signal_term_handler)
   time.sleep(120)
 
-  # We need a second sleep because the SIGTERM will interrupt the first sleep
+  # We need a second sleep because the SIGTERM will interrupt the first sleep.
   time.sleep(120)

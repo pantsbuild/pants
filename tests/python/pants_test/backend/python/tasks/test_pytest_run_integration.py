@@ -49,7 +49,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                                 '--test-pytest-coverage=1',
                                 '--test-pytest-timeout-terminate-wait=%d' % terminate_wait,
                                 '--timeout-default=1',
-                                'testprojects/tests/python/pants/timeout:must_kill_target'])
+                                'testprojects/tests/python/pants/timeout:ignore_terminate_target'])
     end = time.time()
     self.assert_failure(pants_run)
 

@@ -81,15 +81,15 @@ class TestRunnerTaskMixin(object):
 
       def terminator():
         handler.terminate()
-        def kill():
+        def kill_if_not_terminated():
           if handler.poll() is None:
-            # We can't use the context logger because it might not exist
+            # We can't use the context logger because it might not exist.
             import logging
             logger = logging.getLogger(__name__)
             logger.warn("Timed out test did not terminate gracefully after %s seconds, killing..." % wait_time)
             handler.kill()
 
-        timer = Timer(wait_time, kill)
+        timer = Timer(wait_time, kill_if_not_terminated)
         timer.start()
 
       return terminator
