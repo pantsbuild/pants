@@ -39,6 +39,8 @@ class TestRunnerTaskMixin(object):
              help='The default timeout (in seconds) for a test if timeout is not set on the target.')
     register('--timeout-maximum', action='store', type=int, advanced=True,
              help='The maximum timeout (in seconds) that can be set on a test target.')
+    register('--timeout-terminate-wait', action='store', type=int, advanced=True, default=10,
+             help='If a test does not terminate on a SIGTERM, how long to wait (in seconds) before sending a SIGKILL.')
 
   def execute(self):
     """Run the task."""
@@ -82,7 +84,10 @@ class TestRunnerTaskMixin(object):
         handler.terminate()
         def kill():
           if handler.poll() is None:
-            self.context.log.warn("Warning: Timed out test did not terminate gracefully after %s seconds, killing..." % wait_time)
+            # We can't use the context logger because it might not exist
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warn("Timed out test did not terminate gracefully after %s seconds, killing..." % wait_time)
             handler.kill()
 
         timer = Timer(wait_time, kill)
@@ -93,7 +98,7 @@ class TestRunnerTaskMixin(object):
     try:
       with Timeout(timeout,
                    threading_timer=Timer,
-                   abort_handler=_graceful_terminate(process_handler, 10)):
+                   abort_handler=_graceful_terminate(process_handler, self.get_options().timeout_terminate_wait)):
         return process_handler.wait()
     except TimeoutReached as e:
       raise TestFailedTaskError(str(e), failed_targets=test_targets)
