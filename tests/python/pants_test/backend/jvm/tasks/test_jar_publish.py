@@ -79,6 +79,15 @@ class JarPublishTest(TaskTestBase):
 
     return targets.values()
 
+  def _prepare_targets_with_duplicates(self):
+    targets = list(self._prepare_for_publishing())
+    conflict = self.create_library(
+      'conflict', 'java_library', 'conflict', ['Conflict.java'],
+      provides="""artifact(org='com.example', name='nail', repo=internal)""",
+    )
+    targets.append(conflict)
+    return targets
+
   def _get_repos(self):
     return {
       'internal': {
@@ -245,6 +254,15 @@ class JarPublishTest(TaskTestBase):
   def test_publish_local_only(self):
     with self.assertRaises(TaskError):
       self.create_task(self.context())
+
+  def test_check_targets_fails_with_duplicate_artifacts(self):
+    bad_targets = self._prepare_targets_with_duplicates()
+    with temporary_dir() as publishdir:
+      self.set_options(dryrun=False, local=publishdir)
+      task = self.create_task(self.context(target_roots=bad_targets))
+      self._prepare_mocks(task)
+      with self.assertRaises(JarPublish.DuplicateArtifactError):
+        task.check_targets(task.exported_targets())
 
 
 class FailNTimes(object):
