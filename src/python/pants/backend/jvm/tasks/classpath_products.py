@@ -141,6 +141,9 @@ class ClasspathProducts(object):
   def init_func(pants_workdir):
     return lambda: ClasspathProducts(pants_workdir)
 
+  def __repr__(self):
+    return 'ClasspathProducts(classpaths={}, excludes={}, workdir={})'.format(self._classpaths, self._excludes, self._pants_workdir)
+
   def copy(self):
     """Returns a copy of this ClasspathProducts.
 
