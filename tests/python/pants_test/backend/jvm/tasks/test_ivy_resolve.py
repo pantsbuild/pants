@@ -49,10 +49,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
                                read_from=None,
                                write_to=None)
 
-  def resolve(self, targets):
+  def resolve(self, targets, workdir=None):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
-    context = self.context(target_roots=targets)
-    self.create_task(context).execute()
+    opts = {'': {'pants_workdir': workdir}} if workdir else None
+    context = self.context(target_roots=targets, options=opts)
+    self.create_task(context, workdir=workdir).execute()
     return context.products.get_data('compile_classpath')
 
   #
@@ -231,13 +232,67 @@ class IvyResolveTest(JvmToolTaskTestBase):
     excluding_target = self.make_target('//:b', JavaLibrary, excludes=[Exclude('junit', 'junit')])
     compile_classpath = self.resolve([junit_jar_lib, excluding_target])
 
-  def test_ivy_blah(self):
-    # TODO flesh it out
+  @ensure_cached(IvyResolve, expected_num_artifacts=1)
+  def test_fetch_resolve_has_same_resolved_jars_as_full(self):
+
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
     junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+    with temporary_dir() as cache_dir:
+      self.set_options_for_scope('cache.{}'.format(self.options_scope),
+                                 read_from=[cache_dir],
+                                 write_to=[cache_dir], level='debug')
+
+      print('-------------------------------------------------')
+      print('----------------------------first run---------------------')
+      print('-------------------------------------------------')
+      print('-------------------------------------------------')
+
+      with self._temp_workdir() as workdir:
+        compile_classpath_1 = self.resolve([junit_jar_lib], workdir=workdir)
+        self._print_dir_contents(workdir)
+
+      print('-------------------------------------------------')
+      print('----------------------------second run---------------------')
+      print('-------------------------------------------------')
+      print('-------------------------------------------------')
+      # Now do a second resolve with a fresh work directory.
+      with self._temp_workdir() as workdir2:
+        self._print_dir_contents(workdir2)
+        compile_classpath_2 = self.resolve([junit_jar_lib], workdir=workdir2)
+        self._print_dir_contents(workdir2)
+
+
+
+      self.assertEqual(compile_classpath_1.get_for_target(junit_jar_lib),
+                       compile_classpath_2.get_for_target(junit_jar_lib))
+
+    # with create cache dir
+    #   run with cache dir but fresh workdir
+    #   run with same cache dir but fresh workdir again
+    #   inspect products
+
 
     result = self.create_task(self.context())._ivy_resolve([junit_jar_lib])
 
+  def _print_dir_contents(self, cache_dir, indent=''):
+    if os.path.isdir(cache_dir):
+      list_cachedir = os.listdir(cache_dir)
+      val = len(list_cachedir)
+    else:
+      list_cachedir = []
+      val = 'file'
+    print('{}/{}    {}'.format(indent, os.path.basename(cache_dir), val))
+
+    for e in list_cachedir:
+      self._print_dir_contents(os.path.join(cache_dir, e), indent+'  ')
+
+  def _temp_workdir(self):
+    # doing the option munging is no longer necessary I think as we do it in resolve()
+    #old_workdir = self.options['']['pants_workdir']
+    with temporary_dir as workdir:
+      #self.options['']['pants_workdir'] = workdir
+      yield workdir
+    #self.options['']['pants_workdir'] = old_workdir
 
 class IvyResolveFingerprintStrategyTest(BaseTest):
 

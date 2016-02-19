@@ -83,7 +83,15 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       def run_pants(command):
         return self.run_pants_with_workdir(command, workdir, config=config)
 
-      run_pants(['resolve', '3rdparty:junit'])
+      resolve_run = run_pants(['resolve', '3rdparty:junit'])
+      first_export_result = run_pants(['resolve', 'export', '3rdparty:junit'])
+      print('RESOLVERUN')
+      print('RESOLVERUN')
+      print(resolve_run.stdout_data)
+      print('EXPORTRUN')
+      print('EXPORTRUN')
+      print('EXPORTRUN')
+      print(first_export_result.stdout_data)
       resolve_workdir = self._find_resolve_workdir(workdir)
       # The first run did a ran ivy in resolve mode, so it doesn't have a fetch-ivy.xml.
       self.assertNotIn('fetch-ivy.xml', os.listdir(resolve_workdir))
@@ -91,7 +99,11 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       run_pants(['clean-all'])
 
       run_pants(['resolve', '3rdparty:junit'])
+      second_export_result = run_pants(['export', '3rdparty:junit'])
 
+      # Using the fetch pattern should result in the same export information.
+      self.assertEqual(first_export_result.stdout_data, second_export_result.stdout_data)
+      self.fail()
       # The second run uses the cached resolution information from the first resolve, and
       # generates a fetch ivy.xml.
       self.assertIn('fetch-ivy.xml', os.listdir(resolve_workdir))
