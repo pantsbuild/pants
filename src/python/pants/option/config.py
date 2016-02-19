@@ -23,6 +23,8 @@ class Config(object):
 
   Supports recursive variable substitution using standard python format strings. E.g.,
   %(var_name)s will be replaced with the value of var_name.
+
+  :API: public
   """
   _DEFAULT_SECTION = configparser.DEFAULTSECT
 
@@ -36,6 +38,8 @@ class Config(object):
     A handful of seed values will be set to act as if specified in the loaded config file's DEFAULT
     section, and be available for use in substitutions.  The caller may override some of these
     seed values.
+
+    :API: public
 
     :param configpaths: Load from these paths. Later instances take precedence over earlier ones.
                         If unspecified, loads from pants.ini in the current build root directory.
@@ -97,6 +101,8 @@ class Config(object):
     If the specified section does not exist or is missing a definition for the option, the value is
     looked up in the DEFAULT section.  If there is still no definition found, the default value
     supplied is returned.
+
+    :API: public
     """
     return self._getinstance(section, option, type_, default)
 

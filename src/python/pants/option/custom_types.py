@@ -15,6 +15,8 @@ def dict_option(s):
   """An option of type 'dict'.
 
   The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
+
+  :API: public
   """
   return _convert(s, (dict,))
 
@@ -24,6 +26,8 @@ def list_option(s):
 
   The value (on the command-line, in an env var or in the config file) must be eval'able to a
   list or tuple.
+
+  :API: public
   """
   return _convert(s, (list, tuple))
 
@@ -45,7 +49,10 @@ def target_list_option(s):
 
 
 def file_option(s):
-  """Same type as 'str', but indicates string represents a filepath."""
+  """Same type as 'str', but indicates string represents a filepath.
+
+  :API: public
+  """
   if not os.path.isfile(s):
     raise ParseError('Options file "{filepath}" does not exist.'.format(filepath=s))
   return s
