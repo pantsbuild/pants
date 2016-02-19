@@ -27,6 +27,8 @@ class PythonRequirement(object):
 
   To let other Targets depend on this ``python_requirement``, put it in a
   `python_requirement_library <#python_requirement_library>`_.
+
+  :API: public
   """
 
   def __init__(self, requirement, name=None, repository=None, version_filter=None, use_2to3=False,
@@ -45,42 +47,69 @@ class PythonRequirement(object):
     self.compatibility = compatibility or ['']
 
   def should_build(self, python, platform):
+    """
+    :API: public
+    """
     return self._version_filter(python, platform)
 
   @property
   def use_2to3(self):
+    """
+    :API: public
+    """
     return self._use_2to3
 
   @property
   def repository(self):
+    """
+    :API: public
+    """
     return self._repository
 
   # duck-typing Requirement interface for Resolver, since Requirement cannot be
   # subclassed (curses!)
   @property
   def key(self):
+    """
+    :API: public
+    """
     return self._requirement.key
 
   @property
   def extras(self):
+    """
+    :API: public
+    """
     return self._requirement.extras
 
   @property
   def specs(self):
+    """
+    :API: public
+    """
     return self._requirement.specs
 
   @property
   def project_name(self):
+    """
+    :API: public
+    """
     return self._requirement.project_name
 
   @property
   def requirement(self):
+    """
+    :API: public
+    """
     return self._requirement
 
   def __contains__(self, item):
     return item in self._requirement
 
   def cache_key(self):
+    """
+    :API: public
+    """
     return str(self._requirement)
 
   def __repr__(self):

@@ -22,6 +22,7 @@ Open Source Projects
 
 - [Twitter-Commons](https://github.com/twitter/commons/)
 - [Apache Aurora](http://aurora.apache.org/)
+- [Fsq.io](https://github.com/foursquare/fsqio/)
 
 Testimonials
 ------------
