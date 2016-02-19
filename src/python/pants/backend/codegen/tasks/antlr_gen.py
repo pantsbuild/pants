@@ -70,6 +70,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
       else:
         args.append(target.package)
       java_main = 'org.antlr.v4.Tool'
+    else:
+      raise TaskError('Unexpected compiler type for target {}'.format(target.address.spec))
 
     antlr_classpath = self.tool_classpath(compiler)
     sources = self._calculate_sources([target])
