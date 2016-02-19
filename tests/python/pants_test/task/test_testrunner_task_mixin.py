@@ -93,7 +93,6 @@ class TestRunnerTaskMixinTest(TaskTestBase):
     task.execute()
 
     # Ensure nothing got called
-    print(task.call_list)
     self.assertListEqual(task.call_list, [])
 
   def test_get_timeouts_no_default(self):
@@ -283,7 +282,7 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
       with self.assertRaises(TestFailedTaskError):
         task.execute()
 
-      # Ensure that all the calls we want to kill the process gracefully are made
+      # Ensure that all the calls we want to kill the process gracefully are made.
       self.assertEqual(self.process_handler.call_list,
                        [[u'process_handler.terminate'], [u'process_handler.poll'], [u'process_handler.kill'], [u'process_handler.wait']])
 
@@ -305,6 +304,6 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
       with self.assertRaises(TestFailedTaskError):
         task.execute()
 
-      # Ensure that we only call terminate, and not kill
+      # Ensure that we only call terminate, and not kill.
       self.assertEqual(self.process_handler.call_list,
                        [[u'process_handler.terminate'], [u'process_handler.poll'], [u'process_handler.wait']])

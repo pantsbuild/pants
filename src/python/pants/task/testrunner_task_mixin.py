@@ -79,7 +79,6 @@ class TestRunnerTaskMixin(object):
       If terminate doesn't work after wait_time seconds, do a kill.
       """
 
-
       def terminator():
         handler.terminate()
         def kill():
