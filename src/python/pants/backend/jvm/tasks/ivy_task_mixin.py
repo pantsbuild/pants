@@ -32,50 +32,6 @@ from pants.util.memo import memoized_property
 logger = logging.getLogger(__name__)
 
 
-class ExistingResolveSituation(object):
-  def __init__(self,
-               ivy_workdir,
-               resolve_workdir,
-               resolve_hash_name,
-               ivy_cache_dir,
-               potential_frozen_resolutions,
-               confs):
-    self.potential_frozen_resolution = potential_frozen_resolutions
-    self.ivy_cache_dir = ivy_cache_dir
-    self.resolve_hash_name = resolve_hash_name
-    self.ivy_workdir = ivy_workdir
-    self.resolve_workdir = resolve_workdir
-    self.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm = os.path.join(resolve_workdir, 'classpath')
-    self.file_containing_full_list_of_resolved_jars_in_ivy_cache = self.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm + '.raw'
-    # If a report file is not present, we need to exec ivy, even if all the individual
-    # targets are up to date. See https://rbcommons.com/s/twitter/r/2015.
-    # Note that it's possible for all targets to be valid but for no classpath file to exist at
-    # target_classpath_file, e.g., if we previously built a superset of targets.
-    any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
-    self.any_report_missing = any_report_missing
-    self.existing_report_paths = existing_report_paths
-
-  def _collect_existing_reports(self, confs, resolve_hash_name):
-    report_missing = False
-    report_paths = []
-    for conf in confs:
-      report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
-      if not os.path.exists(report_path):
-        report_missing = True
-        break
-      else:
-        report_paths.append(report_path)
-    return report_missing, report_paths
-
-  def has_file_containing_ivy_jar_locations(self):
-    return os.path.exists(
-      self.file_containing_full_list_of_resolved_jars_in_ivy_cache)
-
-  def requires_new_resolve(self):
-    return (self.any_report_missing or
-            not self.has_file_containing_ivy_jar_locations())
-
-
 class FrozenResolution(object):
   def __init__(self):
     self.target_to_resolved_coordinates = defaultdict(OrderedSet)
@@ -258,6 +214,18 @@ class IvyTaskMixin(TaskBase):
     # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
     return IvySubsystem.global_instance().get_options().cache_dir
 
+  def _collect_existing_reports(self, confs, resolve_hash_name):
+    report_missing = False
+    report_paths = []
+    for conf in confs:
+      report_path = IvyUtils.xml_report_path(self.ivy_cache_dir, resolve_hash_name, conf)
+      if not os.path.exists(report_path):
+        report_missing = True
+        break
+      else:
+        report_paths.append(report_path)
+    return report_missing, report_paths
+
   def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False):
     """Resolves external classpath products (typically jars) for the given targets.
@@ -326,6 +294,21 @@ class IvyTaskMixin(TaskBase):
 
     return result.resolve_hash_name
 
+  def _blah_print(self, cache_dir, indent=''):
+    if os.path.isdir(cache_dir):
+      list_cachedir = os.listdir(cache_dir)
+      val = len(list_cachedir)
+    else:
+      list_cachedir = []
+      val = 'file'
+    basename = os.path.basename(cache_dir)
+    print('{}/{}    {}'.format(indent, basename, val))
+    if basename == 'python-setup':
+      print('{}...'.format(indent))
+      return
+    for e in list_cachedir:
+      self._blah_print(os.path.join(cache_dir, e), indent+'  ')
+
   def _ivy_resolve(self,
                   targets,
                   executor=None,
@@ -379,26 +362,47 @@ class IvyTaskMixin(TaskBase):
       resolve_workdir = os.path.join(ivy_workdir, resolve_hash_name)
       potential_frozen_resolutions = self.load_frozen_resolutions(resolve_workdir, targets)
 
-      situ = ExistingResolveSituation(ivy_workdir,
-                                      resolve_workdir,
-                                      resolve_hash_name,
-                                      self.ivy_cache_dir,
-                                      potential_frozen_resolutions,
-                                      confs)
+      potential_frozen_resolution = potential_frozen_resolutions
+      #ivy_cache_dir = ivy_cache_dir
+      resolve_hash_name = resolve_hash_name
+      ivy_workdir = ivy_workdir
+      resolve_workdir = resolve_workdir
+      file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm = os.path.join(resolve_workdir, 'classpath')
+      file_containing_full_list_of_resolved_jars_in_ivy_cache = file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm + '.raw'
+      # If a report file is not present, we need to exec ivy, even if all the individual
+      # targets are up to date. See https://rbcommons.com/s/twitter/r/2015.
+      # Note that it's possible for all targets to be valid but for no classpath file to exist at
+      # target_classpath_file, e.g., if we previously built a superset of targets.
+      any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
+      any_report_missing = any_report_missing
+      existing_report_paths = existing_report_paths
+
+      def has_file_containing_ivy_jar_locations():
+        return os.path.exists(
+          file_containing_full_list_of_resolved_jars_in_ivy_cache)
+
+      def requires_new_resolve():
+        # TODO maybe debug print the bools for deciding to do what.
+        return (any_report_missing or
+                not has_file_containing_ivy_jar_locations())
+
+
       safe_mkdir(resolve_workdir)
+
       if (invalidation_check.invalid_vts or
-            situ.requires_new_resolve()):
-        if situ.potential_frozen_resolution:
+            requires_new_resolve()):
+        if potential_frozen_resolution:
           self._run_fetch_resolve(confs,
                                   executor,
                                   extra_args,
                                   resolve_vts,
-                                  situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
-                                  situ.resolve_hash_name,
-                                  situ.resolve_workdir,
-                                  workunit_name,
-                                  situ.potential_frozen_resolution)
-          result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, situ)
+                                  file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                  resolve_hash_name,
+                                  resolve_workdir,
+                                  workunit_name + '-fetch',
+                                  potential_frozen_resolution)
+          result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                                file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
           return result
         else:
           self._run_full_resolve(confs,
@@ -406,11 +410,12 @@ class IvyTaskMixin(TaskBase):
                                  extra_args,
                                  resolve_vts,
                                  pinned_artifacts,
-                                 situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
-                                 situ.resolve_hash_name,
-                                 situ.resolve_workdir,
+                                file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                 resolve_hash_name,
+                                 resolve_workdir,
                                  workunit_name)
-          result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, situ)
+          result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                                file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
 
           frozen_resolutions_by_conf = self.construct_frozen_resolutions_by_conf(confs, result, targets)
           self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
@@ -420,16 +425,25 @@ class IvyTaskMixin(TaskBase):
           return result
 
       else:
-        logger.debug("Using previously resolved reports: {}".format(situ.existing_report_paths))
-        result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, situ)
+        # if frozen resolution,
+        #   look for fetch based report and hydrate from that
+        # else
+        #   load report, drop frozen resolutions and cache them
+        #   do regular thing
+        if potential_frozen_resolution:
+          logger.debug("hey there's a frozen resolve")
+        logger.debug("Using previously resolved reports: {}".format(existing_report_paths))
+        result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name, file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                                file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
         return result
 
-  def _symlink_stuff_and_construct_resolve_result(self, ivy_workdir, resolve_hash_name, situ):
+  def _symlink_stuff_and_construct_resolve_result(self, ivy_workdir, resolve_hash_name, file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                                file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm):
     symlink_map = self._symlink_from_cache_path(self.ivy_cache_dir, ivy_workdir,
-                                                situ.file_containing_full_list_of_resolved_jars_in_ivy_cache,
-                                                situ.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
+                                                file_containing_full_list_of_resolved_jars_in_ivy_cache,
+                                                file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
     classpath = IvyUtils.load_classpath_from_cachepath(
-      situ.file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
+      file_containing_full_list_of_resolved_jars_pointing_to_symlink_farm)
     result = IvyResolveResultClasspathEtc(classpath, symlink_map, resolve_hash_name)
     return result
 
@@ -442,9 +456,9 @@ class IvyTaskMixin(TaskBase):
       frozen_resolutions_by_conf[conf] = frozen_resolution
     return frozen_resolutions_by_conf
 
-  def _stupid_debug_prints(self, frozen_resolutions_by_conf, situ):
+  def _stupid_debug_prints(self, frozen_resolutions_by_conf, potential_frozen_resolution):
     created_default = frozen_resolutions_by_conf.get('default')
-    potential_default = situ.potential_frozen_resolution.get('default')
+    potential_default = potential_frozen_resolution.get('default')
     print(
       'type(created_default.all_resolved_coordinates) == type(potential_default.all_resolved_coordinates)')
     print(type(created_default.all_resolved_coordinates) == type(
