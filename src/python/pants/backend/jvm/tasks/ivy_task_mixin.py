@@ -205,6 +205,10 @@ class IvyTaskMixin(TaskBase):
   # Protect writes to the global map of jar path -> symlinks to that jar.
   symlink_map_lock = threading.Lock()
 
+  @classmethod
+  def implementation_version(cls):
+    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 1)]
+
   @memoized_property
   def ivy_cache_dir(self):
     """The path of the ivy cache dir used for resolves.
