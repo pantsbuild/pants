@@ -5,9 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import threading
-import time
 from abc import abstractmethod
+from threading import Timer
 
 from pants.base.exceptions import TestFailedTaskError
 from pants.util.timeout import Timeout, TimeoutReached
@@ -86,13 +85,15 @@ class TestRunnerTaskMixin(object):
             self.context.log.warn("Warning: Timed out test did not terminate gracefully after %s seconds, killing..." % wait_time)
             handler.kill()
 
-        timer = threading.Timer(wait_time, kill)
+        timer = Timer(wait_time, kill)
         timer.start()
 
       return terminator
 
     try:
-      with Timeout(timeout, abort_handler=_graceful_terminate(process_handler, 10)):
+      with Timeout(timeout,
+                   threading_timer=Timer,
+                   abort_handler=_graceful_terminate(process_handler, 10)):
         return process_handler.wait()
     except TimeoutReached as e:
       raise TestFailedTaskError(str(e), failed_targets=test_targets)
