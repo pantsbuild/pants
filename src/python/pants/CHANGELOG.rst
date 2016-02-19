@@ -1,6 +1,72 @@
 RELEASE HISTORY
 ===============
 
+0.0.73 (02/19/2016)
+-------------------
+
+This release features more formal public API docstrings for many modules
+and classes.
+
+API Changes
+~~~~~~~~~~~
+
+* Add public API markers for python backend and others
+  `RB #3473 <https://rbcommons.com/s/twitter/r/3473>`_
+  `RB #3469 <https://rbcommons.com/s/twitter/r/3469>`_
+
+* Upgrade default go to 1.6.
+  `RB #3476 <https://rbcommons.com/s/twitter/r/3476>`_
+
+Bugfixes
+~~~~~~~~
+
+* Add styleguide to docs
+  `RB #3456 <https://rbcommons.com/s/twitter/r/3456>`_
+
+* Remove unused kwarg, locally_changed_targets, from Task.invalidated
+  `RB #3467 <https://rbcommons.com/s/twitter/r/3467>`_
+
+* support searching multiple linux java dist dirs
+  `RB #3472 <https://rbcommons.com/s/twitter/r/3472>`_
+
+* Separate cli spec parsing from filesystem walking
+  `RB #3466 <https://rbcommons.com/s/twitter/r/3466>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow for random build ordering
+  `RB #3462 <https://rbcommons.com/s/twitter/r/3462>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump junit runner and jar tool versions to newly published
+  `RB #3477 <https://rbcommons.com/s/twitter/r/3477>`_
+
+* Add Foursquare's Fsq.io to the "Powered By"  page.
+  `RB #3323 <https://rbcommons.com/s/twitter/r/3323>`_
+
+* Upgrade default go to 1.6.
+  `RB #3476 <https://rbcommons.com/s/twitter/r/3476>`_
+
+* Remove unused partitioning support in cache and invalidation support
+  `RB #3467 <https://rbcommons.com/s/twitter/r/3467>`_
+  `RB #3474 <https://rbcommons.com/s/twitter/r/3474>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Noop only a cyclic dependency, and not an entire Node
+  `RB #3478 <https://rbcommons.com/s/twitter/r/3478>`_
+
+* [engine] Tighten input validation
+  `Issue #2525 <https://github.com/pantsbuild/pants/issues/2525>`_
+  `Issue #2526 <https://github.com/pantsbuild/pants/issues/2526>`_
+  `RB #) <https://rbcommons.com/s/twitter/r/3245/)>`_
+  `RB #3448 <https://rbcommons.com/s/twitter/r/3448>`_
+
+
 0.0.72 (02/16/2016)
 -------------------
 This release concludes the deprecation cycle for the old API for
