@@ -201,7 +201,7 @@ class BaseTest(unittest.TestCase):
       'write_to': [],
     }
 
-    BuildRoot().path = self.build_root
+    BuildRoot().set_path(self.build_root)
     self.addCleanup(BuildRoot().reset)
 
     # We need a pants.ini, even if empty. get_buildroot() uses its presence.

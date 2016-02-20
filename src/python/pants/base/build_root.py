@@ -11,17 +11,30 @@ from contextlib import contextmanager
 from pants.util.meta import Singleton
 
 
-# TODO: Even this should probably just be a new-style option?
 class BuildRoot(Singleton):
   """Represents the global workspace build root.
 
-  By default a pants workspace is defined by a root directory where the workspace configuration
-  file - 'pants.ini' - lives.  This path can also be manipulated through this interface for
-  re-location of the build root in tests.
+  By default the root of the pants workspace is the directory in which the runner script
+  is located.
+
+  This path can also be manipulated through this interface for re-location of the
+  build root in tests.
   """
 
   class NotFoundError(Exception):
     """Raised when unable to find the current workspace build root."""
+
+  @classmethod
+  def detect_buildroot(cls):
+    cwd = os.getcwd()
+    # As a sanity check, verify that there's a pants runner script in the cwd.
+    # Technically this check will false-positive if run in a dir that isn't the buildroot
+    # but which happens to contain a file called 'pants'. But that seems unlikely in practice.
+    pants_runner = os.path.join(cwd, 'pants')
+    if not os.path.isfile(pants_runner):
+      raise cls.NotFoundError('The current working directory does not appear to be the root of '
+                              'a Pants workspace.')
+    return cwd
 
   def __init__(self):
     self._root_dir = None
@@ -30,17 +43,10 @@ class BuildRoot(Singleton):
   def path(self):
     """Returns the build root for the current workspace."""
     if self._root_dir is None:
-      buildroot = os.path.abspath(os.getcwd())
-      while not os.path.exists(os.path.join(buildroot, 'pants.ini')):
-        if buildroot != os.path.dirname(buildroot):
-          buildroot = os.path.dirname(buildroot)
-        else:
-          raise self.NotFoundError('Could not find pants.ini!')
-      self._root_dir = os.path.realpath(buildroot)
+      self._root_dir = os.path.realpath(self.detect_buildroot())
     return self._root_dir
 
-  @path.setter
-  def path(self, root_dir):
+  def set_path(self, root_dir):
     """Manually establishes the build root for the current workspace."""
     path = os.path.realpath(root_dir)
     if not os.path.exists(path):
