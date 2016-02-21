@@ -8,52 +8,61 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.base.parse_context import ParseContext
+from pants.base.specs import DescendantAddresses
 from pants.bin.goal_runner import OptionsInitializer
-from pants.engine.exp.legacy.parsers import legacy_python_callbacks_parser
+from pants.build_graph.address import Address
+from pants.engine.exp.engine import LocalSerialEngine
+from pants.engine.exp.graph import SourceRoots, create_graph_tasks
+from pants.engine.exp.legacy.parsers import LegacyPythonCallbacksParser
 from pants.engine.exp.mapper import AddressMapper
+from pants.engine.exp.parsers import SymbolTable
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Return, State, Throw
 from pants.engine.exp.targets import Target
+from pants.util.memo import memoized_method
+
+
+class LegacyTable(SymbolTable):
+
+  @classmethod
+  @memoized_method
+  def aliases(cls):
+    """TODO: This is a nasty escape hatch to pass aliases to LegacyPythonCallbacksParser."""
+    options, build_config = OptionsInitializer().setup()
+    return build_config.registered_aliases()
+
+  @classmethod
+  @memoized_method
+  def table(cls):
+    return {alias: Target for alias in cls.aliases().target_types}
 
 
 def list():
-  """Lists all addresses under the current build root subject to `--spec-excludes` constraints."""
+  """Lists all addresses under the current build root."""
+
   build_root = get_buildroot()
+  source_roots = SourceRoots(build_root, tuple())
+  symbol_table_cls = LegacyTable
+  address_mapper = AddressMapper(build_root,
+                                 symbol_table_cls=symbol_table_cls,
+                                 parser_cls=LegacyPythonCallbacksParser)
 
-  options, build_config = OptionsInitializer().setup()
-  aliases = build_config.registered_aliases()
+  # Create a Scheduler containing only the graph tasks, with a single installed goal that
+  # requests an Address.
+  goal = 'list'
+  tasks = create_graph_tasks(address_mapper, symbol_table_cls, source_roots)
+  scheduler = LocalScheduler({goal: Address}, symbol_table_cls, tasks)
 
-  symbol_table = {alias: Target for alias in aliases.target_types}
+  # Execute a request for the root.
+  build_request = BuildRequest(goals=[goal], spec_roots=[DescendantAddresses(build_root)])
+  result = LocalSerialEngine(scheduler).execute(build_request)
+  if result.error:
+    raise result.error
 
-  object_table = aliases.objects
-
-  def per_path_symbol_factory(path, global_symbols):
-    per_path_symbols = {}
-
-    symbols = global_symbols.copy()
-    for alias, target_macro_factory in aliases.target_macro_factories.items():
-      for target_type in target_macro_factory.target_types:
-        symbols[target_type] = lambda *args, **kwargs: per_path_symbols[alias](*args, **kwargs)
-
-    parse_context = ParseContext(rel_path=os.path.relpath(os.path.dirname(path), build_root),
-                                 type_aliases=symbols)
-
-    for alias, object_factory in aliases.context_aware_object_factories.items():
-      per_path_symbols[alias] = object_factory(parse_context)
-
-    for alias, target_macro_factory in aliases.target_macro_factories.items():
-      target_macro = target_macro_factory.target_macro(parse_context)
-      per_path_symbols[alias] = target_macro
-      for target_type in target_macro_factory.target_types:
-        per_path_symbols[target_type] = target_macro
-
-    return per_path_symbols
-
-  parser = legacy_python_callbacks_parser(symbol_table,
-                                          object_table=object_table,
-                                          per_path_symbol_factory=per_path_symbol_factory)
-  mapper = AddressMapper(build_root, parser=parser)
-
-  # Should use build_ignore_patterns instead.
-  spec_excludes = None
-  for address, obj in mapper.walk_addressables(path_excludes=spec_excludes):
-    print(address.spec)
+  # Render the output.
+  for state in result.root_products.values():
+    if type(state) is Throw:
+      raise state.exc
+    elif type(state) is not Return:
+      State.raise_unrecognized(dep_state)
+    for address in state.value:
+      print(address)

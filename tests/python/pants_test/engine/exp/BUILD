@@ -24,10 +24,11 @@ python_tests(
   name='engine',
   sources=['test_engine.py'],
   dependencies=[
+    'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
+    'src/python/pants/engine/exp/examples:planners',
     'src/python/pants/engine/exp:engine',
     'src/python/pants/engine/exp:scheduler',
-    'src/python/pants/engine/exp/examples:planners',
   ]
 )
 

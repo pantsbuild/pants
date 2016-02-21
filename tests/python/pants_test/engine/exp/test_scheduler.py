@@ -10,18 +10,21 @@ import unittest
 
 import pytest
 
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
+from pants.engine.exp.addressable import Addresses
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
                                                 Jar, JavaSources, ThriftSources,
                                                 setup_json_scheduler)
-from pants.engine.exp.scheduler import (BuildRequest, PartiallyConsumedInputsError, Return,
-                                        SelectNode, Throw)
+from pants.engine.exp.scheduler import (BuildRequest, DependenciesNode,
+                                        PartiallyConsumedInputsError, Return, SelectNode, Throw)
 
 
 class SchedulerTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
+    self.spec_parser = CmdLineSpecParser(build_root)
     self.scheduler = setup_json_scheduler(build_root)
     self.engine = LocalSerialEngine(self.scheduler)
 
@@ -37,6 +40,7 @@ class SchedulerTest(unittest.TestCase):
     self.consumes_managed_thirdparty = Address.parse('src/java/managed_thirdparty')
     self.managed_guava = Address.parse('3rdparty/jvm/managed:guava')
     self.managed_hadoop = Address.parse('3rdparty/jvm/managed:hadoop-common')
+    self.managed_resolve_latest = Address.parse('3rdparty/jvm/managed:latest-hadoop')
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
   def assert_select_for_subjects(self, walk, product, subjects, variants=None, variant_key=None):
@@ -51,11 +55,16 @@ class SchedulerTest(unittest.TestCase):
     predicate = (lambda _: True) if failures else None
     result = self.engine.execute(build_request)
     self.assertIsNone(result.error)
-    return list(self.scheduler.walk_product_graph(predicate=predicate))
+    return list(self.scheduler.walk_product_graph(build_request, predicate=predicate))
+
+  def request(self, goals, *addresses):
+    return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
+
+  def request_specs(self, goals, *specs):
+    return BuildRequest(goals=goals, spec_roots=specs)
 
   def assert_resolve_only(self, goals, root_specs, jars):
-    build_request = BuildRequest(goals=goals,
-                                 addressable_roots=[Address.parse(spec) for spec in root_specs])
+    build_request = self.request(goals, *root_specs)
     walk = self.build_and_walk(build_request)
 
     # Expect a SelectNode for each of the Jar/Classpath.
@@ -77,13 +86,13 @@ class SchedulerTest(unittest.TestCase):
     # This is different than today.  There is a gen'able target reachable from the java target, but
     # the scheduler 'pull-seeding' has ApacheThriftPlanner stopping short since the subject it's
     # handed is not thrift.
-    build_request = BuildRequest(goals=['gen'], addressable_roots=[self.java])
+    build_request = self.request(['gen'], self.java)
     walk = self.build_and_walk(build_request)
 
     self.assert_select_for_subjects(walk, JavaSources, [self.java])
 
   def test_gen(self):
-    build_request = BuildRequest(goals=['gen'], addressable_roots=[self.thrift])
+    build_request = self.request(['gen'], self.thrift)
     walk = self.build_and_walk(build_request)
 
     # Root: expect the synthetic GenGoal product.
@@ -99,7 +108,7 @@ class SchedulerTest(unittest.TestCase):
                                     variants=variants, variant_key='thrift')
 
   def test_codegen_simple(self):
-    build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java])
+    build_request = self.request(['compile'], self.java)
     walk = self.build_and_walk(build_request)
 
     # The subgraph below 'src/thrift/codegen/simple' will be affected by its default variants.
@@ -122,7 +131,7 @@ class SchedulerTest(unittest.TestCase):
                                     variants={'thrift': 'apache_java'})
 
   def test_consumes_resources(self):
-    build_request = BuildRequest(goals=['compile'], addressable_roots=[self.consumes_resources])
+    build_request = self.request(['compile'], self.consumes_resources)
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
@@ -139,8 +148,7 @@ class SchedulerTest(unittest.TestCase):
 
   def test_managed_resolve(self):
     """A managed resolve should consume a ManagedResolve and ManagedJars to produce Jars."""
-    build_request = BuildRequest(goals=['compile'],
-                                 addressable_roots=[self.consumes_managed_thirdparty])
+    build_request = self.request(['compile'], self.consumes_managed_thirdparty)
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
@@ -162,8 +170,7 @@ class SchedulerTest(unittest.TestCase):
 
   def test_dependency_inference(self):
     """Scala dependency inference introduces dependencies that do not exist in BUILD files."""
-    build_request = BuildRequest(goals=['compile'],
-                                 addressable_roots=[self.inferred_deps])
+    build_request = self.request(['compile'], self.inferred_deps)
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
@@ -176,7 +183,7 @@ class SchedulerTest(unittest.TestCase):
 
   def test_multiple_classpath_entries(self):
     """Multiple Classpath products for a single subject currently cause a failure."""
-    build_request = BuildRequest(goals=['compile'], addressable_roots=[self.java_multi])
+    build_request = self.request(['compile'], self.java_multi)
     walk = self.build_and_walk(build_request, failures=True)
 
     # Validate that the root failed.
@@ -186,8 +193,7 @@ class SchedulerTest(unittest.TestCase):
 
   def test_no_variant_thrift(self):
     """No `thrift` variant is configured, and so no configuration is selected."""
-    build_request = BuildRequest(goals=['compile'],
-                                 addressable_roots=[self.no_variant_thrift])
+    build_request = self.request(['compile'], self.no_variant_thrift)
 
     with self.assertRaises(PartiallyConsumedInputsError):
       self.build_and_walk(build_request)
@@ -197,8 +203,41 @@ class SchedulerTest(unittest.TestCase):
 
     A target with ThriftSources doesn't have a thrift config: that input is partially consumed.
     """
-    build_request = BuildRequest(goals=['compile'],
-                                 addressable_roots=[self.unconfigured_thrift])
+    build_request = self.request(['compile'], self.unconfigured_thrift)
 
     with self.assertRaises(PartiallyConsumedInputsError):
       self.build_and_walk(build_request)
+
+  def test_descendant_specs(self):
+    """Test that Addresses are produced via recursive globs of the 3rdparty/jvm directory."""
+    spec = self.spec_parser.parse_spec('3rdparty/jvm::')
+    build_request = self.request_specs(['list'], spec)
+    walk = self.build_and_walk(build_request)
+
+    # Validate the root.
+    root, root_state = walk[0][0]
+    root_value = root_state.value
+    self.assertEqual(DependenciesNode(spec, Address, None, Addresses), root)
+    self.assertEqual(list, type(root_value))
+
+    # Confirm that a few expected addresses are in the list.
+    self.assertIn(self.guava, root_value)
+    self.assertIn(self.managed_guava, root_value)
+    self.assertIn(self.managed_resolve_latest, root_value)
+
+  def test_sibling_specs(self):
+    """Test that sibling Addresses are parsed in the 3rdparty/jvm directory."""
+    spec = self.spec_parser.parse_spec('3rdparty/jvm:')
+    build_request = self.request_specs(['list'], spec)
+    walk = self.build_and_walk(build_request)
+
+    # Validate the root.
+    root, root_state = walk[0][0]
+    root_value = root_state.value
+    self.assertEqual(DependenciesNode(spec, Address, None, Addresses), root)
+    self.assertEqual(list, type(root_value))
+
+    # Confirm that an expected address is in the list.
+    self.assertIn(self.guava, root_value)
+    # And that an subdirectory address is not.
+    self.assertNotIn(self.managed_guava, root_value)
