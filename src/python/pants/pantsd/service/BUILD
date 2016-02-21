@@ -27,3 +27,11 @@ python_library(
     'src/python/pants/pantsd:pailgun_server'
   ]
 )
+
+python_library(
+  name = 'scheduler_service',
+  sources = ['scheduler_service.py'],
+  dependencies = [
+    ':pants_service'
+  ]
+)

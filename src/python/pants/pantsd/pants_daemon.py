@@ -128,9 +128,6 @@ class PantsDaemon(ProcessManager):
     # Reset RunTracker state.
     RunTracker.global_instance().reset(reset_options=False)
 
-    # Reset Subsystem options.
-    Subsystem.set_options(None)
-
     # Reset Goals and Tasks.
     Goal.clear()
 

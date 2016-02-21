@@ -22,6 +22,9 @@ class TestExecutor(object):
     result = closure(*args, **kwargs)
     return self.FakeFuture(lambda: True, lambda: result)
 
+  def shutdown(self):
+    pass
+
 
 class TestFSEventService(BaseTest):
   PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -35,13 +38,16 @@ class TestFSEventService(BaseTest):
     self.service = FSEventService(self.BUILD_ROOT, TestExecutor())
     self.service.register_simple_handler('test', lambda x: True)
     self.service.register_simple_handler('test2', lambda x: False)
+    self.service.register_all_files_handler(lambda x: True)
 
-  def test_register_simple_handler(self):
+  def test_registration(self):
     # N.B. This test implicitly tests register_handler; no need to duplicate work.
     self.assertTrue('test' in self.service._handlers)
     self.assertTrue('test2' in self.service._handlers)
+    self.assertTrue('all_files' in self.service._handlers)
     self.assertIsInstance(self.service._handlers['test'], Watchman.EventHandler)
     self.assertIsInstance(self.service._handlers['test2'], Watchman.EventHandler)
+    self.assertIsInstance(self.service._handlers['all_files'], Watchman.EventHandler)
 
   def test_register_simple_handler_duplicate(self):
     with self.assertRaises(AssertionError):

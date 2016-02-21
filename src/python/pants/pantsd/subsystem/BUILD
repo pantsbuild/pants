@@ -14,8 +14,11 @@ python_library(
   name = 'pants_daemon_launcher',
   sources = ['pants_daemon_launcher.py'],
   dependencies = [
+    '3rdparty/python:futures',
     'src/python/pants/base:build_environment',
+    'src/python/pants/pantsd/service:fs_event_service',
     'src/python/pants/pantsd/service:pailgun_service',
+    'src/python/pants/pantsd/service:scheduler_service',
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/process',
     'src/python/pants/subsystem:subsystem'
