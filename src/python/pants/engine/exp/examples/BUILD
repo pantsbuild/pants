@@ -21,6 +21,7 @@ python_library(
   sources=['visualizer.py'],
   dependencies=[
     ':planners',
+    'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:engine',

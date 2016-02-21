@@ -10,8 +10,9 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import parse_variants
+from pants.engine.exp.addressable import Addresses, parse_variants
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target, Variants
 from pants.util.meta import AbstractClass
@@ -58,7 +59,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
 
 
 class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Selector):
-  """Selects the dependencies of a Product for the Subject provided to the constructor.
+  """Selects a product for each of the dependencies of a product for the Subject.
 
   The dependencies declared on `deps_product` will be provided to the requesting task
   in the order they were declared.
@@ -69,7 +70,7 @@ class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), 
     return DependenciesNode(subject, self.product, variants, self.deps_product)
 
 
-class SelectProjection(datatype('Projection', ['product', 'projected_product', 'field', 'input_product']), Selector):
+class SelectProjection(datatype('Projection', ['product', 'projected_product', 'fields', 'input_product']), Selector):
   """Selects a field of the given Subject to produce a Subject, Product dependency from.
 
   Projecting an input allows for deduplication in the graph, where multiple Subjects
@@ -82,11 +83,11 @@ class SelectProjection(datatype('Projection', ['product', 'projected_product', '
     if not type(subject) == self.input_product:
       return None
 
-    # Find the field of the Subject to project.
-    projected_field = getattr(subject, self.field, None)
-    if projected_field is None:
-      raise ValueError('Subject {} has no field {} to project.'.format(subject, self.field))
-    projected_subject = self.projected_product(projected_field)
+    # Find the fields of the Subject to project.
+    values = []
+    for field in self.fields:
+      values.append(getattr(subject, field))
+    projected_subject = self.projected_product(*values)
     return SelectNode(projected_subject, self.product, variants, None)
 
 
@@ -432,26 +433,26 @@ class ProductGraph(object):
 
     Return a path of Nodes that describe the cycle, or None.
     """
-    path = OrderedSet()
+    parents = set()
     walked = set()
     def _walk(node):
-      if node in path:
-        return tuple(path) + (node,)
+      if node in parents:
+        return True
       if node in walked:
-        return None
-      path.add(node)
+        return False
+      parents.add(node)
       walked.add(node)
 
       for dep in self.dependencies_of(node):
         found = _walk(dep)
-        if found is not None:
+        if found:
           return found
-      path.discard(node)
-      return None
+      parents.discard(node)
+      return False
 
     # Initialize the path with src (since the edge from src->dest may not actually exist), and
     # then walk from the dest.
-    path.update([src])
+    parents.add(src)
     return _walk(dest)
 
   def _add_dependencies(self, node, dependencies):
@@ -471,8 +472,7 @@ class ProductGraph(object):
       if dependency in self._dependencies[node]:
         continue
       self.validate_node(dependency)
-      cycle_path = self._detect_cycle(node, dependency)
-      if cycle_path:
+      if self._detect_cycle(node, dependency):
         self._cyclic_dependencies[node].add(dependency)
       else:
         self._dependencies[node].add(dependency)
@@ -527,6 +527,13 @@ class ProductGraph(object):
     for entry in _walk(_filtered_entries(roots)):
       yield entry
 
+  def clear(self):
+    """Clears all state of the ProductGraph. Exposed for testing."""
+    self._dependencies.clear()
+    self._dependents.clear()
+    self._cyclic_dependencies.clear()
+    self._node_results.clear()
+
 
 class NodeBuilder(object):
   """Encapsulates the details of creating Nodes that involve user-defined functions/tasks.
@@ -535,42 +542,38 @@ class NodeBuilder(object):
   """
 
   @classmethod
-  def create(cls, tasks, symbol_table_cls):
+  def create(cls, tasks):
     """Indexes tasks by their output type."""
     serializable_tasks = defaultdict(set)
     for output_type, input_selects, task in tasks:
       serializable_tasks[output_type].add((task, tuple(input_selects)))
-    literal_products = set(symbol_table_cls.table().values())
-    return cls(serializable_tasks, literal_products)
+    return cls(serializable_tasks)
 
-  def __init__(self, tasks, literal_products):
+  def __init__(self, tasks):
     self._tasks = tasks
-    self._literal_products = literal_products
 
   def task_nodes(self, subject, product, variants):
     # Tasks.
     for task, anded_clause in self._tasks[product]:
+      # NB: we eagerly apply the Tasks' Selectors here to avoid creating Nodes which
+      # are unsatisfiable.
+      if any(c.construct_node(subject, variants) is None for c in anded_clause):
+        continue
       yield TaskNode(subject, product, variants, task, anded_clause)
-    # An Address that might be resolved as a literal value from a build file.
-    # TODO: This defines a special case for Addresses by recognizing that they might be-a literal
-    # Product after resolution, and so it begins by attempting to resolve a Struct for
-    # a subject Address. This type of cast/conversion should likely be reified.
-    if isinstance(subject, Address) and product in self._literal_products:
-      yield SelectNode(subject, Struct, None, None)
 
 
 class BuildRequest(object):
   """Describes the user-requested build."""
 
-  def __init__(self, goals, addressable_roots):
+  def __init__(self, goals, spec_roots):
     """
     :param goals: The list of goal names supplied on the command line.
     :type goals: list of string
-    :param addressable_roots: The list of addresses supplied on the command line.
-    :type addressable_roots: list of :class:`pants.build_graph.address.Address`
+    :param spec_roots: The list of specs supplied on the command line.
+    :type spec_roots: list of :class:`pants.base.specs.Spec`
     """
     self._goals = goals
-    self._addressable_roots = addressable_roots
+    self._spec_roots = spec_roots
 
   @property
   def goals(self):
@@ -580,17 +583,22 @@ class BuildRequest(object):
     """
     return self._goals
 
-  @property
-  def addressable_roots(self):
-    """Return the list of addresses supplied on the command line.
-
-    :rtype: list of :class:`pants.build_graph.address.Address`
-    """
-    return self._addressable_roots
+  def roots(self, products_by_goal):
+    """Determine the root Nodes for the products and subjects selected by the goals and specs."""
+    for goal_name in self.goals:
+      product = products_by_goal[goal_name]
+      for spec_root in self._spec_roots:
+        if type(spec_root) is SingleAddress:
+          subject, variants = parse_variants(Address.parse(spec_root.to_spec_string()))
+          yield SelectNode(subject, product, variants, None)
+        elif type(spec_root) in [SiblingAddresses, DescendantAddresses]:
+          yield DependenciesNode(spec_root, product, None, Addresses)
+        else:
+          raise ValueError('Unsupported command line spec type: {}'.format(spec_root))
 
   def __repr__(self):
-    return ('BuildRequest(goals={!r}, addressable_roots={!r})'
-            .format(self._goals, self._addressable_roots))
+    return ('BuildRequest(goals={!r}, spec_roots={!r})'
+            .format(self._goals, self._spec_roots))
 
 
 class Promise(object):
@@ -622,35 +630,25 @@ class Promise(object):
       return self._success
 
 
-class Step(object):
-  def __init__(self, step_id, node, dependencies, node_builder):
-    self._step_id = step_id
-    self._node = node
-    self._dependencies = dependencies
-    self._node_builder = node_builder
-
+class Step(datatype('Step', ['step_id', 'node', 'dependencies', 'node_builder'])):
   def __call__(self):
     """Called by the Engine in order to execute this Step."""
-    return self._node.step(self._dependencies, self._node_builder)
-
-  @property
-  def node(self):
-    return self._node
+    return self.node.step(self.dependencies, self.node_builder)
 
   def __eq__(self, other):
-    return type(self) == type(other) and self._step_id == other._step_id
+    return type(self) == type(other) and self.step_id == other.step_id
 
   def __ne__(self, other):
     return not (self == other)
 
   def __hash__(self):
-    return hash(self._step_id)
+    return hash(self.step_id)
 
   def __repr__(self):
     return str(self)
 
   def __str__(self):
-    return 'Step({}, {})'.format(self._step_id, self._node)
+    return 'Step({}, {})'.format(self.step_id, self.node)
 
 
 class GraphValidator(object):
@@ -756,9 +754,8 @@ class LocalScheduler(object):
     """
     self._goals = goals
     self._graph_validator = GraphValidator(symbol_table_cls)
-    self._node_builder = NodeBuilder.create(tasks, symbol_table_cls)
+    self._node_builder = NodeBuilder.create(tasks)
     self._product_graph = ProductGraph()
-    self._roots = set()
     self._step_id = -1
 
   def _create_step(self, node):
@@ -769,35 +766,25 @@ class LocalScheduler(object):
     ProductGraph.validate_node(node)
 
     # See whether all of the dependencies for the node are available.
-    deps = {dep: self._product_graph.state(dep)
-            for dep in self._product_graph.dependencies_of(node)}
-    if any(state is None for state in deps.values()):
-      return None
-
+    deps = dict()
+    for dep in self._product_graph.dependencies_of(node):
+      state = self._product_graph.state(dep)
+      if state is None:
+        return None
+      deps[dep] = state
     # Additionally, include Noops for any dependencies that were cyclic.
-    cyclic_deps = {dep: Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
-                   for dep in self._product_graph.cyclic_dependencies_of(node)}
-    deps.update(cyclic_deps)
+    for dep in self._product_graph.cyclic_dependencies_of(node):
+      deps[dep] = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
 
     # Ready.
     self._step_id += 1
     return (Step(self._step_id, node, deps, self._node_builder), Promise())
 
-  def _create_roots(self, build_request):
-    # Determine the root products and subjects based on the request.
-    root_subjects = [parse_variants(a) for a in build_request.addressable_roots]
-    root_products = OrderedSet()
-    for goal_name in build_request.goals:
-      root_products.add(self._goals[goal_name])
-
-    # Roots are products that might be possible to produce for these subjects.
-    return [SelectNode(s, p, v, None) for s, v in root_subjects for p in root_products]
-
   @property
   def product_graph(self):
     return self._product_graph
 
-  def walk_product_graph(self, predicate=None):
+  def walk_product_graph(self, build_request, predicate=None):
     """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
 
     Each node entry is actually a tuple of (Node, State), and each yielded value is
@@ -806,12 +793,12 @@ class LocalScheduler(object):
     The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
     that don't match it. The default predicate eliminates all `Noop` subgraphs.
     """
-    for entry in self._product_graph.walk(self._roots, predicate=predicate):
+    for entry in self._product_graph.walk(build_request.roots(self._goals), predicate=predicate):
       yield entry
 
-  def root_entries(self):
-    """Returns the roots for this scheduler as a dict from Node to State."""
-    return {root: self._product_graph.state(root) for root in self._roots}
+  def root_entries(self, build_request):
+    """Returns the roots for the given BuildRequest as a dict from Node to State."""
+    return {root: self._product_graph.state(root) for root in build_request.roots(self._goals)}
 
   def schedule(self, build_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -822,12 +809,12 @@ class LocalScheduler(object):
     """
 
     pg = self._product_graph
-    self._roots.update(self._create_roots(build_request))
+    roots = build_request.roots(self._goals)
 
     # A dict from Node to a possibly executing Step. Only one Step exists for a Node at a time.
     outstanding = {}
     # Nodes that might need to have Steps created (after any outstanding Step returns).
-    candidates = set(root for root in self._roots)
+    candidates = set(roots)
 
     # Yield nodes that are ready, and then compute new ones.
     scheduling_iterations = 0
@@ -882,7 +869,7 @@ class LocalScheduler(object):
             len(pg.dependencies()),
             scheduling_iterations,
             self._step_id,
-            sum(1 for _ in pg.walk(self._roots))))
+            sum(1 for _ in pg.walk(roots))))
 
   def validate(self):
     """Validates the generated product graph with the configured GraphValidator."""

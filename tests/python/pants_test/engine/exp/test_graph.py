@@ -8,10 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
+from pants.engine.exp.graph import ResolvedTypeMismatchError, SourceRoots, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
@@ -74,26 +75,30 @@ class TestTable(SymbolTable):
 class GraphTestBase(unittest.TestCase):
   _goal = 'parse'
   _product = Struct
+  _build_root = os.path.dirname(__file__)
+  _cmd_line_spec_parser = CmdLineSpecParser(_build_root)
 
   def _select(self, address):
     return SelectNode(address, self._product, None, None)
 
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     symbol_table_cls = TestTable
-    mapper = AddressMapper(build_root=os.path.dirname(__file__),
+    source_roots = SourceRoots(self._build_root, tuple())
+    mapper = AddressMapper(build_root=self._build_root,
                            symbol_table_cls=symbol_table_cls,
                            build_pattern=build_pattern,
                            parser_cls=parser_cls)
     return LocalScheduler({self._goal: self._product},
                           symbol_table_cls,
-                          create_graph_tasks(mapper))
+                          create_graph_tasks(mapper, symbol_table_cls, source_roots))
 
   def create_json(self):
     return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
 
   def _populate(self, scheduler, address):
     """Make a BuildRequest to parse the given Address into a Struct."""
-    request = BuildRequest(goals=[self._goal], addressable_roots=[address])
+    spec = self._cmd_line_spec_parser.parse_spec(str(address))
+    request = BuildRequest(goals=[self._goal], spec_roots=[spec])
     LocalSerialEngine(scheduler).reduce(request)
     return self._select(address)
 

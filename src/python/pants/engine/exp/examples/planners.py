@@ -13,7 +13,7 @@ from abc import abstractmethod, abstractproperty
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
-from pants.engine.exp.graph import Directory, create_graph_tasks
+from pants.engine.exp.graph import Directory, SourceRoots, create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
@@ -66,11 +66,6 @@ class ImportedJVMPackages(datatype('ImportedJVMPackages', ['dependencies'])):
 
 class JVMPackageName(datatype('JVMPackageName', ['name'])):
   """A typedef to represent a fully qualified JVM package name."""
-  pass
-
-
-class SourceRoots(datatype('SourceRoots', ['buildroot', 'srcroots'])):
-  """Placeholder for the SourceRoot subsystem."""
   pass
 
 
@@ -383,8 +378,9 @@ def setup_json_scheduler(build_root):
 
   :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
   """
+  symbol_table_cls = ExampleTable
   address_mapper = AddressMapper(build_root=build_root,
-                                 symbol_table_cls=ExampleTable,
+                                 symbol_table_cls=symbol_table_cls,
                                  build_pattern=r'^BLD.json$',
                                  parser_cls=JsonParser)
 
@@ -399,6 +395,7 @@ def setup_json_scheduler(build_root):
       'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
       'resolve': Classpath,
+      'list': Address,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
     }
@@ -435,9 +432,6 @@ def setup_json_scheduler(build_root):
         Select(ScalaInferredDepsSources),
         SelectLiteral(source_roots, SourceRoots)],
        extract_scala_imports),
-      # TODO: The request for an AddressFamily for each member of a SearchPath will fail whenever
-      # a member of the path doesn't exist. Need to allow for optional products and to then
-      # request the AddressFamilies optionally here.
       (Address,
        [Select(JVMPackageName),
         SelectDependencies(AddressFamily, SearchPath)],
@@ -480,8 +474,8 @@ def setup_json_scheduler(build_root):
        [Select(UnpickleableOutput)],
        unpickleable_input),
     ] + (
-      create_graph_tasks(address_mapper)
+      create_graph_tasks(address_mapper, symbol_table_cls, source_roots)
     )
 
-  scheduler = LocalScheduler(goals, ExampleTable, tasks)
+  scheduler = LocalScheduler(goals, symbol_table_cls, tasks)
   return scheduler

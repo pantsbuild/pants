@@ -18,7 +18,7 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Directory(datatype('Directory', ['path'])):
+class Addresses(datatype('Addresses', ['dependencies'])):
   pass
 
 

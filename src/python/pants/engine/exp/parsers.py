@@ -66,9 +66,10 @@ class SymbolTable(AbstractClass):
 class Parser(AbstractClass):
   @classmethod
   @abstractmethod
-  def parse(cls, path, symbol_table):
+  def parse(cls, path, symbol_table_cls):
     """
-    :param dict symbol_table: A symbol table to expose to the python file being parsed.
+    :param string path: Path to file to parse.
+    :param dict symbol_table_cls: A symbol table to expose to the python file being parsed.
     :returns: A callable that accepts a string path and returns a list of decoded addressable,
               Serializable objects.  The callable will raise :class:`ParseError` if there were any
               problems encountered parsing the python BUILD file at the given path.
