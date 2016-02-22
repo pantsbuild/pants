@@ -58,8 +58,6 @@ class Options(object):
       (because of automatic config file fallback to that section).
     - The hard-coded value provided at registration time.
     - None.
-
-  :API: public
   """
 
   class OptionTrackerRequiredError(Exception):
@@ -88,8 +86,6 @@ class Options(object):
   def create(cls, env, config, known_scope_infos, args=None, bootstrap_option_values=None,
              option_tracker=None,):
     """Create an Options instance.
-
-    :API: public
 
     :param env: a dict of environment variables.
     :param config: data from a config file (must support config.get[list](section, name, default=)).
