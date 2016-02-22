@@ -70,8 +70,6 @@ class Options(object):
     """Expand a set of scopes to include all enclosing scopes.
 
     E.g., if the set contains `foo.bar.baz`, ensure that it also contains `foo.bar` and `foo`.
-
-    :API: public
     """
     ret = {GlobalOptionsRegistrar.get_scope_info()}
     for scope_info in scope_infos:
