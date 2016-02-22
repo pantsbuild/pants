@@ -217,6 +217,9 @@ class IvyInfo(object):
           resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
     return resolved_jars
 
+  def __repr__(self):
+    return 'IvyInfo(conf={}, refs={})'.format(self._conf, self.modules_by_ref.keys())
+
 
 class IvyUtils(object):
   """Useful methods related to interaction with ivy."""
