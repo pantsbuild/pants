@@ -295,6 +295,9 @@ class JarPublish(ScmPublishMixin, JarTask):
     other artifact.
     """
 
+  class DuplicateArtifactError(TaskError):
+    """An artifact was defined by two different targets."""
+
   @classmethod
   def register_options(cls, register):
     super(JarPublish, cls).register_options(register)
@@ -784,7 +787,25 @@ class JarPublish(ScmPublishMixin, JarTask):
                                               suffix,
                                               extension))
 
+  def check_for_duplicate_artifacts(self, targets):
+    targets_by_artifact = defaultdict(list)
+    duplicates = set()
+    for target in targets:
+      artifact = target.provides
+      if artifact in targets_by_artifact:
+        duplicates.add(artifact)
+      targets_by_artifact[artifact].append(target)
+
+    def duplication_message(artifact):
+      specs = sorted('\n    {}'.format(t.address.spec) for t in targets_by_artifact[artifact])
+      return '\n  {artifact} is defined by:{specs}'.format(artifact=artifact, specs=''.join(specs))
+
+    if duplicates:
+      raise self.DuplicateArtifactError('Multiple targets define the same artifacts!\n{}'.format(
+        '\n'.join(duplication_message(artifact) for artifact in duplicates)))
+
   def check_targets(self, targets):
+    self.check_for_duplicate_artifacts(targets)
     invalid = defaultdict(lambda: defaultdict(set))
     derived_by_target = defaultdict(set)
 
