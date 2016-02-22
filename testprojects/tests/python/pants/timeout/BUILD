@@ -5,3 +5,8 @@ python_tests(
   name = 'sleeping_target',
   sources = ['test_sleep.py'],
 )
+
+python_tests(
+  name = 'ignore_terminate_target',
+  sources = ['test_ignore_terminate.py']
+)

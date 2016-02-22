@@ -26,6 +26,10 @@ class ProcessHandler(object):
   def terminate(self):
     raise NotImplementedError
 
+  @abstractmethod
+  def poll(self):
+    raise NotImplementedError
+
 
 class SubprocessProcessHandler(ProcessHandler):
   """The simple passthrough class for a subprocess.Popen object."""
@@ -41,3 +45,6 @@ class SubprocessProcessHandler(ProcessHandler):
 
   def terminate(self):
     return self._process.terminate()
+
+  def poll(self):
+    return self._process.poll()

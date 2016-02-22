@@ -52,6 +52,9 @@ class TestRunnerTaskMixinTest(TaskTestBase):
           def terminate(_):
             self.call_list.append(['process_handler.terminate'])
 
+          def poll(_):
+            self.call_list.append(['process_handler.poll'])
+
         return FakeProcessHandler()
 
       def _get_targets(self):
@@ -132,7 +135,7 @@ class TestRunnerTaskMixinTest(TaskTestBase):
       task.execute()
 
 
-class TestRunnerTaskMixinTimeoutTest(TaskTestBase):
+class TestRunnerTaskMixinSimpleTimeoutTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     class TestRunnerTaskMixinTask(TestRunnerTaskMixin, TaskBase):
@@ -155,6 +158,10 @@ class TestRunnerTaskMixinTimeoutTest(TaskTestBase):
 
           def terminate(_):
             self.call_list.append(['process_handler.terminate'])
+
+          def poll(_):
+            self.call_list.append(['process_handler.poll'])
+            return 0
 
         return FakeProcessHandler()
 
@@ -196,3 +203,107 @@ class TestRunnerTaskMixinTimeoutTest(TaskTestBase):
       # Ensures that Timeout is instantiated with no timeout.
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (None,))
+
+
+class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
+
+  def create_process_handler(self, return_none_first=True):
+    class FakeProcessHandler(ProcessHandler):
+      call_list = []
+      poll_called = False
+
+      def wait(self):
+        self.call_list.append(['process_handler.wait'])
+        return 0
+
+      def kill(self):
+        self.call_list.append(['process_handler.kill'])
+
+      def terminate(self):
+        self.call_list.append(['process_handler.terminate'])
+
+      def poll(self):
+        print("poll called")
+        self.call_list.append(['process_handler.poll'])
+        if not self.poll_called and return_none_first:
+          self.poll_called = True
+          return None
+        else:
+          return 0
+
+    return FakeProcessHandler()
+
+  def task_type(cls):
+    class TestRunnerTaskMixinTask(TestRunnerTaskMixin, TaskBase):
+      call_list = []
+
+      def _execute(self, all_targets):
+        self.call_list.append(['_execute', all_targets])
+        self._spawn_and_wait()
+
+      def _spawn(self, *args, **kwargs):
+        self.call_list.append(['_spawn', args, kwargs])
+
+        return cls.process_handler
+
+      def _get_targets(self):
+        return [targetA, targetB]
+
+      def _test_target_filter(self):
+        def target_filter(target):
+          self.call_list.append(['target_filter', target])
+          if target.name == 'TargetA':
+            return False
+          else:
+            return True
+
+        return target_filter
+
+      def _validate_target(self, target):
+        self.call_list.append(['_validate_target', target])
+
+    return TestRunnerTaskMixinTask
+
+  def test_graceful_terminate_if_poll_is_none(self):
+    self.process_handler = self.create_process_handler(return_none_first=True)
+
+    self.set_options(timeouts=True)
+    task = self.create_task(self.context())
+
+    with patch('pants.task.testrunner_task_mixin.Timer') as mock_timer:
+      def set_handler(dummy, handler):
+        mock_timer_instance = mock_timer.return_value
+        mock_timer_instance.start.side_effect = handler
+        return mock_timer_instance
+
+      mock_timer.side_effect = set_handler
+
+
+      with self.assertRaises(TestFailedTaskError):
+        task.execute()
+
+      # Ensure that all the calls we want to kill the process gracefully are made.
+      self.assertEqual(self.process_handler.call_list,
+                       [[u'process_handler.terminate'], [u'process_handler.poll'], [u'process_handler.kill'], [u'process_handler.wait']])
+
+  def test_graceful_terminate_if_poll_is_zero(self):
+    self.process_handler = self.create_process_handler(return_none_first=False)
+
+    self.set_options(timeouts=True)
+    task = self.create_task(self.context())
+
+    with patch('pants.task.testrunner_task_mixin.Timer') as mock_timer:
+      def set_handler(dummy, handler):
+        mock_timer_instance = mock_timer.return_value
+        mock_timer_instance.start.side_effect = handler
+        return mock_timer_instance
+
+      mock_timer.side_effect = set_handler
+
+
+      with self.assertRaises(TestFailedTaskError):
+        task.execute()
+
+      # Ensure that we only call terminate, and not kill.
+      self.assertEqual(self.process_handler.call_list,
+                       [[u'process_handler.terminate'], [u'process_handler.poll'], [u'process_handler.wait']])
