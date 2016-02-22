@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
@@ -22,6 +23,7 @@ from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.ivy_task_mixin import (IvyResolveFingerprintStrategy,
                                                     IvyResolveResultClasspathEtc)
 from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_delete
 from pants_test.base_test import BaseTest
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
@@ -33,6 +35,10 @@ def mock_ivy_resolve_returning(resolve_result):
     return resolve_result
 
   return mock
+
+
+def strip_workdir(dir, classpath):
+  return [(conf, path[len(dir):]) for conf, path in classpath]
 
 
 class IvyResolveTest(JvmToolTaskTestBase):
@@ -49,11 +55,10 @@ class IvyResolveTest(JvmToolTaskTestBase):
                                read_from=None,
                                write_to=None)
 
-  def resolve(self, targets, workdir=None):
+  def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
-    opts = {'': {'pants_workdir': workdir}} if workdir else None
-    context = self.context(target_roots=targets, options=opts)
-    self.create_task(context, workdir=workdir).execute()
+    context = self.context(target_roots=targets)
+    self.create_task(context).execute()
     return context.products.get_data('compile_classpath')
 
   #
@@ -172,7 +177,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     self.assertNotIn(no_classifier.coordinate, coordinates_for(classifier_cp))
     self.assertIn(classifier.coordinate, coordinates_for(classifier_cp))
 
-  @ensure_cached(IvyResolve, expected_num_artifacts=0)
+  @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
 
@@ -224,55 +229,128 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     self.assertEquals(2, len(classpath))
 
-  @ensure_cached(IvyResolve, expected_num_artifacts=1)
-  def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
-    junit_dep = JarDependency('junit', 'junit', rev='4.12')
-
-    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
-    excluding_target = self.make_target('//:b', JavaLibrary, excludes=[Exclude('junit', 'junit')])
-    compile_classpath = self.resolve([junit_jar_lib, excluding_target])
-
-  @ensure_cached(IvyResolve, expected_num_artifacts=1)
   def test_fetch_resolve_has_same_resolved_jars_as_full(self):
-
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
     junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+
     with temporary_dir() as cache_dir:
       self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                  read_from=[cache_dir],
                                  write_to=[cache_dir], level='debug')
+      with self._temp_workdir() as workdir1:
+        compile_classpath_1 = self.resolve([junit_jar_lib])
 
-      print('-------------------------------------------------')
-      print('----------------------------first run---------------------')
-      print('-------------------------------------------------')
-      print('-------------------------------------------------')
-
-      with self._temp_workdir() as workdir:
-        compile_classpath_1 = self.resolve([junit_jar_lib], workdir=workdir)
-        self._print_dir_contents(workdir)
-
-      print('-------------------------------------------------')
-      print('----------------------------second run---------------------')
-      print('-------------------------------------------------')
-      print('-------------------------------------------------')
       # Now do a second resolve with a fresh work directory.
       with self._temp_workdir() as workdir2:
+        compile_classpath_2 = self.resolve([junit_jar_lib])
+
+      self.assertEqual(strip_workdir(workdir1, compile_classpath_1.get_for_target(junit_jar_lib)),
+                       strip_workdir(workdir2, compile_classpath_2.get_for_target(junit_jar_lib)))
+
+  def test_loading_valid_full_resolve(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+
+    # Initial resolve does a full resolve and populates elements.
+    context1 = self.context(target_roots=[junit_jar_lib])
+    self.create_task(context1).execute()
+
+    # Second resolve should check files and do no ivy call.
+    context2 = self.context(target_roots=[junit_jar_lib])
+    task = self.create_task(context2)
+    task._do_full_resolve = self.fail
+    task.execute()
+
+    self.assertEqual(context1.products.get_data('compile_classpath'),
+                     context2.products.get_data('compile_classpath'))
+
+  def test_invalid_frozen_resolve_file_raises_exception(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+
+    with self._temp_workdir() as workdir:
+      self.resolve([junit_jar_lib])
+
+      # Find the resolution work dir.
+      ivy_workdir = os.path.join(workdir, 'ivy')
+      ivy_subdirs = os.listdir(ivy_workdir)
+      ivy_subdirs.remove('jars')
+      self.assertEqual(1, len(ivy_subdirs))
+      resolve_workdir = os.path.join(ivy_workdir, ivy_subdirs[0])
+
+      # Remove elements that make resolve guess that the last resolve was a full resolve.
+      safe_delete(os.path.join(resolve_workdir, 'ivy.xml'))
+
+      # Open resolution.json, and make it invalid json.
+      frozen_resolve_filename = os.path.join(resolve_workdir, 'resolution.json')
+      with open(frozen_resolve_filename, 'w') as f:
+        f.write('not json!')
+
+      # then run a resolve.
+      # This should raise a good exception I think.
+      # The alternative would be to decide to force a full resolve
+      # TODO needs a better type / message
+      with self.assertRaises(Exception):
+        self.resolve([junit_jar_lib])
+
+  def test_after_a_successful_fetch_resolve_load_from_fetch(self):
+
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+
+    with temporary_dir() as cache_dir:
+      self.set_options_for_scope('cache.{}'.format(self.options_scope),
+                                 read_from=[cache_dir],
+                                 write_to=[cache_dir], level='debug')
+      with self._temp_workdir() as workdir1:
+        compile_classpath_1 = self.resolve([junit_jar_lib])
+        self._print_dir_contents(workdir1)
+
+      # Now do a second resolve with a fresh work directory.
+      # This will re-use the cached resolve.
+      # We then do a 3rd resolve which will load the results of that fetch resolve rather than
+      # redoing the fetch.
+      with self._temp_workdir() as workdir2:
         self._print_dir_contents(workdir2)
-        compile_classpath_2 = self.resolve([junit_jar_lib], workdir=workdir2)
+        compile_classpath_2 = self.resolve([junit_jar_lib])
         self._print_dir_contents(workdir2)
+        compile_classpath_3 = self.resolve([junit_jar_lib])
 
+      self.assertEqual(strip_workdir(workdir1, compile_classpath_1.get_for_target(junit_jar_lib)),
+                       strip_workdir(workdir2, compile_classpath_2.get_for_target(junit_jar_lib)))
 
-
-      self.assertEqual(compile_classpath_1.get_for_target(junit_jar_lib),
-                       compile_classpath_2.get_for_target(junit_jar_lib))
-
+  def test_next_thing(self):
+    self.fail()
     # with create cache dir
     #   run with cache dir but fresh workdir
     #   run with same cache dir but fresh workdir again
     #   inspect products
-
-
     result = self.create_task(self.context())._ivy_resolve([junit_jar_lib])
+  # test the path levels
+  # - invalid resolve ->
+  #   full resolve
+  #     assert frozen resolve
+  #     assert ivy called
+  #     assert symlinks
+  #     assert report
+  # - correct frozen resolve file, report ->
+  #   simple fetch load
+  #     assert no ivy call
+  #     ....
+  #     assert symlinks
+  # - correct frozen resolve, no report ->
+  #   fetch action
+  #     assert ivy called
+  #     assert symlinks
+  #     assert report
+  #
+  # - valid, but broken frozen resolve
+  # - valid, correct frozen resolve, but broken fetch report
+  # - valid, correct frozen resolve, but broken full report
+  # - valid, correct frozen resolve, correct fetch report but broken full report
+  # - if everything is broken, but all the targets are valid, either blow up or force a full resolve.
+  #
+  # Fail if versions from report differ from fetched versions.
 
   def _print_dir_contents(self, cache_dir, indent=''):
     if os.path.isdir(cache_dir):
@@ -286,13 +364,16 @@ class IvyResolveTest(JvmToolTaskTestBase):
     for e in list_cachedir:
       self._print_dir_contents(os.path.join(cache_dir, e), indent+'  ')
 
+  @contextmanager
   def _temp_workdir(self):
-    # doing the option munging is no longer necessary I think as we do it in resolve()
-    #old_workdir = self.options['']['pants_workdir']
-    with temporary_dir as workdir:
-      #self.options['']['pants_workdir'] = workdir
+    old_workdir = self.options['']['pants_workdir']
+    with temporary_dir() as workdir:
+      self.set_options_for_scope('', pants_workdir=workdir)
+      self._test_workdir = workdir
       yield workdir
-    #self.options['']['pants_workdir'] = old_workdir
+    self._test_workdir = old_workdir
+    self.set_options_for_scope('', pants_workdir=old_workdir)
+
 
 class IvyResolveFingerprintStrategyTest(BaseTest):
 

@@ -319,3 +319,12 @@ class ClasspathProducts(object):
         raise TaskError(
           'Classpath entry {} for target {} is located outside the working directory "{}".'
           .format(path, target.address.spec, self._pants_workdir))
+
+  def __eq__(self, other):
+    return (isinstance(other, ClasspathProducts) and
+            self._pants_workdir == other._pants_workdir and
+            self._classpaths == other._classpaths and
+            self._excludes == other._excludes)
+
+  def __ne__(self, other):
+    return not self == other
