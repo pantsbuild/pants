@@ -4,9 +4,9 @@
 import time
 
 
-def test_sleep_short():
+def test_within_timeout():
   time.sleep(0.1)
 
 
-def test_sleep_long():
+def test_exceeds_timeout():
   time.sleep(120)
