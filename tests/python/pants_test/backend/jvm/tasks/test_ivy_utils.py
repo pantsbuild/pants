@@ -295,6 +295,23 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
           },
           result1)
 
+  def test_retrieve_resolved_jars_with_coordinates_on_flat_fetch_resolve(self):
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_flat_graph.xml')
+    coordinates = [coord(org='org1', name='name1', classifier='tests', rev='0.0.1')]
+
+    result = ivy_info.get_resolved_jars_for_coordinates(coordinates)
+
+    self.assertEqual(coordinates, [r.coordinate for r in result])
+
+  def test_retrieve_resolved_jars_with_coordinates_differing_on_version_on_flat_fetch_resolve(self):
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_flat_graph.xml')
+    coordinates = [coord(org='org2', name='name2', rev='0.0.0')]
+
+    result = ivy_info.get_resolved_jars_for_coordinates(coordinates)
+
+    self.assertEqual([coord(org='org2', name='name2', rev='0.0.1')],
+                     [r.coordinate for r in result])
+
   def test_parse_fails_when_same_classifier_different_type(self):
     with self.assertRaises(IvyResolveMappingError):
       self.parse_ivy_report('ivy_utils_resources/report_with_same_classifier_different_type.xml')
