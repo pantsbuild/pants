@@ -20,13 +20,18 @@ def stable_json_sha1(obj):
 
 
 class OptionsFingerprinter(object):
-  """Handles fingerprinting options under a given build_graph."""
+  """Handles fingerprinting options under a given build_graph.
+
+  :API: public
+  """
 
   def __init__(self, build_graph):
     self._build_graph = build_graph
 
   def fingerprint(self, option_type, option_val):
     """Returns a hash of the given option_val based on the option_type.
+
+    :API: public
 
     Returns None if option_val is None.
     """
