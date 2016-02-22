@@ -75,7 +75,7 @@ class Engine(AbstractClass):
     try:
       self.reduce(build_request, fail_slow)
       self._scheduler.validate()
-      return self.Result.finished(self._scheduler.root_entries())
+      return self.Result.finished(self._scheduler.root_entries(build_request))
     except TaskError as e:
       return self.Result.failure(e)
 
