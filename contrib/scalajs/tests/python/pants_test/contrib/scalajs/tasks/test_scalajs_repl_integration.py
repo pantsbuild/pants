@@ -12,6 +12,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ScalaJSReplIntegrationTest(PantsRunIntegrationTest):
 
+  def setUp(self):
+    self.maxDiff = None
+
   def test_run_repl(self):
     command = ['-q',
                'repl',

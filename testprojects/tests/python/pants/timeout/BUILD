@@ -2,6 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'sleeping_target',
-  sources = ['test_sleep.py'],
+  name = 'exceeds_timeout',
+  sources = ['test_exceeds_timeout.py'],
+)
+
+python_tests(
+  name = 'ignores_terminate',
+  sources = ['test_ignores_terminate.py']
 )

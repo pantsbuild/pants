@@ -208,6 +208,9 @@ def execute_runner_async(runner, workunit_factory=None, workunit_name=None, work
       def terminate(_):
         return process.terminate()
 
+      def poll(_):
+        return process.poll()
+
     return WorkUnitProcessHandler()
 
 

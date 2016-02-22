@@ -11,7 +11,7 @@ from collections import defaultdict
 from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import StructAddress, parse_variants
+from pants.engine.exp.addressable import parse_variants
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target, Variants
 from pants.util.meta import AbstractClass
@@ -394,6 +394,10 @@ class ProductGraph(object):
     # Dicts from Nodes to sets of dependency/dependent Nodes.
     self._dependencies = defaultdict(set)
     self._dependents = defaultdict(set)
+    # Illegal/cyclic dependencies. We prevent cyclic dependencies from being introduced into the
+    # dependencies/dependents lists themselves, but track them independently in order to provide
+    # context specific error messages when they are introduced.
+    self._cyclic_dependencies = defaultdict(set)
 
   def _set_state(self, node, state):
     existing_state = self._node_results.get(node, None)
@@ -418,10 +422,8 @@ class ProductGraph(object):
     """Updates the Node with the given State."""
     if type(state) in [Return, Throw, Noop]:
       self._set_state(node, state)
-      return state
     elif type(state) == Waiting:
       self._add_dependencies(node, state.dependencies)
-      return self.state(node)
     else:
       raise State.raise_unrecognized(state)
 
@@ -463,24 +465,20 @@ class ProductGraph(object):
     if self.is_complete(node):
       raise ValueError('Node {} is already completed, and cannot be updated.'.format(node))
 
-    # Validate that adding these deps would not cause a cycle.
+    # Add deps. Any deps which would cause a cycle are added to _cyclic_dependencies instead,
+    # and ignored except for the purposes of Step execution.
     for dependency in dependencies:
       if dependency in self._dependencies[node]:
         continue
       self.validate_node(dependency)
       cycle_path = self._detect_cycle(node, dependency)
       if cycle_path:
-        # If a cycle is detected, don't introduce the dependencies, and instead fail the node.
-        entries = ' ->\n  '.join(str(p) for p in cycle_path)
-        self._set_state(node, Noop('Cycle detected in path:\n  {} !!'.format(entries)))
-        return
-
-    # Finally, add all deps.
-    self._dependencies[node].update(dependencies)
-    for dependency in dependencies:
-      self._dependents[dependency].add(node)
-      # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
-      self._dependencies[dependency]
+        self._cyclic_dependencies[node].add(dependency)
+      else:
+        self._dependencies[node].add(dependency)
+        self._dependents[dependency].add(node)
+        # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
+        self._dependencies[dependency]
 
   def dependents(self):
     return self._dependents
@@ -488,11 +486,17 @@ class ProductGraph(object):
   def dependencies(self):
     return self._dependencies
 
+  def cyclic_dependencies(self):
+    return self._cyclic_dependencies
+
   def dependents_of(self, node):
     return self._dependents[node]
 
   def dependencies_of(self, node):
     return self._dependencies[node]
+
+  def cyclic_dependencies_of(self, node):
+    return self._cyclic_dependencies[node]
 
   def walk(self, roots, predicate=None):
     def _default_walk_predicate(entry):
@@ -552,8 +556,7 @@ class NodeBuilder(object):
     # Product after resolution, and so it begins by attempting to resolve a Struct for
     # a subject Address. This type of cast/conversion should likely be reified.
     if isinstance(subject, Address) and product in self._literal_products:
-      struct_address = StructAddress(subject.spec_path, subject.target_name)
-      yield SelectNode(struct_address, Struct, None, None)
+      yield SelectNode(subject, Struct, None, None)
 
 
 class BuildRequest(object):
@@ -770,6 +773,11 @@ class LocalScheduler(object):
             for dep in self._product_graph.dependencies_of(node)}
     if any(state is None for state in deps.values()):
       return None
+
+    # Additionally, include Noops for any dependencies that were cyclic.
+    cyclic_deps = {dep: Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
+                   for dep in self._product_graph.cyclic_dependencies_of(node)}
+    deps.update(cyclic_deps)
 
     # Ready.
     self._step_id += 1
