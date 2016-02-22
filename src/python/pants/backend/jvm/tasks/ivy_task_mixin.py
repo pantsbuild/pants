@@ -298,7 +298,7 @@ class IvyTaskMixin(TaskBase):
 
     return result.resolve_hash_name
 
-  def _blah_print(self, cache_dir, indent=''):
+  def _print_tree(self, cache_dir, indent=''):
     if os.path.isdir(cache_dir):
       list_cachedir = os.listdir(cache_dir)
       val = len(list_cachedir)
@@ -311,7 +311,7 @@ class IvyTaskMixin(TaskBase):
       print('{}...'.format(indent))
       return
     for e in list_cachedir:
-      self._blah_print(os.path.join(cache_dir, e), indent+'  ')
+      self._print_tree(os.path.join(cache_dir, e), indent+'  ')
 
   def _ivy_resolve(self,
                   targets,
