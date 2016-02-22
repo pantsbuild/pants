@@ -25,26 +25,21 @@ class BuildRootTest(unittest.TestCase):
     safe_rmtree(self.new_root)
 
   def test_via_set(self):
-    BuildRoot().path = self.new_root
+    BuildRoot().set_path(self.new_root)
     self.assertEqual(self.new_root, BuildRoot().path)
 
   def test_reset(self):
-    BuildRoot().path = self.new_root
+    BuildRoot().set_path(self.new_root)
     BuildRoot().reset()
     self.assertEqual(self.original_root, BuildRoot().path)
 
-  def test_via_pantsini(self):
+  def test_via_pants_runner(self):
     with temporary_dir() as root:
       root = os.path.realpath(root)
-      touch(os.path.join(root, 'pants.ini'))
+      touch(os.path.join(root, 'pants'))
       with pushd(root):
         self.assertEqual(root, BuildRoot().path)
-
       BuildRoot().reset()
-      child = os.path.join(root, 'one', 'two')
-      safe_mkdir(child)
-      with pushd(child):
-        self.assertEqual(root, BuildRoot().path)
 
   def test_temporary(self):
     with BuildRoot().temporary(self.new_root):
@@ -53,5 +48,5 @@ class BuildRootTest(unittest.TestCase):
 
   def test_singleton(self):
     self.assertEqual(BuildRoot().path, BuildRoot().path)
-    BuildRoot().path = self.new_root
+    BuildRoot().set_path(self.new_root)
     self.assertEqual(BuildRoot().path, BuildRoot().path)
