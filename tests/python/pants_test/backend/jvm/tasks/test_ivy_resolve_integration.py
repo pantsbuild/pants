@@ -78,32 +78,25 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     # version information from the previous, rather than doing a full resolve.
 
     with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
-      config = {'cache.resolve.ivy': {'write_to': [cache_dir],'read_from': [cache_dir]}}
+      config = {'cache': {'write_to': [cache_dir],'read_from': [cache_dir]}}
 
       def run_pants(command):
         return self.run_pants_with_workdir(command, workdir, config=config)
 
-      resolve_run = run_pants(['resolve', '3rdparty:junit'])
-      first_export_result = run_pants(['resolve', 'export', '3rdparty:junit'])
-      print('RESOLVERUN')
-      print('RESOLVERUN')
-      print(resolve_run.stdout_data)
-      print('EXPORTRUN')
-      print('EXPORTRUN')
-      print('EXPORTRUN')
-      print(first_export_result.stdout_data)
+      first_export_result = run_pants(['export', '3rdparty:junit'])
+
       resolve_workdir = self._find_resolve_workdir(workdir)
       # The first run did a ran ivy in resolve mode, so it doesn't have a fetch-ivy.xml.
       self.assertNotIn('fetch-ivy.xml', os.listdir(resolve_workdir))
 
       run_pants(['clean-all'])
 
-      run_pants(['resolve', '3rdparty:junit'])
+      run_pants(['export', '3rdparty:junit'])
       second_export_result = run_pants(['export', '3rdparty:junit'])
 
       # Using the fetch pattern should result in the same export information.
       self.assertEqual(first_export_result.stdout_data, second_export_result.stdout_data)
-      self.fail()
+
       # The second run uses the cached resolution information from the first resolve, and
       # generates a fetch ivy.xml.
       self.assertIn('fetch-ivy.xml', os.listdir(resolve_workdir))
@@ -117,10 +110,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     for dir in listdir:
       potential_workdir = os.path.join(ivy_dir, dir)
       if os.path.exists(os.path.join(potential_workdir, 'resolution.json')):
+        #print(potential_workdir)
         return potential_workdir
     else:
       self.fail("No resolution.json in ivy workdirs")
-
-  # sub component test
-  # run resolve
-  # make assertions about the file to cache
