@@ -86,7 +86,7 @@ class ProductGraph(object):
   def _detect_cycle(self, src, dest):
     """Given a src and a dest, each of which _might_ already exist in the graph, detect cycles.
 
-    Return a path of Nodes that describe the cycle, or None.
+    Returns True if a cycle would be created by adding an edge from src->dest.
     """
     parents = set()
     walked = set()
