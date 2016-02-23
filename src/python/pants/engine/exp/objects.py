@@ -31,7 +31,7 @@ def _unpickle_serializable(serializable_class, kwargs):
 
 
 class Locatable(AbstractClass):
-  """Marks a class whose constructor should receive its location relative to the build root.
+  """Marks a class whose constructor should receive its spec_path relative to the build root.
 
   Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they
   were parsed. If the object also has a `name` (not all do), then these two fields can be

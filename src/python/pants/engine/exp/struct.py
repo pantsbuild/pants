@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import MutableMapping, MutableSequence
 
 from pants.engine.exp.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
-from pants.engine.exp.objects import (Locatable, Serializable, SerializableFactory, Validatable,
+from pants.engine.exp.objects import (Serializable, SerializableFactory, Validatable,
                                       ValidationError)
 
 
@@ -55,10 +55,6 @@ class Struct(Serializable, SerializableFactory, Validatable):
                   this struct or this structs superclasses.
     :param **kwargs: The struct parameters.
     """
-    # If the object did not request access to its location, ensure that it is not persisted.
-    if not isinstance(self, Locatable):
-      kwargs.pop('spec_path', None)
-
     self._kwargs = kwargs
 
     self._kwargs['abstract'] = abstract

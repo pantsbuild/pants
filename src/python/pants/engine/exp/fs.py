@@ -178,10 +178,6 @@ def create_fs_tasks(buildroot):
       [Select(Path),
        SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
       recursive_subdirectories),
-    (DirectoryListing,
-      [SelectLiteral(fspt, ProjectTree),
-       Select(Path)],
-      list_directory),
   ] + [
     # "Native" operations.
     (Paths,
@@ -195,4 +191,8 @@ def create_fs_tasks(buildroot):
       [SelectLiteral(fspt, ProjectTree),
        Select(Paths)],
       files_content),
+    (DirectoryListing,
+      [SelectLiteral(fspt, ProjectTree),
+       Select(Path)],
+      list_directory),
   ]
