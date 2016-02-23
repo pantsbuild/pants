@@ -196,14 +196,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     with self.assertRaises(IvyUtils.IvyResolveConflictingDepsError):
       IvyUtils._resolve_conflict(v2_force, v1_force)
 
-  def test_get_resolved_jars_for_jar_library(self):
+  def test_get_resolved_jars_for_coordinates(self):
     ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
-    lib = self.make_target(spec=':org1-name1',
-                           target_type=JarLibrary,
-                           jars=[JarDependency(org='org1', name='name1', rev='0.0.1',
-                                               classifier='tests')])
 
-    resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
+    resolved_jars = ivy_info.get_resolved_jars_for_coordinates([JarDependency(org='org1',
+                                                                              name='name1',
+                                                                              rev='0.0.1',
+                                                                              classifier='tests')])
 
     expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1',
                                                        classifier='tests'),
@@ -216,16 +215,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_resolved_jars_with_different_version(self):
     # If a jar is resolved as a different version than the requested one, the coordinates of
     # the resolved jar should match the artifact, not the requested coordinates.
-    lib = self.make_target(spec=':org1-name1',
-                           target_type=JarLibrary,
-                           jars=[
-                             JarDependency(org='org1', name='name1',
-                                           rev='0.0.1',
-                                           classifier='tests')])
 
     ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_resolve_to_other_version.xml')
 
-    resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
+    resolved_jars = ivy_info.get_resolved_jars_for_coordinates([JarDependency(org='org1',
+                                                                              name='name1',
+                                                                              rev='0.0.1',
+                                                                              classifier='tests')])
 
     self.maxDiff = None
     self.assertEqual([coord(org='org1', name='name1',

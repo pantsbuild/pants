@@ -729,7 +729,11 @@ class IvyTaskMixin(TaskBase):
       ivyxml = os.path.join(resolve_workdir, _FETCH_RESOLVE_IVY_XML_FILE_NAME)
       with IvyUtils.ivy_lock:
         try:
-          IvyUtils.generate_fetch_ivy(targets, ivyxml, confs, resolve_hash_name, frozen_resolutions)
+          # so we have all the jars with their versions in resolve_stuffs, so we don't need to do anything
+          # maybe some validation though
+          # TODO validate , and use more than just default.
+          jars = frozen_resolutions.get('default').all_resolved_coordinates
+          IvyUtils.generate_fetch_ivy(targets, ivyxml, confs, resolve_hash_name, jars)
         except IvyUtils.IvyError as e:
           raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
 

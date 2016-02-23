@@ -175,29 +175,20 @@ class IvyInfo(object):
     visited = set()
     return self._do_traverse_dependency_graph(ref, collector, memo, visited)
 
-  def get_resolved_jars_for_jar_library(self, jar_library, memo=None):
-    """Collects jars for the passed jar_library.
+  def get_resolved_jars_for_coordinates(self, coordinates, memo=None):
+    """Collects jars for the passed coordinates.
 
     Because artifacts are only fetched for the "winning" version of a module, the artifacts
     will not always represent the version originally declared by the library.
 
-    This method is transitive within the library's jar_dependencies, but will NOT
-    walk into its non-jar dependencies.
+    This method is transitive within the passed coordinates dependencies.
 
-    :param jar_library: A JarLibrary to collect the transitive artifacts for.
-    :param memo: see `traverse_dependency_graph`
-    :returns: all the artifacts for all of the jars in this library, including transitive deps
-    :rtype: list of :class:`pants.backend.jvm.jar_dependency_utils.ResolvedJar`
-    """
-    return self.get_resolved_jars_for_coordinates(jar_library.jar_dependencies, memo=memo)
-
-  def get_resolved_jars_for_coordinates(self, coordinates, memo=None):
-    """Collects resolved jars with the passed coordinates, ignoring their versions.
-
-    :param coordinates collections.Iterable: Collection of coordinates to collect resolved jars of.
+    :param coordinates collections.Iterable: Collection of coordinates to collect transitive
+                                             resolved jars for.
     :param memo: See `traverse_dependency_graph`.
-    :return: All the artifacts for all of the jars from the provided coordinates, including
-             transitive dependencies.
+    :returns: All the artifacts for all of the jars for the provided coordinates,
+              including transitive dependencies.
+    :rtype: list of :class:`pants.backend.jvm.jar_dependency_utils.ResolvedJar`
     """
     def to_resolved_jar(jar_ref, jar_path):
       return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
@@ -465,7 +456,7 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  def generate_fetch_ivy(cls, targets, ivyxml, confs, resolve_hash_name=None, resolve_stuffs=None):
+  def generate_fetch_ivy(cls, targets, ivyxml, confs, resolve_hash_name=None, jars=None):
     """Generates an ivy xml with all jars marked as intransitive using the all conflict manager."""
     if resolve_hash_name:
       org = IvyUtils.INTERNAL_ORG_NAME
@@ -474,11 +465,6 @@ class IvyUtils(object):
       org, name = cls.identify(targets)
 
     extra_configurations = [conf for conf in confs if conf and conf != 'default']
-
-    # so we have all the jars with their versions in resolve_stuffs, so we don't need to do anything
-    # maybe some validation though
-    # TODO validate stuff, and use more than just default.
-    jars = resolve_stuffs.get('default').all_resolved_coordinates
 
     # use org name _and_ rev so that we can have dependencies with different versions!
     jars_by_key = OrderedDict()
