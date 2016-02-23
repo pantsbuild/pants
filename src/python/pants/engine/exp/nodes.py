@@ -190,7 +190,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
 
 
 class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product', 'field']), Node):
-  """A Node that selects the given Product for each of the items in a `dependencies` field on this subject.
+  """A Node that selects the given Product for each of the items in a field `field` on this subject.
 
   Begins by selecting the `dep_product` for the subject, and then selects a product for each
   member a collection named `field` on the dep_product.
