@@ -16,12 +16,14 @@ import pytest
 from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import SourceRoots, UnhydratedStruct, create_graph_tasks
+from pants.engine.exp.fs import create_fs_tasks
+from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
+from pants.engine.exp.nodes import Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Throw
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target
 from pants.util.contextutil import temporary_file
@@ -54,12 +56,10 @@ class AddressMapTest(unittest.TestCase):
 
   @contextmanager
   def parse_address_map(self, json):
-    with temporary_file() as fp:
-      fp.write(json)
-      fp.close()
-      address_map = AddressMap.parse(fp.name, self._symbol_table_cls, self._parser_cls)
-      self.assertEqual(fp.name, address_map.path)
-      yield address_map
+    path = '/dev/null'
+    address_map = AddressMap.parse(path, json, self._symbol_table_cls, self._parser_cls)
+    self.assertEqual(path, address_map.path)
+    yield address_map
 
   def test_parse(self):
     with self.parse_address_map(dedent("""
@@ -97,9 +97,8 @@ class AddressMapTest(unittest.TestCase):
 
 class AddressFamilyTest(unittest.TestCase):
   def test_create_single(self):
-    address_family = AddressFamily.create('/dev/null',
-                                          '',
-                                          [AddressMap('/dev/null/0', {
+    address_family = AddressFamily.create('',
+                                          [AddressMap('0', {
                                             'one': Thing(name='one', age=42),
                                             'two': Thing(name='two', age=37)
                                           })])
@@ -109,11 +108,10 @@ class AddressFamilyTest(unittest.TestCase):
                      address_family.addressables)
 
   def test_create_multiple(self):
-    address_family = AddressFamily.create('/dev/null',
-                                          'name/space',
-                                          [AddressMap('/dev/null/name/space/0',
+    address_family = AddressFamily.create('name/space',
+                                          [AddressMap('name/space/0',
                                                       {'one': Thing(name='one', age=42)}),
-                                           AddressMap('/dev/null/name/space/1',
+                                           AddressMap('name/space/1',
                                                       {'two': Thing(name='two', age=37)})])
 
     self.assertEqual('name/space', address_family.namespace)
@@ -121,20 +119,23 @@ class AddressFamilyTest(unittest.TestCase):
                       Address.parse('name/space:two'): Thing(name='two', age=37)},
                      address_family.addressables)
 
+  def test_create_empty(self):
+    # Case where directory exists but is empty.
+    address_family = AddressFamily.create('name/space', [])
+    self.assertEquals(dict(), address_family.addressables)
+
   def test_mismatching_paths(self):
     with self.assertRaises(DifferingFamiliesError):
-      AddressFamily.create('/dev/null',
-                           'one',
+      AddressFamily.create('one',
                            [AddressMap('/dev/null/one/0', {}),
                             AddressMap('/dev/null/two/0', {})])
 
   def test_duplicate_names(self):
     with self.assertRaises(DuplicateNameError):
-      AddressFamily.create('/dev/null',
-                           'name/space',
-                           [AddressMap('/dev/null/name/space/0',
+      AddressFamily.create('name/space',
+                           [AddressMap('name/space/0',
                                        {'one': Thing(name='one', age=42)}),
-                            AddressMap('/dev/null/name/space/1',
+                            AddressMap('name/space/1',
                                        {'one': Thing(name='one', age=37)})])
 
 
@@ -154,13 +155,13 @@ class AddressMapperTest(unittest.TestCase):
 
     self._goal = 'list'
     symbol_table_cls = TargetTable
-    self.address_mapper = AddressMapper(build_root=self.build_root,
-                                        symbol_table_cls=symbol_table_cls,
+    self.address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                         parser_cls=JsonParser,
                                         build_pattern=r'.+\.BUILD.json$')
-    tasks = create_graph_tasks(self.address_mapper,
-                               symbol_table_cls,
-                               SourceRoots(self.build_root, tuple()))
+    tasks = (
+        create_fs_tasks(self.build_root) +
+        create_graph_tasks(self.address_mapper, symbol_table_cls)
+      )
     self.scheduler = LocalScheduler({self._goal: UnhydratedStruct},
                                     symbol_table_cls,
                                     tasks)
@@ -171,7 +172,7 @@ class AddressMapperTest(unittest.TestCase):
                              configurations=['//a', Struct(embedded='yes')])
 
   def resolve(self, spec):
-    request = BuildRequest(goals=[self._goal], spec_roots=[spec])
+    request = BuildRequest(goals=[self._goal], subjects=[spec])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error
@@ -184,17 +185,6 @@ class AddressMapperTest(unittest.TestCase):
 
   def resolve_multi(self, spec):
     return {uhs.address: uhs.struct for uhs in self.resolve(spec)}
-
-  def test_no_family(self):
-    # Directory exists but is empty.
-    address_family = self.address_mapper.family('a/c')
-    self.assertEqual({}, address_family.addressables)
-
-    # Directory exists and contains an empty file.
-    build_file = os.path.join(self.build_root, 'a/c/c.BUILD.json')
-    touch(build_file)
-    address_family = self.address_mapper.family('a/c')
-    self.assertEqual({}, address_family.addressables)
 
   def test_no_address_no_family(self):
     spec = SingleAddress('a/c', None)
@@ -223,7 +213,6 @@ class AddressMapperTest(unittest.TestCase):
     return Address.parse(spec)
 
   def test_walk_addressables(self):
-    self.maxDiff = None
     self.assertEqual({self.addr('//:root'): Struct(name='root'),
                       self.addr('a/b:b'): self.a_b_target,
                       self.addr('a/d:d'): Target(name='d'),

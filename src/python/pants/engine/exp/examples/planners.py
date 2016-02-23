@@ -5,21 +5,24 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
 import functools
-import os
 import re
 from abc import abstractmethod, abstractproperty
+from os import sep as os_sep
+from os.path import join as os_path_join
 
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
-from pants.engine.exp.graph import Directory, SourceRoots, create_graph_tasks
+from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths, create_fs_tasks
+from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
+from pants.engine.exp.scheduler import LocalScheduler
+from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
+from pants.engine.exp.sources import Sources
 from pants.engine.exp.struct import Struct, StructWithDeps
-from pants.engine.exp.targets import Sources, Target, Variants
+from pants.engine.exp.targets import Target, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -69,11 +72,6 @@ class JVMPackageName(datatype('JVMPackageName', ['name'])):
   pass
 
 
-class SearchPath(datatype('SearchPath', ['dependencies'])):
-  """A set of Directories to search."""
-  pass
-
-
 @printing_func
 def select_package_address(jvm_package_name, address_families):
   """Return the Address from the given AddressFamilies which provides the given package."""
@@ -90,31 +88,31 @@ def select_package_address(jvm_package_name, address_families):
 
 @printing_func
 def calculate_package_search_path(jvm_package_name, source_roots):
-  """Return a SearchPath for all directories where the given JVMPackageName might exist."""
-  rel_package_dir = jvm_package_name.name.replace('.', os.sep)
-  return SearchPath([Directory(os.path.join(srcroot, rel_package_dir))
-                     for srcroot in source_roots.srcroots])
+  """Return Paths for directories where the given JVMPackageName might exist."""
+  rel_package_dir = jvm_package_name.name.replace('.', os_sep)
+  return Paths([Path(os_path_join(srcroot, rel_package_dir))
+                for srcroot in source_roots.srcroots])
 
 
 @printing_func
-def extract_scala_imports(address, sources, source_roots):
+def extract_scala_imports(source_files_content):
   """A toy example of dependency inference. Would usually be a compiler plugin."""
-  abs_base_path = os.path.join(source_roots.buildroot, address.spec_path)
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
-  for f in sources.iter_paths(base_path=abs_base_path):
-    with open(f) as source_file:
-      for line in source_file:
-        match = import_re.search(line)
-        if match:
-          packages.add(match.group(1).rsplit('.', 1)[0])
+  for _, content in source_files_content.dependencies:
+    for line in content.splitlines():
+      match = import_re.search(line)
+      if match:
+        packages.add(match.group(1).rsplit('.', 1)[0])
   return ImportedJVMPackages([JVMPackageName(p) for p in packages])
 
 
 @printing_func
-def reify_scala_sources(address, sources, dependency_addresses):
-  return ScalaSources(files=list(sources.iter_paths(base_path=address.spec_path)),
-                      dependencies=list(set(dependency_addresses)))
+def reify_scala_sources(sources, dependency_addresses):
+  """Given a ScalaInferredDepsSources object and its inferred dependencies, create ScalaSources."""
+  kwargs = sources._asdict()
+  kwargs['dependencies'] = list(set(dependency_addresses))
+  return ScalaSources(**kwargs)
 
 
 class Requirement(Struct):
@@ -351,6 +349,10 @@ class GenGoal(Goal):
     return [JavaSources, PythonSources, ResourceSources, ScalaSources]
 
 
+class SourceRoots(datatype('SourceRoots', ['srcroots'])):
+  """Placeholder for the SourceRoot subsystem."""
+
+
 class ExampleTable(SymbolTable):
   @classmethod
   def table(cls):
@@ -379,8 +381,7 @@ def setup_json_scheduler(build_root):
   :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
   """
   symbol_table_cls = ExampleTable
-  address_mapper = AddressMapper(build_root=build_root,
-                                 symbol_table_cls=symbol_table_cls,
+  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                  build_pattern=r'^BLD.json$',
                                  parser_cls=JsonParser)
 
@@ -389,13 +390,14 @@ def setup_json_scheduler(build_root):
   scrooge_tool_address = Address.parse('src/scala/scrooge')
 
   # TODO: Placeholder for the SourceRoot subsystem.
-  source_roots = SourceRoots(build_root, ('src/java',))
+  source_roots = SourceRoots(('src/java',))
 
   goals = {
       'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
       'resolve': Classpath,
       'list': Address,
+      'walk': Path,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
     }
@@ -423,20 +425,17 @@ def setup_json_scheduler(build_root):
     ] + [
       # scala dependency inference
       (ScalaSources,
-       [Select(Address),
-        Select(ScalaInferredDepsSources),
+       [Select(ScalaInferredDepsSources),
         SelectDependencies(Address, ImportedJVMPackages)],
        reify_scala_sources),
       (ImportedJVMPackages,
-       [Select(Address),
-        Select(ScalaInferredDepsSources),
-        SelectLiteral(source_roots, SourceRoots)],
+       [SelectProjection(FilesContent, PathGlobs, ('path_globs',), ScalaInferredDepsSources)],
        extract_scala_imports),
       (Address,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, SearchPath)],
+        SelectDependencies(AddressFamily, Paths)],
        select_package_address),
-      (SearchPath,
+      (Paths,
        [Select(JVMPackageName),
         SelectLiteral(source_roots, SourceRoots)],
        calculate_package_search_path),
@@ -474,7 +473,9 @@ def setup_json_scheduler(build_root):
        [Select(UnpickleableOutput)],
        unpickleable_input),
     ] + (
-      create_graph_tasks(address_mapper, symbol_table_cls, source_roots)
+      create_graph_tasks(address_mapper, symbol_table_cls)
+    ) + (
+      create_fs_tasks(build_root)
     )
 
   scheduler = LocalScheduler(goals, symbol_table_cls, tasks)

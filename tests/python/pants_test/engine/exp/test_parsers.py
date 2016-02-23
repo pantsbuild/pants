@@ -49,10 +49,7 @@ class TestTable2(parsers.SymbolTable):
 
 
 def parse(parser, document, symbol_table_cls, **args):
-  with temporary_file() as fp:
-    fp.write(document)
-    fp.close()
-    return parser.parse(fp.name, symbol_table_cls, **args)
+  return parser.parse('/dev/null', document, symbol_table_cls, **args)
 
 
 class JsonParserTest(unittest.TestCase):
@@ -231,47 +228,45 @@ class JsonParserTest(unittest.TestCase):
       "nine": 1
     }
     """).strip()
-    with temporary_file() as fp:
-      fp.write(document)
-      fp.close()
-      with self.assertRaises(ParseError) as exc:
-        parsers.JsonParser.parse(path=fp.name, symbol_table_cls=EmptyTable)
+    filepath = '/dev/null'
+    with self.assertRaises(ParseError) as exc:
+      parsers.JsonParser.parse(filepath, document, symbol_table_cls=EmptyTable)
 
-      # Strip trailing whitespace from the message since our expected literal below will have
-      # trailing ws stripped via editors and code reviews calling for it.
-      actual_lines = [line.rstrip() for line in str(exc.exception).splitlines()]
+    # Strip trailing whitespace from the message since our expected literal below will have
+    # trailing ws stripped via editors and code reviews calling for it.
+    actual_lines = [line.rstrip() for line in str(exc.exception).splitlines()]
 
-      # This message from the json stdlib varies between python releases, so fuzz the match a bit.
-      self.assertRegexpMatches(actual_lines[0],
-                               r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 71\)')
+    # This message from the json stdlib varies between python releases, so fuzz the match a bit.
+    self.assertRegexpMatches(actual_lines[0],
+                             r'Expecting (?:,|\',\'|",") delimiter: line 3 column 12 \(char 71\)')
 
-      self.assertEqual(dedent("""
-        In document at {path}:
-            # An example with several Bobs.
+    self.assertEqual(dedent("""
+      In document at {filepath}:
+          # An example with several Bobs.
 
-            # One with hobbies.
-              {{
-                "type_alias": "pants_test.engine.exp.test_parsers.Bob",
+          # One with hobbies.
+            {{
+              "type_alias": "pants_test.engine.exp.test_parsers.Bob",
 
-                # And internal comment and blank lines.
+              # And internal comment and blank lines.
 
-                "hobbies": [1, 2, 3]}} {{
-              # This comment is inside an empty object that started on the prior line!
-            }}
+              "hobbies": [1, 2, 3]}} {{
+            # This comment is inside an empty object that started on the prior line!
+          }}
 
-            # Another that is imaginary aged.
-         1: {{
-         2:   "type_alias": "pants_test.engine.exp.test_parsers.Bob",
-         3:   "age": 42i,
+          # Another that is imaginary aged.
+       1: {{
+       2:   "type_alias": "pants_test.engine.exp.test_parsers.Bob",
+       3:   "age": 42i,
 
-         4:   "four": 1,
-         5:   "five": 1,
-         6:   "six": 1,
-         7:   "seven": 1,
-         8:   "eight": 1,
-         9:   "nine": 1
-        10: }}
-        """.format(path=fp.name)).strip(), '\n'.join(actual_lines[1:]))
+       4:   "four": 1,
+       5:   "five": 1,
+       6:   "six": 1,
+       7:   "seven": 1,
+       8:   "eight": 1,
+       9:   "nine": 1
+      10: }}
+      """.format(filepath=filepath)).strip(), '\n'.join(actual_lines[1:]))
 
 
 class JsonEncoderTest(unittest.TestCase):

@@ -13,7 +13,8 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
 from pants.engine.exp.examples.planners import Classpath, setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, Return, SelectNode
+from pants.engine.exp.nodes import Return, SelectNode
+from pants.engine.exp.scheduler import BuildRequest
 
 
 class EngineTest(unittest.TestCase):
@@ -26,7 +27,7 @@ class EngineTest(unittest.TestCase):
 
   def request(self, goals, *addresses):
     specs = [self.spec_parser.parse_spec(str(a)) for a in addresses]
-    return BuildRequest(goals=goals, spec_roots=specs)
+    return BuildRequest(goals=goals, subjects=specs)
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
