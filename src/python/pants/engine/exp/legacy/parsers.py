@@ -10,7 +10,6 @@ import threading
 
 import six
 
-from pants.base.build_environment import get_buildroot
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
 from pants.engine.exp.objects import Serializable
@@ -46,7 +45,7 @@ class LegacyPythonCallbacksParser(Parser):
   _lock = threading.Lock()
 
   @classmethod
-  def _per_path_symbol_factory(cls, build_root, path, aliases, global_symbols):
+  def _per_path_symbol_factory(cls, path, aliases, global_symbols):
     per_path_symbols = {}
 
     symbols = global_symbols.copy()
@@ -54,7 +53,7 @@ class LegacyPythonCallbacksParser(Parser):
       for target_type in target_macro_factory.target_types:
         symbols[target_type] = Target
 
-    parse_context = ParseContext(rel_path=os.path.relpath(os.path.dirname(path), build_root),
+    parse_context = ParseContext(rel_path=os.path.dirname(path),
                                  type_aliases=symbols)
 
     for alias, object_factory in aliases.context_aware_object_factories.items():
@@ -71,8 +70,6 @@ class LegacyPythonCallbacksParser(Parser):
   @classmethod
   @memoized_method
   def _get_globals(cls, symbol_table_cls):
-    build_root = get_buildroot()
-
     symbol_table = symbol_table_cls.table()
     # TODO: nasty escape hatch
     object_table = symbol_table_cls.aliases().objects
@@ -104,16 +101,14 @@ class LegacyPythonCallbacksParser(Parser):
 
     if object_table:
       parse_globals.update(object_table)
-    return build_root, parse_globals
+    return parse_globals
 
   @classmethod
-  def parse(cls, path, symbol_table_cls):
-    build_root, parse_globals = cls._get_globals(symbol_table_cls)
-    with open(path) as fp:
-      python = fp.read()
+  def parse(cls, filepath, filecontent, symbol_table_cls):
+    parse_globals = cls._get_globals(symbol_table_cls)
+    python = filecontent
 
-    symbols = cls._per_path_symbol_factory(build_root,
-                                           path,
+    symbols = cls._per_path_symbol_factory(filepath,
                                            symbol_table_cls.aliases(),
                                            parse_globals)
     symbols.update(parse_globals)

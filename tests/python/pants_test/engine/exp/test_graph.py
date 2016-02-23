@@ -85,8 +85,7 @@ class GraphTestBase(unittest.TestCase):
 
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     symbol_table_cls = TestTable
-    mapper = AddressMapper(build_root=self._build_root,
-                           symbol_table_cls=symbol_table_cls,
+    mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                            build_pattern=build_pattern,
                            parser_cls=parser_cls)
     tasks = (
@@ -219,7 +218,7 @@ class InlinedGraphTest(GraphTestBase):
   def test_not_found_and_family_does_not_exist(self):
     scheduler = self.create_json()
     dne = Address.parse('this/dir/does/not/exist')
-    self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
+    self.assertEquals(type(self.resolve_failure(scheduler, dne)), OSError)
 
 
 class LazyResolvingGraphTest(GraphTestBase):

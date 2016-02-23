@@ -381,8 +381,7 @@ def setup_json_scheduler(build_root):
   :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
   """
   symbol_table_cls = ExampleTable
-  address_mapper = AddressMapper(build_root=build_root,
-                                 symbol_table_cls=symbol_table_cls,
+  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                  build_pattern=r'^BLD.json$',
                                  parser_cls=JsonParser)
 

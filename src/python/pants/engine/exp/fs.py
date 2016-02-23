@@ -116,6 +116,8 @@ def list_directory(project_tree, directory):
   """List Paths directly below the given path, relative to the ProjectTree.
 
   Returns a DirectoryListing containing directory and file paths relative to the ProjectTree.
+
+  Raises an exception if the path does not exist, or is not a directoy.
   """
   _, subdirs, subfiles = next(project_tree.walk(directory.path))
   return DirectoryListing(directory,

@@ -99,6 +99,8 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
   """
 
   def _variants_node(self):
+    # TODO: This super-broad check is crazy expensive. Should reduce to just doing Variants
+    # lookups for literal/addressable products.
     if self.product != Variants:
       return SelectNode(self.subject, Variants, self.variants, None)
     return None

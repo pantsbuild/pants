@@ -43,8 +43,7 @@ def list():
 
   build_root = get_buildroot()
   symbol_table_cls = LegacyTable
-  address_mapper = AddressMapper(build_root,
-                                 symbol_table_cls=symbol_table_cls,
+  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                  parser_cls=LegacyPythonCallbacksParser)
 
   # Create a Scheduler containing only the graph tasks, with a single installed goal that
@@ -54,7 +53,7 @@ def list():
   scheduler = LocalScheduler({goal: Address}, symbol_table_cls, tasks)
 
   # Execute a request for the root.
-  build_request = BuildRequest(goals=[goal], subjects=[DescendantAddresses(build_root)])
+  build_request = BuildRequest(goals=[goal], subjects=[DescendantAddresses('')])
   result = LocalSerialEngine(scheduler).execute(build_request)
   if result.error:
     raise result.error

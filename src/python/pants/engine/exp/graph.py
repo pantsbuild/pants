@@ -6,15 +6,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-import os
+from os.path import basename as os_path_basename
 
 import six
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.fs import Path, RecursiveSubDirectories
-from pants.engine.exp.mapper import AddressFamily, AddressMapper, ResolveError
+from pants.engine.exp.fs import DirectoryListing, FilesContent, Path, Paths, RecursiveSubDirectories
+from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.exp.struct import Struct
@@ -30,9 +30,33 @@ def _key_func(entry):
   return key
 
 
-def parse_address_family(address_mapper, directory):
-  """Given a Directory, parses and returns its AddressFamily (which may be empty, but not None)."""
-  return address_mapper.family(directory.path)
+class BuildFilePaths(datatype('BuildFilePaths', ['paths'])):
+  """A list of Paths that are known to match a BUILD file pattern.
+
+  TODO: Because BUILD file names are matched using a regex, this cannot currently use PathGlobs.
+  If we were willing to allow a bit of slop in terms of files read, this could use
+  PathGlobs to get FilesContent for all files with the right prefix, and then discard.
+  """
+
+
+def filter_buildfile_paths(address_mapper, directory_listing):
+  build_files = tuple(f for f in directory_listing.files
+                      if address_mapper.build_pattern.match(os_path_basename(f.path)))
+  return BuildFilePaths(build_files)
+
+
+def parse_address_family(address_mapper, path, build_files_content):
+  """Given the contents of the build files in one directory, return an AddressFamily.
+
+  The AddressFamily may be empty, but it will not be None.
+  """
+  address_maps = []
+  for filepath, filecontent in build_files_content.dependencies:
+    address_maps.append(AddressMap.parse(filepath,
+                                         filecontent,
+                                         address_mapper.symbol_table_cls,
+                                         address_mapper.parser_cls))
+  return AddressFamily.create(path.path, address_maps)
 
 
 class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'dependencies'])):
@@ -192,10 +216,17 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
       [SelectProjection(AddressFamily, Path, ('spec_path',), Address),
        Select(Address)],
       resolve_unhydrated_struct),
+  ] + [
+    # BUILD file parsing.
     (AddressFamily,
       [SelectLiteral(address_mapper, AddressMapper),
-       Select(Path)],
+       Select(Path),
+       SelectProjection(FilesContent, Paths, ('paths',), BuildFilePaths)],
       parse_address_family),
+    (BuildFilePaths,
+      [SelectLiteral(address_mapper, AddressMapper),
+       Select(DirectoryListing)],
+      filter_buildfile_paths),
   ] + [
     # Addresses for 'literal' products might possibly be resolvable from BLD files. These tasks
     # define that lookup for each literal product.

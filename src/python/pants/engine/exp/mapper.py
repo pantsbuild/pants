@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
 import re
 
 from pants.build_graph.address import Address
@@ -36,7 +35,7 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
   """
 
   @classmethod
-  def parse(cls, path, symbol_table_cls, parser_cls):
+  def parse(cls, filepath, filecontent, symbol_table_cls, parser_cls):
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
@@ -47,7 +46,10 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
     :param parser_cls: The parser cls to use.
     :type parser_cls: A :class:`pants.engine.exp.parser.Parser`
     """
-    objects = parser_cls.parse(path, symbol_table_cls)
+    try:
+      objects = parser_cls.parse(filepath, filecontent, symbol_table_cls)
+    except Exception as e:
+      raise MappingError('Failed to parse {}:\n{}'.format(filepath, e))
     objects_by_name = {}
     for obj in objects:
       if not Serializable.is_serializable(obj):
@@ -60,10 +62,10 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
 
       if name in objects_by_name:
         raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
-                                 'map {!r}'.format(path, name, objects_by_name[name], obj))
+                                 'map {!r}'.format(filepath, name, objects_by_name[name], obj))
 
       objects_by_name[name] = obj
-    return cls(path, objects_by_name)
+    return cls(filepath, objects_by_name)
 
 
 class DifferingFamiliesError(MappingError):
@@ -84,20 +86,18 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
   """
 
   @classmethod
-  def create(cls, build_root, spec_path, address_maps):
+  def create(cls, spec_path, address_maps):
     """Creates an address family from the given set of address maps.
 
-    :param string build_root: The absolute path of the root of the namespace. All address maps must
-                              be hydrated from child paths of the build root.
+    :param spec_path: The directory prefix shared by all address_maps.
     :param address_maps: The family of maps that form this namespace.
     :type address_maps: :class:`collections.Iterable` of :class:`AddressMap`
     :returns: a new address family.
     :rtype: :class:`AddressFamily`
     :raises: :class:`MappingError` if the given address maps do not form a family.
     """
-    abs_spec_path = os.path.join(build_root, spec_path)
     for address_map in address_maps:
-      if not address_map.path.startswith(abs_spec_path):
+      if not address_map.path.startswith(spec_path):
         raise DifferingFamiliesError('Expected AddressMaps to share the same parent directory {}, '
                                      'but received: {}'
                                      .format(spec_path, address_map.path))
@@ -153,61 +153,35 @@ class ResolveError(MappingError):
 
 
 class AddressMapper(object):
-  """Maps addresses to the objects they point to."""
+  """Configuration to parse build files matching a filename pattern."""
 
-  def __init__(self, build_root, symbol_table_cls, parser_cls, build_pattern=None):
-    """Creates an address mapper rooted at the given `build_root`.
+  def __init__(self, symbol_table_cls, parser_cls, build_pattern=None):
+    """Create an AddressMapper.
 
     Both the set of files that define a mappable BUILD files and the parser used to parse those
     files can be customized.  See the `pants.engine.exp.parsers` module for example parsers.
 
-    :param string build_root: The root of the BUILD files; typically the code repository root
-                              directory.
     :param string build_pattern: A regular expression for identifying BUILD files used to resolve
                                  addresses; by default looks for `BUILD*` files.
     :param parser_cls: The BUILD file parser cls to use.
     :type parser_cls: A :class:`pants.engine.exp.parser.Parser`
     """
-    self._build_root = os.path.realpath(build_root)
-    self._symbol_table_cls = symbol_table_cls
-    self._parser_cls = parser_cls
-    self._build_pattern = re.compile(build_pattern or r'^BUILD(\.[a-zA-Z0-9_-]+)?$')
-
-  def _find_build_files(self, dir_path):
-    abs_dir_path = os.path.join(self._build_root, dir_path)
-    if not os.path.isdir(abs_dir_path):
-      raise ResolveError('Expected {} to be a directory containing build files.'.format(dir_path))
-    for f in os.listdir(abs_dir_path):
-      if self._build_pattern.match(f):
-        abs_build_file = os.path.join(abs_dir_path, f)
-        if os.path.isfile(abs_build_file):
-          yield abs_build_file
-
-  def _parse(self, path):
-    return AddressMap.parse(path, self._symbol_table_cls, parser_cls=self._parser_cls)
-
-  def family(self, namespace):
-    """Load the AddressFamily in the given namespace (which may be empty).
-
-    :param string namespace: The namespace of the address family to load.
-    :returns: The address family at the given namespace.
-    :rtype: :class:`AddressFamily`
-    """
-    build_files = list(self._find_build_files(namespace))
-    return AddressFamily.create(self._build_root, namespace, [self._parse(bf) for bf in build_files])
+    self.symbol_table_cls = symbol_table_cls
+    self.parser_cls = parser_cls
+    self.build_pattern = re.compile(build_pattern or r'^BUILD(\.[a-zA-Z0-9_-]+)?$')
 
   def __eq__(self, other):
     if self is other:
       return True
     if type(other) != type(self):
       return NotImplemented
-    return (other._build_root == self._build_root and
-            other._symbol_table_cls == self._symbol_table_cls and
-            other._build_pattern == self._build_pattern and
-            other._parser_cls == self._parser_cls)
+    return (other.symbol_table_cls == self.symbol_table_cls and
+            other.build_pattern == self.build_pattern and
+            other.parser_cls == self.parser_cls)
 
   def __ne__(self, other):
     return not (self == other)
 
   def __hash__(self):
-    return hash(self._build_root)
+    # Compiled regexes are not hashable.
+    return hash((self.symbol_table_cls, self.parser_cls))
