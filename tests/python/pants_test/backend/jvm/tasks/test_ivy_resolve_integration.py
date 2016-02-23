@@ -64,6 +64,14 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     ])
     self.assert_success(pants_run)
 
+  def test_ivy_confs_failure(self):
+    pants_run = self.run_pants([
+        'resolve',
+        '--resolve-ivy-confs=parampampam',
+        '3rdparty:junit'
+    ])
+    self.assert_failure(pants_run)
+
   def test_ivy_confs_ini_failure(self):
     pants_ini_config = {'resolve.ivy': {'confs': 'parampampam'}}
     pants_run = self.run_pants([

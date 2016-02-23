@@ -294,7 +294,6 @@ class IvyResolveTest(JvmToolTaskTestBase):
         self.resolve([junit_jar_lib])
 
   def test_after_a_successful_fetch_resolve_load_from_fetch(self):
-
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
     junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
 
