@@ -15,7 +15,7 @@ from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
 from pants.engine.exp.fs import Path, RecursiveSubDirectories, SubDirectories
 from pants.engine.exp.mapper import AddressFamily, AddressMapper, ResolveError
-from pants.engine.exp.objects import SerializableFactory, Validatable
+from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.exp.struct import Struct
 from pants.util.objects import datatype
@@ -122,7 +122,6 @@ def hydrate_struct(unhydrated_struct, dependencies):
   # 'zip' the previously-requested dependencies back together as struct fields.
   def consume_dependencies(item, args=None):
     hydrated_args = args or {}
-    hydrated_args['spec_path'] = address.spec_path
     for key, value in sorted(item._asdict().items(), key=_key_func):
       if not AddressableDescriptor.is_addressable(item, key):
         hydrated_args[key] = value
@@ -137,12 +136,16 @@ def hydrate_struct(unhydrated_struct, dependencies):
         hydrated_args[key] = container_type(maybe_consume(key, v) for v in value)
       else:
         hydrated_args[key] = maybe_consume(key, value)
-    return _hydrate(type(item), **hydrated_args)
+    return _hydrate(type(item), address.spec_path, **hydrated_args)
 
   return consume_dependencies(struct, args={'address': address})
 
 
-def _hydrate(item_type, **kwargs):
+def _hydrate(item_type, spec_path, **kwargs):
+  # If the item will be Locatable, inject the spec_path.
+  if issubclass(item_type, Locatable):
+    kwargs['spec_path'] = spec_path
+
   try:
     item = item_type(**kwargs)
   except TypeConstraintError as e:

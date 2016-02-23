@@ -13,6 +13,7 @@ python_library(
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:selectors',
+    'src/python/pants/engine/exp:sources',
     'src/python/pants/engine/exp:struct',
     'src/python/pants/engine/exp:targets',
   ]

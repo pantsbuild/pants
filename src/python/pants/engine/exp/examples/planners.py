@@ -109,6 +109,7 @@ def extract_scala_imports(source_files_content):
 
 @printing_func
 def reify_scala_sources(sources, dependency_addresses):
+  """Given a ScalaInferredDepsSources object and its inferred dependencies, create ScalaSources."""
   kwargs = sources._asdict()
   kwargs['dependencies'] = list(set(dependency_addresses))
   return ScalaSources(**kwargs)

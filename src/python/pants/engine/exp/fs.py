@@ -58,15 +58,16 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   into 'filespecs'.
   """
 
+  # TODO: regex these.
   _RECURSIVE = os_sep + '**' + os_sep
   _SINGLE = os_sep + '*' + os_sep
 
   @classmethod
   def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
-    """
-    Given various file patterns create a PathGlobs object (without using filesystem operations).
+    """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
-    TODO: This currently sortof executes parsing via 'to_filespec'.
+    TODO: This currently sortof-executes parsing via 'to_filespec'. Should maybe push that out to
+    callers to make them deal with errors earlier.
 
     :param files: A list of relative file paths to include.
     :type files: list of string.
@@ -93,7 +94,8 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
     path_globs = []
     for filespec in filespecs:
-      # TODO regex
+      # TODO: These will be implemented as part of finishing:
+      #   https://github.com/pantsbuild/pants/issues/2946
       if cls._RECURSIVE in filespec:
         raise ValueError('TODO: Unsupported: {}'.format(filespec))
       elif cls._SINGLE in filespec:

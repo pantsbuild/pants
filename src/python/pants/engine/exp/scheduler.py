@@ -192,8 +192,8 @@ class ProductGraph(object):
 
 class BuildRequest(object):
   """Describes the user-requested build.
-  
-  TODO: For convenience only, this object currently supports generating roots for PathGlobs.
+
+  This object supports generating roots for PathGlobs (files) and Specs (addressables).
   """
 
   def __init__(self, goals, subjects):
