@@ -682,9 +682,8 @@ class IvyUtils(object):
         org=jar_attributes.org,
         module=jar_attributes.name,
         version=jar_attributes.rev,
-        mutable=jar_attributes.mutable,
-        force=jar_attributes.force,
-        transitive=jar_attributes.transitive,
+        # TODO what to do with mutable in this case? Force redownloads?
+        # mutable=jar_attributes.mutable,
         artifacts=artifacts.values(),
         any_have_url=any_have_url,
         excludes=[])
