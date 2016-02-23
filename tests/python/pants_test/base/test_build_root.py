@@ -55,3 +55,9 @@ class BuildRootTest(unittest.TestCase):
     self.assertEqual(BuildRoot().path, BuildRoot().path)
     BuildRoot().path = self.new_root
     self.assertEqual(BuildRoot().path, BuildRoot().path)
+
+  def test_not_found(self):
+    with temporary_dir() as root:
+      root = os.path.realpath(root)
+      with pushd(root):
+        self.assertRaises(BuildRoot.NotFoundError, lambda: BuildRoot().path)
