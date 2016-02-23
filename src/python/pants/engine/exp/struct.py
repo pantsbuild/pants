@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import MutableMapping, MutableSequence
 
 from pants.engine.exp.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
-from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable, ValidationError
+from pants.engine.exp.objects import (Locatable, Serializable, SerializableFactory, Validatable,
+                                      ValidationError)
 
 
 class Struct(Serializable, SerializableFactory, Validatable):
@@ -54,6 +55,10 @@ class Struct(Serializable, SerializableFactory, Validatable):
                   this struct or this structs superclasses.
     :param **kwargs: The struct parameters.
     """
+    # If the object did not request access to its location, ensure that it is not persisted.
+    if not isinstance(self, Locatable):
+      kwargs.pop('spec_path', None)
+
     self._kwargs = kwargs
 
     self._kwargs['abstract'] = abstract
@@ -222,7 +227,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
   def __getattr__(self, item):
     if item in self._kwargs:
       return self._kwargs[item]
-    raise AttributeError('{} does not have attribute {!r}'.format(self, item))
+    import inspect
+    raise AttributeError('{} (with mro {}) does not have attribute {!r}'.format(self, inspect.getmro(type(self)), item))
 
   def _key(self):
     if self._hashable_key is None:

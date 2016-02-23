@@ -183,10 +183,6 @@ class AddressMapper(object):
         if os.path.isfile(abs_build_file):
           yield abs_build_file
 
-  @staticmethod
-  def _normalize_parse_path(path):
-    return os.path.realpath(path)
-
   def _parse(self, path):
     return AddressMap.parse(path, self._symbol_table_cls, parser_cls=self._parser_cls)
 

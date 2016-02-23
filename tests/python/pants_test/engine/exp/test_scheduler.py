@@ -17,8 +17,8 @@ from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
                                                 Jar, JavaSources, ThriftSources,
                                                 setup_json_scheduler)
-from pants.engine.exp.scheduler import (BuildRequest, DependenciesNode,
-                                        PartiallyConsumedInputsError, Return, SelectNode, Throw)
+from pants.engine.exp.nodes import DependenciesNode, Return, SelectNode, Throw
+from pants.engine.exp.scheduler import BuildRequest, PartiallyConsumedInputsError
 
 
 class SchedulerTest(unittest.TestCase):
@@ -61,7 +61,7 @@ class SchedulerTest(unittest.TestCase):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
 
   def request_specs(self, goals, *specs):
-    return BuildRequest(goals=goals, spec_roots=specs)
+    return BuildRequest(goals=goals, subjects=specs)
 
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = self.request(goals, *root_specs)

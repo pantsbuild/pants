@@ -12,11 +12,13 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import ResolvedTypeMismatchError, SourceRoots, create_graph_tasks
+from pants.engine.exp.fs import create_fs_tasks
+from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
+from pants.engine.exp.nodes import Noop, Return, SelectNode, Throw
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Noop, Return, SelectNode, Throw
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
@@ -83,14 +85,17 @@ class GraphTestBase(unittest.TestCase):
 
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     symbol_table_cls = TestTable
-    source_roots = SourceRoots(self._build_root, tuple())
     mapper = AddressMapper(build_root=self._build_root,
                            symbol_table_cls=symbol_table_cls,
                            build_pattern=build_pattern,
                            parser_cls=parser_cls)
+    tasks = (
+        create_fs_tasks(self._build_root) +
+        create_graph_tasks(mapper, symbol_table_cls)
+      )
     return LocalScheduler({self._goal: self._product},
                           symbol_table_cls,
-                          create_graph_tasks(mapper, symbol_table_cls, source_roots))
+                          tasks)
 
   def create_json(self):
     return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
@@ -98,7 +103,7 @@ class GraphTestBase(unittest.TestCase):
   def _populate(self, scheduler, address):
     """Make a BuildRequest to parse the given Address into a Struct."""
     spec = self._cmd_line_spec_parser.parse_spec(str(address))
-    request = BuildRequest(goals=[self._goal], spec_roots=[spec])
+    request = BuildRequest(goals=[self._goal], subjects=[spec])
     LocalSerialEngine(scheduler).reduce(request)
     return self._select(address)
 

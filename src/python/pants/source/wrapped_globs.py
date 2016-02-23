@@ -118,7 +118,8 @@ class FilesetRelPathWrapper(object):
     # Check if the glob path has the correct root.
     return os.path.commonprefix([root, glob_path]) != root
 
-  def to_filespec(self, args, root='', excludes=None):
+  @classmethod
+  def to_filespec(cls, args, root='', excludes=None):
     """Return a dict representation of this glob list, relative to the buildroot.
 
     The format of the dict is {'globs': [ 'list', 'of' , 'strings' ]
@@ -162,7 +163,8 @@ class RGlobs(FilesetRelPathWrapper):
 
   wrapped_fn = rglobs_following_symlinked_dirs_by_default
 
-  def to_filespec(self, args, root='', excludes=None):
+  @classmethod
+  def to_filespec(cls, args, root='', excludes=None):
     # In rglobs, * at the beginning of a path component means "any
     # number of directories, including 0".  Unfortunately, "**" in
     # some other systems, e.g. git means "one or more directories".
@@ -211,7 +213,7 @@ class RGlobs(FilesetRelPathWrapper):
 
       rglobs.extend(rglob_path('', out))
 
-    return super(RGlobs, self).to_filespec(rglobs, root=root, excludes=excludes)
+    return super(RGlobs, cls).to_filespec(rglobs, root=root, excludes=excludes)
 
 
 class ZGlobs(FilesetRelPathWrapper):

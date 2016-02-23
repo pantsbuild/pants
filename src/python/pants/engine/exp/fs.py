@@ -1,0 +1,193 @@
+# coding=utf-8
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
+
+from os import sep as os_sep
+from os.path import join
+
+from twitter.common.collections.orderedset import OrderedSet
+
+from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.project_tree import ProjectTree
+from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral
+from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs, globs_matches
+from pants.util.objects import datatype
+
+
+class Path(datatype('Path', ['path'])):
+  """A filesystem path, relative to the ProjectTree's buildroot."""
+
+
+class Paths(datatype('Paths', ['dependencies'])):
+  """A set of Path objects."""
+
+
+class FileContent(datatype('FileContent', ['path', 'content'])):
+  """The content of a file, or None if it did not exist."""
+
+  def __repr__(self):
+    content_str = '(len:{})'.format(len(self.content)) if self.content is not None else 'None'
+    return 'FileContent(path={}, content={})'.format(self.path, content_str)
+
+  def __str__(self):
+    return repr(self)
+
+
+class FilesContent(datatype('FilesContent', ['dependencies'])):
+  """List of FileContent objects."""
+
+
+class PathGlob(datatype('PathGlob', ['relative_to', 'path'])):
+  """A (potentially recursive) glob that may match zero or more Paths.
+
+  The dependencies of this PathGlob are other PathGlob objects relative to (below) this PathGlob.
+  """
+
+
+class PathGlobSiblings(datatype('PathGlobSuffix', ['path', 'suffix'])):
+  pass
+
+
+class PathGlobs(datatype('PathGlobs', ['dependencies'])):
+  """A set of 'filespecs' as produced by FilesetWithSpec.
+
+  This class consumes the (somewhat hidden) support for normalizing globs/rglobs/zglobs
+  into 'filespecs'.
+  """
+
+  _RECURSIVE = os_sep + '**' + os_sep
+  _SINGLE = os_sep + '*' + os_sep
+
+  @classmethod
+  def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
+    """
+    Given various file patterns create a PathGlobs object (without using filesystem operations).
+
+    TODO: This currently sortof executes parsing via 'to_filespec'.
+
+    :param files: A list of relative file paths to include.
+    :type files: list of string.
+    :param string globs: A relative glob pattern of files to include.
+    :param string rglobs: A relative recursive glob pattern of files to include.
+    :param string zglobs: A relative zsh-style glob pattern of files to include.
+    :param zglobs: A relative zsh-style glob pattern of files to include.
+    :rtype: :class:`PathGlobs`
+    """
+    filespecs = OrderedSet()
+    for specs, pattern_cls in ((files, Globs),
+                               (globs, Globs),
+                               (rglobs, RGlobs),
+                               (zglobs, ZGlobs)):
+      if not specs:
+        continue
+      res = pattern_cls.to_filespec(specs)
+      excludes = res.get('excludes')
+      if excludes:
+        raise ValueError('Excludes not supported for PathGlobs. Got: {}'.format(excludes))
+      new_specs = res.get('globs', None)
+      if new_specs:
+        filespecs.update(new_specs)
+
+    path_globs = []
+    for filespec in filespecs:
+      # TODO regex
+      if cls._RECURSIVE in filespec:
+        raise ValueError('TODO: Unsupported: {}'.format(filespec))
+      elif cls._SINGLE in filespec:
+        raise ValueError('TODO: Unsupported: {}'.format(filespec))
+      elif '*' in filespec:
+        raise ValueError('TODO: Unsupported: {}'.format(filespec))
+      else:
+        # A literal path.
+        path_globs.append(PathGlob(relative_to, filespec))
+    return cls(tuple(path_globs))
+
+
+class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 'dependencies'])):
+  """A list of Path objects for recursive subdirectories of the given directory."""
+
+
+class SubDirectories(datatype('SubDirectories', ['directory', 'dependencies'])):
+  """A list of Path objects for direct subdirectories of the given directory."""
+
+
+def list_subdirectories(project_tree, directory):
+  """List subdirectories directly below the given path, relative to the given ProjectTree."""
+  _, subdirs, _ = next(project_tree.walk(directory.path))
+  return SubDirectories(directory, [Path(join(directory.path, subdir)) for subdir in subdirs])
+
+
+def recursive_subdirectories(directory, subdirectories_list):
+  """Given a directory and a list of RecursiveSubDirectories below it, flatten and return."""
+  directories = [directory] + [d for subdir in subdirectories_list for d in subdir.dependencies]
+  return RecursiveSubDirectories(directory, directories)
+
+
+def merge_paths(paths_list):
+  generated = set()
+  def generate():
+    for paths in paths_list:
+      for path in paths.dependencies:
+        if path in generated:
+          continue
+        generated.add(path)
+        yield path
+  return Paths(tuple(generate()))
+
+
+def file_exists(project_tree, path_glob):
+  path = join(path_glob.relative_to, path_glob.path)
+  return Paths((Path(path),) if project_tree.isfile(path) else ())
+
+
+def files_content(project_tree, paths):
+  contents = []
+  for path in paths.dependencies:
+    try:
+      contents.append(FileContent(path.path, project_tree.content(path.path)))
+    except IOError as e:
+      if project_tree.isfile(path.path):
+        # Failing to read an existing file is certainly problematic: raise.
+        raise e
+      # Otherwise, just doesn't exist.
+      contents.append(FileContent(path.path, None))
+  return FilesContent(contents)
+
+
+def create_fs_tasks(buildroot):
+  """Creates tasks that consume the filesystem.
+
+  These tasks are all considered "native", and should have their outputs re-validated
+  for every build. TODO: They should likely get their own ProductGraph.Node type
+  for efficiency/invalidation.
+
+  :param project_tree: A ProjectTree instance to use for filesystem operations.
+  """
+  fspt = FileSystemProjectTree(buildroot)
+  return [
+    # Unfiltered requests for subdirectories.
+    (RecursiveSubDirectories,
+      [Select(Path),
+       SelectDependencies(RecursiveSubDirectories, SubDirectories)],
+      recursive_subdirectories),
+    (SubDirectories,
+      [SelectLiteral(fspt, ProjectTree),
+       Select(Path)],
+      list_subdirectories),
+  ] + [
+    # "Native" operations.
+    (Paths,
+      [SelectDependencies(Paths, PathGlobs)],
+      merge_paths),
+    (Paths,
+      [SelectLiteral(fspt, ProjectTree),
+       Select(PathGlob)],
+      file_exists),
+    (FilesContent,
+      [SelectLiteral(fspt, ProjectTree),
+       Select(Paths)],
+      files_content),
+  ]

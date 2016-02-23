@@ -16,12 +16,14 @@ import pytest
 from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import SourceRoots, UnhydratedStruct, create_graph_tasks
+from pants.engine.exp.fs import create_fs_tasks
+from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
+from pants.engine.exp.nodes import Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler, Throw
+from pants.engine.exp.scheduler import BuildRequest, LocalScheduler
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target
 from pants.util.contextutil import temporary_file
@@ -158,9 +160,10 @@ class AddressMapperTest(unittest.TestCase):
                                         symbol_table_cls=symbol_table_cls,
                                         parser_cls=JsonParser,
                                         build_pattern=r'.+\.BUILD.json$')
-    tasks = create_graph_tasks(self.address_mapper,
-                               symbol_table_cls,
-                               SourceRoots(self.build_root, tuple()))
+    tasks = (
+        create_fs_tasks(self.build_root) +
+        create_graph_tasks(self.address_mapper, symbol_table_cls)
+      )
     self.scheduler = LocalScheduler({self._goal: UnhydratedStruct},
                                     symbol_table_cls,
                                     tasks)
@@ -171,7 +174,7 @@ class AddressMapperTest(unittest.TestCase):
                              configurations=['//a', Struct(embedded='yes')])
 
   def resolve(self, spec):
-    request = BuildRequest(goals=[self._goal], spec_roots=[spec])
+    request = BuildRequest(goals=[self._goal], subjects=[spec])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error

@@ -7,10 +7,12 @@ python_library(
   dependencies=[
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/engine/exp:fs',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:scheduler',
+    'src/python/pants/engine/exp:selectors',
     'src/python/pants/engine/exp:struct',
     'src/python/pants/engine/exp:targets',
   ]
@@ -32,7 +34,15 @@ python_library(
 
 python_binary(
   name='viz',
-  entry_point='pants.engine.exp.examples.visualizer:main',
+  entry_point='pants.engine.exp.examples.visualizer:main_addresses',
+  dependencies=[
+    ':visualizer'
+  ]
+)
+
+python_binary(
+  name='viz-fs',
+  entry_point='pants.engine.exp.examples.visualizer:main_filespecs',
   dependencies=[
     ':visualizer'
   ]
