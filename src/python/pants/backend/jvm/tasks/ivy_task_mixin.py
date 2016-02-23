@@ -81,7 +81,8 @@ class FrozenResolution(object):
       return None
 
     with open(filename) as f:
-      from_file = json.load(f, object_pairs_hook=OrderedDict) # maybe the object_pairs_hook thing will work :/
+      # Using OrderedDict here to maintain insertion order of dict entries.
+      from_file = json.load(f, object_pairs_hook=OrderedDict)
     result = {}
     target_lookup = {t.address.spec: t for t in targets}
     for conf, serialized_resolution in from_file.items():
