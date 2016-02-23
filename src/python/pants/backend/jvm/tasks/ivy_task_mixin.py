@@ -378,21 +378,6 @@ class IvyTaskMixin(TaskBase):
 
     return result.resolve_hash_name
 
-  def _print_tree(self, cache_dir, indent=''):
-    if os.path.isdir(cache_dir):
-      list_cachedir = os.listdir(cache_dir)
-      val = len(list_cachedir)
-    else:
-      list_cachedir = []
-      val = 'file'
-    basename = os.path.basename(cache_dir)
-    print('{}/{}    {}'.format(indent, basename, val))
-    if basename == 'python-setup':
-      print('{}...'.format(indent))
-      return
-    for e in list_cachedir:
-      self._print_tree(os.path.join(cache_dir, e), indent+'  ')
-
   def _ivy_resolve(self,
                   targets,
                   executor=None,
