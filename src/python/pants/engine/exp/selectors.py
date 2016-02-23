@@ -51,16 +51,21 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
     return SelectNode(subject, self.product, variants, self.variant_key)
 
 
-class SelectDependencies(datatype('Dependencies', ['product', 'deps_product']), Selector):
+class SelectDependencies(datatype('Dependencies', ['product', 'deps_product', 'field']), Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
-  The dependencies declared on `deps_product` will be provided to the requesting task
-  in the order they were declared.
+  The dependencies declared on `deps_product` (in the optional `field` parameter, which defaults
+  to 'dependencies' when not specified) will be provided to the requesting task in the
+  order they were declared.
   """
+
+  def __new__(self, product, deps_product, field=None):
+    return super(SelectDependencies, self).__new__(self, product, deps_product, field)
+
   optional = False
 
   def construct_node(self, subject, variants):
-    return DependenciesNode(subject, self.product, variants, self.deps_product)
+    return DependenciesNode(subject, self.product, variants, self.deps_product, self.field)
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):

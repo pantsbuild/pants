@@ -187,26 +187,27 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     return Noop('No source of {}.'.format(self))
 
 
-class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product']), Node):
+class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product', 'field']), Node):
   """A Node that selects the given Product for each of the items in a `dependencies` field on this subject.
 
   Begins by selecting the `dep_product` for the subject, and then selects a product for each
-  of dep_products' dependencies.
+  member a collection named `field` on the dep_product.
 
   The value produced by this Node guarantees that the order of the provided values matches the
-  order of declaration in the `dependencies` list of the `dep_product`.
+  order of declaration in the list `field` of the `dep_product`.
   """
 
   def _dep_product_node(self):
     return SelectNode(self.subject, self.dep_product, self.variants, None)
 
-  def _dep_node(self, dependency):
-    variants = self.variants
-    if isinstance(dependency, Address):
-      # If a subject has literal variants for particular dependencies, they win over all else.
-      dependency, literal_variants = parse_variants(dependency)
-      variants = Variants.merge(variants, literal_variants)
-    return SelectNode(dependency, self.product, variants, None)
+  def _dependency_nodes(self, dep_product):
+    for dependency in getattr(dep_product, self.field or 'dependencies'):
+      variants = self.variants
+      if isinstance(dependency, Address):
+        # If a subject has literal variants for particular dependencies, they win over all else.
+        dependency, literal_variants = parse_variants(dependency)
+        variants = Variants.merge(variants, literal_variants)
+      yield SelectNode(dependency, self.product, variants, None)
 
   def step(self, dependency_states, node_builder):
     # Request the product we need in order to request dependencies.
@@ -222,8 +223,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
       State.raise_unrecognized(dep_product_state)
 
     # The product and its dependency list are available.
-    dep_product = dep_product_state.value
-    dependencies = [self._dep_node(d) for d in dep_product.dependencies]
+    dependencies = list(self._dependency_nodes(dep_product_state.value))
     for dependency in dependencies:
       dep_state = dependency_states.get(dependency, None)
       if dep_state is None or type(dep_state) == Waiting:

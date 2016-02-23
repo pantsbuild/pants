@@ -47,10 +47,6 @@ class PathGlob(datatype('PathGlob', ['relative_to', 'path'])):
   """
 
 
-class PathGlobSiblings(datatype('PathGlobSuffix', ['path', 'suffix'])):
-  pass
-
-
 class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   """A set of 'filespecs' as produced by FilesetWithSpec.
 
@@ -112,14 +108,19 @@ class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 
   """A list of Path objects for recursive subdirectories of the given directory."""
 
 
-class SubDirectories(datatype('SubDirectories', ['directory', 'dependencies'])):
-  """A list of Path objects for direct subdirectories of the given directory."""
+class DirectoryListing(datatype('DirectoryListing', ['directory', 'directories', 'files'])):
+  """A list of file and directory Path objects for the given directory."""
 
 
-def list_subdirectories(project_tree, directory):
-  """List subdirectories directly below the given path, relative to the given ProjectTree."""
-  _, subdirs, _ = next(project_tree.walk(directory.path))
-  return SubDirectories(directory, [Path(join(directory.path, subdir)) for subdir in subdirs])
+def list_directory(project_tree, directory):
+  """List Paths directly below the given path, relative to the ProjectTree.
+
+  Returns a DirectoryListing containing directory and file paths relative to the ProjectTree.
+  """
+  _, subdirs, subfiles = next(project_tree.walk(directory.path))
+  return DirectoryListing(directory,
+                          [Path(join(directory.path, subdir)) for subdir in subdirs],
+                          [Path(join(directory.path, subfile)) for subfile in subfiles])
 
 
 def recursive_subdirectories(directory, subdirectories_list):
@@ -173,12 +174,12 @@ def create_fs_tasks(buildroot):
     # Unfiltered requests for subdirectories.
     (RecursiveSubDirectories,
       [Select(Path),
-       SelectDependencies(RecursiveSubDirectories, SubDirectories)],
+       SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
       recursive_subdirectories),
-    (SubDirectories,
+    (DirectoryListing,
       [SelectLiteral(fspt, ProjectTree),
        Select(Path)],
-      list_subdirectories),
+      list_directory),
   ] + [
     # "Native" operations.
     (Paths,

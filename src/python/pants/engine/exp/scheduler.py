@@ -223,9 +223,9 @@ class BuildRequest(object):
           subject, variants = parse_variants(Address.parse(subject.to_spec_string()))
           yield SelectNode(subject, product, variants, None)
         elif type(subject) in [SiblingAddresses, DescendantAddresses]:
-          yield DependenciesNode(subject, product, None, Addresses)
+          yield DependenciesNode(subject, product, None, Addresses, None)
         elif type(subject) is PathGlobs:
-          yield DependenciesNode(subject, product, None, Paths)
+          yield DependenciesNode(subject, product, None, Paths, None)
         else:
           raise ValueError('Unsupported root subject type: {}'.format(subject))
 

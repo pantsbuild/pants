@@ -217,7 +217,7 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0][0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec, Address, None, Addresses), root)
+    self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that a few expected addresses are in the list.
@@ -234,7 +234,7 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0][0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec, Address, None, Addresses), root)
+    self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that an expected address is in the list.
