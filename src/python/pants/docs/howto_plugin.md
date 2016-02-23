@@ -77,7 +77,7 @@ This instructs pants to look for a module named `hadoop_binary.register` and inv
 it.
 
         :::python
-        [DEFAULT]
+        [GLOBAL]
         backend_packages: [
             "hadoop_binary",
           ]
@@ -96,7 +96,7 @@ The repo's [`pants.ini` file](https://github.com/twitter/commons/blob/master/pan
 `backend_packages` entry listing the plugin packages (packages with `register.py` files):
 
     :::python
-    [DEFAULT]
+    [GLOBAL]
     backend_packages: [
         'twitter.common.pants.jvm.args',
         'twitter.common.pants.jvm.extras',
