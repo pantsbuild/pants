@@ -432,83 +432,47 @@ class IvyTaskMixin(TaskBase):
 
       symlink_classpath_filename = os.path.join(resolve_workdir, 'classpath')
       ivy_cache_classpath_filename = symlink_classpath_filename + '.raw'
-      # If a report file is not present, we need to exec ivy, even if all the individual
-      # targets are up to date. See https://rbcommons.com/s/twitter/r/2015.
-      # Note that it's possible for all targets to be valid but for no classpath file to exist at
-      # target_classpath_file, e.g., if we previously built a superset of targets.
-      any_report_missing, existing_report_paths = self._collect_existing_reports(confs, resolve_hash_name)
 
       safe_mkdir(resolve_workdir)
 
       def last_resolve_was_full_resolve():
-        # if there is a full resolve ivy.xml, then we have done a full resolve.
-        # need additional / better constraints though.
-        # eg
-        # ivy.xml exists, but a rm -rf ~/.ivy2 has happened.
+        # If there is a full resolve ivy.xml, then we have done a full resolve.
+        # TODO need additional / better constraints though.
+        # TODO eg
+        # TODO ivy.xml exists, but a rm -rf ~/.ivy2 has happened.
         return os.path.exists(os.path.join(resolve_workdir, _FULL_RESOLVE_IVY_XML_FILE_NAME))
 
       def last_resolve_was_fetch_resolve():
         # if there is a fetch resolve ivy.xml, then we have done a fetch resolve.
-        # need additional / better constraints though.
-        # eg
-        # ivy.xml exists, but a rm -rf ~/.ivy2 has happened.
-
+        # TODO need additional / better constraints though.
+        # TODO eg
+        # TODO ivy.xml exists, but a rm -rf ~/.ivy2 has happened.
         return os.path.exists(os.path.join(resolve_workdir, _FETCH_RESOLVE_IVY_XML_FILE_NAME))
 
-      def last_resolve_was_remote_resolve():
+      def has_frozen_resolve():
         # If the only file in the resolve workdir is the resolution file,
-        # then it most likely came from cache. There's probably other expressions we could use to double check though.
-        #filename = self._frozen_resolve_file(resolve_workdir)
+        # then it most likely came from cache. There's probably other expressions
+        # we could use to double check though.
         only_cached_resolve_file = [_RESOLVE_FILE_NAME] == os.listdir(resolve_workdir)
         return only_cached_resolve_file
 
-      def is_valid_fetch_resolve():
-        # how to determine a resolve is valid?
-        # parse a file, and check links
-        return True
-
-      def is_valid_full_resolve():
-        return True
-      # could simplify by requiring load are all fetch based
-      #
-
-      # loading a fetch
-      # we really only need the list of jars+their coord tuples. Could drop a file containing just
-      # those to avoid xml parsing.
-      # right now, we sort of do that with the classpath symlink thing.
-
-
-      # fast paths
+      # Resolution loading code, fast paths followed by slow paths.
+      # Fast paths
       # 1. if last was successful fetch resolve, (req valid)
       # 2. if last was successful full resolve   (req valid)
-      # slow paths
+      # Slow paths
       # 1. if last was loaded from cache         (req valid)
       # 2. invalid do a slow full resolve
 
-      # also check
-      #  - validity of symlinks
-      #  - existence of report
-
-      # new constraints
-      #  - need to make sure fetch resolve reports can't be confused with non-fetch
-      # invalid? -> full resolve
-      # only resolve.json -> fetch resolve
-      #
-      # has fetch resolve request
-
-
-      if last_resolve_was_fetch_resolve() and is_valid_fetch_resolve():
-        # r = load
-        # if r is valid
-        #   return r
-
+      if last_resolve_was_fetch_resolve():
         ## load fetch ##
         # prereqs: fetch-report, resolve.json
+        # TODO reorg ala below w/ tests checking validity
         # load resolve.json
         # load report
         # if invalid
         #   clear non-cache workdir and start over
-        potential_frozen_resolutions = self.load_frozen_resolutions(resolve_workdir, targets)
+        potential_frozen_resolutions = self._load_frozen_resolutions(resolve_workdir, targets)
         return self._load_from_fetch_resolve(
           ivy_cache_classpath_filename,
           symlink_classpath_filename,
@@ -516,8 +480,9 @@ class IvyTaskMixin(TaskBase):
           resolve_hash_name,
           potential_frozen_resolutions)
 
-      if last_resolve_was_full_resolve() and is_valid_full_resolve():
+      if last_resolve_was_full_resolve():
         ## load full ##
+        # TODO reorg ala below w/ tests checking validity
         # load report
         # if invalid
         #   clear non-cache workdir and start over
@@ -527,13 +492,14 @@ class IvyTaskMixin(TaskBase):
           symlink_classpath_filename, ivy_workdir,
           resolve_hash_name)
 
-      if last_resolve_was_remote_resolve():
+      if has_frozen_resolve():
         ## fetch resolve bits ##
+        # TODO reorg ala below w/ tests checking validity
         # load resolve.json
         # do resolve
         # mv report to non-cache workdir
         # ret result
-        potential_frozen_resolutions = self.load_frozen_resolutions(resolve_workdir, targets)
+        potential_frozen_resolutions = self._load_frozen_resolutions(resolve_workdir, targets)
         self._do_fetch_resolve(confs, executor, extra_args,
                                ivy_cache_classpath_filename,
                                potential_frozen_resolutions, resolve_hash_name, resolve_vts,
@@ -547,13 +513,10 @@ class IvyTaskMixin(TaskBase):
         return result
 
       if invalidation_check.invalid_vts:
-        # that implies that
-        #   - the local workdir copy was invalidated
-        #   - and a cached version was not found
-        # so,
-        #   we need to do a full resolve and cache the result
-
+        # NB: Invalid here means that there was no matching fingerprint, so there can't be one of the above.
+        # pre-reqs: local workdir copy was invalidated, and no cached resolve.
         ## full resolve bits ##
+        # TODO reorg ala below w/ tests checking validity
         # do resolve
         # mv report to non-cache workdir
         # drop & cache resolve.json
@@ -566,8 +529,12 @@ class IvyTaskMixin(TaskBase):
                                                     resolve_vts, resolve_workdir, targets,
                                                     workunit_name)
 
+      # Weird base case: no valid fetch resolve, no valid full resolve, no cached frozen resolve and
+      # it wasn't invalid, so no full resolve. But, there were no errors trying to do the above
+      # either.
+      #
       # Undefined as yet. It may be that we'd want to do a full resolve in this case
-      # We might also want to blow up.
+      # We might also want to blow up with information about what happened, and a possible fix.
       raise Exception('something')
 
   def _do_full_resolve_cache_and_load(self, confs, executor, extra_args,
