@@ -35,6 +35,9 @@ several contexts, as in these excerpts that define/use `thrift_workdir`:
     [DEFAULT]
     thrift_workdir: %(pants_workdir)s/thrift
 
+    [GLOBAL]
+    print_exception_stacktrace: True
+
     [gen.thrift]
     workdir: %(thrift_workdir)s
 

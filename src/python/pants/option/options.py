@@ -148,16 +148,25 @@ class Options(object):
 
   @property
   def help_request(self):
+    """
+    :API: public
+    """
     return self._help_request
 
   @property
   def target_specs(self):
-    """The targets to operate on."""
+    """The targets to operate on.
+
+    :API: public
+    """
     return self._target_specs
 
   @property
   def goals(self):
-    """The requested goals, in the order specified on the cmd line."""
+    """The requested goals, in the order specified on the cmd line.
+
+    :API: public
+    """
     return self._goals
 
   @property
@@ -191,7 +200,10 @@ class Options(object):
                    self._option_tracker)
 
   def is_known_scope(self, scope):
-    """Whether the given scope is known by this instance."""
+    """Whether the given scope is known by this instance.
+
+    :API: public
+    """
     return scope in self._known_scope_to_info
 
   def passthru_args_for_scope(self, scope):
@@ -244,6 +256,8 @@ class Options(object):
 
     Values are attributes of the returned object, e.g., options.foo.
     Computed lazily per scope.
+
+    :API: public
     """
     # Short-circuit, if already computed.
     if scope in self._values_by_scope:
@@ -268,6 +282,8 @@ class Options(object):
     """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
     Fingerprintable options are options registered via a "fingerprint=True" kwarg.
+
+    :API: public
     """
     pairs = []
     # Note that we iterate over options registered at `scope` and at all enclosing scopes, since
@@ -306,5 +322,8 @@ class Options(object):
     return self._bootstrap_option_values
 
   def for_global_scope(self):
-    """Return the option values for the global scope."""
+    """Return the option values for the global scope.
+
+    :API: public
+    """
     return self.for_scope(GLOBAL_SCOPE)

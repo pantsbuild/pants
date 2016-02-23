@@ -31,7 +31,7 @@ add the following to your pants.ini:
         },
       }
 
-    [DEFAULT]
+    [GLOBAL]
     backend_packages: [
         'example.pants_publish_plugin',
       ]
