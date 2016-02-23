@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
 from os import sep as os_sep
 from os.path import join
 
@@ -65,6 +66,8 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
     TODO: This currently sortof-executes parsing via 'to_filespec'. Should maybe push that out to
     callers to make them deal with errors earlier.
 
+    :param relative_to: The path that all patterns are relative to (which will itself be relative
+                        to the buildroot).
     :param files: A list of relative file paths to include.
     :type files: list of string.
     :param string globs: A relative glob pattern of files to include.
@@ -154,7 +157,7 @@ def files_content(project_tree, paths):
     try:
       contents.append(FileContent(path.path, project_tree.content(path.path)))
     except IOError as e:
-      if project_tree.isfile(path.path):
+      if e.errno != errno.ENOENT:
         # Failing to read an existing file is certainly problematic: raise.
         raise e
       # Otherwise, just doesn't exist.
