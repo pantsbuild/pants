@@ -556,74 +556,62 @@ class IvyTaskMixin(TaskBase):
 
   def _construct_and_cache_frozen_resolutions(self, confs, resolve_vts, resolve_workdir, result,
                                               targets):
-    frozen_resolutions_by_conf = self.construct_frozen_resolutions_by_conf(confs, result, targets)
-    self.dump_frozen_resolutions(resolve_workdir, frozen_resolutions_by_conf)
-    if self.artifact_cache_writes_enabled():
-      self.update_artifact_cache([(resolve_vts, [self._frozen_resolve_file(resolve_workdir)])])
+    frozen_resolutions_by_conf = self._construct_frozen_resolutions_by_conf(confs, result, targets)
+    frozen_resolution_file = self._frozen_resolve_file(resolve_workdir)
+    FrozenResolution.dump_to_file(frozen_resolution_file, frozen_resolutions_by_conf)
 
-  def _load_from_fetch_resolve(self, ivy_cache_classpath_filename,
-                               symlink_classpath_filename,
+    if self.artifact_cache_writes_enabled():
+      self.update_artifact_cache([(resolve_vts, [frozen_resolution_file])])
+
+  def _load_from_fetch_resolve(self, ivy_cache_classpath_filename, symlink_classpath_filename,
                                ivy_workdir, resolve_hash_name, frozen_resolutions):
     symlink_map = self._symlink_from_cache_path(self.ivy_cache_dir, ivy_workdir,
                                                 ivy_cache_classpath_filename,
                                                 symlink_classpath_filename)
-    classpath = IvyUtils.load_classpath_from_cachepath(
-      symlink_classpath_filename)
-    result = IvyFetchResolveResult(classpath, symlink_map, resolve_hash_name, frozen_resolutions=frozen_resolutions)
-    return result
+    classpath = IvyUtils.load_classpath_from_cachepath(symlink_classpath_filename)
+    return IvyFetchResolveResult(classpath, symlink_map, resolve_hash_name,
+                                 frozen_resolutions=frozen_resolutions)
 
-  def _load_from_full_resolve(self, ivy_cache_classpath_filename,
-                               symlink_classpath_filename,
-                               ivy_workdir, resolve_hash_name):
-    result = self._symlink_stuff_and_construct_resolve_result(ivy_workdir, resolve_hash_name,
-                                                              ivy_cache_classpath_filename,
-                                                              symlink_classpath_filename)
-    return result
-
-  def _do_fetch_resolve(self, confs, executor, extra_args,
-                        ivy_cache_classpath_filename,
-                        potential_frozen_resolution, resolve_hash_name, resolve_vts,
-                        resolve_workdir, workunit_name):
-    self._run_fetch_resolve(confs,
-                            executor,
-                            extra_args,
-                            resolve_vts,
-                            ivy_cache_classpath_filename,
-                            resolve_hash_name,
-                            resolve_workdir,
-                            workunit_name + '-fetch',
-                            potential_frozen_resolution)
-
-  def _symlink_stuff_and_construct_resolve_result(self, ivy_workdir, resolve_hash_name, ivy_cache_classpath_filename,
-                                                symlink_classpath_filename):
+  def _load_from_full_resolve(self, ivy_cache_classpath_filename, symlink_classpath_filename,
+                              ivy_workdir, resolve_hash_name):
     symlink_map = self._symlink_from_cache_path(self.ivy_cache_dir, ivy_workdir,
                                                 ivy_cache_classpath_filename,
                                                 symlink_classpath_filename)
-    classpath = IvyUtils.load_classpath_from_cachepath(
-      symlink_classpath_filename)
-    result = IvyFullResolveResult(classpath, symlink_map, resolve_hash_name)
-    return result
+    classpath = IvyUtils.load_classpath_from_cachepath(symlink_classpath_filename)
+    return IvyFullResolveResult(classpath, symlink_map, resolve_hash_name)
 
-  def construct_frozen_resolutions_by_conf(self, confs, result, targets):
-    frozen_resolutions_by_conf = OrderedDict()
-    for conf in confs:
-      frozen_resolution = FrozenResolution()
-      for target, resolved_jars in result.collect_resolved_jars(self.ivy_cache_dir, conf, targets):
-        frozen_resolution.add_resolved_jars(target, resolved_jars)
-      frozen_resolutions_by_conf[conf] = frozen_resolution
-    return frozen_resolutions_by_conf
+  def _do_fetch_resolve(self, confs, executor, extra_args,
+                        ivy_cache_classpath_filename,
+                        frozen_resolution, resolve_hash_name, resolve_vts,
+                        resolve_workdir, workunit_name):
+    workunit_name = workunit_name + '-fetch'
 
-  def dump_frozen_resolutions(self, resolve_workdir, resolutions_by_conf):
-    filename = self._frozen_resolve_file(resolve_workdir)
-    FrozenResolution.dump_to_file(filename, resolutions_by_conf)
+    ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
+    with safe_concurrent_creation(ivy_cache_classpath_filename) as raw_target_classpath_file_tmp:
+      args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
+      targets=resolve_vts.targets,
 
-  def _frozen_resolve_file(self, resolve_workdir):
-    return os.path.join(resolve_workdir, _RESOLVE_FILE_NAME)
+      ivyxml = os.path.join(resolve_workdir, _FETCH_RESOLVE_IVY_XML_FILE_NAME)
+      with IvyUtils.ivy_lock:
+        try:
+          # TODO validate something, and use more than just default somehow.
+          jars = frozen_resolution.get('default').all_resolved_coordinates
+          IvyUtils.generate_fetch_ivy(targets, ivyxml, confs, resolve_hash_name, jars)
+        except IvyUtils.IvyError as e:
+          raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
 
-  def load_frozen_resolutions(self, resolve_workdir, targets):
-    # returns a dict of conf -> FrozenResolution
-    filename = self._frozen_resolve_file(resolve_workdir)
-    return FrozenResolution.load_from_file(filename, targets)
+        try:
+          IvyUtils.exec_ivy(ivy, confs, ivyxml, args,
+                            jvm_options=self.get_options().jvm_options,
+                            executor=executor,
+                            workunit_name=workunit_name,
+                            workunit_factory=self.context.new_workunit)
+        except IvyUtils.IvyError as e:
+          raise self.Error('Ivy resolve failed: {}'.format(e))
+
+      self._validate_classpath_file_creation(raw_target_classpath_file_tmp)
+    logger.debug('Moved ivy classfile file to {dest}'.format(dest=ivy_cache_classpath_filename))
+
 
   def _do_full_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
                        raw_target_classpath_file, resolve_hash_name, resolve_workdir,
@@ -660,47 +648,30 @@ class IvyTaskMixin(TaskBase):
         except IvyUtils.IvyError as e:
           raise self.Error('Ivy resolve failed: {}'.format(e))
 
-      self.validate_classpath_file_creation(raw_target_classpath_file_tmp)
+      self._validate_classpath_file_creation(raw_target_classpath_file_tmp)
     logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
-  def validate_classpath_file_creation(self, raw_target_classpath_file_tmp):
+  def _construct_frozen_resolutions_by_conf(self, confs, result, targets):
+    frozen_resolutions_by_conf = OrderedDict()
+    for conf in confs:
+      frozen_resolution = FrozenResolution()
+      for target, resolved_jars in result.collect_resolved_jars(self.ivy_cache_dir, conf, targets):
+        frozen_resolution.add_resolved_jars(target, resolved_jars)
+      frozen_resolutions_by_conf[conf] = frozen_resolution
+    return frozen_resolutions_by_conf
+
+  def _frozen_resolve_file(self, resolve_workdir):
+    return os.path.join(resolve_workdir, _RESOLVE_FILE_NAME)
+
+  def _load_frozen_resolutions(self, resolve_workdir, targets):
+    # Returns a dict of conf -> FrozenResolution.
+    filename = self._frozen_resolve_file(resolve_workdir)
+    return FrozenResolution.load_from_file(filename, targets)
+
+  def _validate_classpath_file_creation(self, raw_target_classpath_file_tmp):
     if not os.path.exists(raw_target_classpath_file_tmp):
       raise self.Error('Ivy failed to create classpath file at {}'
                        .format(raw_target_classpath_file_tmp))
-
-  def _run_fetch_resolve(self, confs, executor, extra_args, global_vts,
-                          raw_target_classpath_file, resolve_hash_name, resolve_workdir,
-                          workunit_name, frozen_resolutions):
-    # resolve resolutions has all the bits in it to do a boring fetch resolve.
-    # poc
-    #
-    ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
-    with safe_concurrent_creation(raw_target_classpath_file) as raw_target_classpath_file_tmp:
-      args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
-      targets=global_vts.targets,
-
-      ivyxml = os.path.join(resolve_workdir, _FETCH_RESOLVE_IVY_XML_FILE_NAME)
-      with IvyUtils.ivy_lock:
-        try:
-          # so we have all the jars with their versions in resolve_stuffs, so we don't need to do anything
-          # maybe some validation though
-          # TODO validate , and use more than just default.
-          jars = frozen_resolutions.get('default').all_resolved_coordinates
-          IvyUtils.generate_fetch_ivy(targets, ivyxml, confs, resolve_hash_name, jars)
-        except IvyUtils.IvyError as e:
-          raise self.Error('Failed to prepare ivy resolve: {}'.format(e))
-
-        try:
-          IvyUtils.exec_ivy(ivy, confs, ivyxml, args,
-                            jvm_options=self.get_options().jvm_options,
-                            executor=executor,
-                            workunit_name=workunit_name,
-                            workunit_factory=self.context.new_workunit)
-        except IvyUtils.IvyError as e:
-          raise self.Error('Ivy resolve failed: {}'.format(e))
-
-      self.validate_classpath_file_creation(raw_target_classpath_file_tmp)
-    logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
 
   def _symlink_from_cache_path(self, ivy_cache_dir, ivy_workdir, raw_target_classpath_file,
                                target_classpath_file):
