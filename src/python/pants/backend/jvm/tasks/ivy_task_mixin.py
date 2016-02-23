@@ -60,7 +60,7 @@ class FrozenResolution(object):
     return [str(c) for c in self.all_resolved_coordinates]
 
   def __repr__(self):
-    return 'RS(\n  t_to_coord\n    {}\n  all\n    {}'.format(
+    return 'FrozenResolution(\n  target_to_resolved_coordinates\n    {}\n  all\n    {}'.format(
       '\n    '.join(':  '.join([t.address.spec,
                                 '\n      '.join(str(c) for c in cs)])
                     for t,cs in self.target_to_resolved_coordinates.items()),
