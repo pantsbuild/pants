@@ -9,12 +9,15 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file_target_factory',
     'src/python/pants/base:parse_context',
+    'src/python/pants/base:specs',
     'src/python/pants/bin:pants',
+    'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:objects',
+    'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:targets',
     'src/python/pants/util:memo',
-  ]
+  ],
 )
 
 python_binary(

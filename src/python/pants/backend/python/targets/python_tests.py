@@ -11,7 +11,10 @@ from pants.backend.python.targets.python_target import PythonTarget
 
 
 class PythonTests(PythonTarget):
-  """Python tests."""
+  """Python tests.
+
+  :API: public
+  """
 
   def __init__(self, coverage=None, timeout=None, **kwargs):
     """
@@ -25,8 +28,14 @@ class PythonTests(PythonTarget):
 
   @property
   def coverage(self):
+    """
+    :API: public
+    """
     return self._coverage
 
   @property
   def timeout(self):
+    """
+    :API: public
+    """
     return self._timeout

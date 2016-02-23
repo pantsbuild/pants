@@ -10,11 +10,12 @@ import subprocess
 import sys
 from textwrap import dedent
 
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, SelectNode, TaskNode, Throw
+from pants.engine.exp.scheduler import BuildRequest, Noop, SelectNode, TaskNode, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
@@ -46,25 +47,29 @@ def format_node(node, state):
                                  str(state).replace('"', '\\"'))
 
 
-def create_digraph(scheduler):
+# NB: there are only 12 colors in `set312`.
+colorscheme = 'set312'
+max_colors = 12
+colors = {}
 
-  # NB: there are only 12 colors in `set312`.
-  colorscheme = 'set312'
-  max_colors = 12
-  colors = {}
 
-  def format_color(node, node_state):
-    if type(node_state) is Throw:
-      return 'tomato'
-    key = node.product
-    return colors.setdefault(key, (len(colors) % max_colors) + 1)
+def format_color(node, node_state):
+  if type(node_state) is Throw:
+    return 'tomato'
+  elif type(node_state) is Noop:
+    return 'white'
+  key = node.product
+  return colors.setdefault(key, (len(colors) % max_colors) + 1)
+
+
+def create_digraph(scheduler, request):
 
   yield 'digraph plans {'
   yield '  node[colorscheme={}];'.format(colorscheme)
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state), dependency_entries) in scheduler.walk_product_graph():
+  for ((node, node_state), dependency_entries) in scheduler.walk_product_graph(request):
     node_str = format_node(node, node_state)
 
     yield (' "{node}" [style=filled, fillcolor={color}];'
@@ -77,9 +82,9 @@ def create_digraph(scheduler):
   yield '}'
 
 
-def visualize_execution_graph(scheduler):
+def visualize_execution_graph(scheduler, request):
   with temporary_file() as fp:
-    for line in create_digraph(scheduler):
+    for line in create_digraph(scheduler, request):
       fp.write(line)
       fp.write('\n')
     fp.close()
@@ -92,7 +97,7 @@ def visualize_build_request(build_root, build_request):
   scheduler = setup_json_scheduler(build_root)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   LocalSerialEngine(scheduler).reduce(build_request)
-  visualize_execution_graph(scheduler)
+  visualize_execution_graph(scheduler, build_request)
   scheduler.validate()
 
 
@@ -116,7 +121,8 @@ def main():
   if not goals:
     usage('Must supply at least one goal.')
 
-  build_request = BuildRequest(goals=goals,
-                               addressable_roots=[Address.parse(spec) for spec in args
-                                                  if os.path.sep in spec])
+  cmd_line_spec_parser = CmdLineSpecParser(build_root)
+  spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in args
+                if os.path.sep in spec]
+  build_request = BuildRequest(goals=goals, spec_roots=spec_roots)
   visualize_build_request(build_root, build_request)

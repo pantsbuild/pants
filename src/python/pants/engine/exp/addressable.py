@@ -18,18 +18,7 @@ from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
-class Directory(datatype('Directory', ['path'])):
-  pass
-
-
-class StructAddress(datatype('StructAddress', ['spec_path', 'name'])):
-  """This class helps avoid cycles in the "Address might be resolved via a Struct" special case.
-
-  TODO: scheduler.SelectNode defines a special case where it inserts an implicit task that
-  attempts to resolve any subclass of Struct for an Address by requesting the Struct superclass
-  as well. It wraps the subject in this class to avoid causing cycles on the special case.
-  Ideally we could kill that special case in favor of something more principaled.
-  """
+class Addresses(datatype('Addresses', ['dependencies'])):
   pass
 
 

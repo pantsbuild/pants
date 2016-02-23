@@ -21,6 +21,8 @@ class PantsRequirement(object):
 
   NB: The requirement generated is for official pants releases on pypi; so may not be appropriate
   for use in a repo that tracks `pantsbuild/pants` or otherwise uses custom pants sdists.
+
+  :API: public
   """
 
   def __init__(self, parse_context):
