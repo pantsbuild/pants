@@ -40,6 +40,8 @@ class Checkstyle(NailgunTask):
              help='One or more ivy configurations to resolve for this target.')
     register('--jvm-options', advanced=True, action='append', metavar='<option>...',
              help='Run checkstyle with these extra jvm options.')
+    register('--include-user-classpath', action='store_true', default=False, fingerprint=True,
+             help='Add the user classpath to the checkstyle classpath')
     cls.register_jvm_tool(register,
                           'checkstyle',
                           classpath=[
@@ -68,7 +70,8 @@ class Checkstyle(NailgunTask):
   @classmethod
   def prepare(cls, options, round_manager):
     super(Checkstyle, cls).prepare(options, round_manager)
-    round_manager.require_data('runtime_classpath')
+    if options.include_user_classpath:
+      round_manager.require_data('runtime_classpath')
 
   def _is_checked(self, target):
     return target.has_sources(self._JAVA_SOURCE_EXTENSION) and not target.is_synthetic
@@ -98,12 +101,13 @@ class Checkstyle(NailgunTask):
     return sources
 
   def checkstyle(self, targets, sources):
-    runtime_classpaths = self.context.products.get_data('runtime_classpath')
     union_classpath = OrderedSet(self.tool_classpath('checkstyle'))
-    for target in targets:
-      runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True))
-      union_classpath.update(jar for conf, jar in runtime_classpath
-                             if conf in self.get_options().confs)
+    if self.get_options().include_user_classpath:
+      runtime_classpaths = self.context.products.get_data('runtime_classpath')
+      for target in targets:
+        runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True))
+        union_classpath.update(jar for conf, jar in runtime_classpath
+                               if conf in self.get_options().confs)
 
     args = [
       '-c', self.get_options().configuration,
