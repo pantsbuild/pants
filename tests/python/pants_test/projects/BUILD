@@ -13,6 +13,7 @@ python_tests(
 
 python_tests(
   name='testprojects_integration',
+  timeout=600,
   sources=['test_testprojects_integration.py'],
   dependencies=[
     ':base',

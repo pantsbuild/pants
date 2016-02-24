@@ -22,6 +22,8 @@ class JavaTests(JvmTarget):
     :param str test_platform: The name of the platform (defined under the jvm-platform subsystem) to
       use for running tests (that is, a key into the --jvm-platform-platforms dictionary). If
       unspecified, the platform will default to the same one used for compilation.
+    :param int timeout: A timeout (in seconds) which covers the total runtime of all tests in this
+      target. Only applied if `--test-junit-timeouts` is set to True.
     :param list extra_jvm_options: A list of key value pairs of jvm options to use when running the
       tests. Example: ['-Dexample.property=1'] If unspecified, no extra jvm options will be added.
     :param dict extra_env_vars: A map of environment variables to set when running the tests, e.g.

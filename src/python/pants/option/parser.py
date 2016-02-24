@@ -15,7 +15,7 @@ import six
 
 from pants.base.deprecated import check_deprecated_semver
 from pants.base.revision import Revision
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.custom_types import list_option
 from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
                                  BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
@@ -381,7 +381,7 @@ class Parser(object):
       raise ParseError('Cannot fromfile {} with an action ({}) in scope {}'
                        .format(dest, action, self._scope))
 
-    config_section = 'DEFAULT' if self._scope == GLOBAL_SCOPE else self._scope
+    config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
     udest = dest.upper()
     if self._scope == GLOBAL_SCOPE:
       # For convenience, we allow three forms of env var for global scope options.

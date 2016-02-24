@@ -30,6 +30,15 @@ def _unpickle_serializable(serializable_class, kwargs):
   return serializable_class(**kwargs)
 
 
+class Locatable(AbstractClass):
+  """Marks a class whose constructor should receive its spec_path relative to the build root.
+
+  Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they
+  were parsed. If the object also has a `name` (not all do), then these two fields can be
+  combined into an Address.
+  """
+
+
 class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
   """A named tuple to help the readability of the __reduce__ protocol.
 

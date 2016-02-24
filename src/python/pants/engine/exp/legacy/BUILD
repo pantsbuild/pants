@@ -12,10 +12,13 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/bin:pants',
     'src/python/pants/engine/exp:graph',
+    'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:objects',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:targets',
+    'src/python/pants/engine/exp:nodes',
+    'src/python/pants/engine/exp:fs',
     'src/python/pants/util:memo',
   ],
 )

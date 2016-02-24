@@ -6,34 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-import os
+from os.path import basename as os_path_basename
 
 import six
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import AddressableDescriptor, Addresses, TypeConstraintError
-from pants.engine.exp.mapper import AddressFamily, AddressMapper, ResolveError
-from pants.engine.exp.objects import SerializableFactory, Validatable
-from pants.engine.exp.scheduler import Select, SelectDependencies, SelectLiteral, SelectProjection
+from pants.engine.exp.fs import DirectoryListing, FilesContent, Path, Paths, RecursiveSubDirectories
+from pants.engine.exp.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
+from pants.engine.exp.objects import Locatable, SerializableFactory, Validatable
+from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.exp.struct import Struct
 from pants.util.objects import datatype
-
-
-class SourceRoots(datatype('SourceRoots', ['buildroot', 'srcroots'])):
-  """Placeholder for the SourceRoot subsystem."""
-
-
-class Directory(datatype('Directory', ['path'])):
-  """A Directory path."""
-
-
-class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 'dependencies'])):
-  """A list of Directory objects which are recursive subdirectories of the given directory."""
-
-
-class SubDirectories(datatype('SubDirectories', ['directory', 'dependencies'])):
-  """A list of Directory objects which are direct subdirectories of the given directory."""
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -45,9 +30,33 @@ def _key_func(entry):
   return key
 
 
-def parse_address_family(address_mapper, directory):
-  """Given a Directory, parses and returns its AddressFamily (which may be empty, but not None)."""
-  return address_mapper.family(directory.path)
+class BuildFilePaths(datatype('BuildFilePaths', ['paths'])):
+  """A list of Paths that are known to match a BUILD file pattern.
+
+  TODO: Because BUILD file names are matched using a regex, this cannot currently use PathGlobs.
+  If we were willing to allow a bit of slop in terms of files read, this could use
+  PathGlobs to get FilesContent for all files with the right prefix, and then discard.
+  """
+
+
+def filter_buildfile_paths(address_mapper, directory_listing):
+  build_files = tuple(f for f in directory_listing.files
+                      if address_mapper.build_pattern.match(os_path_basename(f.path)))
+  return BuildFilePaths(build_files)
+
+
+def parse_address_family(address_mapper, path, build_files_content):
+  """Given the contents of the build files in one directory, return an AddressFamily.
+
+  The AddressFamily may be empty, but it will not be None.
+  """
+  address_maps = []
+  for filepath, filecontent in build_files_content.dependencies:
+    address_maps.append(AddressMap.parse(filepath,
+                                         filecontent,
+                                         address_mapper.symbol_table_cls,
+                                         address_mapper.parser_cls))
+  return AddressFamily.create(path.path, address_maps)
 
 
 class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'dependencies'])):
@@ -151,12 +160,16 @@ def hydrate_struct(unhydrated_struct, dependencies):
         hydrated_args[key] = container_type(maybe_consume(key, v) for v in value)
       else:
         hydrated_args[key] = maybe_consume(key, value)
-    return _hydrate(type(item), **hydrated_args)
+    return _hydrate(type(item), address.spec_path, **hydrated_args)
 
   return consume_dependencies(struct, args={'address': address})
 
 
-def _hydrate(item_type, **kwargs):
+def _hydrate(item_type, spec_path, **kwargs):
+  # If the item will be Locatable, inject the spec_path.
+  if issubclass(item_type, Locatable):
+    kwargs['spec_path'] = spec_path
+
   try:
     item = item_type(**kwargs)
   except TypeConstraintError as e:
@@ -173,27 +186,8 @@ def _hydrate(item_type, **kwargs):
   return item
 
 
-def cast_from_struct(address, struct):
-  """Given an Address and and a Struct for that Address, return the Struct."""
-  return struct
-
-
 def identity(v):
   return v
-
-
-def list_subdirectories(source_roots, directory):
-  """List subdirectories directly below the given directory, relative to the given buildroot."""
-  abs_dir = os.path.join(source_roots.buildroot, directory.path)
-  _, subdirs, _ = next(os.walk(abs_dir))
-  subdirs = [Directory(os.path.join(directory.path, subdir)) for subdir in subdirs]
-  return SubDirectories(directory, subdirs)
-
-
-def recursive_subdirectories(directory, subdirectories_list):
-  """Given a directory and a list of RecursiveSubDirectories below it, flatten and return."""
-  directories = [directory] + [d for subdir in subdirectories_list for d in subdir.dependencies]
-  return RecursiveSubDirectories(directory, directories)
 
 
 def addresses_from_address_family(address_family):
@@ -206,7 +200,7 @@ def addresses_from_address_families(address_families):
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
 
 
-def create_graph_tasks(address_mapper, symbol_table_cls, source_roots):
+def create_graph_tasks(address_mapper, symbol_table_cls):
   """Creates tasks used to parse Structs from BUILD files.
 
   :param address_mapper: An AddressMapper instance.
@@ -219,27 +213,32 @@ def create_graph_tasks(address_mapper, symbol_table_cls, source_roots):
        SelectDependencies(Struct, UnhydratedStruct)],
       hydrate_struct),
     (UnhydratedStruct,
-      [SelectProjection(AddressFamily, Directory, ('spec_path',), Address),
+      [SelectProjection(AddressFamily, Path, ('spec_path',), Address),
        Select(Address)],
       resolve_unhydrated_struct),
+  ] + [
+    # BUILD file parsing.
     (AddressFamily,
       [SelectLiteral(address_mapper, AddressMapper),
-       Select(Directory)],
+       Select(Path),
+       SelectProjection(FilesContent, Paths, ('paths',), BuildFilePaths)],
       parse_address_family),
+    (BuildFilePaths,
+      [SelectLiteral(address_mapper, AddressMapper),
+       Select(DirectoryListing)],
+      filter_buildfile_paths),
   ] + [
     # Addresses for 'literal' products might possibly be resolvable from BLD files. These tasks
     # define that lookup for each literal product.
     (product,
-     [Select(Address), Select(Struct)],
-     cast_from_struct)
+     [Select(Struct)],
+     identity)
     for product in symbol_table_cls.table().values()
   ] + [
-    # Handling for SiblingAddresses
+    # Spec handling.
     (Addresses,
-      [SelectProjection(AddressFamily, Directory, ('directory',), SiblingAddresses)],
+      [SelectProjection(AddressFamily, Path, ('directory',), SiblingAddresses)],
       addresses_from_address_family),
-  ] + [
-    # Handling for DescendantAddresses (ie, recursive directory walks)
     (Addresses,
       [SelectDependencies(AddressFamily, RecursiveSubDirectories)],
       addresses_from_address_families),
@@ -247,14 +246,6 @@ def create_graph_tasks(address_mapper, symbol_table_cls, source_roots):
     # SelectDependencies clause: we launch the recursion by requesting RecursiveSubDirectories
     # for a Directory projected from DescendantAddresses.
     (RecursiveSubDirectories,
-      [SelectProjection(RecursiveSubDirectories, Directory, ('directory',), DescendantAddresses)],
+      [SelectProjection(RecursiveSubDirectories, Path, ('directory',), DescendantAddresses)],
       identity),
-    (RecursiveSubDirectories,
-      [Select(Directory),
-       SelectDependencies(RecursiveSubDirectories, SubDirectories)],
-      recursive_subdirectories),
-    (SubDirectories,
-      [SelectLiteral(source_roots, SourceRoots),
-       Select(Directory)],
-      list_subdirectories),
   ]

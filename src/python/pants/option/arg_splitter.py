@@ -16,6 +16,7 @@ from pants.util.meta import AbstractClass
 
 
 GLOBAL_SCOPE = ''
+GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
 
 
 class ArgSplitterError(Exception):

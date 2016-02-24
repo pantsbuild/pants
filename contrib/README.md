@@ -38,7 +38,7 @@ Contrib plugins should generally follow 3 basic setup steps:
    This involves 2 edits to `pants.ini`.  You'll need to add one entry in each of the
    `pythonpath` and `backend_packages` lists:
    ```ini
-   [DEFAULT]
+   [GLOBAL]
    # Enable our own custom loose-source plugins as well as contribs.
    pythonpath: [
        "%(buildroot)s/pants-plugins/src/python",

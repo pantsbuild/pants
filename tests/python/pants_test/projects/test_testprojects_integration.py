@@ -67,7 +67,10 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
     # because they take a long time to run.
     timeout_targets = [
       'testprojects/tests/python/pants/timeout:sleeping_target',
-      'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target'
+      'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target',
+       # Called with test_pytest_run_integration
+      'testprojects/tests/python/pants/timeout:exceeds_timeout',
+      'testprojects/tests/python/pants/timeout:ignores_terminate',
     ]
 
     deliberately_conflicting_targets = [
