@@ -30,13 +30,6 @@ from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ensure_cached
 
 
-def mock_ivy_resolve_returning(resolve_result):
-  def mock(*args, **kwargs):
-    return resolve_result
-
-  return mock
-
-
 def strip_workdir(dir, classpath):
   return [(conf, path[len(dir):]) for conf, path in classpath]
 
@@ -134,8 +127,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
     result = IvyFullResolveResult([], symlink_map, 'some-key-for-a-and-b')
     result.ivy_info_for= mock_ivy_info_for
 
+    def mock_ivy_resolve(*args, **kwargs):
+      return result
+
     task = self.create_task(context, workdir='unused')
-    task._ivy_resolve = mock_ivy_resolve_returning(result)
+    task._ivy_resolve = mock_ivy_resolve
 
     task.execute()
     compile_classpath = context.products.get_data('compile_classpath', None)

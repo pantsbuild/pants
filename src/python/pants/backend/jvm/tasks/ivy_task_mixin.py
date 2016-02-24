@@ -612,7 +612,6 @@ class IvyTaskMixin(TaskBase):
       self._validate_classpath_file_creation(raw_target_classpath_file_tmp)
     logger.debug('Moved ivy classfile file to {dest}'.format(dest=ivy_cache_classpath_filename))
 
-
   def _do_full_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
                        raw_target_classpath_file, resolve_hash_name, resolve_workdir,
                        workunit_name):

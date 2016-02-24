@@ -18,7 +18,6 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
@@ -470,34 +469,6 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     assert_order([module4, module2, module1, module3, module6, module5])
     assert_order([module4, module2, module5, module6, module1, module3])
 
-# WIP maybe
-#  def test_collects_origin_url(self):
-#    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_origin_location.xml')
-#
-#    ref = IvyModuleRef("toplevel", "toplevelmodule", "latest")
-#
-#    def collector(r):
-#      x = ivy_info.modules_by_ref.get(r)
-#      if x:
-#        return {x}
-#      else:
-#  #      return set()
-#
-#    result = ivy_info.traverse_dependency_graph(ref, collector, dict())
-#    print(result)
-#    self.assertEqual(
-#          {
-#           IvyModule(ref=IvyModuleRef(org='org1',
-#                                      name='name1',
-#                                      rev='0.0.1',
-#                                      classifier=None,
-#                                      ext=u'jar'),
-#                     artifact='ivy2cache_path/org1/name1.jar',
-#                     #origin_location="http://example.com/example.jar",
-#                     # ^^ maybe
-#                     callers=(IvyModuleRef(org='toplevel', name='toplevelmodule', rev='latest', classifier=None, ext=u'jar'),))
-#          },
-#          result)
   def test_collects_classifiers(self):
     ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_multiple_classifiers.xml')
 
