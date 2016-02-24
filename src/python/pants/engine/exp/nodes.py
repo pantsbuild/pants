@@ -347,8 +347,4 @@ class NodeBuilder(object):
   def task_nodes(self, subject, product, variants):
     # Tasks.
     for task, anded_clause in self._tasks[product]:
-      # NB: we eagerly apply the Tasks' Selectors here to avoid creating Nodes which
-      # are unsatisfiable.
-      if any(c.construct_node(subject, variants) is None for c in anded_clause):
-        continue
       yield TaskNode(subject, product, variants, task, anded_clause)
