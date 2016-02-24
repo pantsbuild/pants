@@ -175,18 +175,19 @@ class IvyInfo(object):
     visited = set()
     return self._do_traverse_dependency_graph(ref, collector, memo, visited)
 
-  def get_resolved_jars_for_jar_library(self, jar_library, memo=None):
-    """Collects jars for the passed jar_library.
+  def get_resolved_jars_for_coordinates(self, coordinates, memo=None):
+    """Collects jars for the passed coordinates.
 
     Because artifacts are only fetched for the "winning" version of a module, the artifacts
     will not always represent the version originally declared by the library.
 
-    This method is transitive within the library's jar_dependencies, but will NOT
-    walk into its non-jar dependencies.
+    This method is transitive within the passed coordinates dependencies.
 
-    :param jar_library A JarLibrary to collect the transitive artifacts for.
-    :param memo see `traverse_dependency_graph`
-    :returns: all the artifacts for all of the jars in this library, including transitive deps
+    :param coordinates collections.Iterable: Collection of coordinates to collect transitive
+                                             resolved jars for.
+    :param memo: See `traverse_dependency_graph`.
+    :returns: All the artifacts for all of the jars for the provided coordinates,
+              including transitive dependencies.
     :rtype: list of :class:`pants.backend.jvm.jar_dependency_utils.ResolvedJar`
     """
     def to_resolved_jar(jar_ref, jar_path):
@@ -199,7 +200,7 @@ class IvyInfo(object):
     resolved_jars = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
-    for jar in jar_library.jar_dependencies:
+    for jar in coordinates:
       classifier = jar.classifier if self._conf == 'default' else self._conf
       jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
