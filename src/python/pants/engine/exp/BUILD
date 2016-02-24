@@ -30,9 +30,9 @@ python_library(
   sources=['engine.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':scheduler',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:meta',
+    ':objects',
   ]
 )
 

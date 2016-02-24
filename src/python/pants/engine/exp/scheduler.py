@@ -192,48 +192,16 @@ class ProductGraph(object):
     self._node_results.clear()
 
 
-class BuildRequest(object):
+class BuildRequest(datatype('BuildRequest', ['goals', 'roots'])):
   """Describes the user-requested build.
 
-  This object supports generating roots for PathGlobs (files) and Specs (addressables).
+  To create a BuildRequest, see `LocalScheduler.build_request`.
+
+  :param goals: The list of goal names supplied on the command line.
+  :type goals: list of string
+  :param roots: Root Nodes for this request.
+  :type roots: list of :class:`pants.engine.exp.nodes.Node`
   """
-
-  def __init__(self, goals, subjects):
-    """
-    :param goals: The list of goal names supplied on the command line.
-    :type goals: list of string
-    :param subjects: A list of Spec and/or PathGlobs objects.
-    :type subjects: list of :class:`pants.base.specs.Spec` and/or :class:`pants.engine.exp.fs.PathGlobs`
-    """
-    self._goals = goals
-    self._subjects = subjects
-
-  @property
-  def goals(self):
-    """Return the list of goal names supplied on the command line.
-
-    :rtype: list of string
-    """
-    return self._goals
-
-  def roots(self, products_by_goal):
-    """Determine the root Nodes for the products and subjects selected by the goals and specs."""
-    for goal_name in self.goals:
-      product = products_by_goal[goal_name]
-      for subject in self._subjects:
-        if type(subject) is SingleAddress:
-          subject, variants = parse_variants(Address.parse(subject.to_spec_string()))
-          yield SelectNode(subject, product, variants, None)
-        elif type(subject) in [SiblingAddresses, DescendantAddresses]:
-          yield DependenciesNode(subject, product, None, Addresses, None)
-        elif type(subject) is PathGlobs:
-          yield DependenciesNode(subject, product, None, Paths, None)
-        else:
-          raise ValueError('Unsupported root subject type: {}'.format(subject))
-
-  def __repr__(self):
-    return ('BuildRequest(goals={!r}, subjects={!r})'
-            .format(self._goals, self._subjects))
 
 
 class Promise(object):
@@ -265,10 +233,10 @@ class Promise(object):
       return self._success
 
 
-class Step(datatype('Step', ['step_id', 'node', 'dependencies', 'node_builder'])):
+class Step(datatype('Step', ['step_id', 'node', 'subject', 'dependencies', 'node_builder'])):
   def __call__(self):
     """Called by the Engine in order to execute this Step."""
-    return self.node.step(self.dependencies, self.node_builder)
+    return self.node.step(self.subject, self.dependencies, self.node_builder)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -288,6 +256,9 @@ class Step(datatype('Step', ['step_id', 'node', 'dependencies', 'node_builder'])
 
 class GraphValidator(object):
   """A concrete object that implements validation of a completed product graph.
+
+  TODO: The name "literal" here is overloaded with SelectLiteral, which is a better fit
+  for the name. The values here are more "user-specified/configured" than "literal".
 
   TODO: If this abstraction seems useful, we should extract an interface and allow plugin
   implementers to install their own. But currently the API isn't great: in particular, it
@@ -380,16 +351,20 @@ class GraphValidator(object):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, symbol_table_cls, tasks):
+  def __init__(self, goals, tasks, subjects, symbol_table_cls):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
+    :param subjects: A Subjects instance that will be used to store/retrieve subjects. Should
+           already contain any "literal" subject values that the given tasks require.
     """
-    self._goals = goals
-    self._graph_validator = GraphValidator(symbol_table_cls)
+    self._products_by_goal = goals
     self._node_builder = NodeBuilder.create(tasks)
+    self._subjects = subjects
+
+    self._graph_validator = GraphValidator(symbol_table_cls)
     self._product_graph = ProductGraph()
     self._step_id = -1
 
@@ -412,8 +387,41 @@ class LocalScheduler(object):
       deps[dep] = Noop('Dep from {} to {} would cause a cycle.'.format(node, dep))
 
     # Ready.
+    subject = self._subjects.get(node.subject_key)
     self._step_id += 1
-    return (Step(self._step_id, node, deps, self._node_builder), Promise())
+    return (Step(self._step_id, node, subject, deps, self._node_builder), Promise())
+
+  def build_request(self, goals, subjects):
+    """Create and return a BuildRequest for the given goals and subjects.
+
+    The resulting BuildRequest object will contain keys tied to this scheduler's ProductGraph, and
+    so it will not be directly usable with other scheduler instances without being re-created.
+
+    :param goals: The list of goal names supplied on the command line.
+    :type goals: list of string
+    :param subjects: A list of Spec and/or PathGlobs objects.
+    :type subjects: list of :class:`pants.base.specs.Spec` and/or :class:`pants.engine.exp.fs.PathGlobs`
+    """
+
+    # Determine the root Nodes for the products and subjects selected by the goals and specs.
+    def roots():
+      for goal_name in goals:
+        product = self._products_by_goal[goal_name]
+        for subject in subjects:
+          if type(subject) is SingleAddress:
+            subject, variants = parse_variants(Address.parse(subject.to_spec_string()))
+            subject_key = self._subjects.put(subject)
+            yield SelectNode(subject_key, product, variants, None)
+          elif type(subject) in [SiblingAddresses, DescendantAddresses]:
+            subject_key = self._subjects.put(subject)
+            yield DependenciesNode(subject_key, product, None, Addresses, None)
+          elif type(subject) is PathGlobs:
+            subject_key = self._subjects.put(subject)
+            yield DependenciesNode(subject_key, product, None, Paths, None)
+          else:
+            raise ValueError('Unsupported root subject type: {}'.format(subject))
+
+    return BuildRequest(goals, tuple(roots()))
 
   @property
   def product_graph(self):
@@ -433,7 +441,7 @@ class LocalScheduler(object):
 
   def root_entries(self, build_request):
     """Returns the roots for the given BuildRequest as a dict from Node to State."""
-    return {root: self._product_graph.state(root) for root in build_request.roots(self._goals)}
+    return {root: self._product_graph.state(root) for root in build_request.roots}
 
   def schedule(self, build_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -444,12 +452,11 @@ class LocalScheduler(object):
     """
 
     pg = self._product_graph
-    roots = list(build_request.roots(self._goals))
 
     # A dict from Node to a possibly executing Step. Only one Step exists for a Node at a time.
     outstanding = {}
     # Nodes that might need to have Steps created (after any outstanding Step returns).
-    candidates = set(roots)
+    candidates = set(build_request.roots)
 
     # Yield nodes that are ready, and then compute new ones.
     scheduling_iterations = 0
@@ -504,7 +511,7 @@ class LocalScheduler(object):
             len(pg.dependencies()),
             scheduling_iterations,
             self._step_id,
-            sum(1 for _ in pg.walk(roots))))
+            sum(1 for _ in pg.walk(build_request.roots))))
 
   def validate(self):
     """Validates the generated product graph with the configured GraphValidator."""

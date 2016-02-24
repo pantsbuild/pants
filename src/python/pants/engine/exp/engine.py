@@ -15,6 +15,7 @@ from Queue import Queue
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
+from pants.engine.exp.objects import SerializationError
 from pants.util.meta import AbstractClass
 
 
@@ -100,15 +101,6 @@ class LocalSerialEngine(Engine):
     for step_batch in self._scheduler.schedule(build_request):
       for step, promise in step_batch:
         promise.success(step())
-
-
-class SerializationError(Exception):
-  """Indicates an error serializing input or outputs of an execution node.
-
-  The `LocalMultiprocessEngine` uses this exception to communicate incompatible planner code when
-  run in debug mode.  Both the plans and the products they produce must be picklable to be executed
-  by the multiprocess engine.
-  """
 
 
 def _try_pickle(obj):
