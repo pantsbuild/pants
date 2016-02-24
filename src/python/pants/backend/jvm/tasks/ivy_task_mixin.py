@@ -193,7 +193,8 @@ class IvyTaskMixin(TaskBase):
       jar_library_targets = [t for t in targets if isinstance(t, JarLibrary)]
       for target in jar_library_targets:
         # Add the artifacts from each dependency module.
-        raw_resolved_jars = ivy_info.get_resolved_jars_for_jar_library(target, memo=ivy_jar_memo)
+        raw_resolved_jars = ivy_info.get_resolved_jars_for_coordinates(target.jar_dependencies,
+                                                                       memo=ivy_jar_memo)
         resolved_jars = [new_resolved_jar_with_symlink_path(target, conf, raw_resolved_jar)
                          for raw_resolved_jar in raw_resolved_jars]
         classpath_products.add_jars_for_targets([target], conf, resolved_jars)
