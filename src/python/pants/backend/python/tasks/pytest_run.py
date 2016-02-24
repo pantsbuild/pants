@@ -156,9 +156,19 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       if not result.success:
         raise TestFailedTaskError(failed_targets=result.failed_targets)
     else:
+      if self.get_options().fail_fast:
+        # Fail fast forces failing hard.
+        fail_hard = True
+      elif self.get_options().fail_slow:
+        fail_hard = False
+      elif self.get_options().coverage:
+        # Coverage often throws errors despite tests succeeding, so force fail soft in that case.
+        fail_hard = False
+      else:
+        # Default to failing fast to maintain existing behavior.
+        fail_hard = True
+
       results = {}
-      # Coverage often throws errors despite tests succeeding, so force failsoft in that case.
-      fail_hard = not self.get_options().fail_slow and not self.get_options().coverage
       for target in targets:
         rv = self._do_run_tests([target], workunit)
         results[target] = rv
@@ -536,6 +546,8 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
       # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
       args = ['--confcutdir', get_buildroot()]
+      if self.get_options().fail_fast:
+        args.extend(['-x'])
       if self._debug:
         args.extend(['-s'])
       if self.get_options().colors:
