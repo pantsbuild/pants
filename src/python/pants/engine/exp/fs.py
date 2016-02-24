@@ -120,11 +120,15 @@ def list_directory(project_tree, directory):
 
   Returns a DirectoryListing containing directory and file paths relative to the ProjectTree.
 
+  Currently ignores `.`-prefixed subdirectories, but should likely use `--ignore-patterns`.
+    TODO: See https://github.com/pantsbuild/pants/issues/2956
+
   Raises an exception if the path does not exist, or is not a directoy.
   """
   _, subdirs, subfiles = next(project_tree.walk(directory.path))
   return DirectoryListing(directory,
-                          [Path(join(directory.path, subdir)) for subdir in subdirs],
+                          [Path(join(directory.path, subdir)) for subdir in subdirs
+                           if not subdir.startswith('.')],
                           [Path(join(directory.path, subfile)) for subfile in subfiles])
 
 
