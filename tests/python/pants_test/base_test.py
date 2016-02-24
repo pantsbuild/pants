@@ -204,8 +204,6 @@ class BaseTest(unittest.TestCase):
     BuildRoot().path = self.build_root
     self.addCleanup(BuildRoot().reset)
 
-    # We need a pants.ini, even if empty. get_buildroot() uses its presence.
-    self.create_file('pants.ini')
     self._build_configuration = BuildConfiguration()
     self._build_configuration.register_aliases(self.alias_groups)
     self.build_file_parser = BuildFileParser(self._build_configuration, self.build_root)
