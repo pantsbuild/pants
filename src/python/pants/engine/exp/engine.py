@@ -112,14 +112,13 @@ class SerializationError(Exception):
 
 
 def _try_pickle(obj):
-  with open(os.devnull, 'w') as devnull:
-    try:
-      pickle.dump(obj, devnull)
-    except Exception as e:
-      # Unfortunately, pickle can raise things other than PickleError instances.  For example it
-      # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
-      # `Exception` type here.
-      raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
+  try:
+    pickle.dumps(obj, protocol=-1)
+  except Exception as e:
+    # Unfortunately, pickle can raise things other than PickleError instances.  For example it
+    # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
+    # `Exception` type here.
+    raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
 def _execute_step(step, debug):

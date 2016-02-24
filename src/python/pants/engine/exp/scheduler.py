@@ -460,6 +460,10 @@ class LocalScheduler(object):
         if candidate_node in outstanding:
           # Node is still a candidate, but is currently running.
           continue
+        if pg.is_complete(candidate_node):
+          # Node has already completed.
+          candidates.discard(candidate_node)
+          continue
         # Create a step if all dependencies are available; otherwise, can assume they are
         # outstanding, and will cause this Node to become a candidate again later.
         candidate_step = self._create_step(candidate_node)
@@ -484,7 +488,7 @@ class LocalScheduler(object):
         pg.update_state(step.node, promise.get())
         if pg.is_complete(step.node):
           # The Node is completed: mark any of its dependents as candidates for Steps.
-          candidates.update(d for d in pg.dependents_of(step.node) if not pg.is_complete(d))
+          candidates.update(d for d in pg.dependents_of(step.node))
         else:
           # Waiting on dependencies.
           incomplete_deps = [d for d in pg.dependencies_of(step.node) if not pg.is_complete(d)]
