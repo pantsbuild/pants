@@ -15,13 +15,31 @@ from pants.util.meta import Singleton
 class BuildRoot(Singleton):
   """Represents the global workspace build root.
 
-  By default a pants workspace is defined by a root directory where the workspace configuration
-  file - 'pants.ini' - lives.  This path can also be manipulated through this interface for
-  re-location of the build root in tests.
+  By default a pants workspace is defined by a root directory where a file called 'pants' -
+  typically the pants runner script - lives.  This path can also be manipulated through
+  this interface for re-location of the build root in tests.
+
+  TODO: If this ever causes a problem (because some subdir that people run pants in
+        legitimately contains a file called 'pants') then we can add a second check for
+        an explicit sentinel file, like 'BUILDROOT'.
   """
 
   class NotFoundError(Exception):
     """Raised when unable to find the current workspace build root."""
+
+  @classmethod
+  def find_buildroot(cls):
+    buildroot = os.path.abspath(os.getcwd())
+    while not os.path.isfile(os.path.join(buildroot, 'pants')):
+      parent = os.path.dirname(buildroot)
+      if buildroot != parent:
+        buildroot = parent
+      else:
+        raise cls.NotFoundError('No buildroot detected. Pants detects the buildroot by looking '
+                                'for a file named pants in the cwd and its ancestors.  Typically '
+                                'this is the runner script that executes pants.  If you have no '
+                                'such script you can create an empty file in your buildroot.')
+    return buildroot
 
   def __init__(self):
     self._root_dir = None
@@ -30,13 +48,7 @@ class BuildRoot(Singleton):
   def path(self):
     """Returns the build root for the current workspace."""
     if self._root_dir is None:
-      buildroot = os.path.abspath(os.getcwd())
-      while not os.path.exists(os.path.join(buildroot, 'pants.ini')):
-        if buildroot != os.path.dirname(buildroot):
-          buildroot = os.path.dirname(buildroot)
-        else:
-          raise self.NotFoundError('Could not find pants.ini!')
-      self._root_dir = os.path.realpath(buildroot)
+      self._root_dir = os.path.realpath(self.find_buildroot())
     return self._root_dir
 
   @path.setter
