@@ -123,14 +123,16 @@ class ProductGraph(object):
 
     # Add deps. Any deps which would cause a cycle are added to _cyclic_dependencies instead,
     # and ignored except for the purposes of Step execution.
+    node_dependencies = self._dependencies[node]
+    node_cyclic_dependencies = self._cyclic_dependencies[node]
     for dependency in dependencies:
-      if dependency in self._dependencies[node]:
+      if dependency in node_dependencies:
         continue
       Node.validate_node(dependency)
       if self._detect_cycle(node, dependency):
-        self._cyclic_dependencies[node].add(dependency)
+        node_cyclic_dependencies.add(dependency)
       else:
-        self._dependencies[node].add(dependency)
+        node_dependencies.add(dependency)
         self._dependents[dependency].add(node)
         # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
         self._dependencies[dependency]
@@ -458,10 +460,6 @@ class LocalScheduler(object):
         if candidate_node in outstanding:
           # Node is still a candidate, but is currently running.
           continue
-        if pg.is_complete(candidate_node):
-          # Node has already completed.
-          candidates.discard(candidate_node)
-          continue
         # Create a step if all dependencies are available; otherwise, can assume they are
         # outstanding, and will cause this Node to become a candidate again later.
         candidate_step = self._create_step(candidate_node)
@@ -486,7 +484,7 @@ class LocalScheduler(object):
         pg.update_state(step.node, promise.get())
         if pg.is_complete(step.node):
           # The Node is completed: mark any of its dependents as candidates for Steps.
-          candidates.update(d for d in pg.dependents_of(step.node))
+          candidates.update(d for d in pg.dependents_of(step.node) if not pg.is_complete(d))
         else:
           # Waiting on dependencies.
           incomplete_deps = [d for d in pg.dependencies_of(step.node) if not pg.is_complete(d)]
