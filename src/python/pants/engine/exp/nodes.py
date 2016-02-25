@@ -162,6 +162,9 @@ class Subjects(object):
       # The key was just created for the first time. Add its `str` representation if we're in debug.
       if self._debug:
         key.set_string(str(obj))
+      if isinstance(obj, Address):
+        print('>>> got address of type {} with fields {}'.format(
+          type(obj), (obj._spec_path, obj._target_name, obj._hash)))
     return stored_key
 
   def get(self, key):
