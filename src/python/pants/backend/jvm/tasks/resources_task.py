@@ -32,9 +32,6 @@ class ResourcesTask(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    """
-    :API: public
-    """
     round_manager.require_data('compile_classpath')
 
   @property

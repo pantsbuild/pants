@@ -17,9 +17,6 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    """
-    :API: public
-    """
     super(JvmToolTaskMixin, cls).prepare(options, round_manager)
     cls.prepare_tools(round_manager)
 
