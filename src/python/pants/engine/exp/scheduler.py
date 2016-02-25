@@ -278,7 +278,7 @@ class GraphValidator(object):
     # Walk into successful nodes for the same subject under this root.
     def predicate(entry):
       node, state = entry
-      return root.subject == node.subject and type(state) is Return
+      return root.subject_key == node.subject_key and type(state) is Return
     # If a product was successfully selected, record it.
     for ((node, _), _) in product_graph.walk([root], predicate=predicate):
       if type(node) is SelectNode:
@@ -295,7 +295,7 @@ class GraphValidator(object):
     # Walk all nodes for the same subject under this root.
     def predicate(entry):
       node, state = entry
-      return root.subject == node.subject
+      return root.subject_key == node.subject_key
     for ((node, state), dependencies) in product_graph.walk([root], predicate=predicate):
       # Look for unsatisfied TaskNodes with at least one unsatisfied dependency.
       if type(node) is not TaskNode:
@@ -326,7 +326,7 @@ class GraphValidator(object):
 
       # Found a partially consumed input.
       for used_literal_dep in used_literal_deps:
-        partials[node.subject][(used_literal_dep, node.product)].append((node.func, missing_products))
+        partials[node.subject_key][(used_literal_dep, node.product)].append((node.func, missing_products))
     return partials
 
   def validate(self, product_graph):
@@ -335,7 +335,7 @@ class GraphValidator(object):
     # Locate roots: those who do not have any dependents for the same subject.
     roots = set()
     for node, dependents in product_graph.dependents().items():
-      if any(d.subject == node.subject for d in dependents):
+      if any(d.subject_key == node.subject_key for d in dependents):
         # Node had a dependent for its subject: was not a root.
         continue
       roots.add(node)
@@ -361,7 +361,7 @@ class LocalScheduler(object):
            already contain any "literal" subject values that the given tasks require.
     """
     self._products_by_goal = goals
-    self._node_builder = NodeBuilder.create(tasks)
+    self._node_builder = NodeBuilder.create(tasks, subjects)
     self._subjects = subjects
 
     self._graph_validator = GraphValidator(symbol_table_cls)
@@ -436,7 +436,7 @@ class LocalScheduler(object):
     The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
     that don't match it. The default predicate eliminates all `Noop` subgraphs.
     """
-    for entry in self._product_graph.walk(build_request.roots(self._goals), predicate=predicate):
+    for entry in self._product_graph.walk(build_request.roots, predicate=predicate):
       yield entry
 
   def root_entries(self, build_request):

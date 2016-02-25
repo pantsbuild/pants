@@ -77,7 +77,11 @@ class SubjectKey(object):
     self._digest = digest
     self._string = string
 
-  def _set_string(self, string):
+  @property
+  def string(self):
+    return self._string
+
+  def set_string(self, string):
     """Sets the string for a SubjectKey after construction.
 
     Since the string representation is not involved in `eq` or `hash`, this allows the key to be
@@ -128,10 +132,11 @@ class Subjects(object):
 
     # Hash the blob and store it if it does not exist.
     key = SubjectKey(sha1(blob).hexdigest())
-    if not self._storage.setdefault(key, blob):
-      # The key did not exist: add its `str` representation to the key if we're in debug.
+    value = self._storage.setdefault(key, blob)
+    if value is blob:
+      # The key was just created for the first time. Add its `str` representation to the key if we're in debug.
       if self._debug:
-        key._set_string(str(obj))
+        key.set_string(str(obj))
     return key
 
   def get(self, key):
@@ -291,14 +296,14 @@ class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', '
   def _dep_product_node(self):
     return SelectNode(self.subject_key, self.dep_product, self.variants, None)
 
-  def _dependency_nodes(self, dep_product):
+  def _dependency_nodes(self, node_builder, dep_product):
     for dependency in getattr(dep_product, self.field or 'dependencies'):
       variants = self.variants
       if isinstance(dependency, Address):
         # If a subject has literal variants for particular dependencies, they win over all else.
         dependency, literal_variants = parse_variants(dependency)
         variants = Variants.merge(variants, literal_variants)
-      yield SelectNode(dependency, self.product, variants, None)
+      yield SelectNode(node_builder.subjects.put(dependency), self.product, variants, None)
 
   def step(self, subject, dependency_states, node_builder):
     # Request the product we need in order to request dependencies.
@@ -314,7 +319,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', '
       State.raise_unrecognized(dep_product_state)
 
     # The product and its dependency list are available.
-    dependencies = list(self._dependency_nodes(dep_product_state.value))
+    dependencies = list(self._dependency_nodes(node_builder, dep_product_state.value))
     for dependency in dependencies:
       dep_state = dependency_states.get(dependency, None)
       if dep_state is None or type(dep_state) == Waiting:
@@ -341,8 +346,8 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
   def _input_node(self):
     return SelectNode(self.subject_key, self.input_product, self.variants, None)
 
-  def _output_node(self, projected_subject):
-    return SelectNode(projected_subject, self.product, self.variants, None)
+  def _output_node(self, node_builder, projected_subject):
+    return SelectNode(node_builder.subjects.put(projected_subject), self.product, self.variants, None)
 
   def step(self, subject, dependency_states, node_builder):
     # Request the product we need to compute the subject.
@@ -368,7 +373,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
       projected_subject = values[0]
     else:
       projected_subject = self.projected_subject(*values)
-    output_node = self._output_node(projected_subject)
+    output_node = self._output_node(node_builder, projected_subject)
 
     # When the output node is available, return its result.
     output_state = dependency_states.get(output_node, None)
@@ -420,18 +425,30 @@ class NodeBuilder(object):
   """Encapsulates the details of creating Nodes that involve user-defined functions/tasks.
 
   This avoids giving Nodes direct access to the task list or product graph.
+
+  TODO: Should likely be renamed to 'StepContext' or something.
   """
 
   @classmethod
-  def create(cls, tasks):
+  def create(cls, tasks, subjects):
     """Indexes tasks by their output type."""
     serializable_tasks = defaultdict(set)
     for output_type, input_selects, task in tasks:
       serializable_tasks[output_type].add((task, tuple(input_selects)))
-    return cls(serializable_tasks)
+    return cls(serializable_tasks, subjects)
 
-  def __init__(self, tasks):
+  def __init__(self, tasks, subjects):
     self._tasks = tasks
+    self._subjects = subjects
+
+  @property
+  def subjects(self):
+    """TODO! This is a total hack which will not work in a multi-threaded situation. This will be
+    changed before this review lands. Intentional trailing whitespace on the next line to mark this:
+--->                                                                                                
+    Re-visit the State types to support introducing subjects some other way.
+    """
+    return self._subjects
 
   def task_nodes(self, subject, product, variants):
     # Tasks.

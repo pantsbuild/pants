@@ -28,12 +28,11 @@ def format_type(node):
 
 
 def format_subject(node):
-  subject = node.subject
-  if type(node.subject) == Address:
-    subject = 'Address({})'.format(node.subject)
+  subject = node.subject_key.string
   if node.variants:
-    subject = '{}@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
-  return subject
+    return '({})@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
+  else:
+    return '({})'.format(subject)
 
 
 def format_product(node):
