@@ -15,10 +15,12 @@ from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
-from pants.engine.exp.nodes import Noop, Return, SelectNode, Throw
+from pants.engine.exp.nodes import Noop, Return, Throw
+from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.engine.exp.nodes import Subjects
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler
+from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.struct import Struct, StructWithDeps
 from pants.engine.exp.targets import Target
 
@@ -80,46 +82,50 @@ class GraphTestBase(unittest.TestCase):
   _build_root = os.path.dirname(__file__)
   _cmd_line_spec_parser = CmdLineSpecParser(_build_root)
 
-  def _select(self, address):
-    return SelectNode(address, self._product, None, None)
-
   def create(self, build_pattern=None, parser_cls=None, inline=False):
+    subjects = Subjects()
     symbol_table_cls = TestTable
-    mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                           build_pattern=build_pattern,
-                           parser_cls=parser_cls)
+
+    project_tree_key = subjects.put(
+        FileSystemProjectTree(self._build_root))
+    address_mapper_key = subjects.put(
+        AddressMapper(symbol_table_cls=symbol_table_cls,
+                      build_pattern=build_pattern,
+                      parser_cls=parser_cls))
+
     tasks = (
-        create_fs_tasks(self._build_root) +
-        create_graph_tasks(mapper, symbol_table_cls)
+        create_fs_tasks(project_tree_key) +
+        create_graph_tasks(address_mapper_key, symbol_table_cls)
       )
     return LocalScheduler({self._goal: self._product},
-                          symbol_table_cls,
-                          tasks)
+                          tasks,
+                          subjects,
+                          symbol_table_cls)
 
   def create_json(self):
     return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
 
   def _populate(self, scheduler, address):
-    """Make a BuildRequest to parse the given Address into a Struct."""
+    """Execute a BuildRequest to parse the given Address into a Struct."""
     spec = self._cmd_line_spec_parser.parse_spec(str(address))
-    request = BuildRequest(goals=[self._goal], subjects=[spec])
+    request = scheduler.build_request(goals=[self._goal], subjects=[spec])
     LocalSerialEngine(scheduler).reduce(request)
-    return self._select(address)
+    root_entries = scheduler.root_entries(request).items()
+    self.assertEquals(1, len(root_entries))
+    return root_entries[0]
 
   def walk(self, scheduler, address):
     """Return a list of all (Node, State) tuples reachable from the given Address."""
-    root = self._populate(scheduler, address)
+    root, _ = self._populate(scheduler, address)
     return list(e for e, _ in scheduler.product_graph.walk([root], predicate=lambda _: True))
 
   def resolve_failure(self, scheduler, address):
-    root = self._populate(scheduler, address)
-    state = scheduler.product_graph.state(root)
+    root, state = self._populate(scheduler, address)
     self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
     return state.exc
 
   def resolve(self, scheduler, address):
-    root = self._populate(scheduler, address)
-    state = scheduler.product_graph.state(root)
+    root, state = self._populate(scheduler, address)
     self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
     return state.value
 

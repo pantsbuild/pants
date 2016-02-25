@@ -19,7 +19,7 @@ from pants.engine.exp.legacy.parsers import LegacyPythonCallbacksParser
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.nodes import Return, State, Subjects, Throw
 from pants.engine.exp.parsers import SymbolTable
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler
+from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.targets import Target
 from pants.util.memo import memoized_method
 

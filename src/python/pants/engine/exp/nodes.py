@@ -157,12 +157,12 @@ class Subjects(object):
 
     # Hash the blob and store it if it does not exist.
     key = SubjectKey.create(blob)
-    value = self._storage.setdefault(key, blob)
-    if value is blob:
-      # The key was just created for the first time. Add its `str` representation to the key if we're in debug.
+    stored_key, prev_value = self._storage.setdefault(key, (key, blob))
+    if stored_key is key:
+      # The key was just created for the first time. Add its `str` representation if we're in debug.
       if self._debug:
         key.set_string(str(obj))
-    return key
+    return stored_key
 
   def get(self, key):
     """Given a key, return its deserialized content.
@@ -170,7 +170,7 @@ class Subjects(object):
     Note that since this is not a cache, if we do not have the content for the object, this
     operation fails noisily.
     """
-    return pickle.loads(self._storage[key])
+    return pickle.loads(self._storage[key][1])
 
 
 class Node(object):

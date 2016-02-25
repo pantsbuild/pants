@@ -18,7 +18,7 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
                                                 Jar, JavaSources, ThriftSources,
                                                 setup_json_scheduler)
 from pants.engine.exp.nodes import DependenciesNode, Return, SelectNode, Throw
-from pants.engine.exp.scheduler import BuildRequest, PartiallyConsumedInputsError
+from pants.engine.exp.scheduler import PartiallyConsumedInputsError
 
 
 class SchedulerTest(unittest.TestCase):
@@ -26,6 +26,7 @@ class SchedulerTest(unittest.TestCase):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
     self.scheduler = setup_json_scheduler(build_root)
+    self.subjects = self.scheduler._subjects
     self.engine = LocalSerialEngine(self.scheduler)
 
     self.guava = Address.parse('3rdparty/jvm:guava')
@@ -43,10 +44,14 @@ class SchedulerTest(unittest.TestCase):
     self.managed_resolve_latest = Address.parse('3rdparty/jvm/managed:latest-hadoop')
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
+  def key(self, subject):
+    return self.subjects.put(subject)
+
   def assert_select_for_subjects(self, walk, product, subjects, variants=None, variant_key=None):
     node_type = SelectNode
+
     variants = tuple(variants.items()) if variants else None
-    self.assertEqual({node_type(subject, product, variants, variant_key) for subject in subjects},
+    self.assertEqual({node_type(self.key(subject), product, variants, variant_key) for subject in subjects},
                      {node for (node, _), _ in walk
                       if node.product == product and isinstance(node, node_type) and node.variants == variants})
 
@@ -61,7 +66,7 @@ class SchedulerTest(unittest.TestCase):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
 
   def request_specs(self, goals, *specs):
-    return BuildRequest(goals=goals, subjects=specs)
+    return self.scheduler.build_request(goals=goals, subjects=specs)
 
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = self.request(goals, *root_specs)
@@ -97,7 +102,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Root: expect the synthetic GenGoal product.
     root_entry = walk[0][0]
-    self.assertEqual(SelectNode(self.thrift, GenGoal, None, None), root_entry[0])
+    self.assertEqual(SelectNode(self.key(self.thrift), GenGoal, None, None), root_entry[0])
     self.assertIsInstance(root_entry[1], Return)
 
     variants = {'thrift': 'apache_java'}
@@ -122,7 +127,7 @@ class SchedulerTest(unittest.TestCase):
         Address.parse('src/thrift:slf4j-api')]
 
     # Root: expect compilation via javac.
-    self.assertEqual((SelectNode(self.java, Classpath, None, None), Return(Classpath(creator='javac'))),
+    self.assertEqual((SelectNode(self.key(self.java), Classpath, None, None), Return(Classpath(creator='javac'))),
                      walk[0][0])
 
     # Confirm that exactly the expected subjects got Classpaths.
@@ -135,7 +140,7 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    self.assertEqual((SelectNode(self.consumes_resources, Classpath, None, None),
+    self.assertEqual((SelectNode(self.key(self.consumes_resources), Classpath, None, None),
                       Return(Classpath(creator='javac'))),
                      walk[0][0])
 
@@ -152,7 +157,7 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    self.assertEqual((SelectNode(self.consumes_managed_thirdparty, Classpath, None, None),
+    self.assertEqual((SelectNode(self.key(self.consumes_managed_thirdparty), Classpath, None, None),
                       Return(Classpath(creator='javac'))),
                      walk[0][0])
 
@@ -174,7 +179,7 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    self.assertEqual((SelectNode(self.inferred_deps, Classpath, None, None),
+    self.assertEqual((SelectNode(self.key(self.inferred_deps), Classpath, None, None),
                       Return(Classpath(creator='scalac'))),
                      walk[0][0])
 
@@ -188,7 +193,7 @@ class SchedulerTest(unittest.TestCase):
 
     # Validate that the root failed.
     root_node, root_state = walk[0][0]
-    self.assertEqual(SelectNode(self.java_multi, Classpath, None, None), root_node)
+    self.assertEqual(SelectNode(self.key(self.java_multi), Classpath, None, None), root_node)
     self.assertEqual(Throw, type(root_state))
 
   def test_no_variant_thrift(self):
@@ -217,7 +222,7 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0][0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
+    self.assertEqual(DependenciesNode(self.key(spec), Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that a few expected addresses are in the list.
@@ -234,7 +239,7 @@ class SchedulerTest(unittest.TestCase):
     # Validate the root.
     root, root_state = walk[0][0]
     root_value = root_state.value
-    self.assertEqual(DependenciesNode(spec, Address, None, Addresses, None), root)
+    self.assertEqual(DependenciesNode(self.key(spec), Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
     # Confirm that an expected address is in the list.

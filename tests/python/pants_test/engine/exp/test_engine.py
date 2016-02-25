@@ -14,7 +14,6 @@ from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
 from pants.engine.exp.examples.planners import Classpath, setup_json_scheduler
 from pants.engine.exp.nodes import Return, SelectNode
-from pants.engine.exp.scheduler import BuildRequest
 
 
 class EngineTest(unittest.TestCase):

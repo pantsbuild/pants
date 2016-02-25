@@ -23,7 +23,7 @@ from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      UnaddressableObjectError)
 from pants.engine.exp.nodes import Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler
+from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target
 from pants.util.contextutil import temporary_file
@@ -172,7 +172,7 @@ class AddressMapperTest(unittest.TestCase):
                              configurations=['//a', Struct(embedded='yes')])
 
   def resolve(self, spec):
-    request = BuildRequest(goals=[self._goal], subjects=[spec])
+    request = self.scheduler.build_request(goals=[self._goal], subjects=[spec])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error
