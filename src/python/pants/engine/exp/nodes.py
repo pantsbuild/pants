@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import cPickle as pickle
 from abc import abstractmethod, abstractproperty
+from binascii import hexlify
 from collections import defaultdict
 from hashlib import sha1
-from binascii import hexlify
 from struct import Struct as StdlibStruct
 
 from pants.build_graph.address import Address

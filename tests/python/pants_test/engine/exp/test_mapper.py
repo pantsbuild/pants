@@ -13,6 +13,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
@@ -21,7 +22,7 @@ from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
-from pants.engine.exp.nodes import Throw
+from pants.engine.exp.nodes import Subjects, Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.struct import Struct
@@ -153,18 +154,24 @@ class AddressMapperTest(unittest.TestCase):
     shutil.copytree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'),
                     self.build_root)
 
+    subjects = Subjects()
     self._goal = 'list'
     symbol_table_cls = TargetTable
-    self.address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                        parser_cls=JsonParser,
-                                        build_pattern=r'.+\.BUILD.json$')
+
+    project_tree_key = subjects.put(
+        FileSystemProjectTree(self.build_root))
+    address_mapper_key = subjects.put(
+        AddressMapper(symbol_table_cls=symbol_table_cls,
+                      parser_cls=JsonParser,
+                      build_pattern=r'.+\.BUILD.json$'))
     tasks = (
-        create_fs_tasks(self.build_root) +
-        create_graph_tasks(self.address_mapper, symbol_table_cls)
+        create_fs_tasks(project_tree_key) +
+        create_graph_tasks(address_mapper_key, symbol_table_cls)
       )
     self.scheduler = LocalScheduler({self._goal: UnhydratedStruct},
-                                    symbol_table_cls,
-                                    tasks)
+                                    tasks,
+                                    subjects,
+                                    symbol_table_cls)
 
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',

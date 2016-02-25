@@ -9,15 +9,14 @@ import os
 import unittest
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
-from pants.engine.exp.nodes import Noop, Return, Throw
-from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.exp.nodes import Subjects
+from pants.engine.exp.nodes import Noop, Return, Subjects, Throw
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
 from pants.engine.exp.scheduler import LocalScheduler

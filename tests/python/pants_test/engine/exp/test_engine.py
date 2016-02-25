@@ -26,7 +26,7 @@ class EngineTest(unittest.TestCase):
 
   def request(self, goals, *addresses):
     specs = [self.spec_parser.parse_spec(str(a)) for a in addresses]
-    return BuildRequest(goals=goals, subjects=specs)
+    return self.scheduler.build_request(goals=goals, subjects=specs)
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
