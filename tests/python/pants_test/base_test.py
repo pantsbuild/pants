@@ -272,7 +272,10 @@ class BaseTest(unittest.TestCase):
     options = create_options_for_optionables(optionables,
                                              extra_scopes=extra_scopes,
                                              options=options)
-    Subsystem._options = options
+
+    Subsystem.reset(reset_options=True)
+    Subsystem.set_options(options)
+
     context = create_context(options=options,
                              passthru_args=passthru_args,
                              target_roots=target_roots,
