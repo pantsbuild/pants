@@ -26,8 +26,6 @@ from pants.util.fileutil import atomic_copy
 from pants.util.memo import memoized_property
 
 
-_FETCH_RESOLVE_IVY_XML_FILE_NAME = 'fetch-ivy.xml'
-
 _FULL_RESOLVE_IVY_XML_FILE_NAME = 'ivy.xml'
 
 _RESOLVE_FILE_NAME = 'resolution.json'
