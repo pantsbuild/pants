@@ -6,7 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
 
+import pytest
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef
@@ -19,12 +21,17 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
-from pants.util.contextutil import temporary_dir
+from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyResolveResult
+from pants.util.contextutil import open_zip, temporary_dir, temporary_file
+from pants.util.dirutil import safe_delete
 from pants_test.base_test import BaseTest
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import subsystem_instance
 from pants_test.tasks.task_test_base import ensure_cached
+
+
+def strip_workdir(dir, classpath):
+  return [(conf, path[len(dir):]) for conf, path in classpath]
 
 
 class IvyResolveTest(JvmToolTaskTestBase):
@@ -76,7 +83,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     def artifact_path(name):
       return os.path.join(self.pants_workdir, 'ivy_artifact', name)
 
-    def mock_parse_report(resolve_hash_name_ignored, conf):
+    def mock_ivy_info_for(conf):
       ivy_info = IvyInfo(conf)
 
       # Guava 16.0 would be evicted by Guava 16.0.1.  But in a real
@@ -114,17 +121,17 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
       return ivy_info
 
-    def mock_ivy_resolve(*ignored_args, **ignored_kwargs):
-      symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
-                     artifact_path('bogus1'): artifact_path('bogus1'),
-                     artifact_path('unused'): artifact_path('unused')}
+    symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
+                   artifact_path('bogus1'): artifact_path('bogus1'),
+                   artifact_path('unused'): artifact_path('unused')}
+    result = IvyResolveResult([], symlink_map, 'some-key-for-a-and-b', {})
+    result._ivy_info_for= mock_ivy_info_for
 
-      return [], symlink_map, 'some-key-for-a-and-b'
-
+    def mock_ivy_resolve(*args, **kwargs):
+      return result
 
     task = self.create_task(context, workdir='unused')
     task._ivy_resolve = mock_ivy_resolve
-    task._parse_report = mock_parse_report
 
     task.execute()
     compile_classpath = context.products.get_data('compile_classpath', None)
@@ -217,6 +224,80 @@ class IvyResolveTest(JvmToolTaskTestBase):
     classpath = self.create_task(self.context()).ivy_classpath([junit_jar_lib])
 
     self.assertEquals(2, len(classpath))
+
+  def test_second_resolve_reuses_existing_resolution_files(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+    with self._temp_workdir():
+      # Initial resolve does a full resolve and populates elements.
+      initial_context = self.context(target_roots=[junit_jar_lib])
+      self.create_task(initial_context).execute()
+
+      # Second resolve should check files and do no ivy call.
+      load_context = self.context(target_roots=[junit_jar_lib])
+      task = self.create_task(load_context)
+
+      def fail(*arg, **kwargs):
+        self.fail("Unexpected call to ivy.")
+      task._do_resolve = fail
+
+      task.execute()
+
+      self.assertEqual(initial_context.products.get_data('compile_classpath'),
+                       load_context.products.get_data('compile_classpath'))
+
+  def test_when_a_report_for_a_conf_is_missing_fall_back_to_full_resolve(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+    with self._temp_workdir() as workdir:
+      self.resolve([junit_jar_lib])
+
+      # Remove report from workdir.
+      ivy_resolve_workdir = self._find_resolve_workdir(workdir)
+      report_path = os.path.join(ivy_resolve_workdir, 'resolve-report-default.xml')
+      safe_delete(report_path)
+
+      self.resolve([junit_jar_lib])
+
+      self.assertTrue(os.path.isfile(report_path),
+                      'Expected {} to exist as a file'.format(report_path))
+
+  def test_when_symlink_cachepath_fails_on_load_due_to_missing_file_trigger_full_resolve(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+    with self._temp_workdir() as workdir:
+      self.resolve([jar_lib])
+
+      # Add pointer to cachepath that points to a non-existent file.
+      ivy_resolve_workdir = self._find_resolve_workdir(workdir)
+      raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
+      with open(raw_classpath_path, 'a') as raw_f:
+        raw_f.write(os.pathsep)
+        raw_f.write(os.path.join('non-existent-file'))
+
+      self.resolve([jar_lib])
+
+      # The raw_classpath should be re-created because the previous resolve became invalid.
+      with open(raw_classpath_path) as f:
+        self.assertNotIn('non-existent-file', f.read())
+
+  def _find_resolve_workdir(self, workdir):
+    ivy_dir = os.path.join(workdir, 'ivy')
+    ivy_dir_subdirs = os.listdir(ivy_dir)
+    ivy_dir_subdirs.remove('jars')  # Ignore the jars directory.
+    self.assertEqual(1, len(ivy_dir_subdirs), 'There should only be the resolve directory.')
+    ivy_resolve_workdir = ivy_dir_subdirs[0]
+    return os.path.join(ivy_dir, ivy_resolve_workdir)
+
+  @contextmanager
+  def _temp_workdir(self):
+    old_workdir = self.options['']['pants_workdir']
+    with temporary_dir() as workdir:
+      self.set_options_for_scope('', pants_workdir=workdir)
+      self._test_workdir = workdir
+      yield workdir
+    self._test_workdir = old_workdir
+    self.set_options_for_scope('', pants_workdir=old_workdir)
 
 
 class IvyResolveFingerprintStrategyTest(BaseTest):

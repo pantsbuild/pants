@@ -387,7 +387,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
 
   def parse_ivy_report(self, rel_path):
     path = os.path.join('tests/python/pants_test/backend/jvm/tasks', rel_path)
-    ivy_info = IvyUtils._parse_xml_report(conf='default', path=path)
+    ivy_info = IvyUtils.parse_xml_report_by_path(conf='default', path=path)
     self.assertIsNotNone(ivy_info)
     return ivy_info
 

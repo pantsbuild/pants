@@ -356,10 +356,10 @@ class IvyUtils(object):
     if not os.path.exists(path):
       raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
 
-    return cls._parse_xml_report(conf, path)
+    return cls.parse_xml_report_by_path(conf, path)
 
   @classmethod
-  def _parse_xml_report(cls, conf, path):
+  def parse_xml_report_by_path(cls, conf, path):
     logger.debug("Parsing ivy report {}".format(path))
     ret = IvyInfo(conf)
     etree = ET.parse(path)
