@@ -5,17 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import json
 import logging
 import os
 import threading
-from collections import OrderedDict, defaultdict
 from hashlib import sha1
 
-from twitter.common.collections import OrderedSet
-
 from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.backend.jvm.jar_dependency_utils import ResolvedJar
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
