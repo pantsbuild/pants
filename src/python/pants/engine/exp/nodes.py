@@ -143,7 +143,10 @@ class Subjects(object):
   def __init__(self, debug=True, protocol=None):
     self._storage = dict()
     self._debug = debug
-    self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
+    # TODO: Have seen strange inconsistencies with pickle protocol version 1/2 (ie, the
+    # binary versions): in particular, bytes added into the middle of otherwise identical
+    # objects.
+    self._protocol = protocol if protocol is not None else 0
 
   def put(self, obj):
     """Serialize and hash a Serializable, returning a unique key to retrieve it later."""
@@ -157,14 +160,11 @@ class Subjects(object):
 
     # Hash the blob and store it if it does not exist.
     key = SubjectKey.create(blob)
-    stored_key, prev_value = self._storage.setdefault(key, (key, blob))
+    stored_key, _ = self._storage.setdefault(key, (key, blob))
     if stored_key is key:
       # The key was just created for the first time. Add its `str` representation if we're in debug.
       if self._debug:
         key.set_string(str(obj))
-      if isinstance(obj, Address):
-        print('>>> got address of type {} with fields {}'.format(
-          type(obj), (obj._spec_path, obj._target_name, obj._hash)))
     return stored_key
 
   def get(self, key):
