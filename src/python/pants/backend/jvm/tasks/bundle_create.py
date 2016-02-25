@@ -128,9 +128,8 @@ class BundleCreate(JvmBinaryTask):
     """Create a self-contained application bundle.
 
     The bundle will contain the target classes, dependencies and resources.
-
-    :API: public
     """
+
     assert(isinstance(app, BundleCreate.App))
 
     bundle_dir = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(app.basename))

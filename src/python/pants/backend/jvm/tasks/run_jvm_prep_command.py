@@ -55,9 +55,6 @@ class RunJvmPrepCommandBase(Task):
     return isinstance(tgt, JvmPrepCommand) and tgt.payload.get_field_value('goal') == cls.goal
 
   def execute(self):
-    """
-    :API: public
-    """
     if self.goal not in JvmPrepCommand.goals():
       raise  TaskError("Expected goal to be one of {}".format(JvmPrepCommand.goals()))
 
