@@ -100,6 +100,12 @@ class M2Coordinate(object):
                                                         classifier=maybe_compenent(self.classifier),
                                                         ext=self.ext)
 
+  @classmethod
+  def from_string(cls, string_coord):
+    # TODO Tests
+    org,name,rev,classifier,ext = string_coord.split(':')
+    return M2Coordinate(org, name, rev, classifier or None,ext or None)
+
   def __eq__(self, other):
     return isinstance(other, M2Coordinate) and self._id == other._id
 

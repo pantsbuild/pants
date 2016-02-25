@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
+from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -78,3 +79,46 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
         '3rdparty:junit'
     ], config=pants_ini_config)
     self.assert_failure(pants_run)
+
+  def test_ivy_bimodal_resolve_caching(self):
+    # This test covers the case where a successful ivy resolve will drop a generic representation
+    # and cache it. Then, after a clean-all invalidates the workdir, the next resolve will use the
+    # version information from the previous, rather than doing a full resolve.
+
+    with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
+      config = {'cache': {'write_to': [cache_dir],'read_from': [cache_dir]}}
+
+      def run_pants(command):
+        return self.run_pants_with_workdir(command, workdir, config=config)
+
+      first_export_result = run_pants(['export', '3rdparty:junit'])
+
+      resolve_workdir = self._find_resolve_workdir(workdir)
+      # The first run did a ran ivy in resolve mode, so it doesn't have a fetch-ivy.xml.
+      self.assertNotIn('fetch-ivy.xml', os.listdir(resolve_workdir))
+
+      run_pants(['clean-all'])
+
+      run_pants(['export', '3rdparty:junit'])
+      second_export_result = run_pants(['export', '3rdparty:junit'])
+
+      # Using the fetch pattern should result in the same export information.
+      self.assertEqual(first_export_result.stdout_data, second_export_result.stdout_data)
+
+      # The second run uses the cached resolution information from the first resolve, and
+      # generates a fetch ivy.xml.
+      self.assertIn('fetch-ivy.xml', os.listdir(resolve_workdir))
+
+  def _find_resolve_workdir(self, workdir):
+    # Finds the first resolve workdir that contains a resolution.json.
+    # Otherwise fails
+    ivy_dir = os.path.join(workdir, 'ivy')
+    listdir = os.listdir(ivy_dir)
+    listdir.remove('jars')
+    for dir in listdir:
+      potential_workdir = os.path.join(ivy_dir, dir)
+      if os.path.exists(os.path.join(potential_workdir, 'resolution.json')):
+        #print(potential_workdir)
+        return potential_workdir
+    else:
+      self.fail("No resolution.json in ivy workdirs")

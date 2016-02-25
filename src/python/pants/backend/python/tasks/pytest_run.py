@@ -536,6 +536,8 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
       # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
       args = ['--confcutdir', get_buildroot()]
+      if self.get_options().fail_fast:
+        args.extend(['-x'])
       if self._debug:
         args.extend(['-s'])
       if self.get_options().colors:

@@ -143,8 +143,8 @@ class IvyInfo(object):
       # If we're here, that means we're resolving something that
       # transitively depends on itself
       return set()
-
     visited.add(ref)
+
     acc = collector(ref)
     # NB(zundel): ivy does not return deps in a consistent order for the same module for
     # different resolves.  Sort them to get consistency and prevent cache invalidation.
@@ -175,18 +175,19 @@ class IvyInfo(object):
     visited = set()
     return self._do_traverse_dependency_graph(ref, collector, memo, visited)
 
-  def get_resolved_jars_for_jar_library(self, jar_library, memo=None):
-    """Collects jars for the passed jar_library.
+  def get_resolved_jars_for_coordinates(self, coordinates, memo=None):
+    """Collects jars for the passed coordinates.
 
     Because artifacts are only fetched for the "winning" version of a module, the artifacts
     will not always represent the version originally declared by the library.
 
-    This method is transitive within the library's jar_dependencies, but will NOT
-    walk into its non-jar dependencies.
+    This method is transitive within the passed coordinates dependencies.
 
-    :param jar_library A JarLibrary to collect the transitive artifacts for.
-    :param memo see `traverse_dependency_graph`
-    :returns: all the artifacts for all of the jars in this library, including transitive deps
+    :param coordinates collections.Iterable: Collection of coordinates to collect transitive
+                                             resolved jars for.
+    :param memo: See `traverse_dependency_graph`.
+    :returns: All the artifacts for all of the jars for the provided coordinates,
+              including transitive dependencies.
     :rtype: list of :class:`pants.backend.jvm.jar_dependency_utils.ResolvedJar`
     """
     def to_resolved_jar(jar_ref, jar_path):
@@ -199,13 +200,16 @@ class IvyInfo(object):
     resolved_jars = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
-    for jar in jar_library.jar_dependencies:
+    for jar in coordinates:
       classifier = jar.classifier if self._conf == 'default' else self._conf
       jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
         for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
           resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
     return resolved_jars
+
+  def __repr__(self):
+    return 'IvyInfo(conf={}, refs={})'.format(self._conf, self.modules_by_ref.keys())
 
 
 class IvyUtils(object):
@@ -381,7 +385,7 @@ class IvyUtils(object):
                                         classifier=classifier, ext=ext)
 
           artifact_cache_path = artifact.get('location')
-          ivy_module = IvyModule(ivy_module_ref, artifact_cache_path, callers)
+          ivy_module = IvyModule(ivy_module_ref, artifact_cache_path, tuple(callers))
 
           ret.add_module(ivy_module)
     return ret
@@ -446,6 +450,37 @@ class IvyUtils(object):
         overrides=overrides)
 
     template_relpath = os.path.join('templates', 'ivy_utils', 'ivy.mustache')
+    template_text = pkgutil.get_data(__name__, template_relpath)
+    generator = Generator(template_text, lib=template_data)
+    with safe_open(ivyxml, 'w') as output:
+      generator.write(output)
+
+  @classmethod
+  def generate_fetch_ivy(cls, targets, ivyxml, confs, resolve_hash_name=None, jars=None):
+    """Generates an ivy xml with all jars marked as intransitive using the all conflict manager."""
+    if resolve_hash_name:
+      org = IvyUtils.INTERNAL_ORG_NAME
+      name = resolve_hash_name
+    else:
+      org, name = cls.identify(targets)
+
+    extra_configurations = [conf for conf in confs if conf and conf != 'default']
+
+    # use org name _and_ rev so that we can have dependencies with different versions!
+    jars_by_key = OrderedDict()
+    for jar in jars:
+      jars = jars_by_key.setdefault((jar.org, jar.name, jar.rev), [])
+      jars.append(jar)
+
+
+    dependencies = [cls._generate_fetch_jar_template(jars) for jars in jars_by_key.values()]
+
+    template_data = TemplateData(org=org,
+                                 module=name,
+                                 extra_configurations=extra_configurations,
+                                 dependencies=dependencies)
+
+    template_relpath = os.path.join('templates', 'ivy_utils', 'ivy_fetch.mustache')
     template_text = pkgutil.get_data(__name__, template_relpath)
     generator = Generator(template_text, lib=template_data)
     with safe_open(ivyxml, 'w') as output:
@@ -604,5 +639,53 @@ class IvyUtils(object):
         artifacts=artifacts.values(),
         any_have_url=any_have_url,
         excludes=[cls._generate_exclude_template(exclude) for exclude in excludes])
+
+    return template
+
+  @classmethod
+  def _generate_fetch_jar_template(cls, jars):
+    global_dep_attributes = set(Dependency(org=jar.org,
+                                           name=jar.name,
+                                           rev=jar.rev,
+                                           transitive=False,
+                                           mutable=False,
+                                           force=False
+        )
+                                for jar in jars)
+    if len(global_dep_attributes) != 1:
+      # If we batch fetches and assume conflict manager all, we could ignore these.
+      # Leaving this here for now.
+      conflicting_dependencies = sorted(str(g) for g in global_dep_attributes)
+      raise cls.IvyResolveConflictingDepsError('Found conflicting dependencies:\n\t{}'
+                                               .format('\n\t'.join(conflicting_dependencies)))
+    jar_attributes = global_dep_attributes.pop()
+
+    any_have_url = False
+
+    artifacts = OrderedDict()
+    for jar in jars:
+      ext = jar.ext
+      # TODO something with URLs
+      #url = jar.url
+      #if url:
+      #  any_have_url = True
+      url=None
+      classifier = jar.classifier
+      artifact = Artifact(name=jar.name,
+                          type_=ext or 'jar',
+                          ext=ext,
+                          url=url,
+                          classifier=classifier)
+      artifacts[(ext, url, classifier)] = artifact
+
+    template = TemplateData(
+        org=jar_attributes.org,
+        module=jar_attributes.name,
+        version=jar_attributes.rev,
+        # TODO what to do with mutable in this case? Force redownloads?
+        # mutable=jar_attributes.mutable,
+        artifacts=artifacts.values(),
+        any_have_url=any_have_url,
+        excludes=[])
 
     return template
