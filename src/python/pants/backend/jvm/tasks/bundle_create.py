@@ -74,9 +74,6 @@ class BundleCreate(JvmBinaryTask):
     return True
 
   def execute(self):
-    """
-    :API: public
-    """
     archiver_type = self.get_options().archive
     archiver = archive.archiver(archiver_type) if archiver_type else None
 
