@@ -9,6 +9,8 @@ import cPickle as pickle
 from abc import abstractmethod, abstractproperty
 from collections import defaultdict
 from hashlib import sha1
+from binascii import hexlify
+from struct import Struct as StdlibStruct
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
@@ -65,16 +67,39 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
 class SubjectKey(object):
   """Holds the digest for a Subject, which uniquely identifies it.
 
+  The `_hash` is a memoized 32 bit integer hashcode computed from the digest.
+
   The `string` field holds the string representation of the subject, but is optional (usually only
   used when debugging is enabled).
 
   NB: Because `string` is not included in equality comparisons, we cannot just use `datatype` here.
   """
 
-  __slots__ = ['_digest', '_string']
+  __slots__ = ['_digest', '_hash', '_string']
 
-  def __init__(self, digest, string=None):
+  # The digest implementation used for SubjectKeys.
+  _DIGEST_IMPL = sha1
+  _DIGEST_SIZE = _DIGEST_IMPL().digest_size
+
+  # A struct.Struct definition for grabbing the first 4 bytes off of a digest of
+  # size DIGEST_SIZE, and discarding the rest.
+  _32_BIT_STRUCT = StdlibStruct('<l' + ('x' * (_DIGEST_SIZE - 4)))
+
+  @classmethod
+  def create(cls, blob, string=None):
+    """Given a blob, hash it to construct a SubjectKey.
+
+    :param blob: Binary content to hash.
+    :param string: An optional human-readable representation of the blob for debugging purposes.
+    """
+    digest = cls._DIGEST_IMPL(blob).digest()
+    _hash, = cls._32_BIT_STRUCT.unpack(digest)
+    return cls(digest, _hash, string)
+
+  def __init__(self, digest, _hash, string):
+    """Not for direct use: construct a SubjectKey via `create` instead."""
     self._digest = digest
+    self._hash = _hash
     self._string = string
 
   @property
@@ -91,7 +116,7 @@ class SubjectKey(object):
     self._string = string
 
   def __hash__(self):
-    return hash(self._digest)
+    return self._hash
 
   def __eq__(self, other):
     return type(other) == SubjectKey and self._digest == other._digest
@@ -101,7 +126,7 @@ class SubjectKey(object):
 
   def __repr__(self):
     return 'Key({}{})'.format(
-        self._digest,
+        hexlify(self._digest),
         '' if self._string is None else ':[{}]'.format(self._string))
 
   def __str__(self):
@@ -131,7 +156,7 @@ class Subjects(object):
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
     # Hash the blob and store it if it does not exist.
-    key = SubjectKey(sha1(blob).hexdigest())
+    key = SubjectKey.create(blob)
     value = self._storage.setdefault(key, blob)
     if value is blob:
       # The key was just created for the first time. Add its `str` representation to the key if we're in debug.
