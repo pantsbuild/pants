@@ -19,11 +19,15 @@ class Properties(object):
 
   Originally copied from:
   https://github.com/twitter/commons/blob/master/src/python/twitter/common/config/properties.py
+
+  :API: public
   """
 
   @staticmethod
   def load(data):
     """Loads properties from an open stream or the contents of a string.
+
+    :API: public
 
     :param (string | open stream) data: An open stream or a string.
     :returns: A dict of parsed property data.
@@ -94,7 +98,10 @@ class Properties(object):
 
   @staticmethod
   def dump(props, output):
-    """Dumps a dict of properties to the specified open stream or file path."""
+    """Dumps a dict of properties to the specified open stream or file path.
+
+    :API: public
+    """
     def escape(token):
       return re.sub(r'([=:\s])', r'\\\1', token)
 

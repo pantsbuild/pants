@@ -10,10 +10,16 @@ from pants.task.task import TaskBase
 
 
 class JvmToolTaskMixin(JvmToolMixin, TaskBase):
-  """A JvmToolMixin specialized for mixing in to Tasks."""
+  """A JvmToolMixin specialized for mixing in to Tasks.
+
+  :API: public
+  """
 
   @classmethod
   def prepare(cls, options, round_manager):
+    """
+    :API: public
+    """
     super(JvmToolTaskMixin, cls).prepare(options, round_manager)
     cls.prepare_tools(round_manager)
 
@@ -32,6 +38,8 @@ class JvmToolTaskMixin(JvmToolMixin, TaskBase):
 
   def tool_classpath(self, key, scope=None):
     """Get a classpath for the tool previously registered under key in the given scope.
+
+    :API: public
 
     :param string key: The key the tool configuration was registered under.
     :param string scope: The scope the tool configuration was registered under; the task scope by

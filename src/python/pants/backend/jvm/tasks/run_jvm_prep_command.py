@@ -20,6 +20,8 @@ class RunJvmPrepCommandBase(Task):
   This task is meant to be subclassed, setting the 'goal' variable appropriately.
 
   output unless the 'compile_classpath_only' field is set to True in the task
+
+  :API: public
   """
   goal = None
   classpath_product_only = False
@@ -40,6 +42,9 @@ class RunJvmPrepCommandBase(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    """
+    :API: public
+    """
     super(RunJvmPrepCommandBase, cls).prepare(options, round_manager)
     round_manager.require_data('compile_classpath')
     if not cls.classpath_product_only:
@@ -50,6 +55,9 @@ class RunJvmPrepCommandBase(Task):
     return isinstance(tgt, JvmPrepCommand) and tgt.payload.get_field_value('goal') == cls.goal
 
   def execute(self):
+    """
+    :API: public
+    """
     if self.goal not in JvmPrepCommand.goals():
       raise  TaskError("Expected goal to be one of {}".format(JvmPrepCommand.goals()))
 

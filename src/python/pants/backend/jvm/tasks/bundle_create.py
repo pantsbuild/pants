@@ -21,6 +21,9 @@ from pants.util.dirutil import safe_mkdir
 
 
 class BundleCreate(JvmBinaryTask):
+  """
+  :API: public
+  """
 
   # Directory for both internal and external libraries.
   LIBS_DIR = 'libs'
@@ -71,6 +74,9 @@ class BundleCreate(JvmBinaryTask):
     return True
 
   def execute(self):
+    """
+    :API: public
+    """
     archiver_type = self.get_options().archive
     archiver = archive.archiver(archiver_type) if archiver_type else None
 
@@ -122,6 +128,8 @@ class BundleCreate(JvmBinaryTask):
     """Create a self-contained application bundle.
 
     The bundle will contain the target classes, dependencies and resources.
+
+    :API: public
     """
     assert(isinstance(app, BundleCreate.App))
 

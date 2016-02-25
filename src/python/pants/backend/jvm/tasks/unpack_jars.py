@@ -43,6 +43,8 @@ class UnpackJars(Task):
   """Unpack artifacts specified by unpacked_jars() targets.
 
   Adds an entry to SourceRoot for the contents.
+
+  :API: public
   """
 
   class InvalidPatternError(Exception):
@@ -138,6 +140,9 @@ class UnpackJars(Task):
       ZIP.extract(jar_path, unpack_dir, filter_func=unpack_filter)
 
   def execute(self):
+    """
+    :API: public
+    """
     addresses = [target.address for target in self.context.targets()]
     closure = self.context.build_graph.transitive_subgraph_of_addresses(addresses)
     unpacked_jars_list = [t for t in closure if isinstance(t, UnpackedJars)]

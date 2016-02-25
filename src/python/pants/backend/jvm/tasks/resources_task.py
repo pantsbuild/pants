@@ -16,6 +16,8 @@ class ResourcesTask(Task):
 
   This base assumes that resources targets or targets that generate resources are independent from
   each other and can be processed in isolation in any order.
+
+  :API: public
   """
 
   @classmethod
@@ -30,6 +32,9 @@ class ResourcesTask(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    """
+    :API: public
+    """
     round_manager.require_data('compile_classpath')
 
   @property
