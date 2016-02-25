@@ -98,7 +98,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
              help='Run all tests in a single chroot. If turned off, each test target will '
                   'create a new chroot, which will be much slower, but more correct, as the'
                   'isolation verifies that all dependencies are correctly declared.')
-    register('--fail-slow', action='store_true', default=False,
+    register('--fail-slow', action='store_true', default=True,
+             deprecated_hint='Fail slow is now the default. To override use --fail-fast.',
+             deprecated_version='0.0.76',
              help='Do not fail fast on the first test failure in a suite; instead run all tests '
                   'and report errors only after all tests complete.')
     register('--junit-xml-dir', metavar='<DIR>',
@@ -156,23 +158,11 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       if not result.success:
         raise TestFailedTaskError(failed_targets=result.failed_targets)
     else:
-      if self.get_options().fail_fast:
-        # Fail fast forces failing hard.
-        fail_hard = True
-      elif self.get_options().fail_slow:
-        fail_hard = False
-      elif self.get_options().coverage:
-        # Coverage often throws errors despite tests succeeding, so force fail soft in that case.
-        fail_hard = False
-      else:
-        # Default to failing fast to maintain existing behavior.
-        fail_hard = True
-
       results = {}
       for target in targets:
         rv = self._do_run_tests([target], workunit)
         results[target] = rv
-        if not rv.success and fail_hard:
+        if not rv.success and self.get_options().fail_fast:
           break
 
       for target in sorted(results):
