@@ -176,7 +176,8 @@ class AddressMapperTest(unittest.TestCase):
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',
                              dependencies=['//d:e'],
-                             configurations=['//a', Struct(embedded='yes')])
+                             configurations=['//a', Struct(embedded='yes')],
+                             type_alias='target')
 
   def resolve(self, spec):
     request = self.scheduler.build_request(goals=[self._goal], subjects=[spec])
@@ -209,7 +210,7 @@ class AddressMapperTest(unittest.TestCase):
 
     # Success.
     self.scheduler.product_graph.clear()
-    self.assertEqual(Struct(name='c'), self.resolve(spec).struct)
+    self.assertEqual(Struct(name='c', type_alias='struct'), self.resolve(spec).struct)
 
   def test_resolve(self):
     resolved = self.resolve(SingleAddress('a/b', None))
@@ -220,17 +221,17 @@ class AddressMapperTest(unittest.TestCase):
     return Address.parse(spec)
 
   def test_walk_addressables(self):
-    self.assertEqual({self.addr('//:root'): Struct(name='root'),
+    self.assertEqual({self.addr('//:root'): Struct(name='root', type_alias='struct'),
                       self.addr('a/b:b'): self.a_b_target,
-                      self.addr('a/d:d'): Target(name='d'),
-                      self.addr('a/d/e:e'): Target(name='e'),
-                      self.addr('a/d/e:e-prime'): Struct(name='e-prime')},
+                      self.addr('a/d:d'): Target(name='d', type_alias='target'),
+                      self.addr('a/d/e:e'): Target(name='e', type_alias='target'),
+                      self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
                      self.resolve_multi(DescendantAddresses('')))
 
   def test_walk_addressables_rel_path(self):
-    self.assertEqual({self.addr('a/d:d'): Target(name='d'),
-                      self.addr('a/d/e:e'): Target(name='e'),
-                      self.addr('a/d/e:e-prime'): Struct(name='e-prime')},
+    self.assertEqual({self.addr('a/d:d'): Target(name='d', type_alias='target'),
+                      self.addr('a/d/e:e'): Target(name='e', type_alias='target'),
+                      self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
                      self.resolve_multi(DescendantAddresses('a/d')))
 
   @pytest.mark.xfail(reason='''Excludes are not implemented: expects excludes=['a/b', 'a/d/e'])''')
