@@ -28,8 +28,6 @@ from pants.util.memo import memoized_property
 
 _FULL_RESOLVE_IVY_XML_FILE_NAME = 'ivy.xml'
 
-_RESOLVE_FILE_NAME = 'resolution.json'
-
 logger = logging.getLogger(__name__)
 
 
