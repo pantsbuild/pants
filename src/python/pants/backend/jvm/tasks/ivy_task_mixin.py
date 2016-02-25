@@ -47,7 +47,16 @@ class IvyResolveResult(object):
 
   @property
   def has_resolved_artifacts(self):
+    """The requested targets have a resolution associated with them."""
     return self.resolve_hash_name is not None
+
+  def has_real_files_for_all_artifacts(self):
+    """All of the artifact paths for this resolve point to existing files."""
+    for path in self.classpath:
+      if not os.path.isfile(path):
+        return False
+    else:
+      return True
 
   def resolved_jars_for_each_target(self, conf, targets):
     """Finds the resolved jars for each jar_library target in targets and yields them with the
@@ -104,13 +113,6 @@ class IvyResolveResult(object):
     resolved_jars = [self._new_resolved_jar_with_symlink_path(conf, target, raw_resolved_jar)
                      for raw_resolved_jar in raw_resolved_jars]
     return resolved_jars
-
-  def has_real_files_for_all_artifacts(self):
-    for path in self.classpath:
-      if not os.path.isfile(path):
-        return False
-    else:
-      return True
 
 
 _NO_RESOLVE_RUN_RESULT = IvyResolveResult([], {}, None, None)
@@ -215,8 +217,8 @@ class IvyTaskMixin(TaskBase):
     :type extra_args: list of string
     :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
                                         resolved.
-    :returns: The id of the reports associated with this resolve.
-    :rtype: string
+    :returns: The ids of the reports associated with this resolve.
+    :rtype: list of string
     """
     confs = confs or ('default',)
     targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
@@ -255,10 +257,9 @@ class IvyTaskMixin(TaskBase):
       # There was no resolve to do, so no 3rdparty deps to process below.
       return
 
-    # After running ivy, we parse the resulting reports, and record the dependencies for
-    # all relevant targets (ie: those that have direct dependencies).
-    # Record the ordered subset of jars that each jar_library/leaf depends on using
-    # stable symlinks within the working copy.
+    # After running ivy, we update the classpath products with the excludes from the targets.
+    # We also collect the resolved jar information for each target and update the classpath
+    # appropriately.
     classpath_products.add_excludes_for_targets(targets)
     for conf in confs:
       for target, resolved_jars in result.resolved_jars_for_each_target(conf, targets):
@@ -278,7 +279,7 @@ class IvyTaskMixin(TaskBase):
     """Resolves external dependencies for the given targets.
 
     If there are no targets suitable for jvm transitive dependency resolution, an empty result is
-    returned, ie: ([], {}, None).
+    returned.
 
     :param targets: The targets to resolve jvm dependencies for.
     :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
@@ -325,8 +326,6 @@ class IvyTaskMixin(TaskBase):
 
       workdir_reports_by_conf = {c: self._resolve_report_path(resolve_workdir, c) for c in confs}
 
-      safe_mkdir(resolve_workdir)
-
       if (not invalidation_check.invalid_vts and
           all(os.path.isfile(report) for report in workdir_reports_by_conf.values()) and
           os.path.isfile(ivy_cache_classpath_filename)):
@@ -339,10 +338,11 @@ class IvyTaskMixin(TaskBase):
                             ivy_cache_classpath_filename,
                             resolve_hash_name, resolve_workdir, workunit_name)
 
-      return self._load_from_resolve(
-        ivy_cache_classpath_filename,
-        symlink_classpath_filename, ivy_workdir,
-        resolve_hash_name, workdir_reports_by_conf)
+      return self._load_from_resolve(ivy_cache_classpath_filename,
+                                     symlink_classpath_filename,
+                                     ivy_workdir,
+                                     resolve_hash_name,
+                                     workdir_reports_by_conf)
 
   def _load_from_resolve(self, ivy_cache_classpath_filename, symlink_classpath_filename,
                               ivy_workdir, resolve_hash_name, reports_by_conf):
@@ -355,7 +355,9 @@ class IvyTaskMixin(TaskBase):
   def _do_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
                        raw_target_classpath_file, resolve_hash_name, resolve_workdir,
                        workunit_name):
+    safe_mkdir(resolve_workdir)
     ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
+
     with safe_concurrent_creation(raw_target_classpath_file) as raw_target_classpath_file_tmp:
       args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
 

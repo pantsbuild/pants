@@ -21,7 +21,7 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy, IvyResolveResult
-from pants.util.contextutil import open_zip, temporary_dir, temporary_file
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_delete
 from pants_test.base_test import BaseTest
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
