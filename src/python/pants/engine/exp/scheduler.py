@@ -263,10 +263,10 @@ class Promise(object):
       return self._success
 
 
-class Step(datatype('Step', ['step_id', 'node', 'dependencies', 'node_builder'])):
-  def __call__(self):
+class Step(datatype('Step', ['step_id', 'node', 'dependencies'])):
+  def __call__(self, node_builder):
     """Called by the Engine in order to execute this Step."""
-    return self.node.step(self.dependencies, self.node_builder)
+    return self.node.step(self.dependencies, node_builder)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -411,7 +411,10 @@ class LocalScheduler(object):
 
     # Ready.
     self._step_id += 1
-    return (Step(self._step_id, node, deps, self._node_builder), Promise())
+    return (Step(self._step_id, node, deps), Promise())
+
+  def node_builder(self):
+    return self._node_builder
 
   @property
   def product_graph(self):

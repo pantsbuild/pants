@@ -5,17 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
 import functools
 import multiprocessing
 import os
 from abc import abstractmethod
-from Queue import Queue
 
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.exceptions import TaskError
+from pants.engine.exp.processing import StatefulPool
 from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 try:
@@ -27,7 +27,7 @@ except ImportError:
 class Engine(AbstractClass):
   """An engine for running a pants command line."""
 
-  class Result(collections.namedtuple('Result', ['error', 'root_products'])):
+  class Result(datatype('Result', ['error', 'root_products'])):
     """Represents the result of a single engine run."""
 
     @classmethod
@@ -61,33 +61,35 @@ class Engine(AbstractClass):
     """
     self._scheduler = scheduler
 
-  def execute(self, build_request, fail_slow=False):
+  def execute(self, build_request):
     """Executes the requested build.
 
     :param build_request: The description of the goals to achieve.
     :type build_request: :class:`BuildRequest`
-    :param bool fail_slow: `True` to run as much of the build request as possible, returning a mix
-                           of successfully produced root products and failed products when failures
-                           are encountered.
     :returns: The result of the run.
     :rtype: :class:`Engine.Result`
     """
     try:
-      self.reduce(build_request, fail_slow)
+      self.reduce(build_request)
       self._scheduler.validate()
       return self.Result.finished(self._scheduler.root_entries(build_request))
     except TaskError as e:
       return self.Result.failure(e)
 
+  def start(self):
+    """Start up this engine instance, creating any resources it needs."""
+    pass
+
+  def close(self):
+    """Shutdown this engine instance, releasing resources it was using."""
+    pass
+
   @abstractmethod
-  def reduce(self, build_request, fail_slow=False):
+  def reduce(self, build_request):
     """Reduce the given execution graph returning its root products.
 
     :param build_request: The description of the goals to achieve.
     :type build_request: :class:`BuildRequest`
-    :param bool fail_slow: `True` to run as much of the build request as possible, returning a mix
-                           of successfully produced root products and failed products when failures
-                           are encountered.
     :returns: The root products promised by the execution graph.
     :rtype: dict of (:class:`Promise`, product)
     """
@@ -96,10 +98,11 @@ class Engine(AbstractClass):
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
-  def reduce(self, build_request, fail_slow=False):
+  def reduce(self, build_request):
+    node_builder = self._scheduler.node_builder()
     for step_batch in self._scheduler.schedule(build_request):
       for step, promise in step_batch:
-        promise.success(step())
+        promise.success(step(node_builder))
 
 
 class SerializationError(Exception):
@@ -122,21 +125,26 @@ def _try_pickle(obj):
       raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
-def _execute_step(step, debug):
-  """A picklable top-level function to help support local multiprocessing uses."""
+def _execute_step(debug, node_builder, step):
+  """A picklable top-level function to help support local multiprocessing uses.
+  
+  Executes the Step for the given NodeBilder, and returns a tuple of step id and
+  result or exception.
+  """
+  step_id = step.step_id
   try:
-    result = step()
+    result = step(node_builder)
   except Exception as e:
-    # Trap any exception raised by the execution node that bubbles up past the fail slow guards
-    # (if enabled) and pass this back to our main thread for handling.
-    return (step, e)
+    # Trap any exception raised by the execution node that bubbles up, and
+    # pass this back to our main thread for handling.
+    return (step_id, e)
 
   if debug:
     try:
       _try_pickle(result)
     except SerializationError as e:
-      return (step, e)
-  return (step, result)
+      return (step_id, e)
+  return (step_id, result)
 
 
 class LocalMultiprocessEngine(Engine):
@@ -144,8 +152,8 @@ class LocalMultiprocessEngine(Engine):
 
   def __init__(self, scheduler, pool_size=None, debug=True):
     """
-    :param local_scheduler: The local scheduler for creating execution graphs.
-    :type local_scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
+    :param scheduler: The local scheduler for creating execution graphs.
+    :type scheduler: :class:`pants.engine.exp.scheduler.LocalScheduler`
     :param int pool_size: The number of worker processes to use; by default 2 processes per core will
                           be used.
     :param bool debug: `True` to turn on pickling error debug mode (slower); True by default.
@@ -153,38 +161,24 @@ class LocalMultiprocessEngine(Engine):
     """
     super(LocalMultiprocessEngine, self).__init__(scheduler)
     self._pool_size = pool_size if pool_size and pool_size > 0 else 2 * multiprocessing.cpu_count()
-    self._pool = multiprocessing.Pool(self._pool_size)
+
+    execute_step = functools.partial(_execute_step, debug)
+    node_builder = scheduler.node_builder()
+    self._pool = StatefulPool(self._pool_size, execute_step, node_builder)
     self._debug = debug
 
-  class Executor(object):
-    def __init__(self, pool, pool_size, fail_slow, debug):
-      super(LocalMultiprocessEngine.Executor, self).__init__()
+  def _submit(self, step):
+    _try_pickle(step)
+    self._pool.submit(step)
 
-      self._pool = pool
-      self._pool_size = pool_size
-      self._fail_slow = fail_slow
-      self._debug = debug
+  def start(self):
+    self._pool.start()
 
-      self._results = Queue()
-
-    def submit(self, step):
-      # A picklable execution that returns the step.
-      execute_step = functools.partial(_execute_step, step, self._debug)
-      if self._debug:
-        _try_pickle(execute_step)
-      self._pool.apply_async(execute_step, callback=self._results.put)
-
-    def await_one_result(self):
-      step, result = self._results.get()
-      if isinstance(result, Exception):
-        raise result
-      return step, result
-
-  def reduce(self, build_request, fail_slow=False):
-    executor = self.Executor(self._pool, self._pool_size, fail_slow=fail_slow, debug=self._debug)
-
-    # Steps move from `pending_submission` to `in_flight`.
+  def reduce(self, build_request):
+    # Step instances which have not been submitted yet.
+    # TODO: Scheduler now only sends work once, so a deque should be fine here.
     pending_submission = OrderedSet()
+    # Dict from step id to a Promise for Steps that have been submitted.
     in_flight = dict()
 
     def submit_until(n):
@@ -192,20 +186,22 @@ class LocalMultiprocessEngine(Engine):
       to_submit = min(len(pending_submission) - n, self._pool_size - len(in_flight))
       for _ in range(to_submit):
         step, promise = pending_submission.pop(last=False)
-        if step in in_flight:
+        if step.step_id in in_flight:
           raise Exception('{} is already in_flight!'.format(step))
-        in_flight[step] = promise
-        executor.submit(step)
+        in_flight[step.step_id] = promise
+        self._submit(step)
       return to_submit
 
     def await_one():
       """Await one completed step, and remove it from in_flight."""
       if not in_flight:
         raise Exception('Awaited an empty pool!')
-      step, result = executor.await_one_result()
-      if step not in in_flight:
+      step_id, result = self._pool.await_one_result()
+      if isinstance(result, Exception):
+        raise result
+      if step_id not in in_flight:
         raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight.keys()))
-      in_flight.pop(step).success(result)
+      in_flight.pop(step.step_id).success(result)
 
     # The main reduction loop:
     # 1. Whenever we don't have enough work to saturate the pool, request more.
@@ -232,4 +228,3 @@ class LocalMultiprocessEngine(Engine):
 
   def close(self):
     self._pool.close()
-    self._pool.join()
