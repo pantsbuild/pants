@@ -45,6 +45,21 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
             post = True
         self.assertTrue(init and pre and post)
 
+  def test_invalidation_report_clean_all(self):
+    with self.temporary_workdir() as workdir:
+      command = ['clean-all', 'compile',
+                 'examples/src/java/org/pantsbuild/example/hello/main',
+                 '--reporting-invalidation-report']
+      pants_run = self.run_pants_with_workdir(command, workdir)
+      self.assert_success(pants_run)
+
+      # The 'latest' link has been removed by clean-all but that's not fatal.
+      report_dirs = os.listdir(os.path.join(workdir, 'reports'))
+      self.assertEquals(1, len(report_dirs))
+
+      output = os.path.join(workdir, 'reports', report_dirs[0], 'invalidation-report.csv')
+      self.assertTrue(os.path.exists(output), msg='Missing report file {}'.format(output))
+
   INFO_LEVEL_COMPILE_MSG='Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
   DEBUG_LEVEL_COMPILE_MSG='compile(examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
 
