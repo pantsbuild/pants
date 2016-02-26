@@ -233,10 +233,20 @@ class Promise(object):
       return self._success
 
 
-class Step(datatype('Step', ['step_id', 'node', 'subject', 'dependencies', 'node_builder'])):
-  def __call__(self):
+class Step(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'])):
+  """All inputs needed to run Node.step for the given Node.
+  
+  TODO: See docs on StepResult.
+  
+  :param step_id: A unique id for the step, to ease comparison.
+  :param node: The Node instance that will run.
+  :param subject: The Subject referred to by Node.subject_key.
+  :param dependencies: The declared dependencies of the Node from previous Waiting steps.
+  """
+
+  def __call__(self, node_builder):
     """Called by the Engine in order to execute this Step."""
-    return self.node.step(self.subject, self.dependencies, self.node_builder)
+    return self.node.step(self.subject, self.dependencies)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -252,6 +262,20 @@ class Step(datatype('Step', ['step_id', 'node', 'subject', 'dependencies', 'node
 
   def __str__(self):
     return 'Step({}, {})'.format(self.step_id, self.node)
+
+
+class StepResult(datatype('Step', ['state', 'introduced_subjects'])):
+  """The result of running a Step, passed back to the Scheduler via the Promise class.
+
+  TODO: For simplicity, Step and StepResult both pessimistically inline all input/output content,
+  which means that a lot of excess data crosses process boundaries. To do this more efficiently,
+  a multi-process setup should have local storage, and multi-round RPC should determine which
+  inputs/outputs are not already present in the remote process before sending blobs.
+  
+  :param state: The State value returned by the Step.
+  :param introduced_subjects: A Subjects instance containing any potentially new subjects
+    created by the Step.
+  """
 
 
 class GraphValidator(object):
@@ -361,7 +385,7 @@ class LocalScheduler(object):
            already contain any "literal" subject values that the given tasks require.
     """
     self._products_by_goal = goals
-    self._node_builder = NodeBuilder.create(tasks, subjects)
+    self._tasks = tasks
     self._subjects = subjects
 
     self._graph_validator = GraphValidator(symbol_table_cls)
@@ -390,6 +414,14 @@ class LocalScheduler(object):
     subject = self._subjects.get(node.subject_key)
     self._step_id += 1
     return (Step(self._step_id, node, subject, deps, self._node_builder), Promise())
+
+  def node_builder(self):
+    """Create and return a NodeBuilder instance for this Scheduler.
+
+    A NodeBuilder is a relatively heavyweight object (since it contains an index of all
+    registered tasks), so it should be used for the execution of multiple Steps.
+    """
+    return NodeBuilder.create(self._tasks)
 
   def build_request(self, goals, subjects):
     """Create and return a BuildRequest for the given goals and subjects.
