@@ -95,7 +95,7 @@ class SubjectKey(object):
     :param string: An optional human-readable representation of the blob for debugging purposes.
     """
     digest = cls._DIGEST_IMPL(blob).digest()
-    _hash, = cls._32_BIT_STRUCT.unpack(digest)
+    _hash = cls._32_BIT_STRUCT.unpack(digest)[0]
     return cls(digest, _hash, string)
 
   def __init__(self, digest, _hash, string):
@@ -150,7 +150,7 @@ class Subjects(object):
     # objects.
     self._protocol = protocol if protocol is not None else 0
 
-  def len(self):
+  def __len__(self):
     return len(self._storage)
 
   def put(self, obj):
@@ -220,7 +220,7 @@ class Node(object):
     """The variants for this Node."""
 
   @abstractmethod
-  def step(self, subject, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     """Given a dict of the dependency States for this Node, returns the current State of the Node.
 
     The NodeBuilder parameter provides a way to construct Nodes that require information about
@@ -275,7 +275,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
       return item
     return None
 
-  def step(self, subject, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
     variants = self.variants
@@ -307,7 +307,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
 
     # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
-    dependencies = list(node_builder.task_nodes(self.subject_key, self.product, variants))
+    dependencies = list(step_context.task_nodes(self.subject_key, self.product, variants))
     matches = {}
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
@@ -349,16 +349,16 @@ class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', '
   def _dep_product_node(self):
     return SelectNode(self.subject_key, self.dep_product, self.variants, None)
 
-  def _dependency_nodes(self, node_builder, dep_product):
+  def _dependency_nodes(self, step_context, dep_product):
     for dependency in getattr(dep_product, self.field or 'dependencies'):
       variants = self.variants
       if isinstance(dependency, Address):
         # If a subject has literal variants for particular dependencies, they win over all else.
         dependency, literal_variants = parse_variants(dependency)
         variants = Variants.merge(variants, literal_variants)
-      yield SelectNode(node_builder.introduce_subject(dependency), self.product, variants, None)
+      yield SelectNode(step_context.introduce_subject(dependency), self.product, variants, None)
 
-  def step(self, subject, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     # Request the product we need in order to request dependencies.
     dep_product_node = self._dep_product_node()
     dep_product_state = dependency_states.get(dep_product_node, None)
@@ -372,7 +372,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', '
       State.raise_unrecognized(dep_product_state)
 
     # The product and its dependency list are available.
-    dependencies = list(self._dependency_nodes(node_builder, dep_product_state.value))
+    dependencies = list(self._dependency_nodes(step_context, dep_product_state.value))
     for dependency in dependencies:
       dep_state = dependency_states.get(dependency, None)
       if dep_state is None or type(dep_state) == Waiting:
@@ -399,10 +399,10 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
   def _input_node(self):
     return SelectNode(self.subject_key, self.input_product, self.variants, None)
 
-  def _output_node(self, node_builder, projected_subject):
-    return SelectNode(node_builder.introduce_subject(projected_subject), self.product, self.variants, None)
+  def _output_node(self, step_context, projected_subject):
+    return SelectNode(step_context.introduce_subject(projected_subject), self.product, self.variants, None)
 
-  def step(self, subject, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     # Request the product we need to compute the subject.
     input_node = self._input_node()
     input_state = dependency_states.get(input_node, None)
@@ -426,7 +426,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
       projected_subject = values[0]
     else:
       projected_subject = self.projected_subject(*values)
-    output_node = self._output_node(node_builder, projected_subject)
+    output_node = self._output_node(step_context, projected_subject)
 
     # When the output node is available, return its result.
     output_state = dependency_states.get(output_node, None)
@@ -442,7 +442,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
 
 class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func', 'clause']), Node):
 
-  def step(self, subject, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     # Compute dependencies.
     dep_values = []
     dependencies = []
