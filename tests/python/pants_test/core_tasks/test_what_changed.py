@@ -294,6 +294,13 @@ class WhatChangedTest(WhatChangedTestBasic):
       ),
     )
 
+  def test_if_files_changed_files(self):
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      options={'if_files_changed': ['root/src/java/a/b/c/Foo.java']},
+      workspace=self.workspace(),
+    )
+
   def test_include_dependees(self):
     self.assert_console_output(
       'root/src/py/dependency_tree/a:a',

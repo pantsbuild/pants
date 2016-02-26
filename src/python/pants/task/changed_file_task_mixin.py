@@ -12,6 +12,7 @@ from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.build_graph.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
+from pants.option.custom_types import list_option
 
 
 class ChangeCalculator(object):
@@ -26,6 +27,7 @@ class ChangeCalculator(object):
                fast=False,
                changes_since=None,
                diffspec=None,
+               changed_files=None,
                exclude_target_regexp=None,
                spec_excludes=None):
     deprecated_conditional(lambda: spec_excludes is not None,
@@ -41,6 +43,7 @@ class ChangeCalculator(object):
     self._fast = fast
     self._changes_since = changes_since
     self._diffspec = diffspec
+    self._changed_files = changed_files
     self._exclude_target_regexp = exclude_target_regexp
     self._spec_excludes = spec_excludes
 
@@ -54,7 +57,9 @@ class ChangeCalculator(object):
 
   def changed_files(self):
     """Determines the files changed according to SCM/workspace and options."""
-    if self._diffspec:
+    if self._changed_files:
+      return set(self._changed_files)
+    elif self._diffspec:
       return self._workspace.changes_in(self._diffspec)
     else:
       since = self._changes_since or self._scm.current_rev_identifier()
@@ -129,6 +134,8 @@ class ChangedFileTaskMixin(object):
              help='Calculate changes since this tree-ish/scm ref (defaults to current HEAD/tip).')
     register('--diffspec',
              help='Calculate changes contained within given scm spec (commit range/sha/ref/etc).')
+    register('--if-files-changed', type=list_option, default=[],
+             help='Calculate targets that depend on the given files.')
     register('--include-dependees', choices=['none', 'direct', 'transitive'], default='none',
              help='Include direct or transitive dependees of changed targets.')
 
@@ -151,6 +158,7 @@ class ChangedFileTaskMixin(object):
                             fast=options.fast,
                             changes_since=options.changes_since,
                             diffspec=options.diffspec,
+                            changed_files=options.if_files_changed,
                             # NB: exclude_target_regexp is a global scope option registered
                             # elsewhere
                             exclude_target_regexp=options.exclude_target_regexp,
