@@ -12,6 +12,8 @@ from collections import defaultdict
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
+import six
+
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
 from pants.engine.exp.objects import SerializationError
@@ -153,6 +155,13 @@ class Subjects(object):
 
   def put(self, obj):
     """Serialize and hash a Serializable, returning a unique key to retrieve it later."""
+    return self.maybe_put(obj)[0]
+
+  def maybe_put(self, obj):
+    """Similar to put, but returns a tuple of key, value.
+
+    If the object had already been stored, returns None for the value. Always returns the key.
+    """
     try:
       blob = pickle.dumps(obj, protocol=self._protocol)
     except Exception as e:
@@ -163,12 +172,23 @@ class Subjects(object):
 
     # Hash the blob and store it if it does not exist.
     key = SubjectKey.create(blob)
-    stored_key, _ = self._storage.setdefault(key, (key, blob))
+    stored_key, stored_value = self._storage.setdefault(key, (key, blob))
     if stored_key is key:
       # The key was just created for the first time. Add its `str` representation if we're in debug.
       if self._debug:
         key.set_string(str(obj))
-    return stored_key
+      return stored_key, stored_value
+    else:
+      # Entry already existed.
+      return stored_key, None
+
+  def put_entry(self, key, value):
+    """Store an entry returned by `maybe_put` (presumably in some other Subjects intance)."""
+    if type(key) is not SubjectKey:
+      raise ValueError('Expected a SubjectKey key. Got: {}'.format(key))
+    if type(value) is not six.binary_type:
+      raise ValueError('Expected a binary value. Got type: {}'.format(type(value)))
+    return self._storage.setdefault(key, (key, value))[0]
 
   def get(self, key):
     """Given a key, return its deserialized content.
@@ -205,6 +225,8 @@ class Node(object):
 
     The NodeBuilder parameter provides a way to construct Nodes that require information about
     installed tasks.
+
+    TODO: The NodeBuilder is now a StepContext... rename everywhere.
 
     After this method returns a non-Waiting state, it will never be visited again for this Node.
 
@@ -334,7 +356,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', '
         # If a subject has literal variants for particular dependencies, they win over all else.
         dependency, literal_variants = parse_variants(dependency)
         variants = Variants.merge(variants, literal_variants)
-      yield SelectNode(node_builder.subjects.put(dependency), self.product, variants, None)
+      yield SelectNode(node_builder.introduce_subject(dependency), self.product, variants, None)
 
   def step(self, subject, dependency_states, node_builder):
     # Request the product we need in order to request dependencies.
@@ -378,7 +400,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'vari
     return SelectNode(self.subject_key, self.input_product, self.variants, None)
 
   def _output_node(self, node_builder, projected_subject):
-    return SelectNode(node_builder.subjects.put(projected_subject), self.product, self.variants, None)
+    return SelectNode(node_builder.introduce_subject(projected_subject), self.product, self.variants, None)
 
   def step(self, subject, dependency_states, node_builder):
     # Request the product we need to compute the subject.
@@ -452,36 +474,30 @@ class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func
       return Throw(e)
 
 
-class NodeBuilder(object):
-  """Encapsulates the details of creating Nodes that involve user-defined functions/tasks.
+class StepContext(object):
+  """Encapsulates external state and the details of creating Nodes.
 
-  This avoids giving Nodes direct access to the task list or product graph.
-
-  TODO: Should likely be renamed to 'StepContext' or something.
+  This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  @classmethod
-  def create(cls, tasks, subjects):
-    """Indexes tasks by their output type."""
-    serializable_tasks = defaultdict(set)
-    for output_type, input_selects, task in tasks:
-      serializable_tasks[output_type].add((task, tuple(input_selects)))
-    return cls(serializable_tasks, subjects)
-
-  def __init__(self, tasks, subjects):
-    self._tasks = tasks
+  def __init__(self, node_builder, subjects):
+    self._node_builder = node_builder
     self._subjects = subjects
+    self._introduced_subjects = dict()
+
+  def introduce_subject(self, subject):
+    """Introduces a potentially new Subject, and returns a SubjectKey."""
+    key, value = self._subjects.maybe_put(subject)
+    if value is not None:
+      # This subject had not been seen before by this Subjects instance.
+      self._introduced_subjects[key] = value
+    return key
+
+  def task_nodes(self, subject_key, product, variants):
+    """Yields task Node instances which might be able to provide a value for the given inputs."""
+    return self._node_builder.task_nodes(subject_key, product, variants)
 
   @property
-  def subjects(self):
-    """TODO! This is a total hack which will not work in a multi-threaded situation. This will be
-    changed before this review lands. Intentional trailing whitespace on the next line to mark this:
---->                                                                                                
-    Re-visit the State types to support introducing subjects some other way.
-    """
-    return self._subjects
-
-  def task_nodes(self, subject, product, variants):
-    # Tasks.
-    for task, anded_clause in self._tasks[product]:
-      yield TaskNode(subject, product, variants, task, anded_clause)
+  def introduced_subjects(self):
+    """Return a dict of any subjects that were introduced by the running Step."""
+    return self._introduced_subjects

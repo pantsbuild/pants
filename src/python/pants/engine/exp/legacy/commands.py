@@ -64,7 +64,13 @@ def list():
 
   # Execute a request for the root.
   build_request = scheduler.build_request(goals=[goal], subjects=[DescendantAddresses('')])
-  result = LocalSerialEngine(scheduler).execute(build_request)
+  engine = LocalSerialEngine(scheduler)
+  engine.start()
+  try:
+    result = engine.execute(build_request)
+  finally:
+    engine.close()
+
   if result.error:
     raise result.error
 

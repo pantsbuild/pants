@@ -101,9 +101,10 @@ class LocalSerialEngine(Engine):
 
   def reduce(self, build_request):
     node_builder = self._scheduler.node_builder()
+    subjects = self._scheduler.subjects()
     for step_batch in self._scheduler.schedule(build_request):
       for step, promise in step_batch:
-        promise.success(step(node_builder))
+        promise.success(step(node_builder, subjects))
 
 
 def _try_pickle(obj):
@@ -116,15 +117,17 @@ def _try_pickle(obj):
     raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
 
 
-def _execute_step(debug, node_builder, step):
+def _execute_step(debug, process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
-  
-  Executes the Step for the given NodeBilder, and returns a tuple of step id and
+
+  Executes the Step for the given NodeBuilder and Subjects, and returns a tuple of step id and
   result or exception.
   """
+  node_builder, subjects = process_state
+
   step_id = step.step_id
   try:
-    result = step(node_builder)
+    result = step(node_builder, subjects)
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
@@ -155,7 +158,8 @@ class LocalMultiprocessEngine(Engine):
 
     execute_step = functools.partial(_execute_step, debug)
     node_builder = scheduler.node_builder()
-    self._pool = StatefulPool(self._pool_size, execute_step, node_builder)
+    subjects = scheduler.subjects()
+    self._pool = StatefulPool(self._pool_size, execute_step, (node_builder, subjects))
     self._debug = debug
 
   def _submit(self, step):

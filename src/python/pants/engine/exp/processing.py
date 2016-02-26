@@ -22,7 +22,7 @@ def _stateful_pool_loop(send_queue, recv_queue, function, state):
 
 class StatefulPool(object):
   """A multiprocessing.Pool-alike with stateful workers running the same function.
-  
+
   Note: there is no exception handling wrapping the function, so it should handle its
   own exceptions and return a failure result if need be.
 

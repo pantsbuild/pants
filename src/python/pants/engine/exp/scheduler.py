@@ -13,7 +13,7 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses, parse_variants
 from pants.engine.exp.fs import PathGlobs, Paths
-from pants.engine.exp.nodes import (DependenciesNode, Node, NodeBuilder, Noop, Return, SelectNode,
+from pants.engine.exp.nodes import (DependenciesNode, Node, Noop, Return, SelectNode, StepContext,
                                     TaskNode, Throw, Waiting)
 from pants.util.objects import datatype
 
@@ -233,20 +233,42 @@ class Promise(object):
       return self._success
 
 
-class Step(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'])):
+class NodeBuilder(object):
+  """Holds an index of tasks used to instantiate TaskNodes."""
+
+  @classmethod
+  def create(cls, tasks):
+    """Indexes tasks by their output type."""
+    serializable_tasks = defaultdict(set)
+    for output_type, input_selects, task in tasks:
+      serializable_tasks[output_type].add((task, tuple(input_selects)))
+    return cls(serializable_tasks)
+
+  def __init__(self, tasks):
+    self._tasks = tasks
+
+  def task_nodes(self, subject, product, variants):
+    # Tasks.
+    for task, anded_clause in self._tasks[product]:
+      yield TaskNode(subject, product, variants, task, anded_clause)
+
+
+class StepRequest(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'])):
   """Additional inputs needed to run Node.step for the given Node.
-  
+
   TODO: See docs on StepResult.
-  
+
   :param step_id: A unique id for the step, to ease comparison.
   :param node: The Node instance that will run.
   :param subject: The Subject referred to by Node.subject_key.
   :param dependencies: The declared dependencies of the Node from previous Waiting steps.
   """
 
-  def __call__(self, node_builder):
+  def __call__(self, node_builder, subjects):
     """Called by the Engine in order to execute this Step."""
-    return self.node.step(self.subject, self.dependencies, node_builder)
+    step_context = StepContext(node_builder, subjects)
+    result = self.node.step(self.subject, self.dependencies, step_context)
+    return StepResult(result, step_context.introduced_subjects)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -261,7 +283,7 @@ class Step(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'])):
     return str(self)
 
   def __str__(self):
-    return 'Step({}, {})'.format(self.step_id, self.node)
+    return 'StepRequest({}, {})'.format(self.step_id, self.node)
 
 
 class StepResult(datatype('Step', ['state', 'introduced_subjects'])):
@@ -269,12 +291,14 @@ class StepResult(datatype('Step', ['state', 'introduced_subjects'])):
 
   TODO: For simplicity, Step and StepResult both pessimistically inline all input/output content,
   which means that a lot of excess data crosses process boundaries. To do this more efficiently,
-  a multi-process setup should have local storage, and multi-round RPC should determine which
-  inputs/outputs are not already present in the remote process before sending blobs.
-  
+  a multi-process setup should likely use multi-round RPC to determine which inputs/outputs are
+  not already present in the remote process before sending blobs. Alternatively, could _always_
+  use a 3rdparty datastore to transfer inputs.
+
   :param state: The State value returned by the Step.
-  :param introduced_subjects: A Subjects instance containing any potentially new subjects
-    created by the Step.
+  :param introduced_subjects: A dict containing Subjects that were potentially introduced by
+    running this Step. In a multiprocess environment, it's impossible to know which subjects
+    already exist, so some of the introduced Subjects may already be known to the Scheduler.
   """
 
 
@@ -387,7 +411,7 @@ class LocalScheduler(object):
     self._products_by_goal = goals
     self._tasks = tasks
     self._subjects = subjects
-    self._node_builder = NodeBuilder.create(self._tasks, self._subjects)
+    self._node_builder = NodeBuilder.create(self._tasks)
 
     self._graph_validator = GraphValidator(symbol_table_cls)
     self._product_graph = ProductGraph()
@@ -414,15 +438,19 @@ class LocalScheduler(object):
     # Ready.
     subject = self._subjects.get(node.subject_key)
     self._step_id += 1
-    return (Step(self._step_id, node, subject, deps), Promise())
+    return (StepRequest(self._step_id, node, subject, deps), Promise())
 
   def node_builder(self):
-    """Create and return a NodeBuilder instance for this Scheduler.
+    """Return the NodeBuilder instance for this Scheduler.
 
     A NodeBuilder is a relatively heavyweight object (since it contains an index of all
     registered tasks), so it should be used for the execution of multiple Steps.
     """
     return self._node_builder
+
+  def subjects(self):
+    """Return the Subjects instance for this Scheduler."""
+    return self._subjects
 
   def build_request(self, goals, subjects):
     """Create and return a BuildRequest for the given goals and subjects.
@@ -476,6 +504,15 @@ class LocalScheduler(object):
     """Returns the roots for the given BuildRequest as a dict from Node to State."""
     return {root: self._product_graph.state(root) for root in build_request.roots}
 
+  def _complete_step(self, node, step_result):
+    """Given a StepResult for the given Node, complete the step."""
+    result, introduced_subjects = step_result
+    # Store any newly introduced subjects.
+    for key, value in introduced_subjects.items():
+      self._subjects.put_entry(key, value)
+    # Update the Node's state in the graph.
+    self._product_graph.update_state(node, result)
+
   def schedule(self, build_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
 
@@ -525,7 +562,7 @@ class LocalScheduler(object):
           continue
         # The step has completed; see whether the Node is completed.
         outstanding.pop(node)
-        pg.update_state(step.node, promise.get())
+        self._complete_step(step.node, promise.get())
         if pg.is_complete(step.node):
           # The Node is completed: mark any of its dependents as candidates for Steps.
           candidates.update(d for d in pg.dependents_of(step.node))
