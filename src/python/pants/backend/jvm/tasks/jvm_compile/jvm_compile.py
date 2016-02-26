@@ -331,10 +331,6 @@ class JvmCompile(NailgunTaskBase):
     if not relevant_targets:
       return
 
-    # Clone the compile_classpath to the runtime_classpath.
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
-
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
             as workunit:
@@ -345,9 +341,10 @@ class JvmCompile(NailgunTaskBase):
                                      self.context.run_tracker,
                                      self._worker_count)
 
+    # Clone the compile_classpath to the runtime_classpath.
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
 
-
-    classpath_product = self.context.products.get_data('runtime_classpath')
     fingerprint_strategy = self._fingerprint_strategy(classpath_product)
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
@@ -378,11 +375,10 @@ class JvmCompile(NailgunTaskBase):
 
       # Once compilation has completed, replace the classpath entry for each target with
       # its jar'd representation.
-      classpath_products = self.context.products.get_data('runtime_classpath')
       for cc in compile_contexts.values():
         for conf in self._confs:
-          classpath_products.remove_for_target(cc.target, [(conf, cc.classes_dir)])
-          classpath_products.add_for_target(cc.target, [(conf, cc.jar_file)])
+          classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+          classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
   def compile_chunk(self,
                     invalidation_check,
@@ -665,7 +661,7 @@ class JvmCompile(NailgunTaskBase):
           # Otherwise, simply ensure that it is empty.
           safe_delete(tmp_analysis_file)
         target, = vts.targets
-        fatal_warnings = fatal_warnings = self._compute_language_property(target, lambda x: x.fatal_warnings)
+        fatal_warnings = self._compute_language_property(target, lambda x: x.fatal_warnings)
         self._compile_vts(vts,
                           compile_context.sources,
                           tmp_analysis_file,
