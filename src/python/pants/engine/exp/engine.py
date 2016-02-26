@@ -201,7 +201,7 @@ class LocalMultiprocessEngine(Engine):
         raise result
       if step_id not in in_flight:
         raise Exception('Received unexpected work from the Executor: {} vs {}'.format(step, in_flight.keys()))
-      in_flight.pop(step.step_id).success(result)
+      in_flight.pop(step_id).success(result)
 
     # The main reduction loop:
     # 1. Whenever we don't have enough work to saturate the pool, request more.

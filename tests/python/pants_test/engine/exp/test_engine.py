@@ -38,6 +38,7 @@ class EngineTest(unittest.TestCase):
   @contextmanager
   def multiprocessing_engine(self, pool_size=None):
     with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=True)) as e:
+      e.start()
       yield e
 
   def test_serial_engine_simple(self):

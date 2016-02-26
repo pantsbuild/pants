@@ -59,7 +59,7 @@ class StatefulPool(object):
     return self._recv.get(block=True)
 
   def close(self):
-    for _ in len(self._processes):
+    for _ in self._processes:
       self._send.put(None, block=False)
     for process in self._processes:
       process.join(10)
