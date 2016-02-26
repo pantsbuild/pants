@@ -124,6 +124,13 @@ class UnionProducts(object):
   def __str__(self):
     return "UnionProducts({})".format(self._products_by_target)
 
+  def __eq__(self, other):
+    return (isinstance(other, UnionProducts) and
+            self._products_by_target == other._products_by_target)
+
+  def __ne__(self, other):
+    return not self == other
+
 
 class RootedProducts(object):
   """File products of a build that have a concept of a 'root' directory.

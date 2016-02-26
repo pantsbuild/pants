@@ -35,9 +35,9 @@ class IvyResolveResult(object):
   """A class wrapping the classpath, a mapping from ivy cache jars to their linked location
      under .pants.d, and the id of the reports associated with the resolve."""
 
-  def __init__(self, classpath, symlink_map, resolve_hash_name, reports_by_conf):
+  def __init__(self, resolved_artifact_paths, symlink_map, resolve_hash_name, reports_by_conf):
     self._reports_by_conf = reports_by_conf
-    self.classpath = classpath
+    self.resolved_artifact_paths = resolved_artifact_paths
     self.resolve_hash_name = resolve_hash_name
     self._symlink_map = symlink_map
 
@@ -46,9 +46,9 @@ class IvyResolveResult(object):
     """The requested targets have a resolution associated with them."""
     return self.resolve_hash_name is not None
 
-  def has_real_files_for_all_artifacts(self):
+  def all_linked_artifacts_exist(self):
     """All of the artifact paths for this resolve point to existing files."""
-    for path in self.classpath:
+    for path in self.resolved_artifact_paths:
       if not os.path.isfile(path):
         return False
     else:
@@ -235,7 +235,7 @@ class IvyTaskMixin(TaskBase):
     :type targets: collection.Iterable
     """
     result = self._ivy_resolve(targets, silent=silent, workunit_name=workunit_name)
-    return result.classpath
+    return result.resolved_artifact_paths
 
   def _resolve_subset(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False, pinned_artifacts=None):
@@ -322,12 +322,16 @@ class IvyTaskMixin(TaskBase):
 
       workdir_reports_by_conf = {c: self._resolve_report_path(resolve_workdir, c) for c in confs}
 
-      if (not invalidation_check.invalid_vts and
-          all(os.path.isfile(report) for report in workdir_reports_by_conf.values()) and
-          os.path.isfile(ivy_cache_classpath_filename)):
+      def resolve_result_files_exist():
+        return (all(os.path.isfile(report) for report in workdir_reports_by_conf.values()) and
+                os.path.isfile(ivy_cache_classpath_filename))
+
+      # Check for a previous run's resolution result files. If they exist try to load a result using
+      # them. If that fails, fall back to doing a resolve and loading its results.
+      if not invalidation_check.invalid_vts and resolve_result_files_exist():
         result = self._load_from_resolve(ivy_cache_classpath_filename, symlink_classpath_filename,
                                           ivy_workdir, resolve_hash_name, workdir_reports_by_conf)
-        if result.has_real_files_for_all_artifacts():
+        if result.all_linked_artifacts_exist():
           return result
 
       self._do_resolve(confs, executor, extra_args, resolve_vts, pinned_artifacts,
@@ -345,8 +349,8 @@ class IvyTaskMixin(TaskBase):
     symlink_map = self._symlink_from_cache_path(self.ivy_cache_dir, ivy_workdir,
                                                 ivy_cache_classpath_filename,
                                                 symlink_classpath_filename)
-    classpath = IvyUtils.load_classpath_from_cachepath(symlink_classpath_filename)
-    return IvyResolveResult(classpath, symlink_map, resolve_hash_name, reports_by_conf)
+    resolved_artifact_paths = IvyUtils.load_classpath_from_cachepath(symlink_classpath_filename)
+    return IvyResolveResult(resolved_artifact_paths, symlink_map, resolve_hash_name, reports_by_conf)
 
   def _do_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
                        raw_target_classpath_file, resolve_hash_name, resolve_workdir,
