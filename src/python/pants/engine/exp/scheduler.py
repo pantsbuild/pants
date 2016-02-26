@@ -234,7 +234,7 @@ class Promise(object):
 
 
 class Step(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'])):
-  """All inputs needed to run Node.step for the given Node.
+  """Additional inputs needed to run Node.step for the given Node.
   
   TODO: See docs on StepResult.
   
@@ -246,7 +246,7 @@ class Step(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'])):
 
   def __call__(self, node_builder):
     """Called by the Engine in order to execute this Step."""
-    return self.node.step(self.subject, self.dependencies)
+    return self.node.step(self.subject, self.dependencies, node_builder)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -387,6 +387,7 @@ class LocalScheduler(object):
     self._products_by_goal = goals
     self._tasks = tasks
     self._subjects = subjects
+    self._node_builder = NodeBuilder.create(self._tasks, self._subjects)
 
     self._graph_validator = GraphValidator(symbol_table_cls)
     self._product_graph = ProductGraph()
@@ -413,7 +414,7 @@ class LocalScheduler(object):
     # Ready.
     subject = self._subjects.get(node.subject_key)
     self._step_id += 1
-    return (Step(self._step_id, node, subject, deps, self._node_builder), Promise())
+    return (Step(self._step_id, node, subject, deps), Promise())
 
   def node_builder(self):
     """Create and return a NodeBuilder instance for this Scheduler.
@@ -421,7 +422,7 @@ class LocalScheduler(object):
     A NodeBuilder is a relatively heavyweight object (since it contains an index of all
     registered tasks), so it should be used for the execution of multiple Steps.
     """
-    return NodeBuilder.create(self._tasks)
+    return self._node_builder
 
   def build_request(self, goals, subjects):
     """Create and return a BuildRequest for the given goals and subjects.

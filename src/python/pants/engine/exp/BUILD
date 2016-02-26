@@ -30,9 +30,10 @@ python_library(
   sources=['engine.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':objects',
+    ':processing',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:meta',
-    ':objects',
   ]
 )
 
@@ -102,6 +103,11 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
   ]
+)
+
+python_library(
+  name='processing',
+  sources=['processing.py'],
 )
 
 python_library(
