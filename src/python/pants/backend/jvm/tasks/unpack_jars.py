@@ -43,6 +43,8 @@ class UnpackJars(Task):
   """Unpack artifacts specified by unpacked_jars() targets.
 
   Adds an entry to SourceRoot for the contents.
+
+  :API: public
   """
 
   class InvalidPatternError(Exception):

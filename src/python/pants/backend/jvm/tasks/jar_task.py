@@ -235,6 +235,8 @@ class JarTask(NailgunTask):
 
   All subclasses will share the same underlying nailgunned jar tool and thus benefit from fast
   invocations.
+
+  :API: public
   """
 
   @classmethod
@@ -274,6 +276,8 @@ class JarTask(NailgunTask):
   @contextmanager
   def open_jar(self, path, overwrite=False, compressed=True, jar_rules=None):
     """Yields a Jar that will be written when the context exits.
+
+    :API: public
 
     :param string path: the path to the jar file
     :param bool overwrite: overwrite the file at ``path`` if it exists; ``False`` by default; ie:

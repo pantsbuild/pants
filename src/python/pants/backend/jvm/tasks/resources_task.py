@@ -16,6 +16,8 @@ class ResourcesTask(Task):
 
   This base assumes that resources targets or targets that generate resources are independent from
   each other and can be processed in isolation in any order.
+
+  :API: public
   """
 
   @classmethod

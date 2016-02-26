@@ -19,7 +19,10 @@ from pants.util.dirutil import safe_open
 
 
 class Checkstyle(NailgunTask):
-  """Check Java code for style violations."""
+  """Check Java code for style violations.
+
+  :API: public
+  """
 
   _CHECKSTYLE_MAIN = 'com.puppycrawl.tools.checkstyle.Main'
 

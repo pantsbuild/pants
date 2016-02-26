@@ -59,6 +59,9 @@ def interpret_test_spec(test_spec):
 
 
 class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
+  """
+  :API: public
+  """
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod

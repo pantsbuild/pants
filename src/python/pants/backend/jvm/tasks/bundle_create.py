@@ -21,6 +21,9 @@ from pants.util.dirutil import safe_mkdir
 
 
 class BundleCreate(JvmBinaryTask):
+  """
+  :API: public
+  """
 
   # Directory for both internal and external libraries.
   LIBS_DIR = 'libs'
@@ -123,6 +126,7 @@ class BundleCreate(JvmBinaryTask):
 
     The bundle will contain the target classes, dependencies and resources.
     """
+
     assert(isinstance(app, BundleCreate.App))
 
     bundle_dir = os.path.join(self.get_options().pants_distdir, '{}-bundle'.format(app.basename))

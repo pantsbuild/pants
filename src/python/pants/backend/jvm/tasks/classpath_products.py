@@ -17,7 +17,10 @@ from pants.goal.products import UnionProducts
 
 
 class ClasspathEntry(object):
-  """Represents a java classpath entry."""
+  """Represents a java classpath entry.
+
+  :API: public
+  """
 
   def __init__(self, path):
     self._path = path
@@ -27,6 +30,8 @@ class ClasspathEntry(object):
     """Returns the pants internal path of this classpath entry.
 
     Suitable for use in constructing classpaths for pants executions and pants generated artifacts.
+
+    :API: public
 
     :rtype: string
     """
@@ -55,15 +60,24 @@ class ClasspathEntry(object):
 
   @classmethod
   def is_artifact_classpath_entry(cls, classpath_entry):
+    """
+    :API: public
+    """
     return isinstance(classpath_entry, ArtifactClasspathEntry)
 
   @classmethod
   def is_internal_classpath_entry(cls, classpath_entry):
+    """
+    :API: public
+    """
     return not cls.is_artifact_classpath_entry(classpath_entry)
 
 
 class ArtifactClasspathEntry(ClasspathEntry):
-  """Represents a resolved third party classpath entry."""
+  """Represents a resolved third party classpath entry.
+
+  :API: public
+  """
 
   def __init__(self, path, coordinate, cache_path):
     super(ArtifactClasspathEntry, self).__init__(path)
@@ -87,6 +101,8 @@ class ArtifactClasspathEntry(ClasspathEntry):
 
     Suitable for use in constructing classpaths for external tools that should not be subject to
     potential volatility in pants own internal caches.
+
+    :API: public
 
     :rtype: string
     """
@@ -132,6 +148,10 @@ def _not_excluded_filter(excludes):
 
 
 class ClasspathProducts(object):
+  """
+  :API: public
+  """
+
   def __init__(self, pants_workdir, classpaths=None, excludes=None):
     self._classpaths = classpaths or UnionProducts()
     self._excludes = excludes or UnionProducts()
@@ -139,6 +159,9 @@ class ClasspathProducts(object):
 
   @staticmethod
   def init_func(pants_workdir):
+    """
+    :API: public
+    """
     return lambda: ClasspathProducts(pants_workdir)
 
   def copy(self):
@@ -147,6 +170,8 @@ class ClasspathProducts(object):
     Edits to the copy's classpaths or exclude associations will not affect the classpaths or
     excludes in the original. The copy is shallow though, so edits to the the copy's product values
     will mutate the original's product values.  See `UnionProducts.copy`.
+
+    :API: public
 
     :rtype: :class:`ClasspathProducts`
     """
