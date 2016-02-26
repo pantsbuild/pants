@@ -160,6 +160,8 @@ class IvyTaskMixin(TaskBase):
   parse the graph structure of dependencies. Therefore, this mixin explicitly disables the
   cache for its invalidation checks via the `use_cache=False` parameter. Tasks that extend
   the mixin may safely enable task-level caching settings.
+
+  :API: public
   """
 
   class Error(TaskError):
@@ -192,6 +194,8 @@ class IvyTaskMixin(TaskBase):
   def ivy_cache_dir(self):
     """The path of the ivy cache dir used for resolves.
 
+    :API: public
+
     :rtype: string
     """
     # TODO(John Sirois): Fixup the IvySubsystem to encapsulate its properties.
@@ -200,6 +204,8 @@ class IvyTaskMixin(TaskBase):
   def resolve(self, executor, targets, classpath_products, confs=None, extra_args=None,
               invalidate_dependents=False):
     """Resolves external classpath products (typically jars) for the given targets.
+
+    :API: public
 
     :param executor: A java executor to run ivy with.
     :type executor: :class:`pants.java.executor.Executor`
@@ -231,6 +237,9 @@ class IvyTaskMixin(TaskBase):
 
   def ivy_classpath(self, targets, silent=True, workunit_name=None):
     """Create the classpath for the passed targets.
+
+    :API: public
+
     :param targets: A collection of targets to resolve a classpath for.
     :type targets: collection.Iterable
     """

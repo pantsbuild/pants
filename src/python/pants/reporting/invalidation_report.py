@@ -5,9 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from collections import namedtuple
 
 from pants.build_graph.target import Target
+from pants.util.dirutil import safe_open
 
 
 class InvalidationReport(object):
@@ -102,7 +104,8 @@ class InvalidationReport(object):
     # TODO(zundel) set report to stream to the file
     filename = filename or self._filename
     if filename:
-      with open(filename, 'w') as writer:
+      # Usually the directory exists from reporting initialization, but not if clean-all was a goal.
+      with safe_open(filename, 'w') as writer:
         writer.write(
           'invocation_id,task_name,targets_hash,target_id,cache_key_id,cache_key_hash,phase,valid'
           + '\n')

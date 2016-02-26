@@ -42,6 +42,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     return super(NailgunTaskBase, cls).global_subsystems() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
+    """
+    :API: public
+    """
     super(NailgunTaskBase, self).__init__(*args, **kwargs)
 
     id_tuple = (self.ID_PREFIX, self.__class__.__name__)
@@ -82,6 +85,8 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     If --no-use-nailgun is specified then the java main is run in a freshly spawned subprocess,
     otherwise a persistent nailgun server dedicated to this Task subclass is used to speed up
     amortized run times.
+
+    :API: public
     """
     executor = self.create_java_executor()
 
@@ -106,7 +111,11 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
 
 
 # TODO(John Sirois): This just prevents ripple - maybe inline
-class NailgunTask(NailgunTaskBase, Task): pass
+class NailgunTask(NailgunTaskBase, Task):
+  """
+  :API: public
+  """
+  pass
 
 
 class NailgunKillall(Task):
