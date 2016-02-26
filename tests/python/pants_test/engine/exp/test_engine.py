@@ -24,13 +24,17 @@ class EngineTest(unittest.TestCase):
 
     self.java = Address.parse('src/java/codegen/simple')
 
+  def key(self, subject):
+    return self.scheduler._subjects.put(subject)
+
   def request(self, goals, *addresses):
     specs = [self.spec_parser.parse_spec(str(a)) for a in addresses]
     return self.scheduler.build_request(goals=goals, subjects=specs)
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
-    self.assertEqual({SelectNode(self.java, Classpath, None, None): Return(Classpath(creator='javac'))},
+    self.assertEqual({SelectNode(self.key(self.java), Classpath, None, None):
+                        Return(Classpath(creator='javac'))},
                      result.root_products)
     self.assertIsNone(result.error)
 
