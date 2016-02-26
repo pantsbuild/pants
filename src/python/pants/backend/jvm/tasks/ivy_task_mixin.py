@@ -32,8 +32,10 @@ logger = logging.getLogger(__name__)
 
 
 class IvyResolveResult(object):
-  """A class wrapping the classpath, a mapping from ivy cache jars to their linked location
-     under .pants.d, and the id of the reports associated with the resolve."""
+  """The result of an Ivy resolution.
+
+  The result data includes the list of resolved artifacts, the relationships between those artifacts
+  and the targets that requested them and the hash name of the resolve."""
 
   def __init__(self, resolved_artifact_paths, symlink_map, resolve_hash_name, reports_by_conf):
     self._reports_by_conf = reports_by_conf
@@ -55,8 +57,7 @@ class IvyResolveResult(object):
       return True
 
   def resolved_jars_for_each_target(self, conf, targets):
-    """Finds the resolved jars for each jar_library target in targets and yields them with the
-    target.
+    """Yields the resolved jars for each passed JarLibrary.
 
     If there is no report for the requested conf, yields nothing.
 
@@ -79,7 +80,7 @@ class IvyResolveResult(object):
 
   def _ivy_info_for(self, conf):
     report_path = self._reports_by_conf.get(conf)
-    return IvyUtils.parse_xml_report_by_path(conf, report_path)
+    return IvyUtils.parse_xml_report(conf, report_path)
 
   def _new_resolved_jar_with_symlink_path(self, conf, tgt, resolved_jar_without_symlink):
     def candidate_cache_paths():
@@ -103,8 +104,8 @@ class IvyResolveResult(object):
                        pants_path=pants_path,
                        cache_path=resolved_jar_without_symlink.cache_path)
 
-  def _resolved_jars_with_symlinks(self, conf, ivy_info, ivy_jar_memo, resolved_coordinates, target):
-    raw_resolved_jars = ivy_info.get_resolved_jars_for_coordinates(resolved_coordinates,
+  def _resolved_jars_with_symlinks(self, conf, ivy_info, ivy_jar_memo, coordinates, target):
+    raw_resolved_jars = ivy_info.get_resolved_jars_for_coordinates(coordinates,
                                                                    memo=ivy_jar_memo)
     resolved_jars = [self._new_resolved_jar_with_symlink_path(conf, target, raw_resolved_jar)
                      for raw_resolved_jar in raw_resolved_jars]
@@ -124,9 +125,9 @@ class IvyResolveFingerprintStrategy(FingerprintStrategy):
     hash_elements_for_target = []
 
     if isinstance(target, JarLibrary):
-      managed_jar_dependencies_artifacts = JarDependencyManagement.global_instance().for_target(target)
-      if managed_jar_dependencies_artifacts:
-        hash_elements_for_target.append(str(managed_jar_dependencies_artifacts.id))
+      managed_jar_artifact_set = JarDependencyManagement.global_instance().for_target(target)
+      if managed_jar_artifact_set:
+        hash_elements_for_target.append(str(managed_jar_artifact_set.id))
 
       hash_elements_for_target.append(target.payload.fingerprint())
     elif isinstance(target, JvmTarget) and target.payload.excludes:
@@ -359,7 +360,10 @@ class IvyTaskMixin(TaskBase):
                                                 ivy_cache_classpath_filename,
                                                 symlink_classpath_filename)
     resolved_artifact_paths = IvyUtils.load_classpath_from_cachepath(symlink_classpath_filename)
-    return IvyResolveResult(resolved_artifact_paths, symlink_map, resolve_hash_name, reports_by_conf)
+    return IvyResolveResult(resolved_artifact_paths,
+                            symlink_map,
+                            resolve_hash_name,
+                            reports_by_conf)
 
   def _do_resolve(self, confs, executor, extra_args, global_vts, pinned_artifacts,
                        raw_target_classpath_file, resolve_hash_name, resolve_workdir,

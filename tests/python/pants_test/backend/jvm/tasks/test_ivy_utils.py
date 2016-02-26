@@ -383,11 +383,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.context()
 
     with self.assertRaises(IvyUtils.IvyResolveReportError):
-      IvyUtils.parse_xml_report('INVALID_CACHE_DIR', 'INVALID_REPORT_UNIQUE_NAME', 'default')
+      IvyUtils.parse_xml_report('default', IvyUtils.xml_report_path('INVALID_CACHE_DIR',
+                                                                    'INVALID_REPORT_UNIQUE_NAME',
+                                                                    'default'))
 
   def parse_ivy_report(self, rel_path):
     path = os.path.join('tests/python/pants_test/backend/jvm/tasks', rel_path)
-    ivy_info = IvyUtils.parse_xml_report_by_path(conf='default', path=path)
+    ivy_info = IvyUtils.parse_xml_report(conf='default', path=path)
     self.assertIsNotNone(ivy_info)
     return ivy_info
 
