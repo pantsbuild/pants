@@ -507,11 +507,12 @@ class LocalScheduler(object):
             candidates.add(step.node)
 
     print('created {} total nodes in {} scheduling iterations and {} steps, '
-          'with {} nodes in the executed path.'.format(
+          'with {} nodes in the executed path. there are now {} unique subjects.'.format(
             len(pg.dependencies()),
             scheduling_iterations,
             self._step_id,
-            sum(1 for _ in pg.walk(build_request.roots))))
+            sum(1 for _ in pg.walk(build_request.roots)),
+            self._subjects.len()))
 
   def validate(self):
     """Validates the generated product graph with the configured GraphValidator."""

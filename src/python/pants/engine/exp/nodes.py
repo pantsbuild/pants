@@ -148,6 +148,9 @@ class Subjects(object):
     # objects.
     self._protocol = protocol if protocol is not None else 0
 
+  def len(self):
+    return len(self._storage)
+
   def put(self, obj):
     """Serialize and hash a Serializable, returning a unique key to retrieve it later."""
     try:
