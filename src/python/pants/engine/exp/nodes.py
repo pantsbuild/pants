@@ -85,7 +85,7 @@ class SubjectKey(object):
 
   # A struct.Struct definition for grabbing the first 4 bytes off of a digest of
   # size DIGEST_SIZE, and discarding the rest.
-  _32_BIT_STRUCT = StdlibStruct('<l' + ('x' * (_DIGEST_SIZE - 4)))
+  _32_BIT_STRUCT = StdlibStruct(b'<l' + (b'x' * (_DIGEST_SIZE - 4)))
 
   @classmethod
   def create(cls, blob, string=None):
