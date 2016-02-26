@@ -12,6 +12,10 @@ from collections import namedtuple
 from pants.util.meta import AbstractClass
 
 
+class SerializationError(Exception):
+  """Indicates an error serializing an object."""
+
+
 # TODO: Likely no longer necessary, due to the laziness of the product graph.
 class Resolvable(AbstractClass):
   """Represents a resolvable object."""

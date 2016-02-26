@@ -7,9 +7,11 @@ python_library(
   dependencies=[
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/base:file_system_project_tree',
     'src/python/pants/engine/exp:fs',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
+    'src/python/pants/engine/exp:nodes',
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:selectors',

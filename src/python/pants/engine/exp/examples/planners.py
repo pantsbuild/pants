@@ -12,10 +12,12 @@ from os import sep as os_sep
 from os.path import join as os_path_join
 
 from pants.base.exceptions import TaskError
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths, create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
+from pants.engine.exp.nodes import Subjects
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -375,22 +377,26 @@ class ExampleTable(SymbolTable):
             'inferred_scala': ScalaInferredDepsSources}
 
 
-def setup_json_scheduler(build_root):
+def setup_json_scheduler(build_root, debug=True):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
   :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
   """
+  subjects = Subjects(debug=debug)
   symbol_table_cls = ExampleTable
-  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                 build_pattern=r'^BLD.json$',
-                                 parser_cls=JsonParser)
 
-  # TODO(John Sirois): once the options system is plumbed, make the tool spec configurable.
-  # It could also just be pointed at the scrooge jar at that point.
-  scrooge_tool_address = Address.parse('src/scala/scrooge')
-
-  # TODO: Placeholder for the SourceRoot subsystem.
-  source_roots = SourceRoots(('src/java',))
+  # Register "literal" subjects required for these tasks.
+  # TODO: Replace with `Subsystems`.
+  project_tree_key = subjects.put(
+      FileSystemProjectTree(build_root))
+  address_mapper_key = subjects.put(
+      AddressMapper(symbol_table_cls=symbol_table_cls,
+                    build_pattern=r'^BLD.json$',
+                    parser_cls=JsonParser))
+  source_roots_key = subjects.put(
+      SourceRoots(('src/java',)))
+  scrooge_tool_address_key = subjects.put(
+      Address.parse('src/scala/scrooge'))
 
   goals = {
       'compile': Classpath,
@@ -415,12 +421,12 @@ def setup_json_scheduler(build_root):
       (ScalaSources,
        [Select(ThriftSources),
         SelectVariant(ScroogeScalaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address, Classpath)],
+        SelectLiteral(scrooge_tool_address_key, Classpath)],
        gen_scrooge_thrift),
       (JavaSources,
        [Select(ThriftSources),
         SelectVariant(ScroogeJavaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address, Classpath)],
+        SelectLiteral(scrooge_tool_address_key, Classpath)],
        gen_scrooge_thrift),
     ] + [
       # scala dependency inference
@@ -437,7 +443,7 @@ def setup_json_scheduler(build_root):
        select_package_address),
       (Paths,
        [Select(JVMPackageName),
-        SelectLiteral(source_roots, SourceRoots)],
+        SelectLiteral(source_roots_key, SourceRoots)],
        calculate_package_search_path),
     ] + [
       # Remote dependency resolution
@@ -473,10 +479,10 @@ def setup_json_scheduler(build_root):
        [Select(UnpickleableOutput)],
        unpickleable_input),
     ] + (
-      create_graph_tasks(address_mapper, symbol_table_cls)
+      create_graph_tasks(address_mapper_key, symbol_table_cls)
     ) + (
-      create_fs_tasks(build_root)
+      create_fs_tasks(project_tree_key)
     )
 
-  scheduler = LocalScheduler(goals, symbol_table_cls, tasks)
+  scheduler = LocalScheduler(goals, tasks, subjects, symbol_table_cls)
   return scheduler

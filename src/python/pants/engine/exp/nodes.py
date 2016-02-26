@@ -5,11 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import cPickle as pickle
 from abc import abstractmethod, abstractproperty
+from binascii import hexlify
 from collections import defaultdict
+from hashlib import sha1
+from struct import Struct as StdlibStruct
+
+import six
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
+from pants.engine.exp.objects import SerializationError
 from pants.engine.exp.targets import Target, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -59,14 +66,149 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   pass
 
 
+class SubjectKey(object):
+  """Holds the digest for a Subject, which uniquely identifies it.
+
+  The `_hash` is a memoized 32 bit integer hashcode computed from the digest.
+
+  The `string` field holds the string representation of the subject, but is optional (usually only
+  used when debugging is enabled).
+
+  NB: Because `string` is not included in equality comparisons, we cannot just use `datatype` here.
+  """
+
+  __slots__ = ['_digest', '_hash', '_string']
+
+  # The digest implementation used for SubjectKeys.
+  _DIGEST_IMPL = sha1
+  _DIGEST_SIZE = _DIGEST_IMPL().digest_size
+
+  # A struct.Struct definition for grabbing the first 4 bytes off of a digest of
+  # size DIGEST_SIZE, and discarding the rest.
+  _32_BIT_STRUCT = StdlibStruct(b'<l' + (b'x' * (_DIGEST_SIZE - 4)))
+
+  @classmethod
+  def create(cls, blob, string=None):
+    """Given a blob, hash it to construct a SubjectKey.
+
+    :param blob: Binary content to hash.
+    :param string: An optional human-readable representation of the blob for debugging purposes.
+    """
+    digest = cls._DIGEST_IMPL(blob).digest()
+    _hash = cls._32_BIT_STRUCT.unpack(digest)[0]
+    return cls(digest, _hash, string)
+
+  def __init__(self, digest, _hash, string):
+    """Not for direct use: construct a SubjectKey via `create` instead."""
+    self._digest = digest
+    self._hash = _hash
+    self._string = string
+
+  @property
+  def string(self):
+    return self._string
+
+  def set_string(self, string):
+    """Sets the string for a SubjectKey after construction.
+
+    Since the string representation is not involved in `eq` or `hash`, this allows the key to be
+    used for lookups before its string representation has been stored, and then only generated
+    it the object will remain in use.
+    """
+    self._string = string
+
+  def __hash__(self):
+    return self._hash
+
+  def __eq__(self, other):
+    return type(other) == SubjectKey and self._digest == other._digest
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __repr__(self):
+    return 'Key({}{})'.format(
+        hexlify(self._digest),
+        '' if self._string is None else ':[{}]'.format(self._string))
+
+  def __str__(self):
+    return repr(self)
+
+
+class Subjects(object):
+  """Stores and creates unique keys for input Serializable objects.
+
+  TODO: A placeholder for the cache/content-addressability implementation from
+    https://github.com/pantsbuild/pants/issues/2870
+  """
+
+  def __init__(self, debug=True, protocol=None):
+    self._storage = dict()
+    self._debug = debug
+    # TODO: Have seen strange inconsistencies with pickle protocol version 1/2 (ie, the
+    # binary versions): in particular, bytes added into the middle of otherwise identical
+    # objects.
+    self._protocol = protocol if protocol is not None else 0
+
+  def __len__(self):
+    return len(self._storage)
+
+  def put(self, obj):
+    """Serialize and hash a Serializable, returning a unique key to retrieve it later."""
+    return self.maybe_put(obj)[0]
+
+  def maybe_put(self, obj):
+    """Similar to put, but returns a tuple of key, value.
+
+    If the object had already been stored, returns None for the value. Always returns the key.
+    """
+    try:
+      blob = pickle.dumps(obj, protocol=self._protocol)
+    except Exception as e:
+      # Unfortunately, pickle can raise things other than PickleError instances.  For example it
+      # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
+      # `Exception` type here.
+      raise SerializationError('Failed to pickle {}: {}'.format(obj, e))
+
+    # Hash the blob and store it if it does not exist.
+    key = SubjectKey.create(blob)
+    stored_key, stored_value = self._storage.setdefault(key, (key, blob))
+    if stored_key is key:
+      # The key was just created for the first time. Add its `str` representation if we're in debug.
+      if self._debug:
+        key.set_string(str(obj))
+      return stored_key, stored_value
+    else:
+      # Entry already existed.
+      return stored_key, None
+
+  def put_entry(self, key, value):
+    """Store an entry returned by `maybe_put` (presumably in some other Subjects intance)."""
+    if type(key) is not SubjectKey:
+      raise ValueError('Expected a SubjectKey key. Got: {}'.format(key))
+    if type(value) is not six.binary_type:
+      raise ValueError('Expected a binary value. Got type: {}'.format(type(value)))
+    return self._storage.setdefault(key, (key, value))[0]
+
+  def get(self, key):
+    """Given a key, return its deserialized content.
+
+    Note that since this is not a cache, if we do not have the content for the object, this
+    operation fails noisily.
+    """
+    return pickle.loads(self._storage[key][1])
+
+
 class Node(object):
   @classmethod
   def validate_node(cls, node):
     if not isinstance(node, Node):
       raise ValueError('Value {} is not a Node.'.format(node))
+    if type(node.subject_key) is not SubjectKey:
+      raise ValueError('Node {} has a non-SubjectKey subject.'.format(node))
 
   @abstractproperty
-  def subject(self):
+  def subject_key(self):
     """The subject for this Node."""
 
   @abstractproperty
@@ -78,17 +220,22 @@ class Node(object):
     """The variants for this Node."""
 
   @abstractmethod
-  def step(self, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     """Given a dict of the dependency States for this Node, returns the current State of the Node.
 
     The NodeBuilder parameter provides a way to construct Nodes that require information about
     installed tasks.
 
+    TODO: The NodeBuilder is now a StepContext... rename everywhere.
+
     After this method returns a non-Waiting state, it will never be visited again for this Node.
+
+    TODO: Not all Node types actually need the `subject` as a parameter... can that be pushed out
+    as an explicit dependency type? Perhaps the "is-a/has-a" checks should be native outside of Node?
     """
 
 
-class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'variant_key']), Node):
+class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', 'variant_key']), Node):
   """A Node that selects a product for a subject.
 
   A Select can be satisfied by multiple sources, but fails if multiple sources produce a value. The
@@ -102,7 +249,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
     # TODO: This super-broad check is crazy expensive. Should reduce to just doing Variants
     # lookups for literal/addressable products.
     if self.product != Variants:
-      return SelectNode(self.subject, Variants, self.variants, None)
+      return SelectNode(self.subject_key, Variants, self.variants, None)
     return None
 
   def _select_literal(self, candidate, variant_value):
@@ -128,7 +275,7 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       return item
     return None
 
-  def step(self, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     # Request default Variants for the subject, so that if there are any we can propagate
     # them to task nodes.
     variants = self.variants
@@ -154,13 +301,13 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       variant_value = variant_values[0]
 
     # If the Subject "is a" or "has a" Product, then we're done.
-    literal_value = self._select_literal(self.subject, variant_value)
+    literal_value = self._select_literal(subject, variant_value)
     if literal_value is not None:
       return Return(literal_value)
 
     # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
-    dependencies = list(node_builder.task_nodes(self.subject, self.product, variants))
+    dependencies = list(step_context.task_nodes(self.subject_key, self.product, variants))
     matches = {}
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
@@ -183,13 +330,13 @@ class SelectNode(datatype('SelectNode', ['subject', 'product', 'variants', 'vari
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
       # by adding support for "mergeable" products. see:
       #   https://github.com/pantsbuild/pants/issues/2526
-      return Throw(ConflictingProducersError(self.subject, self.product, matches))
+      return Throw(ConflictingProducersError(subject, self.product, matches))
     elif len(matches) == 1:
       return Return(matches.values()[0])
     return Noop('No source of {}.'.format(self))
 
 
-class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'variants', 'dep_product', 'field']), Node):
+class DependenciesNode(datatype('DependenciesNode', ['subject_key', 'product', 'variants', 'dep_product', 'field']), Node):
   """A Node that selects the given Product for each of the items in a field `field` on this subject.
 
   Begins by selecting the `dep_product` for the subject, and then selects a product for each
@@ -200,18 +347,18 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
   """
 
   def _dep_product_node(self):
-    return SelectNode(self.subject, self.dep_product, self.variants, None)
+    return SelectNode(self.subject_key, self.dep_product, self.variants, None)
 
-  def _dependency_nodes(self, dep_product):
+  def _dependency_nodes(self, step_context, dep_product):
     for dependency in getattr(dep_product, self.field or 'dependencies'):
       variants = self.variants
       if isinstance(dependency, Address):
         # If a subject has literal variants for particular dependencies, they win over all else.
         dependency, literal_variants = parse_variants(dependency)
         variants = Variants.merge(variants, literal_variants)
-      yield SelectNode(dependency, self.product, variants, None)
+      yield SelectNode(step_context.introduce_subject(dependency), self.product, variants, None)
 
-  def step(self, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     # Request the product we need in order to request dependencies.
     dep_product_node = self._dep_product_node()
     dep_product_state = dependency_states.get(dep_product_node, None)
@@ -225,7 +372,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
       State.raise_unrecognized(dep_product_state)
 
     # The product and its dependency list are available.
-    dependencies = list(self._dependency_nodes(dep_product_state.value))
+    dependencies = list(self._dependency_nodes(step_context, dep_product_state.value))
     for dependency in dependencies:
       dep_state = dependency_states.get(dependency, None)
       if dep_state is None or type(dep_state) == Waiting:
@@ -242,7 +389,7 @@ class DependenciesNode(datatype('DependenciesNode', ['subject', 'product', 'vari
     return Return([dependency_states[d].value for d in dependencies])
 
 
-class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants', 'projected_subject', 'fields', 'input_product']), Node):
+class ProjectionNode(datatype('ProjectionNode', ['subject_key', 'product', 'variants', 'projected_subject', 'fields', 'input_product']), Node):
   """A Node that selects the given input Product for the Subject, and then selects for a new subject.
 
   TODO: This is semantically very similar to DependenciesNode (which might be considered to be a
@@ -250,12 +397,12 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
   """
 
   def _input_node(self):
-    return SelectNode(self.subject, self.input_product, self.variants, None)
+    return SelectNode(self.subject_key, self.input_product, self.variants, None)
 
-  def _output_node(self, projected_subject):
-    return SelectNode(projected_subject, self.product, self.variants, None)
+  def _output_node(self, step_context, projected_subject):
+    return SelectNode(step_context.introduce_subject(projected_subject), self.product, self.variants, None)
 
-  def step(self, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     # Request the product we need to compute the subject.
     input_node = self._input_node()
     input_state = dependency_states.get(input_node, None)
@@ -279,7 +426,7 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
       projected_subject = values[0]
     else:
       projected_subject = self.projected_subject(*values)
-    output_node = self._output_node(projected_subject)
+    output_node = self._output_node(step_context, projected_subject)
 
     # When the output node is available, return its result.
     output_state = dependency_states.get(output_node, None)
@@ -293,14 +440,14 @@ class ProjectionNode(datatype('ProjectionNode', ['subject', 'product', 'variants
       raise State.raise_unrecognized(output_state)
 
 
-class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', 'clause']), Node):
+class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func', 'clause']), Node):
 
-  def step(self, dependency_states, node_builder):
+  def step(self, subject, dependency_states, step_context):
     # Compute dependencies.
     dep_values = []
     dependencies = []
     for select in self.clause:
-      dep = select.construct_node(self.subject, self.variants)
+      dep = select.construct_node(self.subject_key, self.variants)
       if dep is None:
         return Noop('Dependency {} is not satisfiable.'.format(select))
       dependencies.append(dep)
@@ -327,28 +474,30 @@ class TaskNode(datatype('TaskNode', ['subject', 'product', 'variants', 'func', '
       return Throw(e)
 
 
-class NodeBuilder(object):
-  """Encapsulates the details of creating Nodes that involve user-defined functions/tasks.
+class StepContext(object):
+  """Encapsulates external state and the details of creating Nodes.
 
-  This avoids giving Nodes direct access to the task list or product graph.
+  This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  @classmethod
-  def create(cls, tasks):
-    """Indexes tasks by their output type."""
-    serializable_tasks = defaultdict(set)
-    for output_type, input_selects, task in tasks:
-      serializable_tasks[output_type].add((task, tuple(input_selects)))
-    return cls(serializable_tasks)
+  def __init__(self, node_builder, subjects):
+    self._node_builder = node_builder
+    self._subjects = subjects
+    self._introduced_subjects = dict()
 
-  def __init__(self, tasks):
-    self._tasks = tasks
+  def introduce_subject(self, subject):
+    """Introduces a potentially new Subject, and returns a SubjectKey."""
+    key, value = self._subjects.maybe_put(subject)
+    if value is not None:
+      # This subject had not been seen before by this Subjects instance.
+      self._introduced_subjects[key] = value
+    return key
 
-  def task_nodes(self, subject, product, variants):
-    # Tasks.
-    for task, anded_clause in self._tasks[product]:
-      # NB: we eagerly apply the Tasks' Selectors here to avoid creating Nodes which
-      # are unsatisfiable.
-      if any(c.construct_node(subject, variants) is None for c in anded_clause):
-        continue
-      yield TaskNode(subject, product, variants, task, anded_clause)
+  def task_nodes(self, subject_key, product, variants):
+    """Yields task Node instances which might be able to provide a value for the given inputs."""
+    return self._node_builder.task_nodes(subject_key, product, variants)
+
+  @property
+  def introduced_subjects(self):
+    """Return a dict of any subjects that were introduced by the running Step."""
+    return self._introduced_subjects

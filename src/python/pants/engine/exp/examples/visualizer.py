@@ -28,12 +28,11 @@ def format_type(node):
 
 
 def format_subject(node):
-  subject = node.subject
-  if type(node.subject) == Address:
-    subject = 'Address({})'.format(node.subject)
+  subject = node.subject_key.string
   if node.variants:
-    subject = '{}@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
-  return subject
+    return '({})@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
+  else:
+    return '({})'.format(subject)
 
 
 def format_product(node):
@@ -95,12 +94,18 @@ def visualize_execution_graph(scheduler, request):
       binary_util.ui_open(image_file)
 
 
-def visualize_build_request(build_root, build_request):
+def visualize_build_request(build_root, goals, subjects):
   scheduler = setup_json_scheduler(build_root)
+  build_request = scheduler.build_request(goals, subjects)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
-  LocalSerialEngine(scheduler).reduce(build_request)
-  visualize_execution_graph(scheduler, build_request)
-  scheduler.validate()
+  engine = LocalSerialEngine(scheduler)
+  engine.start()
+  try:
+    engine.reduce(build_request)
+    visualize_execution_graph(scheduler, build_request)
+    scheduler.validate()
+  finally:
+    engine.close()
 
 
 def pop_build_root_and_goals(description, args):
@@ -135,7 +140,7 @@ def main_addresses():
 
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in args]
-  visualize_build_request(build_root, BuildRequest(goals=goals, subjects=spec_roots))
+  visualize_build_request(build_root, goals, spec_roots)
 
 
 def main_filespecs():
@@ -143,4 +148,4 @@ def main_filespecs():
 
   # Create a PathGlobs object relative to the buildroot.
   path_globs = PathGlobs.create('', globs=args)
-  visualize_build_request(build_root, BuildRequest(goals=goals, subjects=[path_globs]))
+  visualize_build_request(build_root, goals, [path_globs])

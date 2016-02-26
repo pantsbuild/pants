@@ -13,6 +13,7 @@ from textwrap import dedent
 
 import pytest
 
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
@@ -21,9 +22,9 @@ from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
-from pants.engine.exp.nodes import Throw
+from pants.engine.exp.nodes import Subjects, Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import BuildRequest, LocalScheduler
+from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.struct import Struct
 from pants.engine.exp.targets import Target
 from pants.util.contextutil import temporary_file
@@ -153,26 +154,33 @@ class AddressMapperTest(unittest.TestCase):
     shutil.copytree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'),
                     self.build_root)
 
+    subjects = Subjects()
     self._goal = 'list'
     symbol_table_cls = TargetTable
-    self.address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                        parser_cls=JsonParser,
-                                        build_pattern=r'.+\.BUILD.json$')
+
+    project_tree_key = subjects.put(
+        FileSystemProjectTree(self.build_root))
+    address_mapper_key = subjects.put(
+        AddressMapper(symbol_table_cls=symbol_table_cls,
+                      parser_cls=JsonParser,
+                      build_pattern=r'.+\.BUILD.json$'))
     tasks = (
-        create_fs_tasks(self.build_root) +
-        create_graph_tasks(self.address_mapper, symbol_table_cls)
+        create_fs_tasks(project_tree_key) +
+        create_graph_tasks(address_mapper_key, symbol_table_cls)
       )
     self.scheduler = LocalScheduler({self._goal: UnhydratedStruct},
-                                    symbol_table_cls,
-                                    tasks)
+                                    tasks,
+                                    subjects,
+                                    symbol_table_cls)
 
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',
                              dependencies=['//d:e'],
-                             configurations=['//a', Struct(embedded='yes')])
+                             configurations=['//a', Struct(embedded='yes')],
+                             type_alias='target')
 
   def resolve(self, spec):
-    request = BuildRequest(goals=[self._goal], subjects=[spec])
+    request = self.scheduler.build_request(goals=[self._goal], subjects=[spec])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error
@@ -202,7 +210,7 @@ class AddressMapperTest(unittest.TestCase):
 
     # Success.
     self.scheduler.product_graph.clear()
-    self.assertEqual(Struct(name='c'), self.resolve(spec).struct)
+    self.assertEqual(Struct(name='c', type_alias='struct'), self.resolve(spec).struct)
 
   def test_resolve(self):
     resolved = self.resolve(SingleAddress('a/b', None))
@@ -213,17 +221,17 @@ class AddressMapperTest(unittest.TestCase):
     return Address.parse(spec)
 
   def test_walk_addressables(self):
-    self.assertEqual({self.addr('//:root'): Struct(name='root'),
+    self.assertEqual({self.addr('//:root'): Struct(name='root', type_alias='struct'),
                       self.addr('a/b:b'): self.a_b_target,
-                      self.addr('a/d:d'): Target(name='d'),
-                      self.addr('a/d/e:e'): Target(name='e'),
-                      self.addr('a/d/e:e-prime'): Struct(name='e-prime')},
+                      self.addr('a/d:d'): Target(name='d', type_alias='target'),
+                      self.addr('a/d/e:e'): Target(name='e', type_alias='target'),
+                      self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
                      self.resolve_multi(DescendantAddresses('')))
 
   def test_walk_addressables_rel_path(self):
-    self.assertEqual({self.addr('a/d:d'): Target(name='d'),
-                      self.addr('a/d/e:e'): Target(name='e'),
-                      self.addr('a/d/e:e-prime'): Struct(name='e-prime')},
+    self.assertEqual({self.addr('a/d:d'): Target(name='d', type_alias='target'),
+                      self.addr('a/d/e:e'): Target(name='e', type_alias='target'),
+                      self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
                      self.resolve_multi(DescendantAddresses('a/d')))
 
   @pytest.mark.xfail(reason='''Excludes are not implemented: expects excludes=['a/b', 'a/d/e'])''')

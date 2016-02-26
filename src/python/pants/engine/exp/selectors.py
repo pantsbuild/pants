@@ -18,7 +18,7 @@ class Selector(AbstractClass):
     """Return true if this Selector is optional. It may result in a `None` match."""
 
   @abstractmethod
-  def construct_node(self, subject, variants):
+  def construct_node(self, subject_key, variants):
     """Constructs a Node for this Selector and the given Subject/Variants.
 
     May return None if the Selector can be known statically to not be satisfiable for the inputs.
@@ -34,8 +34,8 @@ class Select(datatype('Subject', ['product', 'optional']), Selector):
   def __new__(self, product, optional=False):
     return super(Select, self).__new__(self, product, optional)
 
-  def construct_node(self, subject, variants):
-    return SelectNode(subject, self.product, variants, None)
+  def construct_node(self, subject_key, variants):
+    return SelectNode(subject_key, self.product, variants, None)
 
 
 class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
@@ -47,8 +47,8 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
   """
   optional = False
 
-  def construct_node(self, subject, variants):
-    return SelectNode(subject, self.product, variants, self.variant_key)
+  def construct_node(self, subject_key, variants):
+    return SelectNode(subject_key, self.product, variants, self.variant_key)
 
 
 class SelectDependencies(datatype('Dependencies', ['product', 'deps_product', 'field']), Selector):
@@ -64,8 +64,8 @@ class SelectDependencies(datatype('Dependencies', ['product', 'deps_product', 'f
 
   optional = False
 
-  def construct_node(self, subject, variants):
-    return DependenciesNode(subject, self.product, variants, self.deps_product, self.field)
+  def construct_node(self, subject_key, variants):
+    return DependenciesNode(subject_key, self.product, variants, self.deps_product, self.field)
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
@@ -79,14 +79,14 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
   """
   optional = False
 
-  def construct_node(self, subject, variants):
-    return ProjectionNode(subject, self.product, variants, self.projected_subject, self.fields, self.input_product)
+  def construct_node(self, subject_key, variants):
+    return ProjectionNode(subject_key, self.product, variants, self.projected_subject, self.fields, self.input_product)
 
 
-class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
+class SelectLiteral(datatype('Literal', ['subject_key', 'product']), Selector):
   """Selects a literal Subject (other than the one applied to the selector)."""
   optional = False
 
-  def construct_node(self, subject, variants):
-    # NB: Intentionally ignores subject parameter to provide a literal subject.
-    return SelectNode(self.subject, self.product, variants, None)
+  def construct_node(self, subject_key, variants):
+    # NB: Intentionally ignores subject_key parameter to provide a literal subject.
+    return SelectNode(self.subject_key, self.product, variants, None)

@@ -136,6 +136,7 @@ class Address(object):
     norm_path = os.path.normpath(spec_path)
     self._spec_path = norm_path if norm_path != '.' else ''
     self._target_name = target_name
+    self._hash = hash((self._spec_path, self._target_name))
 
   @property
   def spec_path(self):
@@ -198,11 +199,7 @@ class Address(object):
     return (self._spec_path == other._spec_path and
             self._target_name == other._target_name)
 
-  _hash = None
-
   def __hash__(self):
-    if self._hash is None:
-      self._hash = hash((self._spec_path, self._target_name))
     return self._hash
 
   def __ne__(self, other):

@@ -7,8 +7,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import MutableMapping, MutableSequence
 
+import six
+
 from pants.engine.exp.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
 from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable, ValidationError
+
+
+def _normalize_utf8_keys(kwargs):
+  """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
+  if any(type(key) is six.binary_type for key in kwargs.keys()):
+    return {six.text_type(k): v for k, v in kwargs.items()}
+  return kwargs
 
 
 class Struct(Serializable, SerializableFactory, Validatable):
@@ -18,10 +27,14 @@ class Struct(Serializable, SerializableFactory, Validatable):
   Structs can carry a name in which case they become addressable and can be reused.
   """
 
-  # Internal book-keeping fields to exclude from hash codes/equality checks.
-  _SPECIAL_FIELDS = ('extends', 'merges', 'type_alias')
+  # Fields dealing with inheritance.
+  _INHERITANCE_FIELDS = ('extends', 'merges')
+  # The type alias for an instance overwrites any inherited type_alias field.
+  _TYPE_ALIAS_FIELD = 'type_alias'
+  # Fields that should not be inherited.
+  _UNINHERITABLE_FIELDS = _INHERITANCE_FIELDS + (_TYPE_ALIAS_FIELD,)
 
-  def __init__(self, abstract=False, extends=None, merges=None, **kwargs):
+  def __init__(self, abstract=False, extends=None, merges=None, type_alias=None, **kwargs):
     """Creates a new struct data blob.
 
     By default Structs are anonymous (un-named), concrete (not `abstract`), and they neither
@@ -54,9 +67,12 @@ class Struct(Serializable, SerializableFactory, Validatable):
                   this struct or this structs superclasses.
     :param **kwargs: The struct parameters.
     """
+    kwargs = _normalize_utf8_keys(kwargs)
+
     self._kwargs = kwargs
 
     self._kwargs['abstract'] = abstract
+    self._kwargs[self._TYPE_ALIAS_FIELD] = type_alias
 
     self.extends = extends
     self.merges = merges
@@ -70,8 +86,6 @@ class Struct(Serializable, SerializableFactory, Validatable):
         self.report_validation_error('Address and name do not match! address: {}, name: {}'
                                      .format(self.address, self.name))
       self._kwargs['name'] = target_name
-
-    self._hashable_key = None
 
   @property
   def name(self):
@@ -110,7 +124,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
 
     :rtype: string
     """
-    return self._kwargs.get('type_alias', type(self).__name__)
+    type_alias = self._kwargs.get(self._TYPE_ALIAS_FIELD, None)
+    return type_alias if type_alias is not None else type(self).__name__
 
   @property
   def abstract(self):
@@ -161,7 +176,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     attributes.pop('address', None)
 
     # We should never inherit special fields - these are for local book-keeping only.
-    for field in self._SPECIAL_FIELDS:
+    for field in self._UNINHERITABLE_FIELDS:
       attributes.pop(field, None)
 
     return attributes
@@ -170,8 +185,9 @@ class Struct(Serializable, SerializableFactory, Validatable):
     if not (self.extends or self.merges):
       return self
 
+    # Filter out the attributes that we will consume below for inheritance.
     attributes = {k: v for k, v in self._asdict().items()
-                  if k not in self._SPECIAL_FIELDS and v is not None}
+                  if k not in self._INHERITANCE_FIELDS and v is not None}
 
     if self.extends:
       for k, v in self._extract_inheritable_attributes(self.extends).items():
@@ -225,20 +241,18 @@ class Struct(Serializable, SerializableFactory, Validatable):
     raise AttributeError('{} does not have attribute {!r}'.format(self, item))
 
   def _key(self):
-    if self._hashable_key is None:
-      if self.address:
-        self._hashable_key = self.address
-      else:
-        def hashable(value):
-          if isinstance(value, dict):
-            return tuple(sorted((k, hashable(v)) for k, v in value.items()))
-          elif isinstance(value, list):
-            return tuple(hashable(v) for v in value)
-          else:
-            return value
-        self._hashable_key = tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
-                                          if k not in self._SPECIAL_FIELDS))
-    return self._hashable_key
+    if self.address:
+      return self.address
+    else:
+      def hashable(value):
+        if isinstance(value, dict):
+          return tuple(sorted((k, hashable(v)) for k, v in value.items()))
+        elif isinstance(value, list):
+          return tuple(hashable(v) for v in value)
+        else:
+          return value
+      return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
+                          if k not in self._INHERITANCE_FIELDS))
 
   def __hash__(self):
     return hash(self._key())

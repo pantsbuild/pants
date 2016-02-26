@@ -14,7 +14,6 @@ from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
 from pants.engine.exp.examples.planners import Classpath, setup_json_scheduler
 from pants.engine.exp.nodes import Return, SelectNode
-from pants.engine.exp.scheduler import BuildRequest
 
 
 class EngineTest(unittest.TestCase):
@@ -25,19 +24,24 @@ class EngineTest(unittest.TestCase):
 
     self.java = Address.parse('src/java/codegen/simple')
 
+  def key(self, subject):
+    return self.scheduler._subjects.put(subject)
+
   def request(self, goals, *addresses):
     specs = [self.spec_parser.parse_spec(str(a)) for a in addresses]
-    return BuildRequest(goals=goals, subjects=specs)
+    return self.scheduler.build_request(goals=goals, subjects=specs)
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
-    self.assertEqual({SelectNode(self.java, Classpath, None, None): Return(Classpath(creator='javac'))},
+    self.assertEqual({SelectNode(self.key(self.java), Classpath, None, None):
+                        Return(Classpath(creator='javac'))},
                      result.root_products)
     self.assertIsNone(result.error)
 
   @contextmanager
   def multiprocessing_engine(self, pool_size=None):
     with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=True)) as e:
+      e.start()
       yield e
 
   def test_serial_engine_simple(self):
