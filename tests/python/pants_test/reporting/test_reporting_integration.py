@@ -63,7 +63,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   INFO_LEVEL_COMPILE_MSG='Compiling 1 zinc source in 1 target (examples/src/java/org/pantsbuild/example/hello/simple:simple).'
   DEBUG_LEVEL_COMPILE_MSG='compile(examples/src/java/org/pantsbuild/example/hello/simple:simple) finished with status Successful'
 
-  def test_ouput_level_warn(self):
+  def test_output_level_warn(self):
     command = ['compile',
                'examples/src/java/org/pantsbuild/example/hello/simple',
                '--compile-zinc-level=warn']
