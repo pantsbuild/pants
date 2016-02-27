@@ -14,6 +14,7 @@ from os.path import join as os_path_join
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
+from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths, create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
@@ -23,8 +24,7 @@ from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
 from pants.engine.exp.sources import Sources
-from pants.engine.exp.struct import Struct, StructWithDeps
-from pants.engine.exp.targets import Target, Variants
+from pants.engine.exp.struct import Struct, StructWithDeps, Variants, HasStructs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -37,6 +37,30 @@ def printing_func(func):
     print('{} executed for {}, returned: {}'.format(func.__name__, inputs, return_val))
     return return_val
   return wrapper
+
+
+class Target(Struct, HasStructs):
+  """A placeholder for the most-numerous Struct subclass.
+
+  This particular implementation holds a collection of other Structs in a `configurations` field.
+  """
+  collection_field = 'configurations'
+
+  def __init__(self, name=None, configurations=None, **kwargs):
+    """
+    :param string name: The name of this target which forms its address in its namespace.
+    :param list configurations: The configurations that apply to this target in various contexts.
+    """
+    super(Target, self).__init__(name=name, **kwargs)
+
+    self.configurations = configurations
+
+  @addressable_list(SubclassesOf(Struct))
+  def configurations(self):
+    """The configurations that apply to this target in various contexts.
+
+    :rtype list of :class:`pants.engine.exp.configuration.Struct`
+    """
 
 
 class JavaSources(Sources, StructWithDeps):

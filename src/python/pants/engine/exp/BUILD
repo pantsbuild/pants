@@ -79,7 +79,7 @@ python_library(
   dependencies=[
     ':addressable',
     ':objects',
-    ':targets',
+    ':struct',
     'src/python/pants/build_graph',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
@@ -141,14 +141,5 @@ python_library(
     ':fs',
     ':struct',
     'src/python/pants/source',
-  ]
-)
-
-python_library(
-  name='targets',
-  sources=['targets.py'],
-  dependencies=[
-    ':addressable',
-    ':struct',
   ]
 )

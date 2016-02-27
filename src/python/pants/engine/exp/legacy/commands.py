@@ -11,7 +11,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.goal_runner import OptionsInitializer
-from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
@@ -24,6 +23,9 @@ from pants.engine.exp.targets import Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
 
+
+class LegacyTarget(StructWithDeps):
+  """
 
 class LegacyTable(SymbolTable):
 
@@ -65,7 +67,7 @@ def list():
       create_fs_tasks(project_tree_key) +
       create_graph_tasks(address_mapper_key, symbol_table_cls)
     )
-  scheduler = LocalScheduler({goal: Address}, tasks, subjects, symbol_table_cls)
+  scheduler = LocalScheduler({goal: Target}, tasks, subjects, symbol_table_cls)
 
   # Execute a request for the given specs.
   build_request = scheduler.build_request(goals=[goal], subjects=spec_roots)
@@ -85,5 +87,5 @@ def list():
       raise state.exc
     elif type(state) is not Return:
       State.raise_unrecognized(dep_state)
-    for address in state.value:
-      print(address)
+    for target in state.value:
+      print(target._asdict())

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from abc import abstractproperty
 from collections import MutableMapping, MutableSequence
 
 import six
@@ -292,3 +293,47 @@ class StructWithDeps(Struct):
 
     :rtype: list
     """
+
+
+class HasStructs(object):
+  """A mixin to mark an object as containing a collection of Structs in one of its fields."""
+
+  @abstractproperty
+  def collection_field(cls):
+    """Returns the name of the field of this Class that contains a collection of Structs."""
+
+
+class Variants(Struct):
+  """A struct that holds default variant values.
+
+  Variants are key-value pairs representing uniquely identifying parameters for a Node.
+
+  Default variants are usually configured on a Target to be used whenever they are
+  not specified by a caller.
+
+  They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
+  stored internally as sorted nested tuples of key-value strings.
+  """
+
+  @staticmethod
+  def merge(left, right):
+    """Merges right over left, ensuring that the return value is a tuple of tuples, or None."""
+    if not left:
+      if right:
+        return tuple(right)
+      else:
+        return None
+    if not right:
+      return tuple(left)
+    # Merge by key, and then return sorted by key.
+    merged = dict(left)
+    for key, value in right:
+      merged[key] = value
+    return tuple(sorted(merged.items(), key=lambda x: x[0]))
+
+  def __init__(self, default=None, **kwargs):
+    """
+    :param dict default: A dict of default variant values.
+    """
+    # TODO: enforce the type of variants using the Addressable framework.
+    super(Variants, self).__init__(default=default, **kwargs)
