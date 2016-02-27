@@ -19,6 +19,9 @@ class ListIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def test_single(self):
     self.do_list('3rdparty:guava')
 
+  def test_missing(self):
+    self.do_list('3rdparty:wait_seriously_there_is_a_library_named_that')
+
   def test_siblings(self):
     self.do_list('3rdparty:')
 

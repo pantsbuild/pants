@@ -469,11 +469,7 @@ class LocalScheduler(object):
       for goal_name in goals:
         product = self._products_by_goal[goal_name]
         for subject in subjects:
-          if type(subject) is SingleAddress:
-            subject, variants = parse_variants(Address.parse(subject.to_spec_string()))
-            subject_key = self._subjects.put(subject)
-            yield SelectNode(subject_key, product, variants, None)
-          elif type(subject) in [SiblingAddresses, DescendantAddresses]:
+          if type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
             subject_key = self._subjects.put(subject)
             yield DependenciesNode(subject_key, product, None, Addresses, None)
           elif type(subject) is PathGlobs:
