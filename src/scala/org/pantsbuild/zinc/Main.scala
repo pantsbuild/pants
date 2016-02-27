@@ -40,7 +40,9 @@ object Main {
       Reporters.create(
         log,
         settings.consoleLog.fileFilters,
-        settings.consoleLog.msgFilters
+        settings.consoleLog.msgFilters,
+        settings.fatalWarnings,
+        settings.nonFatalWarningsPatterns
       )
     val progress =
       new SimpleCompileProgress(
