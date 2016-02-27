@@ -1,4 +1,4 @@
-Created by running `./build-support/bin/contributors.sh`.
+Created by running `build-support/bin/contributors.sh`.
 
 + Alan Paulin
 + Alexander Johnson
@@ -12,6 +12,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Chris Aniszczyk
 + Chris Burroughs
 + Chris Chen
++ Chris Heisterkamp
 + Chris Pesto
 + Cody Gibb
 + Craig Schertz
