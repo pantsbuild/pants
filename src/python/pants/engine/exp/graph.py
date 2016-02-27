@@ -200,11 +200,11 @@ def addresses_from_address_families(address_families):
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
 
 
-def create_graph_tasks(address_mapper, symbol_table_cls):
+def create_graph_tasks(address_mapper_key, symbol_table_cls):
   """Creates tasks used to parse Structs from BUILD files.
 
-  :param address_mapper: An AddressMapper instance.
-  :param symbol_table_cls: A symbol table class.
+  :param address_mapper_key: The SubjectKey for an AddressMapper instance.
+  :param symbol_table_cls: A SymbolTable class to provide symbols for Address lookups.
   """
   return [
     # Support for resolving Structs from Addresses
@@ -219,16 +219,16 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   ] + [
     # BUILD file parsing.
     (AddressFamily,
-      [SelectLiteral(address_mapper, AddressMapper),
+      [SelectLiteral(address_mapper_key, AddressMapper),
        Select(Path),
        SelectProjection(FilesContent, Paths, ('paths',), BuildFilePaths)],
       parse_address_family),
     (BuildFilePaths,
-      [SelectLiteral(address_mapper, AddressMapper),
+      [SelectLiteral(address_mapper_key, AddressMapper),
        Select(DirectoryListing)],
       filter_buildfile_paths),
   ] + [
-    # Addresses for 'literal' products might possibly be resolvable from BLD files. These tasks
+    # Addresses for user-defined products might possibly be resolvable from BLD files. These tasks
     # define that lookup for each literal product.
     (product,
      [Select(Struct)],

@@ -11,7 +11,6 @@ from os.path import join
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import ProjectTree
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs, globs_matches
@@ -120,11 +119,15 @@ def list_directory(project_tree, directory):
 
   Returns a DirectoryListing containing directory and file paths relative to the ProjectTree.
 
+  Currently ignores `.`-prefixed subdirectories, but should likely use `--ignore-patterns`.
+    TODO: See https://github.com/pantsbuild/pants/issues/2956
+
   Raises an exception if the path does not exist, or is not a directoy.
   """
   _, subdirs, subfiles = next(project_tree.walk(directory.path))
   return DirectoryListing(directory,
-                          [Path(join(directory.path, subdir)) for subdir in subdirs],
+                          [Path(join(directory.path, subdir)) for subdir in subdirs
+                           if not subdir.startswith('.')],
                           [Path(join(directory.path, subfile)) for subfile in subfiles])
 
 
@@ -165,16 +168,13 @@ def files_content(project_tree, paths):
   return FilesContent(contents)
 
 
-def create_fs_tasks(buildroot):
+def create_fs_tasks(project_tree_key):
   """Creates tasks that consume the filesystem.
 
-  These tasks are all considered "native", and should have their outputs re-validated
+  Many of these tasks are considered "native", and should have their outputs re-validated
   for every build. TODO: They should likely get their own ProductGraph.Node type
   for efficiency/invalidation.
-
-  :param project_tree: A ProjectTree instance to use for filesystem operations.
   """
-  fspt = FileSystemProjectTree(buildroot)
   return [
     # Unfiltered requests for subdirectories.
     (RecursiveSubDirectories,
@@ -187,15 +187,15 @@ def create_fs_tasks(buildroot):
       [SelectDependencies(Paths, PathGlobs)],
       merge_paths),
     (Paths,
-      [SelectLiteral(fspt, ProjectTree),
+      [SelectLiteral(project_tree_key, ProjectTree),
        Select(PathGlob)],
       file_exists),
     (FilesContent,
-      [SelectLiteral(fspt, ProjectTree),
+      [SelectLiteral(project_tree_key, ProjectTree),
        Select(Paths)],
       files_content),
     (DirectoryListing,
-      [SelectLiteral(fspt, ProjectTree),
+      [SelectLiteral(project_tree_key, ProjectTree),
        Select(Path)],
       list_directory),
   ]
