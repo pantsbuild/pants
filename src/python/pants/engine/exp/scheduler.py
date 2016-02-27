@@ -458,10 +458,15 @@ class LocalScheduler(object):
     The resulting BuildRequest object will contain keys tied to this scheduler's ProductGraph, and
     so it will not be directly usable with other scheduler instances without being re-created.
 
+    A BuildRequest for an Address represents exactly one product output, as does SingleAddress. But
+    we differentiate between them here in order to normalize the output for all Spec objects
+    as "list of product".
+
     :param goals: The list of goal names supplied on the command line.
     :type goals: list of string
     :param subjects: A list of Spec and/or PathGlobs objects.
-    :type subjects: list of :class:`pants.base.specs.Spec` and/or :class:`pants.engine.exp.fs.PathGlobs`
+    :type subjects: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+       :class:`pants.engine.exp.fs.PathGlobs` objects.
     """
 
     # Determine the root Nodes for the products and subjects selected by the goals and specs.
@@ -469,11 +474,12 @@ class LocalScheduler(object):
       for goal_name in goals:
         product = self._products_by_goal[goal_name]
         for subject in subjects:
-          if type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
-            subject_key = self._subjects.put(subject)
+          subject_key = self._subjects.put(subject)
+          if type(subject) is Address:
+            yield SelectNode(subject_key, product, None, None)
+          elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
             yield DependenciesNode(subject_key, product, None, Addresses, None)
           elif type(subject) is PathGlobs:
-            subject_key = self._subjects.put(subject)
             yield DependenciesNode(subject_key, product, None, Paths, None)
           else:
             raise ValueError('Unsupported root subject type: {}'.format(subject))
