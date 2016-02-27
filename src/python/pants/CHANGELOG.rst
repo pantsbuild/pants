@@ -11,10 +11,9 @@ zero-or-more pants.ini/config files in the future.
 
 Additionally, there is now support for validating that all options defined in a
 pants.ini file are valid options. Passing or configuring '--verify-config' will trigger
-this validation. To allow this check to be executed for global options as well as scoped
-options, a [GLOBAL] section is now the recommend place to put global options. This
-differentiates them from [DEFAULT] options, which are may be used as template values in
-other config sections.
+this validation. To allow global options to be verified, a new [GLOBAL] section is now the
+recommend place to specify global options. This differentiates them from [DEFAULT] options,
+which may be used as template values in other config sections, and thus cannot be verified.
 
 API Changes
 ~~~~~~~~~~~
@@ -80,12 +79,12 @@ New Engine Work
 ~~~~~~~~~~~~~~~
 
 * [engine] Introduce content-addressability
-  `Issue #2968)), <https://github.com/pantsbuild/pants/issues/2968)),>`_
-  `Issue #2956)) <https://github.com/pantsbuild/pants/issues/2956))>`_
+  `Issue #2968 <https://github.com/pantsbuild/pants/issues/2968>`_
+  `Issue #2956 <https://github.com/pantsbuild/pants/issues/2956>`_
   `RB #3498 <https://rbcommons.com/s/twitter/r/3498>`_
 
 * [engine] First round of work for 'native' filesystem support
-  `Issue #2946), <https://github.com/pantsbuild/pants/issues/2946),>`_
+  `Issue #2946, <https://github.com/pantsbuild/pants/issues/2946>`_
   `RB #3488 <https://rbcommons.com/s/twitter/r/3488>`_
 
 * [engine] Implement recursive address walking
