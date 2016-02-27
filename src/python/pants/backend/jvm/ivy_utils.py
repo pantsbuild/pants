@@ -337,29 +337,18 @@ class IvyUtils(object):
                                                          resolve_hash_name, conf))
 
   @classmethod
-  def parse_xml_report(cls, cache_dir, resolve_hash_name, conf):
+  def parse_xml_report(cls, conf, path):
     """Parse the ivy xml report corresponding to the name passed to ivy.
 
-    :param string cache_dir: The path of the ivy cache dir used for resolves.
-    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
-                                     resolution; if `None` returns `None` instead of attempting to
-                                     parse any report.
     :param string conf: the ivy conf name (e.g. "default")
-    :returns: The info in the xml report or None if target is empty.
+    :param string path: The path to the ivy report file.
+    :returns: The info in the xml report.
     :rtype: :class:`IvyInfo`
     :raises: :class:`IvyResolveMappingError` if no report exists.
     """
-    # TODO(John Sirois): Cleanup acceptance of None, this is IvyResolve's concern, not ours.
-    if not resolve_hash_name:
-      return None
-    path = cls.xml_report_path(cache_dir, resolve_hash_name, conf)
     if not os.path.exists(path):
       raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
 
-    return cls._parse_xml_report(conf, path)
-
-  @classmethod
-  def _parse_xml_report(cls, conf, path):
     logger.debug("Parsing ivy report {}".format(path))
     ret = IvyInfo(conf)
     etree = ET.parse(path)
