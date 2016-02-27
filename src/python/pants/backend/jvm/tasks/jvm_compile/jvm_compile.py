@@ -119,6 +119,14 @@ class JvmCompile(NailgunTaskBase):
              default=list(cls.get_no_warning_args_default()),
              help='Extra compiler args to use when warnings are disabled.')
 
+    register('--fatal-warnings-enabled-args', advanced=True, type=list_option, fingerprint=True,
+             default=list(cls.get_fatal_warnings_enabled_args_default()),
+             help='Extra compiler args to use when fatal warnings are enabled.')
+
+    register('--fatal-warnings-disabled-args', advanced=True, type=list_option, fingerprint=True,
+             default=list(cls.get_fatal_warnings_disabled_args_default()),
+             help='Extra compiler args to use when fatal warnings are disabled.')
+
     register('--debug-symbols', default=False, action='store_true', fingerprint=True,
              help='Compile with debug symbol enabled.')
 
@@ -199,6 +207,16 @@ class JvmCompile(NailgunTaskBase):
   @classmethod
   def get_no_warning_args_default(cls):
     """Override to set default for --no-warning-args option."""
+    return ()
+
+  @classmethod
+  def get_fatal_warnings_enabled_args_default(cls):
+    """Override to set default for --fatal-warnings-enabled-args option."""
+    return ()
+
+  @classmethod
+  def get_fatal_warnings_disabled_args_default(cls):
+    """Override to set default for --fatal-warnings-disabled-args option."""
     return ()
 
   @property

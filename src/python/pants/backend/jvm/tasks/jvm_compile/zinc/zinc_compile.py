@@ -97,6 +97,14 @@ class BaseZincCompile(JvmCompile):
     return ('-S-nowarn',)
 
   @classmethod
+  def get_fatal_warnings_enabled_args_default(cls):
+    return ('-S-Xfatal-warnings', '-C-Werror')
+
+  @classmethod
+  def get_fatal_warnings_disabled_args_default(cls):
+    return ()
+
+  @classmethod
   def register_options(cls, register):
     super(BaseZincCompile, cls).register_options(register)
     # TODO: disable by default because it breaks dependency parsing:
@@ -297,7 +305,9 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(settings.args)
 
     if fatal_warnings:
-      zinc_args.extend(['-S-Xfatal-warnings', '-C-Werror'])
+      zinc_args.extend(self.get_options().fatal_warnings_enabled_args)
+    else:
+      zinc_args.extend(self.get_options().fatal_warnings_disabled_args)
 
     jvm_options = list(self._jvm_options)
 
