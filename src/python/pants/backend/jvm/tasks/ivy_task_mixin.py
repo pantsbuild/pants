@@ -35,7 +35,8 @@ class IvyResolveResult(object):
   """The result of an Ivy resolution.
 
   The result data includes the list of resolved artifacts, the relationships between those artifacts
-  and the targets that requested them and the hash name of the resolve."""
+  and the targets that requested them and the hash name of the resolve.
+  """
 
   def __init__(self, resolved_artifact_paths, symlink_map, resolve_hash_name, reports_by_conf):
     self._reports_by_conf = reports_by_conf
