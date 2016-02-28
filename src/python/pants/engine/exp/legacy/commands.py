@@ -21,6 +21,7 @@ from pants.engine.exp.nodes import Return, State, Subjects, Throw
 from pants.engine.exp.parsers import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.targets import Target
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
 
 
@@ -30,7 +31,7 @@ class LegacyTable(SymbolTable):
   @memoized_method
   def aliases(cls):
     """TODO: This is a nasty escape hatch to pass aliases to LegacyPythonCallbacksParser."""
-    options, build_config = OptionsInitializer().setup()
+    options, build_config = OptionsInitializer(OptionsBootstrapper()).setup()
     return build_config.registered_aliases()
 
   @classmethod

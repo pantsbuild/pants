@@ -33,7 +33,6 @@ from pants.help.help_printer import HelpPrinter
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.logging.setup import setup_logging
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.report import Report
 from pants.reporting.reporting import Reporting
@@ -49,14 +48,14 @@ logger = logging.getLogger(__name__)
 class OptionsInitializer(object):
   """Initializes global options and logging."""
 
-  def __init__(self, options_bootstrapper=None, working_set=None, exiter=sys.exit):
+  def __init__(self, options_bootstrapper, working_set=None, exiter=sys.exit):
     """
-    :param OptionsBootStrapper options_bootstrapper: An options bootstrapper instance (Optional).
+    :param OptionsBootStrapper options_bootstrapper: An options bootstrapper instance.
     :param pkg_resources.WorkingSet working_set: The working set of the current run as returned by
-                                                 PluginResolver.resolve() (Optional).
-    :param func exiter: A function that accepts an exit code value and exits (for tests, Optional).
+                                                 PluginResolver.resolve().
+    :param func exiter: A function that accepts an exit code value and exits (for tests).
     """
-    self._options_bootstrapper = options_bootstrapper or OptionsBootstrapper()
+    self._options_bootstrapper = options_bootstrapper
     self._working_set = working_set or PluginResolver(self._options_bootstrapper).resolve()
     self._exiter = exiter
 

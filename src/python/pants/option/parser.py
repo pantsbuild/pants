@@ -68,7 +68,7 @@ class Parser(object):
     """Create a Parser instance.
 
     :param env: a dict of environment variables.
-    :param config: data from a config file (must support config.get[list](section, name, default=)).
+    :param :class:`pants.option.config.Config` config: data from a config file.
     :param scope_info: the scope this parser acts for.
     :param parent_parser: the parser for the scope immediately enclosing this one, or
                           None if this is the global scope.

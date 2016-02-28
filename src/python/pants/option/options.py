@@ -88,7 +88,7 @@ class Options(object):
     """Create an Options instance.
 
     :param env: a dict of environment variables.
-    :param config: data from a config file (must support config.get[list](section, name, default=)).
+    :param :class:`pants.option.config.Config` config: data from a config file.
     :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
     :param args: a list of cmd-line args; defaults to `sys.argv` if None is supplied.
     :param bootstrap_option_values: An optional namespace containing the values of bootstrap
