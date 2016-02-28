@@ -15,12 +15,12 @@ python_library(
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:nodes',
-    'src/python/pants/engine/exp:objects',
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:scheduler',
-    'src/python/pants/engine/exp:targets',
+    'src/python/pants/engine/exp:struct',
     'src/python/pants/option',
     'src/python/pants/util:memo',
+    'src/python/pants/util:objects',
   ],
 )
 

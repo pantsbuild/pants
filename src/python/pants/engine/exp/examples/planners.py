@@ -24,7 +24,7 @@ from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
 from pants.engine.exp.sources import Sources
-from pants.engine.exp.struct import Struct, StructWithDeps, Variants, HasStructs
+from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 

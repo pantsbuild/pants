@@ -16,19 +16,31 @@ from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.legacy.parsers import LegacyPythonCallbacksParser
 from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.nodes import Return, State, Subjects, Throw
+from pants.engine.exp.nodes import Return, SelectNode, State, Subjects, Throw
 from pants.engine.exp.parsers import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
-from pants.engine.exp.targets import Target
+from pants.engine.exp.selectors import Select, SelectDependencies
+from pants.engine.exp.struct import StructWithDeps
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
+from pants.util.objects import datatype
 
 
-class LegacyTarget(StructWithDeps):
+class LegacyBuildGraphNode(datatype('LegacyGraphNode', ['target', 'dependency_addresses'])):
+  """A Node to represent a node in the legacy BuildGraph.
+
+  A facade implementing the legacy BuildGraph would inspect only these entries in the ProductGraph.
   """
 
-class LegacyTable(SymbolTable):
 
+class TargetAdaptor(StructWithDeps):
+  """A Struct to imitate the existing Target.
+
+  Extending StructWithDeps causes the class to have a `dependencies` field marked Addressable.
+  """
+
+
+class LegacyTable(SymbolTable):
   @classmethod
   @memoized_method
   def aliases(cls):
@@ -39,7 +51,26 @@ class LegacyTable(SymbolTable):
   @classmethod
   @memoized_method
   def table(cls):
-    return {alias: Target for alias in cls.aliases().target_types}
+    return {alias: TargetAdaptor for alias in cls.aliases().target_types}
+
+
+def reify_legacy_graph(legacy_target, dependency_nodes):
+  """Given a TargetAdaptor and LegacyBuildGraphNodes for its deps, return a LegacyBuildGraphNode."""
+  # Instantiate the Target from the TargetAdaptor struct.
+  # TODO.
+  target = legacy_target
+  return LegacyBuildGraphNode(target, [node.target.address for node in dependency_nodes])
+
+
+def legacy_tasks():
+  """Create tasks to recursively parse the legacy graph."""
+  return [
+      # Given a TargetAdaptor and its dependencies, construct a Target.
+      (LegacyBuildGraphNode,
+       [Select(TargetAdaptor),
+        SelectDependencies(LegacyBuildGraphNode, TargetAdaptor)],
+       reify_legacy_graph)
+    ]
 
 
 def list():
@@ -49,7 +80,7 @@ def list():
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
 
-  subjects = Subjects(debug=False)
+  subjects = Subjects(debug=True)
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.
@@ -62,12 +93,13 @@ def list():
 
   # Create a Scheduler containing only the graph tasks, with a single installed goal that
   # requests an Address.
-  goal = 'list'
+  goal = 'dependencies'
   tasks = (
+      legacy_tasks() +
       create_fs_tasks(project_tree_key) +
       create_graph_tasks(address_mapper_key, symbol_table_cls)
     )
-  scheduler = LocalScheduler({goal: Target}, tasks, subjects, symbol_table_cls)
+  scheduler = LocalScheduler({goal: LegacyBuildGraphNode}, tasks, subjects, symbol_table_cls)
 
   # Execute a request for the given specs.
   build_request = scheduler.build_request(goals=[goal], subjects=spec_roots)
@@ -81,11 +113,14 @@ def list():
   if result.error:
     raise result.error
 
-  # Render the output.
-  for state in result.root_products.values():
+  # Render all LegacyGraphNodes under the roots.
+  for ((node, state), _) in scheduler.walk_product_graph(build_request):
     if type(state) is Throw:
       raise state.exc
-    elif type(state) is not Return:
-      State.raise_unrecognized(dep_state)
-    for target in state.value:
-      print(target._asdict())
+    if type(node) is not SelectNode:
+      continue
+    if node.product is not LegacyBuildGraphNode:
+      continue
+
+    # Print out the Target struct.
+    print(state.value.target)
