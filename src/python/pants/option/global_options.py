@@ -8,8 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from pants.base.build_environment import (get_buildroot, get_pants_cachedir, get_pants_config_file,
-                                          get_pants_configdir, pants_version)
+from pants.base.build_environment import (get_buildroot, get_pants_cachedir,
+                                          get_default_pants_config_file, get_pants_configdir,
+                                          pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import list_option
 from pants.option.optionable import Optionable
@@ -78,9 +79,12 @@ class GlobalOptionsRegistrar(Optionable):
              default=os.path.join(buildroot, 'dist'),
              help='Write end-product artifacts to this dir.')
     register('--pants-config-files', advanced=True, type=list_option,
-             default=[get_pants_config_file()], help='Paths to Pants config files.')
-    # TODO: Deprecate --config-override (and possibly the pantsrc flags) in favor of
-    # --pants-config-files.
+             default=[get_default_pants_config_file()], help='Paths to Pants config files.')
+    # TODO: Deprecate --config-override in favor of --pants-config-files.
+    # But only once we're able to both append and override list-valued options, as there are
+    # use-cases for both here.
+    # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
+    # to set extra config file locations in an initial bootstrap config file.
     register('--config-override', advanced=True, action='append', metavar='<path>',
              help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, action='store_true', default=True,

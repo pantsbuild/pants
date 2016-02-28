@@ -15,9 +15,10 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.eval import parse_expression
+from pants.util.meta import AbstractClass
 
 
-class Config(object):
+class Config(AbstractClass):
   """Encapsulates ini-style config file loading and access.
 
   Supports recursive variable substitution using standard python format strings. E.g.,
@@ -27,10 +28,6 @@ class Config(object):
 
   class ConfigError(Exception):
     pass
-
-  @staticmethod
-  def empty():
-    return _EmptyConfig()
 
   @classmethod
   def load(cls, configpaths, seed_values=None):
@@ -46,7 +43,7 @@ class Config(object):
                         pants_supportdir and pants_distdir.
     """
     if not configpaths:
-      return cls.empty()
+      return _EmptyConfig()
 
     single_file_configs = []
     for configpath in configpaths:

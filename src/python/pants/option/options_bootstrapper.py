@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 
-from pants.base.build_environment import get_pants_config_file
+from pants.base.build_environment import get_default_pants_config_file
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
 from pants.option.custom_types import list_option
@@ -62,7 +62,7 @@ class OptionsBootstrapper(object):
     if paths_str:
       paths = list_option(paths_str)
     else:
-      paths = [get_pants_config_file()]
+      paths = [get_default_pants_config_file()]
 
     return paths
 
