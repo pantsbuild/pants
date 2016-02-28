@@ -1,6 +1,95 @@
 RELEASE HISTORY
 ===============
 
+0.0.74 (02/27/2016)
+-------------------
+
+This release changes how pants detects the buildroot from using the location of a
+'pants.ini' file, to using the location of a file named 'pants' (usually the name of
+the pants executable script at the root of a repo). This is in service of allowing for
+zero-or-more pants.ini/config files in the future.
+
+Additionally, there is now support for validating that all options defined in a
+pants.ini file are valid options. Passing or configuring '--verify-config' will trigger
+this validation. To allow global options to be verified, a new [GLOBAL] section is now the
+recommend place to specify global options. This differentiates them from [DEFAULT] options,
+which may be used as template values in other config sections, and thus cannot be verified.
+
+API Changes
+~~~~~~~~~~~
+
+* Set public api markers for jvm tasks
+  `RB #3499 <https://rbcommons.com/s/twitter/r/3499>`_
+
+* Change how we detect the buildroot.
+  `RB #3489 <https://rbcommons.com/s/twitter/r/3489>`_
+
+* Add public api markers for core_tasks
+  `RB #3490 <https://rbcommons.com/s/twitter/r/3490>`_
+
+* Add [GLOBAL] in pants.ini for pants global options; Add config file validations against options
+  `RB #3475 <https://rbcommons.com/s/twitter/r/3475>`_
+
+* Add public api markers for pantsd and options
+  `RB #3484 <https://rbcommons.com/s/twitter/r/3484>`_
+
+Bugfixes
+~~~~~~~~
+
+* Allow for running the invalidation report when clean-all is on the command line
+  `RB #3503 <https://rbcommons.com/s/twitter/r/3503>`_
+
+* Enable fail-fast for pytest so it works like fail-fast for junit
+  `RB #3497 <https://rbcommons.com/s/twitter/r/3497>`_
+
+* Reset Subsystems when creating a new context in tests
+  `RB #3496 <https://rbcommons.com/s/twitter/r/3496>`_
+
+* Set timeout for the long running 'testprojects' integration test
+  `RB #3491 <https://rbcommons.com/s/twitter/r/3491>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Java checkstyle will optionally not include the runtime classpath with checkstyle
+  `RB #3487 <https://rbcommons.com/s/twitter/r/3487>`_
+
+* Error out on duplicate artifacts for jar publish.
+  `RB #3481 <https://rbcommons.com/s/twitter/r/3481>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Change ivy resolve ordering to attempt load first and fall back to full resolve if load fails.
+  `RB #3501 <https://rbcommons.com/s/twitter/r/3501>`_
+
+* Clean up extraneous code in jvm_compile.
+  `RB #3504 <https://rbcommons.com/s/twitter/r/3504>`_
+
+* Retrieve jars from IvyInfo using a collection of coordinates instead of jar_library targets.
+  `RB #3495 <https://rbcommons.com/s/twitter/r/3495>`_
+
+* Document the 'timeout' parameter to junit_tests and python_tests
+  `RB #3492 <https://rbcommons.com/s/twitter/r/3492>`_
+
+* When a timeout triggers, first do SIGTERM, then wait a bit, and then do SIGKILL
+  `RB #3479 <https://rbcommons.com/s/twitter/r/3479>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Introduce content-addressability
+  `Issue #2968 <https://github.com/pantsbuild/pants/issues/2968>`_
+  `Issue #2956 <https://github.com/pantsbuild/pants/issues/2956>`_
+  `RB #3498 <https://rbcommons.com/s/twitter/r/3498>`_
+
+* [engine] First round of work for 'native' filesystem support
+  `Issue #2946, <https://github.com/pantsbuild/pants/issues/2946>`_
+  `RB #3488 <https://rbcommons.com/s/twitter/r/3488>`_
+
+* [engine] Implement recursive address walking
+  `RB #3485 <https://rbcommons.com/s/twitter/r/3485>`_
+
 0.0.73 (02/19/2016)
 -------------------
 
