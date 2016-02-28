@@ -8,9 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from pants.base.build_environment import (get_buildroot, get_pants_cachedir,
-                                          get_default_pants_config_file, get_pants_configdir,
-                                          pants_version)
+from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
+                                          get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import list_option
 from pants.option.optionable import Optionable
