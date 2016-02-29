@@ -75,6 +75,10 @@ that.""",
   def test_sections(self):
     self.assertEquals(['a', 'b', 'defined_section'], self.config.sections())
 
+  def test_empty(self):
+    config = Config.load([])
+    self.assertEquals([], config.sections())
+
   def _check_defaults(self, accessor, default):
     self.assertEquals(None, accessor('c', 'fast'))
     self.assertEquals(None, accessor('c', 'preempt', None))
