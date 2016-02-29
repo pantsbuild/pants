@@ -80,6 +80,12 @@ class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'depen
     return hash(self.struct)
 
 
+def _raise_did_you_mean(address_family, name):
+  possibilities = '\n  '.join(str(a) for a in address_family.addressables)
+  raise ResolveError('A Struct was not found in namespace {} for name "{}". '
+                     'Did you mean one of?:\n  {}'.format(address_family.namespace, name, possibilities))
+
+
 def resolve_unhydrated_struct(address_family, address):
   """Given an Address and its AddressFamily, resolve an UnhydratedStruct.
 
@@ -89,9 +95,7 @@ def resolve_unhydrated_struct(address_family, address):
 
   struct = address_family.addressables.get(address)
   if not struct:
-    possibilities = '\n  '.join(str(a) for a in address_family.addressables)
-    raise ResolveError('A Struct was not found at address {}. '
-                       'Did you mean one of?:\n  {}'.format(address, possibilities))
+    _raise_did_you_mean(address_family, address.target_name)
 
   dependencies = []
   def maybe_append(outer_key, value):
@@ -190,6 +194,19 @@ def identity(v):
   return v
 
 
+def address_from_address_family(address_family, single_address):
+  """Given an AddressFamily and a SingleAddress, return an Addresses object containing the Address.
+
+  Raises an exception if the SingleAddress does not match an existing Address.
+  """
+  name = single_address.name
+  if name is None:
+    name = os_path_basename(single_address.directory)
+  if name not in address_family.objects_by_name:
+    _raise_did_you_mean(address_family, single_address.name)
+  return Addresses(tuple([Address(address_family.namespace, name)]))
+
+
 def addresses_from_address_family(address_family):
   """Given an AddressFamily, return an Addresses objects containing all of its `addressables`."""
   return Addresses(tuple(address_family.addressables.keys()))
@@ -236,6 +253,10 @@ def create_graph_tasks(address_mapper_key, symbol_table_cls):
     for product in symbol_table_cls.table().values()
   ] + [
     # Spec handling.
+    (Addresses,
+      [SelectProjection(AddressFamily, Path, ('directory',), SingleAddress),
+       Select(SingleAddress)],
+      address_from_address_family),
     (Addresses,
       [SelectProjection(AddressFamily, Path, ('directory',), SiblingAddresses)],
       addresses_from_address_family),

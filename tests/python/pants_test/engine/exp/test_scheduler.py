@@ -17,7 +17,8 @@ from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
                                                 Jar, JavaSources, ThriftSources,
                                                 setup_json_scheduler)
-from pants.engine.exp.nodes import DependenciesNode, Return, SelectNode, Throw
+from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
+                                    Throw)
 from pants.engine.exp.scheduler import PartiallyConsumedInputsError
 
 
@@ -76,6 +77,21 @@ class SchedulerTest(unittest.TestCase):
     self.assert_select_for_subjects(walk, Jar, jars)
     self.assert_select_for_subjects(walk, Classpath, jars)
 
+  def assert_root(self, walk, node, return_value):
+    """Asserts that the first Node in a walk was a DependenciesNode with the single given result."""
+    ((root, root_state), dependencies) = walk[0]
+    self.assertEquals(type(root), DependenciesNode)
+    self.assertEquals(Return([return_value]), root_state)
+    self.assertIn((node, Return(return_value)), dependencies)
+
+  def assert_root_failed(self, walk, node, thrown_type):
+    """Asserts that the first Node in a walk was a DependenciesNode with a Throw result."""
+    ((root, root_state), dependencies) = walk[0]
+    self.assertEquals(type(root), DependenciesNode)
+    self.assertEquals(Throw, type(root_state))
+    self.assertIn((node, thrown_type), [(k, type(v.exc)) for k, v in dependencies
+                                        if type(v) is Throw])
+
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
                              root_specs=['3rdparty/jvm:guava'],
@@ -101,9 +117,9 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Root: expect the synthetic GenGoal product.
-    root_entry = walk[0][0]
-    self.assertEqual(SelectNode(self.key(self.thrift), GenGoal, None, None), root_entry[0])
-    self.assertIsInstance(root_entry[1], Return)
+    self.assert_root(walk,
+                     SelectNode(self.key(self.thrift), GenGoal, None, None),
+                     GenGoal("non-empty input to satisfy the Goal constructor"))
 
     variants = {'thrift': 'apache_java'}
     # Expect ThriftSources to have been selected.
@@ -134,9 +150,10 @@ class SchedulerTest(unittest.TestCase):
         Jar(org=cl1, name=cl2, rev='2.5', type_alias='jar'),
         Address.parse('src/thrift:slf4j-api')]
 
-    # Root: expect compilation via javac.
-    self.assertEqual((SelectNode(self.key(self.java), Classpath, None, None), Return(Classpath(creator='javac'))),
-                     walk[0][0])
+    # Root: expect a DependenciesNode depending on a SelectNode with compilation via javac.
+    self.assert_root(walk,
+                     SelectNode(self.key(self.java), Classpath, None, None),
+                     Classpath(creator='javac'))
 
     # Confirm that exactly the expected subjects got Classpaths.
     self.assert_select_for_subjects(walk, Classpath, subjects)
@@ -148,9 +165,9 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    self.assertEqual((SelectNode(self.key(self.consumes_resources), Classpath, None, None),
-                      Return(Classpath(creator='javac'))),
-                     walk[0][0])
+    self.assert_root(walk,
+                     SelectNode(self.key(self.consumes_resources), Classpath, None, None),
+                     Classpath(creator='javac'))
 
     # Confirm a classpath for the resources target and other subjects. We know that they are
     # reachable from the root (since it was involved in this walk).
@@ -165,9 +182,9 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    self.assertEqual((SelectNode(self.key(self.consumes_managed_thirdparty), Classpath, None, None),
-                      Return(Classpath(creator='javac'))),
-                     walk[0][0])
+    self.assert_root(walk,
+                     SelectNode(self.key(self.consumes_managed_thirdparty), Classpath, None, None),
+                     Classpath(creator='javac'))
 
     # Confirm that we produced classpaths for the managed jars.
     managed_jars = [self.managed_guava,
@@ -187,9 +204,9 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    self.assertEqual((SelectNode(self.key(self.inferred_deps), Classpath, None, None),
-                      Return(Classpath(creator='scalac'))),
-                     walk[0][0])
+    self.assert_root(walk,
+                     SelectNode(self.key(self.inferred_deps), Classpath, None, None),
+                     Classpath(creator='scalac'))
 
     # Confirm that we requested a classpath for the root and inferred targets.
     self.assert_select_for_subjects(walk, Classpath, [self.inferred_deps, self.java_simple])
@@ -200,9 +217,9 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request, failures=True)
 
     # Validate that the root failed.
-    root_node, root_state = walk[0][0]
-    self.assertEqual(SelectNode(self.key(self.java_multi), Classpath, None, None), root_node)
-    self.assertEqual(Throw, type(root_state))
+    self.assert_root_failed(walk,
+                            SelectNode(self.key(self.java_multi), Classpath, None, None),
+                            ConflictingProducersError)
 
   def test_no_variant_thrift(self):
     """No `thrift` variant is configured, and so no configuration is selected."""

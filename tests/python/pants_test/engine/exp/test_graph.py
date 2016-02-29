@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
@@ -79,7 +78,6 @@ class GraphTestBase(unittest.TestCase):
   _goal = 'parse'
   _product = Struct
   _build_root = os.path.dirname(__file__)
-  _cmd_line_spec_parser = CmdLineSpecParser(_build_root)
 
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     subjects = Subjects()
@@ -106,8 +104,7 @@ class GraphTestBase(unittest.TestCase):
 
   def _populate(self, scheduler, address):
     """Execute a BuildRequest to parse the given Address into a Struct."""
-    spec = self._cmd_line_spec_parser.parse_spec(str(address))
-    request = scheduler.build_request(goals=[self._goal], subjects=[spec])
+    request = scheduler.build_request(goals=[self._goal], subjects=[address])
     LocalSerialEngine(scheduler).reduce(request)
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))

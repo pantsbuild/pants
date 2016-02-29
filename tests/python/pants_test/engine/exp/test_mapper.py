@@ -210,11 +210,14 @@ class AddressMapperTest(unittest.TestCase):
 
     # Success.
     self.scheduler.product_graph.clear()
-    self.assertEqual(Struct(name='c', type_alias='struct'), self.resolve(spec).struct)
+    resolved = self.resolve(spec)
+    self.assertEqual(1, len(resolved))
+    self.assertEqual(Struct(name='c', type_alias='struct'), resolved[0].struct)
 
   def test_resolve(self):
     resolved = self.resolve(SingleAddress('a/b', None))
-    self.assertEqual(self.a_b, resolved.address)
+    self.assertEqual(1, len(resolved))
+    self.assertEqual(self.a_b, resolved[0].address)
 
   @staticmethod
   def addr(spec):

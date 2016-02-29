@@ -9,7 +9,6 @@ import os
 import unittest
 from contextlib import closing, contextmanager
 
-from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalMultiprocessEngine, LocalSerialEngine, SerializationError
 from pants.engine.exp.examples.planners import Classpath, setup_json_scheduler
@@ -20,7 +19,6 @@ class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.scheduler = setup_json_scheduler(build_root)
-    self.spec_parser = CmdLineSpecParser(build_root)
 
     self.java = Address.parse('src/java/codegen/simple')
 
@@ -28,8 +26,7 @@ class EngineTest(unittest.TestCase):
     return self.scheduler._subjects.put(subject)
 
   def request(self, goals, *addresses):
-    specs = [self.spec_parser.parse_spec(str(a)) for a in addresses]
-    return self.scheduler.build_request(goals=goals, subjects=specs)
+    return self.scheduler.build_request(goals=goals, subjects=addresses)
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))

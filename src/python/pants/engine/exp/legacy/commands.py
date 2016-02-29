@@ -5,11 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
+import sys
 
 from pants.base.build_environment import get_buildroot
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.base.specs import DescendantAddresses
 from pants.bin.goal_runner import OptionsInitializer
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
@@ -42,13 +42,17 @@ class LegacyTable(SymbolTable):
 def list():
   """Lists all addresses under the current build root."""
 
+  build_root = get_buildroot()
+  cmd_line_spec_parser = CmdLineSpecParser(build_root)
+  spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
+
   subjects = Subjects(debug=False)
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
   project_tree_key = subjects.put(
-      FileSystemProjectTree(get_buildroot()))
+      FileSystemProjectTree(build_root))
   address_mapper_key = subjects.put(
       AddressMapper(symbol_table_cls=symbol_table_cls,
                     parser_cls=LegacyPythonCallbacksParser))
@@ -62,8 +66,8 @@ def list():
     )
   scheduler = LocalScheduler({goal: Address}, tasks, subjects, symbol_table_cls)
 
-  # Execute a request for the root.
-  build_request = scheduler.build_request(goals=[goal], subjects=[DescendantAddresses('')])
+  # Execute a request for the given specs.
+  build_request = scheduler.build_request(goals=[goal], subjects=spec_roots)
   engine = LocalSerialEngine(scheduler)
   engine.start()
   try:
