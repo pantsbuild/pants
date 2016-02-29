@@ -7,9 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import traceback
-from collections import OrderedDict, defaultdict, deque
-
-from twitter.common.collections import OrderedSet
 
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -22,41 +19,11 @@ logger = logging.getLogger(__name__)
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected."""
 
-  def __init__(self, address_mapper):
-    self._address_mapper = address_mapper
-    self.reset()
-
-  @property
-  def address_mapper(self):
-    return self._address_mapper
-
   def reset(self):
+    super(LegacyBuildGraph, self).reset()
     self._addresses_already_closed = set()
-    self._target_by_address = OrderedDict()
-    self._target_dependencies_by_address = defaultdict(OrderedSet)
-    self._target_dependees_by_address = defaultdict(set)
     self._derived_from_by_derivative_address = {}
     self.synthetic_addresses = set()
-
-  def contains_address(self, address):
-    return address in self._target_by_address
-
-  def get_target(self, address):
-    return self._target_by_address.get(address, None)
-
-  def dependencies_of(self, address):
-    assert address in self._target_by_address, (
-      'Cannot retrieve dependencies of {address} because it is not in the BuildGraph.'
-      .format(address=address)
-    )
-    return self._target_dependencies_by_address[address]
-
-  def dependents_of(self, address):
-    assert address in self._target_by_address, (
-      'Cannot retrieve dependents of {address} because it is not in the BuildGraph.'
-      .format(address=address)
-    )
-    return self._target_dependees_by_address[address]
 
   def get_derived_from(self, address):
     parent_address = self._derived_from_by_derivative_address.get(address, address)
@@ -126,55 +93,6 @@ class LegacyBuildGraph(BuildGraph):
     else:
       self._target_dependencies_by_address[dependent].add(dependency)
       self._target_dependees_by_address[dependency].add(dependent)
-
-  def targets(self, predicate=None):
-    return filter(predicate, self._target_by_address.values())
-
-  def walk_transitive_dependency_graph(self, addresses, work, predicate=None, postorder=False):
-    walked = set()
-
-    def _walk_rec(addr):
-      if addr not in walked:
-        walked.add(addr)
-        target = self._target_by_address[addr]
-        if not predicate or predicate(target):
-          if not postorder:
-            work(target)
-          for dep_address in self._target_dependencies_by_address[addr]:
-            _walk_rec(dep_address)
-          if postorder:
-            work(target)
-    for address in addresses:
-      _walk_rec(address)
-
-  def walk_transitive_dependee_graph(self, addresses, work, predicate=None, postorder=False):
-    walked = set()
-
-    def _walk_rec(addr):
-      if addr not in walked:
-        walked.add(addr)
-        target = self._target_by_address[addr]
-        if not predicate or predicate(target):
-          if not postorder:
-            work(target)
-          for dep_address in self._target_dependees_by_address[addr]:
-            _walk_rec(dep_address)
-          if postorder:
-            work(target)
-    for address in addresses:
-      _walk_rec(address)
-
-  def transitive_subgraph_of_addresses_bfs(self, addresses, predicate=None):
-    walked = OrderedSet()
-    to_walk = deque(addresses)
-    while len(to_walk) > 0:
-      address = to_walk.popleft()
-      target = self._target_by_address[address]
-      if target not in walked:
-        if not predicate or predicate(target):
-          walked.add(target)
-          to_walk.extend(self._target_dependencies_by_address[address])
-    return walked
 
   def inject_synthetic_target(self,
                               address,

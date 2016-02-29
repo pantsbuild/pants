@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from abc import abstractmethod, abstractproperty
-from collections import defaultdict
+from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
@@ -56,24 +56,30 @@ class BuildGraph(AbstractClass):
 
     return transitive_subgraph_fn(t.address for t in targets)
 
-  @abstractproperty
+  def __init__(self, address_mapper):
+    self._address_mapper = address_mapper
+    self.reset()
+
+  @property
   def address_mapper(self):
     """
     :API: public
     """
 
-  @abstractmethod
   def reset(self):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies.
 
     :API: public
     """
+    self._target_by_address = OrderedDict()
+    self._target_dependencies_by_address = defaultdict(OrderedSet)
+    self._target_dependees_by_address = defaultdict(set)
 
-  @abstractmethod
   def contains_address(self, address):
     """
     :API: public
     """
+    return address in self._target_by_address
 
   def get_target_from_spec(self, spec, relative_to=''):
     """Converts `spec` into an address and returns the result of `get_target`
@@ -82,14 +88,13 @@ class BuildGraph(AbstractClass):
     """
     return self.get_target(Address.parse(spec, relative_to=relative_to))
 
-  @abstractmethod
   def get_target(self, address):
     """Returns the Target at `address` if it has been injected into the BuildGraph, otherwise None.
 
     :API: public
     """
+    return self._target_by_address.get(address, None)
 
-  @abstractmethod
   def dependencies_of(self, address):
     """Returns the dependencies of the Target at `address`.
 
@@ -97,8 +102,12 @@ class BuildGraph(AbstractClass):
 
     :API: public
     """
+    assert address in self._target_by_address, (
+      'Cannot retrieve dependencies of {address} because it is not in the BuildGraph.'
+      .format(address=address)
+    )
+    return self._target_dependencies_by_address[address]
 
-  @abstractmethod
   def dependents_of(self, address):
     """Returns the Targets which depend on the target at `address`.
 
@@ -106,6 +115,11 @@ class BuildGraph(AbstractClass):
 
     :API: public
     """
+    assert address in self._target_by_address, (
+      'Cannot retrieve dependents of {address} because it is not in the BuildGraph.'
+      .format(address=address)
+    )
+    return self._target_dependees_by_address[address]
 
   @abstractmethod
   def get_derived_from(self, address):
@@ -154,7 +168,6 @@ class BuildGraph(AbstractClass):
     :param Address dependency: The dependency to be injected.
     """
 
-  @abstractmethod
   def targets(self, predicate=None):
     """Returns all the targets in the graph in no particular order.
 
@@ -162,6 +175,7 @@ class BuildGraph(AbstractClass):
 
     :param predicate: A target predicate that will be used to filter the targets returned.
     """
+    return filter(predicate, self._target_by_address.values())
 
   def sorted_targets(self):
     """
@@ -171,7 +185,6 @@ class BuildGraph(AbstractClass):
     """
     return sort_targets(self.targets())
 
-  @abstractmethod
   def walk_transitive_dependency_graph(self, addresses, work, predicate=None, postorder=False):
     """Given a work function, walks the transitive dependency closure of `addresses` using DFS.
 
@@ -187,8 +200,22 @@ class BuildGraph(AbstractClass):
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
       that would only be reachable through Targets that fail the predicate.
     """
+    walked = set()
 
-  @abstractmethod
+    def _walk_rec(addr):
+      if addr not in walked:
+        walked.add(addr)
+        target = self._target_by_address[addr]
+        if not predicate or predicate(target):
+          if not postorder:
+            work(target)
+          for dep_address in self._target_dependencies_by_address[addr]:
+            _walk_rec(dep_address)
+          if postorder:
+            work(target)
+    for address in addresses:
+      _walk_rec(address)
+
   def walk_transitive_dependee_graph(self, addresses, work, predicate=None, postorder=False):
     """Identical to `walk_transitive_dependency_graph`, but walks dependees preorder (or postorder
     if the postorder parameter is True).
@@ -198,6 +225,21 @@ class BuildGraph(AbstractClass):
 
     :API: public
     """
+    walked = set()
+
+    def _walk_rec(addr):
+      if addr not in walked:
+        walked.add(addr)
+        target = self._target_by_address[addr]
+        if not predicate or predicate(target):
+          if not postorder:
+            work(target)
+          for dep_address in self._target_dependees_by_address[addr]:
+            _walk_rec(dep_address)
+          if postorder:
+            work(target)
+    for address in addresses:
+      _walk_rec(address)
 
   def transitive_dependees_of_addresses(self, addresses, predicate=None, postorder=False):
     """Returns all transitive dependees of `address`.
@@ -235,7 +277,6 @@ class BuildGraph(AbstractClass):
                                           postorder=postorder)
     return ret
 
-  @abstractmethod
   def transitive_subgraph_of_addresses_bfs(self, addresses, predicate=None):
     """Returns the transitive dependency closure of `addresses` using BFS.
 
@@ -247,6 +288,16 @@ class BuildGraph(AbstractClass):
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
       that would only be reachable through Targets that fail the predicate.
     """
+    walked = OrderedSet()
+    to_walk = deque(addresses)
+    while len(to_walk) > 0:
+      address = to_walk.popleft()
+      target = self._target_by_address[address]
+      if target not in walked:
+        if not predicate or predicate(target):
+          walked.add(target)
+          to_walk.extend(self._target_dependencies_by_address[address])
+    return walked
 
   @abstractmethod
   def inject_synthetic_target(self,
