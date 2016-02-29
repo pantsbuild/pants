@@ -12,7 +12,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class ListIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
   def do_list(self, success, *args):
-    return self.run_pants(['run', 'src/python/pants/engine/exp/legacy:list', '--'] + list(args))
+    pants_run = self.run_pants(['run', 'src/python/pants/engine/exp/legacy:list', '--'] + list(args))
     if success:
       self.assert_success(pants_run)
     else:
