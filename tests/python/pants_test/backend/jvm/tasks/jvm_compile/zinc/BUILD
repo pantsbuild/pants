@@ -8,6 +8,7 @@ python_tests(
   dependencies=[
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
+  timeout = 300,
   tags = {'integration'},
 )
 
