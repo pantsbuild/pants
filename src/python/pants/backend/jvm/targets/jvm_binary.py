@@ -50,10 +50,7 @@ class JarRule(FingerprintedMixin, AbstractClass):
 
 
 class Skip(JarRule):
-  """A rule that skips adding matched entries to a jar.
-
-  :API: public
-  """
+  """A rule that skips adding matched entries to a jar."""
 
   def __repr__(self):
     return "Skip(apply_pattern={})".format(self.payload.apply_pattern)
