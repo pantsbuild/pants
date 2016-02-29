@@ -17,6 +17,7 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
+    'src/python/pants/build_graph',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:selectors',
     'src/python/pants/util:objects',

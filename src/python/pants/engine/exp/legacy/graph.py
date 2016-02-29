@@ -5,9 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.parsers import LegacyPythonCallbacksParser, TargetAdaptor
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral
 from pants.util.objects import datatype
+
+
+class ExpGraph(BuildGraph):
+  def __init__(self):
+    pass
 
 
 class LegacyBuildGraphNode(datatype('LegacyGraphNode', ['target', 'target_cls', 'dependency_addresses'])):
