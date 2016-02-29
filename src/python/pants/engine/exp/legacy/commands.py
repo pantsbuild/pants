@@ -14,10 +14,10 @@ from pants.bin.goal_runner import OptionsInitializer
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
-from pants.engine.exp.legacy.graph import LegacyBuildGraphNode, create_legacy_graph_tasks
+from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
 from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
 from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.nodes import Return, SelectNode, State, Subjects, Throw
+from pants.engine.exp.nodes import Subjects
 from pants.engine.exp.parsers import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -58,34 +58,19 @@ def list():
 
   # Create a Scheduler containing only the graph tasks, with a single installed goal that
   # requests an Address.
-  goal = 'dependencies'
   tasks = (
       create_legacy_graph_tasks() +
       create_fs_tasks(project_tree_key) +
       create_graph_tasks(address_mapper_key, symbol_table_cls)
     )
-  scheduler = LocalScheduler({goal: LegacyBuildGraphNode}, tasks, subjects, symbol_table_cls)
+  scheduler = LocalScheduler({}, tasks, subjects, symbol_table_cls)
 
   # Execute a request for the given specs.
-  build_request = scheduler.build_request(goals=[goal], subjects=spec_roots)
   engine = LocalSerialEngine(scheduler)
   engine.start()
   try:
-    result = engine.execute(build_request)
+    graph = ExpGraph(address_mapper=None, scheduler=scheduler, engine=engine)
+    for address in graph.inject_specs_closure(spec_roots):
+      print(address)
   finally:
     engine.close()
-
-  if result.error:
-    raise result.error
-
-  # Render all LegacyGraphNodes under the roots.
-  for ((node, state), _) in scheduler.walk_product_graph(build_request):
-    if type(state) is Throw:
-      raise state.exc
-    if type(node) is not SelectNode:
-      continue
-    if node.product is not LegacyBuildGraphNode:
-      continue
-
-    # Print out the Target struct.
-    print(state.value.target)

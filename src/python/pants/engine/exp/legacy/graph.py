@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.parser import TargetAdaptor
+from pants.engine.exp.nodes import Return, SelectNode, State, Throw
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral
 from pants.util.objects import datatype
 
@@ -18,24 +19,33 @@ class ExpGraph(BuildGraph):
   This implementation is backed by a Scheduler that is able to resolve LegacyBuildGraphNodes.
   """
 
-  def __init__(self, address_mapper, scheduler):
+  def __init__(self, address_mapper, scheduler, engine):
     """Construct a graph given an address_mapper and Scheduler.
 
     :param address_mapper: A build_graph.BuildFileAddressMapper (required by the subclass...
       TODO: Deprecate that access point on the subclass and remove.)
     :param scheduler: A Scheduler that is configured to be able to resolve LegacyBuildGraphNodes.
+    :param scheduler: An Engine subclass to execute calls to `inject`.
     """
-    super(self, ExpGraph).__init__(address_mapper)
     self._scheduler = scheduler
     self._graph = scheduler.product_graph
+    self._engine = engine
     self._address_mapper = address_mapper
-    self._reset_private()
+    super(ExpGraph, self).__init__(address_mapper)
+    self.reset()
 
   def reset(self):
     super(ExpGraph, self).reset()
+    self._index(self._graph.completed_nodes().items())
 
+  def _index(self, entries):
+    """Index the given sequence of (node, state) tuples into the storage provided by the base class.
+
+    This is an additive operation: any existing connections involving these nodes are preserved.
+    """
+    addresses = set()
     # Index the ProductGraph.
-    for node, state in self._graph.completed_nodes().items():
+    for node, state in entries:
       # Locate nodes that contain LegacyBuildGraphNode values.
       if node.product is not LegacyBuildGraphNode:
         continue
@@ -51,11 +61,13 @@ class ExpGraph(BuildGraph):
       # We have a successfully parsed LegacyBuildGraphNode.
       target = state.value.target
       address = target.address
+      addresses.add(address)
       self._targets_by_address[address] = target
       dependencies = state.value.dependency_addresses
       self._target_dependencies_by_address[address] = dependencies
       for dependency in dependencies:
-        self._target_dependees_by_address[dependency].add(address)
+         self._target_dependees_by_address[dependency].add(address)
+    return addresses
 
   def get_derived_from(self, address):
     raise ValueError('Not implemented.')
@@ -81,7 +93,15 @@ class ExpGraph(BuildGraph):
     raise ValueError('Not implemented.')
 
   def inject_specs_closure(self, specs, fail_fast=None, spec_excludes=None):
-    pass # TODO
+    # Request loading of these specs.
+    request = self._scheduler.execution_request(products=[LegacyBuildGraphNode], subjects=specs)
+    result = self._engine.execute(request)
+    if result.error:
+      raise result.error
+    # Update the base class indexes for this request.
+    for address in self._index(self._scheduler.root_entries(request).items()):
+      yield address
+
 
 class LegacyBuildGraphNode(datatype('LegacyGraphNode', ['target', 'dependency_addresses'])):
   """A Node to represent a node in the legacy BuildGraph.
