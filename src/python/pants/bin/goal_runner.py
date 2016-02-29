@@ -24,7 +24,7 @@ from pants.bin.repro import Reproducer
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.legacy_build_graph import LegacyBuildGraph
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
 from pants.goal.goal import Goal
@@ -194,7 +194,7 @@ class GoalRunnerFactory(object):
       build_ignore_patterns,
       exclude_target_regexps=self._global_options.exclude_target_regexp
     )
-    self._build_graph = BuildGraph(self._address_mapper)
+    self._build_graph = LegacyBuildGraph(self._address_mapper)
 
   def _get_project_tree(self, build_file_rev):
     """Creates the project tree for build files for use in a given pants run."""
