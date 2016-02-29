@@ -137,6 +137,9 @@ class ProductGraph(object):
         # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
         self._dependencies[dependency]
 
+  def completed_nodes(self):
+    return self._node_results
+
   def dependents(self):
     return self._dependents
 

@@ -55,14 +55,12 @@ def list():
   address_mapper_key = subjects.put(
       AddressMapper(symbol_table_cls=symbol_table_cls,
                     parser_cls=LegacyPythonCallbacksParser))
-  symbol_table_cls_key = subjects.put(
-      symbol_table_cls)
 
   # Create a Scheduler containing only the graph tasks, with a single installed goal that
   # requests an Address.
   goal = 'dependencies'
   tasks = (
-      create_legacy_graph_tasks(symbol_table_cls_key) +
+      create_legacy_graph_tasks() +
       create_fs_tasks(project_tree_key) +
       create_graph_tasks(address_mapper_key, symbol_table_cls)
     )
