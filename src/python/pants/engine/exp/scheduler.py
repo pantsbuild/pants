@@ -195,13 +195,12 @@ class ProductGraph(object):
     self._node_results.clear()
 
 
-class BuildRequest(datatype('BuildRequest', ['goals', 'roots'])):
-  """Describes the user-requested build.
+class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
+  """Holds the roots for an execution, which might have been requested by a user.
 
-  To create a BuildRequest, see `LocalScheduler.build_request`.
+  To create an ExecutionRequest, see `LocalScheduler.build_request` (which performs goal
+  translation) or `LocalScheduler.execution_request`.
 
-  :param goals: The list of goal names supplied on the command line.
-  :type goals: list of string
   :param roots: Root Nodes for this request.
   :type roots: list of :class:`pants.engine.exp.nodes.Node`
   """
@@ -456,12 +455,25 @@ class LocalScheduler(object):
     return self._subjects
 
   def build_request(self, goals, subjects):
-    """Create and return a BuildRequest for the given goals and subjects.
+    """Translate the given goal names into product types, and return an ExecutionRequest.
 
-    The resulting BuildRequest object will contain keys tied to this scheduler's ProductGraph, and
+    :param goals: The list of goal names supplied on the command line.
+    :type goals: list of string
+    :param subjects: A list of Spec and/or PathGlobs objects.
+    :type subjects: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
+       :class:`pants.engine.exp.fs.PathGlobs` objects.
+    :returns: An ExecutionRequest for the given goals and subjects.
+    """
+    return self.execution_request([self._products_by_goal[goal_name] for goal_name in goals],
+                                  subjects)
+
+  def execution_request(self, products, subjects):
+    """Create and return an ExecutionRequest for the given products and subjects.
+
+    The resulting ExecutionRequest object will contain keys tied to this scheduler's ProductGraph, and
     so it will not be directly usable with other scheduler instances without being re-created.
 
-    A BuildRequest for an Address represents exactly one product output, as does SingleAddress. But
+    An ExecutionRequest for an Address represents exactly one product output, as does SingleAddress. But
     we differentiate between them here in order to normalize the output for all Spec objects
     as "list of product".
 
@@ -474,10 +486,9 @@ class LocalScheduler(object):
 
     # Determine the root Nodes for the products and subjects selected by the goals and specs.
     def roots():
-      for goal_name in goals:
-        product = self._products_by_goal[goal_name]
-        for subject in subjects:
-          subject_key = self._subjects.put(subject)
+      for subject in subjects:
+        subject_key = self._subjects.put(subject)
+        for product in products:
           if type(subject) is Address:
             yield SelectNode(subject_key, product, None, None)
           elif type(subject) in [SingleAddress, SiblingAddresses, DescendantAddresses]:
@@ -487,13 +498,13 @@ class LocalScheduler(object):
           else:
             raise ValueError('Unsupported root subject type: {}'.format(subject))
 
-    return BuildRequest(goals, tuple(roots()))
+    return ExecutionRequest(tuple(roots()))
 
   @property
   def product_graph(self):
     return self._product_graph
 
-  def walk_product_graph(self, build_request, predicate=None):
+  def walk_product_graph(self, execution_request, predicate=None):
     """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
 
     Each node entry is actually a tuple of (Node, State), and each yielded value is
@@ -502,12 +513,12 @@ class LocalScheduler(object):
     The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
     that don't match it. The default predicate eliminates all `Noop` subgraphs.
     """
-    for entry in self._product_graph.walk(build_request.roots, predicate=predicate):
+    for entry in self._product_graph.walk(execution_request.roots, predicate=predicate):
       yield entry
 
-  def root_entries(self, build_request):
-    """Returns the roots for the given BuildRequest as a dict from Node to State."""
-    return {root: self._product_graph.state(root) for root in build_request.roots}
+  def root_entries(self, execution_request):
+    """Returns the roots for the given ExecutionRequest as a dict from Node to State."""
+    return {root: self._product_graph.state(root) for root in execution_request.roots}
 
   def _complete_step(self, node, step_result):
     """Given a StepResult for the given Node, complete the step."""
@@ -518,7 +529,7 @@ class LocalScheduler(object):
     # Update the Node's state in the graph.
     self._product_graph.update_state(node, result)
 
-  def schedule(self, build_request):
+  def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
 
     This method should be called by exactly one scheduling thread, but the Step objects returned
@@ -531,7 +542,7 @@ class LocalScheduler(object):
     # A dict from Node to a possibly executing Step. Only one Step exists for a Node at a time.
     outstanding = {}
     # Nodes that might need to have Steps created (after any outstanding Step returns).
-    candidates = set(build_request.roots)
+    candidates = set(execution_request.roots)
 
     # Yield nodes that are ready, and then compute new ones.
     scheduling_iterations = 0
@@ -586,7 +597,7 @@ class LocalScheduler(object):
             len(pg.dependencies()),
             scheduling_iterations,
             self._step_id,
-            sum(1 for _ in pg.walk(build_request.roots)),
+            sum(1 for _ in pg.walk(execution_request.roots)),
             len(self._subjects)))
 
   def validate(self):
