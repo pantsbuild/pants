@@ -159,6 +159,17 @@ class ProductGraph(object):
     return self._cyclic_dependencies[node]
 
   def walk(self, roots, predicate=None):
+    """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
+
+    Each node entry is actually a tuple of (Node, State), and each yielded value is
+    a tuple of (node_entry, dependency_node_entries).
+
+    The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
+    that don't match it. The default predicate eliminates all `Noop` subgraphs.
+
+    TODO: Not very many consumers actually need the dependency list here: should drop it and
+    allow them to request it specifically.
+    """
     def _default_walk_predicate(entry):
       node, state = entry
       cls = type(state)
@@ -503,18 +514,6 @@ class LocalScheduler(object):
   @property
   def product_graph(self):
     return self._product_graph
-
-  def walk_product_graph(self, execution_request, predicate=None):
-    """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
-
-    Each node entry is actually a tuple of (Node, State), and each yielded value is
-    a tuple of (node_entry, dependency_node_entries).
-
-    The given predicate is applied to entries, and eliminates the subgraphs represented by nodes
-    that don't match it. The default predicate eliminates all `Noop` subgraphs.
-    """
-    for entry in self._product_graph.walk(execution_request.roots, predicate=predicate):
-      yield entry
 
   def root_entries(self, execution_request):
     """Returns the roots for the given ExecutionRequest as a dict from Node to State."""

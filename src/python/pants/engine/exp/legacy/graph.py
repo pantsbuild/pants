@@ -36,25 +36,27 @@ class ExpGraph(BuildGraph):
 
   def reset(self):
     super(ExpGraph, self).reset()
-    self._index(self._graph.completed_nodes().items())
+    self._index(self._graph.completed_nodes().keys())
 
-  def _index(self, entries):
-    """Index the given sequence of (node, state) tuples into the storage provided by the base class.
+  def _index(self, roots):
+    """Index from the given roots into the storage provided by the base class.
 
     This is an additive operation: any existing connections involving these nodes are preserved.
     """
     addresses = set()
     # Index the ProductGraph.
-    for node, state in entries:
+    # TODO: It's not very common to actually use the dependencies of a Node during a walk... should
+    # consider removing those from that API.
+    for ((node, state), _) in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyBuildGraphNode values.
       if node.product is not LegacyBuildGraphNode:
         continue
       if type(node) is not SelectNode:
         continue
-      if type(state) in [Throw, Noop]:
+      if type(state) is Throw:
         # TODO: get access to `Subjects` instance in order to `to-str` more effectively here.
         raise AddressLookupError(
-            'Build graph construction failed for {}: {}'.format(node.subject_key, state))
+            'Build graph construction failed for {}:\n  {}'.format(node.subject_key, state.exc))
       elif type(state) is not Return:
         State.raise_unrecognized(state)
 
@@ -62,7 +64,7 @@ class ExpGraph(BuildGraph):
       target = state.value.target
       address = target.address
       addresses.add(address)
-      self._targets_by_address[address] = target
+      self._target_by_address[address] = target
       dependencies = state.value.dependency_addresses
       self._target_dependencies_by_address[address] = dependencies
       for dependency in dependencies:
@@ -99,7 +101,7 @@ class ExpGraph(BuildGraph):
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
-    for address in self._index(self._scheduler.root_entries(request).items()):
+    for address in self._index(request.roots):
       yield address
 
 
