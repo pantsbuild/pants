@@ -16,11 +16,11 @@ from pants.build_graph.build_graph import BuildGraph
 logger = logging.getLogger(__name__)
 
 
-class LegacyBuildGraph(BuildGraph):
+class MutableBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected."""
 
   def reset(self):
-    super(LegacyBuildGraph, self).reset()
+    super(MutableBuildGraph, self).reset()
     self._addresses_already_closed = set()
     self._derived_from_by_derivative_address = {}
     self.synthetic_addresses = set()

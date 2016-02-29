@@ -10,7 +10,7 @@ import unittest
 
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
-from pants.build_graph.legacy_build_graph import LegacyBuildGraph
+from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
 
 
@@ -81,7 +81,7 @@ class BuildFileAliasesTest(unittest.TestCase):
     with self.assertRaises(TypeError):
       BuildFileAliases(targets={'fred': object()})
 
-    target = Target('fred', Address.parse('a:b'), LegacyBuildGraph(address_mapper=None))
+    target = Target('fred', Address.parse('a:b'), MutableBuildGraph(address_mapper=None))
     with self.assertRaises(TypeError):
       BuildFileAliases(targets={'fred': target})
 

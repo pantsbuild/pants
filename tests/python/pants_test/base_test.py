@@ -22,7 +22,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.build_graph.legacy_build_graph import LegacyBuildGraph
+from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
 from pants.goal.goal import Goal
 from pants.source.source_root import SourceRootConfig
@@ -210,7 +210,7 @@ class BaseTest(unittest.TestCase):
     self.project_tree = FileSystemProjectTree(self.build_root)
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, self.project_tree,
                                                  build_ignore_patterns=self.build_ignore_patterns)
-    self.build_graph = LegacyBuildGraph(address_mapper=self.address_mapper)
+    self.build_graph = MutableBuildGraph(address_mapper=self.address_mapper)
 
   def buildroot_files(self, relpath=None):
     """Returns the set of all files under the test build root.
@@ -230,7 +230,7 @@ class BaseTest(unittest.TestCase):
   def reset_build_graph(self):
     """Start over with a fresh build graph with no targets in it."""
     self.address_mapper = BuildFileAddressMapper(self.build_file_parser, FileSystemProjectTree(self.build_root))
-    self.build_graph = LegacyBuildGraph(address_mapper=self.address_mapper)
+    self.build_graph = MutableBuildGraph(address_mapper=self.address_mapper)
 
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
