@@ -48,7 +48,10 @@ scala_build_info = {
 
 
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
-  """A scala platform."""
+  """A scala platform.
+
+  :API: public
+  """
 
   options_scope = 'scala-platform'
 

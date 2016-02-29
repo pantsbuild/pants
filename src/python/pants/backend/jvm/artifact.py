@@ -19,6 +19,8 @@ class Artifact(PayloadField):
   """Represents a publishable jvm artifact ala maven or ivy.
 
   Used in the ``provides`` parameter to *jvm*\_library targets.
+
+  :API: public
   """
 
   def __init__(self, org, name, repo, publication_metadata=None):

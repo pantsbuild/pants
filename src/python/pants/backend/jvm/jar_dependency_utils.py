@@ -38,7 +38,10 @@ class ResolvedJar(object):
 
 
 class M2Coordinate(object):
-  """Represents a fully qualified name of an artifact."""
+  """Represents a fully qualified name of an artifact.
+
+  :API: public
+  """
 
   def __init__(self, org, name, rev=None, classifier=None, ext=None):
     """
@@ -62,6 +65,8 @@ class M2Coordinate(object):
   @classmethod
   def create(cls, jar):
     """Creates an actual M2Coordinate from the given M2Coordinate-like object (eg a JarDependency).
+
+    :API: public
 
     :param JarDependency jar: the input coordinate.
     :return: A new M2Coordinate, unless the input is already an M2Coordinate in which case it just
@@ -88,6 +93,8 @@ class M2Coordinate(object):
   @memoized_property
   def artifact_filename(self):
     """Returns the canonical maven-style filename for an artifact pointed at by this coordinate.
+
+    :API: public
 
     :rtype: string
     """

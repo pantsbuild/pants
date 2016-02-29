@@ -9,7 +9,10 @@ from pants.backend.jvm.targets.jvm_target import JvmTarget
 
 
 class ExportableJvmLibrary(JvmTarget):
-  """A baseclass for java targets that support being exported to an artifact repository."""
+  """A baseclass for java targets that support being exported to an artifact repository.
+
+  :API: public
+  """
 
   def __init__(self, *args, **kwargs):
     """

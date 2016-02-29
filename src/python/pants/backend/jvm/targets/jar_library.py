@@ -17,7 +17,10 @@ from pants.build_graph.target import Target
 
 
 class JarLibrary(Target):
-  """A set of external JAR files."""
+  """A set of external JAR files.
+
+  :API: public
+  """
 
   class WrongTargetTypeError(Exception):
     """Thrown if the wrong type of target is encountered."""
@@ -48,7 +51,10 @@ class JarLibrary(Target):
 
   @property
   def managed_dependencies(self):
-    """The managed_jar_dependencies target this jar_library specifies, or None."""
+    """The managed_jar_dependencies target this jar_library specifies, or None.
+
+    :API: public
+    """
     if self.payload.managed_dependencies:
       address = Address.parse(self.payload.managed_dependencies,
                               relative_to=self.address.spec_path)
@@ -58,10 +64,16 @@ class JarLibrary(Target):
 
   @property
   def jar_dependencies(self):
+    """
+    :API: public
+    """
     return self.payload.jars
 
   @property
   def excludes(self):
+    """
+    :API: public
+    """
     return self.payload.excludes
 
   @staticmethod
@@ -69,6 +81,8 @@ class JarLibrary(Target):
     """Convenience method to resolve a list of specs to JarLibraries and return its jars attributes.
 
     Expects that the jar_libraries are declared relative to this target.
+
+    :API: public
 
     :param Address relative_to: address target that references jar_library_specs, for
       error messages

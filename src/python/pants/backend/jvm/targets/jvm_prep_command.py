@@ -33,6 +33,8 @@ class JvmPrepCommand(JvmTarget):
   Pants will execute the `jvm_prep_command()` when processing the specified goal.  They will be
   triggered when running targets that depend on the `prep_command()` target or when the
   target is referenced from the command line.
+
+  :API: public
   """
   _goals=frozenset()
 

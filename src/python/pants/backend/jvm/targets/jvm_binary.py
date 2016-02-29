@@ -50,7 +50,10 @@ class JarRule(FingerprintedMixin, AbstractClass):
 
 
 class Skip(JarRule):
-  """A rule that skips adding matched entries to a jar."""
+  """A rule that skips adding matched entries to a jar.
+
+  :API: public
+  """
 
   def __repr__(self):
     return "Skip(apply_pattern={})".format(self.payload.apply_pattern)
@@ -154,6 +157,8 @@ class JarRules(FingerprintedMixin):
   such that there are no duplicates in the final deploy jar.  The four
   `Duplicate <#Duplicate>`_ rules support resolution of these cases by allowing 1st wins,
   last wins, concatenation of the duplicate entry contents or raising an exception.
+
+  :API: public
   """
 
   @classmethod
@@ -194,6 +199,8 @@ class JarRules(FingerprintedMixin):
 
     Can be set with `set_default` but otherwise defaults to
     `skip_signatures_and_duplicates_concat_well_known_metadata`.
+
+    :API: public
     """
     if cls._DEFAULT is None:
       cls._DEFAULT = cls.skip_signatures_and_duplicates_concat_well_known_metadata()
@@ -222,7 +229,10 @@ class JarRules(FingerprintedMixin):
 
   @property
   def default_dup_action(self):
-    """The default action to take when a duplicate jar entry is encountered."""
+    """The default action to take when a duplicate jar entry is encountered.
+
+    :API: public
+    """
     return self.payload.default_dup_action
 
   @property
@@ -285,6 +295,8 @@ class JvmBinary(JvmTarget):
   * ``binary`` - Create an executable jar of the binary. On the JVM
     this means the jar has a manifest specifying the main class.
   * ``run`` - Executes the main class of this binary locally.
+
+  :API: public
   """
 
   def __init__(self,
@@ -300,6 +312,8 @@ class JvmBinary(JvmTarget):
                shading_rules=None,
                **kwargs):
     """
+    :API: public
+
     :param string main: The name of the ``main`` class, e.g.,
       ``'org.pantsbuild.example.hello.main.HelloMain'``. This class may be
       present as the source of this target or depended-upon library.

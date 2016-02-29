@@ -14,7 +14,10 @@ from pants.util.memo import memoized_property
 
 
 class JarDependency(object):
-  """A pre-built Maven repository dependency."""
+  """A pre-built Maven repository dependency.
+
+  :API: public
+  """
 
   def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
                classifier=None, mutable=None, intransitive=False, excludes=None):
