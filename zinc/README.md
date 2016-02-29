@@ -21,9 +21,9 @@ Zinc is built using pants:
 
 To build a jar use:
 
-    ./pants binary.dup --excludes="['rootdoc.txt']" zinc:
+    ./pants binary.dup --exclude-files="['rootdoc.txt']" zinc
 
-To consume a jar, change the zinc target in BUILD.tools. To force pants to re-resolve
+To consume a jar, add a zinc target in BUILD.tools. To force pants to re-resolve
 and re-shade the artifact, use a new `rev` whenever the artifact has changed.
 
     jar_library(name = 'zinc',
