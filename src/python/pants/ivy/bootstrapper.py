@@ -157,4 +157,5 @@ class Bootstrapper(object):
 
     return Ivy(bootstrap_jar_path,
                ivy_settings=self._ivy_subsystem.get_options().ivy_settings,
-               ivy_cache_dir=self._ivy_subsystem.get_options().cache_dir)
+               ivy_cache_dir=self._ivy_subsystem.get_options().cache_dir,
+               extra_jvm_options=self._ivy_subsystem.extra_jvm_options())
