@@ -286,8 +286,6 @@ class IvyUtils(object):
   def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
     """Symlinks all paths listed in inpath that are under ivy_cache_dir into symlink_dir.
 
-    :API: public
-
     If there is an existing symlink for a file under inpath, it is used rather than creating
     a new symlink. Preserves all other paths. Writes the resulting paths to outpath.
     Returns a map of path -> symlink to that path.
@@ -330,9 +328,6 @@ class IvyUtils(object):
 
   @staticmethod
   def identify(targets):
-    """
-    :API: public
-    """
     targets = list(targets)
     if len(targets) == 1 and targets[0].is_jvm and getattr(targets[0], 'provides', None):
       return targets[0].provides.org, targets[0].provides.name
@@ -400,9 +395,6 @@ class IvyUtils(object):
   @classmethod
   def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
                    pinned_artifacts=None):
-    """
-    :API: public
-    """
     if resolve_hash_name:
       org = IvyUtils.INTERNAL_ORG_NAME
       name = resolve_hash_name
@@ -472,8 +464,6 @@ class IvyUtils(object):
     It also modifies the JarDependency objects' excludes to contain all the jars excluded by
     provides.
 
-    :API: public
-
     :param iterable targets: List of targets to collect JarDependencies and excludes from.
 
     :returns: A pair of a list of JarDependencies, and a set of excludes to apply globally.
@@ -502,25 +492,16 @@ class IvyUtils(object):
                                                                         proposed=jar)
 
     def collect_jars(target):
-      """
-      :API: public
-      """
       if isinstance(target, JarLibrary):
         for jar in target.jar_dependencies:
           add_jar(jar)
 
     def collect_excludes(target):
-      """
-      :API: public
-      """
       target_excludes = target.payload.get_field_value('excludes')
       if target_excludes:
         global_excludes.update(target_excludes)
 
     def collect_provide_excludes(target):
-      """
-      :API: public
-      """
       if not target.is_exported:
         return
       logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
@@ -528,9 +509,6 @@ class IvyUtils(object):
       provide_excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
 
     def collect_elements(target):
-      """
-      :API: public
-      """
       targets_processed.add(target)
       collect_jars(target)
       collect_excludes(target)
