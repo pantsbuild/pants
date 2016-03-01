@@ -17,6 +17,7 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
+    ':parser',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:graph',
@@ -30,6 +31,8 @@ python_library(
   sources=['commands.py'],
   dependencies=[
     '3rdparty/python:beautifulsoup4',  # This is needed to satisfy pants-plugins deps.
+    ':graph',
+    ':parser',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:specs',
     'src/python/pants/bin',

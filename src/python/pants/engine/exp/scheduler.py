@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import sys
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -597,7 +598,8 @@ class LocalScheduler(object):
             scheduling_iterations,
             self._step_id,
             sum(1 for _ in pg.walk(execution_request.roots)),
-            len(self._subjects)))
+            len(self._subjects)),
+          file=sys.stderr)
 
   def validate(self):
     """Validates the generated product graph with the configured GraphValidator."""

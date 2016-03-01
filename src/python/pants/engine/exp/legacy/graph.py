@@ -67,7 +67,7 @@ class ExpGraph(BuildGraph):
       dependencies = state.value.dependency_addresses
       self._target_dependencies_by_address[address] = dependencies
       for dependency in dependencies:
-         self._target_dependees_by_address[dependency].add(address)
+        self._target_dependees_by_address[dependency].add(address)
     return addresses
 
   def _instantiate_target(self, target_adaptor):
@@ -94,19 +94,19 @@ class ExpGraph(BuildGraph):
 
   @property
   def address_mapper(self):
-    raise ValueError('Not implemented.')
+    raise NotImplemented('Not implemented.')
 
   def get_derived_from(self, address):
-    raise ValueError('Not implemented.')
+    raise NotImplemented('Not implemented.')
 
   def get_concrete_derived_from(self, address):
-    raise ValueError('Not implemented.')
+    raise NotImplemented('Not implemented.')
 
   def inject_target(self, target, dependencies=None, derived_from=None, synthetic=False):
-    raise ValueError('Not implemented.')
+    raise NotImplemented('Not implemented.')
 
   def inject_dependency(self, dependent, dependency):
-    raise ValueError('Not implemented.')
+    raise NotImplemented('Not implemented.')
 
   def inject_synthetic_target(self,
                               address,
@@ -114,10 +114,10 @@ class ExpGraph(BuildGraph):
                               dependencies=None,
                               derived_from=None,
                               **kwargs):
-    raise ValueError('Not implemented.')
+    raise NotImplemented('Not implemented.')
 
   def inject_address_closure(self, address):
-    raise ValueError('Not implemented.')
+    raise NotImplemented('Not implemented.')
 
   def inject_specs_closure(self, specs, fail_fast=None, spec_excludes=None):
     # Request loading of these specs.

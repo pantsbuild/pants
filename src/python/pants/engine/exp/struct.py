@@ -341,7 +341,7 @@ class Variants(Struct):
     merged = dict(left)
     for key, value in right:
       merged[key] = value
-    return tuple(sorted(merged.items(), key=lambda x: x[0]))
+    return tuple(sorted(merged.items()))
 
   def __init__(self, default=None, **kwargs):
     """
