@@ -46,6 +46,7 @@ class PythonCheckStyleTask(PythonTask):
     super(PythonCheckStyleTask, self).__init__(*args, **kwargs)
     self._plugins = [plugin for plugin in self._plugins if not plugin.skip()]
     self.options = self.get_options()
+    self.excluder = FileExcluder(self.options.suppress, self.context.log)
 
   @classmethod
   def global_subsystems(cls):
@@ -98,9 +99,8 @@ class PythonCheckStyleTask(PythonTask):
 
     if self.options.suppress:
       # Filter out any suppressed plugins
-      excluder = FileExcluder(self.options.suppress, self.context.log)
       check_plugins = [plugin for plugin in self._plugins
-                       if excluder.should_include(python_file.filename, plugin.name)]
+                       if self.excluder.should_include(python_file.filename, plugin.name)]
     else:
       check_plugins = self._plugins
 
