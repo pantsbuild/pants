@@ -130,9 +130,24 @@ class UnpackLibrariesTest(TestAndroidBase):
         self.assertTrue(isinstance(created_library, AndroidLibrary))
         self.assertEqual(android_library.payload.include_patterns, created_library.payload.include_patterns)
         self.assertEqual(android_library.payload.exclude_patterns, created_library.payload.exclude_patterns)
-        self.assertEqual(len(created_library.dependencies), 2)
-        for dep in created_library.dependencies:
-          self.assertTrue(isinstance(dep, AndroidResources) or isinstance(dep, JarLibrary))
+        self.assertEqual(len(created_library.dependencies), 1)
+        self.assertTrue(isinstance(created_library.dependencies[0], AndroidResources))
+
+  def test_create_android_library_dependency_injection(self):
+    with self.android_library() as android_library:
+      with self.android_binary(dependencies=[android_library]) as android_binary:
+        with temporary_dir() as temp:
+          self.assertEqual([android_library], android_binary.dependencies)
+
+          contents = self.unpacked_aar_library(temp)
+          task = self.create_task(self.context())
+          coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
+          task.create_android_library_target(android_library, coordinate, contents)
+
+          # Make sure that a JarLibrary has been injected into the android_binary deps.
+          self.assertTrue(any(isinstance(x, JarLibrary) for x in android_binary.dependencies))
+          for dep in android_binary.dependencies:
+            self.assertTrue(isinstance(dep, AndroidLibrary) or isinstance(dep, JarLibrary))
 
   def test_no_classes_jar(self):
     with self.android_library(include_patterns=['**/*.class']) as android_library:

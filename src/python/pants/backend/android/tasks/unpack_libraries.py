@@ -148,7 +148,12 @@ class UnpackLibraries(Task):
     if os.path.isdir(resource_dir):
       deps.append(self.create_resource_target(target, coordinate, manifest, resource_dir))
     if os.path.isfile(jar_file):
-      deps.append(self.create_classes_jar_target(target, coordinate, jar_file))
+      # TODO(mateo): This is not strictly correct and needs to be rethought. The correct thing is to operate over
+      # AndroidBinary targets instead - if a library depends on another library then our dependency inferral breaks.
+      # As it stands, the only way to get around this is to manually add the 3rdparty jar to the dependencies of the
+      # android_binary (see :hello_with_library example).
+      for dependent in target.dependents:
+        dependent.inject_dependency(self.create_classes_jar_target(target, coordinate, jar_file).address)
 
     address = Address(self.workdir, '{}-android_library'.format(coordinate.artifact_filename))
     new_target = self.context.add_new_target(address, AndroidLibrary,
@@ -169,7 +174,6 @@ class UnpackLibraries(Task):
       elif 'aar' == coordinate.ext:
         unpacked_aar_destination = self.unpacked_aar_location(coordinate)
         jar_file = os.path.join(unpacked_aar_destination, 'classes.jar')
-
         # Unpack .aar files.
         if coordinate not in self._unpacked_archives:
           ZIP.extract(aar_or_jar, unpacked_aar_destination)

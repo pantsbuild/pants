@@ -4,18 +4,18 @@
 
 android_dependency(name='android-support-v4',
   jars = [
-    jar(org='com.android.support', name='support-v4', rev='22.0.0'),
+    jar(org='com.android.support', name='support-v4', rev='22.0.0', ext='aar'),
   ],
 )
 
 android_dependency(name='appcompat-v7',
   jars = [
-    jar(org='com.android.support', name='appcompat-v7', rev='22.0.0'),
+    jar(org='com.android.support', name='appcompat-v7', rev='22.0.0', ext='aar'),
   ],
 )
 
 android_dependency(name='google-play-services',
   jars=[
-    jar(org='com.google.android.gms', name='play-services', rev='7.0.0'),
+    jar(org='com.google.android.gms', name='play-services', rev='7.0.0', ext='aar'),
   ],
 )
