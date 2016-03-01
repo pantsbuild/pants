@@ -11,8 +11,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class ListIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
-  def do_list(self, success, *args):
-    pants_run = self.run_pants(['run', 'src/python/pants/engine/exp/legacy:list', '--'] + list(args))
+  def do_deps(self, success, *args):
+    args = ['run', 'src/python/pants/engine/exp/legacy:dependencies', '--'] + list(args)
+    pants_run = self.run_pants(args)
     if success:
       self.assert_success(pants_run)
     else:
@@ -20,13 +21,13 @@ class ListIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
     return pants_run
 
   def test_single(self):
-    self.do_list(True, '3rdparty:guava')
+    self.do_deps(True, '3rdparty:guava')
 
   def test_missing(self):
-    self.do_list(False, '3rdparty:wait_seriously_there_is_a_library_named_that')
+    self.do_deps(False, '3rdparty:wait_seriously_there_is_a_library_named_that')
 
   def test_siblings(self):
-    self.do_list(True, '3rdparty:')
+    self.do_deps(True, '3rdparty:')
 
   def test_descendants(self):
-    self.do_list(True, '3rdparty::')
+    self.do_deps(True, '3rdparty::')

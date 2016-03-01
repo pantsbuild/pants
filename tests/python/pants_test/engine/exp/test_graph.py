@@ -10,7 +10,8 @@ import unittest
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import Exactly, addressable, addressable_dict
+from pants.engine.exp.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
+                                          addressable_list)
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
@@ -19,8 +20,19 @@ from pants.engine.exp.nodes import Noop, Return, Subjects, Throw
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
 from pants.engine.exp.scheduler import LocalScheduler
-from pants.engine.exp.struct import Struct, StructWithDeps
-from pants.engine.exp.targets import Target
+from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps
+
+
+class Target(Struct, HasStructs):
+  collection_field = 'configurations'
+
+  def __init__(self, name=None, configurations=None, **kwargs):
+    super(Target, self).__init__(name=name, **kwargs)
+    self.configurations = configurations
+
+  @addressable_list(SubclassesOf(Struct))
+  def configurations(self):
+    pass
 
 
 class ApacheThriftConfiguration(StructWithDeps):
@@ -75,7 +87,6 @@ class TestTable(SymbolTable):
 
 
 class GraphTestBase(unittest.TestCase):
-  _goal = 'parse'
   _product = Struct
   _build_root = os.path.dirname(__file__)
 
@@ -94,7 +105,7 @@ class GraphTestBase(unittest.TestCase):
         create_fs_tasks(project_tree_key) +
         create_graph_tasks(address_mapper_key, symbol_table_cls)
       )
-    return LocalScheduler({self._goal: self._product},
+    return LocalScheduler(dict(),
                           tasks,
                           subjects,
                           symbol_table_cls)
@@ -103,8 +114,8 @@ class GraphTestBase(unittest.TestCase):
     return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
 
   def _populate(self, scheduler, address):
-    """Execute a BuildRequest to parse the given Address into a Struct."""
-    request = scheduler.build_request(goals=[self._goal], subjects=[address])
+    """Perform an ExecutionRequest to parse the given Address into a Struct."""
+    request = scheduler.execution_request(products=[self._product], subjects=[address])
     LocalSerialEngine(scheduler).reduce(request)
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))

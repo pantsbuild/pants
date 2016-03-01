@@ -14,8 +14,15 @@ from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.parse_context import ParseContext
 from pants.engine.exp.objects import Serializable
 from pants.engine.exp.parsers import Parser
-from pants.engine.exp.targets import Target
+from pants.engine.exp.struct import StructWithDeps
 from pants.util.memo import memoized_method, memoized_property
+
+
+class TargetAdaptor(StructWithDeps):
+  """A Struct to imitate the existing Target.
+
+  Extending StructWithDeps causes the class to have a `dependencies` field marked Addressable.
+  """
 
 
 class LegacyPythonCallbacksParser(Parser):
@@ -51,7 +58,7 @@ class LegacyPythonCallbacksParser(Parser):
     symbols = global_symbols.copy()
     for alias, target_macro_factory in aliases.target_macro_factories.items():
       for target_type in target_macro_factory.target_types:
-        symbols[target_type] = Target
+        symbols[target_type] = TargetAdaptor
 
     parse_context = ParseContext(rel_path=os.path.dirname(path),
                                  type_aliases=symbols)
@@ -63,7 +70,7 @@ class LegacyPythonCallbacksParser(Parser):
       target_macro = target_macro_factory.target_macro(parse_context)
       per_path_symbols[alias] = target_macro
       for target_type in target_macro_factory.target_types:
-        per_path_symbols[target_type] = Target
+        per_path_symbols[target_type] = TargetAdaptor
 
     return per_path_symbols
 

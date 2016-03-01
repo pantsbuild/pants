@@ -17,7 +17,7 @@ import six
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
 from pants.engine.exp.objects import SerializationError
-from pants.engine.exp.targets import Target, Variants
+from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -261,9 +261,9 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
       # Check whether the subject is-a instance of the product.
       yield candidate
       # Else, check whether it has-a instance of the product.
-      if isinstance(candidate, Target):
-        for configuration in candidate.configurations:
-          yield configuration
+      if isinstance(candidate, HasStructs):
+        for subject in getattr(candidate, candidate.collection_field):
+          yield subject
 
     # TODO: returning only the first literal configuration of a given type/variant. Need to
     # define mergeability for products.
