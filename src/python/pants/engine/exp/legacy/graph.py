@@ -49,16 +49,16 @@ class ExpGraph(BuildGraph):
     # consider removing those from that API.
     for ((node, state), _) in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyBuildGraphNode values.
-      if node.product is not LegacyBuildGraphNode:
-        continue
-      if type(node) is not SelectNode:
-        continue
       if type(state) is Throw:
         # TODO: get access to `Subjects` instance in order to `to-str` more effectively here.
         raise AddressLookupError(
             'Build graph construction failed for {}:\n  {}'.format(node.subject_key, state.exc))
       elif type(state) is not Return:
         State.raise_unrecognized(state)
+      if node.product is not LegacyBuildGraphNode:
+        continue
+      if type(node) is not SelectNode:
+        continue
 
       # We have a successfully parsed LegacyBuildGraphNode.
       target = state.value.target
