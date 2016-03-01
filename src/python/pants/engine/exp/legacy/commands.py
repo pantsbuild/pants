@@ -38,8 +38,8 @@ class LegacyTable(SymbolTable):
     return {alias: TargetAdaptor for alias in cls.aliases().target_types}
 
 
-def list():
-  """Lists all addresses under the current build root."""
+def dependencies():
+  """Lists the transitive dependencies of targets under the current build root."""
 
   build_root = get_buildroot()
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
@@ -69,11 +69,7 @@ def list():
   engine = LocalSerialEngine(scheduler)
   engine.start()
   try:
-    # TODO: It is not necessary to transitively parse the graph in order to execute list: the
-    # resulting graph contains enough information to render `dependencies`, but then only displays
-    # the roots. `list` would be more efficiently accomplished by requesting `Address` objects,
-    # rather than Legacy*Nodes (which trigger recursive walks in `create_legacy_graph_tasks`).
-    graph = ExpGraph(scheduler, engine)
+    graph = ExpGraph(scheduler, engine, symbol_table_cls)
     for address in graph.inject_specs_closure(spec_roots):
       print(address)
   finally:

@@ -17,6 +17,7 @@ python_library(
   name='graph',
   sources=['graph.py'],
   dependencies=[
+    'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:selectors',
@@ -40,8 +41,8 @@ python_library(
 )
 
 python_binary(
-  name='list',
-  entry_point='pants.engine.exp.legacy.commands:list',
+  name='dependencies',
+  entry_point='pants.engine.exp.legacy.commands:dependencies',
   dependencies=[
     ':commands'
   ]

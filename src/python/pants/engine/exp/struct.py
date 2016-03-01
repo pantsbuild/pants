@@ -29,11 +29,15 @@ class Struct(Serializable, SerializableFactory, Validatable):
   """
 
   # Fields dealing with inheritance.
-  _INHERITANCE_FIELDS = ('extends', 'merges')
+  _INHERITANCE_FIELDS = {'extends', 'merges'}
   # The type alias for an instance overwrites any inherited type_alias field.
   _TYPE_ALIAS_FIELD = 'type_alias'
+  # The field that indicates whether a Struct is abstract (and should thus skip validation).
+  _ABSTRACT_FIELD = 'abstract'
   # Fields that should not be inherited.
-  _UNINHERITABLE_FIELDS = _INHERITANCE_FIELDS + (_TYPE_ALIAS_FIELD,)
+  _UNINHERITABLE_FIELDS = _INHERITANCE_FIELDS | {_TYPE_ALIAS_FIELD, _ABSTRACT_FIELD}
+  # Fields that are only intended for consumption by the Struct baseclass.
+  _INTERNAL_FIELDS = _INHERITANCE_FIELDS | {_ABSTRACT_FIELD}
 
   def __init__(self, abstract=False, extends=None, merges=None, type_alias=None, **kwargs):
     """Creates a new struct data blob.
@@ -88,6 +92,14 @@ class Struct(Serializable, SerializableFactory, Validatable):
                                      .format(self.address, self.name))
       self._kwargs['name'] = target_name
 
+  def kwargs(self):
+    """Returns a dict of the kwargs for this Struct which were not interpreted by the baseclass.
+
+    This excludes fields like `extends`, `merges`, and `abstract`, which are consumed by
+    SerializableFactory.create and Validatable.validate.
+    """
+    return {k: v for k, v in self._kwargs.items() if k not in self._INTERNAL_FIELDS}
+
   @property
   def name(self):
     """Return the name of this object, if any.
@@ -136,7 +148,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
 
     :rtype: bool
     """
-    return self._kwargs['abstract']
+    return self._kwargs.get('abstract', False)
 
   # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
   # our superclasses logically provide fields within this constrained set.

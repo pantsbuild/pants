@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.parser import TargetAdaptor
@@ -19,7 +20,7 @@ class ExpGraph(BuildGraph):
   This implementation is backed by a Scheduler that is able to resolve LegacyBuildGraphNodes.
   """
 
-  def __init__(self, scheduler, engine):
+  def __init__(self, scheduler, engine, symbol_table_cls):
     """Construct a graph given an address_mapper and Scheduler.
 
     :param scheduler: A Scheduler that is configured to be able to resolve LegacyBuildGraphNodes.
@@ -27,6 +28,7 @@ class ExpGraph(BuildGraph):
     """
     self._scheduler = scheduler
     self._graph = scheduler.product_graph
+    self._target_types = symbol_table_cls.aliases().target_types
     self._engine = engine
     super(ExpGraph, self).__init__()
 
@@ -57,15 +59,39 @@ class ExpGraph(BuildGraph):
         continue
 
       # We have a successfully parsed a LegacyBuildGraphNode.
-      target = state.value.target
-      address = target.address
+      target_adaptor = state.value.target_adaptor
+      address = target_adaptor.address
       addresses.add(address)
-      self._target_by_address[address] = target
+      if address not in self._target_by_address:
+        self._target_by_address[address] = self._instantiate_target(target_adaptor)
       dependencies = state.value.dependency_addresses
       self._target_dependencies_by_address[address] = dependencies
       for dependency in dependencies:
          self._target_dependees_by_address[dependency].add(address)
     return addresses
+
+  def _instantiate_target(self, target_adaptor):
+    """Given a TargetAdaptor struct previously parsed from a BUILD file, instantiate a Target.
+
+    TODO: This assumes that the SymbolTable used for parsing matches the SymbolTable passed
+    to this graph. Would be good to make that more explicit, but it might be better to nuke
+    the Target subclassing pattern instead, and lean further into the "configuration composition"
+    model explored in the `exp` package.
+    """
+    target_cls = self._target_types[target_adaptor.type_alias]
+    try:
+      # Pop dependencies, which was already consumed while constructing LegacyBuildGraphNode.
+      kwargs = target_adaptor.kwargs()
+      kwargs.pop('dependencies')
+      # Instantiate.
+      return target_cls(build_graph=self, **kwargs)
+    #except Exception as e:
+    #  #raise TargetDefinitionException(
+    #  #    target_adaptor.address,
+    #  #    'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
+    #  raise e
+    except TargetDefinitionException:
+      raise
 
   @property
   def address_mapper(self):
@@ -105,7 +131,7 @@ class ExpGraph(BuildGraph):
       yield address
 
 
-class LegacyBuildGraphNode(datatype('LegacyGraphNode', ['target', 'dependency_addresses'])):
+class LegacyBuildGraphNode(datatype('LegacyGraphNode', ['target_adaptor', 'dependency_addresses'])):
   """A Node to represent a node in the legacy BuildGraph.
 
   A facade implementing the legacy BuildGraph would inspect only these entries in the ProductGraph.
@@ -116,7 +142,7 @@ def reify_legacy_graph(legacy_target, dependency_nodes):
   """Given a TargetAdaptor and LegacyBuildGraphNodes for its deps, return a LegacyBuildGraphNode."""
   # Instantiate the Target from the TargetAdaptor struct.
   target = legacy_target
-  return LegacyBuildGraphNode(target, [node.target.address for node in dependency_nodes])
+  return LegacyBuildGraphNode(target, [node.target_adaptor.address for node in dependency_nodes])
 
 
 def create_legacy_graph_tasks():
