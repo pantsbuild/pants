@@ -61,7 +61,7 @@ class SchedulerTest(unittest.TestCase):
     predicate = (lambda _: True) if failures else None
     result = self.engine.execute(build_request)
     self.assertIsNone(result.error)
-    return list(self.scheduler.walk_product_graph(build_request, predicate=predicate))
+    return list(self.scheduler.product_graph.walk(build_request.roots, predicate=predicate))
 
   def request(self, goals, *addresses):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])

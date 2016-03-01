@@ -62,18 +62,18 @@ class Engine(AbstractClass):
     """
     self._scheduler = scheduler
 
-  def execute(self, build_request):
+  def execute(self, execution_request):
     """Executes the requested build.
 
-    :param build_request: The description of the goals to achieve.
-    :type build_request: :class:`BuildRequest`
+    :param execution_request: The description of the goals to achieve.
+    :type execution_request: :class:`ExecutionRequest`
     :returns: The result of the run.
     :rtype: :class:`Engine.Result`
     """
     try:
-      self.reduce(build_request)
+      self.reduce(execution_request)
       self._scheduler.validate()
-      return self.Result.finished(self._scheduler.root_entries(build_request))
+      return self.Result.finished(self._scheduler.root_entries(execution_request))
     except TaskError as e:
       return self.Result.failure(e)
 
@@ -86,11 +86,11 @@ class Engine(AbstractClass):
     pass
 
   @abstractmethod
-  def reduce(self, build_request):
+  def reduce(self, execution_request):
     """Reduce the given execution graph returning its root products.
 
-    :param build_request: The description of the goals to achieve.
-    :type build_request: :class:`BuildRequest`
+    :param execution_request: The description of the goals to achieve.
+    :type execution_request: :class:`ExecutionRequest`
     :returns: The root products promised by the execution graph.
     :rtype: dict of (:class:`Promise`, product)
     """
@@ -99,10 +99,10 @@ class Engine(AbstractClass):
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
-  def reduce(self, build_request):
+  def reduce(self, execution_request):
     node_builder = self._scheduler.node_builder()
     subjects = self._scheduler.subjects()
-    for step_batch in self._scheduler.schedule(build_request):
+    for step_batch in self._scheduler.schedule(execution_request):
       for step, promise in step_batch:
         promise.success(step(node_builder, subjects))
 
@@ -169,7 +169,7 @@ class LocalMultiprocessEngine(Engine):
   def start(self):
     self._pool.start()
 
-  def reduce(self, build_request):
+  def reduce(self, execution_request):
     # Step instances which have not been submitted yet.
     # TODO: Scheduler now only sends work once, so a deque should be fine here.
     pending_submission = OrderedSet()
@@ -201,7 +201,7 @@ class LocalMultiprocessEngine(Engine):
     # The main reduction loop:
     # 1. Whenever we don't have enough work to saturate the pool, request more.
     # 2. Whenever the pool is not saturated, submit currently pending work.
-    for step_batch in self._scheduler.schedule(build_request):
+    for step_batch in self._scheduler.schedule(execution_request):
       if not step_batch:
         # A batch should only be empty if all dependency work is currently blocked/running.
         if not in_flight and not pending_submission:

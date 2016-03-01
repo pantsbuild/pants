@@ -17,7 +17,6 @@ from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
 from pants.engine.exp.fs import PathGlobs
 from pants.engine.exp.nodes import Noop, SelectNode, TaskNode, Throw
-from pants.engine.exp.scheduler import BuildRequest
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
@@ -70,7 +69,7 @@ def create_digraph(scheduler, request):
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state), dependency_entries) in scheduler.walk_product_graph(request):
+  for ((node, node_state), dependency_entries) in scheduler.product_graph.walk(request.roots):
     node_str = format_node(node, node_state)
 
     yield (' "{node}" [style=filled, fillcolor={color}];'
@@ -96,13 +95,13 @@ def visualize_execution_graph(scheduler, request):
 
 def visualize_build_request(build_root, goals, subjects):
   scheduler = setup_json_scheduler(build_root)
-  build_request = scheduler.build_request(goals, subjects)
+  execution_request = scheduler.build_request(goals, subjects)
   # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
   engine = LocalSerialEngine(scheduler)
   engine.start()
   try:
-    engine.reduce(build_request)
-    visualize_execution_graph(scheduler, build_request)
+    engine.reduce(execution_request)
+    visualize_execution_graph(scheduler, execution_request)
     scheduler.validate()
   finally:
     engine.close()

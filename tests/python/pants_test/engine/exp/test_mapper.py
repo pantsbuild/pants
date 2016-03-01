@@ -16,6 +16,7 @@ import pytest
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
+from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
@@ -25,10 +26,21 @@ from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
 from pants.engine.exp.nodes import Subjects, Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
-from pants.engine.exp.struct import Struct
-from pants.engine.exp.targets import Target
+from pants.engine.exp.struct import HasStructs, Struct
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch
+
+
+class Target(Struct, HasStructs):
+  collection_field = 'configurations'
+
+  def __init__(self, name=None, configurations=None, **kwargs):
+    super(Target, self).__init__(name=name, **kwargs)
+    self.configurations = configurations
+
+  @addressable_list(SubclassesOf(Struct))
+  def configurations(self):
+    pass
 
 
 class Thing(object):

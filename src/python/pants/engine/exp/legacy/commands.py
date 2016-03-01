@@ -11,22 +11,20 @@ from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.goal_runner import OptionsInitializer
-from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
-from pants.engine.exp.legacy.parsers import LegacyPythonCallbacksParser
+from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
+from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
 from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.nodes import Return, State, Subjects, Throw
+from pants.engine.exp.nodes import Subjects
 from pants.engine.exp.parsers import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
-from pants.engine.exp.targets import Target
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
 
 
 class LegacyTable(SymbolTable):
-
   @classmethod
   @memoized_method
   def aliases(cls):
@@ -37,11 +35,11 @@ class LegacyTable(SymbolTable):
   @classmethod
   @memoized_method
   def table(cls):
-    return {alias: Target for alias in cls.aliases().target_types}
+    return {alias: TargetAdaptor for alias in cls.aliases().target_types}
 
 
-def list():
-  """Lists all addresses under the current build root."""
+def dependencies():
+  """Lists the transitive dependencies of targets under the current build root."""
 
   build_root = get_buildroot()
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
@@ -58,32 +56,21 @@ def list():
       AddressMapper(symbol_table_cls=symbol_table_cls,
                     parser_cls=LegacyPythonCallbacksParser))
 
-  # Create a Scheduler containing only the graph tasks, with a single installed goal that
-  # requests an Address.
-  goal = 'list'
+  # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The ExpGraph
+  # will explicitly request the products it needs.
   tasks = (
+      create_legacy_graph_tasks() +
       create_fs_tasks(project_tree_key) +
       create_graph_tasks(address_mapper_key, symbol_table_cls)
     )
-  scheduler = LocalScheduler({goal: Address}, tasks, subjects, symbol_table_cls)
+  scheduler = LocalScheduler(dict(), tasks, subjects, symbol_table_cls)
 
-  # Execute a request for the given specs.
-  build_request = scheduler.build_request(goals=[goal], subjects=spec_roots)
+  # Populate the graph for the given request, and print the resulting Addresses.
   engine = LocalSerialEngine(scheduler)
   engine.start()
   try:
-    result = engine.execute(build_request)
+    graph = ExpGraph(scheduler, engine, symbol_table_cls)
+    for address in graph.inject_specs_closure(spec_roots):
+      print(address)
   finally:
     engine.close()
-
-  if result.error:
-    raise result.error
-
-  # Render the output.
-  for state in result.root_products.values():
-    if type(state) is Throw:
-      raise state.exc
-    elif type(state) is not Return:
-      State.raise_unrecognized(dep_state)
-    for address in state.value:
-      print(address)

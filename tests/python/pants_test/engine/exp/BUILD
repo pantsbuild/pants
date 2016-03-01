@@ -41,7 +41,6 @@ python_tests(
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:struct',
-    'src/python/pants/engine/exp:targets',
   ]
 )
 
@@ -53,7 +52,6 @@ python_tests(
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:struct',
-    'src/python/pants/engine/exp:targets',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]

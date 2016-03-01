@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from abc import abstractproperty
 from collections import MutableMapping, MutableSequence
 
 import six
@@ -28,11 +29,15 @@ class Struct(Serializable, SerializableFactory, Validatable):
   """
 
   # Fields dealing with inheritance.
-  _INHERITANCE_FIELDS = ('extends', 'merges')
+  _INHERITANCE_FIELDS = {'extends', 'merges'}
   # The type alias for an instance overwrites any inherited type_alias field.
   _TYPE_ALIAS_FIELD = 'type_alias'
+  # The field that indicates whether a Struct is abstract (and should thus skip validation).
+  _ABSTRACT_FIELD = 'abstract'
   # Fields that should not be inherited.
-  _UNINHERITABLE_FIELDS = _INHERITANCE_FIELDS + (_TYPE_ALIAS_FIELD,)
+  _UNINHERITABLE_FIELDS = _INHERITANCE_FIELDS | {_TYPE_ALIAS_FIELD, _ABSTRACT_FIELD}
+  # Fields that are only intended for consumption by the Struct baseclass.
+  _INTERNAL_FIELDS = _INHERITANCE_FIELDS | {_ABSTRACT_FIELD}
 
   def __init__(self, abstract=False, extends=None, merges=None, type_alias=None, **kwargs):
     """Creates a new struct data blob.
@@ -87,6 +92,14 @@ class Struct(Serializable, SerializableFactory, Validatable):
                                      .format(self.address, self.name))
       self._kwargs['name'] = target_name
 
+  def kwargs(self):
+    """Returns a dict of the kwargs for this Struct which were not interpreted by the baseclass.
+
+    This excludes fields like `extends`, `merges`, and `abstract`, which are consumed by
+    SerializableFactory.create and Validatable.validate.
+    """
+    return {k: v for k, v in self._kwargs.items() if k not in self._INTERNAL_FIELDS}
+
   @property
   def name(self):
     """Return the name of this object, if any.
@@ -135,7 +148,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
 
     :rtype: bool
     """
-    return self._kwargs['abstract']
+    return self._kwargs.get('abstract', False)
 
   # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
   # our superclasses logically provide fields within this constrained set.
@@ -292,3 +305,47 @@ class StructWithDeps(Struct):
 
     :rtype: list
     """
+
+
+class HasStructs(object):
+  """A mixin to mark an object as containing a collection of Structs in one of its fields."""
+
+  @abstractproperty
+  def collection_field(cls):
+    """Returns the name of the field of this Class that contains a collection of Structs."""
+
+
+class Variants(Struct):
+  """A struct that holds default variant values.
+
+  Variants are key-value pairs representing uniquely identifying parameters for a Node.
+
+  Default variants are usually configured on a Target to be used whenever they are
+  not specified by a caller.
+
+  They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
+  stored internally as sorted nested tuples of key-value strings.
+  """
+
+  @staticmethod
+  def merge(left, right):
+    """Merges right over left, ensuring that the return value is a tuple of tuples, or None."""
+    if not left:
+      if right:
+        return tuple(right)
+      else:
+        return None
+    if not right:
+      return tuple(left)
+    # Merge by key, and then return sorted by key.
+    merged = dict(left)
+    for key, value in right:
+      merged[key] = value
+    return tuple(sorted(merged.items()))
+
+  def __init__(self, default=None, **kwargs):
+    """
+    :param dict default: A dict of default variant values.
+    """
+    # TODO: enforce the type of variants using the Addressable framework.
+    super(Variants, self).__init__(default=default, **kwargs)
