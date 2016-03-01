@@ -69,6 +69,10 @@ def list():
   engine = LocalSerialEngine(scheduler)
   engine.start()
   try:
+    # TODO: It is not necessary to transitively parse the graph in order to execute list: the
+    # resulting graph contains enough information to render `dependencies`, but then only displays
+    # the roots. `list` would be more efficiently accomplished by requesting `Address` objects,
+    # rather than Legacy*Nodes (which trigger recursive walks in `create_legacy_graph_tasks`).
     graph = ExpGraph(address_mapper=None, scheduler=scheduler, engine=engine)
     for address in graph.inject_specs_closure(spec_roots):
       print(address)
