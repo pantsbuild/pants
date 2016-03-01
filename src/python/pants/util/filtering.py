@@ -56,7 +56,10 @@ def create_filter(predicate_param, predicate_factory):
 
 
 def wrap_filters(filters):
-  """Returns a single filter that short-circuit ANDs the specified filters."""
+  """Returns a single filter that short-circuit ANDs the specified filters.
+
+  :API: public
+  """
   def combined_filter(x):
     for filt in filters:
       if not filt(x):

@@ -56,6 +56,8 @@ def memoized(func=None, key_factory=equal_args, cache_factory=dict):
                                arguments.
   + `clear()`: Causes the memoization cache to be fully cleared.
 
+  :API: public
+
   :param func: The function to wrap.  Only generally passed by the python runtime and should be
                omitted when passing a custom `key_factory` or `cache_factory`.
   :param key_factory: A function that can form a cache key from the arguments passed to the
@@ -132,6 +134,8 @@ def memoized_method(func=None, key_factory=per_instance, **kwargs):
   ...   def name(self):
   ...     pass
 
+  :API: public
+
   :param func: The function to wrap.  Only generally passed by the python runtime and should be
                omitted when passing a custom `key_factory` or `cache_factory`.
   :param key_factory: A function that can form a cache key from the arguments passed to the
@@ -193,6 +197,8 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   >>> bar.now
   1433267424.056189
   >>>
+
+  :API: public
 
   :param func: The property getter method to wrap.  Only generally passed by the python runtime and
                should be omitted when passing a custom `key_factory` or `cache_factory`.

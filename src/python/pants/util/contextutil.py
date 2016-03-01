@@ -66,6 +66,8 @@ def temporary_dir(root_dir=None, cleanup=True, suffix=str()):
   """
     A with-context that creates a temporary directory.
 
+    :API: public
+
     You may specify the following keyword args:
     :param string root_dir: The parent directory to create the temporary directory.
     :param bool cleanup: Whether or not to clean up the temporary directory.
@@ -82,6 +84,8 @@ def temporary_dir(root_dir=None, cleanup=True, suffix=str()):
 def temporary_file_path(root_dir=None, cleanup=True, suffix=''):
   """
     A with-context that creates a temporary file and returns its path.
+
+    :API: public
 
     You may specify the following keyword args:
     :param str root_dir: The parent directory to create the temporary file.
@@ -154,6 +158,8 @@ def pushd(directory):
 def open_zip(path_or_file, *args, **kwargs):
   """
     A with-context for zip files.  Passes through positional and kwargs to zipfile.ZipFile.
+
+    :API: public
   """
   try:
     allowZip64 = kwargs.pop('allowZip64', True)

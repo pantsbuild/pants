@@ -549,6 +549,8 @@ class Task(TaskBase):
   Tasks form the atoms of work done by pants and when executed generally produce artifacts as a
   side effect whether these be files on disk (for example compilation outputs) or characters output
   to the terminal (for example dependency graph metadata).
+
+  :API: public
   """
 
   @abstractmethod
