@@ -48,6 +48,9 @@ class IvyResolveMappingError(Exception):
 
 
 class IvyModuleRef(object):
+  """
+  :API: public
+  """
 
   # latest.integration is ivy magic meaning "just get the latest version"
   _ANY_REV = 'latest.integration'
@@ -104,6 +107,9 @@ class IvyModuleRef(object):
 
 
 class IvyInfo(object):
+  """
+  :API: public
+  """
 
   def __init__(self, conf):
     self._conf = conf
@@ -210,7 +216,10 @@ class IvyInfo(object):
 
 
 class IvyUtils(object):
-  """Useful methods related to interaction with ivy."""
+  """Useful methods related to interaction with ivy.
+
+  :API: public
+  """
 
   ivy_lock = threading.RLock()
 
@@ -250,6 +259,9 @@ class IvyUtils(object):
                executor,
                workunit_name,
                workunit_factory):
+    """
+    :API: public
+    """
     ivy = ivy or Bootstrapper.default_ivy()
 
     ivy_args = ['-ivy', ivyxml]
@@ -326,6 +338,8 @@ class IvyUtils(object):
   def xml_report_path(cls, cache_dir, resolve_hash_name, conf):
     """The path to the xml report ivy creates after a retrieve.
 
+    :API: public
+
     :param string cache_dir: The path of the ivy cache dir used for resolves.
     :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
                                      resolution.
@@ -339,6 +353,8 @@ class IvyUtils(object):
   @classmethod
   def parse_xml_report(cls, conf, path):
     """Parse the ivy xml report corresponding to the name passed to ivy.
+
+    :API: public
 
     :param string conf: the ivy conf name (e.g. "default")
     :param string path: The path to the ivy report file.
