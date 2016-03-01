@@ -159,7 +159,7 @@ class ProductGraph(object):
     return self._cyclic_dependencies[node]
 
   def walk(self, roots, predicate=None):
-    """Yields Nodes depth-first in pre-order, starting from the roots for this Scheduler.
+    """Yields Nodes depth-first in pre-order, starting from the given roots.
 
     Each node entry is actually a tuple of (Node, State), and each yielded value is
     a tuple of (node_entry, dependency_node_entries).
@@ -488,8 +488,8 @@ class LocalScheduler(object):
     we differentiate between them here in order to normalize the output for all Spec objects
     as "list of product".
 
-    :param goals: The list of goal names supplied on the command line.
-    :type goals: list of string
+    :param products: A list of product types to request for the roots.
+    :type products: list of types
     :param subjects: A list of Spec and/or PathGlobs objects.
     :type subjects: list of :class:`pants.base.specs.Spec`, `pants.build_graph.Address`, and/or
        :class:`pants.engine.exp.fs.PathGlobs` objects.

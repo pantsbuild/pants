@@ -137,11 +137,10 @@ class LegacyBuildGraphNode(datatype('LegacyGraphNode', ['target_adaptor', 'depen
   """
 
 
-def reify_legacy_graph(legacy_target, dependency_nodes):
+def reify_legacy_graph(target_adaptor, dependency_nodes):
   """Given a TargetAdaptor and LegacyBuildGraphNodes for its deps, return a LegacyBuildGraphNode."""
-  # Instantiate the Target from the TargetAdaptor struct.
-  target = legacy_target
-  return LegacyBuildGraphNode(target, [node.target_adaptor.address for node in dependency_nodes])
+  return LegacyBuildGraphNode(target_adaptor,
+                              [node.target_adaptor.address for node in dependency_nodes])
 
 
 def create_legacy_graph_tasks():

@@ -45,7 +45,7 @@ def dependencies():
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
 
-  subjects = Subjects(debug=True)
+  subjects = Subjects(debug=False)
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.
@@ -56,16 +56,16 @@ def dependencies():
       AddressMapper(symbol_table_cls=symbol_table_cls,
                     parser_cls=LegacyPythonCallbacksParser))
 
-  # Create a Scheduler containing only the graph tasks, with a single installed goal that
-  # requests an Address.
+  # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The ExpGraph
+  # will explicitly request the products it needs.
   tasks = (
       create_legacy_graph_tasks() +
       create_fs_tasks(project_tree_key) +
       create_graph_tasks(address_mapper_key, symbol_table_cls)
     )
-  scheduler = LocalScheduler({}, tasks, subjects, symbol_table_cls)
+  scheduler = LocalScheduler(dict(), tasks, subjects, symbol_table_cls)
 
-  # Execute a request for the given specs.
+  # Populate the graph for the given request, and print the resulting Addresses.
   engine = LocalSerialEngine(scheduler)
   engine.start()
   try:
