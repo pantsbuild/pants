@@ -235,8 +235,7 @@ class GoalRunnerFactory(object):
         specs.add(spec_parser.parse_spec(spec_str))
 
       # Then scan them to generate unique Addresses.
-      for address in self._address_mapper.scan_specs(specs, fail_fast, self._spec_excludes):
-        self._build_graph.inject_address_closure(address)
+      for address in self._build_graph.inject_specs_closure(specs, fail_fast):
         target = self._build_graph.get_target(address)
         if tag_filter(target):
           self._targets.append(target)

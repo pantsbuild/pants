@@ -10,6 +10,7 @@ from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.deprecated import deprecated
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.meta import AbstractClass
@@ -61,10 +62,12 @@ class BuildGraph(AbstractClass):
     self.reset()
 
   @property
+  @deprecated('0.0.78', hint_message='Use context.address_mapper or self.inject_specs_closure.')
   def address_mapper(self):
     """
     :API: public
     """
+    return self._address_mapper
 
   def reset(self):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies.
@@ -332,6 +335,19 @@ class BuildGraph(AbstractClass):
 
     :param Address address: The address to inject.  Must be resolvable by `self._address_mapper` or
                             else be the address of an already injected entity.
+    """
+
+  @abstractmethod
+  def inject_specs_closure(self, specs, fail_fast=None, spec_excludes=None):
+    """Resolves, constructs and injects Targets and their transitive closures of dependencies.
+
+    :API: public
+
+    :param specs: A list of base.specs.Spec objects to resolve and inject.
+    :param fail_fast: Whether to fail quickly for the first error, or to complete all
+      possible injections before failing.
+    :param spec_excludes: Deprecated: applied via the AddressMapper instead.
+    :returns: Yields a sequence of resolved Address objects.
     """
 
   def resolve(self, spec):

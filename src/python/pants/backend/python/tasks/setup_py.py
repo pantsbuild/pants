@@ -29,6 +29,7 @@ from pants.backend.python.tasks.python_task import PythonTask
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
+from pants.base.specs import SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
@@ -72,8 +73,8 @@ class TargetAncestorIterator(object):
     """
     def iter_targets_in_spec_path(spec_path):
       try:
-        for address in self._build_graph.address_mapper.addresses_in_spec_path(spec_path):
-          self._build_graph.inject_address_closure(address)
+        siblings = SiblingAddresses(spec_path)
+        for address in self._build_graph.inject_specs_closure([siblings]):
           yield self._build_graph.get_target(address)
       except AddressLookupError:
         # A spec path may not have any addresses registered under it and that's ok.

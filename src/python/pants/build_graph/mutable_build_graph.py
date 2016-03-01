@@ -180,6 +180,13 @@ class MutableBuildGraph(BuildGraph):
       raise self.TransitiveLookupError("{message}\n  referenced from {spec}"
                                        .format(message=e, spec=target_address.spec))
 
+  def inject_specs_closure(self, specs, fail_fast=None, spec_excludes=None):
+    for address in self._address_mapper.scan_specs(specs,
+                                                   fail_fast=fail_fast,
+                                                   spec_excludes=spec_excludes):
+      self.inject_address_closure(address)
+      yield address
+
   def _target_addressable_to_target(self, address, addressable):
     """Realizes a TargetAddressable into a Target at `address`.
 
