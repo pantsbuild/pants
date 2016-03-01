@@ -19,20 +19,16 @@ class ExpGraph(BuildGraph):
   This implementation is backed by a Scheduler that is able to resolve LegacyBuildGraphNodes.
   """
 
-  def __init__(self, address_mapper, scheduler, engine):
+  def __init__(self, scheduler, engine):
     """Construct a graph given an address_mapper and Scheduler.
 
-    :param address_mapper: A build_graph.BuildFileAddressMapper (required by the subclass...
-      TODO: Deprecate that access point on the subclass and remove.)
     :param scheduler: A Scheduler that is configured to be able to resolve LegacyBuildGraphNodes.
     :param scheduler: An Engine subclass to execute calls to `inject`.
     """
     self._scheduler = scheduler
     self._graph = scheduler.product_graph
     self._engine = engine
-    self._address_mapper = address_mapper
-    super(ExpGraph, self).__init__(address_mapper)
-    self.reset()
+    super(ExpGraph, self).__init__()
 
   def reset(self):
     super(ExpGraph, self).reset()
@@ -60,7 +56,7 @@ class ExpGraph(BuildGraph):
       if type(node) is not SelectNode:
         continue
 
-      # We have a successfully parsed LegacyBuildGraphNode.
+      # We have a successfully parsed a LegacyBuildGraphNode.
       target = state.value.target
       address = target.address
       addresses.add(address)
@@ -70,6 +66,10 @@ class ExpGraph(BuildGraph):
       for dependency in dependencies:
          self._target_dependees_by_address[dependency].add(address)
     return addresses
+
+  @property
+  def address_mapper(self):
+    raise ValueError('Not implemented.')
 
   def get_derived_from(self, address):
     raise ValueError('Not implemented.')

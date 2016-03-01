@@ -73,7 +73,7 @@ def list():
     # resulting graph contains enough information to render `dependencies`, but then only displays
     # the roots. `list` would be more efficiently accomplished by requesting `Address` objects,
     # rather than Legacy*Nodes (which trigger recursive walks in `create_legacy_graph_tasks`).
-    graph = ExpGraph(address_mapper=None, scheduler=scheduler, engine=engine)
+    graph = ExpGraph(scheduler, engine)
     for address in graph.inject_specs_closure(spec_roots):
       print(address)
   finally:
