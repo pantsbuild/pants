@@ -57,17 +57,15 @@ class BuildGraph(AbstractClass):
 
     return transitive_subgraph_fn(t.address for t in targets)
 
-  def __init__(self, address_mapper):
-    self._address_mapper = address_mapper
+  def __init__(self):
     self.reset()
 
-  @property
+  @abstractproperty
   @deprecated('0.0.78', hint_message='Use context.address_mapper or self.inject_specs_closure.')
   def address_mapper(self):
     """
     :API: public
     """
-    return self._address_mapper
 
   def reset(self):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies.

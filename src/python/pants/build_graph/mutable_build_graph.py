@@ -19,11 +19,19 @@ logger = logging.getLogger(__name__)
 class MutableBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected."""
 
+  def __init__(self, address_mapper):
+    self._address_mapper = address_mapper
+    super(MutableBuildGraph, self).__init__()
+
   def reset(self):
     super(MutableBuildGraph, self).reset()
     self._addresses_already_closed = set()
     self._derived_from_by_derivative_address = {}
     self.synthetic_addresses = set()
+
+  @property
+  def address_mapper(self):
+    return self._address_mapper
 
   def get_derived_from(self, address):
     parent_address = self._derived_from_by_derivative_address.get(address, address)
