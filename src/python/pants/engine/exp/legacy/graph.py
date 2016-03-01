@@ -85,13 +85,12 @@ class ExpGraph(BuildGraph):
       kwargs.pop('dependencies')
       # Instantiate.
       return target_cls(build_graph=self, **kwargs)
-    #except Exception as e:
-    #  #raise TargetDefinitionException(
-    #  #    target_adaptor.address,
-    #  #    'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
-    #  raise e
     except TargetDefinitionException:
       raise
+    except Exception as e:
+      raise TargetDefinitionException(
+          target_adaptor.address,
+          'Failed to instantiate Target with type {}: {}'.format(target_cls, e))
 
   @property
   def address_mapper(self):
@@ -134,7 +133,7 @@ class ExpGraph(BuildGraph):
 class LegacyBuildGraphNode(datatype('LegacyGraphNode', ['target_adaptor', 'dependency_addresses'])):
   """A Node to represent a node in the legacy BuildGraph.
 
-  A facade implementing the legacy BuildGraph would inspect only these entries in the ProductGraph.
+  The ExpGraph implementation inspects only these entries in the ProductGraph.
   """
 
 
@@ -148,7 +147,8 @@ def reify_legacy_graph(legacy_target, dependency_nodes):
 def create_legacy_graph_tasks():
   """Create tasks to recursively parse the legacy graph."""
   return [
-      # Given a TargetAdaptor and its dependencies, construct a Target.
+      # Recursively requests LegacyGraphNodes for TargetAdaptors, which will result in a
+      # transitive graph walk.
       (LegacyBuildGraphNode,
        [Select(TargetAdaptor),
         SelectDependencies(LegacyBuildGraphNode, TargetAdaptor)],
