@@ -234,12 +234,12 @@ class BuildDictionaryInfoExtracterTest(unittest.TestCase):
     class FooDatatype(datatype('FooDatatype', ['bar', 'baz'])):
       """Foo docstring."""
 
-      def __new__(self, bar, baz=42):
+      def __new__(cls, bar, baz=42):
         """
         :param bar: Bar details.
         :param int baz: Baz details.
         """
-        return super(Foo, self).__new__(bar, baz)
+        return super(Foo, cls).__new__(cls, bar, baz)
 
     bfa = BuildFileAliases(targets={},
       objects={

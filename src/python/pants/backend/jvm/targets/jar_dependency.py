@@ -30,7 +30,7 @@ class JarDependency(datatype('JarDependency', [
                              key_arg='excludes',
                              allowable=(tuple, list,)))
 
-  def __new__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
+  def __new__(cls, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
               classifier=None, mutable=None, intransitive=False, excludes=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
@@ -54,8 +54,8 @@ class JarDependency(datatype('JarDependency', [
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
     """
     excludes = JarDependency._prepare_excludes(excludes)
-    return super(JarDependency, self).__new__(
-        self, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
+    return super(JarDependency, cls).__new__(
+        cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
         classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes)
 
   @property

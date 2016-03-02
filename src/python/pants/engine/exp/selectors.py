@@ -31,8 +31,8 @@ class Select(datatype('Subject', ['product', 'optional']), Selector):
   If optional=True and no matching product can be produced, will return None.
   """
 
-  def __new__(self, product, optional=False):
-    return super(Select, self).__new__(self, product, optional)
+  def __new__(cls, product, optional=False):
+    return super(Select, cls).__new__(cls, product, optional)
 
   def construct_node(self, subject_key, variants):
     return SelectNode(subject_key, self.product, variants, None)
@@ -59,8 +59,8 @@ class SelectDependencies(datatype('Dependencies', ['product', 'deps_product', 'f
   order they were declared.
   """
 
-  def __new__(self, product, deps_product, field=None):
-    return super(SelectDependencies, self).__new__(self, product, deps_product, field)
+  def __new__(cls, product, deps_product, field=None):
+    return super(SelectDependencies, cls).__new__(cls, product, deps_product, field)
 
   optional = False
 
