@@ -57,25 +57,7 @@ class FSEventService(PantsService):
           ['not', ['match', '.*', 'wholename']],  # Exclude files in dotpath dirs (.pants.d/* etc).
           ['not', ['match', '*.pyc']]  # Exclude .pyc files.
           # TODO(kwlzn): Make exclusions here optionable.
-        ]
-      ),
-      callback
-    )
-
-  def register_simple_handler(self, filename, callback):
-    """Registers a simple subscription and handler for files matching a specific name.
-
-    :param str filename: the filename/glob for the simple filename match (e.g. 'BUILD.*').
-    :param func callback: the callback to execute on each filesystem event
-    """
-    self.register_handler(
-      filename,
-      dict(
-        fields=['name'],
-        expression=[
-          'allof',  # All of the below rules must be true to match.
-          ['type', 'f'],  # Match only files (not dirs, symlinks, character devices etc).
-          ['match', filename]  # Match only files with a specific name.
+          # Related: https://github.com/pantsbuild/pants/issues/2956
         ]
       ),
       callback

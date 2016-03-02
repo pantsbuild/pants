@@ -36,22 +36,15 @@ class TestFSEventService(BaseTest):
   def setUp(self):
     BaseTest.setUp(self)
     self.service = FSEventService(self.BUILD_ROOT, TestExecutor())
-    self.service.register_simple_handler('test', lambda x: True)
-    self.service.register_simple_handler('test2', lambda x: False)
-    self.service.register_all_files_handler(lambda x: True)
+    self.service.register_all_files_handler(lambda x: True, name='test')
+    self.service.register_all_files_handler(lambda x: False, name='test2')
 
   def test_registration(self):
     # N.B. This test implicitly tests register_handler; no need to duplicate work.
     self.assertTrue('test' in self.service._handlers)
     self.assertTrue('test2' in self.service._handlers)
-    self.assertTrue('all_files' in self.service._handlers)
     self.assertIsInstance(self.service._handlers['test'], Watchman.EventHandler)
     self.assertIsInstance(self.service._handlers['test2'], Watchman.EventHandler)
-    self.assertIsInstance(self.service._handlers['all_files'], Watchman.EventHandler)
-
-  def test_register_simple_handler_duplicate(self):
-    with self.assertRaises(AssertionError):
-      self.service.register_simple_handler('test', lambda x: True)
 
   def test_register_handler_duplicate(self):
     with self.assertRaises(AssertionError):

@@ -14,7 +14,7 @@ from pants.pantsd.service.pants_service import PantsService
 class SchedulerService(PantsService):
   """The pantsd scheduler service.
 
-  This service holds an online scheduler instance that is primed via watchman filesystem events.
+  This service holds an online Scheduler instance that is primed via watchman filesystem events.
   This provides for a quick fork of pants runs (via the pailgun) with a fully primed ProductGraph
   in memory.
   """
@@ -55,6 +55,7 @@ class SchedulerService(PantsService):
   def _handle_file_event(self, filename):
     self._logger.debug('file {} changed!'.format(filename))
     # TODO(kwlzn): Map file events to nodes in the ProductGraph and invalidate accordingly.
+    # See: https://github.com/pantsbuild/pants/issues/2970
 
   def _process_event_queue(self):
     """File event notification queue processor."""
