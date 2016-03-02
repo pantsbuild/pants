@@ -591,6 +591,8 @@ class Task(TaskBase):
 
   def __init__(self, context, workdir):
     """
+    Add pass-thru Task Constructor for public API visibility.
+
     :API: public
     """
     super(Task, self).__init__(context, workdir)
