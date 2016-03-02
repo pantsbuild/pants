@@ -33,7 +33,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     self.assertIn('publish.jar.scm_push_attempts = ', pants_run.stdout_data)
 
   def test_options_option(self):
-    pants_run = self.run_pants(['options', '--no-colors', '--name=colors'])
+    pants_run = self.run_pants(['options', '--no-colors', '--name=colors', '--no-skip-inherited'])
     self.assert_success(pants_run)
     self.assertIn('options.colors = ', pants_run.stdout_data)
     self.assertIn('unpack-jars.colors = ', pants_run.stdout_data)
@@ -165,3 +165,25 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'invalid_global' under [GLOBAL]", pants_run.stderr_data)
       self.assertIn("ERROR] Invalid option 'another_invalid_global' under [GLOBAL]", pants_run.stderr_data)
+
+  def test_skip_inherited(self):
+    pants_run = self.run_pants([
+      '--no-colors', '--no-jvm-platform-validate-colors', '--test-junit-colors',
+      '--unpack-jars-colors', '--no-resolve-ivy-colors', '--imports-ivy-imports-colors',
+      '--compile-colors', '--no-compile-zinc-colors',
+      'options', '--no-colors', '--skip-inherited', '--name=colors',
+    ])
+    self.assert_success(pants_run)
+    lines = (s.split('(', 1)[0] for s in pants_run.stdout_data.split('\n') if '(' in s)
+    lines = [s.strip() for s in lines]
+    # This should be included because it has no super-scopes.
+    self.assertIn('colors = False', lines)
+    # These should be included because they differ from the super-scope value.
+    self.assertIn('test.junit.colors = True', lines)
+    self.assertIn('unpack-jars.colors = True', lines)
+    self.assertIn('imports.ivy-imports.colors = True', lines)
+    self.assertIn('compile.colors = True', lines)
+    self.assertIn('compile.zinc.colors = False', lines)
+    # These should be omitted because they have the same value as their super-scope.
+    self.assertNotIn('jvm-platform-validate.colors = False', lines)
+    self.assertNotIn('resolve.ivy.colors = False', lines)
