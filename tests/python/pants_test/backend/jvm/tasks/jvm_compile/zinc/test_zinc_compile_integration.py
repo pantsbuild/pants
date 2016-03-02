@@ -132,7 +132,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     self.assertListEqual(extract_content(analysis1), extract_content(analysis2))
 
   def test_zinc_fatal_warning(self):
-    def test_combination(target, default_fatal_warnings, expect_success):
+    def test_combination(target, default_fatal_warnings, expect_success, extra_args=[]):
       with self.temporary_workdir() as workdir:
         with self.temporary_cachedir() as cachedir:
           if default_fatal_warnings:
@@ -143,7 +143,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
               workdir,
               cachedir,
               'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}'.format(target),
-              extra_args=[arg])
+              extra_args=[arg] + extra_args)
 
           if expect_success:
             self.assert_success(pants_run)
@@ -155,3 +155,8 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     test_combination('fatal', default_fatal_warnings=False, expect_success=False)
     test_combination('nonfatal', default_fatal_warnings=True, expect_success=True)
     test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)
+
+    test_combination('fatal', default_fatal_warnings=True, expect_success=True,
+      extra_args=['--compile-zinc-fatal-warnings-enabled-args=[\'-C-Werror\']'])
+    test_combination('fatal', default_fatal_warnings=False, expect_success=False,
+      extra_args=['--compile-zinc-fatal-warnings-disabled-args=[\'-S-Xfatal-warnings\']'])
