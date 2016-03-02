@@ -42,6 +42,7 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ],
 )
 

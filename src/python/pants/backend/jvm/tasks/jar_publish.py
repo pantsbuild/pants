@@ -176,8 +176,7 @@ class PomWriter(object):
     """Fetches the jar representation of the given target, and applies the latest pushdb version."""
     jar, _ = internal_target.get_artifact_info()
     pushdb_entry = self._get_db(internal_target).get_entry(internal_target)
-    jar.rev = pushdb_entry.version().version()
-    return jar
+    return jar.copy(rev=pushdb_entry.version().version())
 
   def _internaldep(self, jar_dependency, target):
     template_data = self._jardep(jar_dependency)

@@ -142,7 +142,7 @@ class BuildDictionaryInfoExtracter(object):
     arg_descriptions = cls.get_arg_descriptions_from_docstring(func)
     argspec = inspect.getargspec(func)
     arg_names = argspec.args
-    if inspect.ismethod(func):
+    if inspect.ismethod(func) or func.__name__ == '__new__':
       arg_names = arg_names[1:]
     num_defaulted_args = len(argspec.defaults) if argspec.defaults is not None else 0
     first_defaulted_arg = len(arg_names) - num_defaulted_args
@@ -189,8 +189,10 @@ class BuildDictionaryInfoExtracter(object):
       raise TaskError('No such object type: {}'.format(alias))
     if inspect.isfunction(obj_type) or inspect.ismethod(obj_type):
       return self.get_function_args(obj_type)
-    elif inspect.isclass(obj_type):
+    elif inspect.isclass(obj_type) and inspect.ismethod(obj_type.__init__):
       return self.get_function_args(obj_type.__init__)
+    elif inspect.isclass(obj_type):
+      return self.get_function_args(obj_type.__new__)
     elif hasattr(obj_type, '__call__'):
       return self.get_function_args(obj_type.__call__)
     else:

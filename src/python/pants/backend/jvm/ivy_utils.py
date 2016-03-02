@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import copy
 import errno
 import logging
 import os
@@ -419,9 +418,7 @@ class IvyUtils(object):
           # here, because overrides do not apply directly (they are exclusively transitive). This is
           # actually a good thing, because it gives us more control over what happens.
           coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
-          dep = copy.copy(dep)
-          dep.rev = coord.rev
-          jars[i] = dep
+          jars[i] = dep.copy(rev=coord.rev)
         elif dep.force:
           # If this dependency is marked as 'force' and there is no version conflict, use the normal
           # pants behavior for 'force'.
@@ -523,8 +520,8 @@ class IvyUtils(object):
     # longer global.
     if provide_excludes:
       additional_excludes = tuple(provide_excludes)
-      for coordinate, jar in jars.items():
-        jar.excludes += additional_excludes
+      jars = {coordinate: jar.copy(excludes=jar.excludes + additional_excludes)
+              for coordinate, jar in jars.items()}
 
     return jars.values(), global_excludes
 

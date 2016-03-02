@@ -11,16 +11,27 @@ from pants.base.deprecated import deprecated
 from pants.base.payload_field import stable_json_sha1
 from pants.base.validation import assert_list
 from pants.util.memo import memoized_property
+from pants.util.objects import datatype
 
 
-class JarDependency(object):
+class JarDependency(datatype('JarDependency', [
+  'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
+  'classifier', 'mutable', 'intransitive', 'excludes'])):
   """A pre-built Maven repository dependency.
 
   :API: public
   """
 
-  def __init__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-               classifier=None, mutable=None, intransitive=False, excludes=None):
+  @staticmethod
+  def _prepare_excludes(excludes):
+    return tuple(assert_list(excludes,
+                             expected_type=Exclude,
+                             can_be_none=True,
+                             key_arg='excludes',
+                             allowable=(tuple, list,)))
+
+  def __new__(cls, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
+              classifier=None, mutable=None, intransitive=False, excludes=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
     :param string name: The Maven ``artifactId`` of this dependency.
@@ -42,30 +53,30 @@ class JarDependency(object):
     :param list excludes: Transitive dependencies of this jar to exclude.
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
     """
-    self.org = org
-    self._base_name = name
-    self.rev = rev
-    self.force = force
-    self.ext = ext
-    self.url = url
-    self.apidocs = apidocs
-    self.classifier = classifier
-    self.transitive = not intransitive
-    self.mutable = mutable
-
-    self.excludes = tuple(assert_list(excludes,
-                                      expected_type=Exclude,
-                                      can_be_none=True,
-                                      key_arg='excludes',
-                                      allowable=(tuple, list,)))
+    excludes = JarDependency._prepare_excludes(excludes)
+    return super(JarDependency, cls).__new__(
+        cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
+        classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes)
 
   @property
   def name(self):
-    return self._base_name
+    return self.base_name
 
-  @name.setter
-  def name(self, value):
-    self._base_name = value
+  @property
+  def transitive(self):
+    return not self.intransitive
+
+  def copy(self, **replacements):
+    """Returns a clone of this JarDependency with the given replacements kwargs overlaid."""
+    cls = type(self)
+    kwargs = self._asdict()
+    for key, val in replacements.items():
+      if key == 'excludes':
+        val = JarDependency._prepare_excludes(val)
+      kwargs[key] = val
+    org = kwargs.pop('org')
+    base_name = kwargs.pop('base_name')
+    return cls(org, base_name, **kwargs)
 
   def __str__(self):
     return 'JarDependency({})'.format(self.coordinate)
