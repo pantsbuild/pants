@@ -244,6 +244,7 @@ class IvyTaskMixin(TaskBase):
                                   resolve_workdir,
                                   self.symlink_map_lock,
                                   resolve_hash_name,
+                                  self.get_options().soft_excludes,
                                   confs)
 
       # Check for a previous run's resolution result files. If they exist try to load a result using
@@ -264,13 +265,3 @@ class IvyTaskMixin(TaskBase):
                           request)
 
       return IvyUtils.load_resolve(request)
-
-  def _exec_ivy(self, ivy, executor, confs, ivyxml, args, workunit_name):
-    try:
-      IvyUtils.exec_ivy(ivy, confs, ivyxml, args,
-                        jvm_options=self.get_options().jvm_options,
-                        executor=executor,
-                        workunit_name=workunit_name,
-                        workunit_factory=self.context.new_workunit)
-    except IvyUtils.IvyError as e:
-      raise self.Error('Ivy resolve failed: {}'.format(e))

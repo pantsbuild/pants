@@ -44,7 +44,8 @@ Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])
 logger = logging.getLogger(__name__)
 
 
-class IvyResolveRequest(datatype('IvyResolveRequest', ['cachedir', 'workdir', 'symlink_lock', 'hash_name', 'confs'])):
+class IvyResolveRequest(datatype('IvyResolveRequest', [
+  'cachedir', 'workdir', 'symlink_lock', 'hash_name', 'soft_excludes', 'confs'])):
 
   _FULL_RESOLVE_IVY_XML_FILE_NAME = 'ivy.xml'
 
@@ -345,7 +346,7 @@ class IvyUtils(object):
   :API: public
   """
 
-  ivy_lock = threading.RLock()
+  _ivy_lock = threading.RLock()
 
   INTERNAL_ORG_NAME = 'internal'
 
@@ -414,21 +415,18 @@ class IvyUtils(object):
       args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
 
       targets = global_vts.targets
-      # TODO(John Sirois): merge the code below into IvyUtils or up here; either way, better
-      # diagnostics can be had in `IvyUtils.generate_ivy` if this is done.
-      # See: https://github.com/pantsbuild/pants/issues/2239
-      jars, global_excludes = cls.calculate_classpath(targets)
+      jars, global_excludes = cls._calculate_classpath(targets)
 
       # Don't pass global excludes to ivy when using soft excludes.
-      if self.get_options().soft_excludes:
+      if request.soft_excludes:
         global_excludes = []
 
       ivyxml = request.ivy_xml_path
-      with cls.ivy_lock:
-        cls.generate_ivy(targets, jars, global_excludes, ivyxml, request.confs,
-                              resolve_hash_name, pinned_artifacts)
+      with cls._ivy_lock:
+        cls._generate_ivy(targets, jars, global_excludes, ivyxml, request.confs,
+                          request.hash_name, pinned_artifacts)
 
-        self._exec_ivy(ivy, executor, request.confs, ivyxml, args, workunit_name)
+        cls._exec_ivy(ivy, request.confs, ivyxml, args, executor, request.confs, ivyxml, args, workunit_name)
 
         # Copy ivy resolve file into resolve workdir.
         for conf in request.confs:
@@ -436,20 +434,27 @@ class IvyUtils(object):
                       request._resolve_report_path(resolve_workdir, conf))
 
       if not os.path.exists(raw_target_classpath_file_tmp):
-        raise self.Error('Ivy failed to create classpath file at {}'
-                         .format(raw_target_classpath_file_tmp))
+        raise IvyError('Ivy failed to create classpath file at {}'
+                       .format(raw_target_classpath_file_tmp))
 
-    logger.debug('Moved ivy classfile file to {dest}'.format(dest=raw_target_classpath_file))
+    logger.debug('Moved ivy classfile file to {dest}'.format(dest=request.ivy_cache_classpath_filename))
 
   @classmethod
+  @deprecated('0.0.80', hint_message='Use `load_resolve` and `do_resolve` instead.')
   def exec_ivy(cls, ivy, confs, ivyxml, args,
                jvm_options,
                executor,
                workunit_name,
                workunit_factory):
-    """
-    :API: public
-    """
+    return cls._exec_ivy(ivy, confs, ivyxml, args, jvm_options, executor, workunit_name,
+                         workunit_factory)
+
+  @classmethod
+  def _exec_ivy(cls, ivy, confs, ivyxml, args,
+                jvm_options,
+                executor,
+                workunit_name,
+                workunit_factory):
     ivy = ivy or Bootstrapper.default_ivy()
 
     ivy_args = ['-ivy', ivyxml]
@@ -589,7 +594,14 @@ class IvyUtils(object):
     return ret
 
   @classmethod
+  @deprecated('0.0.80', hint_message='Use `load_resolve` and `do_resolve` instead.')
   def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
+                   pinned_artifacts=None):
+    return cls._generate_ivy(targets, jars, excludes, ivyxml, confs, resolve_hash_name,
+                             pinned_artifacts)
+
+  @classmethod
+  def _generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
                    pinned_artifacts=None):
     if resolve_hash_name:
       org = IvyUtils.INTERNAL_ORG_NAME
@@ -652,7 +664,12 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
+  @deprecated('0.0.80', hint_message='Use `load_resolve` and `do_resolve` instead.')
   def calculate_classpath(cls, targets):
+    return cls._calculate_classpath(targets)
+
+  @classmethod
+  def _calculate_classpath(cls, targets):
     """Creates a consistent classpath and list of excludes for the passed targets.
 
     It also modifies the JarDependency objects' excludes to contain all the jars excluded by
@@ -765,10 +782,9 @@ class IvyUtils(object):
                                            transitive=jar.transitive)
                                 for jar in jars)
     if len(global_dep_attributes) != 1:
-      # TODO(John Sirois): Need to provide information about where these came from - could be
-      # far-flung JarLibrary targets.  The jars here were collected from targets via
-      # `calculate_classpath` above and so merging of the 2 could provide the context needed.
-      # See: https://github.com/pantsbuild/pants/issues/2239
+      # TODO: Need to provide information about where these came from - could be
+      # far-flung JarLibrary targets. The jars here were collected from targets via
+      # `_calculate_classpath` above and so merging of the 2 could provide the context needed.
       conflicting_dependencies = sorted(str(g) for g in global_dep_attributes)
       raise cls.IvyResolveConflictingDepsError('Found conflicting dependencies:\n\t{}'
                                                .format('\n\t'.join(conflicting_dependencies)))
