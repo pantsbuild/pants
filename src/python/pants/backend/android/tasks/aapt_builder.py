@@ -82,8 +82,10 @@ class AaptBuilder(AaptTask):
         resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([binary.address])
         resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
 
-        # Priority for resources is left to right, so reverse the collection order (DFS preorder).
-        args = self._render_args(binary, reversed(resource_dirs), dex_files)
+        # Priority for resources is left to right so dependency order matters.
+        # TODO(mateo): Make resources a first class AndroidBinary attribute to limit the order-dependent parts of the
+        # BUILD files.
+        args = self._render_args(binary, resource_dirs, dex_files)
         with self.context.new_workunit(name='apk-bundle',
                                        labels=[WorkUnitLabel.MULTITOOL]) as workunit:
           returncode = subprocess.call(args, stdout=workunit.output('stdout'),
