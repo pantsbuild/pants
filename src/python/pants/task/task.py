@@ -589,6 +589,12 @@ class Task(TaskBase):
   :API: public
   """
 
+  def __init__(self, context, workdir):
+    """
+    :API: public
+    """
+    super(Task, self).__init__(context, workdir)
+
   @abstractmethod
   def execute(self):
     """Executes this task.
