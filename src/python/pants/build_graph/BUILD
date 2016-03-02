@@ -11,7 +11,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:build_file_target_factory',
-    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:hash_utils',

@@ -102,7 +102,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
     register('--runtime', advanced=True, type=list_option, default=['//:scala-library'],
              help='Target specs pointing to the scala runtime libraries.',
-             deprecated_version='0.0.75',
+             deprecated_version='0.0.75', removal_version='0.0.79',
              deprecated_hint='Option is no longer used, --version is used to specify the major '
                              'version. The runtime is created based on major version. '
                              'The runtime target will be defined at the address //:scala-library '

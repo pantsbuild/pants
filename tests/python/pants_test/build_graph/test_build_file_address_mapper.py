@@ -109,15 +109,6 @@ class BuildFileAddressMapperTest(BaseTest):
     with self.assertRaises(BuildFileAddressMapper.EmptyBuildFileError):
       self.address_mapper.resolve_spec('//:foo')
 
-  def test_context_scan_with_deprecated_spec_excludes(self):
-    # Can be removed while `spec_excludes` removal.
-    self.add_to_build_file('BUILD', 'target(name="foo")')
-    self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    context = self.context()
-    context._spec_excludes = ['subdir']
-    graph = context.scan()
-    self.assertEquals([target.address.spec for target in graph.targets()], ['//:foo'])
-
   def test_address_lookup_error_hierarchy(self):
     self.assertIsInstance(BuildFileAddressMapper.AddressNotInBuildFile(), AddressLookupError)
     self.assertIsInstance(BuildFileAddressMapper.EmptyBuildFileError(), AddressLookupError)

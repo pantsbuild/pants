@@ -18,8 +18,6 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.deprecated import deprecated, deprecated_conditional
-from pants.base.project_tree import ProjectTree
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -74,12 +72,7 @@ class BuildFileAddressMapper(object):
     """
     self._build_file_parser = build_file_parser
     self._spec_path_to_address_map_map = {}  # {spec_path: {address: addressable}} mapping
-    if isinstance(project_tree, ProjectTree):
-      self._project_tree = project_tree
-    else:
-      # If project_tree is BuildFile class actually.
-      # TODO(tabishev): Remove after transition period.
-      self._project_tree = project_tree._get_project_tree(self.root_dir)
+    self._project_tree = project_tree
     self._build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
 
     self._exclude_target_regexps = exclude_target_regexps or []
@@ -186,11 +179,8 @@ class BuildFileAddressMapper(object):
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
 
-  def scan_build_files(self, base_path, spec_excludes=None):
-    deprecated_conditional(lambda: spec_excludes is not None,
-                           '0.0.75',
-                           'Use build_ignore_patterns consturctor parameter instead.')
-    return BuildFile.scan_build_files(self._project_tree, base_path, spec_excludes,
+  def scan_build_files(self, base_path):
+    return BuildFile.scan_build_files(self._project_tree, base_path,
                                       build_ignore_patterns=self._build_ignore_patterns)
 
   def specs_to_addresses(self, specs, relative_to=''):
@@ -202,7 +192,7 @@ class BuildFileAddressMapper(object):
     for spec in specs:
       yield self.spec_to_address(spec, relative_to=relative_to)
 
-  def scan_addresses(self, root=None, spec_excludes=None):
+  def scan_addresses(self, root=None):
     """Recursively gathers all addresses visible under `root` of the virtual address space.
 
     :param string root: The absolute path of the root to scan; defaults to the root directory of the
@@ -210,10 +200,6 @@ class BuildFileAddressMapper(object):
     :rtype: set of :class:`pants.build_graph.address.Address`
     :raises AddressLookupError: if there is a problem parsing a BUILD file
     """
-    deprecated_conditional(lambda: spec_excludes is not None,
-                           '0.0.75',
-                           'Use build_ignore_patterns constructor parameter instead.')
-
     root_dir = get_buildroot()
     base_path = None
 
@@ -227,7 +213,6 @@ class BuildFileAddressMapper(object):
     try:
       for build_file in BuildFile.scan_build_files(self._project_tree,
                                                    base_relpath=base_path,
-                                                   spec_excludes=spec_excludes,
                                                    build_ignore_patterns=self._build_ignore_patterns):
         for address in self.addresses_in_spec_path(build_file.spec_path):
           addresses.add(address)
@@ -237,12 +222,9 @@ class BuildFileAddressMapper(object):
                                     .format(message=e, root=root))
     return addresses
 
-  def scan_specs(self, specs, fail_fast=True, spec_excludes=None):
+  def scan_specs(self, specs, fail_fast=True):
     """Execute a collection of `specs.Spec` objects and return an ordered set of Addresses."""
     excluded_target_map = defaultdict(set)  # pattern -> targets (for debugging)
-    deprecated_conditional(lambda: spec_excludes is not None,
-                           '0.0.75',
-                           'Use build_ignore_patterns in address_mapper instead.')
 
     def exclude_spec(spec):
       for pattern in self._exclude_patterns:
@@ -257,7 +239,7 @@ class BuildFileAddressMapper(object):
 
     addresses = OrderedSet()
     for spec in specs:
-      for address in self._scan_spec(spec, fail_fast, spec_excludes, exclude_spec):
+      for address in self._scan_spec(spec, fail_fast, exclude_spec):
         if not exclude_address(address):
           addresses.add(address)
 
@@ -279,7 +261,7 @@ class BuildFileAddressMapper(object):
                            plural=('s' if excluded_count != 1 else '')))
     return addresses
 
-  def _scan_spec(self, spec, fail_fast, spec_excludes, exclude_spec):
+  def _scan_spec(self, spec, fail_fast, exclude_spec):
     """Scans the given address spec."""
 
     errored_out = []
@@ -287,8 +269,7 @@ class BuildFileAddressMapper(object):
     if type(spec) is DescendantAddresses:
       addresses = set()
       try:
-        build_files = self.scan_build_files(base_path=spec.directory,
-                                            spec_excludes=spec_excludes)
+        build_files = self.scan_build_files(base_path=spec.directory)
       except BuildFile.BuildFileError as e:
         raise AddressLookupError(e)
 
@@ -296,19 +277,11 @@ class BuildFileAddressMapper(object):
         try:
           addresses.update(self.addresses_in_spec_path(build_file.spec_path))
         except (BuildFile.BuildFileError, AddressLookupError) as e:
-          # This attempts to filter out broken BUILD files before we parse them.
-          if exclude_spec(build_file.spec_path):
-            deprecated_conditional(lambda: True,
-                                   '0.0.75',
-                                   'Filtering broken BUILD files based on exclude_target_regexp is deprecated '
-                                   'and will be removed. Use ignore_patterns instead.')
-          else:
-            if fail_fast:
-              raise AddressLookupError(e)
-            errored_out.append('--------------------')
-            errored_out.append(traceback.format_exc())
-            errored_out.append('Exception message: {0}'.format(e))
-
+          if fail_fast:
+            raise AddressLookupError(e)
+          errored_out.append('--------------------')
+          errored_out.append(traceback.format_exc())
+          errored_out.append('Exception message: {0}'.format(e))
       if errored_out:
         error_msg = '\n'.join(errored_out + ["Invalid BUILD files for [{0}]".format(spec.to_spec_string())])
         raise AddressLookupError(error_msg)
