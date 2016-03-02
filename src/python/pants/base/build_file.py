@@ -10,10 +10,8 @@ import os
 import re
 
 from pathspec import PathSpec
-from pathspec.gitignore import GitIgnorePattern
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated_conditional
 from pants.util.dirutil import fast_relpath
 from pants.util.meta import AbstractClass
 
@@ -55,42 +53,14 @@ class BuildFile(AbstractClass):
     return BuildFile._PATTERN.match(name)
 
   @staticmethod
-  def _spec_excludes_to_gitignore_syntax(build_root, spec_excludes=None):
-    if spec_excludes:
-      for path in spec_excludes:
-        if os.path.isabs(path):
-          realpath = os.path.realpath(path)
-          if realpath.startswith(build_root):
-            yield '/{}'.format(fast_relpath(realpath, build_root))
-        else:
-          yield '/{}'.format(path)
-
-  @staticmethod
-  def _add_spec_excludes_to_build_ignore_patterns(build_root, build_ignore_patterns=None, spec_excludes=None):
-    if not build_ignore_patterns:
-      build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, [])
-
-    patterns = list(build_ignore_patterns.patterns)
-    patterns.extend(PathSpec.from_lines(
-      GitIgnorePattern,
-      BuildFile._spec_excludes_to_gitignore_syntax(build_root, spec_excludes)).patterns)
-    return PathSpec(patterns)
-
-  @staticmethod
-  def scan_build_files(project_tree, base_relpath, spec_excludes=None, build_ignore_patterns=None):
+  def scan_build_files(project_tree, base_relpath, build_ignore_patterns=None):
     """Looks for all BUILD files
     :param project_tree: Project tree to scan in.
     :type project_tree: :class:`pants.base.project_tree.ProjectTree`
     :param base_relpath: Directory under root_dir to scan.
-    :param spec_excludes: List of paths to exclude from the scan.  These can be absolute paths
-      or paths that are relative to the root_dir.
     :param build_ignore_patterns: .gitignore like patterns to exclude from BUILD files scan.
     :type build_ignore_patterns: pathspec.pathspec.PathSpec
     """
-    deprecated_conditional(lambda: spec_excludes is not None,
-                           '0.0.75',
-                           'Use build_ignore_patterns instead.')
-
     if base_relpath and os.path.isabs(base_relpath):
       raise BuildFile.BadPathError('base_relpath parameter ({}) should be a relative path.'
                                    .format(base_relpath))
@@ -100,11 +70,6 @@ class BuildFile(AbstractClass):
     if build_ignore_patterns and not isinstance(build_ignore_patterns, PathSpec):
       raise TypeError("build_ignore_patterns should be pathspec.pathspec.PathSpec instance, "
                       "instead {} was given.".format(type(build_ignore_patterns)))
-
-    # Hack, will be removed after spec_excludes removal.
-    build_ignore_patterns = BuildFile._add_spec_excludes_to_build_ignore_patterns(project_tree.build_root,
-                                                                                  build_ignore_patterns,
-                                                                                  spec_excludes)
 
     build_files = set()
     for root, dirs, files in project_tree.walk(base_relpath or '', topdown=True):

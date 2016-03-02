@@ -145,7 +145,7 @@ class GlobalOptionsRegistrar(Optionable):
              default=[register.bootstrap.pants_workdir],
              deprecated_hint='Use --ignore-patterns instead. Use .gitignore syntax for each item, '
                              'to simulate old behavior prefix each item with "/".',
-             deprecated_version='0.0.75',
+             deprecated_version='0.0.75', removal_version='0.0.79',
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
     register('--ignore-patterns', advanced=True, action='append', fromfile=True,

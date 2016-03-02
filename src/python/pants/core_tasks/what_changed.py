@@ -20,14 +20,11 @@ class WhatChanged(ChangedFileTaskMixin, ConsoleTask):
              help='Show changed files instead of the targets that own them.')
 
   def console_output(self, _):
-    # Will be provided through context.address_mapper.build_ignore_patterns.
-    spec_excludes = None
     change_calculator = self.change_calculator(self.get_options(),
                                                self.context.address_mapper,
                                                self.context.build_graph,
                                                scm=self.context.scm,
-                                               workspace=self.context.workspace,
-                                               spec_excludes=spec_excludes)
+                                               workspace=self.context.workspace)
     if self.get_options().files:
       for f in sorted(change_calculator.changed_files()):
         yield f

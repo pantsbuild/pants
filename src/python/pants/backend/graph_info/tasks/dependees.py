@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import defaultdict
 
 from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
-from pants.base.build_environment import get_buildroot
 from pants.task.console_task import ConsoleTask
 
 
@@ -28,12 +27,10 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
 
     self._transitive = self.get_options().transitive
     self._closed = self.get_options().closed
-    # Will be provided through context.address_mapper.build_ignore_patterns.
-    self._spec_excludes = None
 
   def console_output(self, _):
     address_mapper = self.context.address_mapper
-    buildfiles = address_mapper.scan_build_files(base_path=None, spec_excludes=self._spec_excludes)
+    buildfiles = address_mapper.scan_build_files(base_path=None)
 
     build_graph = self.context.build_graph
     build_file_parser = self.context.build_file_parser

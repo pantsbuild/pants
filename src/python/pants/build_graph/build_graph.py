@@ -336,7 +336,7 @@ class BuildGraph(AbstractClass):
     """
 
   @abstractmethod
-  def inject_specs_closure(self, specs, fail_fast=None, spec_excludes=None):
+  def inject_specs_closure(self, specs, fail_fast=None):
     """Resolves, constructs and injects Targets and their transitive closures of dependencies.
 
     :API: public
@@ -344,7 +344,6 @@ class BuildGraph(AbstractClass):
     :param specs: A list of base.specs.Spec objects to resolve and inject.
     :param fail_fast: Whether to fail quickly for the first error, or to complete all
       possible injections before failing.
-    :param spec_excludes: Deprecated: applied via the AddressMapper instead.
     :returns: Yields a sequence of resolved Address objects.
     """
 

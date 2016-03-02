@@ -13,7 +13,6 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
@@ -63,14 +62,10 @@ class Context(object):
   def __init__(self, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
-               workspace=None, spec_excludes=None, invalidation_report=None):
+               workspace=None, invalidation_report=None):
     """
     :API: public
     """
-    deprecated_conditional(lambda: spec_excludes is not None,
-                           '0.0.75',
-                           'Use address_mapper#build_ignore_patterns instead.')
-
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -87,7 +82,6 @@ class Context(object):
     self._console_outstream = console_outstream or sys.stdout
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
-    self._spec_excludes = spec_excludes
     self._replace_targets(target_roots)
     self._invalidation_report = invalidation_report
 
@@ -158,11 +152,6 @@ class Context(object):
     :API: public
     """
     return self._workspace
-
-  @property
-  @deprecated('0.0.75')
-  def spec_excludes(self):
-    return self._spec_excludes
 
   @property
   def invalidation_report(self):
@@ -371,6 +360,6 @@ class Context(object):
     :returns: A new build graph encapsulating the targets found.
     """
     build_graph = MutableBuildGraph(self.address_mapper)
-    for address in self.address_mapper.scan_addresses(root, spec_excludes=self._spec_excludes):
+    for address in self.address_mapper.scan_addresses(root):
       build_graph.inject_address_closure(address)
     return build_graph
