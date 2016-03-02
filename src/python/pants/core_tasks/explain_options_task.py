@@ -32,6 +32,8 @@ class ExplainOptionsTask(ConsoleTask):
              help='Show the previous values options had before being overridden.')
     register('--only-overridden', action='store_true', default=False,
              help='Only show values that overrode defaults.')
+    register('--skip-inherited', action='store_true', default=True,
+             help='Do not show inherited options, unless their values differ from their parents.')
 
   def _scope_filter(self, scope):
     pattern = self.get_options().scope
@@ -89,6 +91,18 @@ class ExplainOptionsTask(ConsoleTask):
     for scope in scopes:
       self.context.options.for_scope(scope)
 
+  def _get_parent_scope_option(self, scope, name):
+    if not scope:
+      return None, None
+    parent_scope = ''
+    if '.' in scope:
+      parent_scope, _ = scope.rsplit('.', 1)
+    options = self.context.options.for_scope(parent_scope)
+    try:
+      return parent_scope, options[name]
+    except AttributeError:
+      return None, None
+
   def console_output(self, targets):
     self._force_option_parsing()
     for scope, options in sorted(self.context.options.tracker.option_history_by_scope.items()):
@@ -102,6 +116,10 @@ class ExplainOptionsTask(ConsoleTask):
         if history.latest.deprecation_version and PANTS_SEMVER >= Revision.semver(
           history.latest.deprecation_version):
           continue
+        if self.get_options().skip_inherited:
+          parent_scope, parent_value = self._get_parent_scope_option(scope, option)
+          if parent_scope is not None and parent_value == history.latest.value:
+            continue
         yield '{} = {}'.format(self._format_scope(scope, option),
                                self._format_record(history.latest))
         if self.get_options().show_history:
