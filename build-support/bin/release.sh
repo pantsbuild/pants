@@ -51,21 +51,10 @@ function pkg_pants_testinfra_install_test() {
   python -c "import pants_test"
 }
 
-PKG_PANTS_BACKEND_ANDROID=(
-  "pantsbuild.pants.backend.android"
-  "//src/python/pants/backend/android:plugin"
-  "pkg_pants_backend_android_install_test"
-)
-function pkg_pants_backend_android_install_test() {
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.backend.android==$(local_version)']" \
-    goals | grep "apk" &> /dev/null
-}
 
 # Once an individual (new) package is declared above, insert it into the array below)
 RELEASE_PACKAGES=(
   PKG_PANTS
-  PKG_PANTS_BACKEND_ANDROID
   PKG_PANTS_TESTINFRA
   ${CONTRIB_PACKAGES[*]}
 )

@@ -36,7 +36,6 @@ function usage() {
   echo "              if running integration tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
   echo "              to run only even tests: '-i 0/2', odd: '-i 1/2'"
-  echo " -a           skip android targets when running tests"
   if (( $# > 0 )); then
     die "$@"
   else
@@ -71,19 +70,10 @@ while getopts "hfxbkmsrjlpu:nci:a" opt; do
     n) skip_contrib="true" ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
 shift $((${OPTIND} - 1))
-
-# Android testing requires the SDK to be installed and configured in Pants.
-# Skip if ANDROID_HOME isn't configured in the environment
-if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
-  export SKIP_ANDROID="true"
-else
-  export SKIP_ANDROID="false"
-fi
 
 if [[ $# > 0 ]]; then
   banner "CI BEGINS: $@"
