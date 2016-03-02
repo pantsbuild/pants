@@ -54,9 +54,6 @@ class JarDependency(datatype('JarDependency', [
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
     """
     excludes = JarDependency._prepare_excludes(excludes)
-    # NB: We accept the `base_name` parameter in addition to the `name` parameter to allow
-    # for copy-construction
-    base_name = name if name is not None else base_name
     return super(JarDependency, self).__new__(
         self, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
         classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes)
