@@ -119,19 +119,20 @@ class UnpackLibrariesTest(TestAndroidBase):
 
   def test_create_android_library_target(self):
     with self.android_library(include_patterns=['**/*.class']) as android_library:
-      with temporary_dir() as temp:
-        contents = self.unpacked_aar_library(temp)
-        task = self.create_task(self.context())
-        coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
-        created_library = task.create_android_library_target(android_library, coordinate, contents)
+      with self.android_binary(dependencies=[android_library]) as android_binary:
+        with temporary_dir() as temp:
+          contents = self.unpacked_aar_library(temp)
+          task = self.create_task(self.context())
+          coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
+          created_library = task.create_android_library_target(android_binary, android_library, coordinate, contents)
 
-        self.assertEqual(created_library.derived_from, android_library)
-        self.assertTrue(created_library.is_synthetic)
-        self.assertTrue(isinstance(created_library, AndroidLibrary))
-        self.assertEqual(android_library.payload.include_patterns, created_library.payload.include_patterns)
-        self.assertEqual(android_library.payload.exclude_patterns, created_library.payload.exclude_patterns)
-        self.assertEqual(len(created_library.dependencies), 1)
-        self.assertTrue(isinstance(created_library.dependencies[0], AndroidResources))
+          self.assertEqual(created_library.derived_from, android_library)
+          self.assertTrue(created_library.is_synthetic)
+          self.assertTrue(isinstance(created_library, AndroidLibrary))
+          self.assertEqual(android_library.payload.include_patterns, created_library.payload.include_patterns)
+          self.assertEqual(android_library.payload.exclude_patterns, created_library.payload.exclude_patterns)
+          self.assertEqual(len(created_library.dependencies), 1)
+          self.assertTrue(isinstance(created_library.dependencies[0], AndroidResources))
 
   def test_create_android_library_dependency_injection(self):
     with self.android_library() as android_library:
@@ -142,7 +143,7 @@ class UnpackLibrariesTest(TestAndroidBase):
           contents = self.unpacked_aar_library(temp)
           task = self.create_task(self.context())
           coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
-          task.create_android_library_target(android_library, coordinate, contents)
+          task.create_android_library_target(android_binary, android_library, coordinate, contents)
 
           # Make sure that a JarLibrary has been injected into the android_binary deps.
           self.assertTrue(any(isinstance(x, JarLibrary) for x in android_binary.dependencies))
@@ -151,35 +152,38 @@ class UnpackLibrariesTest(TestAndroidBase):
 
   def test_no_classes_jar(self):
     with self.android_library(include_patterns=['**/*.class']) as android_library:
-      with temporary_dir() as temp:
-        contents = self.unpacked_aar_library(temp, classes_jar=False)
-        task = self.create_task(self.context())
-        coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
-        created_library = task.create_android_library_target(android_library, coordinate, contents)
-        self.assertEqual(len(created_library.dependencies), 1)
-        for dep in created_library.dependencies:
-          isinstance(dep, AndroidResources)
+      with self.android_binary(dependencies=[android_library]) as android_binary:
+        with temporary_dir() as temp:
+          contents = self.unpacked_aar_library(temp, classes_jar=False)
+          task = self.create_task(self.context())
+          coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
+          created_library = task.create_android_library_target(android_binary, android_library, coordinate, contents)
+          self.assertEqual(len(created_library.dependencies), 1)
+          for dep in created_library.dependencies:
+            isinstance(dep, AndroidResources)
 
   def test_no_resources(self):
     with self.android_library() as android_library:
-      with temporary_dir() as temp:
-        contents = self.unpacked_aar_library(temp, classes_jar=False)
-        task = self.create_task(self.context())
-        coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
-        created_library = task.create_android_library_target(android_library, coordinate, contents)
-        self.assertEqual(len(created_library.dependencies), 1)
-        for dep in created_library.dependencies:
-          isinstance(dep, JarLibrary)
+      with self.android_binary(dependencies=[android_library]) as android_binary:
+        with temporary_dir() as temp:
+          contents = self.unpacked_aar_library(temp, classes_jar=False)
+          task = self.create_task(self.context())
+          coordinate = M2Coordinate(org='org.pantsbuild', name='example', rev='1.0')
+          created_library = task.create_android_library_target(android_binary, android_library, coordinate, contents)
+          self.assertEqual(len(created_library.dependencies), 1)
+          for dep in created_library.dependencies:
+            isinstance(dep, JarLibrary)
 
   def test_no_manifest(self):
     with self.android_library(include_patterns=['**/*.class']) as android_library:
-      with temporary_dir() as temp:
-        contents = self.unpacked_aar_library(temp, manifest=False)
-        task = self.create_task(self.context())
-        archive = 'org.pantsbuild.example-1.0'
+      with self.android_binary(dependencies=[android_library]) as android_binary:
+        with temporary_dir() as temp:
+          contents = self.unpacked_aar_library(temp, manifest=False)
+          task = self.create_task(self.context())
+          archive = 'org.pantsbuild.example-1.0'
 
-        with self.assertRaises(UnpackLibraries.MissingElementException):
-          task.create_android_library_target(android_library, archive, contents)
+          with self.assertRaises(UnpackLibraries.MissingElementException):
+            task.create_android_library_target(android_binary, android_library, archive, contents)
 
   # Test unpacking process.
   def create_android_library(self, rev, library_file):

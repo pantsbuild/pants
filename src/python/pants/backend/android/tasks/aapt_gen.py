@@ -120,19 +120,17 @@ class AaptGen(AaptTask):
         if isinstance(tgt, AndroidLibrary) and tgt.manifest:
           gentargets.append(tgt)
       binary.walk(gather_gentargets)
-
       for gen in gentargets:
         aapt_output = self._relative_genfile(gen)
         aapt_file = os.path.join(self.aapt_out(binary), aapt_output)
 
         resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([gen.address])
         resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
-
         if resource_dirs:
           if aapt_file not in self._created_library_targets:
 
-            # Priority for resources is left->right, so reverse collection order (DFS preorder).
-            args = self._render_args(binary, gen.manifest, reversed(resource_dirs))
+            # Priority for resources is left->right, so dependency order matters (see TODO in aapt_builder).
+            args = self._render_args(binary, gen.manifest, resource_dirs)
             with self.context.new_workunit(name='aaptgen', labels=[WorkUnitLabel.MULTITOOL]) as workunit:
               returncode = subprocess.call(args,
                                            stdout=workunit.output('stdout'),

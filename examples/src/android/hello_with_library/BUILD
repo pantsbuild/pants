@@ -7,9 +7,8 @@ android_binary(
   sources=rglobs('main/src/*.java'),
   manifest='main/AndroidManifest.xml',
   dependencies = [
-    '3rdparty/android:android-support-v4',
-    'examples/src/android/example_library',
     ':resources',
+    'examples/src/android/example_library',
     ':support-library',
   ],
 )
