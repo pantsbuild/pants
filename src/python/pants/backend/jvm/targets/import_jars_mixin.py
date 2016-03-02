@@ -16,7 +16,11 @@ from pants.util.memo import memoized_property
 
 
 class ImportJarsMixin(Target):
-  """A Target Mixin to be used when a target declares JarLibraries to be imported."""
+  """A Target Mixin to be used when a target declares JarLibraries to be imported.
+
+ :API: public
+  """
+  # TODO(mateo): Convert android unpack_libraries task to use payload_field.JarsField instead of making this public.
 
   class UnresolvedImportError(AddressLookupError):
     """Raised when an imported JarLibrary cannot be resolved."""
