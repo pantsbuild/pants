@@ -60,6 +60,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def implementation_version(cls):
+    """
+    :API: public
+    """
     return [('TaskBase', 1)]
 
   @classmethod
@@ -81,6 +84,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """The global subsystems this task uses.
 
     A tuple of subsystem types.
+
+    :API: public
     """
     return tuple()
 
@@ -89,6 +94,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """The private, per-task subsystems this task uses.
 
     A tuple of subsystem types.
+
+    :API: public
     """
     return (CacheSetup,)
 
@@ -99,6 +106,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     By default, each task is considered as creating a unique product type(s).
     Subclasses that create products, should override this to specify their unique product type(s).
+
+    :API: public
     """
     return []
 
@@ -114,7 +123,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def supports_passthru_args(cls):
-    """Subclasses may override to indicate that they can use passthru args."""
+    """Subclasses may override to indicate that they can use passthru args.
+
+    :API: public
+    """
     return False
 
   @classmethod
@@ -134,6 +146,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     At most 1 unique proposal is allowed amongst all tasks involved in the run.  If more than 1
     unique list of target roots is proposed an error is raised during task scheduling.
 
+    :API: public
+
     :returns list: The new target roots to use or none to accept the CLI specified target roots.
     """
 
@@ -151,6 +165,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     Typically a task that requires products from other goals would register interest in those
     products here and then retrieve the requested product mappings when executed.
+
+    :API: public
     """
 
   def __init__(self, context, workdir):
@@ -188,10 +204,16 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._fingerprint = None
 
   def get_options(self):
-    """Returns the option values for this task's scope."""
+    """Returns the option values for this task's scope.
+
+    :API: public
+    """
     return self.context.options.for_scope(self.options_scope)
 
   def get_passthru_args(self):
+    """
+    :API: public
+    """
     if not self.supports_passthru_args():
       raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
     else:
@@ -203,6 +225,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     It's not guaranteed that the workdir exists, just that no other task has been given this
     workdir path to use.
+
+    :API: public
     """
     return self._workdir
 
@@ -272,6 +296,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     which will automatically be uploaded to the cache. Tasks should place the output files
     for each VersionedTarget in said results directory. It is highly suggested to follow this
     schema for caching, rather than manually making updates to the artifact cache.
+
+    :API: public
     """
     return False
 
@@ -283,6 +309,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     for a target cloned into the results_dir for the current build (where possible). This
     copy-on-write behaviour allows for immutability of the results_dir once a target has been
     marked valid.
+
+    :API: public
     """
     return False
 
@@ -292,6 +320,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     Deterministic per-target incremental compilation is a relatively difficult thing to implement,
     so this property provides an escape hatch to avoid caching things in that riskier case.
+
+    :API: public
     """
     return False
 
@@ -306,6 +336,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """Checks targets for invalidation, first checking the artifact cache.
 
     Subclasses call this to figure out what to work on.
+
+    :API: public
 
     :param targets:               The targets to check for changes.
     :param invalidate_dependents: If True then any targets depending on changed targets are invalidated.
@@ -533,6 +565,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """If a single target was specified on the cmd line, returns that target.
 
     Otherwise throws TaskError.
+
+    :API: public
     """
     target_roots = self.context.target_roots
     if len(target_roots) == 0:
@@ -555,7 +589,10 @@ class Task(TaskBase):
 
   @abstractmethod
   def execute(self):
-    """Executes this task."""
+    """Executes this task.
+
+    :API: public
+    """
 
 
 class QuietTaskMixin(object):
