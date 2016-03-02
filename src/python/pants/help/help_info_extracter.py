@@ -10,7 +10,7 @@ from collections import namedtuple
 from pants.base.revision import Revision
 from pants.option.custom_types import dict_option, list_option
 from pants.option.option_util import is_boolean_flag
-from pants.version import VERSION
+from pants.version import PANTS_SEMVER
 
 
 class OptionHelpInfo(namedtuple('_OptionHelpInfo',
@@ -18,6 +18,8 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
      'typ', 'fromfile', 'default', 'help', 'deprecated_version', 'deprecated_message',
      'deprecated_hint', 'choices'])):
   """A container for help information for a single option.
+
+  :API: public
 
   registering_class: The type that registered the option.
   display_args: Arg strings suitable for display in help text, including value examples
@@ -37,12 +39,17 @@ class OptionHelpInfo(namedtuple('_OptionHelpInfo',
   """
 
   def comma_separated_display_args(self):
+    """
+    :API: public
+    """
     return ', '.join(self.display_args)
 
 
 class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
                                      ['scope', 'basic', 'recursive', 'advanced'])):
   """A container for help information for a scope of options.
+
+  :API: public
 
   scope: The scope of the described options.
   basic|recursive|advanced: A list of OptionHelpInfo for the options in that group.
@@ -51,19 +58,27 @@ class OptionScopeHelpInfo(namedtuple('_OptionScopeHelpInfo',
 
 
 class HelpInfoExtracter(object):
-  """Extracts information useful for displaying help from option registration args."""
+  """Extracts information useful for displaying help from option registration args.
+
+    :API: public
+  """
 
   @classmethod
   def get_option_scope_help_info_from_parser(cls, parser):
     """Returns a dict of help information for the options registered on the given parser.
 
     Callers can format this dict into cmd-line help, HTML or whatever.
+
+    :API: public
     """
     return cls(parser.scope).get_option_scope_help_info(parser.option_registrations_iter())
 
   @staticmethod
   def compute_default(kwargs):
-    """Compute the default value to display in help for an option registered with these kwargs."""
+    """Compute the default value to display in help for an option registered with these kwargs.
+
+    :API: public
+    """
     ranked_default = kwargs.get('default')
     action = kwargs.get('action')
     typ = None if action in ['store_true', 'store_false'] else kwargs.get('type', str)
@@ -90,7 +105,10 @@ class HelpInfoExtracter(object):
 
   @staticmethod
   def compute_metavar(kwargs):
-    """Compute the metavar to display in help for an option registered with these kwargs."""
+    """Compute the metavar to display in help for an option registered with these kwargs.
+
+    :API: public
+    """
     action = kwargs.get('action')
     metavar = kwargs.get('metavar')
     if not metavar:
@@ -105,11 +123,17 @@ class HelpInfoExtracter(object):
     return metavar
 
   def __init__(self, scope):
+    """
+    :API: public
+    """
     self._scope = scope
     self._scope_prefix = scope.replace('.', '-')
 
   def get_option_scope_help_info(self, option_registrations_iter):
-    """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs) pairs."""
+    """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs) pairs.
+
+    :API: public
+    """
     basic_options = []
     recursive_options = []
     advanced_options = []
@@ -131,11 +155,14 @@ class HelpInfoExtracter(object):
   def _get_deprecated_tense(self, deprecated_version, future_tense='Will be', past_tense='Was'):
     """Provides the grammatical tense for a given deprecated version vs the current version."""
     return future_tense if (
-      Revision.semver(deprecated_version) >= Revision.semver(VERSION)
+      Revision.semver(deprecated_version) >= PANTS_SEMVER
     ) else past_tense
 
   def get_option_help_info(self, args, kwargs):
-    """Returns an OptionHelpInfo for the option registered with the given (args, kwargs)."""
+    """Returns an OptionHelpInfo for the option registered with the given (args, kwargs).
+
+    :API: public
+    """
     display_args = []
     scoped_cmd_line_args = []
     unscoped_cmd_line_args = []

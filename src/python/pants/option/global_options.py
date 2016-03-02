@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from pants.base.build_environment import (get_buildroot, get_pants_cachedir, get_pants_configdir,
-                                          pants_version)
+from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
+                                          get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import list_option
 from pants.option.optionable import Optionable
@@ -77,6 +77,13 @@ class GlobalOptionsRegistrar(Optionable):
     register('--pants-distdir', advanced=True, metavar='<dir>',
              default=os.path.join(buildroot, 'dist'),
              help='Write end-product artifacts to this dir.')
+    register('--pants-config-files', advanced=True, type=list_option,
+             default=[get_default_pants_config_file()], help='Paths to Pants config files.')
+    # TODO: Deprecate --config-override in favor of --pants-config-files.
+    # But only once we're able to both append and override list-valued options, as there are
+    # use-cases for both here.
+    # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
+    # to set extra config file locations in an initial bootstrap config file.
     register('--config-override', advanced=True, action='append', metavar='<path>',
              help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, action='store_true', default=True,
@@ -89,6 +96,8 @@ class GlobalOptionsRegistrar(Optionable):
              help='Add these directories to PYTHONPATH to search for plugins.')
     register('--target-spec-file', action='append', dest='target_spec_files',
              help='Read additional specs from this file, one per line')
+    register('--verify-config', action='store_true', default=False,
+             help='Verify that all config file values correspond to known options.')
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
@@ -134,7 +143,9 @@ class GlobalOptionsRegistrar(Optionable):
              recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
     register('--spec-excludes', advanced=True, action='append',
              default=[register.bootstrap.pants_workdir],
-             deprecated_hint='Use --build-file-ignore instead.', deprecated_version='0.0.75',
+             deprecated_hint='Use --ignore-patterns instead. Use .gitignore syntax for each item, '
+                             'to simulate old behavior prefix each item with "/".',
+             deprecated_version='0.0.75',
              help='Ignore these paths when evaluating the command-line target specs.  Useful with '
                   '::, to avoid descending into unneeded directories.')
     register('--ignore-patterns', advanced=True, action='append', fromfile=True,
@@ -147,9 +158,12 @@ class GlobalOptionsRegistrar(Optionable):
                   'to process the non-erroneous subset of the input.')
     register('--cache-key-gen-version', advanced=True, default='200', recursive=True,
              help='The cache key generation. Bump this to invalidate every artifact for a scope.')
+    register('--workdir-max-build-entries', advanced=True, type=int, default=None,
+             help='Maximum number of previous builds to keep per task target pair in workdir. '
+             'If set, minimum 2 will always be kept to support incremental compilation.')
     register('--max-subprocess-args', advanced=True, type=int, default=100, recursive=True,
              help='Used to limit the number of arguments passed to some subprocesses by breaking '
-             'the command up into multiple invocations')
+             'the command up into multiple invocations.')
     register('--print-exception-stacktrace', advanced=True, action='store_true',
              help='Print to console the full exception stack trace if encountered.')
     register('--build-file-rev', advanced=True,

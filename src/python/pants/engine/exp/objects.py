@@ -12,6 +12,10 @@ from collections import namedtuple
 from pants.util.meta import AbstractClass
 
 
+class SerializationError(Exception):
+  """Indicates an error serializing an object."""
+
+
 # TODO: Likely no longer necessary, due to the laziness of the product graph.
 class Resolvable(AbstractClass):
   """Represents a resolvable object."""
@@ -28,6 +32,15 @@ class Resolvable(AbstractClass):
 def _unpickle_serializable(serializable_class, kwargs):
   # A pickle-compatible top-level function for custom unpickling of Serializables.
   return serializable_class(**kwargs)
+
+
+class Locatable(AbstractClass):
+  """Marks a class whose constructor should receive its spec_path relative to the build root.
+
+  Locatable objects will be passed a `spec_path` constructor kwarg that indicates where they
+  were parsed. If the object also has a `name` (not all do), then these two fields can be
+  combined into an Address.
+  """
 
 
 class SerializablePickle(namedtuple('CustomPickle', ['unpickle_func', 'args'])):
@@ -130,15 +143,3 @@ class Validatable(AbstractClass):
 
     :raises: :class:`ValidationError` if this object is invalid.
     """
-
-
-def datatype(*args, **kwargs):
-  """A wrapper for `namedtuple` that accounts for the type of the object in equality."""
-  class DataType(namedtuple(*args, **kwargs)):
-    def __eq__(self, other):
-      # Compare types and fields.
-      return type(other) == type(self) and super(DataType, self).__eq__(other)
-
-    def __ne__(self, other):
-      return (not self == other)
-  return DataType

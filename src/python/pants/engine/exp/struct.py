@@ -5,10 +5,20 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from abc import abstractproperty
 from collections import MutableMapping, MutableSequence
+
+import six
 
 from pants.engine.exp.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
 from pants.engine.exp.objects import Serializable, SerializableFactory, Validatable, ValidationError
+
+
+def _normalize_utf8_keys(kwargs):
+  """When kwargs are passed literally in a source file, their keys are ascii: normalize."""
+  if any(type(key) is six.binary_type for key in kwargs.keys()):
+    return {six.text_type(k): v for k, v in kwargs.items()}
+  return kwargs
 
 
 class Struct(Serializable, SerializableFactory, Validatable):
@@ -18,10 +28,18 @@ class Struct(Serializable, SerializableFactory, Validatable):
   Structs can carry a name in which case they become addressable and can be reused.
   """
 
-  # Internal book-keeping fields to exclude from hash codes/equality checks.
-  _SPECIAL_FIELDS = ('extends', 'merges', 'type_alias')
+  # Fields dealing with inheritance.
+  _INHERITANCE_FIELDS = {'extends', 'merges'}
+  # The type alias for an instance overwrites any inherited type_alias field.
+  _TYPE_ALIAS_FIELD = 'type_alias'
+  # The field that indicates whether a Struct is abstract (and should thus skip validation).
+  _ABSTRACT_FIELD = 'abstract'
+  # Fields that should not be inherited.
+  _UNINHERITABLE_FIELDS = _INHERITANCE_FIELDS | {_TYPE_ALIAS_FIELD, _ABSTRACT_FIELD}
+  # Fields that are only intended for consumption by the Struct baseclass.
+  _INTERNAL_FIELDS = _INHERITANCE_FIELDS | {_ABSTRACT_FIELD}
 
-  def __init__(self, abstract=False, extends=None, merges=None, **kwargs):
+  def __init__(self, abstract=False, extends=None, merges=None, type_alias=None, **kwargs):
     """Creates a new struct data blob.
 
     By default Structs are anonymous (un-named), concrete (not `abstract`), and they neither
@@ -54,9 +72,12 @@ class Struct(Serializable, SerializableFactory, Validatable):
                   this struct or this structs superclasses.
     :param **kwargs: The struct parameters.
     """
+    kwargs = _normalize_utf8_keys(kwargs)
+
     self._kwargs = kwargs
 
     self._kwargs['abstract'] = abstract
+    self._kwargs[self._TYPE_ALIAS_FIELD] = type_alias
 
     self.extends = extends
     self.merges = merges
@@ -71,7 +92,13 @@ class Struct(Serializable, SerializableFactory, Validatable):
                                      .format(self.address, self.name))
       self._kwargs['name'] = target_name
 
-    self._hashable_key = None
+  def kwargs(self):
+    """Returns a dict of the kwargs for this Struct which were not interpreted by the baseclass.
+
+    This excludes fields like `extends`, `merges`, and `abstract`, which are consumed by
+    SerializableFactory.create and Validatable.validate.
+    """
+    return {k: v for k, v in self._kwargs.items() if k not in self._INTERNAL_FIELDS}
 
   @property
   def name(self):
@@ -110,7 +137,8 @@ class Struct(Serializable, SerializableFactory, Validatable):
 
     :rtype: string
     """
-    return self._kwargs.get('type_alias', type(self).__name__)
+    type_alias = self._kwargs.get(self._TYPE_ALIAS_FIELD, None)
+    return type_alias if type_alias is not None else type(self).__name__
 
   @property
   def abstract(self):
@@ -120,7 +148,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
 
     :rtype: bool
     """
-    return self._kwargs['abstract']
+    return self._kwargs.get('abstract', False)
 
   # It only makes sense to inherit a subset of our own fields (we should not inherit new fields!),
   # our superclasses logically provide fields within this constrained set.
@@ -161,7 +189,7 @@ class Struct(Serializable, SerializableFactory, Validatable):
     attributes.pop('address', None)
 
     # We should never inherit special fields - these are for local book-keeping only.
-    for field in self._SPECIAL_FIELDS:
+    for field in self._UNINHERITABLE_FIELDS:
       attributes.pop(field, None)
 
     return attributes
@@ -170,8 +198,9 @@ class Struct(Serializable, SerializableFactory, Validatable):
     if not (self.extends or self.merges):
       return self
 
+    # Filter out the attributes that we will consume below for inheritance.
     attributes = {k: v for k, v in self._asdict().items()
-                  if k not in self._SPECIAL_FIELDS and v is not None}
+                  if k not in self._INHERITANCE_FIELDS and v is not None}
 
     if self.extends:
       for k, v in self._extract_inheritable_attributes(self.extends).items():
@@ -225,20 +254,18 @@ class Struct(Serializable, SerializableFactory, Validatable):
     raise AttributeError('{} does not have attribute {!r}'.format(self, item))
 
   def _key(self):
-    if self._hashable_key is None:
-      if self.address:
-        self._hashable_key = self.address
-      else:
-        def hashable(value):
-          if isinstance(value, dict):
-            return tuple(sorted((k, hashable(v)) for k, v in value.items()))
-          elif isinstance(value, list):
-            return tuple(hashable(v) for v in value)
-          else:
-            return value
-        self._hashable_key = tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
-                                          if k not in self._SPECIAL_FIELDS))
-    return self._hashable_key
+    if self.address:
+      return self.address
+    else:
+      def hashable(value):
+        if isinstance(value, dict):
+          return tuple(sorted((k, hashable(v)) for k, v in value.items()))
+        elif isinstance(value, list):
+          return tuple(hashable(v) for v in value)
+        else:
+          return value
+      return tuple(sorted((k, hashable(v)) for k, v in self._kwargs.items()
+                          if k not in self._INHERITANCE_FIELDS))
 
   def __hash__(self):
     return hash(self._key())
@@ -278,3 +305,47 @@ class StructWithDeps(Struct):
 
     :rtype: list
     """
+
+
+class HasStructs(object):
+  """A mixin to mark an object as containing a collection of Structs in one of its fields."""
+
+  @abstractproperty
+  def collection_field(cls):
+    """Returns the name of the field of this Class that contains a collection of Structs."""
+
+
+class Variants(Struct):
+  """A struct that holds default variant values.
+
+  Variants are key-value pairs representing uniquely identifying parameters for a Node.
+
+  Default variants are usually configured on a Target to be used whenever they are
+  not specified by a caller.
+
+  They can be imagined as a dict in terms of dupe handling, but for easier hashability they are
+  stored internally as sorted nested tuples of key-value strings.
+  """
+
+  @staticmethod
+  def merge(left, right):
+    """Merges right over left, ensuring that the return value is a tuple of tuples, or None."""
+    if not left:
+      if right:
+        return tuple(right)
+      else:
+        return None
+    if not right:
+      return tuple(left)
+    # Merge by key, and then return sorted by key.
+    merged = dict(left)
+    for key, value in right:
+      merged[key] = value
+    return tuple(sorted(merged.items()))
+
+  def __init__(self, default=None, **kwargs):
+    """
+    :param dict default: A dict of default variant values.
+    """
+    # TODO: enforce the type of variants using the Addressable framework.
+    super(Variants, self).__init__(default=default, **kwargs)

@@ -35,7 +35,7 @@ class BuildFileParser(object):
     pass
 
   class BuildFileScanError(BuildFileParserError):
-    """Raised if there was a problem when gathering all addresses in a BUILD file """
+    """Raised if there was a problem when gathering all addresses in a BUILD file"""
     pass
 
   class AddressableConflictException(BuildFileParserError):
@@ -71,10 +71,6 @@ class BuildFileParser(object):
       address_map.update(sibling_address_map)
     return address_map
 
-  @deprecated('0.0.72', hint_message='Use address_map_from_build_files instead.')
-  def address_map_from_build_file(self, build_file):
-    return self.address_map_from_build_files(build_file.family())
-
   def parse_build_files(self, build_files):
     family_address_map_by_build_file = {}  # {build_file: {address: addressable}}
     for bf in build_files:
@@ -90,10 +86,6 @@ class BuildFileParser(object):
                       target_name=address.target_name))
       family_address_map_by_build_file[bf] = bf_address_map
     return family_address_map_by_build_file
-
-  @deprecated('0.0.72', hint_message='Use parse_build_files instead.')
-  def parse_build_file_family(self, build_file):
-    return self.parse_build_files(build_file.family())
 
   def parse_build_file(self, build_file):
     """Capture Addressable instances from parsing `build_file`.

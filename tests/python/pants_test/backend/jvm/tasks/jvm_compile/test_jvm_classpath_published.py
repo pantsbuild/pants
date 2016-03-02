@@ -39,7 +39,7 @@ class RuntimeClasspathPublisherTest(TaskTestBase):
                                                     init_func=ClasspathProducts.init_func(self.pants_workdir))
       task = self.create_task(context)
 
-      target_classpath_output = os.path.join(dist_dir, self.options_scope, 'java', 'classpath', 'java_lib')
+      target_classpath_output = os.path.join(dist_dir, self.options_scope)
 
       # Create a classpath entry.
       touch(os.path.join(jar_dir, 'z1.jar'))

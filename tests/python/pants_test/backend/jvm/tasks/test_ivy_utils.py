@@ -18,7 +18,6 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
-from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file_path
@@ -196,14 +195,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     with self.assertRaises(IvyUtils.IvyResolveConflictingDepsError):
       IvyUtils._resolve_conflict(v2_force, v1_force)
 
-  def test_get_resolved_jars_for_jar_library(self):
+  def test_get_resolved_jars_for_coordinates(self):
     ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_diamond.xml')
-    lib = self.make_target(spec=':org1-name1',
-                           target_type=JarLibrary,
-                           jars=[JarDependency(org='org1', name='name1', rev='0.0.1',
-                                               classifier='tests')])
 
-    resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
+    resolved_jars = ivy_info.get_resolved_jars_for_coordinates([JarDependency(org='org1',
+                                                                              name='name1',
+                                                                              rev='0.0.1',
+                                                                              classifier='tests')])
 
     expected = {'ivy2cache_path/org1/name1.jar': coord(org='org1', name='name1',
                                                        classifier='tests'),
@@ -216,16 +214,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
   def test_resolved_jars_with_different_version(self):
     # If a jar is resolved as a different version than the requested one, the coordinates of
     # the resolved jar should match the artifact, not the requested coordinates.
-    lib = self.make_target(spec=':org1-name1',
-                           target_type=JarLibrary,
-                           jars=[
-                             JarDependency(org='org1', name='name1',
-                                           rev='0.0.1',
-                                           classifier='tests')])
 
     ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_resolve_to_other_version.xml')
 
-    resolved_jars = ivy_info.get_resolved_jars_for_jar_library(lib)
+    resolved_jars = ivy_info.get_resolved_jars_for_coordinates([JarDependency(org='org1',
+                                                                              name='name1',
+                                                                              rev='0.0.1',
+                                                                              classifier='tests')])
 
     self.maxDiff = None
     self.assertEqual([coord(org='org1', name='name1',
@@ -294,6 +289,23 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
             IvyModuleRef(org='org3', name='name3', rev='0.0.1', ext='tar.gz')
           },
           result1)
+
+  def test_retrieve_resolved_jars_with_coordinates_on_flat_fetch_resolve(self):
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_flat_graph.xml')
+    coordinates = [coord(org='org1', name='name1', classifier='tests', rev='0.0.1')]
+
+    result = ivy_info.get_resolved_jars_for_coordinates(coordinates)
+
+    self.assertEqual(coordinates, [r.coordinate for r in result])
+
+  def test_retrieve_resolved_jars_with_coordinates_differing_on_version_on_flat_fetch_resolve(self):
+    ivy_info = self.parse_ivy_report('ivy_utils_resources/report_with_flat_graph.xml')
+    coordinates = [coord(org='org2', name='name2', rev='0.0.0')]
+
+    result = ivy_info.get_resolved_jars_for_coordinates(coordinates)
+
+    self.assertEqual([coord(org='org2', name='name2', rev='0.0.1')],
+                     [r.coordinate for r in result])
 
   def test_parse_fails_when_same_classifier_different_type(self):
     with self.assertRaises(IvyResolveMappingError):
@@ -371,11 +383,13 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
     self.context()
 
     with self.assertRaises(IvyUtils.IvyResolveReportError):
-      IvyUtils.parse_xml_report('INVALID_CACHE_DIR', 'INVALID_REPORT_UNIQUE_NAME', 'default')
+      IvyUtils.parse_xml_report('default', IvyUtils.xml_report_path('INVALID_CACHE_DIR',
+                                                                    'INVALID_REPORT_UNIQUE_NAME',
+                                                                    'default'))
 
   def parse_ivy_report(self, rel_path):
     path = os.path.join('tests/python/pants_test/backend/jvm/tasks', rel_path)
-    ivy_info = IvyUtils._parse_xml_report(conf='default', path=path)
+    ivy_info = IvyUtils.parse_xml_report(conf='default', path=path)
     self.assertIsNotNone(ivy_info)
     return ivy_info
 

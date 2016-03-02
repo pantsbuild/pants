@@ -7,7 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 
 class Exclude(object):
-  """Represents a dependency exclude pattern to filter transitive dependencies against."""
+  """Represents a dependency exclude pattern to filter transitive dependencies against.
+
+  :API: public
+  """
 
   def __init__(self, org, name=None):
     """

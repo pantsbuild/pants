@@ -13,7 +13,6 @@ import pkgutil
 import threading
 import xml.etree.ElementTree as ET
 from collections import OrderedDict, defaultdict, namedtuple
-from contextlib import contextmanager
 
 import six
 from twitter.common.collections import OrderedSet
@@ -34,6 +33,13 @@ from pants.util.dirutil import safe_mkdir, safe_open
 IvyModule = namedtuple('IvyModule', ['ref', 'artifact', 'callers'])
 
 
+Dependency = namedtuple('DependencyAttributes',
+                        ['org', 'name', 'rev', 'mutable', 'force', 'transitive'])
+
+
+Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,6 +48,9 @@ class IvyResolveMappingError(Exception):
 
 
 class IvyModuleRef(object):
+  """
+  :API: public
+  """
 
   # latest.integration is ivy magic meaning "just get the latest version"
   _ANY_REV = 'latest.integration'
@@ -98,6 +107,9 @@ class IvyModuleRef(object):
 
 
 class IvyInfo(object):
+  """
+  :API: public
+  """
 
   def __init__(self, conf):
     self._conf = conf
@@ -169,18 +181,19 @@ class IvyInfo(object):
     visited = set()
     return self._do_traverse_dependency_graph(ref, collector, memo, visited)
 
-  def get_resolved_jars_for_jar_library(self, jar_library, memo=None):
-    """Collects jars for the passed jar_library.
+  def get_resolved_jars_for_coordinates(self, coordinates, memo=None):
+    """Collects jars for the passed coordinates.
 
     Because artifacts are only fetched for the "winning" version of a module, the artifacts
     will not always represent the version originally declared by the library.
 
-    This method is transitive within the library's jar_dependencies, but will NOT
-    walk into its non-jar dependencies.
+    This method is transitive within the passed coordinates dependencies.
 
-    :param jar_library A JarLibrary to collect the transitive artifacts for.
-    :param memo see `traverse_dependency_graph`
-    :returns: all the artifacts for all of the jars in this library, including transitive deps
+    :param coordinates collections.Iterable: Collection of coordinates to collect transitive
+                                             resolved jars for.
+    :param memo: See `traverse_dependency_graph`.
+    :returns: All the artifacts for all of the jars for the provided coordinates,
+              including transitive dependencies.
     :rtype: list of :class:`pants.backend.jvm.jar_dependency_utils.ResolvedJar`
     """
     def to_resolved_jar(jar_ref, jar_path):
@@ -193,7 +206,7 @@ class IvyInfo(object):
     resolved_jars = OrderedSet()
     def create_collection(dep):
       return OrderedSet([dep])
-    for jar in jar_library.jar_dependencies:
+    for jar in coordinates:
       classifier = jar.classifier if self._conf == 'default' else self._conf
       jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
@@ -203,7 +216,10 @@ class IvyInfo(object):
 
 
 class IvyUtils(object):
-  """Useful methods related to interaction with ivy."""
+  """Useful methods related to interaction with ivy.
+
+  :API: public
+  """
 
   ivy_lock = threading.RLock()
 
@@ -243,6 +259,9 @@ class IvyUtils(object):
                executor,
                workunit_name,
                workunit_factory):
+    """
+    :API: public
+    """
     ivy = ivy or Bootstrapper.default_ivy()
 
     ivy_args = ['-ivy', ivyxml]
@@ -319,6 +338,8 @@ class IvyUtils(object):
   def xml_report_path(cls, cache_dir, resolve_hash_name, conf):
     """The path to the xml report ivy creates after a retrieve.
 
+    :API: public
+
     :param string cache_dir: The path of the ivy cache dir used for resolves.
     :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
                                      resolution.
@@ -330,29 +351,20 @@ class IvyUtils(object):
                                                          resolve_hash_name, conf))
 
   @classmethod
-  def parse_xml_report(cls, cache_dir, resolve_hash_name, conf):
+  def parse_xml_report(cls, conf, path):
     """Parse the ivy xml report corresponding to the name passed to ivy.
 
-    :param string cache_dir: The path of the ivy cache dir used for resolves.
-    :param string resolve_hash_name: Hash from the Cache key from the VersionedTargetSet used for
-                                     resolution; if `None` returns `None` instead of attempting to
-                                     parse any report.
+    :API: public
+
     :param string conf: the ivy conf name (e.g. "default")
-    :returns: The info in the xml report or None if target is empty.
+    :param string path: The path to the ivy report file.
+    :returns: The info in the xml report.
     :rtype: :class:`IvyInfo`
     :raises: :class:`IvyResolveMappingError` if no report exists.
     """
-    # TODO(John Sirois): Cleanup acceptance of None, this is IvyResolve's concern, not ours.
-    if not resolve_hash_name:
-      return None
-    path = cls.xml_report_path(cache_dir, resolve_hash_name, conf)
     if not os.path.exists(path):
       raise cls.IvyResolveReportError('Missing expected ivy output file {}'.format(path))
 
-    return cls._parse_xml_report(conf, path)
-
-  @classmethod
-  def _parse_xml_report(cls, conf, path):
     logger.debug("Parsing ivy report {}".format(path))
     ret = IvyInfo(conf)
     etree = ET.parse(path)
@@ -554,8 +566,6 @@ class IvyUtils(object):
 
   @classmethod
   def _generate_jar_template(cls, jars):
-    Dependency = namedtuple('DependencyAttributes', ['org', 'name', 'rev', 'mutable', 'force',
-                                                     'transitive'])
     global_dep_attributes = set(Dependency(org=jar.org,
                                            name=jar.name,
                                            rev=jar.rev,
@@ -579,7 +589,6 @@ class IvyUtils(object):
 
     any_have_url = False
 
-    Artifact = namedtuple('Artifact', ['name', 'type_', 'ext', 'url', 'classifier'])
     artifacts = OrderedDict()
     for jar in jars:
       ext = jar.ext

@@ -13,8 +13,14 @@ from pants.goal.goal import Goal
 
 
 class TaskRegistrar(object):
+  """
+  :API: public
+  """
+
   def __init__(self, name, action, dependencies=None, serialize=True):
     """
+    :API: public
+
     :param name: the name of the task.
     :param action: the Task action object to invoke this task.
     :param dependencies: DEPRECATED
@@ -47,6 +53,9 @@ class TaskRegistrar(object):
 
   @property
   def task_type(self):
+    """
+    :API: public
+    """
     return self._task
 
   def install(self, goal=None, first=False, replace=False, before=None, after=None):
@@ -55,6 +64,8 @@ class TaskRegistrar(object):
     The placement of the task in the execution list of the goal defaults to the end but can be
     :rtype : object
     influence by specifying exactly one of the following arguments:
+
+    :API: public
 
     :param first: Places this task 1st in the goal's execution list.
     :param replace: Replaces any existing tasks in the goal with this goal.

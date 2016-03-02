@@ -16,8 +16,7 @@ class DefaultFingerprintHashingMixin(object):
 
   Warning: Don't use this when the mixed in class has instance attributes mixed into its
   fingerprints.  This will cause subtle bugs because fingerprints are cached on the Target
-  base class, and the cache key is the instance of the FingerprintStrategy.
-  """
+  base class, and the cache key is the instance of the FingerprintStrategy."""
 
   def __hash__(self):
     return hash(type(self))
@@ -46,19 +45,28 @@ class FingerprintStrategy(AbstractClass):
     """Subclasses must implement a hash so computed fingerprints can be safely memoized."""
 
   @abstractmethod
-  def __eq__(self):
+  def __eq__(self, other):
     """Subclasses must implement an equality check so computed fingerprints can be safely memoized."""
 
 
 class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
-  """The default FingerprintStrategy, which delegates to target.payload.invalidation_hash()."""
+  """The default FingerprintStrategy, which delegates to target.payload.invalidation_hash().
+
+  :API: public
+  """
 
   def compute_fingerprint(self, target):
+    """
+    :API: public
+    """
     return target.payload.fingerprint()
 
 
 class TaskIdentityFingerprintStrategy(FingerprintStrategy):
-  """Fingerprint strategy which includes the current task fingerprint when fingerprinting target."""
+  """Fingerprint strategy which includes the current task fingerprint when fingerprinting target.
+
+  :API: public
+  """
 
   def __init__(self, task):
     self._task = task
@@ -70,6 +78,9 @@ class TaskIdentityFingerprintStrategy(FingerprintStrategy):
     return hasher
 
   def compute_fingerprint(self, target):
+    """
+    :API: public
+    """
     hasher = self._build_hasher(target)
     return hasher.hexdigest()
 

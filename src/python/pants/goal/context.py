@@ -16,7 +16,7 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnitLabel
-from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
 from pants.goal.products import Products
 from pants.goal.workspace import ScmWorkspace
@@ -33,6 +33,8 @@ class Context(object):
 
   Advanced uses of the context include adding new targets to it for upstream or downstream goals to
   operate on and mapping of products a goal creates to the targets the products are associated with.
+
+  :API: public
   """
 
   class Log(object):
@@ -62,6 +64,9 @@ class Context(object):
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
                workspace=None, spec_excludes=None, invalidation_report=None):
+    """
+    :API: public
+    """
     deprecated_conditional(lambda: spec_excludes is not None,
                            '0.0.75',
                            'Use address_mapper#build_ignore_patterns instead.')
@@ -88,22 +93,34 @@ class Context(object):
 
   @property
   def options(self):
-    """Returns the new-style options."""
+    """Returns the new-style options.
+
+    :API: public
+    """
     return self._options
 
   @property
   def log(self):
-    """Returns the preferred logger for goals to use."""
+    """Returns the preferred logger for goals to use.
+
+    :API: public
+    """
     return self._log
 
   @property
   def products(self):
-    """Returns the Products manager for the current run."""
+    """Returns the Products manager for the current run.
+
+    :API: public
+    """
     return self._products
 
   @property
   def source_roots(self):
-    """Returns the :class:`pants.source.source_root.SourceRoots` instance for the current run."""
+    """Returns the :class:`pants.source.source_root.SourceRoots` instance for the current run.
+
+    :API: public
+    """
     return self._source_roots
 
   @property
@@ -113,22 +130,33 @@ class Context(object):
     This set is strictly a subset of all targets in play for the run as returned by self.targets().
     Note that for a command line invocation that uses wildcard selectors : or ::, the targets
     globbed by the wildcards are considered to be target roots.
+
+    :API: public
     """
     return self._target_roots
 
   @property
   def console_outstream(self):
-    """Returns the output stream to write console messages to."""
+    """Returns the output stream to write console messages to.
+
+    :API: public
+    """
     return self._console_outstream
 
   @property
   def scm(self):
-    """Returns the current workspace's scm, if any."""
+    """Returns the current workspace's scm, if any.
+
+    :API: public
+    """
     return self._scm
 
   @property
   def workspace(self):
-    """Returns the current workspace, if any."""
+    """Returns the current workspace, if any.
+
+    :API: public
+    """
     return self._workspace
 
   @property
@@ -138,6 +166,9 @@ class Context(object):
 
   @property
   def invalidation_report(self):
+    """
+    :API: public
+    """
     return self._invalidation_report
 
   def __str__(self):
@@ -145,6 +176,9 @@ class Context(object):
     return 'Context(id:{}, targets:{})'.format(ident, self.targets())
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
+    """
+    :API: public
+    """
     background_root_workunit = self.run_tracker.get_background_root_workunit()
     if parent_workunit_name:
       # We have to keep this workunit alive until all its child work is done, so
@@ -162,11 +196,16 @@ class Context(object):
       work_chain, workunit_parent=workunit_parent, done_hook=done_hook)
 
   def background_worker_pool(self):
-    """Returns the pool to which tasks can submit background work."""
+    """Returns the pool to which tasks can submit background work.
+
+    :API: public
+    """
     return self.run_tracker.background_worker_pool()
 
   def subproc_map(self, f, items):
     """Map function `f` over `items` in subprocesses and return the result.
+
+      :API: public
 
       :param f: A multiproc-friendly (importable) work function.
       :param items: A iterable of pickleable arguments to f.
@@ -188,13 +227,18 @@ class Context(object):
 
   @contextmanager
   def new_workunit(self, name, labels=None, cmd='', log_config=None):
-    """Create a new workunit under the calling thread's current workunit."""
+    """Create a new workunit under the calling thread's current workunit.
+
+    :API: public
+    """
     with self.run_tracker.new_workunit(name=name, labels=labels, cmd=cmd, log_config=log_config) as workunit:
       yield workunit
 
   def acquire_lock(self):
     """ Acquire the global lock for the root directory associated with this context. When
     a goal requires serialization, it will call this to acquire the lock.
+
+    :API: public
     """
     if self.options.for_global_scope().lock:
       if not self._lock.i_am_locking():
@@ -203,6 +247,8 @@ class Context(object):
   def release_lock(self):
     """Release the global lock if it's held.
     Returns True if the lock was held before this call.
+
+    :API: public
     """
     if not self._lock.i_am_locking():
       return False
@@ -211,7 +257,10 @@ class Context(object):
       return True
 
   def is_unlocked(self):
-    """Whether the global lock object is actively holding the lock."""
+    """Whether the global lock object is actively holding the lock.
+
+    :API: public
+    """
     return not self._lock.i_am_locking()
 
   def _replace_targets(self, target_roots):
@@ -232,6 +281,8 @@ class Context(object):
 
     This method ensures the target resolves files against the given target_base, creating the
     directory if needed and registering a source root.
+
+    :API: public
     """
     target_base = os.path.join(get_buildroot(), target_base or address.spec_path)
     if not os.path.exists(target_base):
@@ -258,6 +309,8 @@ class Context(object):
 
     Also includes any new synthetic targets created from the target roots or their transitive
     dependencies during the course of the run.
+
+    :API: public
 
     :param predicate: If specified, the predicate will be used to narrow the scope of targets
                       returned.
@@ -287,6 +340,8 @@ class Context(object):
   def dependents(self, on_predicate=None, from_predicate=None):
     """Returns  a map from targets that satisfy the from_predicate to targets they depend on that
       satisfy the on_predicate.
+
+    :API: public
     """
     core = set(self.targets(on_predicate))
     dependees = defaultdict(set)
@@ -297,7 +352,10 @@ class Context(object):
     return dependees
 
   def resolve(self, spec):
-    """Returns an iterator over the target(s) the given address points to."""
+    """Returns an iterator over the target(s) the given address points to.
+
+    :API: public
+    """
     return self.build_graph.resolve(spec)
 
   def scan(self, root=None):
@@ -307,10 +365,12 @@ class Context(object):
     targets parsed in the root tree's BUILD files will be followed and this may lead to BUILD files
     outside of ``root`` being parsed and included in the returned build graph.
 
+    :API: public
+
     :param string root: The path to scan; by default, the build root.
     :returns: A new build graph encapsulating the targets found.
     """
-    build_graph = BuildGraph(self.address_mapper)
-    for address in self.address_mapper.scan_addresses(root, spec_excludes=self.spec_excludes):
+    build_graph = MutableBuildGraph(self.address_mapper)
+    for address in self.address_mapper.scan_addresses(root, spec_excludes=self._spec_excludes):
       build_graph.inject_address_closure(address)
     return build_graph

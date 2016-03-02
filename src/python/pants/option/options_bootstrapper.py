@@ -6,23 +6,68 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
+import logging
 import os
 import sys
 
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.base.build_environment import get_default_pants_config_file
+from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
+from pants.option.custom_types import list_option
+from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_boolean_flag
 from pants.option.options import Options
 
 
+logger = logging.getLogger(__name__)
+
+
 class OptionsBootstrapper(object):
   """An object that knows how to create options in two stages: bootstrap, and then full options."""
 
-  def __init__(self, env=None, configpath=None, args=None):
+  @staticmethod
+  def get_config_file_paths(env, args):
+    """Get the location of the config files.
+
+    The locations are specified by the --pants-config-files option.  However we need to load the
+    config in order to process the options.  This method special-cases --pants-config-files
+    in order to solve this chicken-and-egg problem.
+
+    Note that, obviously, it's not possible to set the location of config files in a config file.
+    Doing so will have no effect.
+    """
+    # This exactly mirrors the logic applied in Option to all regular options.  Note that we'll
+    # also parse --pants-config as a regular option later, but there's no harm in that.  In fact,
+    # it's preferable, so that any code that happens to want to know where we read config from
+    # can inspect the option.
+    flag = '--pants-config-files='
+    evars = ['PANTS_DEFAULT_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
+
+    paths_str = None
+
+    for arg in args:
+      # Technically this is very slightly incorrect, as we don't check scope.  But it's
+      # very unlikely that any task or subsystem will have an option named --pants-config-files.
+      # TODO: Enforce a ban on options with a --pants- prefix outside our global options?
+      if arg.startswith(flag):
+        paths_str = arg[len(flag):]
+        break
+    if not paths_str:
+      for var in evars:
+        if var in env:
+          paths_str = env[var]
+          break
+    if paths_str:
+      paths = list_option(paths_str)
+    else:
+      paths = [get_default_pants_config_file()]
+
+    return paths
+
+  def __init__(self, env=None, args=None):
     self._env = env if env is not None else os.environ.copy()
-    self._configpath = configpath
     self._post_bootstrap_config = None  # Will be set later.
     self._args = sys.argv if args is None else args
     self._bootstrap_options = None  # We memoize the bootstrap options here.
@@ -61,7 +106,7 @@ class OptionsBootstrapper(object):
       # bootstrap options.
       bargs = filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != '--', self._args))
 
-      configpaths = [self._configpath] if self._configpath else None
+      configpaths = self.get_config_file_paths(env=self._env, args=self._args)
       pre_bootstrap_config = Config.load(configpaths)
 
       def bootstrap_options_from_config(config):
@@ -94,7 +139,6 @@ class OptionsBootstrapper(object):
       # Now recompute the bootstrap options with the full config. This allows us to pick up
       # bootstrap values (such as backends) from a config override file, for example.
       self._bootstrap_options = bootstrap_options_from_config(self._post_bootstrap_config)
-
     return self._bootstrap_options
 
   def get_full_options(self, known_scope_infos):
@@ -117,3 +161,32 @@ class OptionsBootstrapper(object):
                                                bootstrap_option_values=bootstrap_option_values,
                                                option_tracker=self._option_tracker)
     return self._full_options[key]
+
+  def verify_configs_against_options(self, options):
+    """Verify all loaded configs have correct scopes and options.
+
+    :param options: Fully bootstrapped valid options.
+    :return: None.
+    """
+    has_error = False
+    for config in self._post_bootstrap_config.configs:
+      for section in config.sections():
+        if section == GLOBAL_SCOPE_CONFIG_SECTION:
+          scope = GLOBAL_SCOPE
+        else:
+          scope = section
+        try:
+          valid_options_under_scope = set(options.for_scope(scope))
+        except OptionsError:
+          logger.error("Invalid scope [{}] in {}".format(section, config.configpath))
+          has_error = True
+        else:
+          # All the options specified under [`section`] in `config` excluding bootstrap defaults.
+          all_options_under_scope = set(config.configparser.options(section)) - set(config.configparser.defaults())
+          for option in all_options_under_scope:
+            if option not in valid_options_under_scope:
+              logger.error("Invalid option '{}' under [{}] in {}".format(option, section, config.configpath))
+              has_error = True
+
+    if has_error:
+      raise OptionsError("Invalid config entries detected. See log for details.")

@@ -11,6 +11,7 @@
     "dev": "dist/markdown/html/src/python/pants/docs/readme.html",
     "dev_tasks": "dist/markdown/html/src/python/pants/docs/dev_tasks.html",
     "dev_tasks_publish_extras": "dist/markdown/html/src/python/pants/docs/dev_tasks_publish_extras.html",
+    "deprecation_policy": "dist/markdown/html/src/python/pants/docs/deprecation_policy.html",
     "docs": "dist/markdown/html/src/python/pants/docs/docs.html",
     "export" : "dist/markdown/html/src/python/pants/docs/export.html",
     "first_concepts": "dist/markdown/html/src/docs/first_concepts.html",
@@ -36,6 +37,7 @@
     "release_jvm": "dist/markdown/html/src/python/pants/docs/release_jvm.html",
     "scala": "dist/markdown/html/examples/src/scala/org/pantsbuild/example/readme.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
+    "styleguide": "dist/markdown/html/src/python/pants/docs/styleguide.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
     "tshoot": "dist/markdown/html/src/docs/tshoot.html",
     "ThriftDeps": "dist/markdown/html/examples/src/thrift/org/pantsbuild/example/readme.html",
@@ -109,9 +111,11 @@
                 { "page": "dev_tasks_publish_extras" }
 	      ]
             },
+            { "page": "styleguide" },
             { "page": "howto_plugin" },
             { "page": "intellij" },
             { "page": "internals" },
+            { "page": "deprecation_policy" },
             { "page": "release",
               "children": [
                 { "page": "release_jvm" }

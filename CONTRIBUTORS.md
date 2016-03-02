@@ -12,10 +12,12 @@ Created by running `build-support/bin/contributors.sh`.
 + Chris Aniszczyk
 + Chris Burroughs
 + Chris Chen
++ Chris Heisterkamp
 + Chris Pesto
 + Cody Gibb
 + Craig Schertz
 + Dan Davydov
++ Dan Fabulich
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley

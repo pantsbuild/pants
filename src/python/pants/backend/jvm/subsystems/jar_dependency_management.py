@@ -164,7 +164,7 @@ class JarDependencyManagement(Subsystem):
   def targets_by_artifact_set(self, targets):
     """Partitions the input targets by the sets of pinned artifacts they are managed by.
 
-    :param list targets: the input targets (typically just JarLibrary targets).
+    :param collections.Iterable targets: the input targets (typically just JarLibrary targets).
     :return: a mapping of PinnedJarArtifactSet -> list of targets.
     :rtype: dict
     """

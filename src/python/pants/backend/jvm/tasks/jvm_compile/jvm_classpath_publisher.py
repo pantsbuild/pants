@@ -18,7 +18,7 @@ class RuntimeClasspathPublisher(Task):
   def register_options(cls, register):
     super(Task, cls).register_options(register)
     register('--use-old-naming-style', advanced=True, default=True, action='store_true',
-             deprecated_version='0.0.71',
+             deprecated_version='0.0.71', removal_version='0.0.75',
              deprecated_hint='Switch to use the safe identifier to construct canonical classpath.',
              help='Use the old (unsafe) naming style construct canonical classpath.')
 
@@ -33,9 +33,7 @@ class RuntimeClasspathPublisher(Task):
   def execute(self):
     basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    use_target_id = not self.get_options().use_old_naming_style
     ClasspathUtil.create_canonical_classpath(runtime_classpath,
                                              self.context.targets(),
                                              basedir,
-                                             save_classpath_file=True,
-                                             use_target_id=use_target_id)
+                                             save_classpath_file=True)

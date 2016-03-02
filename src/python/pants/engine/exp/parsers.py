@@ -17,7 +17,7 @@ import six
 
 from pants.build_graph.address import Address
 from pants.engine.exp.objects import Resolvable, Serializable
-from pants.util.memo import memoized, memoized_method, memoized_property
+from pants.util.memo import memoized, memoized_method
 from pants.util.meta import AbstractClass
 
 
@@ -42,14 +42,6 @@ class ParseError(Exception):
   """Indicates an error parsing BUILD configuration."""
 
 
-def _read(path):
-  try:
-    with open(path) as fp:
-      return fp.read()
-  except OSError as e:
-    raise ParseError('Problem reading path {}: {}'.format(path, e))
-
-
 class SymbolTable(AbstractClass):
   """A one-classmethod interface exposing a symbol table dict.
 
@@ -66,12 +58,14 @@ class SymbolTable(AbstractClass):
 class Parser(AbstractClass):
   @classmethod
   @abstractmethod
-  def parse(cls, path, symbol_table):
+  def parse(cls, filepath, filecontent, symbol_table_cls):
     """
-    :param dict symbol_table: A symbol table to expose to the python file being parsed.
-    :returns: A callable that accepts a string path and returns a list of decoded addressable,
-              Serializable objects.  The callable will raise :class:`ParseError` if there were any
-              problems encountered parsing the python BUILD file at the given path.
+    :param string filepath: The name of the file being parsed. The parser should not assume
+                            that the path is accessible, and should consume the filecontent.
+    :param bytes filecontent: The raw byte content to parse.
+    :param dict symbol_table_cls: A symbol table to expose to the python file being parsed.
+    :returns: A list of decoded addressable, Serializable objects. The callable will
+              raise :class:`ParseError` if there were any problems encountered parsing the filecontent.
     :rtype: :class:`collections.Callable`
     """
 
@@ -101,7 +95,7 @@ class JsonParser(Parser):
     return JSONDecoder(encoding='UTF-8', object_hook=decoder, strict=True)
 
   @classmethod
-  def parse(cls, path, symbol_table_cls):
+  def parse(cls, filepath, filecontent, symbol_table_cls):
     """Parse the given json encoded string into a list of top-level objects found.
 
     The parser accepts both blank lines and comment lines (those beginning with optional whitespace
@@ -110,14 +104,8 @@ class JsonParser(Parser):
     The parse also supports a simple protocol for serialized types that have an `_asdict` method.
     This includes `namedtuple` subtypes as well as any custom class with an `_asdict` method defined;
     see :class:`pants.engine.exp.serializable.Serializable`.
-
-    :param string path: The path of a json encoded document with extra support for blank lines,
-                        comments and multiple top-level objects.
-    :returns: A list of decoded json data.
-    :rtype: list
-    :raises: :class:`ParseError` if there were any problems encountered parsing the given `json`.
     """
-    json = _read(path)
+    json = filecontent
 
     decoder = cls._get_decoder(symbol_table_cls)
 
@@ -196,9 +184,9 @@ class JsonParser(Parser):
         for line_number, line in comment_lines:
           formatted_json_lines.insert(line_number, format_line(line))
 
-        raise ParseError('{error}\nIn document at {path}:\n{json_data}'
+        raise ParseError('{error}\nIn document at {filepath}:\n{json_data}'
                         .format(error=e,
-                                path=path,
+                                filepath=filepath,
                                 json_data='\n'.join(header_lines + formatted_json_lines)))
 
     return objects
@@ -259,10 +247,10 @@ class PythonAssignmentsParser(Parser):
     return parse_globals
 
   @classmethod
-  def parse(cls, path, symbol_table_cls):
+  def parse(cls, filepath, filecontent, symbol_table_cls):
     parse_globals = cls._get_globals(symbol_table_cls)
 
-    python = _read(path)
+    python = filecontent
     symbols = {}
     six.exec_(python, parse_globals, symbols)
 
@@ -317,10 +305,10 @@ class PythonCallbacksParser(Parser):
     return objects, parse_globals
 
   @classmethod
-  def parse(cls, path, symbol_table_cls):
+  def parse(cls, filepath, filecontent, symbol_table_cls):
     objects, parse_globals = cls._get_globals(symbol_table_cls)
 
-    python = _read(path)
+    python = filecontent
     with cls._lock:
       del objects[:]
       six.exec_(python, parse_globals, {})

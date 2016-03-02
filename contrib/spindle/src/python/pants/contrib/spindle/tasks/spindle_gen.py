@@ -111,7 +111,7 @@ class SpindleGen(NailgunTask):
     targets = self.codegen_targets()
     build_graph = self.context.build_graph
     with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
-      for vts in invalidation_check.invalid_vts_partitioned:
+      for vts in invalidation_check.invalid_vts:
         invalid_targets = vts.targets
         self.execute_codegen(invalid_targets)
 

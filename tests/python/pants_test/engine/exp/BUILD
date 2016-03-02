@@ -24,10 +24,11 @@ python_tests(
   name='engine',
   sources=['test_engine.py'],
   dependencies=[
+    'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
+    'src/python/pants/engine/exp/examples:planners',
     'src/python/pants/engine/exp:engine',
     'src/python/pants/engine/exp:scheduler',
-    'src/python/pants/engine/exp/examples:planners',
   ]
 )
 
@@ -40,7 +41,6 @@ python_tests(
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:struct',
-    'src/python/pants/engine/exp:targets',
   ]
 )
 
@@ -52,7 +52,6 @@ python_tests(
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
     'src/python/pants/engine/exp:struct',
-    'src/python/pants/engine/exp:targets',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ]

@@ -13,7 +13,6 @@ import warnings
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pants.base.deprecated import PastRemovalVersionError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
 from pants.option.custom_types import dict_option, file_option, list_option, target_list_option
@@ -221,7 +220,7 @@ class OptionsTest(unittest.TestCase):
     self.assertEqual([], options.for_global_scope().y)
 
     options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['123','456']"})
-    self.assertEqual(['123','456'], options.for_global_scope().config_override)
+    self.assertEqual(['123', '456'], options.for_global_scope().config_override)
 
     options = self._parse('./pants ', env={'PANTS_CONFIG_OVERRIDE': "['']"})
     self.assertEqual([''], options.for_global_scope().config_override)
@@ -312,7 +311,7 @@ class OptionsTest(unittest.TestCase):
                                                  }}).for_global_scope()
     with self.assertRaises(Parser.BooleanConversionError):
       self._parse('./pants', config={'DEFAULT': {'store_true_flag': 'AlmostTrue',
-                                               }}).for_global_scope()
+                                                 }}).for_global_scope()
 
   def test_defaults(self):
     # Hard-coded defaults.
@@ -670,7 +669,7 @@ class OptionsTest(unittest.TestCase):
                           config={
                             'DEFAULT': {'a': 100},
                             'compile': {'a': 99},
-                            })
+                          })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
 
@@ -691,14 +690,14 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants compile --a=99',
                           config={
                             'DEFAULT': {'a': 100},
-                            })
+                          })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Command line has precedence over environment.
     options = self._parse('./pants compile --a=99',
-                          env={'PANTS_A': 100},)
+                          env={'PANTS_A': 100}, )
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
@@ -707,15 +706,15 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants ',
                           config={
                             'DEFAULT': {'a': 100},
-                            },
-                          env={'PANTS_COMPILE_A': 99},)
+                          },
+                          env={'PANTS_COMPILE_A': 99}, )
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
     self.assertEquals(99, options.for_scope('compile.java').a)
 
     # Command line global overrides the middle scope setting in then env.
     options = self._parse('./pants --a=100',
-                          env={'PANTS_COMPILE_A': 99},)
+                          env={'PANTS_COMPILE_A': 99}, )
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
@@ -724,7 +723,7 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --a=100 ',
                           config={
                             'compile': {'a': 99},
-                            })
+                          })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
@@ -733,8 +732,8 @@ class OptionsTest(unittest.TestCase):
     options = self._parse('./pants --a=100 ',
                           config={
                             'compile': {'a': 99},
-                            },
-                          env={'PANTS_A': 100},)
+                          },
+                          env={'PANTS_A': 100}, )
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(100, options.for_scope('compile').a)
     self.assertEquals(100, options.for_scope('compile.java').a)
@@ -810,12 +809,14 @@ class OptionsTest(unittest.TestCase):
   def test_fromfile_config(self):
     def parse_func(dest, fromfile):
       return self._parse('./pants fromfile', config={'fromfile': {dest: '@{}'.format(fromfile)}})
+
     self.assert_fromfile(parse_func)
 
   def test_fromfile_env(self):
     def parse_func(dest, fromfile):
       return self._parse('./pants fromfile',
                          env={'PANTS_FROMFILE_{}'.format(dest.upper()): '@{}'.format(fromfile)})
+
     self.assert_fromfile(parse_func)
 
   def test_fromfile_error(self):
@@ -840,3 +841,43 @@ class OptionsTest(unittest.TestCase):
   def test_option_tracker_required(self):
     with self.assertRaises(Options.OptionTrackerRequiredError):
       Options.create(None, None, [])
+
+  def test_pants_global_designdoc_example(self):
+    # The example from the design doc.
+    # Get defaults from config and environment.
+    config = {
+      'GLOBAL': {'b': '99'},
+      'compile': {'a': '88', 'c': '77'},
+    }
+
+    env = {
+      'PANTS_COMPILE_C': '66'
+    }
+
+    options = self._parse('./pants --a=1 compile --b=2 compile.java --a=3 --c=4',
+                          env=env, config=config)
+
+    self.assertEqual(1, options.for_global_scope().a)
+    self.assertEqual(99, options.for_global_scope().b)
+    with self.assertRaises(AttributeError):
+      _ = options.for_global_scope().c
+
+    self.assertEqual(1, options.for_scope('compile').a)
+    self.assertEqual(2, options.for_scope('compile').b)
+    self.assertEqual(66, options.for_scope('compile').c)
+
+    self.assertEqual(3, options.for_scope('compile.java').a)
+    self.assertEqual(2, options.for_scope('compile.java').b)
+    self.assertEqual(4, options.for_scope('compile.java').c)
+
+  def test_pants_global_with_default(self):
+    """
+    This test makes sure values under [DEFAULT] still gets read.
+    """
+    config = {'DEFAULT': {'b': '99'},
+              'GLOBAL': {'store_true_flag': True}
+              }
+    options = self._parse('./pants', config=config)
+
+    self.assertEqual(99, options.for_global_scope().b)
+    self.assertTrue(options.for_global_scope().store_true_flag)

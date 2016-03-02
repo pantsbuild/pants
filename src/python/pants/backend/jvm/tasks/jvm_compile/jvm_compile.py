@@ -136,7 +136,10 @@ class JvmCompile(NailgunTaskBase):
 
     register('--size-estimator', advanced=True,
              choices=list(cls.size_estimators.keys()), default='filesize',
-             help='The method of target size estimation.')
+             help='The method of target size estimation. The size estimator estimates the size '
+                  'of targets in order to build the largest targets first (subject to dependency '
+                  'constraints). Choose \'random\' to choose random sizes for each target, which '
+                  'may be useful for distributed builds.')
 
     register('--capture-log', advanced=True, action='store_true', default=False,
              fingerprint=True,
@@ -328,10 +331,6 @@ class JvmCompile(NailgunTaskBase):
     if not relevant_targets:
       return
 
-    # Clone the compile_classpath to the runtime_classpath.
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    runtime_classpath = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
-
     # This ensures the workunit for the worker pool is set
     with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
             as workunit:
@@ -342,15 +341,15 @@ class JvmCompile(NailgunTaskBase):
                                      self.context.run_tracker,
                                      self._worker_count)
 
+    # Clone the compile_classpath to the runtime_classpath.
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
 
-
-    classpath_product = self.context.products.get_data('runtime_classpath')
     fingerprint_strategy = self._fingerprint_strategy(classpath_product)
     # Invalidation check. Everything inside the with block must succeed for the
     # invalid targets to become valid.
     with self.invalidated(relevant_targets,
                           invalidate_dependents=True,
-                          partition_size_hint=0,
                           fingerprint_strategy=fingerprint_strategy,
                           topological_order=True) as invalidation_check:
 
@@ -376,11 +375,10 @@ class JvmCompile(NailgunTaskBase):
 
       # Once compilation has completed, replace the classpath entry for each target with
       # its jar'd representation.
-      classpath_products = self.context.products.get_data('runtime_classpath')
       for cc in compile_contexts.values():
         for conf in self._confs:
-          classpath_products.remove_for_target(cc.target, [(conf, cc.classes_dir)])
-          classpath_products.add_for_target(cc.target, [(conf, cc.jar_file)])
+          classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
+          classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
   def compile_chunk(self,
                     invalidation_check,
@@ -407,7 +405,7 @@ class JvmCompile(NailgunTaskBase):
                                      compile_contexts,
                                      extra_compile_time_classpath,
                                      invalid_targets,
-                                     invalidation_check.invalid_vts_partitioned)
+                                     invalidation_check.invalid_vts)
 
     exec_graph = ExecutionGraph(jobs)
     try:
@@ -590,7 +588,7 @@ class JvmCompile(NailgunTaskBase):
     return "compile({})".format(compile_target.address.spec)
 
   def _create_compile_jobs(self, classpath_products, compile_contexts, extra_compile_time_classpath,
-                           invalid_targets, invalid_vts_partitioned):
+                           invalid_targets, invalid_vts):
     class Counter(object):
       def __init__(self, size, initial=0):
         self.size = size
@@ -602,7 +600,7 @@ class JvmCompile(NailgunTaskBase):
 
       def format_length(self):
         return len(str(self.size))
-    counter = Counter(len(invalid_vts_partitioned))
+    counter = Counter(len(invalid_vts))
 
     def check_cache(vts):
       """Manually checks the artifact cache (usually immediately before compilation.)
@@ -663,7 +661,7 @@ class JvmCompile(NailgunTaskBase):
           # Otherwise, simply ensure that it is empty.
           safe_delete(tmp_analysis_file)
         target, = vts.targets
-        fatal_warnings = fatal_warnings = self._compute_language_property(target, lambda x: x.fatal_warnings)
+        fatal_warnings = self._compute_language_property(target, lambda x: x.fatal_warnings)
         self._compile_vts(vts,
                           compile_context.sources,
                           tmp_analysis_file,
@@ -689,9 +687,7 @@ class JvmCompile(NailgunTaskBase):
 
     jobs = []
     invalid_target_set = set(invalid_targets)
-    for vts in invalid_vts_partitioned:
-      assert len(vts.targets) == 1, ("Requested one target per partition, got {}".format(vts))
-
+    for vts in invalid_vts:
       # Invalidated targets are a subset of relevant targets: get the context for this one.
       compile_target = vts.targets[0]
       compile_context = compile_contexts[compile_target]

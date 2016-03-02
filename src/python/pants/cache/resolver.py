@@ -19,10 +19,16 @@ logger = logging.getLogger(__name__)
 
 
 class Resolver(AbstractClass):
-  """An abstract class base for resolving service urls."""
+  """An abstract class base for resolving service urls.
+
+  :API: public
+  """
 
   class ResolverError(Exception):
-    """Indicate an error resolving service urls."""
+    """Indicate an error resolving service urls.
+
+    :API: public
+    """
 
   @abstractmethod
   def resolve(self, resolve_from):
@@ -36,25 +42,43 @@ class Resolver(AbstractClass):
 
 
 class NoopResolver(Resolver):
-  """A resolver that always yields nothing"""
+  """A resolver that always yields nothing
+
+  :API: public
+  """
 
   def resolve(self, resolve_from):
+    """
+    :API: public
+    """
     return []
 
 
 class ResponseParser(object):
-  """Resolver response parser utility class."""
+  """Resolver response parser utility class.
+
+  :API: public
+  """
 
   class ResponseParserError(Exception):
-    """Indicates an error parsing response from resolver."""
+    """Indicates an error parsing response from resolver.
+
+    :API: public
+    """
 
   def __init__(self, format='json_map', encoding='utf-8', index='hostlist'):
+    """
+    :API: public
+    """
     self.format = format
     self.encoding = encoding
     self.index = index
 
   def parse(self, content):
-    """Parse raw response content for a list of remote artifact cache URLs."""
+    """Parse raw response content for a list of remote artifact cache URLs.
+
+    :API: public
+    """
     if self.format == 'json_map':
       try:
         return assert_list(json.loads(content.decode(self.encoding))[self.index])
@@ -66,10 +90,15 @@ class ResponseParser(object):
 
 
 class RESTfulResolver(Resolver):
-  """Query a resolver on RESTful interface."""
+  """Query a resolver on RESTful interface.
+
+  :API: public
+  """
 
   def __init__(self, timeout, tries, response_parser=None):
     """
+    :API: public
+
     :param int timeout: Timeout for GET in seconds.
     :param int tries: Max number of retries. See docstring on `requests.adapters.HTTPAdapter`
                       for details.
@@ -89,6 +118,9 @@ class RESTfulResolver(Resolver):
       raise self.ResolverError('Request error from {0}'.format(resolve_from))
 
   def resolve(self, resolve_from):
+    """
+    :API: public
+    """
     session = requests.Session()
     session.mount(resolve_from, requests.adapters.HTTPAdapter(max_retries=self._tries))
     content = self._safe_get_content(session, resolve_from)

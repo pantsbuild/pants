@@ -2,6 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+set -eo pipefail
+
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
 source ${REPO_ROOT}/build-support/common.sh
@@ -79,7 +81,7 @@ continue."
   fi
   (
     ${REPO_ROOT}/src/python/pants/docs/publish_via_git.sh \
-      git@github.com:pantsbuild/pantsbuild.github.io.git \
+      https://github.com/pantsbuild/pantsbuild.github.io.git \
       ${publish_path} && \
     do_open ${url}/index.html
   ) || die "Publish to ${url} failed."

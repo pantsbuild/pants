@@ -7,4 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 
 class GoalError(Exception):
-  """Raised to indicate a goal has failed."""
+  """Raised to indicate a goal has failed.
+
+  :API: public
+  """

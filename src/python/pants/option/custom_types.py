@@ -15,6 +15,8 @@ def dict_option(s):
   """An option of type 'dict'.
 
   The value (on the command-line, in an env var or in the config file) must be eval'able to a dict.
+
+  :API: public
   """
   return _convert(s, (dict,))
 
@@ -24,12 +26,16 @@ def list_option(s):
 
   The value (on the command-line, in an env var or in the config file) must be eval'able to a
   list or tuple.
+
+  :API: public
   """
   return _convert(s, (list, tuple))
 
 
 def target_option(s):
   """Same type as 'str', but indicates a single target spec.
+
+  :API: public
 
   TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
   """
@@ -39,13 +45,18 @@ def target_option(s):
 def target_list_option(s):
   """Same type as 'list_option', but indicates list contents are target specs.
 
+  :API: public
+
   TODO(stuhood): Eagerly convert these to Addresses: see https://rbcommons.com/s/twitter/r/2937/
   """
   return _convert(s, (list, tuple))
 
 
 def file_option(s):
-  """Same type as 'str', but indicates string represents a filepath."""
+  """Same type as 'str', but indicates string represents a filepath.
+
+  :API: public
+  """
   if not os.path.isfile(s):
     raise ParseError('Options file "{filepath}" does not exist.'.format(filepath=s))
   return s

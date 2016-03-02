@@ -13,6 +13,8 @@ def parse_spec(spec, relative_to=None):
   """Parses a target address spec and returns the path from the root of the repo to this Target
   and Target name.
 
+  :API: public
+
   :param string spec: Target address spec.
   :param string relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
     interprets the missing spec_path part as `relative_to`.
@@ -89,6 +91,8 @@ class Addresses(namedtuple('Addresses', ['addresses', 'rel_path'])):
   addresses: list of string specs
   rel_path: addresses might be relative specs, so they need to be interpreted
   relative to the path of the BUILD file they were declared in.
+
+  :API: public
   """
 
 
@@ -132,13 +136,20 @@ class Address(object):
     norm_path = os.path.normpath(spec_path)
     self._spec_path = norm_path if norm_path != '.' else ''
     self._target_name = target_name
+    self._hash = hash((self._spec_path, self._target_name))
 
   @property
   def spec_path(self):
+    """
+    :API: public
+    """
     return self._spec_path
 
   @property
   def target_name(self):
+    """
+    :API: public
+    """
     return self._target_name
 
   @property
@@ -147,6 +158,8 @@ class Address(object):
 
     Prepends '//' if the target is at the root, to disambiguate root-level targets
     from "relative" spec notation.
+
+    :API: public
     """
     # TODO(pl): Maybe we should just always start with // for simplicity?
     return '{spec_path}:{target_name}'.format(spec_path=self._spec_path or '//',
@@ -154,16 +167,25 @@ class Address(object):
 
   @property
   def path_safe_spec(self):
+    """
+    :API: public
+    """
     return ('{safe_spec_path}.{target_name}'
             .format(safe_spec_path=self._spec_path.replace(os.sep, '.'),
                     target_name=self._target_name.replace(os.sep, '.')))
 
   @property
   def relative_spec(self):
+    """
+    :API: public
+    """
     return ':{target_name}'.format(target_name=self._target_name)
 
   def reference(self, referencing_path=None):
-    """How to reference this address in a BUILD file."""
+    """How to reference this address in a BUILD file.
+
+    :API: public
+    """
     if referencing_path is not None and self._spec_path == referencing_path:
       return self.relative_spec
     elif os.path.basename(self._spec_path) != self._target_name:
@@ -177,11 +199,7 @@ class Address(object):
     return (self._spec_path == other._spec_path and
             self._target_name == other._target_name)
 
-  _hash = None
-
   def __hash__(self):
-    if self._hash is None:
-      self._hash = hash((self._spec_path, self._target_name))
     return self._hash
 
   def __ne__(self, other):
@@ -195,7 +213,10 @@ class Address(object):
 
 
 class BuildFileAddress(Address):
-  """Represents the address of a type materialized from a BUILD file."""
+  """Represents the address of a type materialized from a BUILD file.
+
+  :API: public
+  """
 
   def __init__(self, build_file, target_name=None):
     """
@@ -203,6 +224,8 @@ class BuildFileAddress(Address):
     :type build_file: :class:`pants.base.build_file.BuildFile`
     :param string target_name: The name of the target within the BUILD file; defaults to the default
                                target, aka the name of the BUILD file parent dir.
+
+    :API: public
     """
     spec_path = os.path.dirname(build_file.relpath)
     super(BuildFileAddress, self).__init__(spec_path=spec_path,
@@ -212,6 +235,8 @@ class BuildFileAddress(Address):
   @property
   def build_file(self):
     """The build file that contains the object this address points to.
+
+    :API: public
 
     :rtype: :class:`pants.base.build_file.BuildFile`
     """

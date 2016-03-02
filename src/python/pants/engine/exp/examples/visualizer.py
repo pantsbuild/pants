@@ -10,11 +10,13 @@ import subprocess
 import sys
 from textwrap import dedent
 
+from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.binaries import binary_util
 from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
-from pants.engine.exp.scheduler import BuildRequest, SelectNode, TaskNode, Throw
+from pants.engine.exp.fs import PathGlobs
+from pants.engine.exp.nodes import Noop, SelectNode, TaskNode, Throw
 from pants.util.contextutil import temporary_file, temporary_file_path
 
 
@@ -25,12 +27,11 @@ def format_type(node):
 
 
 def format_subject(node):
-  subject = node.subject
-  if type(node.subject) == Address:
-    subject = 'Address({})'.format(node.subject)
+  subject = node.subject_key.string
   if node.variants:
-    subject = '{}@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
-  return subject
+    return '({})@{}'.format(subject, ','.join('{}={}'.format(k, v) for k, v in node.variants))
+  else:
+    return '({})'.format(subject)
 
 
 def format_product(node):
@@ -46,26 +47,33 @@ def format_node(node, state):
                                  str(state).replace('"', '\\"'))
 
 
-def create_digraph(scheduler):
+# NB: there are only 12 colors in `set312`.
+colorscheme = 'set312'
+max_colors = 12
+colors = {}
 
-  # NB: there are only 12 colors in `set312`.
-  colorscheme = 'set312'
-  max_colors = 12
-  colors = {}
 
-  def color_index(key):
-    return colors.setdefault(key, (len(colors) % max_colors) + 1)
+def format_color(node, node_state):
+  if type(node_state) is Throw:
+    return 'tomato'
+  elif type(node_state) is Noop:
+    return 'white'
+  key = node.product
+  return colors.setdefault(key, (len(colors) % max_colors) + 1)
+
+
+def create_digraph(scheduler, request):
 
   yield 'digraph plans {'
   yield '  node[colorscheme={}];'.format(colorscheme)
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state), dependency_entries) in scheduler.walk_product_graph():
+  for ((node, node_state), dependency_entries) in scheduler.product_graph.walk(request.roots):
     node_str = format_node(node, node_state)
 
-    yield ('  node [style=filled, fillcolor={color}] "{node}";'
-            .format(color=color_index(node.product),
+    yield (' "{node}" [style=filled, fillcolor={color}];'
+            .format(color=format_color(node, node_state),
                     node=node_str))
 
     for (dep, dep_state) in dependency_entries:
@@ -74,9 +82,9 @@ def create_digraph(scheduler):
   yield '}'
 
 
-def visualize_execution_graph(scheduler):
+def visualize_execution_graph(scheduler, request):
   with temporary_file() as fp:
-    for line in create_digraph(scheduler):
+    for line in create_digraph(scheduler, request):
       fp.write(line)
       fp.write('\n')
     fp.close()
@@ -85,33 +93,58 @@ def visualize_execution_graph(scheduler):
       binary_util.ui_open(image_file)
 
 
-def visualize_build_request(build_root, build_request):
+def visualize_build_request(build_root, goals, subjects):
   scheduler = setup_json_scheduler(build_root)
-  LocalSerialEngine(scheduler).reduce(build_request)
-  visualize_execution_graph(scheduler)
+  execution_request = scheduler.build_request(goals, subjects)
+  # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
+  engine = LocalSerialEngine(scheduler)
+  engine.start()
+  try:
+    engine.reduce(execution_request)
+    visualize_execution_graph(scheduler, execution_request)
+    scheduler.validate()
+  finally:
+    engine.close()
 
 
-def main():
+def pop_build_root_and_goals(description, args):
   def usage(error_message):
     print(error_message, file=sys.stderr)
     print(dedent("""
-    {} [build root path] [goal]+ [address spec]*
+    {} {}
     """.format(sys.argv[0])), file=sys.stderr)
     sys.exit(1)
 
-  args = sys.argv[1:]
   if len(args) < 2:
     usage('Must supply at least the build root path and one goal.')
 
   build_root = args.pop(0)
+
+
   if not os.path.isdir(build_root):
     usage('First argument must be a valid build root, {} is not a directory.'.format(build_root))
+  build_root = os.path.realpath(build_root)
 
-  goals = [arg for arg in args if os.path.sep not in arg]
+  def is_goal(arg): return os.path.sep not in arg
+
+  goals = [arg for arg in args if is_goal(arg)]
   if not goals:
     usage('Must supply at least one goal.')
 
-  build_request = BuildRequest(goals=goals,
-                               addressable_roots=[Address.parse(spec) for spec in args
-                                                  if os.path.sep in spec])
-  visualize_build_request(build_root, build_request)
+  return build_root, goals, [arg for arg in args if not is_goal(arg)]
+
+
+def main_addresses():
+  build_root, goals, args = pop_build_root_and_goals('[build root path] [goal]+ [address spec]*', sys.argv[1:])
+
+  cmd_line_spec_parser = CmdLineSpecParser(build_root)
+  spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in args]
+  visualize_build_request(build_root, goals, spec_roots)
+
+
+def main_filespecs():
+  build_root, goals, args = pop_build_root_and_goals('[build root path] [filespecs]*', sys.argv[1:])
+
+  # Create a PathGlobs object relative to the buildroot.
+  path_globs = PathGlobs.create('', globs=args)
+  visualize_build_request(build_root, goals, [path_globs])

@@ -19,6 +19,8 @@ class Payload(object):
 
   A Target will add PayloadFields to its Payload until instantiation is finished, at which point
   freeze() will be called and make the Payload immutable.
+
+  :API: public
   """
 
   def __init__(self):
@@ -34,6 +36,8 @@ class Payload(object):
     """Permanently make this Payload instance immutable.
 
     No more fields can be added after calling freeze().
+
+    :API: public
     """
     self._frozen = True
 
@@ -41,11 +45,15 @@ class Payload(object):
     """An alternative to attribute access for duck typing Payload instances.
 
     Has the same semantics as dict.get, and in fact just delegates to the underlying field mapping.
+
+    :API: public
     """
     return self._fields.get(key, default)
 
   def get_field_value(self, key, default=None):
     """Retrieves the value in the payload field if the field exists, otherwise returns the default.
+
+    :API: public
     """
     if key in self._fields:
       payload_field = self._fields[key]
@@ -54,12 +62,17 @@ class Payload(object):
     return default
 
   def add_fields(self, field_dict):
-    """Add a mapping of field names to PayloadField instances."""
+    """Add a mapping of field names to PayloadField instances.
+
+    :API: public
+    """
     for key, field in field_dict.items():
       self.add_field(key, field)
 
   def add_field(self, key, field):
     """Add a field to the Payload.
+
+    :API: public
 
     :param string key:  The key for the field.  Fields can be accessed using attribute access as
       well as `get_field` using `key`.
@@ -113,6 +126,8 @@ class Payload(object):
     """Invalidates memoized fingerprints for this payload.
 
     Exposed for testing.
+
+    :API: public
     """
     self._fingerprint_memo_map = {}
     for field in self._fields.values():

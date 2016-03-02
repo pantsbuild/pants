@@ -15,7 +15,7 @@ import six
 
 from pants.base.deprecated import check_deprecated_semver
 from pants.base.revision import Revision
-from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.custom_types import list_option
 from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
                                  BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
@@ -25,7 +25,7 @@ from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWith
 from pants.option.option_util import is_boolean_flag
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
-from pants.version import VERSION
+from pants.version import PANTS_SEMVER
 
 
 class Parser(object):
@@ -68,7 +68,7 @@ class Parser(object):
     """Create a Parser instance.
 
     :param env: a dict of environment variables.
-    :param config: data from a config file (must support config.get[list](section, name, default=)).
+    :param :class:`pants.option.config.Config` config: data from a config file.
     :param scope_info: the scope this parser acts for.
     :param parent_parser: the parser for the scope immediately enclosing this one, or
                           None if this is the global scope.
@@ -299,7 +299,7 @@ class Parser(object):
                removal_version=deprecated_ver,
                hint=kwargs.get('deprecated_hint', ''))
 
-      if Revision.semver(VERSION) >= Revision.semver(deprecated_ver):
+      if PANTS_SEMVER >= Revision.semver(deprecated_ver):
         # Once we've hit the deprecated_version, raise an error instead of warning. This allows for
         # more actionable options hinting to continue beyond the deprecation period until removal.
         raise DeprecatedOptionError(msg)
@@ -381,7 +381,7 @@ class Parser(object):
       raise ParseError('Cannot fromfile {} with an action ({}) in scope {}'
                        .format(dest, action, self._scope))
 
-    config_section = 'DEFAULT' if self._scope == GLOBAL_SCOPE else self._scope
+    config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
     udest = dest.upper()
     if self._scope == GLOBAL_SCOPE:
       # For convenience, we allow three forms of env var for global scope options.
@@ -455,8 +455,12 @@ class Parser(object):
     choices = kwargs.get('choices')
     for ranked_val in ranked_vals:
       details = config_details if ranked_val.rank == RankedValue.CONFIG else None
-      self._option_tracker.record_option(scope=self._scope, option=dest, value=ranked_val.value,
-                                         rank=ranked_val.rank, details=details)
+      self._option_tracker.record_option(scope=self._scope,
+                                         option=dest,
+                                         value=ranked_val.value,
+                                         rank=ranked_val.rank,
+                                         deprecation_version=kwargs.get('deprecated_version'),
+                                         details=details)
 
     def check(val):
       if choices is not None and val is not None and val not in choices:

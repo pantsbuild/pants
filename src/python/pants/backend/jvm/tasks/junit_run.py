@@ -59,6 +59,9 @@ def interpret_test_spec(test_spec):
 
 
 class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
+  """
+  :API: public
+  """
   _MAIN = 'org.pantsbuild.tools.junit.ConsoleRunner'
 
   @classmethod
@@ -101,7 +104,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     cls.register_jvm_tool(register,
                           'junit',
                           classpath=[
-                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.1'),
+                            JarDependency(org='org.pantsbuild', name='junit-runner', rev='1.0.2'),
                           ],
                           main=JUnitRun._MAIN,
                           # TODO(John Sirois): Investigate how much less we can get away with.
@@ -365,6 +368,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               workunit_labels=[WorkUnitLabel.TEST],
               cwd=workdir,
               synthetic_jar_dir=self.workdir,
+              create_synthetic_jar=self.synthetic_classpath,
             ))
 
           if result != 0 and self._fail_fast:

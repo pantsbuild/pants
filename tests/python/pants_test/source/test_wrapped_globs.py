@@ -60,6 +60,10 @@ class FilesetRelPathWrapperTest(BaseTest):
                     {'globs': ['y/*.java'],
                      'exclude': [{'globs': ['y/fleem.java']}]})
 
+  def test_glob_mid_single(self):
+    self._spec_test('globs("a/*/Fleem.java")',
+                    {'globs': ['y/a/*/Fleem.java']})
+
   def test_glob_to_spec_list(self):
     self._spec_test('["fleem.java", "morx.java"]',
                     {'globs': ['y/fleem.java', 'y/morx.java']})

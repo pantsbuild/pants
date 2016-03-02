@@ -9,7 +9,10 @@ import os
 
 
 class Repository(object):
-  """An artifact repository, such as a maven repo."""
+  """An artifact repository, such as a maven repo.
+
+  :API: public
+  """
 
   def __init__(self, name=None, url=None, push_db_basedir=None, **kwargs):
     """

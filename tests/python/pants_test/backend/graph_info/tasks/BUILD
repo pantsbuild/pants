@@ -30,6 +30,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'pathdeps',
+  sources = ['test_pathdeps.py'],
+  dependencies = [
+    'src/python/pants/backend/graph_info/tasks',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
+
+python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
   dependencies = [
@@ -63,6 +72,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
+    'src/python/pants/backend/python/targets:python',
     'tests/python/pants_test/tasks:task_test_base',
   ],
 )

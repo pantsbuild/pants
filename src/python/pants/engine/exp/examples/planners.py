@@ -5,22 +5,28 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import collections
 import functools
-import os
 import re
 from abc import abstractmethod, abstractproperty
+from os import sep as os_sep
+from os.path import join as os_path_join
 
 from pants.base.exceptions import TaskError
+from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
-from pants.engine.exp.graph import Directory, create_graph_tasks
+from pants.engine.exp.addressable import SubclassesOf, addressable_list
+from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths, create_fs_tasks
+from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
-from pants.engine.exp.objects import datatype
+from pants.engine.exp.nodes import Subjects
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import (LocalScheduler, Select, SelectDependencies, SelectLiteral,
+from pants.engine.exp.scheduler import LocalScheduler
+from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
-from pants.engine.exp.struct import Struct, StructWithDeps
-from pants.engine.exp.targets import Sources, Target, Variants
+from pants.engine.exp.sources import Sources
+from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps, Variants
+from pants.util.meta import AbstractClass
+from pants.util.objects import datatype
 
 
 def printing_func(func):
@@ -31,6 +37,30 @@ def printing_func(func):
     print('{} executed for {}, returned: {}'.format(func.__name__, inputs, return_val))
     return return_val
   return wrapper
+
+
+class Target(Struct, HasStructs):
+  """A placeholder for the most-numerous Struct subclass.
+
+  This particular implementation holds a collection of other Structs in a `configurations` field.
+  """
+  collection_field = 'configurations'
+
+  def __init__(self, name=None, configurations=None, **kwargs):
+    """
+    :param string name: The name of this target which forms its address in its namespace.
+    :param list configurations: The configurations that apply to this target in various contexts.
+    """
+    super(Target, self).__init__(name=name, **kwargs)
+
+    self.configurations = configurations
+
+  @addressable_list(SubclassesOf(Struct))
+  def configurations(self):
+    """The configurations that apply to this target in various contexts.
+
+    :rtype list of :class:`pants.engine.exp.configuration.Struct`
+    """
 
 
 class JavaSources(Sources, StructWithDeps):
@@ -68,16 +98,6 @@ class JVMPackageName(datatype('JVMPackageName', ['name'])):
   pass
 
 
-class SourceRoots(datatype('SourceRoots', ['buildroot', 'srcroots'])):
-  """Placeholder for the SourceRoot subsystem."""
-  pass
-
-
-class SearchPath(datatype('SearchPath', ['dependencies'])):
-  """A set of Directories to search."""
-  pass
-
-
 @printing_func
 def select_package_address(jvm_package_name, address_families):
   """Return the Address from the given AddressFamilies which provides the given package."""
@@ -94,31 +114,31 @@ def select_package_address(jvm_package_name, address_families):
 
 @printing_func
 def calculate_package_search_path(jvm_package_name, source_roots):
-  """Return a SearchPath for all directories where the given JVMPackageName might exist."""
-  rel_package_dir = jvm_package_name.name.replace('.', os.sep)
-  return SearchPath([Directory(os.path.join(srcroot, rel_package_dir))
-                     for srcroot in source_roots.srcroots])
+  """Return Paths for directories where the given JVMPackageName might exist."""
+  rel_package_dir = jvm_package_name.name.replace('.', os_sep)
+  return Paths([Path(os_path_join(srcroot, rel_package_dir))
+                for srcroot in source_roots.srcroots])
 
 
 @printing_func
-def extract_scala_imports(address, sources, source_roots):
+def extract_scala_imports(source_files_content):
   """A toy example of dependency inference. Would usually be a compiler plugin."""
-  abs_base_path = os.path.join(source_roots.buildroot, address.spec_path)
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
-  for f in sources.iter_paths(base_path=abs_base_path):
-    with open(f) as source_file:
-      for line in source_file:
-        match = import_re.search(line)
-        if match:
-          packages.add(match.group(1).rsplit('.', 1)[0])
+  for _, content in source_files_content.dependencies:
+    for line in content.splitlines():
+      match = import_re.search(line)
+      if match:
+        packages.add(match.group(1).rsplit('.', 1)[0])
   return ImportedJVMPackages([JVMPackageName(p) for p in packages])
 
 
 @printing_func
-def reify_scala_sources(address, sources, dependency_addresses):
-  return ScalaSources(files=list(sources.iter_paths(base_path=address.spec_path)),
-                      dependencies=list(set(dependency_addresses)))
+def reify_scala_sources(sources, dependency_addresses):
+  """Given a ScalaInferredDepsSources object and its inferred dependencies, create ScalaSources."""
+  kwargs = sources._asdict()
+  kwargs['dependencies'] = list(set(dependency_addresses))
+  return ScalaSources(**kwargs)
 
 
 class Requirement(Struct):
@@ -299,6 +319,66 @@ def unpickleable_input(unpickleable):
   raise Exception('This function should never run, because its selected input is unpickleable.')
 
 
+class Goal(AbstractClass):
+  """A synthetic aggregate product produced by a goal, which is its own task."""
+
+  def __init__(self, *args):
+    if all(arg is None for arg in args):
+      msg = '\n  '.join(p.__name__ for p in self.products())
+      raise TaskError('Unable to produce any of the products for goal `{}`:\n  {}'.format(
+        self.name(), msg))
+
+  @classmethod
+  @abstractmethod
+  def name(cls):
+    """Returns the name of the Goal."""
+
+  @classmethod
+  def signature(cls):
+    """Returns a task triple for this Goal, used to install the Goal.
+
+    A Goal is it's own synthetic output product, and its constructor acts as its task function. It
+    selects each of its products as optional, but fails synchronously if none of them are available.
+    """
+    return (cls, [Select(p, optional=True) for p in cls.products()], cls)
+
+  @classmethod
+  @abstractmethod
+  def products(cls):
+    """Returns the products that this Goal requests."""
+
+  def __eq__(self, other):
+    return type(self) == type(other)
+
+  def __ne__(self, other):
+    return not (self == other)
+
+  def __hash__(self):
+    return hash(type(self))
+
+  def __str__(self):
+    return '{}()'.format(type(self).__name__)
+
+  def __repr__(self):
+    return str(self)
+
+
+class GenGoal(Goal):
+  """A goal that requests all known types of sources."""
+
+  @classmethod
+  def name(cls):
+    return 'gen'
+
+  @classmethod
+  def products(cls):
+    return [JavaSources, PythonSources, ResourceSources, ScalaSources]
+
+
+class SourceRoots(datatype('SourceRoots', ['srcroots'])):
+  """Placeholder for the SourceRoot subsystem."""
+
+
 class ExampleTable(SymbolTable):
   @classmethod
   def table(cls):
@@ -321,32 +401,39 @@ class ExampleTable(SymbolTable):
             'inferred_scala': ScalaInferredDepsSources}
 
 
-def setup_json_scheduler(build_root):
+def setup_json_scheduler(build_root, debug=True):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
   :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
   """
-  address_mapper = AddressMapper(build_root=build_root,
-                                 symbol_table_cls=ExampleTable,
-                                 build_pattern=r'^BLD.json$',
-                                 parser_cls=JsonParser)
+  subjects = Subjects(debug=debug)
+  symbol_table_cls = ExampleTable
 
-  # TODO(John Sirois): once the options system is plumbed, make the tool spec configurable.
-  # It could also just be pointed at the scrooge jar at that point.
-  scrooge_tool_address = Address.parse('src/scala/scrooge')
+  # Register "literal" subjects required for these tasks.
+  # TODO: Replace with `Subsystems`.
+  project_tree_key = subjects.put(
+      FileSystemProjectTree(build_root))
+  address_mapper_key = subjects.put(
+      AddressMapper(symbol_table_cls=symbol_table_cls,
+                    build_pattern=r'^BLD.json$',
+                    parser_cls=JsonParser))
+  source_roots_key = subjects.put(
+      SourceRoots(('src/java',)))
+  scrooge_tool_address_key = subjects.put(
+      Address.parse('src/scala/scrooge'))
 
-  # TODO: Placeholder for the SourceRoot subsystem.
-  source_roots = SourceRoots(build_root, ('src/java',))
-
-  products_by_goal = {
-      'compile': [Classpath],
+  goals = {
+      'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
-      'resolve': [Classpath],
-      'gen': [JavaSources, PythonSources, ResourceSources, ScalaSources],
-      'unpickleable': [UnpickleableResult],
+      'resolve': Classpath,
+      'list': Address,
+      'walk': Path,
+      GenGoal.name(): GenGoal,
+      'unpickleable': UnpickleableResult,
     }
   tasks = [
       # Codegen
+      GenGoal.signature(),
       (JavaSources,
        [Select(ThriftSources),
         SelectVariant(ApacheThriftJavaConfiguration, 'thrift')],
@@ -358,35 +445,29 @@ def setup_json_scheduler(build_root):
       (ScalaSources,
        [Select(ThriftSources),
         SelectVariant(ScroogeScalaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address, Classpath)],
+        SelectLiteral(scrooge_tool_address_key, Classpath)],
        gen_scrooge_thrift),
       (JavaSources,
        [Select(ThriftSources),
         SelectVariant(ScroogeJavaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address, Classpath)],
+        SelectLiteral(scrooge_tool_address_key, Classpath)],
        gen_scrooge_thrift),
     ] + [
       # scala dependency inference
       (ScalaSources,
-       [Select(Address),
-        Select(ScalaInferredDepsSources),
+       [Select(ScalaInferredDepsSources),
         SelectDependencies(Address, ImportedJVMPackages)],
        reify_scala_sources),
       (ImportedJVMPackages,
-       [Select(Address),
-        Select(ScalaInferredDepsSources),
-        SelectLiteral(source_roots, SourceRoots)],
+       [SelectProjection(FilesContent, PathGlobs, ('path_globs',), ScalaInferredDepsSources)],
        extract_scala_imports),
-      # TODO: The request for an AddressFamily for each member of a SearchPath will fail whenever
-      # a member of the path doesn't exist. Need to allow for optional products and to then
-      # request the AddressFamilies optionally here.
       (Address,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, SearchPath)],
+        SelectDependencies(AddressFamily, Paths)],
        select_package_address),
-      (SearchPath,
+      (Paths,
        [Select(JVMPackageName),
-        SelectLiteral(source_roots, SourceRoots)],
+        SelectLiteral(source_roots_key, SourceRoots)],
        calculate_package_search_path),
     ] + [
       # Remote dependency resolution
@@ -422,8 +503,10 @@ def setup_json_scheduler(build_root):
        [Select(UnpickleableOutput)],
        unpickleable_input),
     ] + (
-      create_graph_tasks(address_mapper)
+      create_graph_tasks(address_mapper_key, symbol_table_cls)
+    ) + (
+      create_fs_tasks(project_tree_key)
     )
 
-  scheduler = LocalScheduler(products_by_goal, tasks)
+  scheduler = LocalScheduler(goals, tasks, subjects, symbol_table_cls)
   return scheduler

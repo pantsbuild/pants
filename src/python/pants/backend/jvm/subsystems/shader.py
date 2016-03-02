@@ -21,17 +21,17 @@ from pants.util.contextutil import open_zip, temporary_file
 class Shading(object):
   """Wrapper around relocate and exclude shading rules exposed in BUILD files."""
 
-  class Rule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
-    """Represents a transformation rule for a jar shading session."""
-
-    def render(self):
-      return 'rule {0} {1}\n'.format(self.from_pattern, self.to_pattern)
-
   SHADE_PREFIX = '__shaded_by_pants__.'
   """The default shading package."""
 
-  class Relocate(namedtuple('ShadingRule', ['from_pattern', 'shade_pattern', 'shade_prefix'])):
-    """Base class for shading relocation rules specifyable in BUILD files."""
+  class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
+    """Base class for shading keep and zap rules specifiable in BUILD files."""
+
+    def render(self):
+      return '{name} {pattern}\n'.format(name=self.name, pattern=self.pattern)
+
+  class RelocateRule(namedtuple('Rule', ['from_pattern', 'to_pattern'])):
+    """Base class for shading relocation rules specifiable in BUILD files."""
 
     _wildcard_pattern = re.compile('[*]+')
     _starts_with_number_pattern = re.compile('^[0-9]')
@@ -49,122 +49,167 @@ class Shading(object):
       yield from_pattern[last:]
 
     @classmethod
-    def _sanitize_package_name(cls, name):
-      parts = name.split('.')
-      for i, part in enumerate(parts):
-        part = cls._illegal_package_char_pattern.sub('_', part)
-        if cls._starts_with_number_pattern.match(part):
-          part = '_{}'.format(part)
-        parts[i] = part
-      return '.'.join(filter(None, parts))
-
-    @classmethod
     def new(cls, from_pattern, shade_pattern=None, shade_prefix=None):
-      """Creates a rule which shades jar entries from one pattern to another.
+      if not shade_pattern:
+        shade_pattern = ''.join(cls._infer_shaded_pattern_iter(from_pattern, shade_prefix))
+      return cls(from_pattern, shade_pattern)
 
-      Examples: ::
+    def render(self):
+      return 'rule {0} {1}\n'.format(self.from_pattern, self.to_pattern)
 
-          # Rename everything in the org.foobar.example package
-          # to __shaded_by_pants__.org.foobar.example.
-          shading_relocate('org.foobar.example.**')
+  @classmethod
+  def create_keep(cls, pattern):
+    """Creates a rule which marks classes matching the given pattern as roots.
 
-          # Rename org.foobar.example.Main to __shaded_by_pants__.org.foobar.example.Main
-          shading_relocate('org.foobar.example.Main')
+    If any keep rules are set, all classes that are not reachable from roots are removed from the
+    jar.
 
-          # Rename org.foobar.example.Main to org.foobar.example.NotMain
-          shading_relocate('org.foobar.example.Main', 'org.foobar.example.NotMain')
+    Examples: ::
 
-          # Rename all 'Main' classes under any direct subpackage of org.foobar.
-          shading_relocate('org.foobar.*.Main')
+        # Only include classes reachable from Main.
+        shading_keep('org.foobar.example.Main')
 
-          # Rename org.foobar package to com.barfoo package
-          shading_relocate('org.foobar.**', 'com.barfoo.@1')
+        # Only keep classes reachable from the example package.
+        shading_keep('org.foobar.example.*')
 
-          # Rename everything in org.foobar.example package to __hello__.org.foobar.example
-          shading_relocate('org.foobar.example.**', shade_prefix='__hello__')
+    :param string pattern: Any fully-qualified classname which matches this pattern will be kept as
+      a root. '*' is a wildcard that matches any individual package component, and '**' is a
+      wildcard that matches any trailing pattern (ie the rest of the string).
+    """
+    return cls.UnaryRule('keep', pattern)
 
-      :param string from_pattern: Any fully-qualified classname which matches this pattern will be
-        shaded. '*' is a wildcard that matches any individual package component, and '**' is a
-        wildcard that matches any trailing pattern (ie the rest of the string).
-      :param string shade_pattern: The shaded pattern to use, where ``@1``, ``@2``, ``@3``, etc are
-        references to the groups matched by wildcards (groups are numbered from left to right). If
-        omitted, this pattern is inferred from the input pattern, prefixed by the ``shade_prefix``
-        (if provided). (Eg, a ``from_pattern`` of ``com.*.foo.bar.**`` implies a default
-        ``shade_pattern`` of ``__shaded_by_pants__.com.@1.foo.@2``)
-      :param string shade_prefix: Prefix to prepend when generating a ``shade_pattern`` (if a
-        ``shade_pattern`` is not provided by the user). Defaults to '``__shaded_by_pants__.``'.
-      """
-      if shade_prefix is None:
-        # NB(gmalmquist): Have have to check "is None" rather than just one-lining this with an or
-        # statement, because the empty-string is a valid prefix which should not be replaced by the
-        # default prefix.
-        shade_prefix = Shading.SHADE_PREFIX
-      return cls(from_pattern, shade_pattern, shade_prefix)
+  @classmethod
+  def create_zap(cls, pattern):
+    """Creates a rule which removes matching classes from the jar.
 
-    def rule(self):
-      from_pattern = self.from_pattern
-      shade_prefix = self.shade_prefix
-      shade_pattern = self.shade_pattern or ''.join(self._infer_shaded_pattern_iter(from_pattern,
-                                                                                    shade_prefix))
-      return Shading.Rule(from_pattern, shade_pattern)
+    Examples: ::
 
-  class Exclude(Relocate):
-    """Creates a rule which excludes the given pattern from shading."""
+        # Remove the main class.
+        shading_zap('org.foobar.example.Main')
 
-    @classmethod
-    def new(cls, pattern):
-      """Creates a rule which excludes the given pattern from shading.
+        # Remove everything in the example package.
+        shading_keep('org.foobar.example.*')
 
-      Examples: ::
+    :param string pattern: Any fully-qualified classname which matches this pattern will removed
+      from the jar. '*' is a wildcard that matches any individual package component, and '**' is a
+      wildcard that matches any trailing pattern (ie the rest of the string).
+    """
+    return cls.UnaryRule('zap', pattern)
 
-          # Don't shade the org.foobar.example.Main class
-          shading_exclude('org.foobar.example.Main')
+  @classmethod
+  def create_relocate(cls, from_pattern, shade_pattern=None, shade_prefix=None):
+    """Creates a rule which shades jar entries from one pattern to another.
 
-          # Don't shade anything under org.foobar.example
-          shading_exclude('org.foobar.example.**')
+    Examples: ::
 
-      :param string pattern: Any fully-qualified classname which matches this pattern will NOT be
-        shaded. '*' is a wildcard that matches any individual package component, and '**' is a
-        wildcard that matches any trailing pattern (ie the rest of the string).
-      """
-      return super(Shading.Exclude, cls).new(pattern, shade_prefix='')
+        # Rename everything in the org.foobar.example package
+        # to __shaded_by_pants__.org.foobar.example.
+        shading_relocate('org.foobar.example.**')
 
-  class RelocatePackage(Relocate):
-    """Convenience constructor for a package relocation rule."""
+        # Rename org.foobar.example.Main to __shaded_by_pants__.org.foobar.example.Main
+        shading_relocate('org.foobar.example.Main')
 
-    @classmethod
-    def new(self, package_name, shade_prefix=None, recursive=True):
-      """Convenience constructor for a package relocation rule.
+        # Rename org.foobar.example.Main to org.foobar.example.NotMain
+        shading_relocate('org.foobar.example.Main', 'org.foobar.example.NotMain')
 
-      Essentially equivalent to just using ``shading_relocate('package_name.**')``.
+        # Rename all 'Main' classes under any direct subpackage of org.foobar.
+        shading_relocate('org.foobar.*.Main')
 
-      :param string package_name: Package name to shade (eg, ``org.pantsbuild.example``).
-      :param string shade_prefix: Optional prefix to apply to the package. Defaults to
-        ``__shaded_by_pants__.``.
-      :param bool recursive: Whether to rename everything under any subpackage of ``package_name``,
-        or just direct children of the package. (Defaults to True).
-      """
-      from_pattern = '{package}.{capture}'.format(package=package_name,
-                                                  capture='**' if recursive else '*')
-      return super(Shading.RelocatePackage, self).new(from_pattern=from_pattern,
-                                                      shade_prefix=shade_prefix)
+        # Rename org.foobar package to com.barfoo package
+        shading_relocate('org.foobar.**', 'com.barfoo.@1')
 
-  class ExcludePackage(Relocate):
-    """Convenience constructor for a package exclusion rule."""
+        # Rename everything in org.foobar.example package to __hello__.org.foobar.example
+        shading_relocate('org.foobar.example.**', shade_prefix='__hello__')
 
-    @classmethod
-    def new(cls, package_name, recursive=True):
-      """Convenience constructor for a package exclusion rule.
+    :param string from_pattern: Any fully-qualified classname which matches this pattern will be
+      shaded. '*' is a wildcard that matches any individual package component, and '**' is a
+      wildcard that matches any trailing pattern (ie the rest of the string).
+    :param string shade_pattern: The shaded pattern to use, where ``@1``, ``@2``, ``@3``, etc are
+      references to the groups matched by wildcards (groups are numbered from left to right). If
+      omitted, this pattern is inferred from the input pattern, prefixed by the ``shade_prefix``
+      (if provided). (Eg, a ``from_pattern`` of ``com.*.foo.bar.**`` implies a default
+      ``shade_pattern`` of ``__shaded_by_pants__.com.@1.foo.@2``)
+    :param string shade_prefix: Prefix to prepend when generating a ``shade_pattern`` (if a
+      ``shade_pattern`` is not provided by the user). Defaults to '``__shaded_by_pants__.``'.
+    """
+    # NB(gmalmquist): Have have to check "is None" rather than using an or statement, because the
+    # empty-string is a valid prefix which should not be replaced by the default prefix.
+    shade_prefix = Shading.SHADE_PREFIX if shade_prefix is None else shade_prefix
+    return cls.RelocateRule.new(from_pattern, shade_pattern, shade_prefix)
 
-      Essentially equivalent to just using ``shading_exclude('package_name.**')``.
+  @classmethod
+  def create_exclude(cls, pattern):
+    """Creates a rule which excludes the given pattern from shading.
 
-      :param string package_name: Package name to exclude (eg, ``org.pantsbuild.example``).
-      :param bool recursive: Whether to exclude everything under any subpackage of ``package_name``,
-        or just direct children of the package. (Defaults to True).
-      """
-      from_pattern = '{package}.{capture}'.format(package=package_name,
-                                                  capture='**' if recursive else '*')
-      return super(Shading.ExcludePackage, cls).new(from_pattern=from_pattern, shade_prefix='')
+    Examples: ::
+
+        # Don't shade the org.foobar.example.Main class
+        shading_exclude('org.foobar.example.Main')
+
+        # Don't shade anything under org.foobar.example
+        shading_exclude('org.foobar.example.**')
+
+    :param string pattern: Any fully-qualified classname which matches this pattern will NOT be
+      shaded. '*' is a wildcard that matches any individual package component, and '**' is a
+      wildcard that matches any trailing pattern (ie the rest of the string).
+    """
+    return cls.create_relocate(pattern, shade_prefix='')
+
+  @classmethod
+  def create_keep_package(cls, package_name, recursive=True):
+    """Convenience constructor for a package keep rule.
+
+    Essentially equivalent to just using ``shading_keep('package_name.**')``.
+
+    :param string package_name: Package name to keep (eg, ``org.pantsbuild.example``).
+    :param bool recursive: Whether to keep everything under any subpackage of ``package_name``,
+      or just direct children of the package. (Defaults to True).
+    """
+    return cls.create_keep(cls._format_package_glob(package_name, recursive))
+
+  @classmethod
+  def create_zap_package(cls, package_name, recursive=True):
+    """Convenience constructor for a package zap rule.
+
+    Essentially equivalent to just using ``shading_zap('package_name.**')``.
+
+    :param string package_name: Package name to remove (eg, ``org.pantsbuild.example``).
+    :param bool recursive: Whether to remove everything under any subpackage of ``package_name``,
+      or just direct children of the package. (Defaults to True).
+    """
+    return cls.create_zap(cls._format_package_glob(package_name, recursive))
+
+  @classmethod
+  def create_relocate_package(cls, package_name, shade_prefix=None, recursive=True):
+    """Convenience constructor for a package relocation rule.
+
+    Essentially equivalent to just using ``shading_relocate('package_name.**')``.
+
+    :param string package_name: Package name to shade (eg, ``org.pantsbuild.example``).
+    :param string shade_prefix: Optional prefix to apply to the package. Defaults to
+      ``__shaded_by_pants__.``.
+    :param bool recursive: Whether to rename everything under any subpackage of ``package_name``,
+      or just direct children of the package. (Defaults to True).
+    """
+    return cls.create_relocate(from_pattern=cls._format_package_glob(package_name, recursive),
+                               shade_prefix=shade_prefix)
+
+  @classmethod
+  def create_exclude_package(cls, package_name, recursive=True):
+    """Convenience constructor for a package exclusion rule.
+
+    Essentially equivalent to just using ``shading_exclude('package_name.**')``.
+
+    :param string package_name: Package name to exclude (eg, ``org.pantsbuild.example``).
+    :param bool recursive: Whether to exclude everything under any subpackage of ``package_name``,
+      or just direct children of the package. (Defaults to True).
+    """
+    return cls.create_relocate(from_pattern=cls._format_package_glob(package_name, recursive),
+                               shade_prefix='')
+
+  @classmethod
+  def _format_package_glob(cls, package_name, recursive=True):
+    return '{package}.{capture}'.format(package=package_name, capture='**' if recursive else '*')
 
 
 class Shader(object):
@@ -215,8 +260,8 @@ class Shader(object):
     :returns: A `Shader.Rule` describing the shading exclusion.
     """
     if not package_name:
-      return Shading.Exclude.new('**' if recursive else '*').rule()
-    return Shading.ExcludePackage.new(package_name, recursive=recursive).rule()
+      return Shading.create_exclude('**' if recursive else '*')
+    return Shading.create_exclude_package(package_name, recursive=recursive)
 
   @classmethod
   def exclude_class(cls, class_name):
@@ -225,7 +270,7 @@ class Shader(object):
     :param unicode class_name: A fully qualified classname, eg: `org.pantsbuild.tools.jar.Main`.
     :returns: A `Shader.Rule` describing the shading exclusion.
     """
-    return Shading.Exclude.new(class_name).rule()
+    return Shading.create_exclude(class_name)
 
   @classmethod
   def shade_package(cls, package_name=None, recursive=False):
@@ -238,8 +283,8 @@ class Shader(object):
     :returns: A `Shader.Rule` describing the packages to be shaded.
     """
     if not package_name:
-      return Shading.Relocate.new('**' if recursive else '*').rule()
-    return Shading.RelocatePackage.new(package_name, recursive=recursive).rule()
+      return Shading.create_relocate('**' if recursive else '*')
+    return Shading.create_relocate_package(package_name, recursive=recursive)
 
   @classmethod
   def shade_class(cls, class_name):
@@ -248,7 +293,7 @@ class Shader(object):
     :param unicode class_name: A fully qualified classname, eg: `org.pantsbuild.tools.jar.Main`.
     :returns: A `Shader.Rule` describing the class shading.
     """
-    return Shading.Relocate.new(class_name).rule()
+    return Shading.create_relocate(class_name)
 
   @staticmethod
   def _iter_packages(paths):
@@ -364,6 +409,14 @@ class Shader(object):
     return rules
 
   @contextmanager
+  def temporary_rules_file(self, rules):
+    with temporary_file() as fp:
+      for rule in rules:
+        fp.write(rule.render())
+      fp.close()
+      yield fp.name
+
+  @contextmanager
   def binary_shader_for_rules(self, output_jar, jar, rules, jvm_options=None):
     """Yields an `Executor.Runner` that will perform shading of the binary `jar` when `run()`.
 
@@ -377,15 +430,11 @@ class Shader(object):
     :returns: An `Executor.Runner` that can be `run()` to shade the given `jar`.
     :rtype: :class:`pants.java.executor.Executor.Runner`
     """
-    with temporary_file() as fp:
-      for rule in rules:
-        fp.write(rule.render())
-      fp.close()
-
+    with self.temporary_rules_file(rules) as rules_file:
       yield self._executor.runner(classpath=self._jarjar_classpath,
                                   main='org.pantsbuild.jarjar.Main',
                                   jvm_options=jvm_options,
-                                  args=['process', fp.name, jar, output_jar])
+                                  args=['process', rules_file, jar, output_jar])
 
   def binary_shader(self, output_jar, main, jar, custom_rules=None, jvm_options=None):
     """Yields an `Executor.Runner` that will perform shading of the binary `jar` when `run()`.

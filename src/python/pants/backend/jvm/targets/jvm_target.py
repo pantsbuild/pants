@@ -20,7 +20,10 @@ from pants.util.memo import memoized_property
 
 
 class JvmTarget(Target, Jarable):
-  """A base class for all java module targets that provides path and dependency translation."""
+  """A base class for all java module targets that provides path and dependency translation.
+
+  :API: public
+  """
 
   @classmethod
   def subsystems(cls):
@@ -39,6 +42,8 @@ class JvmTarget(Target, Jarable):
                fatal_warnings=None,
                **kwargs):
     """
+    :API: public
+
     :param excludes: List of `exclude <#exclude>`_\s to filter this target's
       transitive dependencies against.
     :param sources: Source code files to build. Paths are relative to the BUILD

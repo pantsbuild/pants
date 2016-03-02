@@ -14,6 +14,7 @@ page(
     ':internals',
     ':release',
     ':release_jvm',
+    ':styleguide',
   ]
 )
 
@@ -34,6 +35,11 @@ page(
 page(
   name='dev_tasks_publish_extras',
   source='dev_tasks_publish_extras.md',
+)
+
+page(
+  name='deprecation_policy',
+  source='deprecation_policy.md',
 )
 
 page(
@@ -59,6 +65,7 @@ page(
     ':howto_ask',
     ':howto_develop',
     ':internals',
+    ':styleguide',
   ]
 )
 
@@ -113,3 +120,10 @@ page(
   ]
 )
 
+page(
+  name='styleguide',
+  source='styleguide.md',
+  links=[
+    ':howto_contribute',
+  ]
+)

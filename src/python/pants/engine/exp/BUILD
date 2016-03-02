@@ -30,9 +30,21 @@ python_library(
   sources=['engine.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':objects',
+    ':processing',
     'src/python/pants/base:exceptions',
-    'src/python/pants/engine/exp:scheduler',
     'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
+  name='fs',
+  sources=['fs.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    'src/python/pants/base:project_tree',
+    'src/python/pants/source',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -42,8 +54,10 @@ python_library(
   dependencies=[
     '3rdparty/python:six',
     ':addressable',
+    ':fs',
     ':mapper',
     ':objects',
+    ':selectors',
     'src/python/pants/build_graph',
   ]
 )
@@ -56,6 +70,19 @@ python_library(
     ':parsers',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
+  name='nodes',
+  sources=['nodes.py'],
+  dependencies=[
+    ':addressable',
+    ':objects',
+    ':struct',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ]
 )
 
@@ -79,25 +106,39 @@ python_library(
 )
 
 python_library(
-  name='scheduler',
-  sources=['scheduler.py'],
+  name='processing',
+  sources=['processing.py'],
+)
+
+python_library(
+  name='selectors',
+  sources=['selectors.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/exp:addressable',
-    'src/python/pants/engine/exp:objects',
-    'src/python/pants/engine/exp:targets',
-    'src/python/pants/util:memo',
+    ':nodes',
     'src/python/pants/util:meta',
+    'src/python/pants/util:objects',
   ]
 )
 
 python_library(
-  name='targets',
-  sources=['targets.py'],
+  name='scheduler',
+  sources=['scheduler.py'],
+  dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':addressable',
+    ':fs',
+    'src/python/pants/base:specs',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:objects',
+  ]
+)
+
+python_library(
+  name='sources',
+  sources=['sources.py'],
   dependencies=[
     ':addressable',
+    ':fs',
     ':struct',
     'src/python/pants/source',
   ]

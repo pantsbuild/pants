@@ -16,7 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class JVM(Subsystem):
-  """A JVM invocation."""
+  """A JVM invocation.
+
+  :API: public
+  """
   options_scope = 'jvm'
 
   @classmethod
@@ -38,6 +41,8 @@ class JVM(Subsystem):
              ],
              help='The JVM remote-debugging arguments. {debug_port} will be replaced with '
                   'the value of the --debug-port option.')
+    register('--synthetic-classpath', advanced=True, action='store_true', default=True,
+             help="Use synthetic jar to work around classpath length restrictions.")
 
   def get_jvm_options(self):
     """Return the options to run this JVM with.

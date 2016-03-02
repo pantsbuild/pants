@@ -17,10 +17,14 @@ class Resources(Target):
 
   Resources are Java-style resources accessible via the ``Class.getResource``
   and friends API. In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
+
+  :API: public
   """
 
   def __init__(self, address=None, payload=None, sources=None, **kwargs):
     """
+    :API: public
+
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
     :type sources: ``Fileset`` or list of strings
@@ -35,6 +39,8 @@ class Resources(Target):
   def has_sources(self, extension=None):
     """``Resources`` never own sources of any particular native type, like for example
     ``JavaLibrary``.
+
+    :API: public
     """
     # TODO(John Sirois): track down the reason for this hack and kill or explain better.
     return extension is None
