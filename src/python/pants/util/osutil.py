@@ -25,6 +25,9 @@ OS_ALIASES = {
 
 
 def get_os_name():
+  """
+  :API: public
+  """
   return os.uname()[0].lower()
 
 
@@ -38,6 +41,9 @@ def get_os_id(uname_func=None):
 
 
 def normalize_os_name(os_name):
+  """
+  :API: public
+  """
   if os_name not in OS_ALIASES:
     for proper_name, aliases in OS_ALIASES.items():
       if os_name in aliases:

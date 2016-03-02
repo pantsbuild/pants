@@ -43,7 +43,10 @@ def fast_relpath(path, start):
 def safe_mkdir(directory, clean=False):
   """Ensure a directory is present.
 
-  If it's not there, create it.  If it is, no-op. If clean is True, ensure the dir is empty."""
+  If it's not there, create it.  If it is, no-op. If clean is True, ensure the dir is empty.
+
+  :API: public
+  """
   if clean:
     safe_rmtree(directory)
   try:
@@ -92,6 +95,7 @@ def safe_walk(path, **kwargs):
     unicode_literals. See e.g.
     https://mail.python.org/pipermail/python-dev/2008-December/083856.html
 
+    :API: public
   """
   # If os.walk is given a text argument, it yields text values; if it
   # is given a binary argument, it yields binary values.
@@ -127,6 +131,8 @@ def safe_mkdtemp(cleaner=_mkdtemp_atexit_cleaner, **kw):
   """Create a temporary directory that is cleaned up on process exit.
 
   Arguments are as to tempfile.mkdtemp.
+
+  :API: public
   """
   # Proper lock sanitation on fork [issue 6721] would be desirable here.
   with _MKDTEMP_LOCK:
@@ -142,12 +148,18 @@ def register_rmtree(directory, cleaner=_mkdtemp_atexit_cleaner):
 
 
 def safe_rmtree(directory):
-  """Delete a directory if it's present. If it's not present, no-op."""
+  """Delete a directory if it's present. If it's not present, no-op.
+
+  :API: public
+  """
   shutil.rmtree(directory, ignore_errors=True)
 
 
 def safe_open(filename, *args, **kwargs):
-  """Open a file safely, ensuring that its directory exists."""
+  """Open a file safely, ensuring that its directory exists.
+
+  :API: public
+  """
   safe_mkdir_for(filename)
   return open(filename, *args, **kwargs)
 
@@ -256,6 +268,10 @@ def relative_symlink(source_path, link_path):
 
 
 def relativize_path(path, rootdir):
+  """
+
+  :API: public
+  """
   # Note that we can't test for length and return the shorter of the two, because we need these
   # paths to be stable across systems (e.g., because they get embedded in analysis files),
   # and this choice might be inconsistent across systems. So we assume the relpath is always
@@ -275,6 +291,8 @@ def relativize_paths(paths, rootdir):
 
 def touch(path, times=None):
   """Equivalent of unix `touch path`.
+
+    :API: public
 
     :path: The file to touch.
     :times Either a tuple of (atime, mtime) or else a single time to use for both.  If not

@@ -17,6 +17,8 @@ class ReplTaskMixin(MutexTaskMixin):
 
   By mixing in this class, REPL implementations ensure they are the only REPL that is being run in
   the current pants session.
+
+  :API: public
   """
 
   @classmethod
