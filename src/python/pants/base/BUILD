@@ -45,9 +45,6 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     ':project_tree',
-    # TODO(tabishev): Remove this dependency after transition period.
-    # Currently needed because of FilesystemBuildFile declared in build_file.py.
-    ':file_system_project_tree',
     ':deprecated',
   ]
 )

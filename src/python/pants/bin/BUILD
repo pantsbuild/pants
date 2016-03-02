@@ -17,6 +17,7 @@ python_library(
     'src/python/pants/base:build_file',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:file_system_project_tree',
     'src/python/pants/base:scm_project_tree',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',

@@ -18,8 +18,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.deprecated import deprecated, deprecated_conditional
-from pants.base.project_tree import ProjectTree
+from pants.base.deprecated import deprecated_conditional
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -74,12 +73,7 @@ class BuildFileAddressMapper(object):
     """
     self._build_file_parser = build_file_parser
     self._spec_path_to_address_map_map = {}  # {spec_path: {address: addressable}} mapping
-    if isinstance(project_tree, ProjectTree):
-      self._project_tree = project_tree
-    else:
-      # If project_tree is BuildFile class actually.
-      # TODO(tabishev): Remove after transition period.
-      self._project_tree = project_tree._get_project_tree(self.root_dir)
+    self._project_tree = project_tree
     self._build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
 
     self._exclude_target_regexps = exclude_target_regexps or []
