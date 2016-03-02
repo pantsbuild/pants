@@ -26,10 +26,13 @@ class JarDependencyTest(unittest.TestCase):
     self._test_copy(self._mkjardep(tpe=ScalaJarDependency))
 
   def _test_copy(self, original):
-    clone = original.copy()
-    self.assertEqual(original, clone)
-    original.excludes += (Exclude(org='com.blah', name='blah'),)
-    self.assertNotEqual(original, clone)
+    # A no-op clone results in an equal object.
+    self.assertEqual(original, original.copy())
+    # Excludes included in equality.
+    excludes_added = original.copy(excludes=[Exclude(org='com.blah', name='blah')])
+    self.assertNotEqual(original, excludes_added)
+    # Clones are equal with equal content.
+    self.assertEqual(original.copy(rev='1.2.3'), original.copy(rev='1.2.3'))
 
   def _mkjardep(self, org='foo', name='foo',
                 excludes=(Exclude(org='example.com', name='foo-lib'),), tpe=JarDependency):

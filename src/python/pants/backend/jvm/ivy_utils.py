@@ -488,11 +488,8 @@ class IvyUtils(object):
       # See: https://github.com/pantsbuild/pants/issues/2239
       coordinate = (jar.org, jar.name, jar.classifier)
       existing = jars.get(coordinate)
-      candidate = jar if not existing else cls._resolve_conflict(existing=existing,
+      jars[coordinate] = jar if not existing else cls._resolve_conflict(existing=existing,
                                                                         proposed=jar)
-      # Clone the JarDependency object so that any mutations occuring in the context of this method
-      # do not affect the graph.
-      jars[coordinate] = candidate.copy()
 
     def collect_jars(target):
       if isinstance(target, JarLibrary):
@@ -526,8 +523,8 @@ class IvyUtils(object):
     # longer global.
     if provide_excludes:
       additional_excludes = tuple(provide_excludes)
-      for coordinate, jar in jars.items():
-        jar.excludes += additional_excludes
+      jars = {coordinate: jar.copy(excludes=jar.excludes+additional_excludes)
+              for coordinate, jar in jars.items()}
 
     return jars.values(), global_excludes
 
