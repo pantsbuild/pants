@@ -180,6 +180,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     This allows us to change Task.__init__()'s arguments without
     changing every subclass. If the subclass does not need its own
     initialization, this method can (and should) be omitted entirely.
+
+    :API: public
     """
     super(TaskBase, self).__init__()
     self.context = context
