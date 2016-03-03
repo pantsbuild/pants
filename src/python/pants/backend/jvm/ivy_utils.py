@@ -377,7 +377,12 @@ class IvyUtils(object):
     return TemplateData(org=jar.org, module=jar.name, version=jar.rev)
 
   @staticmethod
+  @deprecated('0.0.80', hint_message='Use `do_resolve` and `load_resolve` instead.')
   def load_classpath_from_cachepath(path):
+    return IvyUtils._load_classpath_from_cachepath(path)
+
+  @staticmethod
+  def _load_classpath_from_cachepath(path):
     if not os.path.exists(path):
       return []
     else:
@@ -401,7 +406,7 @@ class IvyUtils(object):
       return None
     symlink_map = cls._symlink_from_cache_path(cachedir, workdir, symlink_lock, request)
     resolved_artifact_paths = \
-      cls.load_classpath_from_cachepath(request.symlink_classpath_filename(workdir))
+      cls._load_classpath_from_cachepath(request.symlink_classpath_filename(workdir))
     result = IvyResolveResult(resolved_artifact_paths,
                               symlink_map,
                               request.hash_name,
@@ -437,7 +442,7 @@ class IvyUtils(object):
 
         # Copy ivy resolve file(s) into the workdir.
         for conf in request.confs:
-          atomic_copy(cls._xml_report_path(ivy.ivy_cache_dir, request.hash_name, conf),
+          atomic_copy(cls.xml_report_path(ivy.ivy_cache_dir, request.hash_name, conf),
                       request._resolve_report_path(workdir, conf))
 
       if not os.path.exists(raw_target_classpath_file_tmp):
@@ -499,7 +504,7 @@ class IvyUtils(object):
     real_ivy_cache_dir = os.path.realpath(ivy_cache_dir)
     symlink_map = OrderedDict()
 
-    inpaths = cls.load_classpath_from_cachepath(inpath)
+    inpaths = cls._load_classpath_from_cachepath(inpath)
     paths = OrderedSet([os.path.realpath(path) for path in inpaths])
 
     for path in paths:
@@ -538,12 +543,7 @@ class IvyUtils(object):
       return IvyUtils.INTERNAL_ORG_NAME, Target.maybe_readable_identify(targets)
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `do_resolve` and `load_resolve` instead.')
   def xml_report_path(cls, cache_dir, resolve_hash_name, conf):
-    return cls._xml_report_path(cache_dir, resolve_hash_name, conf)
-
-  @classmethod
-  def _xml_report_path(cls, cache_dir, resolve_hash_name, conf):
     """The path to the xml report ivy creates after a retrieve.
 
     :param string cache_dir: The path of the ivy cache dir used for resolves.
