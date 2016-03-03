@@ -14,6 +14,19 @@
 #   ...
 # }
 #
+
+PKG_ANDROID=(
+  "pantsbuild.pants.contrib.android"
+  "//contrib/android/src/python/pants/contrib/android:plugin"
+  "pkg_android_install_test"
+)
+function pkg_android_install_test() {
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
+    --explain gen | grep "android" &> /dev/null
+}
+
+
 PKG_SCROOGE=(
   "pantsbuild.pants.contrib.scrooge"
   "//contrib/scrooge/src/python/pants/contrib/scrooge:plugin"
@@ -112,6 +125,7 @@ function pkg_python_checks_install_test() {
 
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
+  PKG_ANDROID
   PKG_SCROOGE
   PKG_BUILDGEN
   PKG_SPINDLE
