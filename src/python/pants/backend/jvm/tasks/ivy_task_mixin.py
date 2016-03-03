@@ -21,7 +21,6 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.task.task import TaskBase
-from pants.util.fileutil import atomic_copy
 from pants.util.memo import memoized_property
 
 
@@ -102,7 +101,7 @@ class IvyTaskMixin(TaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 1)]
+    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 2)]
 
   @memoized_property
   def ivy_cache_dir(self):
@@ -187,14 +186,14 @@ class IvyTaskMixin(TaskBase):
     return result.resolve_hash_name
 
   def _ivy_resolve(self,
-                  targets,
-                  executor=None,
-                  silent=False,
-                  workunit_name=None,
-                  confs=None,
-                  extra_args=None,
-                  invalidate_dependents=False,
-                  pinned_artifacts=None):
+                   targets,
+                   executor=None,
+                   silent=False,
+                   workunit_name=None,
+                   confs=None,
+                   extra_args=None,
+                   invalidate_dependents=False,
+                   pinned_artifacts=None):
     """Resolves external dependencies for the given targets.
 
     If there are no targets suitable for jvm transitive dependency resolution, an empty result is
@@ -219,7 +218,6 @@ class IvyTaskMixin(TaskBase):
       return _NO_RESOLVE_RUN_RESULT
 
     confs = confs or ('default',)
-    extra_args = extra_args or []
 
     fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
@@ -234,18 +232,21 @@ class IvyTaskMixin(TaskBase):
         return _NO_RESOLVE_RUN_RESULT
 
       resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
-
       resolve_hash_name = resolve_vts.cache_key.hash
-
       ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
       resolve_workdir = os.path.join(ivy_workdir, resolve_hash_name)
+      artifacts, global_excludes = IvyUtils.calculate_classpath(resolve_vts.targets)
 
       request = IvyResolveRequest(self.ivy_cache_dir,
                                   resolve_workdir,
                                   self.symlink_map_lock,
                                   resolve_hash_name,
+                                  confs,
+                                  artifacts,
+                                  pinned_artifacts,
+                                  global_excludes,
                                   self.get_options().soft_excludes,
-                                  confs)
+                                  extra_args or [])
 
       # Check for a previous run's resolution result files. If they exist try to load a result using
       # them. If that fails, fall back to doing a resolve and loading its results.
@@ -258,10 +259,10 @@ class IvyTaskMixin(TaskBase):
       ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
       IvyUtils.do_resolve(ivy,
                           executor,
-                          extra_args,
-                          resolve_vts,
-                          pinned_artifacts,
-                          workunit_name,
-                          request)
+                          request,
+                          jvm_options=self.get_options().jvm_options,
+                          workunit_name=workunit_name,
+                          workunit_factory=self.context.new_workunit)
 
-      return IvyUtils.load_resolve(request)
+      # Try again to load the resolve, which should now definitely be present.
+      return IvyUtils.load_resolve(request, fatal=True)

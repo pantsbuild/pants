@@ -21,6 +21,7 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependenc
                                                                     PinnedJarArtifactSet)
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.util.fileutil import atomic_copy
 from pants.base.deprecated import deprecated
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
@@ -45,7 +46,16 @@ logger = logging.getLogger(__name__)
 
 
 class IvyResolveRequest(datatype('IvyResolveRequest', [
-  'cachedir', 'workdir', 'symlink_lock', 'hash_name', 'soft_excludes', 'confs'])):
+  'cachedir', 'workdir', 'symlink_lock', 'hash_name', 'confs', 'artifacts',
+  'pinned_artifacts', 'global_excludes', 'is_soft_excludes', 'extra_args'])):
+  """Contains all unique information identifying a particular ivy resolve.
+
+  When deciding whether to add a property here or to add it to the `do_resolve` method, ask
+  whether it affects the identity of the resolve: if it does, it should be part of this
+  value.
+
+  TODO: Document parameters.
+  """
 
   _FULL_RESOLVE_IVY_XML_FILE_NAME = 'ivy.xml'
 
@@ -61,7 +71,7 @@ class IvyResolveRequest(datatype('IvyResolveRequest', [
     systems. Note that for any given ivy_workdir, there will be a single well-known symlink
     dir, so that paths within that directory are consistent across builds.
     """
-    return os.path.join(ivy_workdir, 'jars')
+    return os.path.join(self.workdir, 'jars')
 
   @property
   def ivy_cache_classpath_filename(self):
@@ -76,11 +86,11 @@ class IvyResolveRequest(datatype('IvyResolveRequest', [
 
   @property
   def reports_by_conf(self):
-    return {c: self._resolve_report_path(self.workdir, c) for c in self.confs}
+    return {c: self._resolve_report_path(c) for c in self.confs}
 
   def result_files_exist(self):
     return (all(os.path.isfile(report) for report in self.reports_by_conf.values()) and
-            os.path.isfile(ivy_cache_classpath_filename))
+            os.path.isfile(self.ivy_cache_classpath_filename))
 
 
 class IvyResolveResult(object):
@@ -397,8 +407,8 @@ class IvyUtils(object):
       cls.load_classpath_from_cachepath(request.symlink_classpath_filename)
     result = IvyResolveResult(resolved_artifact_paths,
                               symlink_map,
-                              resolve.hash_name,
-                              resolve.reports_by_conf)
+                              request.hash_name,
+                              request.reports_by_conf)
     if not result.all_linked_artifacts_exist():
       # Outputs not present.
       if fatal:
@@ -408,30 +418,30 @@ class IvyUtils(object):
     return result
 
   @classmethod
-  def do_resolve(cls, ivy, executor, extra_args, global_vts, pinned_artifacts, workunit_name, request):
+  def do_resolve(cls, ivy, executor, request, jvm_options=None, workunit_name=None, workunit_factory=None):
     safe_mkdir(request.workdir)
 
-    with safe_concurrent_creation(request.ivy_cache_classpath_filename) as raw_target_classpath_file_tmp:
-      args = ['-cachepath', raw_target_classpath_file_tmp] + extra_args
+    jvm_options = jvm_options or []
+    workunit_name = workunit_name if workunit_name is not None else 'ivy'
 
-      targets = global_vts.targets
-      jars, global_excludes = cls._calculate_classpath(targets)
+    with safe_concurrent_creation(request.ivy_cache_classpath_filename) as raw_target_classpath_file_tmp:
+      args = ['-cachepath', raw_target_classpath_file_tmp] + request.extra_args
 
       # Don't pass global excludes to ivy when using soft excludes.
-      if request.soft_excludes:
+      if request.is_soft_excludes:
         global_excludes = []
 
       ivyxml = request.ivy_xml_path
       with cls._ivy_lock:
-        cls._generate_ivy(targets, jars, global_excludes, ivyxml, request.confs,
-                          request.hash_name, pinned_artifacts)
+        cls._generate_ivy(request.artifacts, request.global_excludes, ivyxml, request.confs,
+                          request.hash_name, request.pinned_artifacts)
 
-        cls._exec_ivy(ivy, request.confs, ivyxml, args, executor, request.confs, ivyxml, args, workunit_name)
+        cls._exec_ivy(ivy, request.confs, ivyxml, args, jvm_options, executor, workunit_name, workunit_factory)
 
-        # Copy ivy resolve file into resolve workdir.
+        # Copy ivy resolve file(s) into resolve workdir.
         for conf in request.confs:
-          atomic_copy(cls.xml_report_path(request.cache_dir, request.hash_name, conf),
-                      request._resolve_report_path(resolve_workdir, conf))
+          atomic_copy(cls._xml_report_path(request.cachedir, request.hash_name, conf),
+                      request._resolve_report_path(conf))
 
       if not os.path.exists(raw_target_classpath_file_tmp):
         raise IvyError('Ivy failed to create classpath file at {}'
@@ -440,7 +450,7 @@ class IvyUtils(object):
     logger.debug('Moved ivy classfile file to {dest}'.format(dest=request.ivy_cache_classpath_filename))
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `load_resolve` and `do_resolve` instead.')
+  @deprecated('0.0.80', hint_message='Use `do_resolve` and `load_resolve` instead.')
   def exec_ivy(cls, ivy, confs, ivyxml, args,
                jvm_options,
                executor,
@@ -450,11 +460,8 @@ class IvyUtils(object):
                          workunit_factory)
 
   @classmethod
-  def _exec_ivy(cls, ivy, confs, ivyxml, args,
-                jvm_options,
-                executor,
-                workunit_name,
-                workunit_factory):
+  def _exec_ivy(cls, ivy, confs, ivyxml, args, jvm_options, executor,
+                workunit_name, workunit_factory):
     ivy = ivy or Bootstrapper.default_ivy()
 
     ivy_args = ['-ivy', ivyxml]
@@ -476,7 +483,7 @@ class IvyUtils(object):
       raise IvyUtils.IvyError(e)
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `load_resolve` and `do_resolve` instead.')
+  @deprecated('0.0.80', hint_message='Use `do_resolve` and `load_resolve` instead.')
   def symlink_cachepath(cls, ivy_cache_dir, inpath, symlink_dir, outpath):
     return cls._symlink_cachepath(ivy_cache_dir, inpath, symlink_dir, outpath)
 
@@ -525,6 +532,7 @@ class IvyUtils(object):
     return dict(symlink_map)
 
   @staticmethod
+  @deprecated('0.0.80', hint_message='Use `do_resolve` and `load_resolve` instead.')
   def identify(targets):
     targets = list(targets)
     if len(targets) == 1 and targets[0].is_jvm and getattr(targets[0], 'provides', None):
@@ -533,7 +541,7 @@ class IvyUtils(object):
       return IvyUtils.INTERNAL_ORG_NAME, Target.maybe_readable_identify(targets)
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `load_resolve` and `do_resolve` instead.')
+  @deprecated('0.0.80', hint_message='Use `do_resolve` and `load_resolve` instead.')
   def xml_report_path(cls, cache_dir, resolve_hash_name, conf):
     return cls._xml_report_path(cache_dir, resolve_hash_name, conf)
 
@@ -594,20 +602,17 @@ class IvyUtils(object):
     return ret
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `load_resolve` and `do_resolve` instead.')
+  @deprecated('0.0.80', hint_message='Use `do_resolve` and `load_resolve` instead.')
   def generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
                    pinned_artifacts=None):
-    return cls._generate_ivy(targets, jars, excludes, ivyxml, confs, resolve_hash_name,
-                             pinned_artifacts)
+    if not resolve_hash_name:
+      resolve_hash_name = Target.maybe_readable_identify(targets)
+    return cls._generate_ivy(jars, excludes, ivyxml, confs, resolve_hash_name, pinned_artifacts)
 
   @classmethod
-  def _generate_ivy(cls, targets, jars, excludes, ivyxml, confs, resolve_hash_name=None,
-                   pinned_artifacts=None):
-    if resolve_hash_name:
-      org = IvyUtils.INTERNAL_ORG_NAME
-      name = resolve_hash_name
-    else:
-      org, name = cls.identify(targets)
+  def _generate_ivy(cls, jars, excludes, ivyxml, confs, resolve_hash_name, pinned_artifacts=None):
+    org = IvyUtils.INTERNAL_ORG_NAME
+    name = resolve_hash_name
 
     extra_configurations = [conf for conf in confs if conf and conf != 'default']
 
@@ -664,12 +669,7 @@ class IvyUtils(object):
       generator.write(output)
 
   @classmethod
-  @deprecated('0.0.80', hint_message='Use `load_resolve` and `do_resolve` instead.')
   def calculate_classpath(cls, targets):
-    return cls._calculate_classpath(targets)
-
-  @classmethod
-  def _calculate_classpath(cls, targets):
     """Creates a consistent classpath and list of excludes for the passed targets.
 
     It also modifies the JarDependency objects' excludes to contain all the jars excluded by
@@ -784,7 +784,8 @@ class IvyUtils(object):
     if len(global_dep_attributes) != 1:
       # TODO: Need to provide information about where these came from - could be
       # far-flung JarLibrary targets. The jars here were collected from targets via
-      # `_calculate_classpath` above and so merging of the 2 could provide the context needed.
+      # `calculate_classpath` above so executing this step there instead may make more
+      # sense.
       conflicting_dependencies = sorted(str(g) for g in global_dep_attributes)
       raise cls.IvyResolveConflictingDepsError('Found conflicting dependencies:\n\t{}'
                                                .format('\n\t'.join(conflicting_dependencies)))
@@ -829,7 +830,7 @@ class IvyUtils(object):
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
     with request.symlink_lock:
-      return cls._symlink_cachepath(request.cache_dir,
-                                    request.raw_target_classpath_file,
+      return cls._symlink_cachepath(request.cachedir,
+                                    request.ivy_cache_classpath_filename,
                                     request.symlink_dir,
                                     request.symlink_classpath_filename)

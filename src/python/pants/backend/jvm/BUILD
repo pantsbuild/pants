@@ -57,6 +57,7 @@ python_library(
     'src/python/pants/ivy',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:fileutil',
   ],
 )
 
