@@ -274,8 +274,9 @@ class IvyUtils(object):
 
     runner = ivy.runner(jvm_options=ivy_jvm_options, args=ivy_args, executor=executor)
     try:
-      result = execute_runner(runner, workunit_factory=workunit_factory,
-                              workunit_name=workunit_name)
+      with ivy.resolution_lock:
+        result = execute_runner(runner, workunit_factory=workunit_factory,
+                                workunit_name=workunit_name)
       if result != 0:
         raise IvyUtils.IvyError('Ivy returned {result}. cmd={cmd}'.format(result=result, cmd=runner.cmd))
     except runner.executor.Error as e:
