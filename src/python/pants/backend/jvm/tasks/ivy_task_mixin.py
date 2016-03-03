@@ -237,10 +237,7 @@ class IvyTaskMixin(TaskBase):
       resolve_workdir = os.path.join(ivy_workdir, resolve_hash_name)
       artifacts, global_excludes = IvyUtils.calculate_classpath(resolve_vts.targets)
 
-      request = IvyResolveRequest(self.ivy_cache_dir,
-                                  resolve_workdir,
-                                  self.symlink_map_lock,
-                                  resolve_hash_name,
+      request = IvyResolveRequest(resolve_hash_name,
                                   confs,
                                   artifacts,
                                   pinned_artifacts,
@@ -248,10 +245,17 @@ class IvyTaskMixin(TaskBase):
                                   self.get_options().soft_excludes,
                                   extra_args or [])
 
+      def load_resolve(fatal):
+        return IvyUtils.load_resolve(self.ivy_cache_dir,
+                                     resolve_workdir,
+                                     self.symlink_map_lock,
+                                     request,
+                                     fatal=fatal)
+
       # Check for a previous run's resolution result files. If they exist try to load a result using
       # them. If that fails, fall back to doing a resolve and loading its results.
       if not invalidation_check.invalid_vts:
-        result = IvyUtils.load_resolve(request, fatal=False)
+        result = load_resolve(fatal=False)
         if result is not None:
           # Successfully loaded the previous resolve result.
           return result
@@ -259,10 +263,11 @@ class IvyTaskMixin(TaskBase):
       ivy = Bootstrapper.default_ivy(bootstrap_workunit_factory=self.context.new_workunit)
       IvyUtils.do_resolve(ivy,
                           executor,
+                          resolve_workdir,
                           request,
                           jvm_options=self.get_options().jvm_options,
                           workunit_name=workunit_name,
                           workunit_factory=self.context.new_workunit)
 
       # Try again to load the resolve, which should now definitely be present.
-      return IvyUtils.load_resolve(request, fatal=True)
+      return load_resolve(fatal=True)

@@ -46,51 +46,47 @@ logger = logging.getLogger(__name__)
 
 
 class IvyResolveRequest(datatype('IvyResolveRequest', [
-  'cachedir', 'workdir', 'symlink_lock', 'hash_name', 'confs', 'artifacts',
-  'pinned_artifacts', 'global_excludes', 'is_soft_excludes', 'extra_args'])):
+  'hash_name', 'confs', 'artifacts', 'pinned_artifacts', 'global_excludes',
+  'is_soft_excludes', 'extra_args'])):
   """Contains all unique information identifying a particular ivy resolve.
 
-  When deciding whether to add a property here or to add it to the `do_resolve` method, ask
-  whether it affects the identity of the resolve: if it does, it should be part of this
-  value.
+  When deciding whether to add a property here or to add it to the `do_resolve` or
+  `load_resolve` methods, ask whether it affects the identity of the resolve: if it
+  does, it should be part of this datatype.
 
   TODO: Document parameters.
   """
 
   _FULL_RESOLVE_IVY_XML_FILE_NAME = 'ivy.xml'
 
-  @property
-  def symlink_classpath_filename(self):
-    return os.path.join(self.workdir, 'classpath')
+  def symlink_classpath_filename(self, workdir):
+    return os.path.join(workdir, 'classpath')
 
-  @property
-  def symlink_dir(self):
+  def symlink_dir(self, workdir):
     """A common dir for symlinks into the ivy2 cache.
 
     This ensures that paths to jars in artifact-cached analysis files are consistent across
     systems. Note that for any given ivy_workdir, there will be a single well-known symlink
     dir, so that paths within that directory are consistent across builds.
     """
-    return os.path.join(self.workdir, 'jars')
+    return os.path.join(workdir, 'jars')
 
-  @property
-  def ivy_cache_classpath_filename(self):
-    return self.symlink_classpath_filename + '.raw'
+  def ivy_cache_classpath_filename(self, workdir):
+    return self.symlink_classpath_filename(workdir) + '.raw'
 
-  def _resolve_report_path(self, conf):
-    return os.path.join(self.workdir, 'resolve-report-{}.xml'.format(conf))
+  def _resolve_report_path(self, workdir, conf):
+    return os.path.join(workdir, 'resolve-report-{}.xml'.format(conf))
 
-  @property
-  def ivy_xml_path(self):
-    return os.path.join(self.workdir, self._FULL_RESOLVE_IVY_XML_FILE_NAME)
+  def ivy_xml_path(self, workdir):
+    return os.path.join(workdir, self._FULL_RESOLVE_IVY_XML_FILE_NAME)
 
-  @property
-  def reports_by_conf(self):
-    return {c: self._resolve_report_path(c) for c in self.confs}
+  def reports_by_conf(self, workdir):
+    return {c: self._resolve_report_path(workdir, c) for c in self.confs}
 
-  def result_files_exist(self):
-    return (all(os.path.isfile(report) for report in self.reports_by_conf.values()) and
-            os.path.isfile(self.ivy_cache_classpath_filename))
+  def result_files_exist(self, workdir):
+    reports = self.reports_by_conf(workdir).values()
+    return (all(os.path.isfile(report) for report in reports) and
+            os.path.isfile(self.ivy_cache_classpath_filename(workdir)))
 
 
 class IvyResolveResult(object):
@@ -389,7 +385,7 @@ class IvyUtils(object):
         return filter(None, (path.strip() for path in cp.read().split(os.pathsep)))
 
   @classmethod
-  def load_resolve(cls, request, fatal=True):
+  def load_resolve(cls, cachedir, workdir, symlink_lock, request, fatal=True):
     """Given a IvyResolveRequest, return an IvyResolveResult or None.
 
     If `fatal=True`, then rather than returning None, any failure to locate an input or output
@@ -397,51 +393,52 @@ class IvyUtils(object):
 
     If either the inputs or outputs are not present, returns None.
     """
-    if not request.result_files_exist():
+    if not request.result_files_exist(workdir):
       # Inputs not present.
       if fatal:
-        raise IvyResolveMappingError('Resolve report did not exist for {}'.format(request))
+        raise IvyResolveMappingError(
+            'Resolve report did not exist in {} for {}'.format(workdir, request))
       return None
-    symlink_map = cls._symlink_from_cache_path(request)
+    symlink_map = cls._symlink_from_cache_path(cachedir, workdir, symlink_lock, request)
     resolved_artifact_paths = \
-      cls.load_classpath_from_cachepath(request.symlink_classpath_filename)
+      cls.load_classpath_from_cachepath(request.symlink_classpath_filename(workdir))
     result = IvyResolveResult(resolved_artifact_paths,
                               symlink_map,
                               request.hash_name,
-                              request.reports_by_conf)
+                              request.reports_by_conf(workdir))
     if not result.all_linked_artifacts_exist():
       # Outputs not present.
       if fatal:
         raise IvyResolveMappingError(
-            'Some artifacts were not linked into the pants workdir for {}'.format(result))
+            'Some artifacts were not linked to {} for {}'.format(workdir, result))
       return None
     return result
 
   @classmethod
-  def do_resolve(cls, ivy, executor, request, jvm_options=None, workunit_name=None, workunit_factory=None):
-    safe_mkdir(request.workdir)
+  def do_resolve(cls, ivy, executor, workdir, request, jvm_options=None, workunit_name=None, workunit_factory=None):
+    safe_mkdir(workdir)
 
     jvm_options = jvm_options or []
     workunit_name = workunit_name if workunit_name is not None else 'ivy'
 
-    with safe_concurrent_creation(request.ivy_cache_classpath_filename) as raw_target_classpath_file_tmp:
+    with safe_concurrent_creation(request.ivy_cache_classpath_filename(workdir)) as raw_target_classpath_file_tmp:
       args = ['-cachepath', raw_target_classpath_file_tmp] + request.extra_args
 
       # Don't pass global excludes to ivy when using soft excludes.
       if request.is_soft_excludes:
         global_excludes = []
 
-      ivyxml = request.ivy_xml_path
+      ivyxml = request.ivy_xml_path(workdir)
       with cls._ivy_lock:
         cls._generate_ivy(request.artifacts, request.global_excludes, ivyxml, request.confs,
                           request.hash_name, request.pinned_artifacts)
 
         cls._exec_ivy(ivy, request.confs, ivyxml, args, jvm_options, executor, workunit_name, workunit_factory)
 
-        # Copy ivy resolve file(s) into resolve workdir.
+        # Copy ivy resolve file(s) into the workdir.
         for conf in request.confs:
-          atomic_copy(cls._xml_report_path(request.cachedir, request.hash_name, conf),
-                      request._resolve_report_path(conf))
+          atomic_copy(cls._xml_report_path(ivy.ivy_cache_dir, request.hash_name, conf),
+                      request._resolve_report_path(workdir, conf))
 
       if not os.path.exists(raw_target_classpath_file_tmp):
         raise IvyError('Ivy failed to create classpath file at {}'
@@ -825,12 +822,12 @@ class IvyUtils(object):
     return template
 
   @classmethod
-  def _symlink_from_cache_path(cls, request):
+  def _symlink_from_cache_path(cls, cachedir, workdir, symlink_lock, request):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
-    with request.symlink_lock:
-      return cls._symlink_cachepath(request.cachedir,
-                                    request.ivy_cache_classpath_filename,
-                                    request.symlink_dir,
-                                    request.symlink_classpath_filename)
+    with symlink_lock:
+      return cls._symlink_cachepath(cachedir,
+                                    request.ivy_cache_classpath_filename(workdir),
+                                    request.symlink_dir(workdir),
+                                    request.symlink_classpath_filename(workdir))
