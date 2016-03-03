@@ -253,17 +253,11 @@ Invalid BUILD files for \[::\]$""", re.DOTALL)
     self.assert_scanned(['::'], expected=expected_specs, address_mapper=address_mapper_with_ignore)
 
   def test_exclude_target_regexps(self):
-    expected_specs = [':root', 'a', 'a:b', 'a/b', 'a/b:c']
-
-    # This bogus BUILD file gets in the way of parsing.
-    self.add_to_build_file('some/dir', 'COMPLETELY BOGUS BUILDFILE)\n')
-    with self.assertRaises(AddressLookupError):
-      self.assert_scanned(['::'], expected=expected_specs)
-
     address_mapper_with_exclude = BuildFileAddressMapper(self.build_file_parser,
                                                          self.project_tree,
-                                                         exclude_target_regexps=[r'.*some/dir.*'])
-    self.assert_scanned(['::'], expected=expected_specs, address_mapper=address_mapper_with_exclude)
+                                                         exclude_target_regexps=[r'.*:b.*'])
+    self.assert_scanned(['::'], expected=[':root', 'a', 'a/b:c'],
+                        address_mapper=address_mapper_with_exclude)
 
   def assert_scanned(self, specs_strings, expected, address_mapper=None):
     """Parse and scan the given specs."""
