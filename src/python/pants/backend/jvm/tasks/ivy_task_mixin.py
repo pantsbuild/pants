@@ -235,21 +235,24 @@ class IvyTaskMixin(TaskBase):
       resolve_hash_name = resolve_vts.cache_key.hash
       ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
       resolve_workdir = os.path.join(ivy_workdir, resolve_hash_name)
+
+      # Calculate the classpath.
       artifacts, global_excludes = IvyUtils.calculate_classpath(resolve_vts.targets)
+      if self.get_options().soft_excludes:
+        global_excludes = []
 
       request = IvyResolveRequest(resolve_hash_name,
                                   confs,
                                   artifacts,
                                   pinned_artifacts,
                                   global_excludes,
-                                  self.get_options().soft_excludes,
                                   extra_args or [])
 
       def load_resolve(fatal):
         return IvyUtils.load_resolve(self.ivy_cache_dir,
                                      resolve_workdir,
-                                     self.symlink_map_lock,
                                      request,
+                                     symlink_lock=self.symlink_map_lock,
                                      fatal=fatal)
 
       # Check for a previous run's resolution result files. If they exist try to load a result using

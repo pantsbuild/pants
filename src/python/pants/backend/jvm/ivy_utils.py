@@ -46,8 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 class IvyResolveRequest(datatype('IvyResolveRequest', [
-  'hash_name', 'confs', 'artifacts', 'pinned_artifacts', 'global_excludes',
-  'is_soft_excludes', 'extra_args'])):
+  'hash_name', 'confs', 'artifacts', 'pinned_artifacts', 'global_excludes', 'extra_args'])):
   """Contains all unique information identifying a particular ivy resolve.
 
   When deciding whether to add a property here or to add it to the `do_resolve` or
@@ -96,8 +95,8 @@ class IvyResolveResult(object):
   and the targets that requested them and the hash name of the resolve.
   """
 
-  def __init__(self, resolved_artifact_paths, symlink_map, resolve_hash_name, reports_by_conf):
-    self._reports_by_conf = reports_by_conf
+  def __init__(self, resolved_artifact_paths, symlink_map, resolve_hash_name, ivy_info_by_conf):
+    self._ivy_info_by_conf = ivy_info_by_conf
     self.resolved_artifact_paths = resolved_artifact_paths
     self.resolve_hash_name = resolve_hash_name
     self._symlink_map = symlink_map
@@ -120,12 +119,12 @@ class IvyResolveResult(object):
 
     If there is no report for the requested conf, yields nothing.
 
-    :param conf: The ivy conf to load targets for.
+    :param conf: The ivy conf to load jars for.
     :param targets: The collection of JarLibrary targets to find resolved jars for.
     :yield: target, resolved_jars
     :raises IvyTaskMixin.UnresolvedJarError
     """
-    ivy_info = self._ivy_info_for(conf)
+    ivy_info = self._ivy_info_by_conf.get(conf, None)
     if not ivy_info:
       return
 
@@ -136,10 +135,6 @@ class IvyResolveResult(object):
       resolved_jars = self._resolved_jars_with_symlinks(conf, ivy_info, ivy_jar_memo,
                                                target.jar_dependencies, target)
       yield target, resolved_jars
-
-  def _ivy_info_for(self, conf):
-    report_path = self._reports_by_conf.get(conf)
-    return IvyUtils.parse_xml_report(conf, report_path)
 
   def _new_resolved_jar_with_symlink_path(self, conf, tgt, resolved_jar_without_symlink):
     def candidate_cache_paths():
@@ -390,7 +385,7 @@ class IvyUtils(object):
         return filter(None, (path.strip() for path in cp.read().split(os.pathsep)))
 
   @classmethod
-  def load_resolve(cls, cachedir, workdir, symlink_lock, request, fatal=True):
+  def load_resolve(cls, cachedir, workdir, request, symlink_lock=None, fatal=True):
     """Given a IvyResolveRequest, return an IvyResolveResult or None.
 
     If `fatal=True`, then rather than returning None, any failure to locate an input or output
@@ -404,13 +399,17 @@ class IvyUtils(object):
         raise IvyResolveMappingError(
             'Resolve report did not exist in {} for {}'.format(workdir, request))
       return None
-    symlink_map = cls._symlink_from_cache_path(cachedir, workdir, symlink_lock, request)
+    symlink_map = cls._symlink_from_cache_path(cachedir, workdir, request, symlink_lock)
     resolved_artifact_paths = \
       cls._load_classpath_from_cachepath(request.symlink_classpath_filename(workdir))
+
+    # Parse reports and create a result.
+    ivy_info_by_conf = {conf: IvyUtils.parse_xml_report(conf, report)
+                       for conf, report in request.reports_by_conf(workdir).items()}
     result = IvyResolveResult(resolved_artifact_paths,
                               symlink_map,
                               request.hash_name,
-                              request.reports_by_conf(workdir))
+                              ivy_info_by_conf)
     if not result.all_linked_artifacts_exist():
       # Outputs not present.
       if fatal:
@@ -428,10 +427,6 @@ class IvyUtils(object):
 
     with safe_concurrent_creation(request.ivy_cache_classpath_filename(workdir)) as raw_target_classpath_file_tmp:
       args = ['-cachepath', raw_target_classpath_file_tmp] + request.extra_args
-
-      # Don't pass global excludes to ivy when using soft excludes.
-      if request.is_soft_excludes:
-        global_excludes = []
 
       ivyxml = request.ivy_xml_path(workdir)
       with cls._ivy_lock:
@@ -822,10 +817,11 @@ class IvyUtils(object):
     return template
 
   @classmethod
-  def _symlink_from_cache_path(cls, cachedir, workdir, symlink_lock, request):
+  def _symlink_from_cache_path(cls, cachedir, workdir, request, symlink_lock=None):
     # Make our actual classpath be symlinks, so that the paths are uniform across systems.
     # Note that we must do this even if we read the raw_target_classpath_file from the artifact
     # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
+    symlink_lock = symlink_lock if symlink_lock is not None else threading.Lock()
     with symlink_lock:
       return cls._symlink_cachepath(cachedir,
                                     request.ivy_cache_classpath_filename(workdir),
