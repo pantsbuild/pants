@@ -24,4 +24,4 @@ tar -C "$SDK_INSTALL_LOCATION" -xf "$SDK_ARCHIVE_LOCATION"
 
 # Add SDKs as needed.
 echo "y" | "$ANDROID_HOME"/tools/android update sdk -u --all --filter \
-     platform-tools,android-19,android-20,android-21,android-22abuild-tools-19.1.0,extra-android-support,extra-google-m2repository,extra-android-m2repository
+     platform-tools,android-19,android-20,android-21,android-22,build-tools-19.1.0,extra-android-support,extra-google-m2repository,extra-android-m2repository
