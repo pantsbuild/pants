@@ -34,6 +34,7 @@ cache:
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - $HOME/.npm
+    - $SDK_INSTALL_LOCATION
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
