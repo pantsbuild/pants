@@ -17,7 +17,8 @@ from pants.core_tasks.pantsd_kill import PantsDaemonKill
 from pants.core_tasks.reporting_server_kill import ReportingServerKill
 from pants.core_tasks.reporting_server_run import ReportingServerRun
 from pants.core_tasks.roots import ListRoots
-from pants.core_tasks.run_prep_command import RunPrepCommand
+from pants.core_tasks.run_prep_command import (RunBinaryPrepCommand, RunCompilePrepCommand,
+                                               RunTestPrepCommand)
 from pants.core_tasks.targets_help import TargetsHelp
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
@@ -70,8 +71,11 @@ def register_goals():
   # Stub for other goals to schedule 'compile'. See noop_exec_task.py for why this is useful.
   task(name='compile', action=NoopCompile).install('compile')
 
-  # Must be the first thing we register under 'test'.
-  task(name='run_prep_command', action=RunPrepCommand).install('test')
+  # Prep commands must be the first thing we register under its goal.
+  task(name='test-prep-command', action=RunTestPrepCommand).install('test', first=True)
+  task(name='binary-prep-command', action=RunBinaryPrepCommand).install('binary', first=True)
+  task(name='compile-prep-command', action=RunCompilePrepCommand).install('compile', first=True)
+
   # Stub for other goals to schedule 'test'. See noop_exec_task.py for why this is useful.
   task(name='test', action=NoopTest).install('test')
 

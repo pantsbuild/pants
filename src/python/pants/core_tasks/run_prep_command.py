@@ -9,15 +9,46 @@ import os
 import subprocess
 from collections import namedtuple
 
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.build_graph.prep_command import PrepCommand
 from pants.task.task import Task
 
 
-class RunPrepCommand(Task):
+class RunPrepCommandBase(Task):
+  """Base class to enable running shell commands before executing a goal.
+
+  This task is meant to be subclassed, setting the 'goal' variable appropriately.
+  For example, create a subclass and then register it in a plugin to run
+  at the beginning of the binary goal in register.py:
+
+  task(name='binary-prep-command', action=RunBinaryPrepCommand).install('binary', first=True)
+
+  :API: public
+  """
+  goal = None
+
+  @classmethod
+  def register_options(cls, register):
+    """Register options for this optionable.
+
+    In this case, there are no special options, but we want to use this opportunity to setup
+    goal validation in PrepCommand before the build graph is parsed.
+    """
+    super(RunPrepCommandBase, cls).register_options(register)
+    PrepCommand.add_goal(cls.goal)
+
+  @classmethod
+  def runnable_prep_cmd(cls, tgt):
+    return isinstance(tgt, PrepCommand) and tgt.payload.get_field_value('goal') == cls.goal
 
   def execute(self):
-    targets = self.context.targets(postorder=True)
+    if self.goal not in PrepCommand.goals():
+      raise  AssertionError('Got goal "{}". Expected goal to be one of {}'.format(
+          self.goal, PrepCommand.goals()))
+
+    targets = self.context.targets(postorder=True,  predicate=self.runnable_prep_cmd)
     Cmdline = namedtuple('Cmdline', ['cmdline', 'environ'])
 
     def make_cmdline(target):
@@ -65,3 +96,27 @@ class RunPrepCommand(Task):
           workunit.set_outcome(WorkUnit.FAILURE if process.returncode else WorkUnit.SUCCESS)
           if process.returncode:
             raise TaskError('RunPrepCommand failed to run {cmdline}'.format(cmdline=cmdline))
+
+
+class RunBinaryPrepCommand(RunPrepCommandBase):
+  """Run a shell command before other tasks in the binary goal."""
+  goal = 'binary'
+
+
+class RunTestPrepCommand(RunPrepCommandBase):
+  """Run a shell command before other tasks in the test goal."""
+  goal = 'test'
+
+
+class RunCompilePrepCommand(RunPrepCommandBase):
+  """Run a shell command before other tasks in the compile goal."""
+  goal = 'compile'
+
+
+class RunPrepCommand(RunPrepCommandBase):
+  """Run a shell command before other tasks in the test goal."""
+  goal = 'test'
+
+  @deprecated('0.0.78', hint_message="Register RunTestPrepCommand instead.")
+  def __init__(self, **kwargs):
+    super(RunPrepCommand, self).__init__(self, **kwargs)
