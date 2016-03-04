@@ -23,7 +23,25 @@ PKG_ANDROID=(
 function pkg_android_install_test() {
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
-    --explain gen | grep "android" &> /dev/null
+    --explain gen | grep "aapt" &> /dev/null && \
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
+    --explain unpack-jars | grep "unpack-libs" &> /dev/null && \
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
+    --explain compile | grep "unpack-libs" &> /dev/null && \
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
+    --explain binary | grep "dex" &> /dev/null && \
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
+    --explain apk | grep "apk" &> /dev/null && \
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
+    --explain sign | grep "SignApkTask" &> /dev/null && \
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.android==$(local_version)']" \
+    --explain bundle | grep "zipalign" &> /dev/null
 }
 
 
