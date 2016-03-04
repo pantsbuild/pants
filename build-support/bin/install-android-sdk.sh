@@ -1,8 +1,6 @@
 # Install the Android SDK for the Pants Android contrib module.
 set -xf
-# ANDROID_HOME set in travis.yaml.
-# CURRENT_ANDROID_SDK_BUNDLE seeded in travis.yaml per OS.
-
+# SDK_INSTALL_LOCATION and ANDROID_HOME set in travis.yaml.
 
 # This ANDROID_HOME is a hack to work for linux and osx - will be set perm in per-os yaml.
 # SDK_INSTALL_LOCATION="$HOME/opt/android-sdk-install"

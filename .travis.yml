@@ -59,7 +59,7 @@ env:
     # See: http://docs.travis-ci.com/user/encryption-keys/
     - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
   matrix:
-    - CI_FLAGS="-fkmsrcjlpa 'Python contrib tests'"  # (n)
+    - CI_FLAGS="-fkmsrcjlp 'Python contrib tests'"  # (n)
 
 
 before_script: |
