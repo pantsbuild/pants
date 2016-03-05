@@ -16,7 +16,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
   def test_pytest_run_timeout_succeeds(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--test-pytest-options="-k within_timeout"',
+                                '--test-pytest-options=-k within_timeout',
                                 '--timeout-default=2',
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout'])
     self.assert_success(pants_run)
@@ -26,7 +26,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--test-pytest-coverage=1',
-                                '--test-pytest-options="-k exceeds_timeout"',
+                                '--test-pytest-options=-k exceeds_timeout',
                                 '--timeout-default=1',
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout'])
     end = time.time()
@@ -63,15 +63,15 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
 
     # Ensure that the warning about killing triggered.
-    self.assertIn("WARN] Timed out test did not terminate gracefully after %d seconds, killing..." % terminate_wait,
-                  pants_run.stderr_data)
+    self.assertIn("WARN] Timed out test did not terminate gracefully after {} seconds, "
+                  "killing...".format(terminate_wait), pants_run.stderr_data)
 
   def test_pytest_explicit_coverage(self):
     with temporary_dir() as coverage_dir:
       pants_run = self.run_pants(['clean-all',
                                   'test.pytest',
                                   '--test-pytest-coverage=path:testprojects',
-                                  '--test-pytest-coverage-output-dir={dir}'.format(dir=coverage_dir),
+                                  '--test-pytest-coverage-output-dir={}'.format(coverage_dir),
                                   'testprojects/tests/python/pants/constants_only:constants_only'])
       self.assert_success(pants_run)
       self.assertTrue(os.path.exists(os.path.join(coverage_dir, 'coverage.xml')))
