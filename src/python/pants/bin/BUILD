@@ -73,6 +73,5 @@ python_binary(
   dependencies=[
     ':bin',
     'pants-plugins/src/python/internal_backend:plugins',
-    'src/python/pants/backend/android:plugin',
   ],
 )
