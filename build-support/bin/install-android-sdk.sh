@@ -27,4 +27,5 @@ echo "y" | "$ANDROID_HOME"/tools/android update sdk -u --all --filter \
      platform-tools,android-19,android-20,android-21,android-22,build-tools-19.1.0,extra-android-support,extra-google-m2repository,extra-android-m2repository
 
 # Generate debug keystore
-keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 name "CN=Android Debug,O=Android,C=US"
+keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android \
+        -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
