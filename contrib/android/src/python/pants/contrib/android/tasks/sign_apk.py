@@ -129,6 +129,7 @@ class SignApkTask(Task):
       self.setup_default_config(self.default_config_location)
     print("DIDNT HIT")
     import pdb; pdb.set_trace()
+
     targets = self.context.targets(self.is_signtarget)
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = []
