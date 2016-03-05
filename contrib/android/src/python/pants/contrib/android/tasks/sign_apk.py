@@ -125,9 +125,7 @@ class SignApkTask(Task):
   def execute(self):
     # One time setup of the default keystore config file.
     if not os.path.isfile(self.default_config_location):
-      import pdb; pdb.set_trace()
       self.setup_default_config(self.default_config_location)
-
 
     targets = self.context.targets(self.is_signtarget)
     with self.invalidated(targets) as invalidation_check:
