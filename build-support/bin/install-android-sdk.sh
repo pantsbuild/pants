@@ -13,6 +13,18 @@ set -xf
 # ANDROID_HOME="$SDK_INSTALL_LOCATION/android-sdk-linux"
 mkdir -p "$SDK_INSTALL_LOCATION"
 
+# Add SDKs as needed.
+declare -a SDK_MODULES(platform-tools \
+                       android-19 \
+                       android-20 \
+                       android-21 \
+                       android-22 \
+                       build-tools-19.1.0 \
+                       extra-android-support \
+                       extra-google-m2repository \
+                       extra-android-m2repository)
+
+
 ANDROID_SDK_URL="http://dl.google.com/android/android-sdk_r24.4.1-linux.tgz"
 SDK_FILE=$(basename $ANDROID_SDK_URL)
 
@@ -22,10 +34,11 @@ SDK_ARCHIVE_LOCATION="$SDK_INSTALL_LOCATION"/"$SDK_FILE"
 wget "$ANDROID_SDK_URL" -O "$SDK_ARCHIVE_LOCATION"
 tar -C "$SDK_INSTALL_LOCATION" -xf "$SDK_ARCHIVE_LOCATION"
 
-# Add SDKs as needed.
-echo "y" | "$ANDROID_HOME"/tools/android update sdk -u --all --filter \
-     platform-tools,android-19,android-20,android-21,android-22,build-tools-19.1.0,extra-android-support,extra-google-m2repository,extra-android-m2repository
+function join { local IFS="$1"; shift; echo "$*"; }
+MODULE_LIST=$(join , SDK_MODULES)
+
+echo "y" | "$ANDROID_HOME"/tools/android update sdk -u --all --filter $MODULE_LIST
 
 # Generate debug keystore
-keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android \
-        -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android  \
+        -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
