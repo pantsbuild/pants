@@ -14,7 +14,7 @@ set -xf
 mkdir -p "$SDK_INSTALL_LOCATION"
 
 # Add SDKs as needed.
-declare -a SDK_MODULES(platform-tools \
+declare -a SDK_MODULES=(platform-tools \
                        android-19 \
                        android-20 \
                        android-21 \
