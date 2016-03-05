@@ -8,7 +8,7 @@ set -xf
 
 # SDK_INSTALL_LOCATION and ANDROID_HOME set in travis.yaml.
 ANDROID_SDK_URL="http://dl.google.com/android/android-sdk_r24.4.1-linux.tgz"
-SDK_FILE=$(basename $ANDROID_SDK_URL)
+SDK_FILE=$(basename "$ANDROID_SDK_URL")
 
 # The debug.keystore has a well-known definition and location.
 KEYSTORE_LOCATION="$HOME"/.android
@@ -30,14 +30,12 @@ mkdir -p "$KEYSTORE_LOCATION"
 
 function join { local IFS="$1"; shift; echo "$*"; }
 MODULE_LIST=$(join , ${SDK_MODULES[@]})
-echo $MODULE_LIST
 
 echo "Downloading $ANDROID_SDK_URL..."
 SDK_ARCHIVE_LOCATION="$SDK_INSTALL_LOCATION"/"$SDK_FILE"
 
 wget -nc "$ANDROID_SDK_URL" -O "$SDK_ARCHIVE_LOCATION"
 tar -C "$SDK_INSTALL_LOCATION" -xf "$SDK_ARCHIVE_LOCATION"
-
 
 echo "y" | "$ANDROID_HOME"/tools/android update sdk -u --all --filter "$MODULE_LIST" &>/dev/null
 
