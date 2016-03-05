@@ -24,12 +24,6 @@ declare -a SDK_MODULES=(platform-tools \
                        extra-google-m2repository \
                        extra-android-m2repository)
 
-function join { local IFS="$1"; shift; echo "$*"; }
-MODULE_LIST=$(join , ${SDK_MODULES[@]})
-
-echo $MODULE_LIST
-exit
-
 mkdir -p "$SDK_INSTALL_LOCATION"
 mkdir -p "$KEYSTORE_LOCATION"
 
@@ -39,6 +33,8 @@ SDK_ARCHIVE_LOCATION="$SDK_INSTALL_LOCATION"/"$SDK_FILE"
 wget "$ANDROID_SDK_URL" -O "$SDK_ARCHIVE_LOCATION"
 tar -C "$SDK_INSTALL_LOCATION" -xf "$SDK_ARCHIVE_LOCATION"
 
+function join { local IFS="$1"; shift; echo "$*"; }
+MODULE_LIST=$(join , ${SDK_MODULES[@]})
 
 echo "y" | "$ANDROID_HOME"/tools/android update sdk -u --all --filter "$MODULE_LIST"
 
