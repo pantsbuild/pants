@@ -12,7 +12,6 @@ addons:
     - lib32z1
     - lib32z1-dev
 
-
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
   # get bytecode compiled in non-yet-understood circumstances leading to
@@ -42,6 +41,7 @@ cache:
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - $HOME/.npm
+    - $HOME/.android
     - $SDK_INSTALL_LOCATION
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv

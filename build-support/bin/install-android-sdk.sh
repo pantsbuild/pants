@@ -7,11 +7,8 @@ set -xf
 # Install the Android SDK for the Pants Android contrib module.
 
 # SDK_INSTALL_LOCATION and ANDROID_HOME set in travis.yaml.
-
-# This ANDROID_HOME is DEBUG DEBUG DEBUG - local.
-# SDK_INSTALL_LOCATION="$HOME/opt/android-sdk-install"
-# ANDROID_HOME="$SDK_INSTALL_LOCATION/android-sdk-linux"
-mkdir -p "$SDK_INSTALL_LOCATION"
+ANDROID_SDK_URL="http://dl.google.com/android/android-sdk_r24.4.1-linux.tgz"
+SDK_FILE=$(basename $ANDROID_SDK_URL)
 
 # Add SDKs as needed.
 declare -a SDK_MODULES=(platform-tools \
@@ -25,8 +22,7 @@ declare -a SDK_MODULES=(platform-tools \
                        extra-android-m2repository)
 
 
-ANDROID_SDK_URL="http://dl.google.com/android/android-sdk_r24.4.1-linux.tgz"
-SDK_FILE=$(basename $ANDROID_SDK_URL)
+mkdir -p "$SDK_INSTALL_LOCATION"
 
 echo "Downloading $ANDROID_SDK_URL..."
 SDK_ARCHIVE_LOCATION="$SDK_INSTALL_LOCATION"/"$SDK_FILE"
@@ -39,6 +35,6 @@ MODULE_LIST=$(join , SDK_MODULES)
 
 echo "y" | "$ANDROID_HOME"/tools/android update sdk -u --all --filter $MODULE_LIST
 
-# Generate debug keystore
+# Generate well known debug.keystore
 keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android  \
         -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
