@@ -4,6 +4,14 @@
 # cache configured below.
 sudo: false
 
+# These are needed to run the Android SDK tools.
+addons:
+  apt:
+    packages:
+    - lib32stdc++6
+    - lib32z1
+    - lib32z1-dev
+
 
 before_cache:
   # Kill all python bytecode in our cached venvs.  Some files appear to
