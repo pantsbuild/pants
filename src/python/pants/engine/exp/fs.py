@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import errno
 import fnmatch
 from os import sep as os_sep
-from os.path import join
+from os.path import join, normpath
 
 from twitter.common.collections.orderedset import OrderedSet
 
@@ -61,11 +61,16 @@ class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob
   """
 
 
-class PathGlobs(datatype('PathGlobs', ['dependencies'])):
-  """A set of 'filespecs' as produced by FilesetWithSpec.
+def _norm_join(path, paths):
+  joined = normpath(join(path, *paths))
+  return '' if joined == '.' else joined
 
-  This class consumes the (somewhat hidden) support for normalizing globs/rglobs/zglobs
-  into 'filespecs'.
+
+class PathGlobs(datatype('PathGlobs', ['dependencies'])):
+  """A set of 'PathGlob' objects.
+
+  This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
+  globs/rglobs/zglobs into 'filespecs'.
   """
 
   _DOUBLE = '**'
@@ -117,10 +122,10 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
       raise ValueError('TODO: Unsupported: {}'.format(filespec))
     elif cls._SINGLE in filespec_parts[-1]:
       # There is a wildcard in the file basename of the path: match and glob.
-      return PathWildcard(join(*filespec_parts[:-1]), filespec_parts[-1])
+      return PathWildcard(_norm_join(relative_to, filespec_parts[:-1]), filespec_parts[-1])
     else:
       # A literal path.
-      filespec = join(relative_to, *filespec_parts)
+      filespec = _norm_join(relative_to, filespec_parts)
       if cls._SINGLE in filespec:
         raise ValueError('Directory-name globs are not supported: {}'.format(filespec))
       return PathLiteral(filespec)

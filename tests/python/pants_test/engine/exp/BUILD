@@ -11,7 +11,16 @@ python_tests(
 
 
 python_tests(
-  name='struct`',
+  name='fs',
+  sources=['test_fs.py'],
+  dependencies=[
+    'src/python/pants/engine/exp:fs',
+  ]
+)
+
+
+python_tests(
+  name='struct',
   sources=['test_struct.py'],
   dependencies=[
     'src/python/pants/build_graph',
