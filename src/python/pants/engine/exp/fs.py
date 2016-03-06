@@ -6,14 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
+import fnmatch
 from os import sep as os_sep
 from os.path import join
 
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import ProjectTree
-from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral
+from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs, globs_matches
+from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -40,10 +42,22 @@ class FilesContent(datatype('FilesContent', ['dependencies'])):
   """List of FileContent objects."""
 
 
-class PathGlob(datatype('PathGlob', ['relative_to', 'path'])):
-  """A (potentially recursive) glob that may match zero or more Paths.
+class PathGlob(AbstractClass):
+  """A filename pattern."""
 
-  The dependencies of this PathGlob are other PathGlob objects relative to (below) this PathGlob.
+
+class PathLiteral(datatype('PathLiteral', ['path']), PathGlob):
+  """A literal path, which may or may not exist.
+
+  This is differentiated from a Path by the fact that a PathLiteral may not exist, while a
+  Path must exist.
+  """
+
+
+class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob):
+  """A path with a glob/wildcard in the basename component.
+
+  May match zero or more paths.
   """
 
 
@@ -54,9 +68,8 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   into 'filespecs'.
   """
 
-  # TODO: regex these.
-  _RECURSIVE = os_sep + '**' + os_sep
-  _SINGLE = os_sep + '*' + os_sep
+  _DOUBLE = '**'
+  _SINGLE = '*'
 
   @classmethod
   def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
@@ -89,21 +102,28 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
       new_specs = res.get('globs', None)
       if new_specs:
         filespecs.update(new_specs)
+    return cls.create_from_specs(relative_to, filespecs)
 
-    path_globs = []
-    for filespec in filespecs:
-      # TODO: These will be implemented as part of finishing:
-      #   https://github.com/pantsbuild/pants/issues/2946
-      if cls._RECURSIVE in filespec:
-        raise ValueError('TODO: Unsupported: {}'.format(filespec))
-      elif cls._SINGLE in filespec:
-        raise ValueError('TODO: Unsupported: {}'.format(filespec))
-      elif '*' in filespec:
-        raise ValueError('TODO: Unsupported: {}'.format(filespec))
-      else:
-        # A literal path.
-        path_globs.append(PathGlob(relative_to, filespec))
-    return cls(tuple(path_globs))
+  @classmethod
+  def create_from_specs(cls, relative_to, filespecs):
+    return cls(tuple(cls._parse_spec(relative_to, filespec.split(os_sep)) for filespec in filespecs))
+
+  @classmethod
+  def _parse_spec(cls, relative_to, filespec_parts):
+    """Given the path components of a filespec, return a potentially nested PathGlob object."""
+    if cls._DOUBLE in filespec_parts:
+      raise ValueError('TODO: Unsupported: {}'.format(filespec))
+    elif cls._SINGLE in filespec_parts:
+      raise ValueError('TODO: Unsupported: {}'.format(filespec))
+    elif cls._SINGLE in filespec_parts[-1]:
+      # There is a wildcard in the file basename of the path: match and glob.
+      return PathWildcard(join(*filespec_parts[:-1]), filespec_parts[-1])
+    else:
+      # A literal path.
+      filespec = join(relative_to, *filespec_parts)
+      if cls._SINGLE in filespec:
+        raise ValueError('Directory-name globs are not supported: {}'.format(filespec))
+      return PathLiteral(filespec)
 
 
 class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 'dependencies'])):
@@ -149,8 +169,14 @@ def merge_paths(paths_list):
   return Paths(tuple(generate()))
 
 
-def file_exists(project_tree, path_glob):
-  path = join(path_glob.relative_to, path_glob.path)
+def filter_file_listing(directory_listing, path_wildcard):
+  paths = [Path(join(directory_listing.directory.path, f.path)) for f in directory_listing.files
+           if fnmatch.fnmatch(f.path, path_wildcard.wildcard)]
+  return Paths(paths)
+
+
+def file_exists(project_tree, path_literal):
+  path = path_literal.path
   return Paths((Path(path),) if project_tree.isfile(path) else ())
 
 
@@ -182,13 +208,19 @@ def create_fs_tasks(project_tree_key):
        SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
       recursive_subdirectories),
   ] + [
-    # "Native" operations.
+    # Support for globs.
     (Paths,
       [SelectDependencies(Paths, PathGlobs)],
       merge_paths),
     (Paths,
+      [SelectProjection(DirectoryListing, Path, ('directory',), PathWildcard),
+       Select(PathWildcard)],
+      filter_file_listing),
+  ] + [
+    # "Native" operations.
+    (Paths,
       [SelectLiteral(project_tree_key, ProjectTree),
-       Select(PathGlob)],
+       Select(PathLiteral)],
       file_exists),
     (FilesContent,
       [SelectLiteral(project_tree_key, ProjectTree),
