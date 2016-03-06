@@ -163,8 +163,11 @@ class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 
   """A list of Path objects for recursive subdirectories of the given directory."""
 
 
-class DirectoryListing(datatype('DirectoryListing', ['directory', 'directories', 'files'])):
-  """A list of file and directory Path objects for the given directory."""
+class DirectoryListing(datatype('DirectoryListing', ['directory', 'exists', 'directories', 'files'])):
+  """Lists of file and directory Paths objects.
+
+  If exists=False, then both the directories and files lists will be empty.
+  """
 
 
 def list_directory(project_tree, directory):
@@ -177,11 +180,19 @@ def list_directory(project_tree, directory):
 
   Raises an exception if the path does not exist, or is not a directoy.
   """
-  _, subdirs, subfiles = next(project_tree.walk(directory.path))
-  return DirectoryListing(directory,
-                          [Path(join(directory.path, subdir)) for subdir in subdirs
-                           if not subdir.startswith('.')],
-                          [Path(join(directory.path, subfile)) for subfile in subfiles])
+  try:
+    _, subdirs, subfiles = next(project_tree.walk(directory.path))
+    return DirectoryListing(directory,
+                            True,
+                            [Path(join(directory.path, subdir)) for subdir in subdirs
+                             if not subdir.startswith('.')],
+                            [Path(join(directory.path, subfile)) for subfile in subfiles])
+  except (IOError, OSError) as e:
+    if e.errno != errno.ENOENT:
+      # Failing to read an existing file is certainly problematic: raise.
+      print('Raising e because: {}'.format(e.errno))
+      raise e
+    return DirectoryListing(directory, False, [], [])
 
 
 def recursive_subdirectories(directory, subdirectories_list):
@@ -229,7 +240,7 @@ def files_content(project_tree, paths):
   for path in paths.dependencies:
     try:
       contents.append(FileContent(path.path, project_tree.content(path.path)))
-    except IOError as e:
+    except (IOError, OSError) as e:
       if e.errno != errno.ENOENT:
         # Failing to read an existing file is certainly problematic: raise.
         raise e

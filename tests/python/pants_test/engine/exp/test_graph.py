@@ -231,7 +231,7 @@ class InlinedGraphTest(GraphTestBase):
   def test_not_found_and_family_does_not_exist(self):
     scheduler = self.create_json()
     dne = Address.parse('this/dir/does/not/exist')
-    self.assertEquals(type(self.resolve_failure(scheduler, dne)), OSError)
+    self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
 
 
 class LazyResolvingGraphTest(GraphTestBase):
