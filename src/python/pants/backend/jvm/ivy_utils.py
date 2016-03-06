@@ -21,7 +21,6 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependenc
                                                                     PinnedJarArtifactSet)
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
-from pants.util.fileutil import atomic_copy
 from pants.base.deprecated import deprecated
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
@@ -29,6 +28,7 @@ from pants.build_graph.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
+from pants.util.fileutil import atomic_copy
 from pants.util.objects import datatype
 
 
@@ -164,9 +164,6 @@ class IvyResolveResult(object):
     resolved_jars = [self._new_resolved_jar_with_symlink_path(conf, target, raw_resolved_jar)
                      for raw_resolved_jar in raw_resolved_jars]
     return resolved_jars
-
-
-_NO_RESOLVE_RUN_RESULT = IvyResolveResult([], {}, None, None)
 
 
 class IvyResolveMappingError(Exception):

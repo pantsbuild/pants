@@ -10,7 +10,7 @@ import os
 import threading
 from hashlib import sha1
 
-from pants.backend.jvm.ivy_utils import IvyResolveRequest, IvyUtils
+from pants.backend.jvm.ivy_utils import IvyResolveRequest, IvyResolveResult, IvyUtils
 from pants.backend.jvm.jar_dependency_utils import ResolvedJar
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
@@ -25,6 +25,9 @@ from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
+
+
+_NO_RESOLVE_RUN_RESULT = IvyResolveResult([], {}, None, None)
 
 
 class IvyResolveFingerprintStrategy(FingerprintStrategy):
