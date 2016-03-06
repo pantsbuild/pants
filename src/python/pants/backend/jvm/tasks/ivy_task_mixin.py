@@ -236,8 +236,8 @@ class IvyTaskMixin(TaskBase):
 
       resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
       resolve_hash_name = resolve_vts.cache_key.hash
-      ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
-      resolve_workdir = os.path.join(ivy_workdir, resolve_hash_name)
+      global_ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir, 'ivy')
+      resolve_workdir = os.path.join(global_ivy_workdir, resolve_hash_name)
 
       # Calculate the classpath.
       artifacts, global_excludes = IvyUtils.calculate_classpath(resolve_vts.targets)
@@ -254,6 +254,7 @@ class IvyTaskMixin(TaskBase):
       def load_resolve(fatal):
         return IvyUtils.load_resolve(self.ivy_cache_dir,
                                      resolve_workdir,
+                                     self._symlink_dir(global_ivy_workdir),
                                      request,
                                      symlink_lock=self.symlink_map_lock,
                                      fatal=fatal)
@@ -277,3 +278,12 @@ class IvyTaskMixin(TaskBase):
 
       # Try again to load the resolve, which should now definitely be present.
       return load_resolve(fatal=True)
+
+  def _symlink_dir(self, global_workdir):
+    """A common dir for symlinks into the ivy2 cache.
+
+    This ensures that paths to jars in artifact-cached analysis files are consistent across
+    systems. Note that for any given ivy_workdir, there will be a single well-known symlink
+    dir, so that paths within that directory are consistent across builds.
+    """
+    return os.path.join(global_workdir, 'jars')

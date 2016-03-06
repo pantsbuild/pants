@@ -61,15 +61,6 @@ class IvyResolveRequest(datatype('IvyResolveRequest', [
   def symlink_classpath_filename(self, workdir):
     return os.path.join(workdir, 'classpath')
 
-  def symlink_dir(self, workdir):
-    """A common dir for symlinks into the ivy2 cache.
-
-    This ensures that paths to jars in artifact-cached analysis files are consistent across
-    systems. Note that for any given ivy_workdir, there will be a single well-known symlink
-    dir, so that paths within that directory are consistent across builds.
-    """
-    return os.path.join(workdir, 'jars')
-
   def ivy_cache_classpath_filename(self, workdir):
     return self.symlink_classpath_filename(workdir) + '.raw'
 
@@ -382,7 +373,7 @@ class IvyUtils(object):
         return filter(None, (path.strip() for path in cp.read().split(os.pathsep)))
 
   @classmethod
-  def load_resolve(cls, cachedir, workdir, request, symlink_lock=None, fatal=True):
+  def load_resolve(cls, cachedir, workdir, symlinkdir, request, symlink_lock=None, fatal=True):
     """Given a IvyResolveRequest, return an IvyResolveResult or None.
 
     If `fatal=True`, then rather than returning None, any failure to locate an input or output
@@ -396,7 +387,17 @@ class IvyUtils(object):
         raise IvyResolveMappingError(
             'Resolve report did not exist in {} for {}'.format(workdir, request))
       return None
-    symlink_map = cls._symlink_from_cache_path(cachedir, workdir, request, symlink_lock)
+
+    # Make our actual classpath be symlinks, so that the paths are uniform across systems.
+    # Note that we must do this even if we read the raw_target_classpath_file from the artifact
+    # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
+    symlink_lock = symlink_lock if symlink_lock is not None else threading.Lock()
+    with symlink_lock:
+      symlink_map = cls._symlink_cachepath(cachedir,
+                                           request.ivy_cache_classpath_filename(workdir),
+                                           symlinkdir,
+                                           request.symlink_classpath_filename(workdir))
+
     resolved_artifact_paths = \
       cls._load_classpath_from_cachepath(request.symlink_classpath_filename(workdir))
 
@@ -812,15 +813,3 @@ class IvyUtils(object):
         excludes=[cls._generate_exclude_template(exclude) for exclude in excludes])
 
     return template
-
-  @classmethod
-  def _symlink_from_cache_path(cls, cachedir, workdir, request, symlink_lock=None):
-    # Make our actual classpath be symlinks, so that the paths are uniform across systems.
-    # Note that we must do this even if we read the raw_target_classpath_file from the artifact
-    # cache. If we cache the target_classpath_file we won't know how to create the symlinks.
-    symlink_lock = symlink_lock if symlink_lock is not None else threading.Lock()
-    with symlink_lock:
-      return cls._symlink_cachepath(cachedir,
-                                    request.ivy_cache_classpath_filename(workdir),
-                                    request.symlink_dir(workdir),
-                                    request.symlink_classpath_filename(workdir))
