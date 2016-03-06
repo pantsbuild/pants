@@ -42,8 +42,51 @@ class FilesContent(datatype('FilesContent', ['dependencies'])):
   """List of FileContent objects."""
 
 
+def _norm_join(path, paths):
+  joined = normpath(join(path, *paths))
+  return '' if joined == '.' else joined
+
+
 class PathGlob(AbstractClass):
   """A filename pattern."""
+
+  _DOUBLE = '**'
+  _SINGLE = '*'
+
+  @classmethod
+  def create_from_spec(cls, relative_to, filespec):
+    return cls._parse_spec(relative_to, filespec.split(os_sep))
+
+  @classmethod
+  def _wildcard_part(cls, filespec_parts):
+    """Returns the index of the first single-wildcard part in filespec_parts, or None."""
+    for i, part in enumerate(filespec_parts):
+      if cls._SINGLE in part:
+        return i
+    return None
+
+  @classmethod
+  def _parse_spec(cls, relative_to, parts):
+    """Given the path components of a filespec, return a potentially nested PathGlob object.
+
+    TODO: Because `create_from_spec` is called recursively, this method should work harder to
+    avoid splitting/joining.
+    """
+    if cls._DOUBLE in parts:
+      raise ValueError('TODO: Unsupported: {}'.format(parts))
+
+    wildcard_index = cls._wildcard_part(parts)
+    if wildcard_index is None:
+      # A literal path.
+      return PathLiteral(_norm_join(relative_to, parts))
+    elif wildcard_index == (len(parts) - 1):
+      # There is a wildcard in the file basename of the path.
+      return PathWildcard(_norm_join(relative_to, parts[:-1]), parts[-1])
+    else:
+      # There is a wildcard in (at least one of) the dirnames in the path.
+      return PathDirWildcard(_norm_join(relative_to, parts[:wildcard_index]),
+                             parts[wildcard_index],
+                             join(*parts[wildcard_index + 1:]))
 
 
 class PathLiteral(datatype('PathLiteral', ['path']), PathGlob):
@@ -61,9 +104,14 @@ class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob
   """
 
 
-def _norm_join(path, paths):
-  joined = normpath(join(path, *paths))
-  return '' if joined == '.' else joined
+class PathDirWildcard(datatype('PathDirWildcard', ['directory', 'wildcard', 'remainder']), PathGlob):
+  """A path with a glob/wildcard in a dirname.
+
+  Each PathDirWildcard causes a single directory listing, but the remainder of the path
+  may contain additional wildcards, and thus cause additional directory listings.
+
+  May match zero or more paths.
+  """
 
 
 class PathGlobs(datatype('PathGlobs', ['dependencies'])):
@@ -72,9 +120,6 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
   globs/rglobs/zglobs into 'filespecs'.
   """
-
-  _DOUBLE = '**'
-  _SINGLE = '*'
 
   @classmethod
   def create(cls, relative_to, files=None, globs=None, rglobs=None, zglobs=None):
@@ -111,24 +156,7 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
   @classmethod
   def create_from_specs(cls, relative_to, filespecs):
-    return cls(tuple(cls._parse_spec(relative_to, filespec.split(os_sep)) for filespec in filespecs))
-
-  @classmethod
-  def _parse_spec(cls, relative_to, filespec_parts):
-    """Given the path components of a filespec, return a potentially nested PathGlob object."""
-    if cls._DOUBLE in filespec_parts:
-      raise ValueError('TODO: Unsupported: {}'.format(filespec))
-    elif cls._SINGLE in filespec_parts:
-      raise ValueError('TODO: Unsupported: {}'.format(filespec))
-    elif cls._SINGLE in filespec_parts[-1]:
-      # There is a wildcard in the file basename of the path: match and glob.
-      return PathWildcard(_norm_join(relative_to, filespec_parts[:-1]), filespec_parts[-1])
-    else:
-      # A literal path.
-      filespec = _norm_join(relative_to, filespec_parts)
-      if cls._SINGLE in filespec:
-        raise ValueError('Directory-name globs are not supported: {}'.format(filespec))
-      return PathLiteral(filespec)
+    return cls(tuple(PathGlob.create_from_spec(relative_to, filespec) for filespec in filespecs))
 
 
 class RecursiveSubDirectories(datatype('RecursiveSubDirectories', ['directory', 'dependencies'])):
@@ -175,9 +203,20 @@ def merge_paths(paths_list):
 
 
 def filter_file_listing(directory_listing, path_wildcard):
-  paths = [Path(join(directory_listing.directory.path, f.path)) for f in directory_listing.files
-           if fnmatch.fnmatch(f.path, path_wildcard.wildcard)]
+  paths = tuple(f for f in directory_listing.files
+                if fnmatch.fnmatch(f.path, path_wildcard.wildcard))
   return Paths(paths)
+
+
+def filter_dir_listing(directory_listing, path_dir_wildcard):
+  """Given a PathDirWildcard, compute a PathGlobs object that encompasses its children.
+
+  The resulting PathGlobs object will be simplified relative to this wildcard, in the sense
+  that it will be relative to a subdirectory, with a smaller remainder.
+  """
+  paths = [join(directory_listing.directory.path, f.path) for f in directory_listing.directories
+           if fnmatch.fnmatch(f.path, path_dir_wildcard.wildcard)]
+  return PathGlobs(tuple(PathGlob.create_from_spec(p, path_dir_wildcard.remainder) for p in paths))
 
 
 def file_exists(project_tree, path_literal):
@@ -221,6 +260,10 @@ def create_fs_tasks(project_tree_key):
       [SelectProjection(DirectoryListing, Path, ('directory',), PathWildcard),
        Select(PathWildcard)],
       filter_file_listing),
+    (PathGlobs,
+      [SelectProjection(DirectoryListing, Path, ('directory',), PathDirWildcard),
+       Select(PathDirWildcard)],
+      filter_dir_listing),
   ] + [
     # "Native" operations.
     (Paths,
