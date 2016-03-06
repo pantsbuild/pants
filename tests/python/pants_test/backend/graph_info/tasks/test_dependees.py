@@ -29,6 +29,9 @@ class ReverseDepmapEmptyTest(ConsoleTaskTestBase):
   def test(self):
     self.assert_console_output(targets=[])
 
+  def test_output_format_json(self):
+    self.assert_console_output('{}', targets=[], options={'output_format': 'json'})
+
 
 class BaseReverseDepmapTest(ConsoleTaskTestBase):
   @classmethod
@@ -174,6 +177,19 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       options={'closed': True}
     )
 
+  def test_closed_output_format_json(self):
+    self.assert_console_output(
+      dedent("""
+      {
+          "common/c:c": [
+              "common/c:c",
+              "overlaps:two"
+          ]
+      }""").lstrip('\n'),
+      targets=[self.target('common/c')],
+      options={'closed': True, 'output_format': 'json'}
+    )
+
   def test_transitive(self):
     self.assert_console_output(
       'overlaps:one',
@@ -182,6 +198,41 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       'overlaps:five',
       targets=[self.target('common/b')],
       options={'transitive': True}
+    )
+
+  def test_transitive_output_format_json(self):
+    self.assert_console_output(
+      dedent("""
+      {
+          "common/b:b": [
+              "overlaps:four",
+              "overlaps:three",
+              "overlaps:one",
+              "overlaps:five"
+          ]
+      }""").lstrip('\n'),
+      targets=[self.target('common/b')],
+      options={'transitive': True, 'output_format': 'json'}
+    )
+
+  def test_nodups_dependees_output_format_json(self):
+    self.assert_console_output(
+      dedent("""
+      {
+          "common/a:a": [
+              "overlaps:two",
+              "overlaps:three",
+              "overlaps:one"
+          ],
+          "overlaps:one": [
+              "overlaps:three"
+          ]
+      }""").lstrip('\n'),
+      targets=[
+        self.target('common/a'),
+        self.target('overlaps:one')
+      ],
+      options={'output_format': 'json'}
     )
 
   def test_nodups_dependees(self):
