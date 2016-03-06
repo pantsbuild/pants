@@ -248,7 +248,6 @@ python_tests(
   name = 'jar_create',
   sources = ['test_jar_create.py'],
   dependencies = [
-    'src/python/pants/backend/android/targets:android',
     'src/python/pants/backend/codegen/targets:java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
