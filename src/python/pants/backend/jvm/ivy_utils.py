@@ -53,7 +53,12 @@ class IvyResolveRequest(datatype('IvyResolveRequest', [
   `load_resolve` methods, ask whether it affects the identity of the resolve: if it
   does, it should be part of this datatype.
 
-  TODO: Document parameters.
+  :param hash_name: A unique string name for this resolve.
+  :param confs: A tuple of string ivy confs to resolve for.
+  :param artifacts: A tuple of "artifact-alikes" to fetch; ie, JarDependency objects.
+  :param pinned_artifacts: A tuple of "artifact-alikes" to force the versions of.
+  :param global_excludes: A tuple of Exclude objects to apply globally within this resolve.
+  :param extra_args: Extra Ivy CLI arguments.
   """
 
   _FULL_RESOLVE_IVY_XML_FILE_NAME = 'ivy.xml'
@@ -379,7 +384,15 @@ class IvyUtils(object):
     If `fatal=True`, then rather than returning None, any failure to locate an input or output
     will raise a useful exception instead.
 
-    If either the inputs or outputs are not present, returns None.
+    :param cachedir: The global ivy cache directory.
+    :param workdir: A unique working directory for the resolve.
+    :param symlinkdir: A shared (probably) directory under which to create a symlink map. Protected
+      by the (optional) symlink_lock.
+    :param request: The IvyResolveRequest to execute.
+    :param symlink_lock: An optional threading.Lock to protect access to the shared symlinkdir.
+    :param fatal: If true, failures to load the resolve will throw an exception rather than
+      returning None.
+    :returns: An IvyResolveResult or None
     """
     if not request.result_files_exist(workdir):
       # Inputs not present.
@@ -418,6 +431,16 @@ class IvyUtils(object):
 
   @classmethod
   def do_resolve(cls, ivy, executor, workdir, request, jvm_options=None, workunit_name=None, workunit_factory=None):
+    """Execute the given IvyResolveRequest.
+
+    :param ivy: An ivy.Ivy instance to use.
+    :param executor: A JVM executor to use to invoke ivy.
+    :param workdir: A working directory to write the resolve results into.
+    :param request: An IvyResolveRequest.
+    :param jvm_options: A list of jvm option strings to use for the ivy invoke, or None.
+    :param workunit_name: A workunit name for the ivy invoke, or None.
+    :param workunit_factory: A workunit factory for the ivy invoke, or None.
+    """
     safe_mkdir(workdir)
 
     jvm_options = jvm_options or []
