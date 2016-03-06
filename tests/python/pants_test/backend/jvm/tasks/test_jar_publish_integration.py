@@ -35,7 +35,6 @@ def publish_extra_config(unique_config):
       'backend_packages': [
         'example.pants_publish_plugin',
         'internal_backend.repositories',
-        'pants.backend.android',  # There are android target source roots defined in examples/BUILD
       ],
     },
     'publish.jar': {
