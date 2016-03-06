@@ -46,11 +46,43 @@ class ListOwnersTest(ConsoleTaskTestBase):
   def test_no_targets(self):
     self.assert_console_output(passthru_args=['a/a.txt'])
 
+  def test_no_targets_output_format_json(self):
+    self.assert_console_output(dedent("""
+      {
+          "a/a.txt": []
+      }""").lstrip('\n'),
+      passthru_args=['a/a.txt'],
+      options={'output_format': 'json'}
+    )
+
   def test_one_target(self):
     self.assert_console_output('a:b', passthru_args=['a/b.txt'])
 
+  def test_one_target_output_format_json(self):
+    self.assert_console_output(dedent("""
+      {
+          "a/b.txt": [
+              "a:b"
+          ]
+      }""").lstrip('\n'),
+      passthru_args=['a/b.txt'],
+      options={'output_format': 'json'}
+    )
+
   def test_multiple_targets(self):
     self.assert_console_output('a/c:d', 'a/c:d2', passthru_args=['a/c/d.txt'])
+
+  def test_multiple_targets_output_format_json(self):
+    self.assert_console_output(dedent("""
+      {
+          "a/c/d.txt": [
+              "a/c:d",
+              "a/c:d2"
+          ]
+      }""").lstrip('\n'),
+      passthru_args=['a/c/d.txt'],
+      options={'output_format': 'json'}
+    )
 
   def test_target_in_parent_directory(self):
     self.assert_console_output('a:c', passthru_args=['a/c/c.txt'])
@@ -64,6 +96,17 @@ class ListOwnersTest(ConsoleTaskTestBase):
   def test_no_sources(self):
     self.assert_console_raises(TaskError, passthru_args=[])
 
-  def test_too_many_sources(self):
-    """In future this will support multiple passthru_args, but not yet."""
+  def test_too_many_sources_output_format_text(self):
     self.assert_console_raises(TaskError, passthru_args=['a/a.txt', 'a/b.txt'])
+
+  def test_multiple_sources_output_format_json(self):
+    self.assert_console_output(dedent("""
+      {
+          "a/b.txt": [
+              "a:b"
+          ],
+          "a/a.txt": []
+      }""").lstrip('\n'),
+      passthru_args=['a/a.txt', 'a/b.txt'],
+      options={'output_format': 'json'}
+    )
