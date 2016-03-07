@@ -10,7 +10,8 @@ from contextlib import contextmanager
 from os.path import join
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.exp.fs import PathGlobs, PathLiteral, PathWildcard, PathDirWildcard
+from pants.engine.exp.fs import (PathGlobs, PathLiteral,
+                                 PathDirWildcard, PathWildcard)
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 
@@ -52,5 +53,21 @@ class FSTest(unittest.TestCase):
     name = 'Blah.java'
     subdir = 'foo'
     wildcard = '*'
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, name)], '', [join(subdir, wildcard, name)])
-    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, name)], subdir, [join(wildcard, name)])
+    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, (name,))],
+                          '',
+                          [join(subdir, wildcard, name)])
+    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, (name,))],
+                          subdir,
+                          [join(wildcard, name)])
+
+  def test_create_recursive_dir_wildcard(self):
+    name = 'Blah.java'
+    subdir = 'foo'
+    wildcard = '**'
+    expected_remainders = (name, join(wildcard, name))
+    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, expected_remainders)],
+                          '',
+                          [join(subdir, wildcard, name)])
+    self.assert_pg_equals([PathDirWildcard(subdir, wildcard, expected_remainders)],
+                          subdir,
+                          [join(wildcard, name)])

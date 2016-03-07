@@ -48,7 +48,11 @@ def _norm_join(path, paths):
 
 
 class PathGlob(AbstractClass):
-  """A filename pattern."""
+  """A filename pattern.
+
+  All PathGlob subclasses match zero or more paths, which differentiates them from Path
+  objects, which are expected to represent literal existing files.
+  """
 
   _DOUBLE = '**'
   _SINGLE = '*'
@@ -59,58 +63,63 @@ class PathGlob(AbstractClass):
 
   @classmethod
   def _wildcard_part(cls, filespec_parts):
-    """Returns the index of the first single-wildcard part in filespec_parts, or None."""
+    """Returns the index of the first double-wildcard or single-wildcard part in filespec_parts.
+
+    Only the first value of either kind will be returned, so at least one entry in the tuple will
+    always be None.
+    """
     for i, part in enumerate(filespec_parts):
-      if cls._SINGLE in part:
-        return i
-    return None
+      if cls._DOUBLE in part:
+        if part != cls._DOUBLE:
+          raise ValueError(
+              'Illegal component "{}" in filespec: {}'.format(part, join(*filespec_parts)))
+        return i, None
+      elif cls._SINGLE in part:
+        return None, i
+    return None, None
 
   @classmethod
   def _parse_spec(cls, relative_to, parts):
     """Given the path components of a filespec, return a potentially nested PathGlob object.
 
     TODO: Because `create_from_spec` is called recursively, this method should work harder to
-    avoid splitting/joining.
+    avoid splitting/joining. Optimization needed.
     """
-    if cls._DOUBLE in parts:
-      raise ValueError('TODO: Unsupported: {}'.format(parts))
-
-    wildcard_index = cls._wildcard_part(parts)
-    if wildcard_index is None:
+    double_index, single_index = cls._wildcard_part(parts)
+    if double_index is not None:
+      # There is a double-wildcard in a dirname of the path: double wildcards are recursive,
+      # so there are two remainder possibilities: one with the double wildcard included, and the
+      # other without.
+      remainders = (join(*parts[double_index+1:]), join(*parts[double_index:]))
+      return PathDirWildcard(_norm_join(relative_to, parts[:double_index]),
+                             parts[double_index],
+                             remainders)
+    elif single_index is None:
       # A literal path.
       return PathLiteral(_norm_join(relative_to, parts))
-    elif wildcard_index == (len(parts) - 1):
+    elif single_index == (len(parts) - 1):
       # There is a wildcard in the file basename of the path.
       return PathWildcard(_norm_join(relative_to, parts[:-1]), parts[-1])
     else:
       # There is a wildcard in (at least one of) the dirnames in the path.
-      return PathDirWildcard(_norm_join(relative_to, parts[:wildcard_index]),
-                             parts[wildcard_index],
-                             join(*parts[wildcard_index + 1:]))
+      remainders = (join(*parts[single_index + 1:]),)
+      return PathDirWildcard(_norm_join(relative_to, parts[:single_index]),
+                             parts[single_index],
+                             remainders)
 
 
 class PathLiteral(datatype('PathLiteral', ['path']), PathGlob):
-  """A literal path, which may or may not exist.
-
-  This is differentiated from a Path by the fact that a PathLiteral may not exist, while a
-  Path must exist.
-  """
+  """A single literal PathGlob, which may or may not exist."""
 
 
 class PathWildcard(datatype('PathWildcard', ['directory', 'wildcard']), PathGlob):
-  """A path with a glob/wildcard in the basename component.
-
-  May match zero or more paths.
-  """
+  """A PathGlob with a wildcard in the basename component."""
 
 
-class PathDirWildcard(datatype('PathDirWildcard', ['directory', 'wildcard', 'remainder']), PathGlob):
-  """A path with a glob/wildcard in a dirname.
+class PathDirWildcard(datatype('PathDirWildcard', ['directory', 'wildcard', 'remainders']), PathGlob):
+  """A PathGlob with a single or double-level wildcard in a directory name.
 
-  Each PathDirWildcard causes a single directory listing, but the remainder of the path
-  may contain additional wildcards, and thus cause additional directory listings.
-
-  May match zero or more paths.
+  Each remainders value is applied relative to each directory matched by the wildcard.
   """
 
 
@@ -190,7 +199,6 @@ def list_directory(project_tree, directory):
   except (IOError, OSError) as e:
     if e.errno != errno.ENOENT:
       # Failing to read an existing file is certainly problematic: raise.
-      print('Raising e because: {}'.format(e.errno))
       raise e
     return DirectoryListing(directory, False, [], [])
 
@@ -223,11 +231,13 @@ def filter_dir_listing(directory_listing, path_dir_wildcard):
   """Given a PathDirWildcard, compute a PathGlobs object that encompasses its children.
 
   The resulting PathGlobs object will be simplified relative to this wildcard, in the sense
-  that it will be relative to a subdirectory, with a smaller remainder.
+  that it will be relative to a subdirectory.
   """
-  paths = [join(directory_listing.directory.path, f.path) for f in directory_listing.directories
+  paths = [f.path for f in directory_listing.directories
            if fnmatch.fnmatch(f.path, path_dir_wildcard.wildcard)]
-  return PathGlobs(tuple(PathGlob.create_from_spec(p, path_dir_wildcard.remainder) for p in paths))
+  return PathGlobs(tuple(PathGlob.create_from_spec(p, remainder)
+                         for p in paths
+                         for remainder in path_dir_wildcard.remainders))
 
 
 def file_exists(project_tree, path_literal):
