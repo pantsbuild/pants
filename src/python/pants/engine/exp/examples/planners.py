@@ -15,10 +15,10 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
-from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths, create_fs_tasks
-from pants.engine.exp.graph import create_graph_tasks
+from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.parsers import JsonParser, SymbolTable
+from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
@@ -413,16 +413,12 @@ def setup_json_scheduler(build_root, debug=True):
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  project_tree_key = subjects.put(
-      FileSystemProjectTree(build_root))
-  address_mapper_key = subjects.put(
-      AddressMapper(symbol_table_cls=symbol_table_cls,
-                    build_pattern=r'^BLD.json$',
-                    parser_cls=JsonParser))
-  source_roots_key = subjects.put(
-      SourceRoots(('src/java',)))
-  scrooge_tool_address_key = subjects.put(
-      Address.parse('src/scala/scrooge'))
+  project_tree_key = subjects.put(FileSystemProjectTree(build_root))
+  address_mapper_key = subjects.put(AddressMapper(symbol_table_cls=symbol_table_cls,
+                                                  build_pattern=r'^BLD.json$',
+                                                  parser_cls=JsonParser))
+  source_roots_key = subjects.put(SourceRoots(('src/java',)))
+  scrooge_tool_address_key = subjects.put(Address.parse('src/scala/scrooge'))
 
   goals = {
       'compile': Classpath,
@@ -507,8 +503,8 @@ def setup_json_scheduler(build_root, debug=True):
     ] + (
       create_graph_tasks(address_mapper_key, symbol_table_cls)
     ) + (
-      create_fs_tasks(project_tree_key)
+      create_fs_tasks()
     )
 
-  scheduler = LocalScheduler(goals, tasks, subjects, symbol_table_cls)
+  scheduler = LocalScheduler(goals, tasks, subjects, symbol_table_cls, project_tree_key)
   return scheduler

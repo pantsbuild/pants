@@ -10,8 +10,8 @@ import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.parsers import SymbolTable
+from pants.engine.exp.register import create_fs_tasks
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
@@ -49,11 +49,12 @@ class SchedulerTestBase(object):
       os.mkdir(build_root)
 
     project_tree_key = storage.put(FileSystemProjectTree(build_root))
-    tasks = list(tasks) + create_fs_tasks(project_tree_key)
+    tasks = list(tasks) + create_fs_tasks()
     scheduler = LocalScheduler(goals,
                                tasks,
                                storage,
-                               symbol_table_cls)
+                               symbol_table_cls,
+                               project_tree_key)
     return scheduler, build_root
 
   def execute(self, scheduler, product, *subjects):

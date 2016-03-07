@@ -80,8 +80,10 @@ python_library(
   sources=['nodes.py'],
   dependencies=[
     ':addressable',
+    ':fs',
     ':objects',
     ':struct',
+    ':storage',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',
   ]
@@ -112,6 +114,21 @@ python_library(
 )
 
 python_library(
+  name='register',
+  sources=['register.py'],
+  dependencies=[
+    ':addressable',
+    ':fs',
+    ':graph',
+    ':mapper',
+    ':selectors',
+    ':struct',
+    'src/python/pants/engine/exp/legacy:graph',
+    'src/python/pants/engine/exp/legacy:parser',
+  ]
+)
+
+python_library(
   name='selectors',
   sources=['selectors.py'],
   dependencies=[
@@ -128,6 +145,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':addressable',
     ':fs',
+    ':nodes',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',

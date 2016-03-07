@@ -37,6 +37,7 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/bin',
     'src/python/pants/engine/exp:mapper',
+    'src/python/pants/engine/exp:register',
     'src/python/pants/engine/exp:scheduler',
     'src/python/pants/engine/exp:storage',
     'src/python/pants/option',
