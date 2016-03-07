@@ -82,7 +82,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     def artifact_path(name):
       return os.path.join(self.pants_workdir, 'ivy_artifact', name)
 
-    def mock_ivy_info_for(conf):
+    def ivy_info_for(conf):
       ivy_info = IvyInfo(conf)
 
       # Guava 16.0 would be evicted by Guava 16.0.1.  But in a real
@@ -120,11 +120,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
       return ivy_info
 
+    ivy_info_by_conf = {conf: ivy_info_for(conf) for conf in ('default',)}
     symlink_map = {artifact_path('bogus0'): artifact_path('bogus0'),
                    artifact_path('bogus1'): artifact_path('bogus1'),
                    artifact_path('unused'): artifact_path('unused')}
-    result = IvyResolveResult([], symlink_map, 'some-key-for-a-and-b', {})
-    result._ivy_info_for= mock_ivy_info_for
+    result = IvyResolveResult([], symlink_map, 'some-key-for-a-and-b', ivy_info_by_conf)
 
     def mock_ivy_resolve(*args, **kwargs):
       return result
