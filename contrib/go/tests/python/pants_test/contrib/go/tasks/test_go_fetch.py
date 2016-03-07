@@ -221,3 +221,37 @@ class GoFetchTest(TaskTestBase):
     remote_import_ids = go_fetch._get_remote_import_paths('github.com/u/a',
                                                           gopath=self.build_root)
     self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
+
+  def test_find_meta_tag_with_meta_tag(self):
+    test_html = """<!DOCTYPE html>
+    <html>
+    <head>
+    <meta name="go-import" content="google.golang.org/api git https://code.googlesource.com/google-api-go-client">
+    <meta name="go-source" content="google.golang.org/api https://github.com/google/google-api-go-client https://github.com/google/google-api-go-client/tree/master{/dir} https://github.com/google/google-api-go-client/tree/master{/dir}/{file}#L{line}">
+    <meta http-equiv="refresh" content="0; url=https://godoc.org/google.golang.org/api/googleapi">
+    </head>
+    <body>
+    Nothing to see here. Please <a href="https://godoc.org/google.golang.org/api/googleapi">move along</a>.
+    </body>
+    </html>"""
+
+    go_fetch = self.create_task(self.context())
+    meta_tag_content = go_fetch._find_meta_tag(test_html)
+
+    self.assertEqual(meta_tag_content, "google.golang.org/api git https://code.googlesource.com/google-api-go-client")
+
+  def test_find_meta_tag_with_meta_tag_single_line(self):
+    test_html = '<!DOCTYPE html><html><head><meta name="go-import" content="google.golang.org/api git https://code.googlesource.com/google-api-go-client"></head><body> Nothing to see here.</body></html>'
+
+    go_fetch = self.create_task(self.context())
+    meta_tag_content = go_fetch._find_meta_tag(test_html)
+
+    self.assertEqual(meta_tag_content, "google.golang.org/api git https://code.googlesource.com/google-api-go-client")
+
+  def test_find_meta_tag_without_meta_tag(self):
+    test_html = "<!DOCTYPE html><html><head></head><body> Nothing to see here.</body></html>"
+
+    go_fetch = self.create_task(self.context())
+    meta_tag_content = go_fetch._find_meta_tag(test_html)
+
+    self.assertEqual(meta_tag_content, None)

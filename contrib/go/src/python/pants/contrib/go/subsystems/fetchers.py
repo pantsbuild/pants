@@ -365,8 +365,7 @@ class ArchiveFetcher(Fetcher, Subsystem):
     match, _ = self._matcher(import_path)
     return match.string[:match.end()]
 
-  def fetch(self, import_path, dest, rev=None, url_info=None,
-            meta_repo_url=None):
+  def fetch(self, import_path, dest, rev=None, url_info=None, meta_repo_url=None):
     match, url_info = self._matcher(import_path)
     pkg = GoRemoteLibrary.remote_package_path(self.root(import_path), import_path)
     archive_url = match.expand(url_info.url_format).format(

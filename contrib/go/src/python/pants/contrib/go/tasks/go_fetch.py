@@ -62,11 +62,12 @@ class GoFetch(GoTask):
   def _get_fetcher(self, import_path):
     return Fetchers.global_instance().get_fetcher(import_path)
 
-  def _check_for_meta_tag(self, import_path):
-    """Looks for go-import meta tags for the provided import_path
+  @classmethod
+  def _check_for_meta_tag(cls, import_path):
+    """Looks for go-import meta tags for the provided import_path.
 
     Returns three values. First is the import prefix which designates where the
-    root of the repo should be setup. Next is the version control system that
+    root of the repo should be set up. Next is the version control system that
     must be used to copy down the repository. Finally is the URL to access the
     repository.
 
@@ -75,9 +76,6 @@ class GoFetch(GoTask):
 
     More info: https://golang.org/cmd/go/#hdr-Remote_import_paths
     """
-    meta_import_regex = re.compile('^\s*<meta name="go-import" content="(?P<content>.*)">$')
-    head_close_regex = re.compile('^\s*</head>$')
-
     session = requests.session()
     # Override default http adapters with a retriable one.
     retriable_http_adapter = requests.adapters.HTTPAdapter(max_retries=2)
@@ -88,34 +86,44 @@ class GoFetch(GoTask):
     except requests.ConnectionError as e:
       return None, None, None
 
-    for line in page_data.text.split('\n'):
-      if line == '\n':
-        continue
+    if not page_data:
+      return None, None, None
 
-      meta_import = meta_import_regex.match(line)
-      if meta_import:
-        content_parts = meta_import.group('content').split(' ')
+    meta_import = cls._find_meta_tag(page_data.text)
+    if meta_import:
+      content_parts = meta_import.split(' ')
 
-        # Check to make sure returned root is an exact match to the provided
-        # import path. If it is only a prefix match then we need to check to
-        # make sure that this returned root for this call matches another call
-        # for the meta tags. The second call must return an exact match if it
-        # is to be used.
-        if content_parts[0] == import_path:
+      # Check to make sure returned root is an exact match to the provided
+      # import path. If it is only a prefix match then we need to check to
+      # make sure that this returned root for this call matches another call
+      # for the meta tags. The second call must return an exact match if it
+      # is to be used.
+      if content_parts[0] == import_path and len(content_parts) == 3:
+        return content_parts[0], content_parts[1], content_parts[2]
+      elif content_parts[0] in import_path:
+        root, vcs, url = cls._check_for_meta_tag(content_parts[0])
+
+        if root and content_parts[0] == root and len(content_parts) == 3:
           return content_parts[0], content_parts[1], content_parts[2]
-        elif content_parts[0] in import_path:
-          root, vcs, url = self._check_for_meta_tag(content_parts[0])
-
-          if root and content_parts[0] == root:
-            return content_parts[0], content_parts[1], content_parts[2]
-        else:
-          continue
-
-      head_closed = head_close_regex.match(line)
-      if head_closed:
-        break
 
     return None, None, None
+
+  @classmethod
+  def _find_meta_tag(cls, page_html):
+    """Returns the content of the meta tag if found inside of the provided HTML"""
+
+    content = None
+    meta_import_regex = re.compile('<meta name="go-import"\s+content="(?P<content>[^">]+)">')
+
+    matched = meta_import_regex.search(page_html)
+    if matched:
+      try:
+        content = matched.group('content')
+        return content
+      except IndexError:
+        return None
+
+    return content
 
   def _transitive_download_remote_libs(self, go_remote_libs, all_known_addresses=None):
     """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.
