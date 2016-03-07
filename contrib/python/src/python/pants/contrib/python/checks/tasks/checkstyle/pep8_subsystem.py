@@ -48,9 +48,9 @@ class PEP8Subsystem(PluginSubsystemBase):
   @classmethod
   def register_options(cls, register):
     super(PEP8Subsystem, cls).register_options(register)
-    register('--ignore', type=list_option, default=cls.DEFAULT_IGNORE_CODES,
+    register('--ignore', fingerprint=True, type=list_option, default=cls.DEFAULT_IGNORE_CODES,
              help='Prevent test failure but still produce output for problems.')
-    register('--max-length', type=int, default=100,
+    register('--max-length', fingerprint=True, type=int, default=100,
              help='Max line length to use for PEP8 checks.')
 
   def get_plugin_type(self):
