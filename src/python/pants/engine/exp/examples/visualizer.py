@@ -146,5 +146,5 @@ def main_filespecs():
   build_root, goals, args = pop_build_root_and_goals('[build root path] [filespecs]*', sys.argv[1:])
 
   # Create a PathGlobs object relative to the buildroot.
-  path_globs = PathGlobs.create('', globs=args)
-  visualize_build_request(build_root, goals, [path_globs])
+  path_globs = [PathGlobs.create('', globs=[arg]) for arg in args]
+  visualize_build_request(build_root, goals, path_globs)
