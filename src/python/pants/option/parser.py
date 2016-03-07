@@ -17,7 +17,7 @@ import six
 from pants.base.deprecated import check_deprecated_semver, deprecated_conditional
 from pants.base.revision import Revision
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.custom_types import ListValue, file_option, list_option
+from pants.option.custom_types import ListValueComponent, file_option, list_option
 from pants.option.errors import (BooleanOptionImplicitVal, BooleanOptionNameWithNo,
                                  BooleanOptionType, DeprecatedOptionError, FrozenRegistration,
                                  ImplicitValIsNone, InvalidAction, InvalidKwarg,
@@ -475,7 +475,7 @@ class Parser(object):
     if is_list_option(kwargs):
       # Note: It's important to set flag_val to None if no flags were specified, so we can
       # distinguish between no flags set vs. explicit setting of the value to [].
-      flag_val = ListValue.merge(flag_vals) if flag_vals else None
+      flag_val = ListValueComponent.merge(flag_vals) if flag_vals else None
     elif len(flag_vals) > 1:
       raise ParseError('Multiple cmd line flags specified for option {} in {}'.format(
           dest, self._scope_str()))
@@ -522,7 +522,8 @@ class Parser(object):
     # if a list) are in the set of allowed choices.
     if is_list_option(kwargs):
       merged_rank = ranked_vals[-1].rank
-      merged_val = ListValue.merge([rv.value for rv in ranked_vals if rv.value is not None]).val
+      merged_val = ListValueComponent.merge(
+          [rv.value for rv in ranked_vals if rv.value is not None]).val
       merged_val = [kwargs.get('member_type', str)(x) for x in merged_val]
       map(check, merged_val)
       ret = RankedValue(merged_rank, merged_val)

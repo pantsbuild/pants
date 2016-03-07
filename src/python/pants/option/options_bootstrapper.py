@@ -13,7 +13,7 @@ import sys
 from pants.base.build_environment import get_default_pants_config_file
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
-from pants.option.custom_types import ListValue, list_option
+from pants.option.custom_types import ListValueComponent, list_option
 from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
@@ -45,10 +45,10 @@ class OptionsBootstrapper(object):
     flag = '--pants-config-files='
     evars = ['PANTS_GLOBAL_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
 
-    path_list_values = [ListValue.create(get_default_pants_config_file())]
+    path_list_values = [ListValueComponent.create(get_default_pants_config_file())]
     for var in evars:
       if var in env:
-        path_list_values.append(ListValue.create(env[var]))
+        path_list_values.append(ListValueComponent.create(env[var]))
         break
 
     for arg in args:
@@ -56,9 +56,9 @@ class OptionsBootstrapper(object):
       # very unlikely that any task or subsystem will have an option named --pants-config-files.
       # TODO: Enforce a ban on options with a --pants- prefix outside our global options?
       if arg.startswith(flag):
-        path_list_values.append(ListValue.create(arg[len(flag):]))
+        path_list_values.append(ListValueComponent.create(arg[len(flag):]))
 
-    return ListValue.merge(path_list_values).val
+    return ListValueComponent.merge(path_list_values).val
 
   def __init__(self, env=None, args=None):
     self._env = env if env is not None else os.environ.copy()

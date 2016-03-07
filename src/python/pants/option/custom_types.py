@@ -29,14 +29,14 @@ def list_option(s):
   The value (on the command-line, in an env var or in the config file) must be one of:
 
   1. A string eval'able to a list or tuple, which will replace any previous values.
-  2. "+=" followed by a string eval'able to a list or a tuple, whose values will be appended
-     to any previous values (e.g., those from lower-ranked sources).
+  2. A plus sign followed by a string eval'able to a list or a tuple, whose values will be
+     appended to any previous values (e.g., those from lower-ranked sources).
   3. A scalar, that will be appended to any previous values.
 
 
   :API: public
   """
-  return ListValue.create(s)
+  return ListValueComponent.create(s)
 
 
 def target_option(s):
@@ -83,27 +83,39 @@ def _convert(val, acceptable_types):
   return parse_expression(val, acceptable_types, raise_type=ParseError)
 
 
-class ListValue(object):
-  """The value of a list-typed option.
+class ListValueComponent(object):
+  """A component of the value of a list-typed option.
 
-  Supports both replacing and extending lists, so that, e.g., a command-line flag can
-  append to the value specified in the config file, instead of having to repeat it.
+  One or more instances of this class can be merged to form a list value.
+
+  Each component may either replace or extend the preceding component.  So that, e.g., a cmd-line
+  flag can append to the value specified in the config file, instead of having to repeat it.
   """
   REPLACE = 'REPLACE'
   EXTEND = 'EXTEND'
 
   @classmethod
-  def merge(cls, instances):
+  def merge(cls, components):
+    """Merges components into a single component, applying their actions appropriately.
+
+    This operation is associative:  M(M(a, b), c) == M(a, M(b, c)) == M(a, b, c).
+
+    :param list components: an iterable of instances of ListValueComponent.
+    :return: An instance representing the result of merging the components.
+    :rtype: `ListValueComponent`
+    """
+    # Note that action of the merged component is EXTEND until the first REPLACE is encountered.
+    # This guarantees associativity.
     action = cls.EXTEND
     val = []
-    for instance in instances:
-      if instance.action is cls.REPLACE:
-        val = instance.val
+    for component in components:
+      if component.action is cls.REPLACE:
+        val = component.val
         action = cls.REPLACE
-      elif instance.action is cls.EXTEND:
-        val.extend(instance.val)
+      elif component.action is cls.EXTEND:
+        val.extend(component.val)
       else:
-        raise ParseError('Unknown action for list value: {}'.format(instance.action))
+        raise ParseError('Unknown action for list value: {}'.format(component.action))
     return cls(action, val)
 
   def __init__(self, action, val):
@@ -115,6 +127,10 @@ class ListValue(object):
     """Interpret value as either a list or something to extend another list with.
 
     Note that we accept tuple literals, but the internal value is always a list.
+
+    :param The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
+           a string representation (possibly prefixed by +) of a list or tuple, or a scalar.
+    :rtype: `ListValueComponent`
     """
     if isinstance(value, cls):  # Ensure idempotency.
       action = value.action
