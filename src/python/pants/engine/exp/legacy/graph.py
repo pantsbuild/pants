@@ -121,7 +121,7 @@ class ExpGraph(BuildGraph):
   def inject_address_closure(self, address):
     raise NotImplementedError('Not implemented.')
 
-  def inject_specs_closure(self, specs, fail_fast=None, spec_excludes=None):
+  def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
     request = self._scheduler.execution_request(products=[LegacyBuildGraphNode], subjects=specs)
     result = self._engine.execute(request)

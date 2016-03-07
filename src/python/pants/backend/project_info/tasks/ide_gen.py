@@ -21,7 +21,6 @@ from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.binaries import binary_util
 from pants.build_graph.address import BuildFileAddress
@@ -188,9 +187,6 @@ class IdeGen(IvyTaskMixin, NailgunTask):
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
 
     build_ignore_patterns = self.context.options.for_global_scope().ignore_patterns or []
-    build_ignore_patterns.extend(BuildFile._spec_excludes_to_gitignore_syntax(
-      os.path.realpath(get_buildroot()), self.context.options.for_global_scope().spec_excludes))
-
     project = Project(self.project_name,
                       self.python,
                       self.skip_java,
@@ -202,7 +198,6 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                       jvm_targets,
                       not self.intransitive,
                       self.TargetUtil(self.context),
-                      None,
                       PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns))
 
     if self.python:
@@ -459,13 +454,9 @@ class Project(object):
     return collapsed_source_sets
 
   def __init__(self, name, has_python, skip_java, skip_scala, use_source_root, root_dir,
-               debug_port, context, targets, transitive, target_util, spec_excludes=None, build_ignore_patterns=None):
+               debug_port, context, targets, transitive, target_util, build_ignore_patterns=None):
     """Creates a new, unconfigured, Project based at root_dir and comprised of the sources visible
     to the given targets."""
-    deprecated_conditional(lambda: spec_excludes is not None,
-                           '0.0.75',
-                           'Use build_ignore_patterns instead.')
-
     self.context = context
     self.target_util = target_util
     self.name = name
@@ -489,7 +480,6 @@ class Project(object):
 
     self.internal_jars = OrderedSet()
     self.external_jars = OrderedSet()
-    self.spec_excludes = spec_excludes
     self.build_ignore_patterns = build_ignore_patterns
 
   def configure_python(self, source_paths, test_paths, lib_paths):
@@ -606,7 +596,6 @@ class Project(object):
         build_file = target.address.build_file
         dir_relpath = os.path.dirname(build_file.relpath)
         for descendant in BuildFile.scan_build_files(build_file.project_tree, dir_relpath,
-                                                     spec_excludes=self.spec_excludes,
                                                      build_ignore_patterns=self.build_ignore_patterns):
           candidates.update(self.target_util.get_all_addresses(descendant))
         if not self._is_root_relpath(dir_relpath):

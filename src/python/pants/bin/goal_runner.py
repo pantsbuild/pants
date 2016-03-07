@@ -12,7 +12,6 @@ import pkg_resources
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_scm, pants_version
-from pants.base.build_file import BuildFile
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import BuildConfigurationError
 from pants.base.file_system_project_tree import FileSystemProjectTree
@@ -178,15 +177,12 @@ class GoalRunnerFactory(object):
     self._tag = self._global_options.tag
     self._fail_fast = self._global_options.fail_fast
     # Will be provided through context.address_mapper.build_ignore_patterns.
-    self._spec_excludes = None
     self._explain = self._global_options.explain
     self._kill_nailguns = self._global_options.kill_nailguns
 
     self._project_tree = self._get_project_tree(self._global_options.build_file_rev)
     self._build_file_parser = BuildFileParser(self._build_config, self._root_dir)
     build_ignore_patterns = self._global_options.ignore_patterns or []
-    build_ignore_patterns.extend(BuildFile._spec_excludes_to_gitignore_syntax(self._root_dir,
-                                                                              self._global_options.spec_excludes))
     self._address_mapper = BuildFileAddressMapper(
       self._build_file_parser,
       self._project_tree,
@@ -271,7 +267,6 @@ class GoalRunnerFactory(object):
                         build_graph=self._build_graph,
                         build_file_parser=self._build_file_parser,
                         address_mapper=self._address_mapper,
-                        spec_excludes=self._spec_excludes,
                         invalidation_report=invalidation_report)
 
     return context, invalidation_report
