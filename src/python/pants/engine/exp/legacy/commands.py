@@ -17,9 +17,9 @@ from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
 from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
 from pants.engine.exp.mapper import AddressMapper
-from pants.engine.exp.nodes import Subjects
 from pants.engine.exp.parsers import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
+from pants.engine.exp.storage import Storage
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.util.memo import memoized_method
@@ -44,7 +44,7 @@ def setup():
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
 
-  subjects = Subjects(debug=False)
+  subjects = Storage.create(debug=False)
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.

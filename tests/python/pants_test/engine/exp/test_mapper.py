@@ -23,12 +23,12 @@ from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
-from pants.engine.exp.nodes import Subjects, Throw
+from pants.engine.exp.nodes import Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
+from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct
-from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree, touch
+from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree
 
 
 class Target(Struct, HasStructs):
@@ -166,10 +166,10 @@ class AddressMapperTest(unittest.TestCase):
     shutil.copytree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'),
                     self.build_root)
 
-    subjects = Subjects()
     self._goal = 'list'
     symbol_table_cls = TargetTable
 
+    subjects = Storage.create(in_memory=True)
     project_tree_key = subjects.put(
         FileSystemProjectTree(self.build_root))
     address_mapper_key = subjects.put(
@@ -184,7 +184,6 @@ class AddressMapperTest(unittest.TestCase):
                                     tasks,
                                     subjects,
                                     symbol_table_cls)
-
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',
                              dependencies=['//d:e'],

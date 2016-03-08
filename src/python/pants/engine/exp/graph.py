@@ -220,7 +220,7 @@ def addresses_from_address_families(address_families):
 def create_graph_tasks(address_mapper_key, symbol_table_cls):
   """Creates tasks used to parse Structs from BUILD files.
 
-  :param address_mapper_key: The SubjectKey for an AddressMapper instance.
+  :param address_mapper_key: The subject key for an AddressMapper instance.
   :param symbol_table_cls: A SymbolTable class to provide symbols for Address lookups.
   """
   return [

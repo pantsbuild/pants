@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 import re
-from abc import abstractmethod, abstractproperty
+from abc import abstractmethod
 from os import sep as os_sep
 from os.path import join as os_path_join
 
@@ -18,12 +18,12 @@ from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths, create_fs_tasks
 from pants.engine.exp.graph import create_graph_tasks
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
-from pants.engine.exp.nodes import Subjects
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                         SelectVariant)
 from pants.engine.exp.sources import Sources
+from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -406,7 +406,9 @@ def setup_json_scheduler(build_root, debug=True):
 
   :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
   """
-  subjects = Subjects(debug=debug)
+
+  subjects = Storage.create(debug=debug)
+
   symbol_table_cls = ExampleTable
 
   # Register "literal" subjects required for these tasks.

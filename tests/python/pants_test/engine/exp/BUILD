@@ -11,7 +11,7 @@ python_tests(
 
 
 python_tests(
-  name='struct`',
+  name='struct',
   sources=['test_struct.py'],
   dependencies=[
     'src/python/pants/build_graph',
@@ -40,6 +40,7 @@ python_tests(
     'src/python/pants/engine/exp:graph',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:storage',
     'src/python/pants/engine/exp:struct',
   ]
 )
@@ -51,6 +52,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine/exp:mapper',
     'src/python/pants/engine/exp:parsers',
+    'src/python/pants/engine/exp:storage',
     'src/python/pants/engine/exp:struct',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -63,6 +65,14 @@ python_tests(
   dependencies=[
     'src/python/pants/engine/exp:objects',
     'src/python/pants/engine/exp:parsers',
+  ]
+)
+
+python_tests(
+  name='storage',
+  sources=['test_storage.py'],
+  dependencies=[
+    'src/python/pants/engine/exp:storage',
   ]
 )
 
