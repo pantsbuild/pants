@@ -26,6 +26,7 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_rm_oldest_items_in_dir, safe_rmtree
 from pants.util.meta import AbstractClass
+from pants.util.memo import memoized_method, memoized_property
 
 
 class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
@@ -64,6 +65,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     return [('TaskBase', 1)]
+
+  @classmethod
+  @memoized_method
+  def implementation_version_str(cls):
+    return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_version()])
 
   @classmethod
   def stable_name(cls):
@@ -203,7 +209,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
     self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
-    self._fingerprint = None
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -241,7 +246,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         hasher.update(fp)
     return hasher.hexdigest()
 
-  @property
+  @memoized_property
   def fingerprint(self):
     """Returns a fingerprint for the identity of the task.
 
@@ -251,14 +256,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
-    if not self._fingerprint:
-      hasher = sha1()
-      hasher.update(self._options_fingerprint(self.options_scope))
-      # TODO: this is not recursive, but should be: see #2739
-      for dep in self.subsystem_dependencies_iter():
-        hasher.update(self._options_fingerprint(dep.options_scope()))
-      self._fingerprint = str(hasher.hexdigest())
-    return self._fingerprint
+    hasher = sha1()
+    hasher.update(self._options_fingerprint(self.options_scope))
+    hasher.update(self.implementation_version_str())
+    # TODO: this is not recursive, but should be: see #2739
+    for dep in self.subsystem_dependencies_iter():
+      hasher.update(self._options_fingerprint(dep.options_scope()))
+    return str(hasher.hexdigest())
 
   def artifact_cache_reads_enabled(self):
     return self._cache_factory.read_cache_available()
@@ -287,7 +291,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                     fingerprint_strategy=fingerprint_strategy,
                                     invalidation_report=self.context.invalidation_report,
                                     task_name=type(self).__name__,
-                                    task_version=self.implementation_version())
+                                    task_version=self.implementation_version_str())
 
   @property
   def cache_target_dirs(self):
