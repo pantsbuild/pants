@@ -42,12 +42,12 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
     super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
     self._classpath_products = classpath_products
 
-  def _build_hasher(self, target):
+  def compute_fingerprint(self, target):
     if isinstance(target, Resources):
       # Just do nothing, this kind of dependency shouldn't affect result's hash.
-      return hashlib.sha1()
+      return None
 
-    hasher = super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self)._build_hasher(target)
+    hasher = self._build_hasher(target)
     if isinstance(target, JarLibrary):
       # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
       # the resolved coordinates, and the requested coordinates are used. This ensures that if a
@@ -58,7 +58,7 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
         [target])
       for _, entry in classpath_entries:
         hasher.update(str(entry.coordinate))
-    return hasher
+    return hasher.hexdigest()
 
   def __hash__(self):
     return hash((type(self), self._task.fingerprint))

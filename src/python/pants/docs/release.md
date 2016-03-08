@@ -165,7 +165,7 @@ be obtained via:
 Right now that's:
 
 - pantsbuild.pants
-- pantsbuild.pants.backend.android
+- pantsbuild.pants.contrib.android
 - pantsbuild.pants.contrib.buildgen
 - pantsbuild.pants.contrib.scrooge
 - pantsbuild.pants.contrib.spindle
