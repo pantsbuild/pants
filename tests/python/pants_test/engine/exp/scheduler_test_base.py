@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.exp.fs import create_fs_tasks
@@ -22,7 +23,7 @@ class EmptyTable(SymbolTable):
 
 
 class SchedulerTestBase(object):
-  def mk_scheduler(self, tasks=None, goals=None, storage=None, symbol_table_cls=EmptyTable):
+  def mk_scheduler(self, tasks=None, goals=None, storage=None, build_root_src=None, symbol_table_cls=EmptyTable):
     """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
     goals = goals or dict()
     tasks = tasks or []
@@ -31,6 +32,10 @@ class SchedulerTestBase(object):
     work_dir = safe_mkdtemp()
     self.addCleanup(safe_rmtree, work_dir)
     build_root = os.path.join(work_dir, 'build_root')
+    if build_root_src is not None:
+      shutil.copytree(build_root_src, build_root)
+    else:
+      os.mkdir(build_root)
 
     project_tree_key = storage.put(FileSystemProjectTree(build_root))
     tasks = list(tasks) + create_fs_tasks(project_tree_key)

@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
@@ -167,13 +166,11 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                       build_pattern=r'.+\.BUILD.json$'))
     tasks = create_graph_tasks(address_mapper_key, symbol_table_cls)
 
+    build_root_src = os.path.join(os.path.dirname(__file__), 'examples/mapper_test')
     self.scheduler, self.build_root = self.mk_scheduler(tasks=tasks,
+                                                        build_root_src=build_root_src,
                                                         storage=storage,
                                                         symbol_table_cls=symbol_table_cls)
-
-    # Set up examples into the temporary buildroot.
-    shutil.copytree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'),
-                    self.build_root)
 
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',
