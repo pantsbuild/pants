@@ -31,9 +31,13 @@ class PantsService(AbstractClass):
     """
     return self._kill_switch.is_set()
 
+  def setup(self):
+    """Called before `run` to allow for service->service or other side-effecting setup."""
+
   @abstractmethod
   def run(self):
     """The main entry-point for the service called by the service runner."""
 
   def terminate(self):
+    """Called upon service teardown."""
     self._kill_switch.set()

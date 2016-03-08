@@ -7,6 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import traceback
+
+from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
@@ -21,26 +24,49 @@ class FSEventService(PantsService):
   executed in a configurable threadpool but are generally expected to be short-lived.
   """
 
-  def __init__(self, build_root, executor):
+  ZERO_DEPTH = ['depth', 'eq', 0]
+
+  def __init__(self, build_root, worker_count):
     super(FSEventService, self).__init__()
-    self._build_root = os.path.realpath(build_root)
-    self._executor = executor
     self._logger = logging.getLogger(__name__)
+    self._build_root = os.path.realpath(build_root)
+    self._worker_count = worker_count
+    self._executor = None
     self._handlers = {}
 
-  def register_simple_handler(self, file_name, callback):
-    """Registers a simple subscription and handler for files matching a specific name.
+  def setup(self, executor=None):
+    self._executor = executor or ThreadPoolExecutor(max_workers=self._worker_count)
 
-    :param str name:      the subscription name as used by watchman
-    :param str file_name: the filename for the simple filename match (e.g. 'BUILD')
+  def terminate(self):
+    """An extension of PantsService.terminate() that shuts down the executor if so configured."""
+    if self._executor:
+      self._logger.info('shutting down threadpool')
+      self._executor.shutdown()
+    super(FSEventService, self).terminate()
+
+  def register_all_files_handler(self, callback, name='all_files'):
+    """Registers a subscription for all files under a given watch path.
+
     :param func callback: the callback to execute on each filesystem event
+    :param str name:      the subscription name as used by watchman
     """
-    metadata = dict(fields=['name'], expression=['allof',
-                                                 ['type', 'f'],
-                                                 ['not', 'empty'],
-                                                 ['name', file_name]])
-    self.register_handler(file_name, metadata, callback)
-    return self
+    self.register_handler(
+      name,
+      dict(
+        fields=['name'],
+        expression=[
+          'allof',  # All of the below rules must be true to match.
+          ['type', 'f'],  # Match only files (not dirs, symlinks, character devices etc).
+          ['not', ['dirname', 'dist', self.ZERO_DEPTH]],  # Exclude the ./dist dir.
+          # N.B. 'wholename' ensures we match against the absolute ('/x/y/z') vs base path ('z').
+          ['not', ['match', '.*', 'wholename']],  # Exclude files in dotpath dirs (.pants.d/* etc).
+          ['not', ['match', '*.pyc']]  # Exclude .pyc files.
+          # TODO(kwlzn): Make exclusions here optionable.
+          # Related: https://github.com/pantsbuild/pants/issues/2956
+        ]
+      ),
+      callback
+    )
 
   def register_handler(self, name, metadata, callback):
     """Register subscriptions and their event handlers.
@@ -52,10 +78,10 @@ class FSEventService(PantsService):
     :param func callback: the callback to execute on each matching filesystem event
     """
     assert name not in self._handlers, 'duplicate handler name: {}'.format(name)
-    assert (isinstance(metadata, dict) and
-            'fields' in metadata and 'expression' in metadata), 'invalid handler metadata!'
+    assert (
+      isinstance(metadata, dict) and 'fields' in metadata and 'expression' in metadata
+    ), 'invalid handler metadata!'
     self._handlers[name] = Watchman.EventHandler(name=name, metadata=metadata, callback=callback)
-    return self
 
   def fire_callback(self, handler_name, event_data):
     """Fire an event callback for a given handler."""
@@ -91,11 +117,14 @@ class FSEventService(PantsService):
         handler_name = futures.pop(completed_future)
         id_counter += 1
 
-        # A true result indicates success.
-        if completed_future.result():
-          self._logger.debug('callback ID {} for {} succeeded'.format(id_counter, handler_name))
-        else:
-          self._logger.warning('callback ID {} for {} failed!'.format(id_counter, handler_name))
+        try:
+          result = completed_future.result()
+        except Exception:
+          result = traceback.format_exc()
 
-    # TODO(@kwlzn): events from watchman can aggregate changes to multiple files per event. it may
-    # make sense to split that list in the processing loop to take advantage of the threadpool.
+        if result is not None:
+          # Truthy results or those that raise exceptions are treated as failures.
+          self._logger.warning('callback ID {} for {} failed: {}'
+                               .format(id_counter, handler_name, result))
+        else:
+          self._logger.debug('callback ID {} for {} succeeded'.format(id_counter, handler_name))

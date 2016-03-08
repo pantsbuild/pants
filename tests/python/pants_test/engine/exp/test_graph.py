@@ -16,10 +16,11 @@ from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
-from pants.engine.exp.nodes import Noop, Return, Subjects, Throw
+from pants.engine.exp.nodes import Noop, Return, Throw
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
 from pants.engine.exp.scheduler import LocalScheduler
+from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps
 
 
@@ -91,9 +92,9 @@ class GraphTestBase(unittest.TestCase):
   _build_root = os.path.dirname(__file__)
 
   def create(self, build_pattern=None, parser_cls=None, inline=False):
-    subjects = Subjects()
     symbol_table_cls = TestTable
 
+    subjects = Storage.create(in_memory=True)
     project_tree_key = subjects.put(
         FileSystemProjectTree(self._build_root))
     address_mapper_key = subjects.put(

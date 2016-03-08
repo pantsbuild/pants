@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import logging
 import os
+import time
 from collections import namedtuple
 
 from pants.pantsd.process_manager import ProcessManager
@@ -19,6 +20,7 @@ class Watchman(ProcessManager):
   """Watchman process manager and helper class."""
 
   SOCKET_TIMEOUT_SECONDS = 1
+  RETRY_TIMEOUT_SECONDS = 5
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
@@ -114,20 +116,28 @@ class Watchman(ProcessManager):
     self.write_pid(pid)
     self.write_socket(self._sock_file)
 
-  def watch_project(self, path):
+  def watch_project(self, path, retry_timeout=RETRY_TIMEOUT_SECONDS):
     """Issues the watch-project command to watchman to begin watching the buildroot.
 
-       :param string path: the path to the watchman project root/pants build root.
+    :param string path: the path to the watchman project root/pants build root.
+    :param int retry_timeout: the retry timeout (in seconds).
     """
-    # TODO(kwlzn): this can fail with SocketTimeout - add retry.
-    return self.client.query('watch-project', os.path.realpath(path))
+    deadline = time.time() + retry_timeout
+    while 1:
+      try:
+        # This can occasionally fail with SocketTimeout, so we retry it up to a point.
+        return self.client.query('watch-project', os.path.realpath(path))
+      except self.client.SocketTimeout:
+        self._logger.debug('watchman SocketTimeout on watch-project command, retrying.')
+        if time.time() > deadline:
+          raise
 
   def subscribed(self, build_root, handlers):
     """Bulk subscribe generator for StreamableWatchmanClient.
 
-       :param str build_root: the build_root for all subscriptions.
-       :param iterable handlers: a sequence of Watchman.EventHandler namedtuple objects.
-       :yields: a stream of tuples in the form (subscription_name: str, subscription_event: dict).
+    :param str build_root: the build_root for all subscriptions.
+    :param iterable handlers: a sequence of Watchman.EventHandler namedtuple objects.
+    :yields: a stream of tuples in the form (subscription_name: str, subscription_event: dict).
     """
     command_list = [['subscribe',
                      build_root,

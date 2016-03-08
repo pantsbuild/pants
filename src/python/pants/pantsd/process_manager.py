@@ -346,6 +346,7 @@ class ProcessManager(ProcessMetadataManager):
     """Ensure a process is terminated by sending a chain of kill signals (SIGTERM, SIGKILL)."""
     alive = self.is_alive()
     if alive:
+      logger.debug('terminating {}'.format(self._name))
       for signal_type in signal_chain:
         pid = self.pid
         try:

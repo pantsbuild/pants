@@ -8,14 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import sys
 from collections import defaultdict
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
-from pants.engine.exp.addressable import Addresses, parse_variants
+from pants.engine.exp.addressable import Addresses
 from pants.engine.exp.fs import PathGlobs, Paths
 from pants.engine.exp.nodes import (DependenciesNode, Node, Noop, Return, SelectNode, StepContext,
                                     TaskNode, Throw, Waiting)
+from pants.engine.exp.objects import Closable
 from pants.util.objects import datatype
 
 
@@ -247,7 +246,7 @@ class Promise(object):
       return self._success
 
 
-class NodeBuilder(object):
+class NodeBuilder(Closable):
   """Holds an index of tasks used to instantiate TaskNodes."""
 
   @classmethod
@@ -282,7 +281,7 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'
     """Called by the Engine in order to execute this Step."""
     step_context = StepContext(node_builder, subjects)
     result = self.node.step(self.subject, self.dependencies, step_context)
-    return StepResult(result, step_context.introduced_subjects)
+    return StepResult(result)
 
   def __eq__(self, other):
     return type(self) == type(other) and self.step_id == other.step_id
@@ -300,19 +299,10 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'
     return 'StepRequest({}, {})'.format(self.step_id, self.node)
 
 
-class StepResult(datatype('Step', ['state', 'introduced_subjects'])):
+class StepResult(datatype('Step', ['state'])):
   """The result of running a Step, passed back to the Scheduler via the Promise class.
 
-  TODO: For simplicity, Step and StepResult both pessimistically inline all input/output content,
-  which means that a lot of excess data crosses process boundaries. To do this more efficiently,
-  a multi-process setup should likely use multi-round RPC to determine which inputs/outputs are
-  not already present in the remote process before sending blobs. Alternatively, could _always_
-  use a 3rdparty datastore to transfer inputs.
-
   :param state: The State value returned by the Step.
-  :param introduced_subjects: A dict containing Subjects that were potentially introduced by
-    running this Step. In a multiprocess environment, it's impossible to know which subjects
-    already exist, so some of the introduced Subjects may already be known to the Scheduler.
   """
 
 
@@ -522,10 +512,7 @@ class LocalScheduler(object):
 
   def _complete_step(self, node, step_result):
     """Given a StepResult for the given Node, complete the step."""
-    result, introduced_subjects = step_result
-    # Store any newly introduced subjects.
-    for key, value in introduced_subjects.items():
-      self._subjects.put_entry(key, value)
+    result = step_result.state
     # Update the Node's state in the graph.
     self._product_graph.update_state(node, result)
 
@@ -593,12 +580,11 @@ class LocalScheduler(object):
             candidates.add(step.node)
 
     print('created {} total nodes in {} scheduling iterations and {} steps, '
-          'with {} nodes in the executed path. there are now {} unique subjects.'.format(
+          'with {} nodes in the executed path.'.format(
             len(pg.dependencies()),
             scheduling_iterations,
             self._step_id,
-            sum(1 for _ in pg.walk(execution_request.roots)),
-            len(self._subjects)),
+            sum(1 for _ in pg.walk(execution_request.roots))),
           file=sys.stderr)
 
   def validate(self):
