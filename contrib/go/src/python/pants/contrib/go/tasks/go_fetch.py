@@ -89,41 +89,26 @@ class GoFetch(GoTask):
     if not page_data:
       return None, None, None
 
-    meta_import = cls._find_meta_tag(page_data.text)
-    if meta_import:
-      content_parts = meta_import.split(' ')
-
-      # Check to make sure returned root is an exact match to the provided
-      # import path. If it is only a prefix match then we need to check to
-      # make sure that this returned root for this call matches another call
-      # for the meta tags. The second call must return an exact match if it
-      # is to be used.
-      if content_parts[0] == import_path and len(content_parts) == 3:
-        return content_parts[0], content_parts[1], content_parts[2]
-      elif content_parts[0] in import_path:
-        root, vcs, url = cls._check_for_meta_tag(content_parts[0])
-
-        if root and content_parts[0] == root and len(content_parts) == 3:
-          return content_parts[0], content_parts[1], content_parts[2]
+    root, vcs, url = cls._find_meta_tag(page_data.text)
+    if root and vcs and url:
+      # Check to make sure returned root is an exact match to the provided import path. If it is
+      # not then run a recursive check on the returned and return the values provided by that call.
+      if root == import_path:
+        return root, vcs, url
+      elif import_path.starts_with(root):
+        return cls._check_for_meta_tag(root)
 
     return None, None, None
 
   @classmethod
   def _find_meta_tag(cls, page_html):
-    """Returns the content of the meta tag if found inside of the provided HTML"""
+    """Returns the content of the meta tag if found inside of the provided HTML."""
 
-    content = None
-    meta_import_regex = re.compile('<meta name="go-import"\s+content="(?P<content>[^">]+)">')
-
+    meta_import_regex = re.compile(r'<meta\s+name="go-import"\s+content="(?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)"\s*>')
     matched = meta_import_regex.search(page_html)
     if matched:
-      try:
-        content = matched.group('content')
-        return content
-      except IndexError:
-        return None
-
-    return content
+      return matched.groups()
+    return None
 
   def _transitive_download_remote_libs(self, go_remote_libs, all_known_addresses=None):
     """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.

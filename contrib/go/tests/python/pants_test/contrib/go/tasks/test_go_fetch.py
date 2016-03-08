@@ -222,7 +222,7 @@ class GoFetchTest(TaskTestBase):
                                                           gopath=self.build_root)
     self.assertItemsEqual(remote_import_ids, ['bitbucket.org/u/b', 'github.com/u/c'])
 
-  def test_find_meta_tag_with_meta_tag(self):
+  def test_find_meta_tag_multiline(self):
     test_html = """<!DOCTYPE html>
     <html>
     <head>
@@ -238,17 +238,17 @@ class GoFetchTest(TaskTestBase):
     go_fetch = self.create_task(self.context())
     meta_tag_content = go_fetch._find_meta_tag(test_html)
 
-    self.assertEqual(meta_tag_content, "google.golang.org/api git https://code.googlesource.com/google-api-go-client")
+    self.assertEqual(meta_tag_content, ('google.golang.org/api', 'git', 'https://code.googlesource.com/google-api-go-client'))
 
-  def test_find_meta_tag_with_meta_tag_single_line(self):
+  def test_find_meta_tag_single_line(self):
     test_html = '<!DOCTYPE html><html><head><meta name="go-import" content="google.golang.org/api git https://code.googlesource.com/google-api-go-client"></head><body> Nothing to see here.</body></html>'
 
     go_fetch = self.create_task(self.context())
     meta_tag_content = go_fetch._find_meta_tag(test_html)
 
-    self.assertEqual(meta_tag_content, "google.golang.org/api git https://code.googlesource.com/google-api-go-client")
+    self.assertEqual(meta_tag_content, ('google.golang.org/api', 'git', 'https://code.googlesource.com/google-api-go-client'))
 
-  def test_find_meta_tag_without_meta_tag(self):
+  def test_no_meta_tag(self):
     test_html = "<!DOCTYPE html><html><head></head><body> Nothing to see here.</body></html>"
 
     go_fetch = self.create_task(self.context())
