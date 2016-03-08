@@ -14,6 +14,7 @@ python_requirement_library(
     # repository arg can be removed.
     #   see also: tests/python/pants_test/backend/python/test_python_chroot.py
     python_requirement('antlr_python_runtime==3.1.3',
-                       repository='http://www.antlr3.org/download/Python/')
+                       repository='http://www.antlr3.org/download/Python/',
+                       version_filter=lambda py, pl: True)
   ]
 )

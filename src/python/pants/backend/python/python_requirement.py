@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pkg_resources import Requirement
 
+from pants.base.deprecated import deprecated_conditional
+
 
 class PythonRequirement(object):
   """Pants wrapper around pkg_resources.Requirement
@@ -31,7 +33,11 @@ class PythonRequirement(object):
   :API: public
   """
 
-  def __init__(self, requirement, name=None, repository=None, use_2to3=False, compatibility=None):
+  def __init__(self, requirement, name=None, repository=None, version_filter=None, use_2to3=False,
+               compatibility=None):
+    deprecated_conditional(lambda: version_filter is not None, '0.0.79',
+                           'version_filter using lambda function is no longer supported.')
+
     # TODO(wickman) Allow PythonRequirements to be specified using pip-style vcs or url identifiers,
     # e.g. git+https or just http://...
     self._requirement = Requirement.parse(requirement)
