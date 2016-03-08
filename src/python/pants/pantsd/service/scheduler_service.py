@@ -31,12 +31,11 @@ class SchedulerService(PantsService):
     self._event_queue = Queue.Queue(maxsize=64)
     self._scheduler = scheduler
     self._subjects = self._scheduler.subjects()
+    self._fs_event_service = fs_event_service
 
-    self._setup_fsevent_handlers(fs_event_service)
-
-  def _setup_fsevent_handlers(self, service):
+  def setup(self):
     """Registers filesystem event handlers on an FSEventService instance."""
-    service.register_all_files_handler(self._enqueue_fs_event)
+    self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""

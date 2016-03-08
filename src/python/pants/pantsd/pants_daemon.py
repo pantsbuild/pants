@@ -131,6 +131,11 @@ class PantsDaemon(ProcessManager):
     # Reset Goals and Tasks.
     Goal.clear()
 
+  def _setup_services(self, services):
+    for service in services:
+      self._logger.info('setting up service {}'.format(service))
+      service.setup()
+
   def _run_services(self, services):
     """Service runner main loop."""
     if not services:
@@ -179,6 +184,7 @@ class PantsDaemon(ProcessManager):
     self._write_named_sockets(self._socket_map)
 
     # Enter the main service runner loop.
+    self._setup_services(self._services)
     self._run_services(self._services)
 
   def pre_fork(self):

@@ -13,6 +13,7 @@ python_library(
   name = 'fs_event_service',
   sources = ['fs_event_service.py'],
   dependencies = [
+    '3rdparty/python:futures',
     ':pants_service',
     'src/python/pants/pantsd:watchman',
     'src/python/pants/pantsd/subsystem:watchman_launcher'

@@ -35,7 +35,8 @@ class TestFSEventService(BaseTest):
 
   def setUp(self):
     BaseTest.setUp(self)
-    self.service = FSEventService(self.BUILD_ROOT, TestExecutor())
+    self.service = FSEventService(self.BUILD_ROOT, 1)
+    self.service.setup(TestExecutor())
     self.service.register_all_files_handler(lambda x: True, name='test')
     self.service.register_all_files_handler(lambda x: False, name='test2')
 

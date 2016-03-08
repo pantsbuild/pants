@@ -9,6 +9,8 @@ import logging
 import os
 import traceback
 
+from concurrent.futures import ThreadPoolExecutor
+
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 from pants.pantsd.watchman import Watchman
@@ -24,17 +26,20 @@ class FSEventService(PantsService):
 
   ZERO_DEPTH = ['depth', 'eq', 0]
 
-  def __init__(self, build_root, executor, shutdown_executor=True):
+  def __init__(self, build_root, worker_count):
     super(FSEventService, self).__init__()
-    self._build_root = os.path.realpath(build_root)
-    self._executor = executor
-    self._shutdown_executor = shutdown_executor
     self._logger = logging.getLogger(__name__)
+    self._build_root = os.path.realpath(build_root)
+    self._worker_count = worker_count
+    self._executor = None
     self._handlers = {}
+
+  def setup(self, executor=None):
+    self._executor = executor or ThreadPoolExecutor(max_workers=self._worker_count)
 
   def terminate(self):
     """An extension of PantsService.terminate() that shuts down the executor if so configured."""
-    if self._shutdown_executor:
+    if self._executor:
       self._logger.info('shutting down threadpool')
       self._executor.shutdown()
     super(FSEventService, self).terminate()
@@ -117,7 +122,7 @@ class FSEventService(PantsService):
         except Exception:
           result = traceback.format_exc()
 
-        if result:
+        if result is not None:
           # Truthy results or those that raise exceptions are treated as failures.
           self._logger.warning('callback ID {} for {} failed: {}'
                                .format(id_counter, handler_name, result))

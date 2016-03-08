@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from concurrent.futures import ThreadPoolExecutor
-
 from pants.base.build_environment import get_buildroot
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.service.fs_event_service import FSEventService
@@ -88,9 +86,8 @@ class PantsDaemonLauncher(Subsystem):
                                      DaemonPantsRunner)
     services = [pailgun_service]
 
-    if self._fs_event_enabled:
-      fs_event_service = FSEventService(self._build_root,
-                                        ThreadPoolExecutor(max_workers=self._fs_event_workers))
+    if self._fs_event_enabled and self._scheduler:
+      fs_event_service = FSEventService(self._build_root, self._fs_event_workers)
       scheduler_service = SchedulerService(self._scheduler, fs_event_service)
       services.extend((fs_event_service, scheduler_service))
 
