@@ -5,6 +5,7 @@ python_library(
   name = 'watchman_launcher',
   sources = ['watchman_launcher.py'],
   dependencies = [
+    'src/python/pants/binaries:binary_util',
     'src/python/pants/pantsd:watchman',
     'src/python/pants/subsystem:subsystem'
   ]
