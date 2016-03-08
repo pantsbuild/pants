@@ -10,6 +10,11 @@ from pkg_resources import Requirement
 from pants.base.deprecated import deprecated_conditional
 
 
+def always_build(python, platform):
+  """Top level function is picklable."""
+  return True
+
+
 class PythonRequirement(object):
   """Pants wrapper around pkg_resources.Requirement
 
@@ -44,6 +49,8 @@ class PythonRequirement(object):
     self._repository = repository
     self._name = name or self._requirement.project_name
     self._use_2to3 = use_2to3
+    # Temporary workaround to allow pickling before we fully deprecate version_filter.
+    self._version_filter = version_filter or always_build
     # TODO(wickman) Unify this with PythonTarget .compatibility
     self.compatibility = compatibility or ['']
 
