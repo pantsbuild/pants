@@ -116,11 +116,19 @@ python_tests(
   ]
 )
 
+python_library(
+  name='xml_test_base',
+  sources = ['xml_test_base.py'],
+  dependencies = [
+    'src/python/pants/util:contextutil',
+  ]
+)
+
 python_tests(
   name = 'xml_parser',
   sources = ['test_xml_parser.py'],
   dependencies = [
     'src/python/pants/util:xml_parser',
-    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/util:xml_test_base',
   ]
 )
