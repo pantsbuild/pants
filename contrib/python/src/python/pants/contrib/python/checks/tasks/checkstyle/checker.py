@@ -11,6 +11,7 @@ from collections import namedtuple
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
+from pants.option.custom_types import file_option
 
 from pants.contrib.python.checks.tasks.checkstyle.common import Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
@@ -55,15 +56,16 @@ class PythonCheckStyleTask(PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PythonCheckStyleTask, cls).register_options(register)
-    register('--severity', default='COMMENT', type=str,
+    register('--severity', fingerprint=True, default='COMMENT', type=str,
              help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
-    register('--strict', default=False, action='store_true',
+    register('--strict', fingerprint=True, default=False, action='store_true',
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
+    # Skip short circuits before fingerprinting
     register('--skip', default=False, action='store_true',
              help='If enabled, skip this style checker.')
-    register('--suppress', type=str, default=None,
+    register('--suppress', fingerprint=True, type=file_option, default=None,
              help='Takes a XML file where specific rules on specific files will be skipped.')
-    register('--fail', default=True, action='store_true',
+    register('--fail', fingerprint=True, default=True, action='store_true',
              help='Prevent test failure but still produce output for problems.')
 
   @classmethod
