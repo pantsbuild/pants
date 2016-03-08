@@ -58,7 +58,7 @@ class PythonRequirement(object):
     """
     :API: public
     """
-    return True
+    return self._version_filter(python, platform)
 
   @property
   def use_2to3(self):
