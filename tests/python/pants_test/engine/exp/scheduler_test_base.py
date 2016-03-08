@@ -9,6 +9,7 @@ import os
 import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.parsers import SymbolTable
 from pants.engine.exp.scheduler import LocalScheduler
@@ -54,3 +55,11 @@ class SchedulerTestBase(object):
                                storage,
                                symbol_table_cls)
     return scheduler, build_root
+
+  def execute(self, scheduler, product, *subjects):
+    """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
+    request = scheduler.execution_request(products=[product], subjects=subjects)
+    res = LocalSerialEngine(scheduler).execute(request)
+    if res.error:
+      raise res.error
+    return request
