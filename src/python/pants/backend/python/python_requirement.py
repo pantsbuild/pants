@@ -31,18 +31,13 @@ class PythonRequirement(object):
   :API: public
   """
 
-  def __init__(self, requirement, name=None, repository=None, version_filter=None, use_2to3=False,
-               compatibility=None):
+  def __init__(self, requirement, name=None, repository=None, use_2to3=False, compatibility=None):
     # TODO(wickman) Allow PythonRequirements to be specified using pip-style vcs or url identifiers,
     # e.g. git+https or just http://...
     self._requirement = Requirement.parse(requirement)
     self._repository = repository
     self._name = name or self._requirement.project_name
     self._use_2to3 = use_2to3
-    # TODO(pl): Change version_filter into a hashable flag instead of a lambda.
-    # It definitely belongs in the invalidation hash, and it's only ever used
-    # for differentiating between py3k and py2
-    self._version_filter = version_filter or (lambda py, pl: True)
     # TODO(wickman) Unify this with PythonTarget .compatibility
     self.compatibility = compatibility or ['']
 
@@ -50,7 +45,7 @@ class PythonRequirement(object):
     """
     :API: public
     """
-    return self._version_filter(python, platform)
+    return True
 
   @property
   def use_2to3(self):
