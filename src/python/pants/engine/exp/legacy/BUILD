@@ -50,3 +50,11 @@ python_binary(
     ':commands'
   ]
 )
+
+python_binary(
+  name='pantsd',
+  entry_point='pants.engine.exp.legacy.commands:pantsd',
+  dependencies=[
+    ':commands'
+  ]
+)
