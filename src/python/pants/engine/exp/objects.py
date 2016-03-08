@@ -143,3 +143,11 @@ class Validatable(AbstractClass):
 
     :raises: :class:`ValidationError` if this object is invalid.
     """
+
+
+class Closable(object):
+  """Marks a class that cleans up itself, usually at the end of lifecycle."""
+
+  def close(self):
+    """A no-op implementation, overwrite to actually clean up resources etc."""
+    return

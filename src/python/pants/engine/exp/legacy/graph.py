@@ -10,7 +10,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.nodes import Return, SelectNode, State, Throw
-from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral
+from pants.engine.exp.selectors import Select, SelectDependencies
 from pants.util.objects import datatype
 
 
@@ -50,7 +50,7 @@ class ExpGraph(BuildGraph):
     for ((node, state), _) in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyBuildGraphNode values.
       if type(state) is Throw:
-        # TODO: get access to `Subjects` instance in order to `to-str` more effectively here.
+        # TODO: get access to `Storage` instance in order to `to-str` more effectively here.
         raise AddressLookupError(
             'Build graph construction failed for {}:\n  {}'.format(node.subject_key, state.exc))
       elif type(state) is not Return:

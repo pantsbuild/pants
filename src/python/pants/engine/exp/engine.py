@@ -6,8 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
+import logging
 import multiprocessing
-import os
+import traceback
 from abc import abstractmethod
 
 from twitter.common.collections.orderedset import OrderedSet
@@ -15,6 +16,7 @@ from twitter.common.collections.orderedset import OrderedSet
 from pants.base.exceptions import TaskError
 from pants.engine.exp.objects import SerializationError
 from pants.engine.exp.processing import StatefulPool
+from pants.engine.exp.storage import Storage
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -23,6 +25,9 @@ try:
   import cPickle as pickle
 except ImportError:
   import pickle
+
+
+logger = logging.getLogger(__name__)
 
 
 class Engine(AbstractClass):
@@ -106,6 +111,9 @@ class LocalSerialEngine(Engine):
       for step, promise in step_batch:
         promise.success(step(node_builder, subjects))
 
+  def close(self):
+    self._scheduler.subjects().close()
+
 
 def _try_pickle(obj):
   try:
@@ -120,7 +128,7 @@ def _try_pickle(obj):
 def _execute_step(debug, process_state, step):
   """A picklable top-level function to help support local multiprocessing uses.
 
-  Executes the Step for the given NodeBuilder and Subjects, and returns a tuple of step id and
+  Executes the Step for the given node builder and subjects, and returns a tuple of step id and
   result or exception.
   """
   node_builder, subjects = process_state
@@ -131,6 +139,7 @@ def _execute_step(debug, process_state, step):
   except Exception as e:
     # Trap any exception raised by the execution node that bubbles up, and
     # pass this back to our main thread for handling.
+    logger.warn(traceback.format_exc())
     return (step_id, e)
 
   if debug:
@@ -139,6 +148,15 @@ def _execute_step(debug, process_state, step):
     except SerializationError as e:
       return (step_id, e)
   return (step_id, result)
+
+
+def _process_initializer(node_builder, subjects):
+  """Another picklable top-level function that provides multi-processes' initial states.
+
+  States are returned as a tuple. States are `Closable` so they can be cleaned up once
+  processes are done.
+  """
+  return (node_builder, Storage.clone(subjects))
 
 
 class LocalMultiprocessEngine(Engine):
@@ -159,7 +177,8 @@ class LocalMultiprocessEngine(Engine):
     execute_step = functools.partial(_execute_step, debug)
     node_builder = scheduler.node_builder()
     subjects = scheduler.subjects()
-    self._pool = StatefulPool(self._pool_size, execute_step, (node_builder, subjects))
+    process_initializer = functools.partial(_process_initializer, node_builder, subjects)
+    self._pool = StatefulPool(self._pool_size, process_initializer, execute_step)
     self._debug = debug
 
   def _submit(self, step):
@@ -223,3 +242,4 @@ class LocalMultiprocessEngine(Engine):
 
   def close(self):
     self._pool.close()
+    self._scheduler.subjects().close()

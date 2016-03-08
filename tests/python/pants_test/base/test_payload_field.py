@@ -57,20 +57,6 @@ class PayloadTest(BaseTest):
       PythonRequirementsField([req2]).fingerprint(),
     )
 
-  def test_python_requirements_field_version_filter(self):
-    """version_filter is a lambda and can't be hashed properly.
-
-    Since in practice this is only ever used to differentiate between py3k and py2, it should use
-    a tuple of strings or even just a flag instead.
-    """
-    req1 = PythonRequirement('foo==1.0', version_filter=lambda py, pl: False)
-    req2 = PythonRequirement('foo==1.0')
-
-    self.assertEqual(
-      PythonRequirementsField([req1]).fingerprint(),
-      PythonRequirementsField([req2]).fingerprint(),
-    )
-
   def test_primitive_field(self):
     self.assertEqual(
       PrimitiveField({'foo': 'bar'}).fingerprint(),

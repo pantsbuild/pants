@@ -120,7 +120,6 @@ class PythonRequirementsField(frozenset, PayloadField):
   def _compute_fingerprint(self):
     def fingerprint_iter():
       for req in self:
-        # TODO(pl): See PythonRequirement note about version_filter
         hash_items = (
           repr(req._requirement),
           req._repository,

@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import time
 
 from pants.pantsd.watchman import Watchman
 from pants.subsystem.subsystem import Subsystem
@@ -53,4 +54,11 @@ class WatchmanLauncher(Subsystem):
 
     self._logger.info('watchman is running, pid={pid} socket={socket}'
                       .format(pid=self.watchman.pid, socket=self.watchman.socket))
+    # TODO(kwlzn): This sleep is currently helpful based on empirical testing with older watchman
+    # versions, but should go away quickly once we embed watchman fetching in pants and uprev both
+    # the binary and client versions.
+    time.sleep(5)  # Allow watchman to quiesce before sending commands.
     return self.watchman
+
+  def terminate(self):
+    self.watchman.terminate()
