@@ -33,7 +33,7 @@ class DxCompileIntegrationTest(AndroidIntegrationTest):
     self.dx_test(AndroidIntegrationTest.TEST_TARGET)
 
   def dx_test(self, target):
-    pants_run = self.run_pants(['dex', target])
+    pants_run = self.run_pants(['binary', target])
     self.assert_success(pants_run)
 
   # TODO(mateor) decompile with smali and verify contents of created dex file.

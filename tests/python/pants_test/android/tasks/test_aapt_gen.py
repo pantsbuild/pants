@@ -36,6 +36,18 @@ class TestAaptGen(TestAndroidBase):
           task.create_sdk_jar_deps(targets)
           self.assertNotEquals(task._jar_library_by_sdk['19'], task._jar_library_by_sdk['18'])
 
+  def test_create_sdk_dependency_injection(self):
+    with distribution() as dist:
+      with self.android_binary(target_name='binary1', target_sdk='18') as binary1:
+        with self.android_binary(target_name='binary2', target_sdk='19') as binary2:
+          self.set_options(sdk_path=dist)
+          task = self.create_task(self.context())
+          targets = [binary1, binary2]
+          task.create_sdk_jar_deps(targets)
+          self.assertIn(task._jar_library_by_sdk['18'], binary1.dependencies)
+          self.assertIn(task._jar_library_by_sdk['19'], binary2.dependencies)
+          self.assertNotIn(task._jar_library_by_sdk['19'], binary1.dependencies)
+
   def test_aapt_out_different_sdk(self):
     with self.android_binary(target_name='binary1', target_sdk='18') as binary1:
       with self.android_binary(target_name='binary2', target_sdk='19') as binary2:

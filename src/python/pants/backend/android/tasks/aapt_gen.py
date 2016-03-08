@@ -73,6 +73,7 @@ class AaptGen(AaptTask):
         jar = JarDependency(org='com.google', name='android', rev=sdk, url=jar_url)
         address = Address(self.workdir, 'android-{0}.jar'.format(sdk))
         self._jar_library_by_sdk[sdk] = self.context.add_new_target(address, JarLibrary, jars=[jar])
+      binary.inject_dependency(self._jar_library_by_sdk[sdk].address)
 
   def _render_args(self, binary, manifest, resource_dirs):
     """Compute the args that will be passed to the aapt tool.
@@ -119,19 +120,17 @@ class AaptGen(AaptTask):
         if isinstance(tgt, AndroidLibrary) and tgt.manifest:
           gentargets.append(tgt)
       binary.walk(gather_gentargets)
-
       for gen in gentargets:
         aapt_output = self._relative_genfile(gen)
         aapt_file = os.path.join(self.aapt_out(binary), aapt_output)
 
         resource_deps = self.context.build_graph.transitive_subgraph_of_addresses([gen.address])
         resource_dirs = [t.resource_dir for t in resource_deps if isinstance(t, AndroidResources)]
-
         if resource_dirs:
           if aapt_file not in self._created_library_targets:
 
-            # Priority for resources is left->right, so reverse collection order (DFS preorder).
-            args = self._render_args(binary, gen.manifest, reversed(resource_dirs))
+            # Priority for resources is left->right, so dependency order matters (see TODO in aapt_builder).
+            args = self._render_args(binary, gen.manifest, resource_dirs)
             with self.context.new_workunit(name='aaptgen', labels=[WorkUnitLabel.MULTITOOL]) as workunit:
               returncode = subprocess.call(args,
                                            stdout=workunit.output('stdout'),
@@ -153,12 +152,11 @@ class AaptGen(AaptTask):
     """
     spec_path = os.path.join(os.path.relpath(self.aapt_out(binary), get_buildroot()))
     address = Address(spec_path=spec_path, target_name=gentarget.id)
-    deps = [self._jar_library_by_sdk[binary.target_sdk]]
     new_target = self.context.add_new_target(address,
                                              JavaLibrary,
                                              derived_from=gentarget,
                                              sources=[self._relative_genfile(gentarget)],
-                                             dependencies=deps)
+                                             dependencies=[])
     return new_target
 
   def aapt_out(self, binary):

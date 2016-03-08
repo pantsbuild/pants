@@ -7,8 +7,9 @@ android_binary(
   sources=rglobs('main/src/*.java'),
   manifest='main/AndroidManifest.xml',
   dependencies = [
-    'examples/src/android/example_library',
     ':resources',
+    'examples/src/android/example_library',
+    ':support-library',
   ],
 )
 
@@ -18,3 +19,12 @@ android_resources(
   resource_dir='main/res'
 )
 
+android_library(
+  name='support-library',
+  libraries=['3rdparty/android:android-support-v4'],
+  include_patterns=[
+    '**/*.class',
+  ],
+  dependencies = [
+  ]
+)
