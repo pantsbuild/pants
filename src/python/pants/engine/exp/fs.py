@@ -198,7 +198,6 @@ def list_directory(project_tree, directory):
                             [Path(join(directory.path, subfile)) for subfile in subfiles])
   except (IOError, OSError) as e:
     if e.errno == errno.ENOENT:
-      # Failing to read an existing file is certainly problematic: raise.
       return DirectoryListing(directory, False, [], [])
     else:
       raise e
@@ -253,10 +252,8 @@ def files_content(project_tree, paths):
       contents.append(FileContent(path.path, project_tree.content(path.path)))
     except (IOError, OSError) as e:
       if e.errno == errno.ENOENT:
-        # Otherwise, just doesn't exist.
         contents.append(FileContent(path.path, None))
       else:
-        # Failing to read an existing file is certainly problematic: raise.
         raise e
   return FilesContent(contents)
 
