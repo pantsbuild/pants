@@ -124,3 +124,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
             f.write(lines[0])
           for line in lines[1:]:
             f.write(line)
+
+  @property
+  def _copy_target_attributes(self):
+    """Propagate the provides attribute to the synthetic java_library() target for publishing."""
+    return ['provides']
