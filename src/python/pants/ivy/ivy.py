@@ -5,12 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os.path
+from contextlib import contextmanager
+
+import lockfile
 from six import string_types
 from twitter.common.collections import maybe_list
 
 from pants.java import util
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import Executor, SubprocessExecutor
+from pants.util.dirutil import safe_mkdir
 
 
 class Ivy(object):
@@ -35,7 +40,7 @@ class Ivy(object):
                          self._ivy_settings, type(self._ivy_settings)))
 
     self._ivy_cache_dir = ivy_cache_dir
-    if self._ivy_cache_dir and not isinstance(self._ivy_cache_dir, string_types):
+    if not isinstance(self._ivy_cache_dir, string_types):
       raise ValueError('ivy_cache_dir must be a string, given {} of type {}'.format(
                          self._ivy_cache_dir, type(self._ivy_cache_dir)))
 
@@ -55,6 +60,14 @@ class Ivy(object):
     """Returns the ivy cache dir used by this `Ivy` instance."""
     return self._ivy_cache_dir
 
+  @property
+  @contextmanager
+  def resolution_lock(self):
+    safe_mkdir(self._ivy_cache_dir)
+    ivy_cache_lock_path = os.path.join(self._ivy_cache_dir, 'pants_ivy_lock')
+    with lockfile.LockFile(ivy_cache_lock_path):
+      yield
+
   def execute(self, jvm_options=None, args=None, executor=None,
               workunit_factory=None, workunit_name=None, workunit_labels=None):
     """Executes the ivy commandline client with the given args.
@@ -69,7 +82,8 @@ class Ivy(object):
     executor = executor or SubprocessExecutor(DistributionLocator.cached())
     runner = self.runner(jvm_options=jvm_options, args=args, executor=executor)
     try:
-      result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
+      with self.resolution_lock:
+        result = util.execute_runner(runner, workunit_factory, workunit_name, workunit_labels)
       if result != 0:
         raise self.Error('Ivy command failed with exit code {}{}'.format(
                            result, ': ' + ' '.join(args) if args else ''))

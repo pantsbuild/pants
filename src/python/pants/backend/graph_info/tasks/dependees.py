@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 from collections import defaultdict
 
 from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
@@ -21,6 +22,9 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
              help='List transitive dependees.')
     register('--closed', default=False, action='store_true',
              help='Include the input targets in the output along with the dependees.')
+    # TODO: consider refactoring out common output format methods into MultiFormatConsoleTask.
+    register('--output-format', default='text', choices=['text', 'json'],
+             help='Output format of results.')
 
   def __init__(self, *args, **kwargs):
     super(ReverseDepmap, self).__init__(*args, **kwargs)
@@ -50,12 +54,21 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
           dependees_by_target[dependency].add(target)
 
     roots = set(self.context.target_roots)
-    if self._closed:
+    if self.get_options().output_format == 'json':
+      deps = defaultdict(list)
       for root in roots:
-        yield root.address.spec
+        if self._closed:
+          deps[root.address.spec].append(root.address.spec)
+        for dependent in self.get_dependents(dependees_by_target, [root]):
+          deps[root.address.spec].append(dependent.address.spec)
+      yield json.dumps(deps, indent=4, separators=(',', ': '))
+    else:
+      if self._closed:
+        for root in roots:
+          yield root.address.spec
 
-    for dependent in self.get_dependents(dependees_by_target, roots):
-      yield dependent.address.spec
+      for dependent in self.get_dependents(dependees_by_target, roots):
+        yield dependent.address.spec
 
   def get_dependents(self, dependees_by_target, roots):
     check = set(roots)

@@ -10,51 +10,11 @@ import unittest
 from contextlib import contextmanager
 from xml.dom.minidom import Document
 
-from pants.util.contextutil import temporary_file
 from pants.util.xml_parser import XmlParser
+from pants_test.util.xml_test_base import XmlTestBase
 
 
-class TestXmlBase(unittest.TestCase):
-  """Base class for tests that parse xml."""
-
-  @contextmanager
-  def xml_file(self,
-               manifest_element='manifest',
-               package_attribute='package',
-               package_value='org.pantsbuild.example.hello',
-               uses_sdk_element='uses-sdk',
-               android_attribute='android:targetSdkVersion',
-               activity_element='activity',
-               android_name_attribute='android:name',
-               application_name_value='org.pantsbuild.example.hello.HelloWorld'):
-    """Represent an .xml file (Here an AndroidManifest.xml is used)."""
-    with temporary_file() as fp:
-      fp.write(textwrap.dedent(
-        """<?xml version="1.0" encoding="utf-8"?>
-        <{manifest} xmlns:android="http://schemas.android.com/apk/res/android"
-                    xmlns:unrelated="http://schemas.android.com/apk/res/android"
-            {package}="{package_name}" >
-            <{uses_sdk}
-                {android}="19" />
-            <application >
-                <{activity}
-                    {android_name}="{application_name}" >
-                </{activity}>
-            </application>
-        </{manifest}>""".format(manifest=manifest_element,
-                                package=package_attribute,
-                                package_name=package_value,
-                                uses_sdk=uses_sdk_element,
-                                android=android_attribute,
-                                activity=activity_element,
-                                android_name=android_name_attribute,
-                                application_name=application_name_value)))
-      fp.close()
-      path = fp.name
-      yield path
-
-
-class TestXmlParser(TestXmlBase):
+class TestXmlParser(XmlTestBase):
   """Test the XmlParser class."""
 
   def test_from_file(self):

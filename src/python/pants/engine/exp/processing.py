@@ -8,16 +8,22 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from multiprocessing import Process, Queue
 
 
-def _stateful_pool_loop(send_queue, recv_queue, function, state):
+def _stateful_pool_loop(send_queue, recv_queue, initializer, function):
   """A top-level function implementing the loop for a StatefulPool."""
-  while True:
-    item = recv_queue.get(block=True)
-    if item is None:
-      # Shutdown requested.
-      return
-    # Execute the function, and return the result.
-    result = function(state, item)
-    send_queue.put(result, block=True)
+  states = initializer()
+
+  try:
+    while True:
+      item = recv_queue.get(block=True)
+      if item is None:
+        # Shutdown requested.
+        return
+      # Execute the function, and return the result.
+      result = function(states, item)
+      send_queue.put(result, block=True)
+  finally:
+    for state in states:
+      state.close()
 
 
 class StatefulPool(object):
@@ -27,14 +33,13 @@ class StatefulPool(object):
   own exceptions and return a failure result if need be.
 
   :param pool_size: The number of workers.
+  :param initializer: To provide the initial states for each worker.
   :param function: The function which will be executed for each input object, and receive
     the worker's state and the current input. Should return the value that will be returned
     to the calling thread.
-  :param initial_state: The initial state for each worker. Once the pool is started, the
-    value of the state will diverge in each instance of the worker.
   """
 
-  def __init__(self, pool_size, function, initial_state):
+  def __init__(self, pool_size, initializer, function):
     super(StatefulPool, self).__init__()
 
     self._pool_size = pool_size
@@ -43,7 +48,7 @@ class StatefulPool(object):
     self._recv = Queue()
 
     self._processes = [Process(target=_stateful_pool_loop,
-                               args=(self._recv, self._send, function, initial_state))
+                               args=(self._recv, self._send, initializer, function))
                        for _ in range(pool_size)]
 
   def start(self):

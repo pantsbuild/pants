@@ -12,7 +12,6 @@ from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.binaries import binary_util
-from pants.build_graph.address import Address
 from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.examples.planners import setup_json_scheduler
 from pants.engine.exp.fs import PathGlobs

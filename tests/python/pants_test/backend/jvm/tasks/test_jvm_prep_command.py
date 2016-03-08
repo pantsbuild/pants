@@ -21,9 +21,13 @@ class JvmPrepCommandTest(TaskTestBase):
   def setUp(self):
     super (JvmPrepCommandTest, self).setUp()
     # This is normally taken care of in RunJvmPrepCommandBase.register_options() when running pants,
-    # but needs to be manually added for unit testing
+    # but these don't get called in testing unless you call `self.create_task()`.
+    # Some of these unit tests need to create targets before creating the task.
     JvmPrepCommand.add_goal('test')
     JvmPrepCommand.add_goal('binary')
+
+  def tearDown(self):
+    JvmPrepCommand.reset()
 
   @classmethod
   def task_type(cls):
@@ -38,15 +42,16 @@ class JvmPrepCommandTest(TaskTestBase):
       self.make_target('foo', JvmPrepCommand,)
 
     with self.assertRaisesRegexp(TargetDefinitionException,
-                                 r'.*goal must be one of.*'):
+                                 r'.*Got goal "baloney". Goal must be one of.*'):
       self.make_target('foo', JvmPrepCommand, mainclass='org.pantsbuild.FooMain', goal='baloney')
 
-  def test_isprep(self):
-    tgt1 = self.make_target('tgt1', JvmPrepCommand, mainclass='org.pantsbuild.FooMain')
-    tgt2 = self.make_target('tgt2', JvmPrepCommand, mainclass='org.pantsbuild.FooMain', goal='binary')
-    tgt3 = self.make_target('tgt3', JvmBinary)
+  def test_runnable_prep_cmd(self):
+    prep_cmd_test = self.make_target('prep-cmd-test', JvmPrepCommand, mainclass='org.pantsbuild.FooMain')
+    prep_cmd_binary = self.make_target('prep-cmd-binary', JvmPrepCommand, mainclass='org.pantsbuild.FooMain', goal='binary')
+    not_a_prep_cmd = self.make_target('not-a-prep-command', JvmBinary)
     task = self.create_task(context=self.context())
 
-    self.assertTrue(task.is_prep(tgt1))
-    self.assertFalse(task.is_prep(tgt2))
-    self.assertFalse(task.is_prep(tgt3))
+    self.assertTrue(task.runnable_prep_cmd(prep_cmd_test))
+    # This is a prep_command target, but not for this goal
+    self.assertFalse(task.runnable_prep_cmd(prep_cmd_binary))
+    self.assertFalse(task.runnable_prep_cmd(not_a_prep_cmd))

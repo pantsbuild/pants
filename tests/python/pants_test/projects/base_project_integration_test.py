@@ -15,13 +15,8 @@ class ProjectIntegrationTest(PantsRunIntegrationTest):
   :API: public
   """
 
-  @staticmethod
-  def _android_flags():
-    exclude_android = os.environ.get('SKIP_ANDROID') == "true" or not os.environ.get('ANDROID_HOME')
-    return ['--exclude-target-regexp=.*android.*'] if exclude_android else []
-
   def pants_test(self, command):
     """
     :API: public
     """
-    return self.run_pants(['test'] + command + self._android_flags())
+    return self.run_pants(['test'] + command)

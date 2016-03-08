@@ -32,6 +32,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':objects',
     ':processing',
+    ':storage',
     'src/python/pants/base:exceptions',
     'src/python/pants/util:meta',
   ]
@@ -82,7 +83,6 @@ python_library(
     ':objects',
     ':struct',
     'src/python/pants/build_graph',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )
@@ -142,5 +142,15 @@ python_library(
     ':fs',
     ':struct',
     'src/python/pants/source',
+  ]
+)
+
+python_library(
+  name='storage',
+  sources=['storage.py'],
+  dependencies=[
+    ':objects',
+    '3rdparty/python:lmdb',
+    'src/python/pants/util:dirutil'
   ]
 )

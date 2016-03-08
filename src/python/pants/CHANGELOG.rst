@@ -1,6 +1,88 @@
 RELEASE HISTORY
 ===============
 
+0.0.75 (03/07/2016)
+-------------------
+
+This release completes the deprecation cycle for several options:
+
+* `--scala-platform-runtime`: The `--scala-platform-version` is now used to configure the scala runtime lib.
+* `--use-old-naming-style` for the `export-classpath` goal: The old naming style is no longer supported.
+* `--spec-excludes`: Use `--ignore-patterns` instead.
+
+API Changes
+~~~~~~~~~~~
+
+* Remove deprecated code planned to remove in 0.0.74 and 0.0.75 versions
+  `RB #3527 <https://rbcommons.com/s/twitter/r/3527>`_
+
+Bugfixes
+~~~~~~~~
+
+* Lock ivy resolution based on the cache directory being used.
+  `RB #3529 <https://rbcommons.com/s/twitter/r/3529>`_
+
+* Fix an issue where ivy-bootstrap is ignoring http proxy setttings
+  `RB #3522 <https://rbcommons.com/s/twitter/r/3522>`_
+
+* Clone jars rather than mutating them during ivy resolve
+  `RB #3203 <https://rbcommons.com/s/twitter/r/3203>`_
+
+New Features
+~~~~~~~~~~~~
+
+* allow list-owners to accept multiple source files and output JSON
+  `RB #2755 <https://rbcommons.com/s/twitter/r/2755>`_
+  `RB #3534 <https://rbcommons.com/s/twitter/r/3534>`_
+
+* add JSON output-format option to dependees
+  `RB #3534 <https://rbcommons.com/s/twitter/r/3534>`_
+  `RB #3536 <https://rbcommons.com/s/twitter/r/3536>`_
+
+* Allow running prep_commands in goals other than test
+  `RB #3519 <https://rbcommons.com/s/twitter/r/3519>`_
+
+* When using ./pants options, hide options from super-scopes.
+  `RB #3528 <https://rbcommons.com/s/twitter/r/3528>`_
+
+* zinc: optionize fatal-warnings compiler args
+  `RB #3509 <https://rbcommons.com/s/twitter/r/3509>`_
+
+* An option to set the location of config files.
+  `RB #3500 <https://rbcommons.com/s/twitter/r/3500>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix failing test on CI after 'Remove deprecated code planned to remove in 0.0.74 and 0.0.75 versions' change
+  `RB #3527 <https://rbcommons.com/s/twitter/r/3527>`_
+  `RB #3533 <https://rbcommons.com/s/twitter/r/3533>`_
+
+* Set public API markers for task and util
+  `RB #3520 <https://rbcommons.com/s/twitter/r/3520>`_
+
+* Set public api markers for jvm backend
+  `RB #3515 <https://rbcommons.com/s/twitter/r/3515>`_
+
+* pythonstyle perf: dont parse the exclusions file for every source file.
+  `RB #3518 <https://rbcommons.com/s/twitter/r/3518>`_
+
+* Extract a BuildGraph interface
+  `Issue #2979 <https://github.com/pantsbuild/pants/issues/2979>`_
+  `RB #3514 <https://rbcommons.com/s/twitter/r/3514>`_
+
+* increase compile.zinc integration test timeout
+  `RB #3507 <https://rbcommons.com/s/twitter/r/3507>`_
+
+* fix zinc testing instructions
+  `RB #3513 <https://rbcommons.com/s/twitter/r/3513>`_
+
+New Engine Work
+~~~~~~~~~~~~~~~
+
+* [engine] Implement the BuildGraph interface via the engine
+  `RB #3516 <https://rbcommons.com/s/twitter/r/3516>`_
+
 0.0.74 (02/27/2016)
 -------------------
 

@@ -13,6 +13,7 @@ python_library(
   name = 'fs_event_service',
   sources = ['fs_event_service.py'],
   dependencies = [
+    '3rdparty/python:futures',
     ':pants_service',
     'src/python/pants/pantsd:watchman',
     'src/python/pants/pantsd/subsystem:watchman_launcher'
@@ -25,5 +26,13 @@ python_library(
   dependencies = [
     ':pants_service',
     'src/python/pants/pantsd:pailgun_server'
+  ]
+)
+
+python_library(
+  name = 'scheduler_service',
+  sources = ['scheduler_service.py'],
+  dependencies = [
+    ':pants_service'
   ]
 )

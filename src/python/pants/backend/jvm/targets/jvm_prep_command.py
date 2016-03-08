@@ -34,6 +34,8 @@ class JvmPrepCommand(JvmTarget):
   triggered when running targets that depend on the `prep_command()` target or when the
   target is referenced from the command line.
 
+  See also prep_command for running shell commands.
+
   :API: public
   """
   _goals=frozenset()
@@ -42,6 +44,11 @@ class JvmPrepCommand(JvmTarget):
   def add_goal(goal):
     """Add a named goal to the list of valid goals for the 'goal' parameter."""
     JvmPrepCommand._goals = frozenset(list(JvmPrepCommand._goals) + [goal])
+
+  @classmethod
+  def reset(cls):
+    """Used for testing purposes to reset state."""
+    cls._goals=frozenset()
 
   @staticmethod
   def goals():
@@ -66,6 +73,7 @@ class JvmPrepCommand(JvmTarget):
     })
     super(JvmPrepCommand, self).__init__(payload=payload, **kwargs)
     if not mainclass:
-      raise TargetDefinitionException(self, 'mainclass must be specified')
+      raise TargetDefinitionException(self, 'mainclass must be specified.')
     if goal not in self.goals():
-      raise TargetDefinitionException(self, 'goal must be one of {}.'.format(self.goals()))
+      raise TargetDefinitionException(self, 'Got goal "{}". Goal must be one of {}.'.format(
+          goal, self.goals()))

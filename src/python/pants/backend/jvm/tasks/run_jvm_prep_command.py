@@ -15,11 +15,18 @@ from pants.task.task import Task
 
 
 class RunJvmPrepCommandBase(Task):
-  """Base class to enable running JVM binaries before executing a goal
+  """Base class to enable running JVM binaries before executing a goal.
+
+  This command will use the 'runtime_classpath' product and compile dependent JVM code
+  unless the 'classpath_product_only' field on the task subclass is set to True.
+  Setting `classpath_product_only=True` is useful for running commands before the compile goal
+  completes.
 
   This task is meant to be subclassed, setting the 'goal' variable appropriately.
+  For example, create a subclass and then register it in a plugin to run
+  at the beginning of the binary goal in register.py:
 
-  output unless the 'compile_classpath_only' field is set to True in the task
+  task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
 
   :API: public
   """
@@ -51,14 +58,15 @@ class RunJvmPrepCommandBase(Task):
       round_manager.require_data('runtime_classpath')
 
   @classmethod
-  def is_prep(cls, tgt):
+  def runnable_prep_cmd(cls, tgt):
     return isinstance(tgt, JvmPrepCommand) and tgt.payload.get_field_value('goal') == cls.goal
 
   def execute(self):
     if self.goal not in JvmPrepCommand.goals():
-      raise  TaskError("Expected goal to be one of {}".format(JvmPrepCommand.goals()))
+      raise  AssertionError('Got goal "{}". Expected goal to be one of {}'.format(
+          self.goal, JvmPrepCommand.goals()))
 
-    targets = self.context.targets(postorder=True,  predicate=self.is_prep)
+    targets = self.context.targets(postorder=True,  predicate=self.runnable_prep_cmd)
 
     compile_classpath = self.context.products.get_data('compile_classpath')
     classpath_products = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
@@ -99,31 +107,16 @@ class RunJvmPrepCommandBase(Task):
 
 
 class RunBinaryJvmPrepCommand(RunJvmPrepCommandBase):
-  """Run code from a JVM compiled language before other tasks in the binary goal.
-
-  Register this tasks to run code at the beginning of the binary goal in register.py
-
-  task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
-  """
+  """Run code from a JVM compiled language before other tasks in the binary goal."""
   goal = 'binary'
 
 
 class RunTestJvmPrepCommand(RunJvmPrepCommandBase):
-  """Run code from a JVM compiled language before other tasks in the test goal.
-
-  Register this task to run code at the beginning of the test goal in register.py
-
-  task(name='pre-test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
-  """
+  """Run code from a JVM compiled language before other tasks in the test goal."""
   goal = 'test'
 
 
 class RunCompileJvmPrepCommand(RunJvmPrepCommandBase):
-  """Run code from a JVM compiled language before other tasks in the compile goal.
-
-  Register this tasks to run code at the beginning of the compile goal in register.py
-
-  task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)
-  """
+  """Run code from a JVM compiled language before other tasks in the compile goal."""
   goal = 'compile'
   classpath_product_only = True
