@@ -23,7 +23,17 @@ class EmptyTable(SymbolTable):
 
 
 class SchedulerTestBase(object):
-  def mk_scheduler(self, tasks=None, goals=None, storage=None, build_root_src=None, symbol_table_cls=EmptyTable):
+  """A mixin for classes (tests, presumably) which need to create temporary schedulers.
+
+  TODO: In the medium term, this should be part of pants_test.base_test.BaseTest.
+  """
+
+  def mk_scheduler(self,
+                   tasks=None,
+                   goals=None,
+                   storage=None,
+                   build_root_src=None,
+                   symbol_table_cls=EmptyTable):
     """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
     goals = goals or dict()
     tasks = tasks or []
