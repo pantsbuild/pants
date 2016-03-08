@@ -9,7 +9,6 @@ import os
 import unittest
 from os.path import join
 
-from pants.engine.exp.engine import LocalSerialEngine
 from pants.engine.exp.fs import Path, PathDirWildcard, PathGlobs, PathLiteral, PathWildcard
 from pants.engine.exp.nodes import Return
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
