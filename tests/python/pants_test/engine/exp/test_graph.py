@@ -8,20 +8,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
                                           addressable_list)
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import ResolvedTypeMismatchError, create_graph_tasks
 from pants.engine.exp.mapper import AddressMapper, ResolveError
 from pants.engine.exp.nodes import Noop, Return, Throw
 from pants.engine.exp.parsers import (JsonParser, PythonAssignmentsParser, PythonCallbacksParser,
                                       SymbolTable)
-from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct, StructWithDeps
+from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
 
 class Target(Struct, HasStructs):
@@ -87,29 +85,25 @@ class TestTable(SymbolTable):
             'Target': Target}
 
 
-class GraphTestBase(unittest.TestCase):
+class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   _product = Struct
-  _build_root = os.path.dirname(__file__)
 
   def create(self, build_pattern=None, parser_cls=None, inline=False):
     symbol_table_cls = TestTable
 
-    subjects = Storage.create(in_memory=True)
-    project_tree_key = subjects.put(
-        FileSystemProjectTree(self._build_root))
-    address_mapper_key = subjects.put(
+    storage = Storage.create(in_memory=True)
+    address_mapper_key = storage.put(
         AddressMapper(symbol_table_cls=symbol_table_cls,
                       build_pattern=build_pattern,
                       parser_cls=parser_cls))
 
-    tasks = (
-        create_fs_tasks(project_tree_key) +
-        create_graph_tasks(address_mapper_key, symbol_table_cls)
-      )
-    return LocalScheduler(dict(),
-                          tasks,
-                          subjects,
-                          symbol_table_cls)
+    tasks = create_graph_tasks(address_mapper_key, symbol_table_cls)
+    build_root_src = os.path.join(os.path.dirname(__file__), 'examples')
+    scheduler, build_root = self.mk_scheduler(tasks=tasks,
+                                              storage=storage,
+                                              build_root_src=build_root_src,
+                                              symbol_table_cls=symbol_table_cls)
+    return scheduler
 
   def create_json(self):
     return self.create(build_pattern=r'.+\.BUILD.json$', parser_cls=JsonParser)
@@ -144,7 +138,7 @@ class InlinedGraphTest(GraphTestBase):
 
   def do_test_codegen_simple(self, scheduler):
     def address(name):
-      return Address(spec_path='examples/graph_test', target_name=name)
+      return Address(spec_path='graph_test', target_name=name)
 
     resolved_java1 = self.resolve(scheduler, address('java1'))
 
@@ -190,12 +184,12 @@ class InlinedGraphTest(GraphTestBase):
   def test_resolve_cache(self):
     scheduler = self.create_json()
 
-    nonstrict_address = Address.parse('examples/graph_test:nonstrict')
+    nonstrict_address = Address.parse('graph_test:nonstrict')
     nonstrict = self.resolve(scheduler, nonstrict_address)
     self.assertIs(nonstrict, self.resolve(scheduler, nonstrict_address))
 
     # The already resolved `nonstrict` interior node should be re-used by `java1`.
-    java1_address = Address.parse('examples/graph_test:java1')
+    java1_address = Address.parse('graph_test:java1')
     java1 = self.resolve(scheduler, java1_address)
     self.assertIs(nonstrict, java1.configurations[1])
 
@@ -211,22 +205,22 @@ class InlinedGraphTest(GraphTestBase):
     self.assertTrue(any('cycle' in state.msg for _, state in walk if type(state) is Noop))
 
   def test_cycle_self(self):
-    self.do_test_cycle(self.create_json(), 'examples/graph_test:self_cycle')
+    self.do_test_cycle(self.create_json(), 'graph_test:self_cycle')
 
   def test_cycle_direct(self):
-    self.do_test_cycle(self.create_json(), 'examples/graph_test:direct_cycle')
+    self.do_test_cycle(self.create_json(), 'graph_test:direct_cycle')
 
   def test_cycle_indirect(self):
-    self.do_test_cycle(self.create_json(), 'examples/graph_test:indirect_cycle')
+    self.do_test_cycle(self.create_json(), 'graph_test:indirect_cycle')
 
   def test_type_mismatch_error(self):
     scheduler = self.create_json()
-    mismatch = Address.parse('examples/graph_test:type_mismatch')
+    mismatch = Address.parse('graph_test:type_mismatch')
     self.assertEquals(type(self.resolve_failure(scheduler, mismatch)), ResolvedTypeMismatchError)
 
   def test_not_found_but_family_exists(self):
     scheduler = self.create_json()
-    dne = Address.parse('examples/graph_test:this_addressable_does_not_exist')
+    dne = Address.parse('graph_test:this_addressable_does_not_exist')
     self.assertEquals(type(self.resolve_failure(scheduler, dne)), ResolveError)
 
   def test_not_found_and_family_does_not_exist(self):
@@ -238,7 +232,7 @@ class InlinedGraphTest(GraphTestBase):
 class LazyResolvingGraphTest(GraphTestBase):
   def do_test_codegen_simple(self, scheduler):
     def address(name):
-      return Address(spec_path='examples/graph_test', target_name=name)
+      return Address(spec_path='graph_test', target_name=name)
 
     java1_address = address('java1')
     resolved_java1 = self.resolve(scheduler, java1_address)

@@ -6,29 +6,26 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
 import pytest
 
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.fs import create_fs_tasks
 from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
 from pants.engine.exp.nodes import Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
-from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct
-from pants.util.dirutil import safe_mkdtemp, safe_open, safe_rmtree
+from pants.util.dirutil import safe_open
+from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
 
 class Target(Struct, HasStructs):
@@ -158,32 +155,23 @@ class TargetTable(SymbolTable):
     return {'struct': Struct, 'target': Target}
 
 
-class AddressMapperTest(unittest.TestCase):
+class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
-    self.work_dir = safe_mkdtemp()
-    self.addCleanup(safe_rmtree, self.work_dir)
-    self.build_root = os.path.join(self.work_dir, 'build_root')
-    shutil.copytree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'),
-                    self.build_root)
-
-    self._goal = 'list'
+    # Set up a scheduler that supports address mapping.
     symbol_table_cls = TargetTable
-
-    subjects = Storage.create(in_memory=True)
-    project_tree_key = subjects.put(
-        FileSystemProjectTree(self.build_root))
-    address_mapper_key = subjects.put(
+    storage = Storage.create(in_memory=True)
+    address_mapper_key = storage.put(
         AddressMapper(symbol_table_cls=symbol_table_cls,
                       parser_cls=JsonParser,
                       build_pattern=r'.+\.BUILD.json$'))
-    tasks = (
-        create_fs_tasks(project_tree_key) +
-        create_graph_tasks(address_mapper_key, symbol_table_cls)
-      )
-    self.scheduler = LocalScheduler({self._goal: UnhydratedStruct},
-                                    tasks,
-                                    subjects,
-                                    symbol_table_cls)
+    tasks = create_graph_tasks(address_mapper_key, symbol_table_cls)
+
+    build_root_src = os.path.join(os.path.dirname(__file__), 'examples/mapper_test')
+    self.scheduler, self.build_root = self.mk_scheduler(tasks=tasks,
+                                                        build_root_src=build_root_src,
+                                                        storage=storage,
+                                                        symbol_table_cls=symbol_table_cls)
+
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',
                              dependencies=['//d:e'],
@@ -191,7 +179,7 @@ class AddressMapperTest(unittest.TestCase):
                              type_alias='target')
 
   def resolve(self, spec):
-    request = self.scheduler.build_request(goals=[self._goal], subjects=[spec])
+    request = self.scheduler.execution_request(products=[UnhydratedStruct], subjects=[spec])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:
       raise result.error
