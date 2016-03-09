@@ -35,6 +35,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
   compile.java task can override those options in scope `cache.compile.java`.
 
   Subsystems may depend on other subsystems, and therefore mix in SubsystemClientMixin.
+
+  :API: public
   """
   options_scope_category = ScopeInfo.SUBSYSTEM
 
@@ -173,5 +175,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return self._scope
 
   def get_options(self):
-    """Returns the option values for this subsystem's scope."""
+    """Returns the option values for this subsystem's scope.
+
+    :API: public
+    """
     return self._scoped_options
