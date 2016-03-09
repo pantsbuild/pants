@@ -123,8 +123,6 @@ python_library(
     ':mapper',
     ':selectors',
     ':struct',
-    'src/python/pants/engine/exp/legacy:graph',
-    'src/python/pants/engine/exp/legacy:parser',
   ]
 )
 

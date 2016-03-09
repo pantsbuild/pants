@@ -45,6 +45,16 @@ python_library(
   ],
 )
 
+python_library(
+  name='register',
+  sources=['register.py'],
+  dependencies=[
+    ':graph',
+    ':parser',
+    'src/python/pants/engine/exp:selectors',
+  ]
+)
+
 python_binary(
   name='dependencies',
   entry_point='pants.engine.exp.legacy.commands:dependencies',

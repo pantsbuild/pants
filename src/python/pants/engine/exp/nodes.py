@@ -334,11 +334,11 @@ class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func
 class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'variants']), Node):
   """A native node type for filesystem operations."""
 
-  _NATIVE_FS_PRODUCT_TYPES = {Paths, FilesContent, DirectoryListing}
+  _FS_PRODUCT_TYPES = {Paths, FilesContent, DirectoryListing}
 
   @classmethod
-  def is_native(cls, product):
-    return product in cls._NATIVE_FS_PRODUCT_TYPES
+  def is_filesystem_product(cls, product):
+    return product in cls._FS_PRODUCT_TYPES
 
   def step(self, subject, dependency_states, step_context):
     try:
@@ -351,8 +351,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'vari
     except Exception as e:
       return Throw(e)
 
-    return Noop('couldnt resolve product {} for subject {} in a FilesystemNode'
-                .format(self.product, subject))
+    return Noop("Couldn't resolve product {} for subject {}".format(self.product, subject))
 
 
 class StepContext(object):

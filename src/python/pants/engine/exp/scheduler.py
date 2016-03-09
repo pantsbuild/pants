@@ -262,7 +262,7 @@ class NodeBuilder(Closable):
 
   def gen_nodes(self, subject_key, product, variants):
     # Native filesystem operations.
-    if FilesystemNode.is_native(product):
+    if FilesystemNode.is_filesystem_product(product):
       yield FilesystemNode(subject_key, product, variants)
 
     # Tasks.

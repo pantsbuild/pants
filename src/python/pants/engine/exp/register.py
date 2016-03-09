@@ -15,8 +15,6 @@ from pants.engine.exp.graph import (BuildFilePaths, UnhydratedStruct, address_fr
                                     addresses_from_address_families, addresses_from_address_family,
                                     filter_buildfile_paths, hydrate_struct, identity,
                                     parse_address_family, resolve_unhydrated_struct)
-from pants.engine.exp.legacy.graph import LegacyBuildGraphNode, reify_legacy_graph
-from pants.engine.exp.legacy.parser import TargetAdaptor
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
 from pants.engine.exp.struct import Struct
@@ -45,18 +43,6 @@ def create_fs_tasks():
      [SelectProjection(DirectoryListing, Path, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
      filter_dir_listing),
-  ]
-
-
-def create_legacy_graph_tasks():
-  """Create tasks to recursively parse the legacy graph."""
-  return [
-    # Recursively requests LegacyGraphNodes for TargetAdaptors, which will result in a
-    # transitive graph walk.
-    (LegacyBuildGraphNode,
-     [Select(TargetAdaptor),
-      SelectDependencies(LegacyBuildGraphNode, TargetAdaptor)],
-     reify_legacy_graph)
   ]
 
 
