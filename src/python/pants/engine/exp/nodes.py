@@ -164,7 +164,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
 
     # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
-    dependencies = list(step_context.task_nodes(self.subject_key, self.product, variants))
+    dependencies = list(step_context.gen_nodes(self.subject_key, self.product, variants))
     matches = {}
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
@@ -334,11 +334,11 @@ class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func
 class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'variants']), Node):
   """A native node type for filesystem operations."""
 
-  NATIVE_FS_PRODUCT_TYPES = {Paths, FilesContent, DirectoryListing}
+  _NATIVE_FS_PRODUCT_TYPES = {Paths, FilesContent, DirectoryListing}
 
   @classmethod
   def is_native(cls, product):
-    return product in cls.NATIVE_FS_PRODUCT_TYPES
+    return product in cls._NATIVE_FS_PRODUCT_TYPES
 
   def step(self, subject, dependency_states, step_context):
     try:
@@ -370,10 +370,6 @@ class StepContext(object):
     """Introduces a potentially new Subject, and returns a subject Key."""
     return self._subjects.put(subject)
 
-  def task_nodes(self, subject_key, product, variants):
-    """Yields task Node instances which might be able to provide a value for the given inputs."""
-    if FilesystemNode.is_native(product):
-      yield FilesystemNode(subject_key, product, variants)
-
-    for task_node in self._node_builder.task_nodes(subject_key, product, variants):
-      yield task_node
+  def gen_nodes(self, subject_key, product, variants):
+    """Yields Node instances which might be able to provide a value for the given inputs."""
+    return self._node_builder.gen_nodes(subject_key, product, variants)

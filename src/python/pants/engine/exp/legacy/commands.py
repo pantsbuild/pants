@@ -44,11 +44,11 @@ def setup():
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
 
   subjects = Storage.create(debug=False)
+  project_tree = FileSystemProjectTree(build_root)
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  project_tree_key = subjects.put(FileSystemProjectTree(build_root))
   address_mapper_key = subjects.put(AddressMapper(symbol_table_cls=symbol_table_cls,
                                                   parser_cls=LegacyPythonCallbacksParser))
 
@@ -61,7 +61,7 @@ def setup():
   )
 
   return (
-    LocalScheduler(dict(), tasks, subjects, symbol_table_cls, project_tree_key),
+    LocalScheduler(dict(), tasks, subjects, symbol_table_cls, project_tree),
     spec_roots,
     symbol_table_cls
   )

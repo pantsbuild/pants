@@ -48,13 +48,9 @@ class SchedulerTestBase(object):
     else:
       os.mkdir(build_root)
 
-    project_tree_key = storage.put(FileSystemProjectTree(build_root))
     tasks = list(tasks) + create_fs_tasks()
-    scheduler = LocalScheduler(goals,
-                               tasks,
-                               storage,
-                               symbol_table_cls,
-                               project_tree_key)
+    project_tree = FileSystemProjectTree(build_root)
+    scheduler = LocalScheduler(goals, tasks, storage, symbol_table_cls, project_tree)
     return scheduler, build_root
 
   def execute(self, scheduler, product, *subjects):

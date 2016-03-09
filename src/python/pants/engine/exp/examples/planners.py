@@ -413,7 +413,6 @@ def setup_json_scheduler(build_root, debug=True):
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  project_tree_key = subjects.put(FileSystemProjectTree(build_root))
   address_mapper_key = subjects.put(AddressMapper(symbol_table_cls=symbol_table_cls,
                                                   build_pattern=r'^BLD.json$',
                                                   parser_cls=JsonParser))
@@ -506,5 +505,5 @@ def setup_json_scheduler(build_root, debug=True):
       create_fs_tasks()
     )
 
-  scheduler = LocalScheduler(goals, tasks, subjects, symbol_table_cls, project_tree_key)
-  return scheduler
+  project_tree = FileSystemProjectTree(build_root)
+  return LocalScheduler(goals, tasks, subjects, symbol_table_cls, project_tree)
