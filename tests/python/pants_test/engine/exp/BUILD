@@ -11,6 +11,17 @@ python_tests(
 
 
 python_tests(
+  name='fs',
+  sources=['test_fs.py'],
+  dependencies=[
+    ':scheduler_test_base',
+    'src/python/pants/engine/exp:fs',
+    'src/python/pants/engine/exp:nodes',
+  ]
+)
+
+
+python_tests(
   name='struct',
   sources=['test_struct.py'],
   dependencies=[

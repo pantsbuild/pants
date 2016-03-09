@@ -45,6 +45,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:project_tree',
     'src/python/pants/source',
+    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ]
 )
