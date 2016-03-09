@@ -50,12 +50,14 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:generator',
     'src/python/pants/base:revision',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
     'src/python/pants/java:util',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:fileutil',
   ],
 )
 
