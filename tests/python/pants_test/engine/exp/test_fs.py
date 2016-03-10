@@ -9,7 +9,7 @@ import os
 import unittest
 from os.path import join
 
-from pants.engine.exp.fs import (FilesContent, Path, PathDirWildcard, PathGlobs, PathLiteral,
+from pants.engine.exp.fs import (FileContent, Path, PathDirWildcard, PathGlobs, PathLiteral,
                                  PathWildcard)
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
@@ -31,9 +31,11 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
 
   def assert_content(self, filespecs, expected_content):
     scheduler, _ = self.mk_scheduler(build_root_src=self._build_root_src)
-    result = self.execute(scheduler, FilesContent, self.specs('', *filespecs))[0]
-    self.assertEquals(type(result), FilesContent)
-    actual_content = {f.path: f.content for f in result.dependencies}
+    result = self.execute(scheduler, FileContent, self.specs('', *filespecs))[0]
+    def validate(e):
+      self.assertEquals(type(e), FileContent)
+      return True
+    actual_content = {f.path: f.content for f in result if validate(f)}
     self.assertEquals(expected_content, actual_content)
 
   def assert_pg_equals(self, pathglobs, relative_to, filespecs):
@@ -92,4 +94,4 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
     self.assert_walk(['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/b/2'])
 
   def test_files_content_literal(self):
-    self.assert_content(['4.txt'], {'4.txt', 'four'})
+    self.assert_content(['4.txt'], {'4.txt': 'four\n'})

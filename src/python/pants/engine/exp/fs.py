@@ -243,14 +243,16 @@ def file_exists(project_tree, path_literal):
   return Paths((Path(path),) if project_tree.isfile(path) else ())
 
 
-def files_content(project_tree, paths):
-  contents = []
-  for path in paths.dependencies:
-    try:
-      contents.append(FileContent(path.path, project_tree.content(path.path)))
-    except (IOError, OSError) as e:
-      if e.errno == errno.ENOENT:
-        contents.append(FileContent(path.path, None))
-      else:
-        raise e
-  return FilesContent(contents)
+def files_content(file_contents):
+  """Given a list of FileContent objects, return a FilesContent object."""
+  return FilesContent(file_contents)
+
+
+def file_content(project_tree, path):
+  try:
+    return FileContent(path.path, project_tree.content(path.path))
+  except (IOError, OSError) as e:
+    if e.errno == errno.ENOENT:
+      return FileContent(path.path, None)
+    else:
+      raise e

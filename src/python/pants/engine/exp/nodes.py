@@ -9,8 +9,8 @@ from abc import abstractmethod, abstractproperty
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
-from pants.engine.exp.fs import (DirectoryListing, FilesContent, Path, PathLiteral, Paths,
-                                 file_exists, files_content, list_directory)
+from pants.engine.exp.fs import (DirectoryListing, FileContent, Path, PathLiteral, Paths,
+                                 file_content, file_exists, list_directory)
 from pants.engine.exp.storage import Key
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.objects import datatype
@@ -336,7 +336,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'vari
 
   _FS_PRODUCT_TYPES = {
       Paths: PathLiteral,
-      FilesContent: Paths,
+      FileContent: Path,
       DirectoryListing: Path,
     }
 
@@ -366,11 +366,11 @@ class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'vari
     # If an input product was available, execute.
     input_value = input_state.value
     try:
-      if type(input_value) is PathLiteral:
+      if self.product is Paths:
         return Return(file_exists(step_context.project_tree, input_value))
-      elif type(input_value) is Paths:
-        return Return(files_content(step_context.project_tree, input_value))
-      elif type(input_value) is Path:
+      elif self.product is FileContent:
+        return Return(file_content(step_context.project_tree, input_value))
+      elif self.product is DirectoryListing:
         return Return(list_directory(step_context.project_tree, input_value))
       else:
         return Throw('Mismatched input value {} for {}'.format(input_value, self))

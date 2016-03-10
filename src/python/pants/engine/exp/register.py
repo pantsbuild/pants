@@ -8,9 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
-from pants.engine.exp.fs import (DirectoryListing, FilesContent, Path, PathDirWildcard, PathGlobs,
-                                 Paths, PathWildcard, RecursiveSubDirectories, filter_dir_listing,
-                                 filter_file_listing, merge_paths, recursive_subdirectories)
+from pants.engine.exp.fs import (DirectoryListing, FileContent, FilesContent, Path, PathDirWildcard,
+                                 PathGlobs, Paths, PathWildcard, RecursiveSubDirectories,
+                                 files_content, filter_dir_listing, filter_file_listing,
+                                 merge_paths, recursive_subdirectories)
 from pants.engine.exp.graph import (BuildFilePaths, UnhydratedStruct, address_from_address_family,
                                     addresses_from_address_families, addresses_from_address_family,
                                     filter_buildfile_paths, hydrate_struct, identity,
@@ -25,13 +26,10 @@ from pants.engine.exp.struct import Struct
 def create_fs_tasks():
   """Creates tasks that consume the native filesystem Node type."""
   return [
-    # Unfiltered requests for subdirectories.
     (RecursiveSubDirectories,
      [Select(Path),
       SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
      recursive_subdirectories),
-  ] + [
-    # Support for globs.
     (Paths,
      [SelectDependencies(Paths, PathGlobs)],
      merge_paths),
@@ -43,6 +41,9 @@ def create_fs_tasks():
      [SelectProjection(DirectoryListing, Path, ('directory',), PathDirWildcard),
       Select(PathDirWildcard)],
      filter_dir_listing),
+    (FilesContent,
+     [SelectDependencies(FileContent, Paths)],
+     files_content),
   ]
 
 
