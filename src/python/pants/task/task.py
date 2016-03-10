@@ -64,7 +64,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     :API: public
     """
-    return [('TaskBase', 1)]
+    return [('TaskBase', 2)]
 
   @classmethod
   @memoized_method
@@ -439,13 +439,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # workdir_max_build_entries has been assured of not None before invoking this method.
     max_entries_per_target = max(2, self.context.options.for_global_scope().workdir_max_build_entries)
     for vt in vts:
-      if vt.has_results_dir:
-        if vt.has_previous_results_dir:
-          excludes = [vt.results_dir, vt.previous_results_dir]
-        else:
-          excludes = [vt.results_dir]
-        root_dir = os.path.dirname(vt.results_dir)
-        safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes)
+      live_dirs = list(vt.live_dirs())
+      if not live_dirs:
+        continue
+      root_dir = os.path.dirname(vt.results_dir)
+      safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes=live_dirs)
 
   def _should_cache(self, vt):
     """Return true if the given vt should be written to a cache (if configured)."""
