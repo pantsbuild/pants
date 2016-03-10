@@ -13,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.watchman import Watchman
-from pants.util.memo import memoized_property
 
 
 class FSEventService(PantsService):

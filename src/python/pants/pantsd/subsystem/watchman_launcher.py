@@ -11,7 +11,7 @@ import time
 from pants.binaries.binary_util import BinaryUtil
 from pants.pantsd.watchman import Watchman
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_property
+from pants.util.memo import mutable_memoized_property
 
 
 class WatchmanLauncher(object):
@@ -58,7 +58,7 @@ class WatchmanLauncher(object):
     self._logger = logging.getLogger(__name__)
     self._watchman = None
 
-  @memoized_property
+  @mutable_memoized_property
   def watchman(self):
     watchman_binary = self._binary_util.select_binary(self._watchman_supportdir,
                                                       self._watchman_version,
@@ -67,7 +67,7 @@ class WatchmanLauncher(object):
 
   def maybe_launch(self):
     if not self.watchman.is_alive():
-      self._logger.info('launching watchman at {path}'.format(path=self.watchman.watchman_path))
+      self._logger.info('launching watchman')
       try:
         self.watchman.launch()
       except (self.watchman.ExecutionError, self.watchman.InvalidCommandOutput) as e:
