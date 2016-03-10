@@ -16,12 +16,13 @@ from pants.base.specs import DescendantAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.graph import UnhydratedStruct, create_graph_tasks
+from pants.engine.exp.graph import UnhydratedStruct
 from pants.engine.exp.mapper import (AddressFamily, AddressMap, AddressMapper,
                                      DifferingFamiliesError, DuplicateNameError, ResolveError,
                                      UnaddressableObjectError)
 from pants.engine.exp.nodes import Throw
 from pants.engine.exp.parsers import JsonParser, SymbolTable
+from pants.engine.exp.register import create_graph_tasks
 from pants.engine.exp.storage import Storage
 from pants.engine.exp.struct import HasStructs, Struct
 from pants.util.dirutil import safe_open

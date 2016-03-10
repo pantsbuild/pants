@@ -12,8 +12,8 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
 from pants.engine.exp.fs import PathGlobs, Paths
-from pants.engine.exp.nodes import (DependenciesNode, Node, Noop, Return, SelectNode, StepContext,
-                                    TaskNode, Throw, Waiting)
+from pants.engine.exp.nodes import (DependenciesNode, FilesystemNode, Node, Noop, Return,
+                                    SelectNode, State, StepContext, TaskNode, Throw, Waiting)
 from pants.engine.exp.objects import Closable
 from pants.util.objects import datatype
 
@@ -260,13 +260,17 @@ class NodeBuilder(Closable):
   def __init__(self, tasks):
     self._tasks = tasks
 
-  def task_nodes(self, subject, product, variants):
+  def gen_nodes(self, subject_key, product, variants):
+    # Native filesystem operations.
+    if FilesystemNode.is_filesystem_product(product):
+      yield FilesystemNode(subject_key, product, variants)
+
     # Tasks.
     for task, anded_clause in self._tasks[product]:
-      yield TaskNode(subject, product, variants, task, anded_clause)
+      yield TaskNode(subject_key, product, variants, task, anded_clause)
 
 
-class StepRequest(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'])):
+class StepRequest(datatype('Step', ['step_id', 'node', 'subject', 'dependencies', 'project_tree'])):
   """Additional inputs needed to run Node.step for the given Node.
 
   TODO: See docs on StepResult.
@@ -275,11 +279,12 @@ class StepRequest(datatype('Step', ['step_id', 'node', 'subject', 'dependencies'
   :param node: The Node instance that will run.
   :param subject: The Subject referred to by Node.subject_key.
   :param dependencies: The declared dependencies of the Node from previous Waiting steps.
+  :param project_tree: A FileSystemProjectTree instance.
   """
 
   def __call__(self, node_builder, subjects):
     """Called by the Engine in order to execute this Step."""
-    step_context = StepContext(node_builder, subjects)
+    step_context = StepContext(node_builder, subjects, self.project_tree)
     result = self.node.step(self.subject, self.dependencies, step_context)
     return StepResult(result)
 
@@ -403,7 +408,7 @@ class GraphValidator(object):
 class LocalScheduler(object):
   """A scheduler that expands a ProductGraph by executing user defined tasks."""
 
-  def __init__(self, goals, tasks, subjects, symbol_table_cls):
+  def __init__(self, goals, tasks, subjects, symbol_table_cls, project_tree):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
@@ -411,10 +416,12 @@ class LocalScheduler(object):
            is used to compute values in the product graph.
     :param subjects: A Subjects instance that will be used to store/retrieve subjects. Should
            already contain any "literal" subject values that the given tasks require.
+    :param project_tree: An instance of ProjectTree for the current build root.
     """
     self._products_by_goal = goals
     self._tasks = tasks
     self._subjects = subjects
+    self._project_tree = project_tree
     self._node_builder = NodeBuilder.create(self._tasks)
 
     self._graph_validator = GraphValidator(symbol_table_cls)
@@ -442,7 +449,7 @@ class LocalScheduler(object):
     # Ready.
     subject = self._subjects.get(node.subject_key)
     self._step_id += 1
-    return (StepRequest(self._step_id, node, subject, deps), Promise())
+    return (StepRequest(self._step_id, node, subject, deps, self._project_tree), Promise())
 
   def node_builder(self):
     """Return the NodeBuilder instance for this Scheduler.

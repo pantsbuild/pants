@@ -82,14 +82,16 @@ def create_digraph(scheduler, request):
 
 
 def visualize_execution_graph(scheduler, request):
-  with temporary_file() as fp:
+  with temporary_file(cleanup=False, suffix='.dot') as fp:
     for line in create_digraph(scheduler, request):
       fp.write(line)
       fp.write('\n')
-    fp.close()
-    with temporary_file_path(cleanup=False, suffix='.svg') as image_file:
-      subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, fp.name), shell=True)
-      binary_util.ui_open(image_file)
+
+  print('dot file saved to: {}'.format(fp.name))
+  with temporary_file_path(cleanup=False, suffix='.svg') as image_file:
+    subprocess.check_call('dot -Tsvg -o{} {}'.format(image_file, fp.name), shell=True)
+    print('svg file saved to: {}'.format(image_file))
+    binary_util.ui_open(image_file)
 
 
 def visualize_build_request(build_root, goals, subjects):

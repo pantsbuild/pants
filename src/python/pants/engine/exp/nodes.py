@@ -9,6 +9,8 @@ from abc import abstractmethod, abstractproperty
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
+from pants.engine.exp.fs import (DirectoryListing, FilesContent, Path, PathLiteral, Paths,
+                                 file_exists, files_content, list_directory)
 from pants.engine.exp.storage import Key
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.objects import datatype
@@ -36,17 +38,14 @@ class State(object):
 
 class Noop(datatype('Noop', ['msg']), State):
   """Indicates that a Node did not have the inputs which would be needed for it to execute."""
-  pass
 
 
 class Return(datatype('Return', ['value']), State):
   """Indicates that a Node successfully returned a value."""
-  pass
 
 
 class Throw(datatype('Throw', ['exc']), State):
   """Indicates that a Node should have been able to return a value, but failed."""
-  pass
 
 
 class Waiting(datatype('Waiting', ['dependencies']), State):
@@ -55,7 +54,6 @@ class Waiting(datatype('Waiting', ['dependencies']), State):
   Some Nodes will return different dependency Nodes based on where they are in their lifecycle,
   but all returned dependencies are recorded for the lifetime of a ProductGraph.
   """
-  pass
 
 
 class Node(object):
@@ -166,7 +164,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
 
     # Else, attempt to use a configured task to compute the value.
     has_waiting_dep = False
-    dependencies = list(step_context.task_nodes(self.subject_key, self.product, variants))
+    dependencies = list(step_context.gen_nodes(self.subject_key, self.product, variants))
     matches = {}
     for dep in dependencies:
       dep_state = dependency_states.get(dep, None)
@@ -333,20 +331,44 @@ class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func
       return Throw(e)
 
 
+class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'variants']), Node):
+  """A native node type for filesystem operations."""
+
+  _FS_PRODUCT_TYPES = {Paths, FilesContent, DirectoryListing}
+
+  @classmethod
+  def is_filesystem_product(cls, product):
+    return product in cls._FS_PRODUCT_TYPES
+
+  def step(self, subject, dependency_states, step_context):
+    try:
+      if self.product is Paths and type(subject) is PathLiteral:
+        return Return(file_exists(step_context.project_tree, subject))
+      elif self.product is FilesContent and type(subject) is Paths:
+        return Return(files_content(step_context.project_tree, subject))
+      elif self.product is DirectoryListing and type(subject) is Path:
+        return Return(list_directory(step_context.project_tree, subject))
+    except Exception as e:
+      return Throw(e)
+
+    return Noop("Couldn't resolve product {} for subject {}".format(self.product, subject))
+
+
 class StepContext(object):
   """Encapsulates external state and the details of creating Nodes.
 
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, node_builder, subjects):
+  def __init__(self, node_builder, subjects, project_tree):
     self._node_builder = node_builder
     self._subjects = subjects
+    self.project_tree = project_tree
 
   def introduce_subject(self, subject):
     """Introduces a potentially new Subject, and returns a subject Key."""
     return self._subjects.put(subject)
 
-  def task_nodes(self, subject_key, product, variants):
-    """Yields task Node instances which might be able to provide a value for the given inputs."""
-    return self._node_builder.task_nodes(subject_key, product, variants)
+  def gen_nodes(self, subject_key, product, variants):
+    """Yields Node instances which might be able to provide a value for the given inputs."""
+    return self._node_builder.gen_nodes(subject_key, product, variants)

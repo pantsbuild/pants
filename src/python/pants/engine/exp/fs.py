@@ -12,9 +12,7 @@ from os.path import join, normpath
 
 from twitter.common.collections.orderedset import OrderedSet
 
-from pants.base.project_tree import ProjectTree
-from pants.engine.exp.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
-from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs, globs_matches
+from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -187,7 +185,7 @@ def list_directory(project_tree, directory):
   Currently ignores `.`-prefixed subdirectories, but should likely use `--ignore-patterns`.
     TODO: See https://github.com/pantsbuild/pants/issues/2956
 
-  Raises an exception if the path does not exist, or is not a directoy.
+  Raises an exception if the path does not exist, or is not a directory.
   """
   try:
     _, subdirs, subfiles = next(project_tree.walk(directory.path))
@@ -256,46 +254,3 @@ def files_content(project_tree, paths):
       else:
         raise e
   return FilesContent(contents)
-
-
-def create_fs_tasks(project_tree_key):
-  """Creates tasks that consume the filesystem.
-
-  Many of these tasks are considered "native", and should have their outputs re-validated
-  for every build. TODO: They should likely get their own ProductGraph.Node type
-  for efficiency/invalidation.
-  """
-  return [
-    # Unfiltered requests for subdirectories.
-    (RecursiveSubDirectories,
-      [Select(Path),
-       SelectDependencies(RecursiveSubDirectories, DirectoryListing, field='directories')],
-      recursive_subdirectories),
-  ] + [
-    # Support for globs.
-    (Paths,
-      [SelectDependencies(Paths, PathGlobs)],
-      merge_paths),
-    (Paths,
-      [SelectProjection(DirectoryListing, Path, ('directory',), PathWildcard),
-       Select(PathWildcard)],
-      filter_file_listing),
-    (PathGlobs,
-      [SelectProjection(DirectoryListing, Path, ('directory',), PathDirWildcard),
-       Select(PathDirWildcard)],
-      filter_dir_listing),
-  ] + [
-    # "Native" operations.
-    (Paths,
-      [SelectLiteral(project_tree_key, ProjectTree),
-       Select(PathLiteral)],
-      file_exists),
-    (FilesContent,
-      [SelectLiteral(project_tree_key, ProjectTree),
-       Select(Paths)],
-      files_content),
-    (DirectoryListing,
-      [SelectLiteral(project_tree_key, ProjectTree),
-       Select(Path)],
-      list_directory),
-  ]

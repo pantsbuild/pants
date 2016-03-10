@@ -12,12 +12,12 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.bin.goal_runner import OptionsInitializer
 from pants.engine.exp.engine import LocalSerialEngine
-from pants.engine.exp.fs import create_fs_tasks
-from pants.engine.exp.graph import create_graph_tasks
-from pants.engine.exp.legacy.graph import ExpGraph, create_legacy_graph_tasks
+from pants.engine.exp.legacy.graph import ExpGraph
 from pants.engine.exp.legacy.parser import LegacyPythonCallbacksParser, TargetAdaptor
+from pants.engine.exp.legacy.register import create_legacy_graph_tasks
 from pants.engine.exp.mapper import AddressMapper
 from pants.engine.exp.parsers import SymbolTable
+from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
 from pants.engine.exp.scheduler import LocalScheduler
 from pants.engine.exp.storage import Storage
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -45,11 +45,11 @@ def setup():
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
 
   subjects = Storage.create(debug=False)
+  project_tree = FileSystemProjectTree(build_root)
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  project_tree_key = subjects.put(FileSystemProjectTree(build_root))
   address_mapper_key = subjects.put(AddressMapper(symbol_table_cls=symbol_table_cls,
                                                   parser_cls=LegacyPythonCallbacksParser))
 
@@ -57,12 +57,12 @@ def setup():
   # will explicitly request the products it needs.
   tasks = (
     create_legacy_graph_tasks() +
-    create_fs_tasks(project_tree_key) +
+    create_fs_tasks() +
     create_graph_tasks(address_mapper_key, symbol_table_cls)
   )
 
   return (
-    LocalScheduler(dict(), tasks, subjects, symbol_table_cls),
+    LocalScheduler(dict(), tasks, subjects, symbol_table_cls, project_tree),
     spec_roots,
     symbol_table_cls
   )
