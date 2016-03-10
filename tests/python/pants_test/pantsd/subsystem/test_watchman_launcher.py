@@ -9,7 +9,7 @@ from contextlib import contextmanager
 
 import mock
 
-from pants.pantsd.subsystem.watchman_launcher import BinaryUtil, WatchmanLauncher
+from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 from pants.pantsd.watchman import Watchman
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import subsystem_instance
