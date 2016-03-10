@@ -10,6 +10,7 @@ import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.exp.engine import LocalSerialEngine
+from pants.engine.exp.nodes import Return
 from pants.engine.exp.parsers import SymbolTable
 from pants.engine.exp.register import create_fs_tasks
 from pants.engine.exp.scheduler import LocalScheduler
@@ -53,10 +54,18 @@ class SchedulerTestBase(object):
     scheduler = LocalScheduler(goals, tasks, storage, symbol_table_cls, project_tree)
     return scheduler, build_root
 
-  def execute(self, scheduler, product, *subjects):
+  def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
     request = scheduler.execution_request(products=[product], subjects=subjects)
     res = LocalSerialEngine(scheduler).execute(request)
     if res.error:
       raise res.error
     return request
+
+  def execute(self, scheduler, product, *subjects):
+    """Runs an ExecutionRequest for the given product and subjects, and returns the result value."""
+    request = self.execute_request(scheduler, product, *subjects)
+    states = scheduler.root_entries(request).values()
+    if any(type(state) is not Return for state in states):
+      raise ValueError('At least one request failed: {}'.format(states))
+    return list(state.value for state in states)

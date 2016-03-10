@@ -9,8 +9,8 @@ import os
 import unittest
 from os.path import join
 
-from pants.engine.exp.fs import Path, PathDirWildcard, PathGlobs, PathLiteral, PathWildcard
-from pants.engine.exp.nodes import Return
+from pants.engine.exp.fs import (FilesContent, Path, PathDirWildcard, PathGlobs, PathLiteral,
+                                 PathWildcard)
 from pants_test.engine.exp.scheduler_test_base import SchedulerTestBase
 
 
@@ -26,10 +26,15 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
 
   def assert_walk(self, filespecs, files):
     scheduler, _ = self.mk_scheduler(build_root_src=self._build_root_src)
-    request = self.execute(scheduler, Path, self.specs('', *filespecs))
-    result = scheduler.root_entries(request).values()[0]
-    self.assertEquals(type(result), Return)
-    self.assertEquals(set(files), set([p.path for p in result.value]))
+    result = self.execute(scheduler, Path, self.specs('', *filespecs))[0]
+    self.assertEquals(set(files), set([p.path for p in result]))
+
+  def assert_content(self, filespecs, expected_content):
+    scheduler, _ = self.mk_scheduler(build_root_src=self._build_root_src)
+    result = self.execute(scheduler, FilesContent, self.specs('', *filespecs))[0]
+    self.assertEquals(type(result), FilesContent)
+    actual_content = {f.path: f.content for f in result.dependencies}
+    self.assertEquals(expected_content, actual_content)
 
   def assert_pg_equals(self, pathglobs, relative_to, filespecs):
     self.assertEquals(self.pg(*pathglobs), self.specs(relative_to, *filespecs))
@@ -85,3 +90,6 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
     self.assert_walk(['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
     self.assert_walk(['*.txt', '**/*.txt'], ['a/3.txt', 'a/b/1.txt', '4.txt'])
     self.assert_walk(['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/b/2'])
+
+  def test_files_content_literal(self):
+    self.assert_content(['4.txt'], {'4.txt', 'four'})

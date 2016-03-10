@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-import pytest
-
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
@@ -198,7 +196,6 @@ class SchedulerTest(unittest.TestCase):
                       {ret.value for (node, ret), _ in walk
                        if node.product == Jar and isinstance(node, SelectNode)})
 
-  @pytest.mark.xfail(reason='TODO: see https://github.com/pantsbuild/pants/issues/3024')
   def test_dependency_inference(self):
     """Scala dependency inference introduces dependencies that do not exist in BUILD files."""
     build_request = self.request(['compile'], self.inferred_deps)
