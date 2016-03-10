@@ -31,9 +31,9 @@ class TestWatchman(BaseTest):
 
   def setUp(self):
     BaseTest.setUp(self)
-    with mock.patch.object(Watchman, '_resolve_watchman_path', **self.PATCH_OPTS) as mock_find:
-      mock_find.return_value = self.WATCHMAN_PATH
-      self.watchman = Watchman(self.WORK_DIR)
+    with mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_is_valid:
+      mock_is_valid.return_value = True
+      self.watchman = Watchman('/fake/path/to/watchman', self.WORK_DIR)
 
   def test_client_property(self):
     self.assertIsInstance(self.watchman.client, pywatchman.client)
@@ -48,49 +48,9 @@ class TestWatchman(BaseTest):
   def test_is_valid_executable(self):
     self.assertTrue(self.watchman._is_valid_executable(sys.executable))
 
-  @contextmanager
-  def setup_find_watchman_in_path(self):
-    with mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_valid, \
-         environment_as(PATH='a:b:c'):
-      yield mock_valid
-
-  def test_find_watchman_in_path(self):
-    with self.setup_find_watchman_in_path() as mock_valid:
-      mock_valid.side_effect = [False, False, True]
-      self.assertEquals(self.watchman._find_watchman_in_path(), 'c/watchman')
-      mock_valid.assert_has_calls([
-        mock.call(self.watchman, 'a/{}'.format(self.watchman.process_name)),
-        mock.call(self.watchman, 'b/{}'.format(self.watchman.process_name)),
-        mock.call(self.watchman, 'c/{}'.format(self.watchman.process_name))
-      ])
-
-  def test_find_watchman_in_path_neg(self):
-    with self.setup_find_watchman_in_path() as mock_valid:
-      mock_valid.side_effect = [False, False, False]
-      self.assertIsNone(self.watchman._find_watchman_in_path())
-
   def test_resolve_watchman_path_provided_exception(self):
-    with mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_valid:
-      mock_valid.return_value = False
-      with self.assertRaises(Watchman.ExecutionError):
-        self.watchman._resolve_watchman_path(self.WATCHMAN_PATH)
-
-  def test_resolve_watchman_path_provided(self):
-    with mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_valid:
-      mock_valid.return_value = True
-      self.assertEquals(self.watchman._resolve_watchman_path(self.WATCHMAN_PATH),
-                        self.WATCHMAN_PATH)
-
-  def test_resolve_watchman_path_default_exception(self):
-    with mock.patch.object(Watchman, '_find_watchman_in_path', **self.PATCH_OPTS) as mock_find:
-      mock_find.return_value = None
-      with self.assertRaises(Watchman.ExecutionError):
-        self.watchman._resolve_watchman_path(None)
-
-  def test_resolve_watchman_path_default(self):
-    with mock.patch.object(Watchman, '_find_watchman_in_path', **self.PATCH_OPTS) as mock_find:
-      mock_find.return_value = self.WATCHMAN_PATH
-      self.assertEquals(self.watchman._resolve_watchman_path(None), self.WATCHMAN_PATH)
+    with self.assertRaises(Watchman.ExecutionError):
+      self.watchman = Watchman('/fake/path/to/watchman', self.WORK_DIR)
 
   def test_maybe_init_metadata(self):
     with mock.patch('pants.pantsd.watchman.safe_mkdir', **self.PATCH_OPTS) as mock_mkdir, \
