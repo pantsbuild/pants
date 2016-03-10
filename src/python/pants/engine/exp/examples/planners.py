@@ -15,7 +15,7 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
-from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths
+from pants.engine.exp.fs import FileContent, FilesContent, Path, PathGlobs, Paths
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
@@ -424,9 +424,10 @@ def setup_json_scheduler(build_root, debug=True):
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
       'resolve': Classpath,
       'list': Address,
-      'walk': Path,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
+      'ls': Path,
+      'cat': FileContent,
     }
   tasks = [
       # Codegen
