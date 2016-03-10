@@ -6,9 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 import shutil
 from collections import defaultdict
 
+import requests
 from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -60,6 +62,54 @@ class GoFetch(GoTask):
   def _get_fetcher(self, import_path):
     return Fetchers.global_instance().get_fetcher(import_path)
 
+  @classmethod
+  def _check_for_meta_tag(cls, import_path):
+    """Looks for go-import meta tags for the provided import_path.
+
+    Returns three values. First is the import prefix which designates where the
+    root of the repo should be set up. Next is the version control system that
+    must be used to copy down the repository. Finally is the URL to access the
+    repository.
+
+    If the meta tag is not found in the page's source, None is returned for all
+    three values.
+
+    More info: https://golang.org/cmd/go/#hdr-Remote_import_paths
+    """
+    session = requests.session()
+    # Override default http adapters with a retriable one.
+    retriable_http_adapter = requests.adapters.HTTPAdapter(max_retries=2)
+    session.mount("http://", retriable_http_adapter)
+    session.mount("https://", retriable_http_adapter)
+    try:
+      page_data = session.get('http://{import_path}?go-get=1'.format(import_path=import_path))
+    except requests.ConnectionError as e:
+      return None, None, None
+
+    if not page_data:
+      return None, None, None
+
+    root, vcs, url = cls._find_meta_tag(page_data.text)
+    if root and vcs and url:
+      # Check to make sure returned root is an exact match to the provided import path. If it is
+      # not then run a recursive check on the returned and return the values provided by that call.
+      if root == import_path:
+        return root, vcs, url
+      elif import_path.starts_with(root):
+        return cls._check_for_meta_tag(root)
+
+    return None, None, None
+
+  @classmethod
+  def _find_meta_tag(cls, page_html):
+    """Returns the content of the meta tag if found inside of the provided HTML."""
+
+    meta_import_regex = re.compile(r'<meta\s+name="go-import"\s+content="(?P<root>[^\s]+)\s+(?P<vcs>[^\s]+)\s+(?P<url>[^\s]+)"\s*>')
+    matched = meta_import_regex.search(page_html)
+    if matched:
+      return matched.groups()
+    return None
+
   def _transitive_download_remote_libs(self, go_remote_libs, all_known_addresses=None):
     """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.
 
@@ -93,14 +143,21 @@ class GoFetch(GoTask):
         fetcher = self._get_fetcher(go_remote_lib.import_path)
 
         if not vt.valid:
-          root = fetcher.root(go_remote_lib.import_path)
+          meta_root, meta_protocol, meta_repo_url = self._check_for_meta_tag(go_remote_lib.import_path)
+
+          if meta_root:
+            root = fetcher.root(meta_root)
+          else:
+            root = fetcher.root(go_remote_lib.import_path)
+
           fetch_dir = os.path.join(self.workdir, 'fetches')
           root_dir = os.path.join(fetch_dir, root)
 
           # Only fetch each remote root once.
           if not os.path.exists(root_dir):
             with temporary_dir() as tmp_fetch_root:
-              fetcher.fetch(go_remote_lib.import_path, dest=tmp_fetch_root, rev=go_remote_lib.rev)
+              fetcher.fetch(go_remote_lib.import_path, dest=tmp_fetch_root,
+                            rev=go_remote_lib.rev, meta_repo_url=meta_repo_url)
               safe_mkdir(root_dir)
               for path in os.listdir(tmp_fetch_root):
                 shutil.move(os.path.join(tmp_fetch_root, path), os.path.join(root_dir, path))
