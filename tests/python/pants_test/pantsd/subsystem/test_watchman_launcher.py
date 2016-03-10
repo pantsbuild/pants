@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import mock
 
-from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
+from pants.pantsd.subsystem.watchman_launcher import BinaryUtil, WatchmanLauncher
 from pants.pantsd.watchman import Watchman
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import create_subsystem
@@ -15,14 +15,10 @@ from pants_test.subsystem.subsystem_util import create_subsystem
 
 class TestWatchmanLauncher(BaseTest):
   def setUp(self):
-    BaseTest.setUp(self)
-    self.watchman_launcher = create_subsystem(WatchmanLauncher,
+    super(TestWatchmanLauncher, self).setUp()
+    self.watchman_launcher = create_subsystem(WatchmanLauncher.Factory,
                                               pants_workdir='/pants_workdir',
                                               level='info')
-
-  def test_options_defaults(self):
-    self.assertIsNone(self.watchman_launcher._watchman_path)
-    self.assertEquals(self.watchman_launcher._watchman_log_level, '1')
 
   def create_mock_watchman(self, is_alive):
     mock_watchman = mock.create_autospec(Watchman, spec_set=False)
@@ -60,5 +56,4 @@ class TestWatchmanLauncher(BaseTest):
     mock_watchman.launch.assert_called_once_with()
 
   def test_watchman_property(self):
-    with mock.patch.object(Watchman, '_resolve_watchman_path'):
-      self.assertIsInstance(self.watchman_launcher.watchman, Watchman)
+    self.assertIsInstance(self.watchman_launcher.watchman, Watchman)

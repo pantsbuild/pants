@@ -24,18 +24,18 @@ class Watchman(ProcessManager):
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
-  def __init__(self, work_dir, watchman_path, log_level=1):
+  def __init__(self, watchman_path, work_dir, log_level=1):
     super(Watchman, self).__init__(name='watchman', process_name='watchman', socket_type=str)
-    self._logger = logging.getLogger(__name__)
+    self._watchman_path = self._normalize_watchman_path(watchman_path)
+    self._work_dir = os.path.join(work_dir, self.name)
     self._log_level = log_level
-    self.watchman_path = self._normalize_watchman_path(watchman_path)
 
     # TODO(kwlzn): should these live in .pids or .pants.d? i.e. should watchman survive clean-all?
-    self._work_dir = os.path.join(work_dir, self.name)
     self._state_file = os.path.join(self._work_dir, '{}.state'.format(self.name))
     self._log_file = os.path.join(self._work_dir, '{}.log'.format(self.name))
     self._sock_file = os.path.join(self._work_dir, '{}.sock'.format(self.name))
 
+    self._logger = logging.getLogger(__name__)
     self._watchman_client = None
 
   @property
@@ -86,7 +86,7 @@ class Watchman(ProcessManager):
 
     This is possible due to watchman's built-in async server startup - no double-forking required.
     """
-    cmd = self._construct_cmd((self.watchman_path, 'get-pid'),
+    cmd = self._construct_cmd((self._watchman_path, 'get-pid'),
                               state_file=self._state_file,
                               sock_file=self._sock_file,
                               log_file=self._log_file,
