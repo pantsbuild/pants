@@ -27,7 +27,6 @@ class TestExecutor(object):
 
 
 class TestFSEventService(BaseTest):
-  PATCH_OPTS = dict(autospec=True, spec_set=True)
   BUILD_ROOT = '/build_root'
   EMPTY_EVENT = (None, None)
   FAKE_EVENT = ('test', dict(subscription='test', files=['a/BUILD', 'b/BUILD']))
@@ -35,7 +34,8 @@ class TestFSEventService(BaseTest):
 
   def setUp(self):
     BaseTest.setUp(self)
-    self.service = FSEventService(self.BUILD_ROOT, 1)
+    self.mock_watchman = mock.create_autospec(Watchman, spec_set=True)
+    self.service = FSEventService(self.mock_watchman, self.BUILD_ROOT, 1)
     self.service.setup(TestExecutor())
     self.service.register_all_files_handler(lambda x: True, name='test')
     self.service.register_all_files_handler(lambda x: False, name='test2')
@@ -60,47 +60,35 @@ class TestFSEventService(BaseTest):
 
   @contextmanager
   def mocked_run(self, asserts=True):
-    with mock.patch('pants.pantsd.service.fs_event_service.WatchmanLauncher',
-                    **self.PATCH_OPTS) as mock_watchman_launcher, \
-         mock.patch('pants.pantsd.service.fs_event_service.Watchman',
-                    **self.PATCH_OPTS) as mock_watchman:
-      mock_watchman_launcher.global_instance.return_value = mock_watchman_launcher
-      mock_watchman_launcher.maybe_launch.return_value = mock_watchman
-      self.service.fire_callback = mock.Mock()
-      yield mock_watchman, mock_watchman_launcher, self.service.fire_callback
-      if asserts:
-        mock_watchman.watch_project.assert_called_once_with(self.BUILD_ROOT)
+    self.service.fire_callback = mock.Mock()
+    yield self.service.fire_callback
+    if asserts:
+      self.mock_watchman.watch_project.assert_called_once_with(self.BUILD_ROOT)
 
   def test_run_raise_on_failure_isalive(self):
-    with self.mocked_run(False) as (mock_watchman, mock_watchman_launcher, mock_callback):
-      with self.assertRaises(self.service.ServiceError):
-        mock_watchman.is_alive.return_value = False
-        self.service.run()
-
-  def test_run_raise_on_failure_launch(self):
-    with self.mocked_run(False) as (mock_watchman, mock_watchman_launcher, mock_callback):
-      with self.assertRaises(self.service.ServiceError):
-        mock_watchman_launcher.maybe_launch.return_value = False
-        self.service.run()
+    self.mock_watchman.is_alive.return_value = False
+    with self.mocked_run(False) as mock_callback, \
+         self.assertRaises(self.service.ServiceError):
+      self.service.run()
 
   def test_run(self):
-    with self.mocked_run() as (mock_watchman, mock_watchman_launcher, mock_callback):
-      mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
+    with self.mocked_run() as mock_callback:
+      self.mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
       self.service.run()
       mock_callback.assert_has_calls([mock.call(*self.FAKE_EVENT), mock.call(*self.FAKE_EVENT)],
                                      any_order=True)
 
   def test_run_failed_callback(self):
-    with self.mocked_run() as (mock_watchman, mock_watchman_launcher, mock_callback):
-      mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
+    with self.mocked_run() as mock_callback:
+      self.mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
       mock_callback.side_effect = [False, True]
       self.service.run()
       mock_callback.assert_has_calls([mock.call(*self.FAKE_EVENT), mock.call(*self.FAKE_EVENT)],
                                      any_order=True)
 
   def test_run_breaks_on_kill_switch(self):
-    with self.mocked_run() as (mock_watchman, mock_watchman_launcher, mock_callback):
+    with self.mocked_run() as mock_callback:
       self.service.terminate()
-      mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
+      self.mock_watchman.subscribed.return_value = self.FAKE_EVENT_STREAM
       self.service.run()
       assert not mock_callback.called
