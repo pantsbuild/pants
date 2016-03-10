@@ -9,7 +9,7 @@ from collections import namedtuple
 
 from pants.base.revision import Revision
 from pants.option.custom_types import dict_option, list_option
-from pants.option.option_util import is_boolean_flag
+from pants.option.option_util import is_boolean_option
 from pants.version import PANTS_SEMVER
 
 
@@ -176,7 +176,7 @@ class HelpInfoExtracter(object):
         scoped_arg = arg
       scoped_cmd_line_args.append(scoped_arg)
 
-      if is_boolean_flag(kwargs):
+      if is_boolean_option(kwargs):
         if is_short_arg:
           display_arg = scoped_arg
         else:
@@ -189,7 +189,7 @@ class HelpInfoExtracter(object):
           display_arg = '{arg_str} ({arg_str}) ...'.format(arg_str=display_arg)
       display_args.append(display_arg)
 
-    if is_boolean_flag(kwargs):
+    if is_boolean_option(kwargs):
       typ = bool
     else:
       typ = kwargs.get('type', str)

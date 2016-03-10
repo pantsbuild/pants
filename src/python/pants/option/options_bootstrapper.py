@@ -13,11 +13,11 @@ import sys
 from pants.base.build_environment import get_default_pants_config_file
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
 from pants.option.config import Config
-from pants.option.custom_types import list_option
+from pants.option.custom_types import ListValueComponent, list_option
 from pants.option.errors import OptionsError
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_tracker import OptionTracker
-from pants.option.option_util import is_boolean_flag
+from pants.option.option_util import is_boolean_option
 from pants.option.options import Options
 
 
@@ -43,28 +43,22 @@ class OptionsBootstrapper(object):
     # it's preferable, so that any code that happens to want to know where we read config from
     # can inspect the option.
     flag = '--pants-config-files='
-    evars = ['PANTS_DEFAULT_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
+    evars = ['PANTS_GLOBAL_PANTS_CONFIG_FILES', 'PANTS_PANTS_CONFIG_FILES', 'PANTS_CONFIG_FILES']
 
-    paths_str = None
+    path_list_values = [ListValueComponent.create(get_default_pants_config_file())]
+    for var in evars:
+      if var in env:
+        path_list_values.append(ListValueComponent.create(env[var]))
+        break
 
     for arg in args:
       # Technically this is very slightly incorrect, as we don't check scope.  But it's
       # very unlikely that any task or subsystem will have an option named --pants-config-files.
       # TODO: Enforce a ban on options with a --pants- prefix outside our global options?
       if arg.startswith(flag):
-        paths_str = arg[len(flag):]
-        break
-    if not paths_str:
-      for var in evars:
-        if var in env:
-          paths_str = env[var]
-          break
-    if paths_str:
-      paths = list_option(paths_str)
-    else:
-      paths = [get_default_pants_config_file()]
+        path_list_values.append(ListValueComponent.create(arg[len(flag):]))
 
-    return paths
+    return ListValueComponent.merge(path_list_values).val
 
   def __init__(self, env=None, args=None):
     self._env = env if env is not None else os.environ.copy()
@@ -87,7 +81,7 @@ class OptionsBootstrapper(object):
           flags.add(arg)
           if len(arg) == 2:
             short_flags.add(arg)
-          elif is_boolean_flag(kwargs):
+          elif is_boolean_option(kwargs):
             flags.add('--no-{}'.format(arg[2:]))
 
       GlobalOptionsRegistrar.register_bootstrap_options(capture_the_flags)

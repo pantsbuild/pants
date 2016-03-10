@@ -31,6 +31,7 @@ class ConfigTest(unittest.TestCase):
 
         [a]
         list: [1, 2, 3, %(answer)s]
+        listappend: +[7, 8, 9]
 
         [b]
         preempt: True
@@ -59,6 +60,8 @@ class ConfigTest(unittest.TestCase):
   def test_getstring(self):
     self.assertEquals('/a/b/42', self.config.get('a', 'path'))
     self.assertEquals('/a/b/42::foo', self.config.get('a', 'embed'))
+    self.assertEquals('[1, 2, 3, 42]', self.config.get('a', 'list'))
+    self.assertEquals('+[7, 8, 9]', self.config.get('a', 'listappend'))
     self.assertEquals(
       """
 Let it be known
