@@ -17,7 +17,7 @@ def parse_spec(spec, relative_to=None):
 
   :param string spec: Target address spec.
   :param string relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
-    interprets the missing spec_path part as `relative_to`.
+    interprets the missing meow meow mrr ljksdf  sdfspec_path part as `relative_to`.
 
   For Example::
 
