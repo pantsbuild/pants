@@ -97,11 +97,6 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
              help='Run all tests in a single chroot. If turned off, each test target will '
                   'create a new chroot, which will be much slower, but more correct, as the'
                   'isolation verifies that all dependencies are correctly declared.')
-    register('--fail-slow', action='store_true', default=True,
-             deprecated_hint='Fail slow is now the default. To override use --fail-fast.',
-             deprecated_version='0.0.76',
-             help='Do not fail fast on the first test failure in a suite; instead run all tests '
-                  'and report errors only after all tests complete.')
     register('--junit-xml-dir', metavar='<DIR>',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')

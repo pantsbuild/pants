@@ -3,6 +3,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Alan Paulin
 + Alexander Johnson
 + Alyssa Pohahau
++ Andrew Hamilton
 + Andy Reitz
 + Antoine Tollenaere
 + Benjy Weinberger
