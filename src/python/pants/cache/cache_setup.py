@@ -77,7 +77,7 @@ class CacheSetup(Subsystem):
     register('--max-entries-per-target', advanced=True, type=int, default=8,
              help='Maximum number of old cache files to keep per task target pair')
     register('--pinger-timeout', advanced=True, type=float, default=0.5, help='number of seconds before pinger times out')
-    register('--pinger-tries', advanced=True, type=float, default=2, help='number of times pinger tries a cache')
+    register('--pinger-tries', advanced=True, type=int, default=2, help='number of times pinger tries a cache')
 
   @classmethod
   def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
