@@ -70,7 +70,7 @@ class TestHashUtils(mox.MoxTestBase):
       self.assertEquals(expected_nshards, sharder.nshards)
 
     def check_bad_spec(spec):
-      self.assertRaises(Sharder.InvalidSpec, lambda: Sharder(spec))
+      self.assertRaises(Sharder.InvalidShardSpec, lambda: Sharder(spec))
 
     check('0/1', 0, 1)
     check('0/2', 0, 2)

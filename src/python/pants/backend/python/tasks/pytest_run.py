@@ -213,7 +213,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
                                   bold=True, invert=True, yellow=True)
           """.format(shard=sharder.shard, nshards=sharder.nshards)))
         yield [path]
-    except Sharder.InvalidSpec as e:
+    except Sharder.InvalidShardSpec as e:
       raise self.InvalidShardSpecification(e)
 
   @contextmanager
