@@ -26,6 +26,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError, TestFailedTaskError
+from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
@@ -117,7 +118,10 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     register('--coverage-output-dir', metavar='<DIR>', default=None,
              help='Directory to emit coverage reports to.'
              'If not specified, a default within dist is used.')
-    register('--shard',
+    register('--shard', deprecated_version='0.0.76', removal_version='0.0.78',
+             deprecated_hint='Use --test-shard instead, with the same value.',
+             help='See --test-shard.')
+    register('--test-shard',
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
                   'run tests number 2, 5, 8, 11, ...')
 
@@ -172,57 +176,45 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
         raise TestFailedTaskError(failed_targets=failed_targets)
 
   class InvalidShardSpecification(TaskError):
-    """Indicates an invalid `--shard` option."""
+    """Indicates an invalid `--test-shard` option."""
 
   @contextmanager
   def _maybe_shard(self):
-    shard_spec = self.get_options().shard
-    if not shard_spec:
+    shard_spec = self.get_options().test_shard or self.get_options().shard
+    if shard_spec is None:
       yield []
       return
 
-    components = shard_spec.split('/', 1)
-    if len(components) != 2:
-      raise self.InvalidShardSpecification("Invalid shard specification '{}', should be of form: "
-                                           "[shard index]/[total shards]".format(shard_spec))
+    try:
+      sharder = Sharder(shard_spec)
 
-    def ensure_int(item):
-      try:
-        return int(item)
-      except ValueError:
-        raise self.InvalidShardSpecification("Invalid shard specification '{}', item {} is not an "
-                                             "int".format(shard_spec, item))
+      if sharder.nshards < 2:
+        yield []
+        return
 
-    shard = ensure_int(components[0])
-    total = ensure_int(components[1])
-    if not (0 <= shard and shard < total):
-      raise self.InvalidShardSpecification("Invalid shard specification '{}', shard must "
-                                           "be >= 0 and < {}".format(shard_spec, total))
-    if total < 2:
-      yield []
-      return
-
-    with temporary_dir() as tmp:
-      path = os.path.join(tmp, 'conftest.py')
-      with open(path, 'w') as fp:
-        fp.write(dedent("""
-          def pytest_report_header(config):
-            return 'shard: {shard} of {total} (0-based shard numbering)'
+      with temporary_dir() as tmp:
+        path = os.path.join(tmp, 'conftest.py')
+        with open(path, 'w') as fp:
+          fp.write(dedent("""
+            def pytest_report_header(config):
+              return 'shard: {shard} of {nshards} (0-based shard numbering)'
 
 
-          def pytest_collection_modifyitems(session, config, items):
-            total_count = len(items)
-            removed = 0
-            for i, item in enumerate(list(items)):
-              if i % {total} != {shard}:
-                del items[i - removed]
-                removed += 1
-            reporter = config.pluginmanager.getplugin('terminalreporter')
-            reporter.write_line('Only executing {{}} of {{}} total tests in shard {shard} of '
-                                '{total}'.format(total_count - removed, total_count),
-                                bold=True, invert=True, yellow=True)
-        """.format(shard=shard, total=total)))
-      yield [path]
+            def pytest_collection_modifyitems(session, config, items):
+              total_count = len(items)
+              removed = 0
+              for i, item in enumerate(list(items)):
+                if i % {nshards} != {shard}:
+                  del items[i - removed]
+                  removed += 1
+              reporter = config.pluginmanager.getplugin('terminalreporter')
+              reporter.write_line('Only executing {{}} of {{}} total tests in shard {shard} of '
+                                  '{nshards}'.format(total_count - removed, total_count),
+                                  bold=True, invert=True, yellow=True)
+          """.format(shard=sharder.shard, nshards=sharder.nshards)))
+        yield [path]
+    except Sharder.InvalidShardSpec as e:
+      raise self.InvalidShardSpecification(e)
 
   @contextmanager
   def _maybe_emit_junit_xml(self, targets):
