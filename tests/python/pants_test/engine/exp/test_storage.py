@@ -16,7 +16,7 @@ class StorageTest(unittest.TestCase):
   TEST_KEY = b'hello'
   TEST_VALUE = b'world'
 
-  TEST_DATA = Path('/foo')
+  TEST_PATH = Path('/foo')
 
   def test_lmdb_key_value_store(self):
     with closing(Lmdb()) as kvs:
@@ -31,15 +31,20 @@ class StorageTest(unittest.TestCase):
       # Write the same key again will not overwrite.
       self.assertFalse(kvs.put(self.TEST_KEY, self.TEST_VALUE))
 
-  def test_subjects(self):
-    with closing(Storage.create(in_memory=True)) as subjects:
-      key = subjects.put(self.TEST_DATA)
-      self.assertEquals(self.TEST_DATA, subjects.get(key))
+  def test_storage(self):
+    with closing(Storage.create(in_memory=True)) as storage:
+      key = storage.put(self.TEST_PATH)
+      self.assertEquals(self.TEST_PATH, storage.get(key))
       # The deserialized blob is equal by not the same as the input data.
-      self.assertFalse(subjects.get(key) is self.TEST_DATA)
+      self.assertFalse(storage.get(key) is self.TEST_PATH)
 
       # Any other keys won't exist in the subjects.
       self.assertNotEqual(self.TEST_KEY, key)
 
       with self.assertRaises(InvalidKeyError):
-        self.assertFalse(subjects.get(self.TEST_KEY))
+        self.assertFalse(storage.get(self.TEST_KEY))
+
+      # Verify key and value's types must match.
+      key._type = str
+      with self.assertRaises(ValueError):
+        storage.get(key)

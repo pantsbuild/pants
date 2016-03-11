@@ -26,9 +26,9 @@ class SchedulerTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
-    self.scheduler = setup_json_scheduler(build_root)
-    self.subjects = self.scheduler._subjects
-    self.engine = LocalSerialEngine(self.scheduler)
+    self.scheduler, storage = setup_json_scheduler(build_root)
+    self.storage = storage
+    self.engine = LocalSerialEngine(self.scheduler, storage)
 
     self.guava = Address.parse('3rdparty/jvm:guava')
     self.thrift = Address.parse('src/thrift/codegen/simple')
@@ -46,7 +46,7 @@ class SchedulerTest(unittest.TestCase):
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
 
   def key(self, subject):
-    return self.subjects.put(subject)
+    return self.storage.put(subject)
 
   def assert_select_for_subjects(self, walk, product, subjects, variants=None, variant_key=None):
     node_type = SelectNode
@@ -67,7 +67,7 @@ class SchedulerTest(unittest.TestCase):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
 
   def request_specs(self, goals, *specs):
-    return self.scheduler.build_request(goals=goals, subjects=specs)
+    return self.scheduler.build_request(goals=goals, subject_keys=self.storage.puts(specs))
 
   def assert_resolve_only(self, goals, root_specs, jars):
     build_request = self.request(goals, *root_specs)
@@ -79,18 +79,18 @@ class SchedulerTest(unittest.TestCase):
 
   def assert_root(self, walk, node, return_value):
     """Asserts that the first Node in a walk was a DependenciesNode with the single given result."""
-    ((root, root_state), dependencies) = walk[0]
+    ((root, root_state_key), dependencies) = walk[0]
     self.assertEquals(type(root), DependenciesNode)
-    self.assertEquals(Return([return_value]), root_state)
-    self.assertIn((node, Return(return_value)), dependencies)
+    self.assertEquals(Return([return_value]), self.storage.get(root_state_key))
+    self.assertIn((node, self.key(Return(return_value))), dependencies)
 
   def assert_root_failed(self, walk, node, thrown_type):
     """Asserts that the first Node in a walk was a DependenciesNode with a Throw result."""
     ((root, root_state), dependencies) = walk[0]
     self.assertEquals(type(root), DependenciesNode)
-    self.assertEquals(Throw, type(root_state))
-    self.assertIn((node, thrown_type), [(k, type(v.exc)) for k, v in dependencies
-                                        if type(v) is Throw])
+    self.assertEquals(Throw, root_state.type)
+    self.assertIn((node, thrown_type), [(k, type(self.storage.get(v).exc))
+                                        for k, v in dependencies if v.type is Throw])
 
   def test_resolve(self):
     self.assert_resolve_only(goals=['resolve'],
@@ -195,7 +195,7 @@ class SchedulerTest(unittest.TestCase):
     # Confirm that the produced jars had the appropriate versions.
     self.assertEquals({Jar('org.apache.hadoop', 'hadoop-common', '2.7.0'),
                        Jar('com.google.guava', 'guava', '18.0')},
-                      {ret.value for (node, ret), _ in walk
+                      {self.storage.get(ret).value for (node, ret), _ in walk
                        if node.product == Jar and isinstance(node, SelectNode)})
 
   @pytest.mark.xfail(reason='TODO: see https://github.com/pantsbuild/pants/issues/3024')
@@ -246,8 +246,8 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    root, root_state = walk[0][0]
-    root_value = root_state.value
+    root, root_state_key = walk[0][0]
+    root_value = self.storage.get(root_state_key).value
     self.assertEqual(DependenciesNode(self.key(spec), Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
@@ -263,8 +263,8 @@ class SchedulerTest(unittest.TestCase):
     walk = self.build_and_walk(build_request)
 
     # Validate the root.
-    root, root_state = walk[0][0]
-    root_value = root_state.value
+    root, root_state_key = walk[0][0]
+    root_value = self.storage.get(root_state_key).value
     self.assertEqual(DependenciesNode(self.key(spec), Address, None, Addresses, None), root)
     self.assertEqual(list, type(root_value))
 
