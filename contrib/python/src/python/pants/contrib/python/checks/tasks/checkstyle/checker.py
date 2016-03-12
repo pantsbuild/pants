@@ -5,11 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import re
 from collections import namedtuple
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import file_option
 
@@ -123,18 +125,18 @@ class PythonCheckStyleTask(PythonTask):
     """Process python file looking for indications of problems.
 
     :param filename: (str) Python source filename
-    :return: (bool) flag indicating failure
+    :return: (int) number of failures
     """
     try:
-      python_file = PythonFile.parse(filename)
+      python_file = PythonFile.parse(os.path.join(get_buildroot(), filename))
     except SyntaxError as e:
       print('{filename}:SyntaxError: {error}'.format(filename=filename, error=e))
-      return True
+      return 1
 
     # If the user specifies an invalid severity use comment.
     severity = Nit.SEVERITY.get(self.options.severity, Nit.COMMENT)
 
-    should_fail = False
+    failure_count = 0
     fail_threshold = Nit.WARNING if self.options.strict else Nit.ERROR
 
     for i, nit in enumerate(self.get_nits(python_file)):
@@ -142,8 +144,9 @@ class PythonCheckStyleTask(PythonTask):
         print()  # Add an extra newline to clean up the output only if we have nits.
       if nit.severity >= severity:
         print('{nit}\n'.format(nit=nit))
-      should_fail |= (nit.severity >= fail_threshold)
-    return should_fail
+      if nit.severity >= fail_threshold:
+        failure_count += 1
+    return failure_count
 
   def checkstyle(self, sources):
     """Iterate over sources and run checker on each file.
@@ -152,14 +155,15 @@ class PythonCheckStyleTask(PythonTask):
     file paths that have exceptions and the plugins they need to ignore.
 
     :param sources: iterable containing source file names.
-    :return: Boolean indicating problems found
+    :return: (int) number of failures
     """
-    should_fail = False
+    failure_count = 0
     for filename in sources:
-      should_fail |= self.check_file(filename)
+      failure_count += self.check_file(filename)
 
-    if should_fail and self.options.fail:
-      raise TaskError('Python Style issues found', exit_code=should_fail)
+    if failure_count > 0 and self.options.fail:
+      raise TaskError('{} Python Style issues found'.format(failure_count), exit_code=1)
+    return failure_count
 
   def execute(self):
     """Run Checkstyle on all found source files."""
