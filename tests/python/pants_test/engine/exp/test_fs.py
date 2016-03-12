@@ -48,6 +48,13 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
     self.assert_pg_equals([PathLiteral(join(subdir, name))], subdir, [name])
     self.assert_pg_equals([PathLiteral(join(subdir, name))], '', [join(subdir, name)])
 
+  def test_create_literal_directory(self):
+    subdir = 'foo'
+    name = 'bar/'
+    self.assert_pg_equals([PathLiteral(name)], '', [name])
+    self.assert_pg_equals([PathLiteral(join(subdir, name))], subdir, [name])
+    self.assert_pg_equals([PathLiteral(join(subdir, name))], '', [join(subdir, name)])
+
   def test_create_wildcard(self):
     name = '*.java'
     subdir = 'foo'
@@ -82,16 +89,24 @@ class FSTest(unittest.TestCase, SchedulerTestBase):
     self.assert_walk(['4.txt'], ['4.txt'])
     self.assert_walk(['a/b/1.txt', 'a/b/2'], ['a/b/1.txt', 'a/b/2'])
     self.assert_walk(['a/3.txt'], ['a/3.txt'])
+    self.assert_walk(['z.txt'], [])
+
+  def test_walk_literal_directory(self):
+    self.assert_walk(['a/'], ['a/'])
+    self.assert_walk(['a/b/'], ['a/b/'])
+    self.assert_walk(['z/'], [])
 
   def test_walk_siblings(self):
     self.assert_walk(['*.txt'], ['4.txt'])
     self.assert_walk(['a/b/*.txt'], ['a/b/1.txt'])
     self.assert_walk(['a/b/*'], ['a/b/1.txt', 'a/b/2'])
+    self.assert_walk(['*/0.txt'], [])
 
   def test_walk_recursive(self):
     self.assert_walk(['**/*.txt'], ['a/3.txt', 'a/b/1.txt'])
     self.assert_walk(['*.txt', '**/*.txt'], ['a/3.txt', 'a/b/1.txt', '4.txt'])
     self.assert_walk(['*', '**/*'], ['a/3.txt', 'a/b/1.txt', '4.txt', 'a/b/2'])
+    self.assert_walk(['**/*.zzz'], [])
 
   def test_files_content_literal(self):
     self.assert_content(['4.txt'], {'4.txt': 'four\n'})

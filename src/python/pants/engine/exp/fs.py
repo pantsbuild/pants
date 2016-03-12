@@ -40,9 +40,16 @@ class FilesContent(datatype('FilesContent', ['dependencies'])):
   """List of FileContent objects."""
 
 
-def _norm_join(path, paths):
-  joined = normpath(join(path, *paths))
-  return '' if joined == '.' else joined
+def norm_with_dir(path):
+  """Form of `normpath` that preserves trailing slashes.
+
+  In this case, a trailing slash is used to explicitly indicate that a directory is
+  being matched.
+  """
+  normed = normpath(path)
+  if path.endswith(os_sep):
+    return normed + os_sep
+  return normed
 
 
 class PathGlob(AbstractClass):
@@ -57,7 +64,7 @@ class PathGlob(AbstractClass):
 
   @classmethod
   def create_from_spec(cls, relative_to, filespec):
-    return cls._parse_spec(relative_to, filespec.split(os_sep))
+    return cls._parse_spec(relative_to, norm_with_dir(filespec).split(os_sep))
 
   @classmethod
   def _wildcard_part(cls, filespec_parts):
@@ -89,19 +96,19 @@ class PathGlob(AbstractClass):
       # so there are two remainder possibilities: one with the double wildcard included, and the
       # other without.
       remainders = (join(*parts[double_index+1:]), join(*parts[double_index:]))
-      return PathDirWildcard(_norm_join(relative_to, parts[:double_index]),
+      return PathDirWildcard(join(relative_to, *parts[:double_index]),
                              parts[double_index],
                              remainders)
     elif single_index is None:
       # A literal path.
-      return PathLiteral(_norm_join(relative_to, parts))
+      return PathLiteral(join(relative_to, *parts))
     elif single_index == (len(parts) - 1):
       # There is a wildcard in the file basename of the path.
-      return PathWildcard(_norm_join(relative_to, parts[:-1]), parts[-1])
+      return PathWildcard(join(relative_to, *parts[:-1]), parts[-1])
     else:
       # There is a wildcard in (at least one of) the dirnames in the path.
       remainders = (join(*parts[single_index + 1:]),)
-      return PathDirWildcard(_norm_join(relative_to, parts[:single_index]),
+      return PathDirWildcard(join(relative_to, *parts[:single_index]),
                              parts[single_index],
                              remainders)
 
@@ -126,6 +133,9 @@ class PathGlobs(datatype('PathGlobs', ['dependencies'])):
 
   This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
   globs/rglobs/zglobs into 'filespecs'.
+
+  A glob ending in 'os.sep' explicitly matches a directory; otherwise, globs only match
+  files.
   """
 
   @classmethod
@@ -238,9 +248,14 @@ def filter_dir_listing(directory_listing, path_dir_wildcard):
                          for remainder in path_dir_wildcard.remainders))
 
 
-def file_exists(project_tree, path_literal):
+def path_exists(project_tree, path_literal):
   path = path_literal.path
-  return Paths((Path(path),) if project_tree.isfile(path) else ())
+  exists = False
+  if path.endswith(os_sep):
+    exists = project_tree.isdir(path)
+  else:
+    exists = project_tree.isfile(path)
+  return Paths((Path(path),) if exists else ())
 
 
 def files_content(file_contents):

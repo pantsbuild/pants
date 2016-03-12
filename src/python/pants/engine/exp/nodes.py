@@ -10,7 +10,7 @@ from abc import abstractmethod, abstractproperty
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
 from pants.engine.exp.fs import (DirectoryListing, FileContent, Path, PathLiteral, Paths,
-                                 file_content, file_exists, list_directory)
+                                 file_content, list_directory, path_exists)
 from pants.engine.exp.storage import Key
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.objects import datatype
@@ -367,7 +367,7 @@ class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'vari
     input_value = input_state.value
     try:
       if self.product is Paths:
-        return Return(file_exists(step_context.project_tree, input_value))
+        return Return(path_exists(step_context.project_tree, input_value))
       elif self.product is FileContent:
         return Return(file_content(step_context.project_tree, input_value))
       elif self.product is DirectoryListing:

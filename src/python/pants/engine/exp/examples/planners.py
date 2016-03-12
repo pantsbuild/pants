@@ -116,8 +116,10 @@ def select_package_address(jvm_package_name, address_families):
 def calculate_package_search_path(jvm_package_name, source_roots):
   """Return Paths for directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
-  return Paths([Path(os_path_join(srcroot, rel_package_dir))
-                for srcroot in source_roots.srcroots])
+  if not rel_package_dir.endswith(os_sep):
+    rel_package_dir += os_sep
+  specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
+  return PathGlobs.create_from_specs('', specs)
 
 
 @printing_func
@@ -416,7 +418,7 @@ def setup_json_scheduler(build_root, debug=True):
   address_mapper_key = subjects.put(AddressMapper(symbol_table_cls=symbol_table_cls,
                                                   build_pattern=r'^BLD.json$',
                                                   parser_cls=JsonParser))
-  source_roots_key = subjects.put(SourceRoots(('src/java',)))
+  source_roots_key = subjects.put(SourceRoots(('src/java','src/scala')))
   scrooge_tool_address_key = subjects.put(Address.parse('src/scala/scrooge'))
 
   goals = {
@@ -463,7 +465,7 @@ def setup_json_scheduler(build_root, debug=True):
        [Select(JVMPackageName),
         SelectDependencies(AddressFamily, Paths)],
        select_package_address),
-      (Paths,
+      (PathGlobs,
        [Select(JVMPackageName),
         SelectLiteral(source_roots_key, SourceRoots)],
        calculate_package_search_path),
