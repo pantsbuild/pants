@@ -14,6 +14,7 @@ class FlakeError(Nit):
   # TODO(wickman) There is overlap between this and Flake8 -- consider integrating
   # checkstyle plug-ins into the PEP8 tool directly so that this can be inherited
   # by flake8.
+  # Code reference is here: http://flake8.readthedocs.org/en/latest/warnings.html
   CLASS_ERRORS = {
     'DuplicateArgument': 'F831',
     'ImportShadowedByLoopVar': 'F402',
@@ -31,11 +32,15 @@ class FlakeError(Nit):
 
   def __init__(self, python_file, flake_message):
     super(FlakeError, self).__init__(
-        self.CLASS_ERRORS.get(flake_message.__class__.__name__, 'F999'),
+        self.get_error_code(flake_message),
         Nit.ERROR,
         python_file,
         flake_message.message % flake_message.message_args,
         flake_message.lineno)
+
+  @classmethod
+  def get_error_code(cls, message):
+    return cls.CLASS_ERRORS.get(message.__class__.__name__, 'F999')
 
 
 class PyflakesChecker(CheckstylePlugin):
@@ -44,4 +49,5 @@ class PyflakesChecker(CheckstylePlugin):
   def nits(self):
     checker = FlakesChecker(self.python_file.tree, self.python_file.filename)
     for message in sorted(checker.messages, key=lambda msg: msg.lineno):
-      yield FlakeError(self.python_file, message)
+      if FlakeError.get_error_code(message) not in self.options.ignore:
+        yield FlakeError(self.python_file, message)
