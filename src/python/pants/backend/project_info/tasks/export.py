@@ -123,19 +123,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
     if self.get_options().libraries_javadocs:
       confs.append('javadoc')
 
-    # TODO(gmalmquist): This is a terrible hack for backwards-compatibility with the pants-plugin.
-    # Kill it ASAP, and update test_export_integration#test_export_jar_path_with_excludes_soft to
-    # use the flag actually scoped for this task.
-    export_options = self.get_options()
-    try:
-      ivy_options = self.context.options.for_scope('resolve.ivy')
-    except OptionsError:
-      # No resolve.ivy task installed, so continue silently.
-      ivy_options = []
-    for name in set.intersection(set(export_options), set(ivy_options)):
-      if not ivy_options.is_default(name):
-        setattr(export_options, name, RankedValue(RankedValue.FLAG, ivy_options[name]))
-    confs = confs or export_options.confs
+    self._support_current_pants_plugin_options_usage()
 
     compile_classpath = None
     if confs:
@@ -145,6 +133,21 @@ class ExportTask(IvyTaskMixin, PythonTask):
                    classpath_products=compile_classpath,
                    confs=confs)
     return compile_classpath
+
+  # TODO: This is a terrible hack for backwards-compatibility with the pants-plugin.
+  # Kill it when https://github.com/pantsbuild/intellij-pants-plugin/issues/46 is resolved,
+  # and update test_export_integration#test_export_jar_path_with_excludes_soft to use the flag
+  # actually scoped for this task.
+  def _support_current_pants_plugin_options_usage(self):
+    export_options = self.get_options()
+    try:
+      ivy_options = self.context.options.for_scope('resolve.ivy')
+    except OptionsError:
+      # No resolve.ivy task installed, so continue silently.
+      ivy_options = []
+    for name in set.intersection(set(export_options), set(ivy_options)):
+      if not ivy_options.is_default(name):
+        setattr(export_options, name, RankedValue(RankedValue.FLAG, ivy_options[name]))
 
   def generate_targets_map(self, targets, classpath_products=None):
     """Generates a dictionary containing all pertinent information about the target graph.

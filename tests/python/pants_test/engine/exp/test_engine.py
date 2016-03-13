@@ -18,31 +18,33 @@ from pants.engine.exp.nodes import Return, SelectNode
 class EngineTest(unittest.TestCase):
   def setUp(self):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
-    self.scheduler = setup_json_scheduler(build_root)
+    self.scheduler, self.storage = setup_json_scheduler(build_root, debug=True)
 
     self.java = Address.parse('src/java/codegen/simple')
 
   def key(self, subject):
-    return self.scheduler._subjects.put(subject)
+    return self.storage.put(subject)
 
   def request(self, goals, *addresses):
-    return self.scheduler.build_request(goals=goals, subjects=addresses)
+    return self.scheduler.build_request(goals=goals,
+                                        subject_keys=self.storage.puts(addresses))
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
     self.assertEqual({SelectNode(self.key(self.java), Classpath, None, None):
-                        Return(Classpath(creator='javac'))},
+                        self.key(Return(Classpath(creator='javac')))},
                      result.root_products)
     self.assertIsNone(result.error)
 
   @contextmanager
   def multiprocessing_engine(self, pool_size=None):
-    with closing(LocalMultiprocessEngine(self.scheduler, pool_size=pool_size, debug=True)) as e:
+    with closing(LocalMultiprocessEngine(self.scheduler, self.storage,
+                                         pool_size=pool_size, debug=True)) as e:
       e.start()
       yield e
 
   def test_serial_engine_simple(self):
-    engine = LocalSerialEngine(self.scheduler)
+    engine = LocalSerialEngine(self.scheduler, self.storage)
     self.assert_engine(engine)
 
   def test_multiprocess_engine_multi(self):

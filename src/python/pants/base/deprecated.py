@@ -69,11 +69,9 @@ def deprecated_conditional(predicate,
   will be called, if true, then the deprecation warning will issue.
 
   :param () -> bool predicate: A function that returns True if the deprecation warning should be on.
-  :param unicode removal_version: The pantsbuild.pants version which will remove the deprecated
-                              function.
-  :param unicode predicate_description: A string describing what the predicate means.
+  :param string removal_version: The pants version which will remove the deprecated functionality.
+  :param string hint_message: An optional hint pointing to alternatives to the deprecation.
   :param int stacklevel: How far up in the stack do we go to find the calling fn to report
-  :param unicode hint_message: An optional hint pointing to alternatives to the deprecation.
   :raises DeprecationApplicationError if the deprecation is applied improperly.
   """
   if removal_version is None:

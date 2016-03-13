@@ -24,10 +24,19 @@ class ConflictingProducersError(Exception):
     https://github.com/pantsbuild/pants/issues/2526
   """
 
-  def __init__(self, subject, product, matches):
+  @classmethod
+  def create(cls, subject, product, matches):
+    """Factory method to format the error message.
+
+    This is provided as a workaround to http://bugs.python.org/issue17296 to make this exception
+    picklable.
+    """
     msgs = '\n  '.join('{}: {}'.format(k, v) for k, v in matches.items())
-    msg = 'More than one source of {} for {}:\n  {}'.format(product.__name__, subject, msgs)
-    super(ConflictingProducersError, self).__init__(msg)
+    return ConflictingProducersError('More than one source of {} for {}:\n  {}'
+                                     .format(product.__name__, subject, msgs))
+
+  def __init__(self, message):
+    super(ConflictingProducersError, self).__init__(message)
 
 
 class State(object):
@@ -187,7 +196,7 @@ class SelectNode(datatype('SelectNode', ['subject_key', 'product', 'variants', '
       # TODO: Multiple successful tasks are not currently supported. We should allow for this
       # by adding support for "mergeable" products. see:
       #   https://github.com/pantsbuild/pants/issues/2526
-      return Throw(ConflictingProducersError(subject, self.product, matches))
+      return Throw(ConflictingProducersError.create(subject, self.product, matches))
     elif len(matches) == 1:
       return Return(matches.values()[0])
     return Noop('No source of {}.'.format(self))
@@ -384,14 +393,14 @@ class StepContext(object):
   This avoids giving Nodes direct access to the task list or subject set.
   """
 
-  def __init__(self, node_builder, subjects, project_tree):
+  def __init__(self, node_builder, storage, project_tree):
     self._node_builder = node_builder
-    self._subjects = subjects
+    self._storage = storage
     self.project_tree = project_tree
 
   def introduce_subject(self, subject):
     """Introduces a potentially new Subject, and returns a subject Key."""
-    return self._subjects.put(subject)
+    return self._storage.put(subject)
 
   def gen_nodes(self, subject_key, product, variants):
     """Yields Node instances which might be able to provide a value for the given inputs."""

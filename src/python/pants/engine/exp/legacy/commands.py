@@ -44,14 +44,14 @@ def setup():
   cmd_line_spec_parser = CmdLineSpecParser(build_root)
   spec_roots = [cmd_line_spec_parser.parse_spec(spec) for spec in sys.argv[1:]]
 
-  subjects = Storage.create(debug=False)
+  storage = Storage.create(debug=False)
   project_tree = FileSystemProjectTree(build_root)
   symbol_table_cls = LegacyTable
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  address_mapper_key = subjects.put(AddressMapper(symbol_table_cls=symbol_table_cls,
-                                                  parser_cls=LegacyPythonCallbacksParser))
+  address_mapper_key = storage.put(AddressMapper(symbol_table_cls=symbol_table_cls,
+                                                 parser_cls=LegacyPythonCallbacksParser))
 
   # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The ExpGraph
   # will explicitly request the products it needs.
@@ -62,7 +62,8 @@ def setup():
   )
 
   return (
-    LocalScheduler(dict(), tasks, subjects, symbol_table_cls, project_tree),
+    LocalScheduler(dict(), tasks, symbol_table_cls, project_tree),
+    storage,
     spec_roots,
     symbol_table_cls
   )
@@ -70,10 +71,10 @@ def setup():
 
 def dependencies():
   """Lists the transitive dependencies of targets under the current build root."""
-  scheduler, spec_roots, symbol_table_cls = setup()
+  scheduler, storage, spec_roots, symbol_table_cls = setup()
 
   # Populate the graph for the given request, and print the resulting Addresses.
-  engine = LocalSerialEngine(scheduler)
+  engine = LocalSerialEngine(scheduler, storage)
   engine.start()
   try:
     graph = ExpGraph(scheduler, engine, symbol_table_cls)

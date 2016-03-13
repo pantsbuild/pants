@@ -47,20 +47,21 @@ class ExpGraph(BuildGraph):
     # Index the ProductGraph.
     # TODO: It's not very common to actually use the dependencies of a Node during a walk... should
     # consider removing those from that API.
-    for ((node, state), _) in self._graph.walk(roots=roots):
+    for ((node, state_key), _) in self._graph.walk(roots=roots):
       # Locate nodes that contain LegacyBuildGraphNode values.
-      if type(state) is Throw:
+      if state_key.type is Throw:
         # TODO: get access to `Storage` instance in order to `to-str` more effectively here.
         raise AddressLookupError(
             'Build graph construction failed for {}:\n  {}'.format(node.subject_key, state.exc))
-      elif type(state) is not Return:
-        State.raise_unrecognized(state)
+      elif state_key.type is not Return:
+        State.raise_unrecognized(state_key.type)
       if node.product is not LegacyBuildGraphNode:
         continue
       if type(node) is not SelectNode:
         continue
 
       # We have a successfully parsed a LegacyBuildGraphNode.
+      state = self._engine.storage.get(state_key)
       target_adaptor = state.value.target_adaptor
       address = target_adaptor.address
       addresses.add(address)
@@ -123,7 +124,7 @@ class ExpGraph(BuildGraph):
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
-    request = self._scheduler.execution_request(products=[LegacyBuildGraphNode], subjects=specs)
+    request = self._scheduler.execution_request([LegacyBuildGraphNode], self._engine.storage.puts(specs))
     result = self._engine.execute(request)
     if result.error:
       raise result.error

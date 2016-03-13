@@ -409,17 +409,17 @@ def setup_json_scheduler(build_root, debug=True):
   :rtype :class:`pants.engine.exp.scheduler.LocalScheduler`
   """
 
-  subjects = Storage.create(debug=debug)
+  storage = Storage.create(debug=debug)
 
   symbol_table_cls = ExampleTable
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  address_mapper_key = subjects.put(AddressMapper(symbol_table_cls=symbol_table_cls,
+  address_mapper_key = storage.put(AddressMapper(symbol_table_cls=symbol_table_cls,
                                                   build_pattern=r'^BLD.json$',
                                                   parser_cls=JsonParser))
-  source_roots_key = subjects.put(SourceRoots(('src/java','src/scala')))
-  scrooge_tool_address_key = subjects.put(Address.parse('src/scala/scrooge'))
+  source_roots_key = storage.put(SourceRoots(('src/java','src/scala')))
+  scrooge_tool_address_key = storage.put(Address.parse('src/scala/scrooge'))
 
   goals = {
       'compile': Classpath,
@@ -509,4 +509,4 @@ def setup_json_scheduler(build_root, debug=True):
     )
 
   project_tree = FileSystemProjectTree(build_root)
-  return LocalScheduler(goals, tasks, subjects, symbol_table_cls, project_tree)
+  return LocalScheduler(goals, tasks, symbol_table_cls, project_tree), storage

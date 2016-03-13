@@ -25,9 +25,9 @@ class NailgunTaskBase(JvmToolTaskMixin, TaskBase):
     super(NailgunTaskBase, cls).register_options(register)
     register('--use-nailgun', action='store_true', default=True,
              help='Use nailgun to make repeated invocations of this task quicker.')
-    register('--nailgun-timeout-seconds', advanced=True, default=10,
+    register('--nailgun-timeout-seconds', advanced=True, default=10, type=float,
              help='Timeout (secs) for nailgun startup.')
-    register('--nailgun-connect-attempts', advanced=True, default=5,
+    register('--nailgun-connect-attempts', advanced=True, default=5, type=int,
              help='Max attempts for nailgun connects.')
     cls.register_jvm_tool(register,
                           'nailgun-server',

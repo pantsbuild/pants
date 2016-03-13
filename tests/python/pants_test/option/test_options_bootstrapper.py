@@ -252,7 +252,21 @@ class BootstrapOptionsTest(unittest.TestCase):
 
     self.assertEqual(['/from/flag'],
                      config_path('main', 'args', '-x', "--pants-config-files=['/from/flag']",
-                                 'goal', '--other-flag', PANTS_CONFIG="['/from/env']"))
+                                 'goal', '--other-flag', PANTS_CONFIG_FILES="['/from/env']"))
+
+    # Test appending to the default.
+    self.assertEqual(['{}/pants.ini'.format(get_buildroot()), '/from/env', '/from/flag'],
+                     config_path('main', 'args', '-x', "--pants-config-files=+['/from/flag']",
+                                 'goal', '--other-flag', PANTS_CONFIG_FILES="+['/from/env']"))
+
+    # Test replacing the default, then appending.
+    self.assertEqual(['/from/env', '/from/flag'],
+                     config_path('main', 'args', '-x', "--pants-config-files=+['/from/flag']",
+                                 'goal', '--other-flag', PANTS_CONFIG_FILES="['/from/env']"))
+
+    self.assertEqual(['/from/flag'],
+                     config_path('main', 'args', '-x', "--pants-config-files=['/from/flag']",
+                                 'goal', '--other-flag', PANTS_CONFIG_FILES="+['/from/env']"))
 
   def test_setting_pants_config_in_config(self):
     # Test that setting pants_config in the config file has no effect.

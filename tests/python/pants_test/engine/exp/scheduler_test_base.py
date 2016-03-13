@@ -51,21 +51,21 @@ class SchedulerTestBase(object):
 
     tasks = list(tasks) + create_fs_tasks()
     project_tree = FileSystemProjectTree(build_root)
-    scheduler = LocalScheduler(goals, tasks, storage, symbol_table_cls, project_tree)
-    return scheduler, build_root
+    scheduler = LocalScheduler(goals, tasks, symbol_table_cls, project_tree)
+    return scheduler, storage, build_root
 
-  def execute_request(self, scheduler, product, *subjects):
+  def execute_request(self, scheduler, storage, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
-    request = scheduler.execution_request(products=[product], subjects=subjects)
-    res = LocalSerialEngine(scheduler).execute(request)
+    request = scheduler.execution_request([product], storage.puts(subjects))
+    res = LocalSerialEngine(scheduler, storage).execute(request)
     if res.error:
       raise res.error
     return request
 
-  def execute(self, scheduler, product, *subjects):
+  def execute(self, scheduler, storage, product, *subjects):
     """Runs an ExecutionRequest for the given product and subjects, and returns the result value."""
-    request = self.execute_request(scheduler, product, *subjects)
-    states = scheduler.root_entries(request).values()
+    request = self.execute_request(scheduler, storage, product, *subjects)
+    states = [storage.get(key) for key in scheduler.root_entries(request).values()]
     if any(type(state) is not Return for state in states):
       raise ValueError('At least one request failed: {}'.format(states))
     return list(state.value for state in states)
