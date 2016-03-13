@@ -40,7 +40,7 @@ class FilesContent(datatype('FilesContent', ['dependencies'])):
   """List of FileContent objects."""
 
 
-def norm_with_dir(path):
+def _norm_with_dir(path):
   """Form of `normpath` that preserves trailing slashes.
 
   In this case, a trailing slash is used to explicitly indicate that a directory is
@@ -64,7 +64,7 @@ class PathGlob(AbstractClass):
 
   @classmethod
   def create_from_spec(cls, relative_to, filespec):
-    return cls._parse_spec(relative_to, norm_with_dir(filespec).split(os_sep))
+    return cls._parse_spec(relative_to, _norm_with_dir(filespec).split(os_sep))
 
   @classmethod
   def _wildcard_part(cls, filespec_parts):
@@ -250,7 +250,6 @@ def filter_dir_listing(directory_listing, path_dir_wildcard):
 
 def path_exists(project_tree, path_literal):
   path = path_literal.path
-  exists = False
   if path.endswith(os_sep):
     exists = project_tree.isdir(path)
   else:
