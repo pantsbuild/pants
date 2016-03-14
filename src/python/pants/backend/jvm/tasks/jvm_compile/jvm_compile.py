@@ -26,6 +26,7 @@ from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_walk
@@ -73,6 +74,8 @@ class JvmCompile(NailgunTaskBase):
   """
 
   size_estimators = create_size_estimators()
+  _target_closure_kwargs = dict(include_scopes=Scopes.JVM_COMPILE_SCOPES,
+                                respect_intransitive=True)
 
   @classmethod
   def size_estimator_by_name(cls, estimation_strategy_name):
@@ -571,7 +574,7 @@ class JvmCompile(NailgunTaskBase):
           for r in resolve(declared):
             yield r
         elif isinstance(declared, self.compiler_plugin_types):
-          for r in declared.closure(bfs=True):
+          for r in declared.closure(bfs=True, **self._target_closure_kwargs):
             yield r
         else:
           yield declared
@@ -588,12 +591,13 @@ class JvmCompile(NailgunTaskBase):
     target = compile_context.target
     if compile_context.strict_deps:
       classpath_targets = list(self._compute_strict_dependencies(target))
-      pruned = [t.address.spec for t in target.closure(bfs=True) if t not in classpath_targets]
+      pruned = [t.address.spec for t in target.closure(bfs=True, **self._target_closure_kwargs)
+                if t not in classpath_targets]
       self.context.log.debug(
           'Using strict classpath for {}, which prunes the following dependencies: {}'.format(
             target.address.spec, pruned))
     else:
-      classpath_targets = target.closure(bfs=True)
+      classpath_targets = target.closure(bfs=True, **self._target_closure_kwargs)
     return ClasspathUtil.compute_classpath(classpath_targets, classpath_products,
                                            extra_compile_time_classpath, self._confs)
 
