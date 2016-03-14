@@ -5,6 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import re
+
+from pants.build_graph.address import Address
+from pants.build_graph.target import Target
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
 
 
@@ -146,3 +151,25 @@ class ZincCompileIntegrationTest(BaseCompileIT):
     test_combination('fatal', default_fatal_warnings=False, expect_success=False)
     test_combination('nonfatal', default_fatal_warnings=True, expect_success=True)
     test_combination('nonfatal', default_fatal_warnings=False, expect_success=True)
+
+  def test_record_classpath(self):
+    target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion:printversion'
+    target_id = Target.compute_target_id(Address.parse(target_spec))
+    classpath_filename = '{}.txt'.format(target_id)
+    with self.do_test_compile(target_spec,
+                              expected_files=[classpath_filename, 'PrintVersion.class'],
+                              extra_args=['--compile-zinc-capture-classpath']) as found:
+      found_classpath_file = self.get_only(found, classpath_filename)
+      self.assertTrue(found_classpath_file
+                      .endswith(os.path.join('compile_classpath', classpath_filename)))
+      with open(found_classpath_file, 'r') as f:
+        self.assertIn(target_id, f.read())
+
+  def test_no_record_classpath(self):
+    target_spec = 'testprojects/src/java/org/pantsbuild/testproject/printversion:printversion'
+    target_id = Target.compute_target_id(Address.parse(target_spec))
+    classpath_filename = '{}.txt'.format(target_id)
+    with self.do_test_compile(target_spec,
+                              expected_files=['PrintVersion.class'],
+                              extra_args=['--no-compile-zinc-capture-classpath']) as found:
+      self.assertFalse(classpath_filename in found)
