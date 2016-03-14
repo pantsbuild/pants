@@ -141,6 +141,7 @@ python_library(
   sources=['scheduler.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:wrapt',
     ':addressable',
     ':fs',
     ':nodes',

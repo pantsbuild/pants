@@ -8,6 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import sys
 from collections import defaultdict
 
+from wrapt import synchronized
+
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import Addresses
@@ -60,6 +62,7 @@ class ProductGraph(object):
     # context specific error messages when they are introduced.
     self._cyclic_dependencies = defaultdict(set)
 
+  @synchronized
   def _set_state(self, node, state_key):
     existing_state_key = self._node_results.get(node, None)
     if existing_state_key is not None:
@@ -69,12 +72,15 @@ class ProductGraph(object):
       raise ValueError('Cannot complete Node {} with state_key {}'.format(node, state_key))
     self._node_results[node] = state_key
 
+  @synchronized
   def is_complete(self, node):
     return node in self._node_results
 
+  @synchronized
   def state(self, node):
     return self._node_results.get(node, None)
 
+  @synchronized
   def update_state(self, node, state_key, dependencies=None):
     """Updates the Node with the given State."""
     if state_key.type in [Return, Throw, Noop]:
@@ -84,6 +90,7 @@ class ProductGraph(object):
     else:
       raise State.raise_unrecognized(state_key)
 
+  @synchronized
   def _detect_cycle(self, src, dest):
     """Given a src and a dest, each of which _might_ already exist in the graph, detect cycles.
 
@@ -111,6 +118,7 @@ class ProductGraph(object):
     parents.add(src)
     return _walk(dest)
 
+  @synchronized
   def _add_dependencies(self, node, dependencies):
     """Adds dependency edges from the given src Node to the given dependency Nodes.
 
@@ -138,28 +146,71 @@ class ProductGraph(object):
         # 'touch' the dependencies dict for this dependency, to ensure that an entry exists.
         self._dependencies[dependency]
 
+  @synchronized
   def completed_nodes(self):
     return self._node_results
 
+  @synchronized
   def dependents(self):
     return self._dependents
 
+  @synchronized
   def dependencies(self):
     return self._dependencies
 
+  @synchronized
   def cyclic_dependencies(self):
     return self._cyclic_dependencies
 
+  @synchronized
   def dependents_of(self, node):
     return self._dependents[node]
 
+  @synchronized
   def dependencies_of(self, node):
     return self._dependencies[node]
 
+  @synchronized
   def cyclic_dependencies_of(self, node):
     return self._cyclic_dependencies[node]
 
-  def walk(self, roots, predicate=None):
+  @synchronized
+  def invalidate(self, predicate=None):
+    """Invalidate nodes and their subgraph of dependents given a predicate.
+
+    :param func predicate: A predicate that matches Node objects for all nodes in the graph.
+    """
+    def _delete_node(node):
+      del self._node_results[node]
+      del self._dependents[node]
+      del self._dependencies[node]
+      del self._cyclic_dependencies[node]
+
+    def _sever_root_dependents(roots):
+      for root in roots:
+        for associated in self._dependencies[root]:
+          self._dependents[associated].discard(root)
+
+    def all_predicate(_): return True
+    predicate = predicate or all_predicate
+
+    invalidated_roots = list(node for node in self._node_results.keys() if predicate(node))
+    invalidated_nodes = list(node for (node, _), _ in self.walk(roots=invalidated_roots,
+                                                                predicate=all_predicate,
+                                                                dependents=True))
+
+    # Sever dependee->dependent relationships in the graph for all given invalidated roots.
+    for root in invalidated_roots:
+      _sever_root_dependents(invalidated_roots)
+
+    # Delete all nodes based on a backwards walk of the graph from all matching invalidated roots.
+    for count, node in enumerate(reversed(invalidated_nodes), 1):
+      _delete_node(node)
+
+    return count
+
+  @synchronized
+  def walk(self, roots, predicate=None, dependents=False):
     """Yields Nodes depth-first in pre-order, starting from the given roots.
 
     Each node entry is actually a tuple of (Node, State), and each yielded value is
@@ -190,20 +241,14 @@ class ProductGraph(object):
           continue
         walked.add(node)
 
-        dependencies = _filtered_entries(self.dependencies_of(node))
-        yield (entry, dependencies)
-        for e in _walk(dependencies):
+        deps = _filtered_entries(
+          self.dependencies_of(node) if not dependents else self.dependents_of(node))
+        yield (entry, deps)
+        for e in _walk(deps):
           yield e
 
     for entry in _walk(_filtered_entries(roots)):
       yield entry
-
-  def clear(self):
-    """Clears all state of the ProductGraph. Exposed for testing."""
-    self._dependencies.clear()
-    self._dependents.clear()
-    self._cyclic_dependencies.clear()
-    self._node_results.clear()
 
 
 class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
@@ -539,9 +584,6 @@ class LocalScheduler(object):
     by this method are intended to be executed in multiple threads, and then satisfied by the
     scheduling thread.
     """
-
-    pg = self._product_graph
-
     # A dict from Node to a possibly executing Step. Only one Step exists for a Node at a time.
     outstanding = {}
     # Nodes that might need to have Steps created (after any outstanding Step returns).
@@ -556,7 +598,7 @@ class LocalScheduler(object):
         if candidate_node in outstanding:
           # Node is still a candidate, but is currently running.
           continue
-        if pg.is_complete(candidate_node):
+        if self._product_graph.is_complete(candidate_node):
           # Node has already completed.
           candidates.discard(candidate_node)
           continue
@@ -582,12 +624,13 @@ class LocalScheduler(object):
         # The step has completed; see whether the Node is completed.
         outstanding.pop(node)
         self._complete_step(step.node, promise.get())
-        if pg.is_complete(step.node):
+        if self._product_graph.is_complete(step.node):
           # The Node is completed: mark any of its dependents as candidates for Steps.
-          candidates.update(d for d in pg.dependents_of(step.node))
+          candidates.update(d for d in self._product_graph.dependents_of(step.node))
         else:
           # Waiting on dependencies.
-          incomplete_deps = [d for d in pg.dependencies_of(step.node) if not pg.is_complete(d)]
+          incomplete_deps = [d for d in self._product_graph.dependencies_of(step.node)
+                             if not self._product_graph.is_complete(d)]
           if incomplete_deps:
             # Mark incomplete deps as candidates for Steps.
             candidates.update(incomplete_deps)
@@ -597,10 +640,10 @@ class LocalScheduler(object):
 
     print('created {} total nodes in {} scheduling iterations and {} steps, '
           'with {} nodes in the executed path.'.format(
-            len(pg.dependencies()),
+            len(self._product_graph.dependencies()),
             scheduling_iterations,
             self._step_id,
-            sum(1 for _ in pg.walk(execution_request.roots))),
+            sum(1 for _ in self._product_graph.walk(execution_request.roots))),
           file=sys.stderr)
 
   def validate(self):

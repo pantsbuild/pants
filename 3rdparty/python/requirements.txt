@@ -24,4 +24,5 @@ setuptools==5.4.1
 six>=1.9.0,<2
 thrift==0.9.1
 wheel==0.24.0
+wrapt==1.10.6
 zincutils==0.3.1

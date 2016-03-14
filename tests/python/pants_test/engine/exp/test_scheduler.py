@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import os
 import unittest
 
@@ -17,7 +18,7 @@ from pants.engine.exp.examples.planners import (ApacheThriftJavaConfiguration, C
                                                 setup_json_scheduler)
 from pants.engine.exp.nodes import (ConflictingProducersError, DependenciesNode, Return, SelectNode,
                                     Throw)
-from pants.engine.exp.scheduler import PartiallyConsumedInputsError
+from pants.engine.exp.scheduler import FilesystemNode, PartiallyConsumedInputsError
 
 
 class SchedulerTest(unittest.TestCase):
@@ -27,6 +28,7 @@ class SchedulerTest(unittest.TestCase):
     self.scheduler, storage = setup_json_scheduler(build_root)
     self.storage = storage
     self.engine = LocalSerialEngine(self.scheduler, storage)
+    self.product_graph = self.scheduler.product_graph
 
     self.guava = Address.parse('3rdparty/jvm:guava')
     self.thrift = Address.parse('src/thrift/codegen/simple')
@@ -59,7 +61,7 @@ class SchedulerTest(unittest.TestCase):
     predicate = (lambda _: True) if failures else None
     result = self.engine.execute(build_request)
     self.assertIsNone(result.error)
-    return list(self.scheduler.product_graph.walk(build_request.roots, predicate=predicate))
+    return list(self.product_graph.walk(build_request.roots, predicate=predicate))
 
   def request(self, goals, *addresses):
     return self.request_specs(goals, *[self.spec_parser.parse_spec(str(a)) for a in addresses])
@@ -261,3 +263,85 @@ class SchedulerTest(unittest.TestCase):
     self.assertIn(self.guava, root_value)
     # And that an subdirectory address is not.
     self.assertNotIn(self.managed_guava, root_value)
+
+  @staticmethod
+  def fsnode_predicate(node):
+    return type(node) is FilesystemNode
+
+  def setup_invalidate(self, input_spec='3rdparty/jvm::', goal='ls'):
+    spec = self.spec_parser.parse_spec(input_spec)
+    build_request = self.request_specs([goal], spec)
+    (root_node, _), _ = self.build_and_walk(build_request)[0]
+    return root_node
+
+  def test_invalidate_clear(self):
+    self.setup_invalidate()
+
+    self.assertTrue(self.product_graph.completed_nodes())
+    self.assertTrue(self.product_graph.dependents())
+    self.assertTrue(self.product_graph.dependencies())
+    self.assertTrue(self.product_graph.cyclic_dependencies())
+
+    self.product_graph.invalidate()
+
+    self.assertFalse(self.product_graph.completed_nodes())
+    self.assertFalse(self.product_graph.dependents())
+    self.assertFalse(self.product_graph.dependencies())
+    self.assertFalse(self.product_graph.cyclic_dependencies())
+
+  def test_invalidate_partial(self):
+    self.setup_invalidate()
+
+    self.assertTrue(self.product_graph.completed_nodes())
+    before_fs = list(filter(self.fsnode_predicate, self.product_graph.completed_nodes()))
+    self.assertTrue(before_fs)
+
+    invalidated_ct = self.product_graph.invalidate(predicate=self.fsnode_predicate)
+    self.assertGreater(invalidated_ct, len(before_fs))
+
+    self.assertTrue(self.product_graph.completed_nodes())
+    self.assertFalse(list(filter(self.fsnode_predicate, self.product_graph.completed_nodes())))
+
+  @staticmethod
+  def label_tuples(collection, name):
+    for item in collection:
+      yield tuple(list(item) + [name])
+
+  def test_invalidate_partial_identity_check(self):
+    root_node = self.setup_invalidate()
+
+    before_fs_nodes = set(filter(self.fsnode_predicate, self.product_graph.completed_nodes()))
+
+    self.product_graph.invalidate(predicate=self.fsnode_predicate)
+
+    self.assertTrue(self.product_graph.completed_nodes())
+
+    # Check that the root node and all fs nodes were removed via a identity checks.
+    chain = itertools.chain(self.label_tuples(self.product_graph.completed_nodes().items(),
+                                              'completed_nodes'),
+                            self.label_tuples(self.product_graph.dependents().items(),
+                                              'dependents'),
+                            self.label_tuples(self.product_graph.dependencies().items(),
+                                              'dependencies'),
+                            self.label_tuples(self.product_graph.cyclic_dependencies().items(),
+                                              'cyclic_dependencies'))
+
+    for node, associated, collection_name in chain:
+      self.assertFalse(node is root_node,
+                       'node:\n{}\nis root_node in {}'.format(node, collection_name))
+      self.assertFalse(node in before_fs_nodes,
+                       'node:\n{}\nis a fs node in {}'.format(node, collection_name))
+      if isinstance(associated, set):
+        self.assertFalse(
+          root_node in associated,
+          'root node:\n{}\nis still associated with:\n{}\nin {}'.format(root_node,
+                                                                        node,
+                                                                        collection_name)
+        )
+        for associated_node in associated:
+          self.assertFalse(
+            associated_node in before_fs_nodes,
+            'filesystem node:\n{}\nis still associated with:\n{}\nin {}'.format(associated_node,
+                                                                                node,
+                                                                                collection_name)
+          )
