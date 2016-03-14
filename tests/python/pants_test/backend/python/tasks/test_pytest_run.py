@@ -251,7 +251,8 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_error(self):
     """Test that a test that errors rather than fails shows up in TestFailedTaskError."""
 
-    self.run_failing_tests(targets=[self.red, self.green, self.error], failed_targets=[self.red, self.error])
+    self.run_failing_tests(targets=[self.red, self.green, self.error],
+                           failed_targets=[self.red, self.error])
 
   def test_error_outside_function(self):
     # If the test is outside a class or function, the failure line is in the following format:
@@ -284,7 +285,8 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
 
   def test_one_timeout(self):
-    """When we have two targets, any of them doesn't have a timeout, and we have no default, then no timeout is set."""
+    # When we have two targets, any of them doesn't have a timeout, and we have no default,
+    # then no timeout is set.
 
     with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
@@ -294,7 +296,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
       self.assertEqual(args, (None,))
 
   def test_timeout(self):
-    """Check that a failed timeout returns the right results."""
+    # Check that a failed timeout returns the right results.
 
     with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       mock_timeout().__exit__.side_effect = TimeoutReached(1)
@@ -423,40 +425,46 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.assertEqual([], not_run_statements)
 
   def test_sharding(self):
-    self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red], shard='0/2')
-    self.run_tests(targets=[self.red, self.green], shard='1/2')
+    self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red],
+                           test_shard='0/2')
+    self.run_tests(targets=[self.red, self.green], test_shard='1/2')
 
   def test_sharding_single(self):
-    self.run_failing_tests(targets=[self.red], failed_targets=[self.red], shard='0/1')
+    self.run_failing_tests(targets=[self.red], failed_targets=[self.red], test_shard='0/1')
 
   def test_sharding_invalid_shard_too_small(self):
     with self.assertRaises(PytestRun.InvalidShardSpecification):
-      self.run_tests(targets=[self.green], shard='-1/1')
+      self.run_tests(targets=[self.green], test_shard='-1/1')
 
   def test_sharding_invalid_shard_too_big(self):
     with self.assertRaises(PytestRun.InvalidShardSpecification):
-      self.run_tests(targets=[self.green], shard='1/1')
+      self.run_tests(targets=[self.green], test_shard='1/1')
 
   def test_sharding_invalid_shard_bad_format(self):
     with self.assertRaises(PytestRun.InvalidShardSpecification):
-      self.run_tests(targets=[self.green], shard='1')
+      self.run_tests(targets=[self.green], test_shard='1')
 
     with self.assertRaises(PytestRun.InvalidShardSpecification):
-      self.run_tests(targets=[self.green], shard='1/2/3')
+      self.run_tests(targets=[self.green], test_shard='1/2/3')
 
     with self.assertRaises(PytestRun.InvalidShardSpecification):
-      self.run_tests(targets=[self.green], shard='1/a')
+      self.run_tests(targets=[self.green], test_shard='1/a')
 
   def test_resultlog_regex(self):
     regex = PytestRun.RESULTLOG_FAILED_PATTERN
     for error_failure in ['E', 'F']:
-      self.assertEqual(regex.match('%s filename::class::method' % error_failure).group('file'), 'filename')
-      self.assertEqual(regex.match('%s filename::method' % error_failure).group('file'), 'filename')
+      self.assertEqual(regex.match('%s filename::class::method' % error_failure).group('file'),
+                       'filename')
+      self.assertEqual(regex.match('%s filename::method' % error_failure).group('file'),
+                       'filename')
       self.assertEqual(regex.match('%s filename' % error_failure).group('file'), 'filename')
       self.assertIsNone(regex.match(' %s filename'))
       self.assertIsNone(regex.match(' filename'))
       self.assertIsNone(regex.match('filename'))
       self.assertIsNone(regex.match('%sfilename'))
-      self.assertEqual(regex.match('%s   filename::class:method' % error_failure).group('file'), 'filename')
-      self.assertEqual(regex.match('%s file/name.py::class:method' % error_failure).group('file'), 'file/name.py')
-      self.assertEqual(regex.match('%s file:colons::class::method' % error_failure).group('file'), 'file:colons')
+      self.assertEqual(regex.match('%s   filename::class:method' % error_failure).group('file'),
+                       'filename')
+      self.assertEqual(regex.match('%s file/name.py::class:method' % error_failure).group('file'),
+                       'file/name.py')
+      self.assertEqual(regex.match('%s file:colons::class::method' % error_failure).group('file'),
+                       'file:colons')
