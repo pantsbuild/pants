@@ -210,5 +210,5 @@ def addresses_from_address_family(address_family):
 
 
 def addresses_from_address_families(address_families):
-  """Given a list of AddressFamiliess, return an Addresses object containing all addressables."""
+  """Given a list of AddressFamilies, return an Addresses object containing all addressables."""
   return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
