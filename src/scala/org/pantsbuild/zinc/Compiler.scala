@@ -156,7 +156,7 @@ object Compiler {
 class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
 
   /**
-   * Run a compile. The resulting analysis is pesisted to `inputs.cacheFile`.
+   * Run a compile. The resulting analysis is persisted to `inputs.cacheFile`.
    */
   def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
     import inputs._
