@@ -98,16 +98,16 @@ class TestInterpreterCache(unittest.TestCase):
       python_repos = create_subsystem(PythonRepos, indexes=[], repos=[egg_dir])
       cache = PythonInterpreterCache(python_setup, python_repos)
 
-      interpereters = cache.setup(paths=[os.path.dirname(self._interpreter.binary)],
+      interpreters = cache.setup(paths=[os.path.dirname(self._interpreter.binary)],
                                   filters=[str(interpreter_requirement)])
-      self.assertGreater(len(interpereters), 0)
+      self.assertGreater(len(interpreters), 0)
 
       def assert_egg_extra(interpreter, name, version):
         location = interpreter.get_location('{}=={}'.format(name, version))
         self.assertIsNotNone(location)
         self.assertIsInstance(Package.from_href(location), EggPackage)
 
-      for interpreter in interpereters:
+      for interpreter in interpreters:
         assert_egg_extra(interpreter, 'setuptools', setuptools_version)
         assert_egg_extra(interpreter, 'wheel', wheel_version)
 
