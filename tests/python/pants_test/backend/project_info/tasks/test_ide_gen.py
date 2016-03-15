@@ -88,7 +88,7 @@ class IdeGenTest(BaseTest):
     self.assert_dedup(SourceSet('foo', 'bar', 'baz', is_test=True), deduped_sources)
 
   def test_dedup_test_resources(self):
-    """Show that competting is_test values on a resources-only source set turns off is_test"""
+    """Show that competing is_test values on a resources-only source set turns off is_test"""
     deduped_sources = Project.dedup_sources([
       SourceSet('foo', 'bar', 'baz', is_test=True, resources_only=True),
       SourceSet('foo', 'bar', 'baz', is_test= False, resources_only=True),
