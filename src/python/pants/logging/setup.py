@@ -25,7 +25,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
                       will occur.  If supplied, the directory will be created if it does not already
                       exist and all logs will be tee'd to a rolling set of log files in that
                       directory.
-  :param str scope: A logging scope to configure.  The scopes are hierarchichal logger names, with
+  :param str scope: A logging scope to configure.  The scopes are hierarchical logger names, with
                     The '.' separator providing the scope hierarchy.  By default the root logger is
                     configured.
   :param str log_name: The base name of the log file (defaults to 'pants.log').
