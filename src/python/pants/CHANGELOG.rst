@@ -4712,7 +4712,7 @@ Bugfixes and features
 * Fixup Config to find DEFAULT values for missing sections
   `RB #1851 <https://rbcommons.com/s/twitter/r/1851>`_
 
-* Get published artifact classfier from config
+* Get published artifact classifier from config
   `RB #1857 <https://rbcommons.com/s/twitter/r/1857>`_
 
 * Make Context.targets() include synthetic targets
@@ -5521,7 +5521,7 @@ Bugfixes
   - Dust off the Task Developer's Guide and `rm` the "pagerank" example
   - Add a `sitegen` task, create site with better navigation
   - For 'goal builddict', generate `.rst` and `.html`, not just `.rst`
-  - Narrow setup 'Operating System' classfiers to known-good
+  - Narrow setup 'Operating System' classifiers to known-good
 
   `Issue #16 <https://github.com/pantsbuild/pex/issues/16>`_
   `Issue #461 <https://github.com/pantsbuild/pants/issues/461>`_
