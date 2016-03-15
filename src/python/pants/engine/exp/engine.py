@@ -130,7 +130,7 @@ def _try_pickle(obj):
 
 
 def _execute_step(debug, process_state, step):
-  """A picklable top-level function to help support local multiprocessing uses.
+  """A pickleable top-level function to help support local multiprocessing uses.
 
   Executes the Step for the given node builder and storage, and returns a tuple of step id and
   result or exception.
