@@ -64,7 +64,7 @@ class NodeResolve(NodeTask):
     return cls._resolver_by_type.get(type(target))
 
   def _can_resolve_target(self, target):
-    """Returns whether this is a NodePackage and there a resolver registerd for its subtype.
+    """Returns whether this is a NodePackage and there a resolver registered for its subtype.
 
     :param target: A Target
     :rtype: Boolean
