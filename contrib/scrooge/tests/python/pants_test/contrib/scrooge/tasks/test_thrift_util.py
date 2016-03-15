@@ -26,7 +26,7 @@ class ThriftUtilTest(unittest.TestCase):
       b = os.path.join(dir, 'b')
 
       main = self.write(os.path.join(a, 'main.thrift'), '''
-        include "sub/a_included.thrift" //Todo commet
+        include "sub/a_included.thrift" //Todo comment
         include "b_included.thrift"
         include "c_included.thrift" #jibberish
         include "d_included.thrift" some ramdon
