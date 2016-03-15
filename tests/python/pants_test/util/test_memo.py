@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.util.memo import memoized, memoized_property, mutable_memoized_property, per_instance
+from pants.util.memo import memoized, memoized_property, per_instance, testable_memoized_property
 
 
 class MemoizeTest(unittest.TestCase):
@@ -255,7 +255,7 @@ class MemoizeTest(unittest.TestCase):
 
   def test_mutable_memoized_property(self):
     class Foo(self._Called):
-      @mutable_memoized_property
+      @testable_memoized_property
       def calls(self):
         return self._called()
 

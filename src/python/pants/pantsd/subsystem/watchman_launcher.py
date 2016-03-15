@@ -11,7 +11,7 @@ import time
 from pants.binaries.binary_util import BinaryUtil
 from pants.pantsd.watchman import Watchman
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import mutable_memoized_property
+from pants.util.memo import testable_memoized_property
 
 
 class WatchmanLauncher(object):
@@ -37,7 +37,7 @@ class WatchmanLauncher(object):
       options = self.get_options()
       return WatchmanLauncher(binary_util,
                               options.pants_workdir,
-                              '2' if options.level == 'debug' else '1',
+                              options.level,
                               options.version,
                               options.supportdir)
 
@@ -54,16 +54,22 @@ class WatchmanLauncher(object):
     self._workdir = workdir
     self._watchman_version = watchman_version
     self._watchman_supportdir = watchman_supportdir
-    self._watchman_log_level = log_level
+    self._log_level = log_level
     self._logger = logging.getLogger(__name__)
     self._watchman = None
 
-  @mutable_memoized_property
+  @testable_memoized_property
   def watchman(self):
     watchman_binary = self._binary_util.select_binary(self._watchman_supportdir,
                                                       self._watchman_version,
                                                       'watchman')
-    return Watchman(watchman_binary, self._workdir, self._watchman_log_level)
+    return Watchman(watchman_binary,
+                    self._workdir,
+                    self._convert_log_level(self._log_level))
+
+  def _convert_log_level(self, level):
+    """Convert a given pants log level string into a watchman log level string."""
+    return '2' if level == 'debug' else '1'
 
   def maybe_launch(self):
     if not self.watchman.is_alive():

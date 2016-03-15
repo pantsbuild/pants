@@ -16,7 +16,7 @@ from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 from pants.process.pidlock import OwnerPrintingPIDLockFile
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import mutable_memoized_property
+from pants.util.memo import testable_memoized_property
 
 
 class PantsDaemonLauncher(Subsystem):
@@ -60,11 +60,11 @@ class PantsDaemonLauncher(Subsystem):
     self._scheduler = None
     self._lock = OwnerPrintingPIDLockFile(os.path.join(self._build_root, '.pantsd.startup'))
 
-  @mutable_memoized_property
+  @testable_memoized_property
   def pantsd(self):
     return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._log_dir)
 
-  @mutable_memoized_property
+  @testable_memoized_property
   def watchman_launcher(self):
     return WatchmanLauncher.Factory.global_instance().create()
 

@@ -223,7 +223,7 @@ def memoized_property(func=None, key_factory=per_instance, **kwargs):
   return property(fget=getter, fdel=lambda self: getter.forget(self))
 
 
-def mutable_memoized_property(func=None, key_factory=per_instance, **kwargs):
+def testable_memoized_property(func=None, key_factory=per_instance, **kwargs):
   """A variant of `memoized_property` that allows for setting of properties (for tests, etc)."""
   getter = memoized_method(func=func, key_factory=key_factory, **kwargs)
 
