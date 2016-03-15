@@ -24,14 +24,16 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       with subsystem_instance(GoDistribution.Factory) as factory:
         go_dist = factory.create()
-        goos = go_dist.create_go_cmd('env', args=['GOOS']).check_output().strip()
-        goarch = go_dist.create_go_cmd('env', args=['GOARCH']).check_output().strip()
-        expected_files = set([
-          'contrib.go.testprojects.src.thrift.thrifttest.fleem/039c5ecb4977/src/go/thrifttest/duck/constants.go',
-          'contrib.go.testprojects.src.thrift.thrifttest.fleem/039c5ecb4977/src/go/thrifttest/duck/ttypes.go',
-        ])
+        go_dist.create_go_cmd('env', args=['GOOS']).check_output().strip()
+        go_dist.create_go_cmd('env', args=['GOARCH']).check_output().strip()
+        # TODO: Don't hard-code the fingerprint (the 41904e2552fc part below).  It makes the
+        # test brittle when fingerprinting changes.
+        expected_files = {
+          'contrib.go.testprojects.src.thrift.thrifttest.fleem/41904e2552fc/src/go/thrifttest/duck/constants.go',
+          'contrib.go.testprojects.src.thrift.thrifttest.fleem/41904e2552fc/src/go/thrifttest/duck/ttypes.go',
+        }
 
-        #Fetch the hash for task impl version.
+        # Fetch the hash for task impl version.
         go_thrift_contents = os.listdir(os.path.join(workdir, 'gen', 'go-thrift'))
         self.assertEqual(len(go_thrift_contents), 1)
 

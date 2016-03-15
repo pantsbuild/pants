@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 import six
 
 from pants.option.errors import ParseError
@@ -128,8 +126,9 @@ class ListValueComponent(object):
 
     Note that we accept tuple literals, but the internal value is always a list.
 
-    :param The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
-           a string representation (possibly prefixed by +) of a list or tuple, or a scalar.
+    :param value: The value to convert.  Can be an instance of ListValueComponent, a list, a tuple,
+           a string representation (possibly prefixed by +) of a list or tuple, or any allowed
+           member_type.
     :rtype: `ListValueComponent`
     """
     if isinstance(value, cls):  # Ensure idempotency.
@@ -146,7 +145,7 @@ class ListValueComponent(object):
       val = _convert(value[1:], (list, tuple))
     elif isinstance(value, six.string_types):
       action = cls.EXTEND
-      val = _convert('[r"{}"]'.format(value), list)
+      val = _convert('[r"""{}"""]'.format(value), list)
     else:
       action = cls.EXTEND
       val = _convert('[{}]'.format(value), list)
