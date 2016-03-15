@@ -280,7 +280,7 @@ class TestArtifactCache(unittest.TestCase):
             [False])
           self.assertTrue(os.path.exists(canary))
 
-  def test_corruptted_cached_file_cleaned_up(self):
+  def test_corrupted_cached_file_cleaned_up(self):
     key = CacheKey('muppet_key', 'fake_hash', 42)
 
     with self.setup_local_cache() as artifact_cache:
