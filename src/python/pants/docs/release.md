@@ -147,8 +147,8 @@ Owners
 The following folks are set up to publish to pypi for
 pantsbuild.pants sdists:
 
-Name             | Email                      | PYPI Usename
------------------|----------------------------|-------------
+Name             | Email                      | PYPI Username
+-----------------|----------------------------|--------------
 John Sirois      | john.sirois@gmail.com      | john.sirois
 Benjy Weinberger | benjyw@gmail.com           | benjyw
 Eric Ayers       | zundel@squareup.com        | ericzundel
