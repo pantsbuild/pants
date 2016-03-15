@@ -27,7 +27,7 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
     """
     payload = payload or Payload()
     # TODO(Eric Ayers): The target needs to incorporate the settings of --gen-protoc-version
-    # and --gen-protoc-plugins into the fingerprint.  Consider adding a custom FingeprintStrategy
+    # and --gen-protoc-plugins into the fingerprint.  Consider adding a custom FingerprintStrategy
     # into ProtobufGen to get it.
     payload.add_fields({
       'import_specs': PrimitiveField(imports or ())
