@@ -9,8 +9,8 @@ from abc import abstractmethod, abstractproperty
 
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import parse_variants
-from pants.engine.exp.fs import (DirectoryListing, FilesContent, Path, PathLiteral, Paths,
-                                 file_exists, files_content, list_directory)
+from pants.engine.exp.fs import (DirectoryListing, FileContent, Path, PathLiteral, Paths,
+                                 file_content, list_directory, path_exists)
 from pants.engine.exp.storage import Key
 from pants.engine.exp.struct import HasStructs, Variants
 from pants.util.objects import datatype
@@ -343,24 +343,48 @@ class TaskNode(datatype('TaskNode', ['subject_key', 'product', 'variants', 'func
 class FilesystemNode(datatype('FilesystemNode', ['subject_key', 'product', 'variants']), Node):
   """A native node type for filesystem operations."""
 
-  _FS_PRODUCT_TYPES = {Paths, FilesContent, DirectoryListing}
+  _FS_PRODUCT_TYPES = {
+      Paths: PathLiteral,
+      FileContent: Path,
+      DirectoryListing: Path,
+    }
 
   @classmethod
   def is_filesystem_product(cls, product):
     return product in cls._FS_PRODUCT_TYPES
 
+  def _input_type(self):
+    return self._FS_PRODUCT_TYPES[self.product]
+
+  def _input_node(self):
+    return SelectNode(self.subject_key, self._input_type(), self.variants, None)
+
   def step(self, subject, dependency_states, step_context):
+    # Request the relevant input product for the output product.
+    input_node = self._input_node()
+    input_state = dependency_states.get(input_node, None)
+    if input_state is None or type(input_state) == Waiting:
+      return Waiting([input_node])
+    elif type(input_state) == Throw:
+      return input_state
+    elif type(input_state) == Noop:
+      return Noop('Could not compute {} in order to make filesystem request.'.format(input_node))
+    elif type(input_state) != Return:
+      State.raise_unrecognized(input_state)
+
+    # If an input product was available, execute.
+    input_value = input_state.value
     try:
-      if self.product is Paths and type(subject) is PathLiteral:
-        return Return(file_exists(step_context.project_tree, subject))
-      elif self.product is FilesContent and type(subject) is Paths:
-        return Return(files_content(step_context.project_tree, subject))
-      elif self.product is DirectoryListing and type(subject) is Path:
-        return Return(list_directory(step_context.project_tree, subject))
+      if self.product is Paths:
+        return Return(path_exists(step_context.project_tree, input_value))
+      elif self.product is FileContent:
+        return Return(file_content(step_context.project_tree, input_value))
+      elif self.product is DirectoryListing:
+        return Return(list_directory(step_context.project_tree, input_value))
+      else:
+        return Throw('Mismatched input value {} for {}'.format(input_value, self))
     except Exception as e:
       return Throw(e)
-
-    return Noop("Couldn't resolve product {} for subject {}".format(self.product, subject))
 
 
 class StepContext(object):

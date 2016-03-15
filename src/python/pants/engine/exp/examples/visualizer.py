@@ -61,29 +61,31 @@ def format_color(node, node_state):
   return colors.setdefault(key, (len(colors) % max_colors) + 1)
 
 
-def create_digraph(scheduler, request):
+def create_digraph(scheduler, storage, request):
 
   yield 'digraph plans {'
   yield '  node[colorscheme={}];'.format(colorscheme)
   yield '  concentrate=true;'
   yield '  rankdir=LR;'
 
-  for ((node, node_state), dependency_entries) in scheduler.product_graph.walk(request.roots):
+  for ((node, node_state_key), dependency_entries) in scheduler.product_graph.walk(request.roots):
+    node_state = storage.get(node_state_key)
     node_str = format_node(node, node_state)
 
     yield (' "{node}" [style=filled, fillcolor={color}];'
             .format(color=format_color(node, node_state),
                     node=node_str))
 
-    for (dep, dep_state) in dependency_entries:
+    for (dep, dep_state_key) in dependency_entries:
+      dep_state = storage.get(dep_state_key)
       yield '  "{}" -> "{}"'.format(node_str, format_node(dep, dep_state))
 
   yield '}'
 
 
-def visualize_execution_graph(scheduler, request):
+def visualize_execution_graph(scheduler, storage, request):
   with temporary_file(cleanup=False, suffix='.dot') as fp:
-    for line in create_digraph(scheduler, request):
+    for line in create_digraph(scheduler, storage, request):
       fp.write(line)
       fp.write('\n')
 
@@ -102,7 +104,7 @@ def visualize_build_request(build_root, goals, subjects):
   engine.start()
   try:
     engine.reduce(execution_request)
-    visualize_execution_graph(scheduler, execution_request)
+    visualize_execution_graph(scheduler, storage, execution_request)
     scheduler.validate()
   finally:
     engine.close()

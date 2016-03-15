@@ -15,7 +15,7 @@ from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
 from pants.engine.exp.addressable import SubclassesOf, addressable_list
-from pants.engine.exp.fs import FilesContent, Path, PathGlobs, Paths
+from pants.engine.exp.fs import FileContent, FilesContent, Path, PathGlobs, Paths
 from pants.engine.exp.mapper import AddressFamily, AddressMapper
 from pants.engine.exp.parsers import JsonParser, SymbolTable
 from pants.engine.exp.register import create_fs_tasks, create_graph_tasks
@@ -116,8 +116,10 @@ def select_package_address(jvm_package_name, address_families):
 def calculate_package_search_path(jvm_package_name, source_roots):
   """Return Paths for directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
-  return Paths([Path(os_path_join(srcroot, rel_package_dir))
-                for srcroot in source_roots.srcroots])
+  if not rel_package_dir.endswith(os_sep):
+    rel_package_dir += os_sep
+  specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
+  return PathGlobs.create_from_specs('', specs)
 
 
 @printing_func
@@ -414,9 +416,9 @@ def setup_json_scheduler(build_root, debug=True):
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
   address_mapper_key = storage.put(AddressMapper(symbol_table_cls=symbol_table_cls,
-                                                 build_pattern=r'^BLD.json$',
-                                                 parser_cls=JsonParser))
-  source_roots_key = storage.put(SourceRoots(('src/java',)))
+                                                  build_pattern=r'^BLD.json$',
+                                                  parser_cls=JsonParser))
+  source_roots_key = storage.put(SourceRoots(('src/java','src/scala')))
   scrooge_tool_address_key = storage.put(Address.parse('src/scala/scrooge'))
 
   goals = {
@@ -424,9 +426,10 @@ def setup_json_scheduler(build_root, debug=True):
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
       'resolve': Classpath,
       'list': Address,
-      'walk': Path,
       GenGoal.name(): GenGoal,
       'unpickleable': UnpickleableResult,
+      'ls': Path,
+      'cat': FileContent,
     }
   tasks = [
       # Codegen
@@ -462,7 +465,7 @@ def setup_json_scheduler(build_root, debug=True):
        [Select(JVMPackageName),
         SelectDependencies(AddressFamily, Paths)],
        select_package_address),
-      (Paths,
+      (PathGlobs,
        [Select(JVMPackageName),
         SelectLiteral(source_roots_key, SourceRoots)],
        calculate_package_search_path),
