@@ -29,7 +29,7 @@ script fail:
 
   - Create a pgp signing key if you don't already have one.
 
-    You might use the gpg implemntation of pgp and start here:
+    You might use the gpg implementation of pgp and start here:
     https://www.gnupg.org/gph/en/manual/c14.html
 
   - Configure git to use your pgp key for signing release tags.
